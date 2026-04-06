@@ -2,7 +2,7 @@
 
 **GeoTower** est une application Android native conçue pour la cartographie, l'analyse et le suivi des antennes relais et faisceaux hertziens en France (basée sur les données de l'ANFR). 
 
-Pensée pour les passionnés de télécoms et les professionnels, elle offre une navigation fluide, une base de données 100% hors-ligne et un haut niveau de personnalisation visuelle.
+Pensée pour les passionnés de télécoms, elle offre une navigation fluide, une base de données 100% hors-ligne et un haut niveau de personnalisation visuelle.
 
 ---
 
