@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <capability android:name="actions.intent.OPEN_APP_FEATURE">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:targetPackage="fr.geotower"
+            android:targetClass="fr.geotower.MainActivity">
+            <parameter
+                android:name="feature"
+                android:key="app_feature" />
+        </intent>
+    </capability>
+
+    <capability android:name="actions.intent.GET_THING">
+        <app-widget
+            android:targetPackage="fr.geotower"
+            android:targetClass="fr.geotower.widget.AntennaWidgetReceiver">
+            <parameter
+                android:name="thing.name"
+                android:key="q" />
+        </app-widget>
+    </capability>
+
+</shortcuts>

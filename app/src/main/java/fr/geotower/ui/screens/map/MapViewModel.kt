@@ -1,0 +1,149 @@
+package fr.geotower.ui.screens.map
+
+import android.util.Log
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewModelScope
+import fr.geotower.data.AnfrRepository
+import fr.geotower.data.models.LocalisationEntity
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import org.osmdroid.util.GeoPoint
+
+class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
+
+    private val _antennas = MutableStateFlow<List<LocalisationEntity>>(emptyList())
+    val antennas = _antennas.asStateFlow()
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading = _isLoading.asStateFlow()
+
+    private var searchJob: Job? = null
+    private var cityPolygons: List<List<GeoPoint>>? = null
+    private var isCityLocked = false
+
+    fun loadAntennasForCity(latNorth: Double, lonEast: Double, latSouth: Double, lonWest: Double, polygons: List<List<GeoPoint>>) {
+        searchJob?.cancel()
+        cityPolygons = polygons
+        isCityLocked = true // ✅ ON VERROUILLE LE CHARGEMENT AUTOMATIQUE
+
+        searchJob = viewModelScope.launch {
+            _isLoading.value = true
+            try {
+                val apiMarkers = repository.getAntennasInBox(latNorth, lonEast, latSouth, lonWest)
+                val filteredMarkers = apiMarkers.filter { isPointInPolygon(it.latitude, it.longitude, polygons) }
+
+                _antennas.value = filteredMarkers
+                Log.d("GeoTower", "✅ ${filteredMarkers.size} marqueurs conservés à l'intérieur des frontières sur ${apiMarkers.size} téléchargés.")
+            } catch (e: Exception) {
+                Log.e("GeoTower", "❌ Erreur carte (City) : ${e.message}")
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    fun loadAntennasInBox(zoom: Double, latNorth: Double, lonEast: Double, latSouth: Double, lonWest: Double) {
+        if (isCityLocked) return // ✅ MAGIQUE : Si on regarde une ville, on ne recalcule RIEN quand on bouge la carte !
+
+        searchJob?.cancel()
+
+        searchJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            _isLoading.value = true
+            try {
+                // ✅ 2. ON EMPÊCHE LE CLUSTERING GLOBAL SI UNE VILLE EST RECHERCHÉE
+                if (zoom < 13.0 && cityPolygons == null) {
+                    val clusters = repository.getClusteredAntennas(zoom, latNorth, lonEast, latSouth, lonWest)
+
+                    // On transforme ces DbCluster en fausses LocalisationEntity
+                    val fakeAntennas = clusters.map { cluster ->
+                        LocalisationEntity(
+                            idAnfr = "CLUSTER_${cluster.count}",
+                            operateur = "ORANGE, SFR, BOUYGUES, FREE",
+                            latitude = cluster.centerLat,
+                            longitude = cluster.centerLon,
+                            azimuts = null, codeInsee = null, azimutsFh = null,
+                            filtres = null
+                        )
+                    }
+                    _antennas.value = fakeAntennas
+                } else {
+                    // Si on a zoomé, on charge les vraies antennes détaillées de la zone
+                    val rawAntennas = repository.getAntennasInBox(latNorth, lonEast, latSouth, lonWest)
+
+                    // ✅ 3. SI UNE VILLE EST CIBLÉE, ON LA GARDE STRICTEMENT FILTRÉE !
+                    if (cityPolygons != null) {
+                        _antennas.value = rawAntennas.filter { isPointInPolygon(it.latitude, it.longitude, cityPolygons!!) }
+                    } else {
+                        _antennas.value = rawAntennas
+                    }
+                }
+            } catch (e: Exception) {
+                _antennas.value = emptyList()
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+
+    // ✅ CORRECTION ICI : On passe bien le zoom en paramètre !
+    fun clearCityFilterAndReload(zoom: Double, latNorth: Double, lonEast: Double, latSouth: Double, lonWest: Double) {
+        isCityLocked = false // ✅ ON DÉVERROUILLE
+        cityPolygons = null
+        _antennas.value = emptyList()
+        loadAntennasInBox(zoom, latNorth, lonEast, latSouth, lonWest)
+    }
+
+    fun resetCityLock() {
+        searchJob?.cancel()
+        isCityLocked = false // ✅ ON DÉVERROUILLE
+        cityPolygons = null
+        _antennas.value = emptyList()
+    }
+
+    // ✅ CORRECTION : La fonction est bien à L'INTÉRIEUR de la classe MapViewModel
+    suspend fun searchSiteById(query: String): LocalisationEntity? {
+        return try {
+            val results = repository.searchAntennasById(query)
+            results.firstOrNull()
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    fun clearAntennas() {
+        _antennas.value = emptyList()
+    }
+
+    private fun isPointInPolygon(lat: Double, lon: Double, polygons: List<List<GeoPoint>>): Boolean {
+        var isInside = false
+        for (polygon in polygons) {
+            var j = polygon.size - 1
+            var polyInside = false
+            for (i in polygon.indices) {
+                val pi = polygon[i]
+                val pj = polygon[j]
+                if (((pi.longitude > lon) != (pj.longitude > lon)) &&
+                    (lat < (pj.latitude - pi.latitude) * (lon - pi.longitude) / (pj.longitude - pi.longitude) + pi.latitude)) {
+                    polyInside = !polyInside
+                }
+                j = i
+            }
+            if (polyInside) isInside = true
+        }
+        return isInside
+    }
+}
+
+class MapViewModelFactory(private val repository: AnfrRepository) : ViewModelProvider.Factory {
+    override fun <T : ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(MapViewModel::class.java)) {
+            @Suppress("UNCHECKED_CAST")
+            return MapViewModel(repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
+    }
+}
