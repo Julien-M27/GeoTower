@@ -9,6 +9,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.graphics.BitmapFactory
 import android.location.Location
 import android.os.Build
@@ -112,7 +113,7 @@ class LiveTrackingService : Service() {
             )
         }
 
-        startForeground(notificationId, initialNotification)
+        startAsForeground(initialNotification)
         startLocationUpdates()
 
         return START_STICKY
@@ -285,7 +286,6 @@ class LiveTrackingService : Service() {
         }
 
         val shortCriticalText = extractShortCriticalText(contentText)
-
         val builder = Notification.Builder(this, liveTrackingChannelV3)
             .setContentTitle(AppStrings.nearestAntennaTitle(this))
             .setContentText(contentText)
@@ -301,6 +301,15 @@ class LiveTrackingService : Service() {
             .setStyle(progressStyle)
             .addAction(0, AppStrings.quitAction(this), stopPendingIntent)
 
+        operatorLogo(operator)?.let { logoResId ->
+            builder.setLargeIcon(BitmapFactory.decodeResource(resources, logoResId))
+        }
+
+        runCatching {
+            Notification.Builder::class.java
+                .getMethod("setForegroundServiceBehavior", Int::class.javaPrimitiveType)
+                .invoke(builder, Notification.FOREGROUND_SERVICE_IMMEDIATE)
+        }
         runCatching {
             Notification.Builder::class.java
                 .getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
@@ -391,13 +400,48 @@ class LiveTrackingService : Service() {
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 setSound(null, null)
+                setShowBadge(false)
                 enableVibration(false)
+                enableLights(false)
                 vibrationPattern = longArrayOf(0L)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
 
             val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(channel)
         }
+    }
+
+    private fun startAsForeground(notification: Notification) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            startForegroundWithType(notification, foregroundServiceTypeMask())
+        } else {
+            startForeground(notificationId, notification)
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun startForegroundWithType(notification: Notification, typeMask: Int) {
+        try {
+            startForeground(notificationId, notification, typeMask)
+        } catch (e: SecurityException) {
+            if (typeMask == ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC) throw e
+            startForeground(notificationId, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun foregroundServiceTypeMask(): Int {
+        var mask = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+        if (hasLocationPermission()) {
+            mask = mask or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+        }
+        return mask
+    }
+
+    private fun hasLocationPermission(): Boolean {
+        return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun stopLocationUpdates() {

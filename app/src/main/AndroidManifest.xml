@@ -163,6 +163,6 @@
         <service
             android:name=".services.LiveTrackingService"
             android:exported="false"
-            android:foregroundServiceType="location" />
+            android:foregroundServiceType="dataSync|location" />
     </application>
 </manifest>
