@@ -83,7 +83,7 @@ fun SiteAddressBlock(
 
             InfoLine(
                 label = txtDistanceLabel,
-                value = "$distanceStr$txtFromMyPosition"
+                value = "$distanceStr $txtFromMyPosition"
             )
         }
     }

@@ -52,15 +52,20 @@ class AntennaWidgetWorker(
         try {
             val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
 
-            // 🚀 REQUÊTE GPS IMMÉDIATE ET À PUISSANCE MAXIMALE (High Accuracy)
-            val location: Location? = withTimeoutOrNull(10000L) { // On lui laisse 10 secondes max pour trouver un signal pur
+            // 🚀 REQUÊTE GPS (On augmente à 20 secondes pour laisser le temps au capteur de s'allumer)
+            var location: Location? = withTimeoutOrNull(20000L) {
                 fusedLocationClient.getCurrentLocation(
                     Priority.PRIORITY_HIGH_ACCURACY,
                     CancellationTokenSource().token
                 ).await()
             }
 
-            // Si le GPS n'a rien trouvé en 10 secondes, on arrête
+            // ✅ PLAN B : Si le capteur n'a pas accroché de satellite, on prend la dernière position en mémoire !
+            if (location == null) {
+                location = fusedLocationClient.lastLocation.await()
+            }
+
+            // Si VRAIMENT on a rien (même en mémoire), on abandonne
             if (location == null) {
                 updateUiAndFinish(false)
                 return Result.failure()
@@ -101,7 +106,33 @@ class AntennaWidgetWorker(
 
             val widgetSites = closestSites.map { (siteAntennas, distance) ->
                 val main = siteAntennas.first()
-                val distStr = if (distance >= 1000) String.format(Locale.US, "%.1f km", distance / 1000f) else "${distance.toInt()} m"
+
+                // ✅ NOUVEAU : Le Worker lit enfin la préférence (avec notre sécurité anti-crash)
+                val isMi = try {
+                    prefs.getInt("distance_unit", 0) == 1
+                } catch (e: Exception) {
+                    try {
+                        prefs.getBoolean("distance_unit", false)
+                    } catch (e2: Exception) {
+                        false
+                    }
+                }
+
+                // ✅ NOUVEAU : Il applique la bonne unité (Miles ou Km)
+                val distStr = if (isMi) {
+                    val distMiles = distance / 1609.34f
+                    if (distMiles < 0.1f) {
+                        "${(distance * 3.28084f).toInt()} ft"
+                    } else {
+                        String.format(Locale.US, "%.2f mi", distMiles)
+                    }
+                } else {
+                    if (distance >= 1000) {
+                        String.format(Locale.US, "%.1f km", distance / 1000f)
+                    } else {
+                        "${distance.toInt()} m"
+                    }
+                }
 
                 val baseOrder = listOf("ORANGE", "BOUYGUES", "SFR", "FREE")
 

@@ -49,9 +49,10 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
             notificationManager.createNotificationChannel(channel)
         }
 
-        // Si l'utilisateur clique, ça ouvre l'application
+        // Si l'utilisateur clique, ça ouvre l'application ET lance le téléchargement
         val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            action = "ACTION_DOWNLOAD_DB" // 🚀 Le signal magique !
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP // 🚀 Évite le redémarrage brutal
         }
         val pendingIntent = PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
 

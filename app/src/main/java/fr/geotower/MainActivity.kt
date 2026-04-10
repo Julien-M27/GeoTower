@@ -21,7 +21,6 @@ import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import androidx.work.*
 import fr.geotower.data.workers.SignalQuestUploadWorker
-import fr.geotower.ui.components.GlobalUploadOverlay
 import fr.geotower.widget.AntennaWidgetWorker
 import android.content.pm.PackageManager
 import android.content.Intent
@@ -29,7 +28,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 
 // --- DONNÉES ---
 import fr.geotower.data.AnfrRepository
-import fr.geotower.data.db.AppDatabase
 import fr.geotower.utils.AppConfig
 import fr.geotower.data.api.RetrofitClient
 
@@ -40,14 +38,12 @@ import fr.geotower.ui.screens.onboarding.FirstStartScreen
 import fr.geotower.ui.screens.home.HomeScreen
 import fr.geotower.ui.screens.settings.SettingsScreen
 import fr.geotower.ui.screens.emitters.NearEmittersScreen
-import fr.geotower.ui.screens.emitters.SupportDetailScreen
 import fr.geotower.ui.screens.emitters.SiteDetailScreen
 import fr.geotower.ui.screens.stats.StatisticsScreen
 import fr.geotower.ui.screens.about.AboutScreen
 import fr.geotower.ui.screens.compass.CompassScreen
 import fr.geotower.ui.screens.emitters.SignalQuestUploadScreen
 import android.net.Uri
-import androidx.compose.ui.zIndex
 
 // --- IMPORT MAP ---
 import fr.geotower.ui.screens.map.MapScreen
@@ -74,10 +70,9 @@ class MainActivity : ComponentActivity() {
     // 🌟 2. ATTRAPER LE CLIC QUAND L'APP EST EN ARRIÈRE-PLAN
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        setIntent(intent) // ✅ Crucial : on met à jour l'intent de l'activité
+        setIntent(intent)
+        checkDownloadIntent(intent)
 
-        // ✅ On laisse le NavController gérer l'URL (QR Code ou Notification) tout seul
-        // Cela résout le bug de "mémoire" car il extrait l'ID tout seul de l'URL
         intent.data?.let { uri ->
             if (uri.scheme == "geotower") {
                 // On récupère le navController depuis notre NavHost (via navigateToSiteFlow ou accès direct)
@@ -92,9 +87,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun checkDownloadIntent(intent: Intent?) {
+        if (intent?.action == "ACTION_DOWNLOAD_DB") {
+            // Lancer le téléchargement de la base de données via ton Worker !
+            val request = OneTimeWorkRequestBuilder<fr.geotower.data.workers.DatabaseDownloadWorker>().build()
+            WorkManager.getInstance(this).enqueueUniqueWork(
+                "manual_db_download",
+                ExistingWorkPolicy.REPLACE,
+                request
+            )
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        checkDownloadIntent(intent)
 
         // ✅ ÉTAPE 2 : Vérifie si on a cliqué sur la notif quand l'app était fermée
         if (intent?.getBooleanExtra("SHOW_DB_SUCCESS_POPUP", false) == true) {
@@ -129,12 +137,7 @@ class MainActivity : ComponentActivity() {
         osmdroidConfig.osmdroidBasePath = basePath
         osmdroidConfig.osmdroidTileCache = File(basePath, "tiles")
 
-        // ========================================================
-        // NOUVEAU : LECTURE DE LA DEMANDE DU WIDGET & ASSISTANT
-        // ========================================================
-        // ========================================================
-        // NOUVEAU : MISE À JOUR DU WIDGET À L'OUVERTURE DE L'APP
-        // ========================================================
+
         val updateWidgetRequest = OneTimeWorkRequestBuilder<AntennaWidgetWorker>().build()
         WorkManager.getInstance(this).enqueueUniqueWork(
             "WidgetUpdateOnOpen",
@@ -147,7 +150,7 @@ class MainActivity : ComponentActivity() {
         // NOUVEAU : VÉRIFICATION PÉRIODIQUE DES MISES À JOUR (TOUS LES 3 JOURS)
         // ========================================================
         val updateCheckRequest = androidx.work.PeriodicWorkRequestBuilder<fr.geotower.data.workers.UpdateCheckWorker>(
-            6, java.util.concurrent.TimeUnit.HOURS
+            30, java.util.concurrent.TimeUnit.MINUTES
         ).build()
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
             "PeriodicUpdateCheck",

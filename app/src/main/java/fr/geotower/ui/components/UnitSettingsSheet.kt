@@ -42,9 +42,19 @@ fun UnitSettingsSheet(
     var currentDistance by remember { mutableIntStateOf(AppConfig.distanceUnit.intValue) }
     var currentSpeed by remember { mutableIntStateOf(AppConfig.speedUnit.intValue) }
 
-    fun saveUnit(key: String, stateVar: MutableIntState, value: Int) {
-        stateVar.intValue = value
+    // Fonction locale de sauvegarde propre à la feuille
+    fun saveUnit(key: String, configState: MutableIntState, value: Int) {
+        configState.intValue = value
         prefs.edit().putInt(key, value).apply()
+
+        // ✅ NOUVEAU : On force le rafraîchissement silencieux du widget en arrière-plan !
+        // Dès que l'utilisateur change l'unité, le widget recalcule ses distances.
+        val request = androidx.work.OneTimeWorkRequestBuilder<fr.geotower.widget.AntennaWidgetWorker>().build()
+        androidx.work.WorkManager.getInstance(context).enqueueUniqueWork(
+            "widget_unit_refresh",
+            androidx.work.ExistingWorkPolicy.REPLACE,
+            request
+        )
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {

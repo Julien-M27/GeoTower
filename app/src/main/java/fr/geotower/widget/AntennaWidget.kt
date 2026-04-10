@@ -469,7 +469,32 @@ class RefreshWidgetAction : ActionCallback {
 
                 val widgetSites = closestSites.map { (siteAntennas, distance) ->
                     val main = siteAntennas.first()
-                    val distStr = if (distance >= 1000) String.format(java.util.Locale.US, "%.1f km", distance / 1000f) else "${distance.toInt()} m"
+
+                    val isMi = try {
+                        prefs.getInt("distance_unit", 0) == 1
+                    } catch (e: Exception) {
+                        try {
+                            prefs.getBoolean("distance_unit", false)
+                        } catch (e2: Exception) {
+                            false
+                        }
+                    } || fr.geotower.utils.AppConfig.distanceUnit.intValue == 1
+
+                    val distStr = if (isMi) {
+                        val distMiles = distance / 1609.34f
+                        if (distMiles < 0.1f) {
+                            "${(distance * 3.28084f).toInt()} ft"
+                        } else {
+                            String.format(java.util.Locale.US, "%.2f mi", distMiles)
+                        }
+                    } else {
+                        if (distance >= 1000) {
+                            String.format(java.util.Locale.US, "%.1f km", distance / 1000f)
+                        } else {
+                            "${distance.toInt()} m"
+                        }
+                    }
+
                     val baseOrder = listOf("ORANGE", "BOUYGUES", "SFR", "FREE")
 
                     val ops = siteAntennas.mapNotNull { it.operateur }

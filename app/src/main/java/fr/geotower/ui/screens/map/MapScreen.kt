@@ -592,8 +592,6 @@ fun MapScreen(
 
                         setOnMarkerClickListener { _, _ ->
                             if (isMeasuringMode) {
-                                trackNearestAll = false
-                                trackNearestFav = false
                                 val id = mainAntenna.idAnfr
                                 if (measuredSites.containsKey(id)) {
                                     measuredSites.remove(id)
@@ -1427,7 +1425,7 @@ fun MapScreen(
             }
 
             val deleteButtonSpacer by animateDpAsState(
-                targetValue = if (isSearchActive) 86.dp else 19.dp,
+                targetValue = if (isSearchActive) 93.dp else 19.dp,
                 label = "deleteButtonAnim"
             )
             Spacer(modifier = Modifier.height(deleteButtonSpacer))
