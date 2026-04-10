@@ -250,8 +250,8 @@ fun MapShareMenu(
     val txtAttributionOption = AppStrings.shareMapAttributionOption
 
     val txtAttributionDesc = when(AppConfig.mapProvider.intValue) {
-        0 -> AppStrings.srcOsmDesc
-        1 -> AppStrings.srcIgnDesc
+        0 -> AppStrings.srcIgnDesc
+        1 -> AppStrings.srcOsmDesc
         2 -> "© MapLibre"
         3 -> "© OpenTopoMap"
         else -> AppStrings.srcOsmDesc

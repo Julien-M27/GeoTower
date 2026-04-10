@@ -348,13 +348,37 @@ fun shareFullAntennaCapture(
                                                             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                                                         }
 
-                                                        // 1. Nom du Système (ex: LTE 800)
-                                                        Text(
-                                                            text = band.rawFreq.substringBefore(":").trim(),
-                                                            fontWeight = FontWeight.SemiBold,
-                                                            color = MaterialTheme.colorScheme.onSurface,
-                                                            fontSize = 14.sp
-                                                        )
+                                                        // 1. Nom du Système et Statut aligné à droite
+                                                        val (statusColor, statusText) = when {
+                                                            band.status.contains("En service", true) -> Pair(Color(0xFF4CAF50), txtInService)
+                                                            band.status.contains("Techniquement", true) -> Pair(Color(0xFF4CAF50), txtTechnically)
+                                                            band.status.contains("Approuvé", true) -> Pair(Color(0xFF2196F3), txtProjectApproved)
+                                                            else -> Pair(Color.Gray, txtUnknownStatus)
+                                                        }
+
+                                                        Row(
+                                                            modifier = Modifier.fillMaxWidth(),
+                                                            verticalAlignment = Alignment.CenterVertically
+                                                        ) {
+                                                            Text(
+                                                                text = band.rawFreq.substringBefore(":").trim(),
+                                                                fontWeight = FontWeight.SemiBold,
+                                                                color = MaterialTheme.colorScheme.onSurface,
+                                                                fontSize = 14.sp,
+                                                                modifier = Modifier.weight(1f) // Pousse le statut tout à droite
+                                                            )
+                                                            Spacer(modifier = Modifier.width(6.dp))
+                                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                                Text(
+                                                                    text = statusText,
+                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                    fontWeight = FontWeight.Normal,
+                                                                    fontSize = 12.sp
+                                                                )
+                                                                Spacer(modifier = Modifier.width(6.dp))
+                                                                Icon(Icons.Default.Circle, contentDescription = null, tint = statusColor, modifier = Modifier.size(10.dp))
+                                                            }
+                                                        }
                                                         Spacer(modifier = Modifier.height(4.dp))
 
                                                         // 2. Fréquences détaillées et calculs

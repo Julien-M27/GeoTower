@@ -3,10 +3,6 @@ package fr.geotower.ui.screens.about
 
 import android.widget.ImageView
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
@@ -24,7 +20,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -58,14 +53,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -437,15 +429,13 @@ fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) 
     val releaseNotes = mapOf(
         "Interface & Design" to listOf(
             "Global :" to listOf(
-                "Correction de divers bugs sur le Widget ainsi que l'ajout des Widgets 2x2 et 4x2",
-                "Correction de bug sur la page des Antennes à proximité"
-            ),
-            "Détail du site :" to listOf(
-                "Ajout du mode Fold pour les téléphones pliants"
+                "Ajout des notifications lives pour les téléphones Samsung sous OneUi 8.5 par Luis Baker",
+                "Correction de certains espaces en trop"
             ),
             "Carte des Antennes :" to listOf(
-                "Fix du bug de zoom des clusters",
-                "Nouvel affichage pour les opérateurs ayant le même azimut"
+                "Modification de l'alignement de certains boutons",
+                "Modification du comportement du bouton de localisation",
+                "Réparation de la fonction permettant de mesurer la distance avec l'antenne la plus proche"
             )
         )
     )

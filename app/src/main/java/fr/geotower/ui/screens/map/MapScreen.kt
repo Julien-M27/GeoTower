@@ -23,6 +23,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -51,6 +52,7 @@ import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.WifiTethering
+import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -291,6 +293,7 @@ fun MapScreen(
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
     var showCityStatsPopup by remember { mutableStateOf(false) }
     var showCityStatsDetail by remember { mutableStateOf(false) }
+    var isTrackingActive by remember { mutableStateOf(false) }
 
     val txtMapTitle = AppStrings.mapTitle
     val txtSearchCityOrId = AppStrings.searchCityOrId
@@ -638,88 +641,95 @@ fun MapScreen(
     val currentFilteredAntennas by androidx.compose.runtime.rememberUpdatedState(filteredAntennas)
     val currentLoc by androidx.compose.runtime.rememberUpdatedState(myCurrentLoc)
 
-    // ✅ NOUVEAU : Le moteur de suivi ultra-simplifié et indépendant
-    LaunchedEffect(trackNearestAll, trackNearestFav) {
+    // =====================================================================
+    // ✅ CORRECTION : MOTEUR DE SUIVI SANS "TRAITS FANTÔMES"
+    // =====================================================================
+    LaunchedEffect(Unit) {
         var lastTrackedAllId: String? = null
         var lastTrackedFavId: String? = null
 
-        while (trackNearestAll || trackNearestFav) {
-            val myLoc = currentLoc ?: locationOverlayRef?.myLocation
+        while (true) {
+            // On lit l'état actuel des boutons en temps réel à l'intérieur de la boucle
+            val isAllActive = trackNearestAll
+            val isFavActive = trackNearestFav
 
-            if (myLoc != null && currentFilteredAntennas.isNotEmpty()) {
-                var needsRefresh = false
+            if (isAllActive || isFavActive) {
+                val myLoc = currentLoc ?: locationOverlayRef?.myLocation
 
-                // --- SUIVI 1 : LE PLUS PROCHE GLOBAL ---
-                if (trackNearestAll) {
-                    val nearestAll = currentFilteredAntennas.minByOrNull {
-                        myLoc.distanceToAsDouble(GeoPoint(it.latitude, it.longitude))
-                    }
-                    val targetId = nearestAll?.idAnfr
+                if (myLoc != null && currentFilteredAntennas.isNotEmpty()) {
+                    var needsRefresh = false
 
-                    // Si la cible a changé
-                    if (targetId != lastTrackedAllId) {
-                        // On efface l'ancienne cible (SEULEMENT si l'autre suivi ne l'utilise pas !)
-                        if (lastTrackedAllId != null && lastTrackedAllId != lastTrackedFavId) {
+                    // --- SUIVI 1 : LE PLUS PROCHE GLOBAL ---
+                    if (isAllActive) {
+                        val nearestAll = currentFilteredAntennas.minByOrNull {
+                            myLoc.distanceToAsDouble(GeoPoint(it.latitude, it.longitude))
+                        }
+                        val targetId = nearestAll?.idAnfr
+
+                        // Si la cible a changé
+                        if (targetId != lastTrackedAllId) {
+                            // On efface l'ancienne cible (SEULEMENT si l'autre suivi ne l'utilise pas !)
+                            if (lastTrackedAllId != null && lastTrackedAllId != lastTrackedFavId) {
+                                measuredSites.remove(lastTrackedAllId)
+                            }
+                            // On ajoute la nouvelle cible
+                            nearestAll?.let { measuredSites[it.idAnfr] = it }
+                            lastTrackedAllId = targetId
+                            needsRefresh = true
+                        }
+                    } else if (lastTrackedAllId != null) {
+                        // Si on vient de désactiver le suivi Global
+                        if (lastTrackedAllId != lastTrackedFavId) {
                             measuredSites.remove(lastTrackedAllId)
                         }
-                        // On ajoute la nouvelle cible
-                        nearestAll?.let { measuredSites[it.idAnfr] = it }
-                        lastTrackedAllId = targetId
+                        lastTrackedAllId = null
                         needsRefresh = true
                     }
-                } else if (lastTrackedAllId != null) {
-                    // Si on vient de désactiver le suivi Global, on efface sa trace (si pas utilisée par l'autre)
-                    if (lastTrackedAllId != lastTrackedFavId) {
-                        measuredSites.remove(lastTrackedAllId)
-                    }
-                    lastTrackedAllId = null
-                    needsRefresh = true
-                }
 
-                // --- SUIVI 2 : LE PLUS PROCHE OPÉRATEUR PRÉFÉRÉ ---
-                if (trackNearestFav) {
-                    val opQuery = AppConfig.defaultOperator.value.uppercase()
-                    val nearestFav = currentFilteredAntennas
-                        .filter { (it.operateur ?: "").uppercase().contains(opQuery) }
-                        .minByOrNull { myLoc.distanceToAsDouble(GeoPoint(it.latitude, it.longitude)) }
+                    // --- SUIVI 2 : LE PLUS PROCHE OPÉRATEUR PRÉFÉRÉ ---
+                    if (isFavActive) {
+                        val opQuery = AppConfig.defaultOperator.value.uppercase()
+                        val nearestFav = currentFilteredAntennas
+                            .filter { (it.operateur ?: "").uppercase().contains(opQuery) }
+                            .minByOrNull { myLoc.distanceToAsDouble(GeoPoint(it.latitude, it.longitude)) }
 
-                    val targetId = nearestFav?.idAnfr
+                        val targetId = nearestFav?.idAnfr
 
-                    // Si la cible a changé
-                    if (targetId != lastTrackedFavId) {
-                        // On efface l'ancienne cible (SEULEMENT si l'autre suivi ne l'utilise pas !)
-                        if (lastTrackedFavId != null && lastTrackedFavId != lastTrackedAllId) {
+                        // Si la cible a changé
+                        if (targetId != lastTrackedFavId) {
+                            if (lastTrackedFavId != null && lastTrackedFavId != lastTrackedAllId) {
+                                measuredSites.remove(lastTrackedFavId)
+                            }
+                            // On ajoute la nouvelle cible
+                            nearestFav?.let { measuredSites[it.idAnfr] = it }
+                            lastTrackedFavId = targetId
+                            needsRefresh = true
+                        }
+                    } else if (lastTrackedFavId != null) {
+                        // Si on vient de désactiver le suivi Fav
+                        if (lastTrackedFavId != lastTrackedAllId) {
                             measuredSites.remove(lastTrackedFavId)
                         }
-                        // On ajoute la nouvelle cible
-                        nearestFav?.let { measuredSites[it.idAnfr] = it }
-                        lastTrackedFavId = targetId
+                        lastTrackedFavId = null
                         needsRefresh = true
                     }
-                } else if (lastTrackedFavId != null) {
-                    // Si on vient de désactiver le suivi Fav, on efface sa trace (si pas utilisée par l'autre)
-                    if (lastTrackedFavId != lastTrackedAllId) {
-                        measuredSites.remove(lastTrackedFavId)
-                    }
-                    lastTrackedFavId = null
-                    needsRefresh = true
-                }
 
-                // Si quelque chose a changé, on redessine !
-                if (needsRefresh) {
+                    // Si quelque chose a changé, on redessine !
+                    if (needsRefresh) {
+                        mapViewRef?.let { refreshMeasureLayers(it) }
+                    }
+                }
+            } else {
+                // --- NETTOYAGE COMPLET SI ON ÉTEINT TOUT ---
+                if (lastTrackedAllId != null || lastTrackedFavId != null) {
+                    if (lastTrackedAllId != null) measuredSites.remove(lastTrackedAllId)
+                    if (lastTrackedFavId != null) measuredSites.remove(lastTrackedFavId)
+                    lastTrackedAllId = null
+                    lastTrackedFavId = null
                     mapViewRef?.let { refreshMeasureLayers(it) }
                 }
             }
             delay(1000L) // Mise à jour toutes les secondes
-        }
-
-        // --- NETTOYAGE SI ON ÉTEINT LES DEUX ---
-        if (!trackNearestAll && !trackNearestFav) {
-            if (lastTrackedAllId != null) measuredSites.remove(lastTrackedAllId)
-            if (lastTrackedFavId != null) measuredSites.remove(lastTrackedFavId)
-            lastTrackedAllId = null
-            lastTrackedFavId = null
-            mapViewRef?.let { refreshMeasureLayers(it) }
         }
     }
 
@@ -794,7 +804,15 @@ fun MapScreen(
 
                     var lastRadius = 250
                     addMapListener(object : MapListener {
-                        override fun onScroll(event: ScrollEvent?): Boolean { updateInfo(); return true }
+                        override fun onScroll(event: ScrollEvent?): Boolean {
+                            // Si l'utilisateur fait défiler la carte, on désactive le suivi continu
+                            if (isTrackingActive) {
+                                isTrackingActive = false
+                                locationOverlayRef?.disableFollowLocation()
+                            }
+                            updateInfo()
+                            return true
+                        }
                         override fun onZoom(event: ZoomEvent?): Boolean { updateInfo(); return true }
                         private fun updateInfo() {
                             // ✅ 1. MISE À JOUR INSTANTANÉE POUR L'ÉCHELLE (Avant le delay !)
@@ -1409,7 +1427,7 @@ fun MapScreen(
             }
 
             val deleteButtonSpacer by animateDpAsState(
-                targetValue = if (isSearchActive) 86.dp else 16.dp,
+                targetValue = if (isSearchActive) 86.dp else 19.dp,
                 label = "deleteButtonAnim"
             )
             Spacer(modifier = Modifier.height(deleteButtonSpacer))
@@ -1532,10 +1550,18 @@ fun MapScreen(
                 FloatingActionButton(
                     onClick = {
                         safeClick {
-                            locationOverlayRef?.enableFollowLocation()
-                            locationOverlayRef?.myLocation?.let { loc ->
-                                mapViewRef?.controller?.setZoom(16.0)
-                                mapViewRef?.controller?.setCenter(loc)
+                            if (isTrackingActive) {
+                                // Si déjà actif, on désactive
+                                isTrackingActive = false
+                                locationOverlayRef?.disableFollowLocation()
+                            } else {
+                                // Sinon, on active le suivi continu
+                                isTrackingActive = true
+                                locationOverlayRef?.enableFollowLocation()
+                                locationOverlayRef?.myLocation?.let { loc ->
+                                    mapViewRef?.controller?.setZoom(16.0)
+                                    mapViewRef?.controller?.setCenter(loc)
+                                }
                             }
                         }
                     },
@@ -1543,7 +1569,29 @@ fun MapScreen(
                     shape = CircleShape,
                     modifier = Modifier.size(56.dp)
                 ) {
-                    Icon(Icons.Default.MyLocation, null)
+                    // ✅ On ajoute le cercle très fin autour de l'icône si actif
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .then(
+                                if (isTrackingActive) {
+                                    Modifier.border(
+                                        width = 1.5.dp, // Cercle très fin
+                                        color = MaterialTheme.colorScheme.primary, // Couleur principale
+                                        shape = CircleShape
+                                    ).padding(2.dp) // Petit espacement pour ne pas coller au bord
+                                } else {
+                                    Modifier
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = if (isTrackingActive) Icons.Default.MyLocation else Icons.Outlined.MyLocation, // Change l'icône (plein/vide) pour plus de clarté si tu veux, ou garde Icons.Default.MyLocation
+                            contentDescription = "Localiser",
+                            tint = if (isTrackingActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
                 }
             }
         }
