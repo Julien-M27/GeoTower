@@ -435,7 +435,8 @@ fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) 
             "Carte des Antennes :" to listOf(
                 "Modification de l'alignement de certains boutons",
                 "Modification du comportement du bouton de localisation",
-                "Réparation de la fonction permettant de mesurer la distance avec l'antenne la plus proche"
+                "Réparation de la fonction permettant de mesurer la distance avec l'antenne la plus proche",
+                "Ajout des cartes Hors-Ligne"
             )
         )
     )

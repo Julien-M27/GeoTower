@@ -1403,13 +1403,23 @@ fun SectionDatabase(
     // On génère la bordure si on n'est pas en OneUI
     val border = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
 
-    // 🚀 APPEL DU NOUVEAU COMPOSANT PARTAGÉ
+    // 🚀 NOUVEAU : LA CARTE DES CARTES HORS-LIGNE
+    fr.geotower.ui.components.MapDownloadCard(
+        useOneUi = useOneUi,
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor
+    )
+
+    Spacer(modifier = Modifier.height(16.dp)) // Espace entre les deux cartes
+
+    // 🚀 LA CARTE DE LA BASE DE DONNÉES (Existante)
     fr.geotower.ui.components.DatabaseDownloadCard(
         useOneUi = useOneUi,
         shape = shape,
         border = border,
         bubbleColor = bubbleColor,
-        title = AppStrings.offlineMode // On passe le titre pour qu'il s'affiche dans la bulle
+        title = AppStrings.offlineMode
     )
 
     if (!isWideScreen) {

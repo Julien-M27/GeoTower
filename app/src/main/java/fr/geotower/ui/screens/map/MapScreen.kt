@@ -131,6 +131,12 @@ import org.osmdroid.views.overlay.Polyline
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import androidx.compose.foundation.Canvas as ComposeCanvas
+import org.osmdroid.mapsforge.MapsForgeTileProvider
+import org.osmdroid.mapsforge.MapsForgeTileSource
+import org.mapsforge.map.rendertheme.InternalRenderTheme
+import org.osmdroid.tileprovider.MapTileProviderBasic
+import java.io.File
+import android.os.Environment
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -313,6 +319,8 @@ fun MapScreen(
     val txtMapSatellite = AppStrings.mapSatellite
     val txtMapMapLibre = AppStrings.mapMapLibre
     val txtMapTopo = AppStrings.mapTopo
+    val txtMapOfflineLayer = AppStrings.mapOfflineLayer
+    val txtNoMapFileNotFound = AppStrings.noMapFileNotFound
 
     val txtWarningTitle = AppStrings.warningTitle
     val txtLightColorWarning = AppStrings.lightColorWarning
@@ -852,21 +860,65 @@ fun MapScreen(
                 }
             },
             update = { map ->
+                // Mise à jour de la boussole (ton code actuel)
                 (locationOverlayRef as? CustomLocationOverlay)?.let { overlay ->
                     overlay.currentCompassAzimuth = azimuth
                 }
 
-                val newSource = when (mapProvider) {
-                    1 -> MapUtils.OSM_Source
-                    2 -> if (ignStyle == 1) {
-                        org.osmdroid.tileprovider.tilesource.XYTileSource("MapLibreDark", 1, 20, 256, ".png", arrayOf("https://basemaps.cartocdn.com/rastertiles/dark_all/"))
+                // 🗺️ LOGIQUE HORS-LIGNE (mapProvider == 4)
+                if (mapProvider == 4) {
+                    // 1. On pointe vers le NOUVEAU dossier "maps" créé par notre Worker !
+                    val offlineDir = java.io.File(context.getExternalFilesDir(null), "maps")
+
+                    // 2. On trouve TOUS les fichiers qui se terminent par ".map"
+                    val mapFiles = offlineDir.listFiles { file -> file.extension == "map" } ?: emptyArray()
+
+                    if (mapFiles.isNotEmpty()) {
+                        // On ne crée le provider que s'il n'existe pas déjà pour éviter les clignotements
+                        if (map.tileProvider !is MapsForgeTileProvider) {
+
+                            // ✨ 3. LA MAGIE : On donne directement le tableau contenant tes fichiers !
+                            // Mapsforge gère automatiquement la fusion si tu as France Nord et France Sud en même temps.
+                            val forgeSource = MapsForgeTileSource.createFromFiles(
+                                mapFiles,
+                                InternalRenderTheme.OSMARENDER,
+                                "osmarender"
+                            )
+
+                            val forgeProvider = MapsForgeTileProvider(
+                                org.osmdroid.tileprovider.util.SimpleRegisterReceiver(context),
+                                forgeSource,
+                                null
+                            )
+                            map.tileProvider = forgeProvider
+                        }
                     } else {
-                        org.osmdroid.tileprovider.tilesource.XYTileSource("MapLibre", 1, 20, 256, ".png", arrayOf("https://basemaps.cartocdn.com/rastertiles/voyager/"))
+                        Toast.makeText(context, txtNoMapFileNotFound, Toast.LENGTH_LONG).show()
+                        AppConfig.mapProvider.value = 1 // Retour forcé sur OSM
                     }
-                    3 -> org.osmdroid.tileprovider.tilesource.TileSourceFactory.OpenTopo
-                    else -> if (ignStyle == 2) MapUtils.IgnSource.SATELLITE else MapUtils.IgnSource.PLAN_IGN
+                } else {
+                    // 🌐 LOGIQUE EN LIGNE (OSM, IGN, etc.)
+                    // Si on revient du mode hors-ligne, on remet le provider standard
+                    if (map.tileProvider is MapsForgeTileProvider) {
+                        map.tileProvider = MapTileProviderBasic(context)
+                    }
+
+                    val newSource = when (mapProvider) {
+                        1 -> MapUtils.OSM_Source
+                        2 -> if (ignStyle == 1) {
+                            org.osmdroid.tileprovider.tilesource.XYTileSource("MapLibreDark", 1, 20, 256, ".png", arrayOf("https://basemaps.cartocdn.com/rastertiles/dark_all/"))
+                        } else {
+                            org.osmdroid.tileprovider.tilesource.XYTileSource("MapLibre", 1, 20, 256, ".png", arrayOf("https://basemaps.cartocdn.com/rastertiles/voyager/"))
+                        }
+                        3 -> org.osmdroid.tileprovider.tilesource.TileSourceFactory.OpenTopo
+                        else -> if (ignStyle == 2) MapUtils.IgnSource.SATELLITE else MapUtils.IgnSource.PLAN_IGN
+                    }
+
+                    if (map.tileProvider.tileSource.name() != newSource.name()) {
+                        map.setTileSource(newSource)
+                    }
                 }
-                if (map.tileProvider.tileSource.name() != newSource.name()) { map.setTileSource(newSource) }
+
                 map.overlayManager.tilesOverlay.setColorFilter(if (shouldInvertColors) MapUtils.getInvertFilter() else null)
                 map.invalidate()
             }
@@ -1677,42 +1729,63 @@ fun MapScreen(
     }
 
 
-    if (showLayerSheet) {
-        ModalBottomSheet(
-            onDismissRequest = { showLayerSheet = false },
-            containerColor = MaterialTheme.colorScheme.surface
-        ) {
+        if (showLayerSheet) {
+            // ✅ On vérifie l'état du réseau dès que le menu s'ouvre
+            val isOnline = remember(showLayerSheet) { isNetworkAvailable(context) }
+            val txtOfflineMessage = AppStrings.offlineMessage
+
+            ModalBottomSheet(
+                onDismissRequest = { showLayerSheet = false },
+                containerColor = MaterialTheme.colorScheme.surface
+            ) {
                 // ✅ 1. ON CRÉE LA COLONNE GLOBALE QUI APPLIQUE LE PADDING À TOUT
                 Column(
                     modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 24.dp)
                 ) {
 
-                    // ✅ 2. LA COLONNE DES PREMIERS BOUTONS (Sans le padding)
+                    // ✅ 2. LA COLONNE DES PREMIERS BOUTONS
                     Column(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            MapLayerButton(txtMapOsmLayer, mapProvider == 1, Modifier.weight(1f)) {
-                                AppConfig.mapProvider.value = 1; prefs.edit().putInt("map_provider", 1).apply()
-                                if (ignStyle == 2) { AppConfig.ignStyle.value = 0; prefs.edit().putInt("ign_style", 0).apply() }
+                        // 🌐 ON N'AFFICHE LES CARTES EN LIGNE QUE SI ON A INTERNET
+                        if (isOnline) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                MapLayerButton(txtMapOsmLayer, mapProvider == 1, Modifier.weight(1f)) {
+                                    AppConfig.mapProvider.value = 1; prefs.edit().putInt("map_provider", 1).apply()
+                                    if (ignStyle == 2) { AppConfig.ignStyle.value = 0; prefs.edit().putInt("ign_style", 0).apply() }
+                                }
+                                MapLayerButton(txtMapIgnLayer, mapProvider == 0, Modifier.weight(1f)) {
+                                    AppConfig.mapProvider.value = 0; prefs.edit().putInt("map_provider", 0).apply()
+                                }
                             }
-                            MapLayerButton(txtMapIgnLayer, mapProvider == 0, Modifier.weight(1f)) {
-                                AppConfig.mapProvider.value = 0; prefs.edit().putInt("map_provider", 0).apply()
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                MapLayerButton(txtMapMapLibre, mapProvider == 2, Modifier.weight(1f)) {
+                                    AppConfig.mapProvider.value = 2; prefs.edit().putInt("map_provider", 2).apply()
+                                }
+                                MapLayerButton(txtMapTopo, mapProvider == 3, Modifier.weight(1f)) {
+                                    AppConfig.mapProvider.value = 3; prefs.edit().putInt("map_provider", 3).apply()
+                                }
                             }
+                        } else {
+                            // 📵 MESSAGE HORS-LIGNE
+                            Text(
+                                text = "⚠️ $txtOfflineMessage",
+                                color = MaterialTheme.colorScheme.error,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 4.dp, top = 8.dp)
+                            )
                         }
-                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            MapLayerButton(txtMapMapLibre, mapProvider == 2, Modifier.weight(1f)) {
-                                AppConfig.mapProvider.value = 2; prefs.edit().putInt("map_provider", 2).apply()
-                            }
-                            MapLayerButton(txtMapTopo, mapProvider == 3, Modifier.weight(1f)) {
-                                AppConfig.mapProvider.value = 3; prefs.edit().putInt("map_provider", 3).apply()
-                            }
+
+                        // 🗺️ LE BOUTON HORS-LIGNE PREND TOUTE LA LARGEUR ET RESTE TOUJOURS LÀ
+                        MapLayerButton(txtMapOfflineLayer, mapProvider == 4, Modifier.fillMaxWidth()) {
+                            AppConfig.mapProvider.value = 4
+                            prefs.edit().putInt("map_provider", 4).apply()
                         }
                     }
 
-                    // ✅ 3. L'ANIMATION EST MAINTENANT PROTÉGÉE DANS LA GRANDE COLONNE
+                    // ✅ 3. L'ANIMATION DES STYLES (Cachée si on est hors ligne !)
                     AnimatedVisibility(
-                        visible = mapProvider == 0 || mapProvider == 1 || mapProvider == 2,
+                        visible = isOnline && (mapProvider == 0 || mapProvider == 1 || mapProvider == 2),
                         enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }) + expandVertically(expandFrom = Alignment.Top),
                         exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it }) + shrinkVertically(shrinkTowards = Alignment.Top)
                     ) {
@@ -2212,4 +2285,14 @@ fun MapDistanceIndicator(distanceMeters: Float?, label: String) {
             Text(text = displayDistance, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
         }
     }
+}
+
+// ✅ NOUVEAU : Fonction pour vérifier si internet est disponible
+fun isNetworkAvailable(context: Context): Boolean {
+    val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
+    val network = connectivityManager.activeNetwork ?: return false
+    val activeNetwork = connectivityManager.getNetworkCapabilities(network) ?: return false
+    return activeNetwork.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) ||
+            activeNetwork.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) ||
+            activeNetwork.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)
 }

@@ -24,7 +24,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "1.9.8.1"
+        versionName = "1.9.8.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -86,6 +86,10 @@ dependencies {
     // --- AJOUT POUR LE VECTORIEL (Mapsforge) ---
     // Le pont entre Osmdroid et Mapsforge
     implementation("org.osmdroid:osmdroid-mapsforge:6.1.18")
+    // 2. Le moteur de rendu vectoriel
+    implementation("org.mapsforge:mapsforge-map-android:0.19.0")
+    // 3. Les thèmes de base pour colorier la carte
+    implementation("org.mapsforge:mapsforge-themes:0.19.0")
 
     // Le moteur Mapsforge
     implementation("org.mapsforge:mapsforge-map-android:0.20.0")

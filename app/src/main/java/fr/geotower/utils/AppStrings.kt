@@ -126,6 +126,8 @@ object AppStrings {
 
     val mapMapLibre @Composable get() = get("MapLibre", "MapLibre", "MapLibre")
     val mapTopo @Composable get() = get("OpenTopoMap", "OpenTopoMap", "OpenTopoMap")
+    val mapOfflineLayer @Composable get() = get("🗺️ Hors-ligne", "🗺️ Offline", "🗺️ Offline")
+    val noMapFileNotFound @Composable get() = get("Aucun fichier .map trouvé", "No .map file found", "Nenhum arquivo .map encontrado")
     // --- PERSONNALISATION DES PAGES ---
     val pagesCustomizationTitle @Composable get() = get("Personnalisation des pages", "Pages customization", "Personalização das páginas")
     val pagesCustomizationDesc @Composable get() = get("Personnalisez l'affichage des différentes pages de l'application", "Customize the display of the different pages of the application", "Personalize a exibição das diferentes páginas do aplicativo")
@@ -212,6 +214,16 @@ object AppStrings {
     val deleteData @Composable get() = get("Supprimer les données", "Delete data", "Eliminar dados")
     val deleteDbWarningTitle @Composable get() = get("Attention", "Warning", "Atenção")
     val deleteDbWarningDesc @Composable get() = get("Êtes-vous sûr de vouloir supprimer la base de données ?", "Are you sure you want to delete the database?", "Tem certeza de que deseja excluir a base de dados?")
+
+    val offlineMapsTitle @Composable get() = get("Cartes Hors-Ligne", "Offline Maps", "Mapas Offline")
+    val offlineMapsDesc @Composable get() = get("Téléchargez des cartes régionales pour naviguer sans réseau.", "Download regional maps to navigate without network.", "Transfira mapas regionais para navegar sem rede.")
+    val mapExtracting @Composable get() = get("Extraction en cours...", "Extracting...", "A extrair...")
+    val mapDeleteWarningTitle @Composable get() = get("Supprimer la carte ?", "Delete map?", "Eliminar mapa?")
+    val mapDeleteWarningDesc @Composable get() = get("Voulez-vous vraiment supprimer cette carte de votre appareil ?", "Do you really want to delete this map from your device?", "Tem a certeza de que pretende eliminar este mapa do seu dispositivo?")
+    val downloadAll @Composable get() = get("Tout télécharger", "Download All", "Descarregar tudo")
+    val deleteAllMaps @Composable get() = get("Tout supprimer", "Delete All", "Eliminar tudo")
+    val deleteAllMapsWarningTitle @Composable get() = get("Supprimer toutes les cartes ?", "Delete all maps?", "Eliminar todos os mapas?")
+    val deleteAllMapsWarningDesc @Composable get() = get("Voulez-vous vraiment supprimer toutes les cartes téléchargées ?", "Do you really want to delete all downloaded maps?", "Tem a certeza de que pretende eliminar todos os mapas descarregados?")
 
     // ==========================================
     // 📏 UNITÉS DE MESURE
@@ -854,6 +866,20 @@ object AppStrings {
             "Etat Ministère" -> get("Etat Ministère", "State / Ministry", "Estado / Ministério")
             "Aviation Civile" -> get("Aviation Civile", "Civil Aviation", "Aviação Civil")
             else -> owner // Ex: "ORANGE", "EDF", "SNCF" resteront tels quels
+        }
+    }
+
+    @Composable
+    fun getMapName(id: String): String {
+        return when (id) {
+            "france_north_oam" -> get("France (Moitié Nord)", "France (North)", "França (Norte)")
+            "france_south_oam" -> get("France (Moitié Sud)", "France (South)", "França (Sul)")
+            "corse_oam" -> get("Corse", "Corsica", "Córsega")
+            "caribbean_oam" -> get("Caraïbes (Antilles)", "Caribbean", "Caraíbas")
+            "guyana_oam" -> get("Guyane & Suriname", "Guyana & Suriname", "Guiana e Suriname")
+            "madagascar_oam" -> get("Océan Indien (Réunion...)", "Indian Ocean", "Oceano Índico")
+            "polynesia_oam" -> get("Polynésie Française", "French Polynesia", "Polinésia Francesa")
+            else -> id // Retourne l'ID brut si pas de traduction trouvée
         }
     }
 

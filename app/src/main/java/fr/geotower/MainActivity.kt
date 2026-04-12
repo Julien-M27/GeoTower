@@ -52,6 +52,7 @@ import fr.geotower.ui.screens.map.MapViewModelFactory
 import java.io.File
 import androidx.compose.runtime.collectAsState
 import androidx.navigation.navDeepLink
+import org.mapsforge.map.android.graphics.AndroidGraphicFactory
 
 // ✅ ÉTAPE 1 : État global pour afficher le popup de la BDD depuis n'importe où
 object AppGlobalState {
@@ -102,6 +103,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
+        // 🏗️ INITIALISATION DU MOTEUR VECTORIEL (Mapsforge)
+        // Indispensable pour que le téléphone sache "dessiner" les données du fichier .map
+        AndroidGraphicFactory.createInstance(this.application)
+
         checkDownloadIntent(intent)
 
         // ✅ ÉTAPE 2 : Vérifie si on a cliqué sur la notif quand l'app était fermée
@@ -136,6 +142,20 @@ class MainActivity : ComponentActivity() {
         val basePath = File(cacheDir, "osmdroid")
         osmdroidConfig.osmdroidBasePath = basePath
         osmdroidConfig.osmdroidTileCache = File(basePath, "tiles")
+
+        // =====================================================================
+        // 🚀 NOUVEAU : BOOST DE PERFORMANCES (Spécial Cartes Vectorielles)
+        // =====================================================================
+        // 1. Multi-threading : On force le moteur à utiliser tous les cœurs disponibles du téléphone
+        val cores = Runtime.getRuntime().availableProcessors().toShort()
+        osmdroidConfig.tileDownloadThreads = cores
+        osmdroidConfig.tileFileSystemThreads = cores
+
+        // 2. Cache RAM : On augmente drastiquement la mémoire allouée (de 9 à 40)
+        // Cela évite les saccades (les "tuiles grises") quand on glisse la carte
+        osmdroidConfig.cacheMapTileCount = 40.toShort()
+        osmdroidConfig.cacheMapTileOvershoot = 40.toShort()
+        // =====================================================================
 
 
         val updateWidgetRequest = OneTimeWorkRequestBuilder<AntennaWidgetWorker>().build()
