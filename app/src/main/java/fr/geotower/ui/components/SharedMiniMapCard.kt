@@ -31,6 +31,10 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
+import org.osmdroid.mapsforge.MapsForgeTileProvider
+import org.osmdroid.mapsforge.MapsForgeTileSource
+import org.mapsforge.map.rendertheme.InternalRenderTheme
+import org.osmdroid.tileprovider.MapTileProviderBasic
 
 @Composable
 fun SharedMiniMapCard(
@@ -46,6 +50,26 @@ fun SharedMiniMapCard(
     val context = LocalContext.current
     var mapRef by remember { mutableStateOf<MapView?>(null) }
     val mapProvider by AppConfig.mapProvider
+
+    // ✅ NOUVEAU : État calculé une seule fois
+    var effectiveProvider by remember { mutableIntStateOf(AppConfig.mapProvider.intValue) }
+    var mapFiles by remember { mutableStateOf(emptyArray<java.io.File>()) }
+
+    LaunchedEffect(AppConfig.mapProvider.intValue) {
+        effectiveProvider = AppConfig.mapProvider.intValue
+    }
+
+    LaunchedEffect(Unit) {
+        val offlineDir = java.io.File(context.getExternalFilesDir(null), "maps")
+        val files = offlineDir.listFiles { file -> file.extension == "map" } ?: emptyArray()
+        mapFiles = files
+
+        // Si hors-ligne ET présence de fichiers : on bascule.
+        if (!fr.geotower.ui.screens.map.isNetworkAvailable(context) && files.isNotEmpty()) {
+            effectiveProvider = 4
+        }
+    }
+
     val ignStyle by AppConfig.ignStyle
     val shouldInvertColors = (mapProvider == 0 && ignStyle == 1)
     var currentZoom by remember { mutableDoubleStateOf(17.5) }
@@ -93,17 +117,47 @@ fun SharedMiniMapCard(
             update = { map ->
                 map.controller.setCenter(GeoPoint(centerLat, centerLon))
 
-                val newSource = when (mapProvider) {
-                    1 -> MapUtils.OSM_Source
-                    2 -> if (ignStyle == 1) {
-                        org.osmdroid.tileprovider.tilesource.XYTileSource("MapLibreDark", 1, 20, 256, ".png", arrayOf("https://basemaps.cartocdn.com/rastertiles/dark_all/"))
+                // 🗺️ LOGIQUE HORS-LIGNE
+                if (effectiveProvider == 4) {
+                    if (mapFiles.isNotEmpty()) {
+                        if (map.tileProvider !is MapsForgeTileProvider) {
+                            val forgeSource = MapsForgeTileSource.createFromFiles(
+                                mapFiles,
+                                InternalRenderTheme.OSMARENDER,
+                                "osmarender"
+                            )
+                            val forgeProvider = MapsForgeTileProvider(
+                                org.osmdroid.tileprovider.util.SimpleRegisterReceiver(context),
+                                forgeSource,
+                                null
+                            )
+                            map.tileProvider = forgeProvider
+                        }
                     } else {
-                        org.osmdroid.tileprovider.tilesource.XYTileSource("MapLibre", 1, 20, 256, ".png", arrayOf("https://basemaps.cartocdn.com/rastertiles/voyager/"))
+                        AppConfig.mapProvider.value = 1
                     }
-                    3 -> org.osmdroid.tileprovider.tilesource.TileSourceFactory.OpenTopo
-                    else -> if (ignStyle == 2) MapUtils.IgnSource.SATELLITE else MapUtils.IgnSource.PLAN_IGN
+                } else {
+                    // 🌐 LOGIQUE EN LIGNE
+                    if (map.tileProvider is MapsForgeTileProvider) {
+                        map.tileProvider = MapTileProviderBasic(context)
+                    }
+
+                    // ⚠️ ATTENTION : on utilise "effectiveProvider" ici !
+                    val newSource = when (effectiveProvider) {
+                        1 -> MapUtils.OSM_Source
+                        2 -> if (ignStyle == 1) {
+                            org.osmdroid.tileprovider.tilesource.XYTileSource("MapLibreDark", 1, 20, 256, ".png", arrayOf("https://basemaps.cartocdn.com/rastertiles/dark_all/"))
+                        } else {
+                            org.osmdroid.tileprovider.tilesource.XYTileSource("MapLibre", 1, 20, 256, ".png", arrayOf("https://basemaps.cartocdn.com/rastertiles/voyager/"))
+                        }
+                        3 -> org.osmdroid.tileprovider.tilesource.TileSourceFactory.OpenTopo
+                        else -> if (ignStyle == 2) MapUtils.IgnSource.SATELLITE else MapUtils.IgnSource.PLAN_IGN
+                    }
+                    if (map.tileProvider.tileSource.name() != newSource.name()) {
+                        map.setTileSource(newSource)
+                    }
                 }
-                if (map.tileProvider.tileSource.name() != newSource.name()) map.setTileSource(newSource)
+
                 map.overlayManager.tilesOverlay.setColorFilter(if (shouldInvertColors) MapUtils.getInvertFilter() else null)
 
                 // ✅ CORRECTION ICI : On cherche notre marqueur spécifique (MiniMapAntennaMarker)

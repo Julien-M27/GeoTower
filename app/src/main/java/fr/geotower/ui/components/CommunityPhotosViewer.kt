@@ -76,6 +76,7 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.launch
 import kotlin.math.abs
+import androidx.compose.material.icons.filled.CloudOff
 
 // Modèle de données unifié
 data class CommunityPhoto(
@@ -143,8 +144,11 @@ fun CommunityPhotosSectionShared(
     // --- NOUVEAU : On vérifie si l'opérateur autorise l'upload (SFR / Bouygues) ---
     val canUpload = operatorName != null && (operatorName.contains("SFR", true) || operatorName.contains("BOUYGUES", true))
 
-    // --- SÉCURITÉ : On cache tout si c'est vide ET qu'on n'a pas le droit d'uploader ---
-    if (filteredPhotos.isEmpty() && (!canUpload || onAddPhotoClick == null)) return
+    // ✅ NOUVEAU : On vérifie si on est en ligne en réutilisant ta fonction MapScreen
+    val isOnline = fr.geotower.ui.screens.map.isNetworkAvailable(context)
+
+    // --- SÉCURITÉ : On cache tout si c'est vide ET qu'on n'a pas le droit d'uploader (SEULEMENT EN LIGNE) ---
+    if (filteredPhotos.isEmpty() && (!canUpload || onAddPhotoClick == null) && isOnline) return
 
     val themeMode by AppConfig.themeMode
     val useOneUi by AppConfig.forceOneUiTheme
@@ -178,72 +182,96 @@ fun CommunityPhotosSectionShared(
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-            // --- On utilise filteredPhotos.isEmpty() ---
-            // --- On utilise filteredPhotos.isEmpty() ET on vérifie l'opérateur ---
-            if (filteredPhotos.isEmpty() && canUpload && onAddPhotoClick != null) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(100.dp)
-                        .clip(thumbnailShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), thumbnailShape)
-                        .clickable { onAddPhotoClick() },
-                    contentAlignment = Alignment.Center
+            if (!isOnline) {
+                // 📵 MESSAGE HORS-LIGNE
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(Icons.Default.Outbox, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(AppStrings.uploadPhotosPrompt, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                    }
-                }
-            }
-
-            // --- On utilise filteredPhotos ---
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                itemsIndexed(filteredPhotos) { index, photo ->
-                    AsyncImage(
-                        model = photo.url,
-                        contentDescription = AppStrings.sitePhotoDesc,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .size(120.dp)
-                            .clip(thumbnailShape)
-                            .clickable { selectedPhotoIndex = index }
+                    Icon(
+                        imageVector = Icons.Default.CloudOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        text = AppStrings.communityPhotosOffline,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Medium,
+                        style = MaterialTheme.typography.bodyMedium
                     )
                 }
+            } else {
+                // 🌐 LOGIQUE EN LIGNE (Le code que tu avais déjà)
+                // --- On utilise filteredPhotos.isEmpty() ET on vérifie l'opérateur ---
+                if (filteredPhotos.isEmpty() && canUpload && onAddPhotoClick != null) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(100.dp)
+                            .clip(thumbnailShape)
+                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), thumbnailShape)
+                            .clickable { onAddPhotoClick() },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            Icon(Icons.Default.Outbox, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(AppStrings.uploadPhotosPrompt, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
 
-                // --- NOUVEAU : Carré d'upload à la fin de la liste ---
-                if (filteredPhotos.isNotEmpty() && canUpload && onAddPhotoClick != null) {
-                    item {
-                        Box(
+                // --- On utilise filteredPhotos ---
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                    itemsIndexed(filteredPhotos) { index, photo ->
+                        AsyncImage(
+                            model = photo.url,
+                            contentDescription = AppStrings.sitePhotoDesc,
+                            contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(120.dp) // Même taille que les photos
+                                .size(120.dp)
                                 .clip(thumbnailShape)
-                                .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                                .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), thumbnailShape)
-                                .clickable { onAddPhotoClick() },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Column(
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center
+                                .clickable { selectedPhotoIndex = index }
+                        )
+                    }
+
+                    // --- NOUVEAU : Carré d'upload à la fin de la liste ---
+                    if (filteredPhotos.isNotEmpty() && canUpload && onAddPhotoClick != null) {
+                        item {
+                            Box(
+                                modifier = Modifier
+                                    .size(120.dp) // Même taille que les photos
+                                    .clip(thumbnailShape)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), thumbnailShape)
+                                    .clickable { onAddPhotoClick() },
+                                contentAlignment = Alignment.Center
                             ) {
-                                Icon(
-                                    imageVector = Icons.Default.Outbox,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary,
-                                    modifier = Modifier.size(28.dp)
-                                )
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = AppStrings.uploadPhotosPrompt,
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(horizontal = 8.dp)
-                                )
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Outbox,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(28.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Text(
+                                        text = AppStrings.uploadPhotosPrompt,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.padding(horizontal = 8.dp)
+                                    )
+                                }
                             }
                         }
                     }

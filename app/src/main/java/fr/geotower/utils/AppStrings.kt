@@ -126,7 +126,7 @@ object AppStrings {
 
     val mapMapLibre @Composable get() = get("MapLibre", "MapLibre", "MapLibre")
     val mapTopo @Composable get() = get("OpenTopoMap", "OpenTopoMap", "OpenTopoMap")
-    val mapOfflineLayer @Composable get() = get("🗺️ Hors-ligne", "🗺️ Offline", "🗺️ Offline")
+    val mapOfflineLayer @Composable get() = get("Hors-ligne", "Offline", "Offline")
     val noMapFileNotFound @Composable get() = get("Aucun fichier .map trouvé", "No .map file found", "Nenhum arquivo .map encontrado")
     // --- PERSONNALISATION DES PAGES ---
     val pagesCustomizationTitle @Composable get() = get("Personnalisation des pages", "Pages customization", "Personalização das páginas")
@@ -366,6 +366,20 @@ object AppStrings {
     val srcInspoDesc @Composable get() = get("• © CellularFR développé par Luis Baker\n• © Signal Quest développé par Alexandre Germain\n• © RNC Mobile développé par Cédric\n• © eNB-Analytics développé par Tristan\n• © GeoRadio - L'icône alternative provient de l'application GéoRadio sur iOS développée par Hugo Martin.\n• Concept original basé sur l'application GéoRadio\n• Icône fun dessinée par Johan", "• © CellularFR developed by Luis Baker\n• © Signal Quest developed by Alexandre Germain\n• © RNC Mobile developed by Cédric\n• © eNB-Analytics developed by Tristan\n• © GeoRadio - The alternative icon comes from the GéoRadio iOS app developed by Hugo Martin.\n• Original concept based on the GéoRadio app\n• Fun icon designed by Johan", "• © CellularFR desenvolvido por Luis Baker\n• © Signal Quest desenvolvido por Alexandre Germain\n• © RNC Mobile desenvolvido por Cédric\n• © eNB-Analytics desenvolvido por Tristan\n• © GeoRadio - O ícone alternativo vem da aplicação GéoRadio para iOS desenvolvida por Hugo Martin.\n• Conceito original baseado na aplicação GéoRadio\n• Ícone divertido desenhado por Johan")
 
     // ==========================================
+    // 🗺️ CRÉDITS CARTES (AboutScreen)
+    // ==========================================
+    val openAndroMapsTitle @Composable get() = get(
+        "OpenAndroMaps",
+        "OpenAndroMaps",
+        "OpenAndroMaps"
+    )
+    val openAndroMapsDesc @Composable get() = get(
+        "Cartes vectorielles hors-ligne et thème de rendu (Elevate).",
+        "Offline vector maps and render theme (Elevate).",
+        "Mapas vetoriais offline e tema de renderização (Elevate)."
+    )
+
+    // ==========================================
     // 🔒 CONFIDENTIALITÉ
     // ==========================================
     val privacyCategory @Composable get() = get("Confidentialité", "Privacy", "Privacidade")
@@ -549,6 +563,12 @@ object AppStrings {
 
         return get(fr, en, pt)
     }
+
+    val communityPhotosOffline @Composable get() = get(
+        "Vous êtes hors ligne.\nConnexion internet requise pour voir les photos.",
+        "You are offline.\nInternet connection required to view photos.",
+        "Você está offline.\nConexão à internet necessária para ver as fotos."
+    )
 
     @Composable
     fun photoByAuthor(author: String) = get("Par $author", "By $author", "Por $author")

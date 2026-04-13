@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storage
@@ -427,16 +429,9 @@ fun SectionPresentation(appTitle: String, appVersion: String, logoResId: Int) {
 @Composable
 fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) {
     val releaseNotes = mapOf(
-        "Interface & Design" to listOf(
-            "Global :" to listOf(
-                "Ajout des notifications lives pour les téléphones Samsung sous OneUi 8.5 par Luis Baker",
-                "Correction de certains espaces en trop"
-            ),
-            "Carte des Antennes :" to listOf(
-                "Modification de l'alignement de certains boutons",
-                "Modification du comportement du bouton de localisation",
-                "Réparation de la fonction permettant de mesurer la distance avec l'antenne la plus proche",
-                "Ajout des cartes Hors-Ligne"
+        "Interface & Design" to listOf("Carte des Antennes :" to listOf(
+                "Ajout des cartes Hors-Ligne",
+                "Modification des clusters"
             )
         )
     )
@@ -477,8 +472,11 @@ fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) 
 
 @Composable
 fun SectionSources(cardShape: Shape, bubbleColor: Color) {
-    SectionTitle(AppStrings.aboutSources) // <-- MODIFIÉ
+    SectionTitle(AppStrings.aboutSources)
     val cardColor = if (bubbleColor == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else bubbleColor
+
+    // ✅ On initialise le gestionnaire de liens
+    val uriHandler = LocalUriHandler.current
 
     Card(
         colors = CardDefaults.cardColors(containerColor = cardColor),
@@ -486,13 +484,49 @@ fun SectionSources(cardShape: Shape, bubbleColor: Color) {
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            CreditItem(AppStrings.srcAntennas, AppStrings.srcAntennasDesc) // <-- MODIFIÉ
+            // 1. ANFR (Données)
+            CreditItem(AppStrings.srcAntennas, AppStrings.srcAntennasDesc)
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
-            CreditItem(AppStrings.srcIgn, AppStrings.srcIgnDesc) // <-- MODIFIÉ
+
+            // 2. IGN (Cliquable)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { uriHandler.openUri("https://geoservices.ign.fr/") }
+            ) {
+                CreditItem(AppStrings.srcIgn, AppStrings.srcIgnDesc)
+                Text("geoservices.ign.fr", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            }
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
-            CreditItem(AppStrings.srcOsm, AppStrings.srcOsmDesc) // <-- MODIFIÉ
+
+            // 3. OpenStreetMap (Cliquable)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { uriHandler.openUri("https://www.openstreetmap.org/copyright") }
+            ) {
+                CreditItem(AppStrings.srcOsm, AppStrings.srcOsmDesc)
+                Text("www.openstreetmap.org", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            }
+
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
-            CreditItem(AppStrings.srcInspo, AppStrings.srcInspoDesc) // <-- MODIFIÉ
+
+            // 4. OpenAndroMaps (Cliquable)
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { uriHandler.openUri("https://www.openandromaps.org/") }
+            ) {
+                CreditItem(AppStrings.openAndroMapsTitle, AppStrings.openAndroMapsDesc)
+                Text("www.openandromaps.org", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+            }
+
+            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+
+            // 5. Inspiration
+            CreditItem(AppStrings.srcInspo, AppStrings.srcInspoDesc)
         }
     }
 }
