@@ -216,7 +216,7 @@ object AppStrings {
     val deleteDbWarningDesc @Composable get() = get("Êtes-vous sûr de vouloir supprimer la base de données ?", "Are you sure you want to delete the database?", "Tem certeza de que deseja excluir a base de dados?")
 
     val offlineMapsTitle @Composable get() = get("Cartes Hors-Ligne", "Offline Maps", "Mapas Offline")
-    val offlineMapsDesc @Composable get() = get("Téléchargez des cartes régionales pour naviguer sans réseau.", "Download regional maps to navigate without network.", "Transfira mapas regionais para navegar sem rede.")
+    val offlineMapsDesc @Composable get() = get("Téléchargez des cartes de la France pour naviguer sans réseau.", "Download maps of France to navigate without an internet connection.", "Descarregue mapas de França para navegar sem rede.")
     val mapExtracting @Composable get() = get("Extraction en cours...", "Extracting...", "A extrair...")
     val mapDeleteWarningTitle @Composable get() = get("Supprimer la carte ?", "Delete map?", "Eliminar mapa?")
     val mapDeleteWarningDesc @Composable get() = get("Voulez-vous vraiment supprimer cette carte de votre appareil ?", "Do you really want to delete this map from your device?", "Tem a certeza de que pretende eliminar este mapa do seu dispositivo?")
@@ -938,4 +938,43 @@ object AppStrings {
         "Tap here, go to Permissions > Location, then select \"Allow all the time\".",
         "Toque aqui, vá em Permissões > Localização e selecione \"Permitir o tempo todo\"."
     )
+
+    // ==========================================
+    // ⚠️ PANNES SIGNAL QUEST (DÉTAILS)
+    // ==========================================
+    val outageAttentionDesc @Composable get() = get("Attention panne", "Outage warning", "Aviso de falha")
+    val unknownOutageReason @Composable get() = get("Raison inconnue", "Unknown reason", "Motivo desconhecido")
+    val outageReasonMaintenance @Composable get() = get("Maintenance", "Maintenance", "Manutenção")
+    val outageReasonIncident @Composable get() = get("Incident", "Incident", "Incidente")
+    val outageReasonTechnical @Composable get() = get("Intervention technique", "Technical intervention", "Intervenção técnica")
+
+    // Statuts détaillés
+    val outageVoice @Composable get() = get("Voix", "Voice", "Voz")
+    val outageData @Composable get() = get("Data", "Data", "Dados")
+    val outageStatusDegraded @Composable get() = get("Dégradé", "Degraded", "Degradado")
+    val outageStatusHs @Composable get() = get("Hors Service", "Out of Service", "Fora de Serviço")
+    val outageStatusOk @Composable get() = get("OK", "OK", "OK")
+    val outageStatusNe @Composable get() = get("Non Équipé", "Not Equipped", "Não Equipado")
+    val outageEndExpected @Composable get() = get("Fin prévue le", "Expected end on", "Fim previsto em")
+
+    // ==========================================
+    // 📊 BLOC STATUT (DÉTAIL SITE)
+    // ==========================================
+    val statusTitle @Composable get() = get("Statut du site", "Site Status", "Status do site")
+    val statusFunctional @Composable get() = get("Fonctionnel", "Functional", "Funcional")
+    val statusOutage @Composable get() = get("En panne", "Out of service", "Em manutenção")
+    val showStatusOption @Composable get() = get("Afficher le statut", "Show status", "Mostrar status")
+    val shareStatusOption @Composable get() = get("Partager le statut", "Share status", "Partilhar o status")
+
+    // 🚨 NOUVELLES TRADUCTIONS
+    val serviceVoice @Composable get() = get("Voix", "Voice", "Voz")
+    val serviceSms @Composable get() = get("SMS", "SMS", "SMS")
+    val serviceInternet @Composable get() = get("Internet", "Internet", "Internet")
+    val lastUpdatedText @Composable get() = get("Dernière mise à jour à", "Last updated at", "Última atualização às")
+
+    // 🚨 TRADUCTIONS DES RETOURS BRUTS DE L'API (JSON)
+    val apiDetailIncident @Composable get() = get("Incident en cours", "Ongoing incident", "Incidente em curso")
+    val apiDetailMaintenance @Composable get() = get("Travaux de maintenance", "Maintenance work", "Trabalhos de manutenção")
+    val outageStart @Composable get() = get("Depuis le", "Since", "Desde")
+    // (Note : outageEndExpected existe déjà normalement dans votre fichier)
 }

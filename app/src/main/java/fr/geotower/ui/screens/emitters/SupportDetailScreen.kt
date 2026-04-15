@@ -11,9 +11,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -30,9 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Navigation
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -41,21 +37,18 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -68,17 +61,16 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.PhysiqueEntity
+import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.ui.components.SupportShareMenu
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import java.util.Locale
-import fr.geotower.data.models.PhysiqueEntity
-import fr.geotower.data.models.TechniqueEntity
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -134,6 +126,7 @@ fun SupportDetailScreen(
     var antennas by remember { mutableStateOf<List<LocalisationEntity>>(emptyList()) }
     var physique by remember { mutableStateOf<PhysiqueEntity?>(null) }
     var techniquesMap by remember { mutableStateOf<Map<String, TechniqueEntity>>(emptyMap()) }
+    var hsDataMap by remember { mutableStateOf<Map<String, fr.geotower.data.models.SiteHsEntity>>(emptyMap()) } // 🚨 NOUVEAU
     var communityPhotos by remember { mutableStateOf<List<CommunityPhoto>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
     var userLocation by remember { mutableStateOf<Location?>(null) }
@@ -224,6 +217,31 @@ fun SupportDetailScreen(
                 }
             }
             techniquesMap = techMap
+
+            // 🚨 TÉLÉCHARGEMENT DES PANNES (Nouveau système GeoJSON GeoTower)
+            try {
+                // 1. On récupère directement toutes les pannes via ton Repository ! (C'est lui qui fait le travail)
+                val allHs = repository.getSitesHs()
+
+                val tempOutageMap = mutableMapOf<String, fr.geotower.data.models.SiteHsEntity>()
+
+                // 2. On associe les pannes aux antennes de la page
+                antennas.forEach { ant ->
+                    // Comparaison exacte et infaillible par ID ANFR (comme sur la carte)
+                    val hsData = allHs.firstOrNull { hs ->
+                        val hsId = hs.idAnfr.toLongOrNull()
+                        val antId = ant.idAnfr.toLongOrNull()
+                        hsId != null && hsId == antId
+                    }
+
+                    if (hsData != null) {
+                        tempOutageMap[ant.idAnfr] = hsData
+                    }
+                }
+                hsDataMap = tempOutageMap
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
 
             val photosTemp = mutableListOf<CommunityPhoto>()
             val hasOrange = antennas.any { (it.operateur ?: "").contains("ORANGE", true) }
@@ -438,6 +456,7 @@ fun SupportDetailScreen(
                                         centerLat = mainInfo.latitude,
                                         centerLon = mainInfo.longitude,
                                         mappedAntennas = antennas,
+                                        sitesHs = hsDataMap.values.toList(),
                                         blockShape = blockShape,
                                         cardBorder = cardBorder,
                                         onMapReady = { globalMapRef = it }
@@ -499,6 +518,7 @@ fun SupportDetailScreen(
                                             antennas = antennas,
                                             physique = physique,
                                             techniquesMap = techniquesMap,
+                                            hsDataMap = hsDataMap, // 🚨 ON TRANSMET LA MAP DES PANNES
                                             distanceStr = distanceStr,
                                             bearingStr = bearingStr,
                                             useOneUi = useOneUi,
@@ -513,6 +533,7 @@ fun SupportDetailScreen(
                                     fr.geotower.ui.components.OperatorsListSection(
                                         antennas = antennas,
                                         techniques = techniquesMap,
+                                        hsDataMap = hsDataMap, // 🚨 NOUVEAU
                                         cardBgColor = cardBgColor,
                                         blockShape = blockShape,
                                         useOneUi = useOneUi,

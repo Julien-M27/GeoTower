@@ -923,11 +923,15 @@ fun SiteSettingsSheet(
     showShare: Boolean, onShareChange: (Boolean) -> Unit,
     showDates: Boolean, onDatesChange: (Boolean) -> Unit,
     showAddress: Boolean, onAddressChange: (Boolean) -> Unit,
+    showStatus: Boolean, onStatusChange: (Boolean) -> Unit, // 🚨 NEW
     showFreqs: Boolean, onFreqsChange: (Boolean) -> Unit,
     showLinks: Boolean, onLinksChange: (Boolean) -> Unit,
     onOpenFrequencies: () -> Unit,
-    onDismiss: () -> Unit, onBack: () -> Unit,
-    sheetState: SheetState, useOneUi: Boolean, bubbleColor: Color
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    bubbleColor: Color
 ) {
     val currentOrder by rememberUpdatedState(siteOrder)
     val themeMode by AppConfig.themeMode
@@ -1014,6 +1018,7 @@ fun SiteSettingsSheet(
                             "share" -> DraggableSwitchCard(AppStrings.siteShareOption, showShare, onShareChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "dates" -> DraggableSwitchCard(AppStrings.siteDatesOption, showDates, onDatesChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "address" -> DraggableSwitchCard(AppStrings.siteAddressOption, showAddress, onAddressChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "status" -> DraggableSwitchCard(AppStrings.showStatusOption, showStatus, onStatusChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             // ✅ L'ENGRENAGE MODIFIE BIEN LA VARIABLE UNIQUE
                             "freqs" -> DraggableSwitchCard(AppStrings.siteFreqsOption, showFreqs, onFreqsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = {
                                 onDismiss() // ✅ Ferme le menu Site actuel
@@ -1026,7 +1031,23 @@ fun SiteSettingsSheet(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            TextButton(onClick = { /* Ton code de reset */ }) {
+            TextButton(onClick = {
+                // 🚨 NOUVEAU CODE DE RESET COMPLET
+                onOrderChange(listOf("operator", "bearing_height", "map", "support_details", "photos", "ids", "nav", "share", "dates", "address", "status", "freqs", "links"))
+                onOperatorChange(true)
+                onBearingHeightChange(true)
+                onMapChange(true)
+                onSupportDetailsChange(true)
+                onPhotosChange(true)
+                onIdsChange(true)
+                onNavChange(true)
+                onShareChange(true)
+                onDatesChange(true)
+                onAddressChange(true)
+                onStatusChange(true) // On active le statut par défaut
+                onFreqsChange(true)
+                onLinksChange(true)
+            }) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
                 Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)

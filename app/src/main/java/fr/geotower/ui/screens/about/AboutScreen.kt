@@ -429,9 +429,13 @@ fun SectionPresentation(appTitle: String, appVersion: String, logoResId: Int) {
 @Composable
 fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) {
     val releaseNotes = mapOf(
-        "Interface & Design" to listOf("Carte des Antennes :" to listOf(
+        "Interface & Design" to listOf(
+            "Carte des Antennes :" to listOf(
                 "Ajout des cartes Hors-Ligne",
                 "Modification des clusters"
+            ),
+            "Détail des sites :" to listOf(
+                "Ajout du statut des antennes"
             )
         )
     )

@@ -9,6 +9,8 @@ import fr.geotower.data.models.FaisceauxEntity
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
+import fr.geotower.data.api.SignalQuestClient
+import fr.geotower.data.models.SiteHsEntity
 
 class AnfrRepository(
     private val api: AnfrService,
@@ -108,6 +110,98 @@ class AnfrRepository(
             dao.get5GSupportCountByOperator(operatorName)
         } catch (e: Exception) {
             0
+        }
+    }
+
+    // =================================================================
+    // 3. PANNES RÉSEAU (Nouveau système GeoJSON GeoTower)
+    // =================================================================
+    suspend fun getSitesHs(): List<SiteHsEntity> {
+        return try {
+            // 1. On télécharge le fichier brut depuis ton serveur
+            val response = api.getSitesHsGeoJson()
+            val jsonString = response.string()
+
+            // 2. On lit la structure GeoJSON
+            val jsonObject = org.json.JSONObject(jsonString)
+            val features = jsonObject.getJSONArray("features")
+
+            val hsList = mutableListOf<SiteHsEntity>()
+
+            // 3. On extrait chaque point
+            for (i in 0 until features.length()) {
+                val feature = features.getJSONObject(i)
+                val properties = feature.getJSONObject("properties")
+                val geometry = feature.getJSONObject("geometry")
+                val coordinates = geometry.getJSONArray("coordinates")
+
+                // GeoJSON range toujours [Longitude, Latitude]
+                val lon = coordinates.getDouble(0)
+                val lat = coordinates.getDouble(1)
+
+                // 1. Extraction de toutes les propriétés du JSON
+                val stationAnfr = properties.optString("station_anfr", "")
+                val operateurStr = properties.optString("operateur", "")
+
+                // Détail technique des pannes par technologie
+                val v2g = properties.optString("voix2g", null)
+                val v3g = properties.optString("voix3g", null)
+                val v4g = properties.optString("voix4g", null)
+
+                val d3g = properties.optString("data3g", null)
+                val d4g = properties.optString("data4g", null)
+                val d5g = properties.optString("data5g", null)
+
+                // Infos de localisation
+                val dept = properties.optString("departement", null)
+                val cp = properties.optString("code_postal", null)
+                val insee = properties.optString("code_insee", null)
+                val com = properties.optString("commune", null)
+
+                // 2. Création de l'objet complet
+                val site = SiteHsEntity(
+                    idAnfr = stationAnfr,
+                    operateur = operateurStr,
+                    latitude = lat,
+                    longitude = lon,
+
+                    // Localisation
+                    departement = dept,
+                    codePostal = cp,
+                    codeInsee = insee,
+                    commune = com,
+
+                    // Voix
+                    voix2g = v2g,
+                    voix3g = v3g,
+                    voix4g = v4g,
+
+                    // Data
+                    data3g = d3g,
+                    data4g = d4g,
+                    data5g = d5g,
+
+                    // Global et Détails
+                    voixGlobal = properties.optString("voix", null),
+                    dataGlobal = properties.optString("data", null),
+                    raison = properties.optString("raison", null),
+                    detail = properties.optString("detail", null),
+                    propre = properties.optInt("propre", 0),
+
+                    // Dates
+                    debutVoix = properties.optString("debut_voix", null),
+                    finVoix = properties.optString("fin_voix", null),
+                    debutData = properties.optString("debut_data", null),
+                    finData = properties.optString("fin_data", null),
+                    dateDebut = properties.optString("debut", null),
+                    dateFin = properties.optString("fin", null)
+                )
+                hsList.add(site)
+            }
+            hsList
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
         }
     }
 }

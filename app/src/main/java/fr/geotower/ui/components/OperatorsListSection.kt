@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -32,6 +33,7 @@ import fr.geotower.utils.AppConfig
 fun OperatorsListSection(
     antennas: List<LocalisationEntity>,
     techniques: Map<String, TechniqueEntity>,
+    hsDataMap: Map<String, fr.geotower.data.models.SiteHsEntity> = emptyMap(), // 🚨 Changé ici
     cardBgColor: Color,
     blockShape: Shape,
     useOneUi: Boolean,
@@ -78,6 +80,7 @@ fun OperatorsListSection(
             OperatorDetailItem(
                 antenna = antenna,
                 technique = techniques[antenna.idAnfr],
+                hsEntity = hsDataMap[antenna.idAnfr], // 🚨 Changé ici
                 cardBgColor = cardBgColor,
                 blockShape = blockShape,
                 useOneUi = useOneUi,
@@ -93,7 +96,8 @@ fun OperatorsListSection(
 @Composable
 fun OperatorDetailItem(
     antenna: LocalisationEntity,
-    technique: TechniqueEntity?, // ✅ NOUVEAU PARAMÈTRE
+    technique: TechniqueEntity?,
+    hsEntity: fr.geotower.data.models.SiteHsEntity? = null, // 🚨 Changé ici
     cardBgColor: Color,
     blockShape: Shape,
     useOneUi: Boolean,
@@ -131,8 +135,33 @@ fun OperatorDetailItem(
                 // ✅ On envoie les filtres au formateur
                 val realTechs = formatSiteTechnologies(rawTechs, AppStrings.unknown, s2G, s3G, s4G, s5G, sFh)
                 Text(text = realTechs, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
+
+            } // <-- Fin de la Column(weight = 1f)
+
+            // La flèche reste toute seule à droite
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        } // <-- Fin de la Row contenant le logo, le titre et la flèche
+
+        // 🚨 NOUVEAU PLACEMENT : Sous le logo complet, et au-dessus des dates (Implémentation)
+        if (hsEntity != null) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.padding(top = 12.dp) // Espace avec le logo au-dessus
+            ) {
+                Icon(
+                    imageVector = androidx.compose.material.icons.Icons.Default.Warning,
+                    contentDescription = AppStrings.outageAttentionDesc,
+                    tint = Color(0xFFE53935),
+                    modifier = Modifier.size(16.dp).padding(end = 6.dp)
+                )
+                Text(
+                    text = formatOutageDetails(hsEntity),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFE53935),
+                    lineHeight = 16.sp
+                )
+            }
         }
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -200,4 +229,65 @@ private fun getLocalLogoRes(opName: String): Int? {
         opName.contains("FREE", true) -> R.drawable.logo_free
         else -> null
     }
+}
+
+@Composable
+fun formatOutageDetails(hsData: fr.geotower.data.models.SiteHsEntity): String {
+    // 1. Traduction du texte détaillé de l'API (ex: "Incident en cours")
+    val detailTranslated = when (hsData.detail?.lowercase()) {
+        "incident en cours" -> AppStrings.apiDetailIncident
+        "travaux de maintenance" -> AppStrings.apiDetailMaintenance
+        "intervention technique" -> AppStrings.outageReasonTechnical
+        "null" -> null // 🚨 ON INTERCEPTE ET ON DÉTRUIT LE FAUX TEXTE "null"
+        else -> hsData.detail
+    }
+
+    // 2. Traduction du code court ("INT", "MAINT")
+    val reasonTranslated = when (hsData.raison?.uppercase()) {
+        "MAINT" -> AppStrings.outageReasonMaintenance
+        "INT" -> AppStrings.outageReasonIncident
+        "NULL" -> null // 🚨 PAREIL ICI
+        else -> hsData.raison
+    }
+
+    // 3. On choisit le détail en priorité, sinon le code court, sinon "Inconnu"
+    val displayReason = detailTranslated?.takeIf { it.isNotBlank() && it.lowercase() != "null" }
+        ?: reasonTranslated?.takeIf { it.isNotBlank() && it.lowercase() != "null" }
+        ?: AppStrings.unknownOutageReason
+
+    val statusDegraded = AppStrings.outageStatusDegraded
+    val statusHs = AppStrings.outageStatusHs
+    val voiceLabel = AppStrings.outageVoice
+    val dataLabel = AppStrings.outageData
+
+    // 2. Traduction simple (Uniquement pour ce qui est en panne)
+    fun getStatusText(code: String?): String {
+        return when (code?.uppercase()) {
+            "DE" -> statusDegraded
+            "HS" -> statusHs
+            else -> code ?: "-"
+        }
+    }
+
+    // 3. Filtrage : On ne garde que les services en panne (HS) ou dégradés (DE)
+    val activeOutages = mutableListOf<String>()
+
+    val voixCode = hsData.voixGlobal?.uppercase()
+    if (voixCode == "HS" || voixCode == "DE") {
+        activeOutages.add("$voiceLabel : ${getStatusText(voixCode)}")
+    }
+
+    val dataCode = hsData.dataGlobal?.uppercase()
+    if (dataCode == "HS" || dataCode == "DE") {
+        activeOutages.add("$dataLabel : ${getStatusText(dataCode)}")
+    }
+
+    // 4. Construction de la phrase finale (sans la date)
+    val detailsStr = if (activeOutages.isNotEmpty()) {
+        " (${activeOutages.joinToString(", ")})"
+    } else {
+        "" // Si aucun service spécifique n'est listé en panne, on n'affiche pas de parenthèses
+    }
+
+    return "$displayReason$detailsStr"
 }

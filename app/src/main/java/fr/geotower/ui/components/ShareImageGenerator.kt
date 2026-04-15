@@ -68,6 +68,7 @@ import fr.geotower.utils.AppStrings
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
+import fr.geotower.ui.components.SiteStatusCard
 
 private fun Int.dpToPx(context: Context): Int = (this * context.resources.displayMetrics.density).toInt()
 
@@ -75,8 +76,9 @@ fun shareFullAntennaCapture(
     context: Context,
     currentView: View,
     info: LocalisationEntity,
-    physique: PhysiqueEntity?, // ✅ AJOUT
-    technique: TechniqueEntity?, // ✅ AJOUT
+    physique: PhysiqueEntity?,
+    technique: TechniqueEntity?,
+    hsDataMap: Map<String, fr.geotower.data.models.SiteHsEntity>, // 🚨 AJOUT
     distanceStr: String,
     bearingStr: String,
     forceDarkTheme: Boolean,
@@ -156,9 +158,13 @@ fun shareFullAntennaCapture(
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column {
                                     Text(info.operateur ?: "Inconnu", fontWeight = FontWeight.Bold)
-                                    // ✅ ON UTILISE LES VRAIES TECHNOLOGIES
-                                    val rawTechs = technique?.technologies?.takeIf { it.isNotBlank() } ?: info.frequences
-                                    Text(formatTechnologies(rawTechs, AppStrings.unknown), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    val rawTechs =
+                                        technique?.technologies?.takeIf { it.isNotBlank() }
+                                            ?: info.frequences
+                                    Text(
+                                        formatTechnologies(rawTechs, AppStrings.unknown),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
                                 }
                             }
                         }
@@ -287,6 +293,52 @@ fun shareFullAntennaCapture(
                                                 }
                                             }
                                         }
+                                    }
+                                }
+                                "status" -> {
+                                    if (AppConfig.shareSiteStatus.value) {
+                                        val hsEntity = hsDataMap[info.idAnfr]
+                                        val isOutage = hsEntity != null
+                                        val outageText = hsEntity?.let { fr.geotower.ui.components.formatOutageDetails(it) }
+
+                                        // 1. Calcul des technologies présentes (comme dans l'écran de détail)
+                                        val rawTechs = technique?.technologies?.takeIf { it.isNotBlank() } ?: info.frequences ?: ""
+                                        val has2G = rawTechs.contains("2G", ignoreCase = true)
+                                        val has3G = rawTechs.contains("3G", ignoreCase = true)
+                                        val has4G = rawTechs.contains("4G", ignoreCase = true)
+                                        val has5G = rawTechs.contains("5G", ignoreCase = true)
+
+                                        // 2. Création de la matrice de statut pour l'image
+                                        val realTechStatus = mapOf(
+                                            "2G" to fr.geotower.ui.components.ServiceStatus(
+                                                isVoixOk = if (has2G) hsEntity?.let { it.voix2g != "HS" } ?: true else null,
+                                                isSmsOk = if (has2G) hsEntity?.let { it.voix2g != "HS" } ?: true else null,
+                                                isInternetOk = if (has2G) hsEntity?.let { it.data2g != "HS" } ?: true else null
+                                            ),
+                                            "3G" to fr.geotower.ui.components.ServiceStatus(
+                                                isVoixOk = if (has3G) hsEntity?.let { it.voix3g != "HS" } ?: true else null,
+                                                isSmsOk = if (has3G) hsEntity?.let { it.voix3g != "HS" } ?: true else null,
+                                                isInternetOk = if (has3G) hsEntity?.let { it.data3g != "HS" } ?: true else null
+                                            ),
+                                            "4G" to fr.geotower.ui.components.ServiceStatus(
+                                                isVoixOk = if (has4G) hsEntity?.let { it.voix4g != "HS" } ?: true else null,
+                                                isSmsOk = if (has4G) hsEntity?.let { it.voix4g != "HS" } ?: true else null,
+                                                isInternetOk = if (has4G) hsEntity?.let { it.data4g != "HS" } ?: true else null
+                                            ),
+                                            "5G" to fr.geotower.ui.components.ServiceStatus(
+                                                isVoixOk = if (has5G) hsEntity?.let { it.voix5g != "HS" } ?: true else null,
+                                                isSmsOk = if (has5G) hsEntity?.let { it.voix5g != "HS" } ?: true else null,
+                                                isInternetOk = if (has5G) hsEntity?.let { it.data5g != "HS" } ?: true else null
+                                            )
+                                        )
+
+                                        SiteStatusCard(
+                                            isOutage = isOutage,
+                                            outageText = outageText,
+                                            cardBgColor = MaterialTheme.colorScheme.surfaceVariant,
+                                            blockShape = RoundedCornerShape(12.dp),
+                                            techStatus = realTechStatus // ✅ ON ENVOIE ENFIN LES DONNÉES !
+                                        )
                                     }
                                 }
                                 "freq" -> {
@@ -572,8 +624,9 @@ fun shareFullSiteCapture(
     siteId: Long,
     mainInfo: LocalisationEntity,
     antennas: List<LocalisationEntity>,
-    physique: PhysiqueEntity?, // ✅ AJOUT
-    techniquesMap: Map<String, TechniqueEntity>, // ✅ AJOUT
+    physique: PhysiqueEntity?,
+    techniquesMap: Map<String, TechniqueEntity>,
+    hsDataMap: Map<String, fr.geotower.data.models.SiteHsEntity>, // 🚨 AJOUT
     distanceStr: String,
     bearingStr: String,
     forceDarkTheme: Boolean,
@@ -683,7 +736,8 @@ fun shareFullSiteCapture(
                                                 antennas.forEach { antenna ->
                                                     OperatorDetailItem(
                                                         antenna = antenna,
-                                                        technique = techniquesMap[antenna.idAnfr], // ✅ LA VRAIE DONNÉE EST LÀ
+                                                        technique = techniquesMap[antenna.idAnfr],
+                                                        hsEntity = hsDataMap[antenna.idAnfr], // 🚨 PASSAGE DE LA PANNE ICI
                                                         cardBgColor = Color.Transparent,
                                                         blockShape = RoundedCornerShape(0.dp),
                                                         useOneUi = false,
@@ -803,8 +857,9 @@ fun ThemeOptionItem(
 @Composable
 fun AntennaShareMenu(
     info: LocalisationEntity,
-    physique: PhysiqueEntity?, // ✅ AJOUT
-    technique: TechniqueEntity?, // ✅ AJOUT
+    physique: PhysiqueEntity?,
+    technique: TechniqueEntity?,
+    hsDataMap: Map<String, fr.geotower.data.models.SiteHsEntity>, // 🚨 AJOUT
     distanceStr: String,
     bearingStr: String,
     useOneUi: Boolean,
@@ -844,7 +899,7 @@ fun AntennaShareMenu(
     var incFreqs by remember { mutableStateOf(prefs.getBoolean("share_freq_enabled", true)) }
     var incConfidential by remember { mutableStateOf(prefs.getBoolean("share_confidential_enabled", false)) }
     var incQrCode by remember { mutableStateOf(prefs.getBoolean("share_site_qr_enabled", true)) } // ✅ NOUVELLE VARIABLE
-    var shareOrder by remember { mutableStateOf(prefs.getString("share_order", "map,support,ids,dates,address,freq")!!.split(",")) }
+    var shareOrder by remember { mutableStateOf(prefs.getString("share_order", "map,support,ids,dates,address,status,freq")!!.split(",")) }
 
     // ✅ FORCE LE RECHARGEMENT DES PARAMÈTRES PAR DÉFAUT À CHAQUE OUVERTURE
     LaunchedEffect(showShareSheet) {
@@ -857,7 +912,7 @@ fun AntennaShareMenu(
             incFreqs = prefs.getBoolean("share_freq_enabled", true)
             incConfidential = prefs.getBoolean("share_confidential_enabled", false)
             incQrCode = prefs.getBoolean("share_site_qr_enabled", true)
-            shareOrder = prefs.getString("share_order", "map,support,ids,dates,address,freq")!!
+            shareOrder = prefs.getString("share_order", "map,support,ids,dates,address,status,freq")!!
                 .split(",").filter { it != "heights" }
         }
     }
@@ -980,6 +1035,7 @@ fun AntennaShareMenu(
                                 "ids" -> Triple(AppStrings.shareIdsOption, incIds, { it: Boolean -> incIds = it })
                                 "dates" -> Triple(AppStrings.shareDatesOption, incDates, { it: Boolean -> incDates = it })
                                 "address" -> Triple(AppStrings.shareAddressOption, incAddress, { it: Boolean -> incAddress = it })
+                                "status" -> Triple(AppStrings.shareStatusOption, AppConfig.shareSiteStatus.value, { it: Boolean -> AppConfig.shareSiteStatus.value = it })
                                 "freq" -> Triple(AppStrings.shareFreqOption, incFreqs, { it: Boolean -> incFreqs = it })
                                 else -> Triple("", false, { _: Boolean -> })
                             }
@@ -1010,9 +1066,10 @@ fun AntennaShareMenu(
                     // ✅ AJOUT DU BOUTON RÉINITIALISER
                     TextButton(
                         onClick = {
-                            shareOrder = listOf("map", "support", "ids", "dates", "address", "freq")
+                            shareOrder = listOf("map", "support", "ids", "dates", "address", "status", "freq")
                             prefs.edit().putString("share_order", shareOrder.joinToString(",")).apply()
                             incMap = true; incSupport = true; incIds = true; incDates = true; incAddress = true; incFreqs = true; incQrCode = true
+                            AppConfig.shareSiteStatus.value = true
                         },
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     ) {
@@ -1048,6 +1105,7 @@ fun AntennaShareMenu(
                                 shareFullAntennaCapture(
                                     context, currentView, info,
                                     physique, technique,
+                                    hsDataMap, // 🚨 AJOUT ICI : C'est le 6ème paramètre attendu
                                     distanceStr, bearingStr, selectedShareTheme,
                                     txtSiteDetailsTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtGeneratedBy, txtShareSiteVia, txtimplementation, txtLastModification, txtIdentifiers, txtIdNumber, txtFrequenciesTitle, txtBandsNotSpecified, txtInService, txtTechnically, txtUnknownStatus, txtAnfrStationNumber, txtDates, txtError, txtProjectApproved, txtActivatedOn, txtDateNotSpecifiedAnfr, txtPanelHeightsTitle, txtAzimuths, txtIdSupportLabel, txtSupportDetailsTitle, txtSupportNature, txtOwner, txtAntennaType,
                                     mapBmp, txtInitError, emptyList(), txtCommunityPhotosTitle,
@@ -1069,8 +1127,9 @@ fun AntennaShareMenu(
 fun SupportShareMenu(
     siteId: Long,
     antennas: List<LocalisationEntity>,
-    physique: PhysiqueEntity?, // ✅ AJOUT
-    techniquesMap: Map<String, TechniqueEntity>, // ✅ AJOUT
+    physique: PhysiqueEntity?,
+    techniquesMap: Map<String, TechniqueEntity>,
+    hsDataMap: Map<String, fr.geotower.data.models.SiteHsEntity>, // 🚨 AJOUT
     distanceStr: String,
     bearingStr: String,
     useOneUi: Boolean,
@@ -1286,10 +1345,10 @@ fun SupportShareMenu(
                                 shareFullSiteCapture(
                                     context, currentView, siteId, antennas.first(), antennas,
                                     physique, techniquesMap,
+                                    hsDataMap,
                                     distanceStr, bearingStr, selectedShareTheme,
                                     txtSupportDetailTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtOperatorsTitle, txtGeneratedBy, txtShareSiteVia, txtIdNumber,
                                     txtInitError, txtSupportNature, txtOwner, mapBmp,
-                                    // ✅ CORRECTION DE L'APPEL ICI AUSSI :
                                     incMap, incSupport, incOperators, incConfidential, incQrCode, shareOrder
                                 )
                             }, 300)
@@ -1299,10 +1358,10 @@ fun SupportShareMenu(
                     ) {
                         Text(txtGenerateImage, fontWeight = FontWeight.Bold)
                     }
-                } // Ferme la Column de l'arrangement
-            } // Ferme la Column principale
-        } // Ferme la ModalBottomSheet
-    } // Ferme le if (showSelectionSheet && antennas.isNotEmpty())
+                }
+            }
+        }
+    }
 
 }
 

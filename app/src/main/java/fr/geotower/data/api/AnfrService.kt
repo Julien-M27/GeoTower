@@ -41,4 +41,7 @@ interface AnfrService {
     // ✅ NOUVEAU ENDPOINT : Récupérer le catalogue des cartes
     @GET("/api/v2/maps/catalog")
     suspend fun getMapsCatalog(): List<OfflineMapDto>
+
+    @GET("/api/v2/antennes/hs")
+    suspend fun getSitesHsGeoJson(): okhttp3.ResponseBody
 }

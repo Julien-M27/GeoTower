@@ -1,5 +1,6 @@
 package fr.geotower.ui.components
 
+import android.content.Context
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -42,6 +43,7 @@ fun SharedMiniMapCard(
     centerLat: Double,
     centerLon: Double,
     mappedAntennas: List<LocalisationEntity>,
+    sitesHs: List<fr.geotower.data.models.SiteHsEntity> = emptyList(),
     blockShape: Shape,
     cardBorder: BorderStroke?,
     onMapReady: (MapView) -> Unit,
@@ -164,31 +166,58 @@ fun SharedMiniMapCard(
                 val marker = map.overlays.filterIsInstance<MiniMapAntennaMarker>().firstOrNull()
 
                 if (marker != null) {
-                    // ✅ ON MET À JOUR LES DONNÉES DU MARQUEUR POUR LES TRAITS
                     marker.siteAntennas = mappedAntennas
                     marker.focusOperator = focusOperator
 
+                    // 1. On génère l'icône de base
                     val baseIcon = MapUtils.createAdaptiveMarker(
                         context,
                         mappedAntennas,
                         currentZoom >= 14.0 && AppConfig.showAzimuths.value,
                         focusOperator ?: AppConfig.defaultOperator.value
                     )
-                    val scale = ((currentZoom - 11.0) / 6.5).coerceIn(0.5, 1.0).toFloat()
 
-                    if (scale < 1f && baseIcon is android.graphics.drawable.BitmapDrawable) {
-                        val originalBitmap = baseIcon.bitmap
+                    // 🚨 LE MÊME CODE QUE MAPSCREEN : LOGIQUE DE FUSION SITES HS
+                    val validHsSites = sitesHs.filter { it.latitude != 0.0 && it.longitude != 0.0 }
+                    val mainAntenna = mappedAntennas.firstOrNull()
+
+                    val isHs = if (mainAntenna != null) {
+                        validHsSites.any { hs ->
+                            val hsId = hs.idAnfr.toLongOrNull()
+                            val antId = mainAntenna.idAnfr.toLongOrNull()
+                            hsId != null && hsId == antId
+                        }
+                    } else false
+
+                    val finalIcon = if (isHs && baseIcon is android.graphics.drawable.BitmapDrawable) {
+                        val badgeIcon = createHsBadge(context)
+                        val combinedBitmap = android.graphics.Bitmap.createBitmap(
+                            baseIcon.intrinsicWidth, baseIcon.intrinsicHeight, android.graphics.Bitmap.Config.ARGB_8888
+                        )
+                        val canvas = android.graphics.Canvas(combinedBitmap)
+                        baseIcon.setBounds(0, 0, canvas.width, canvas.height)
+                        baseIcon.draw(canvas)
+                        val offsetX = (canvas.width - badgeIcon.intrinsicWidth) / 2
+                        val offsetY = (canvas.height - badgeIcon.intrinsicHeight) / 2
+                        badgeIcon.setBounds(offsetX, offsetY, offsetX + badgeIcon.intrinsicWidth, offsetY + badgeIcon.intrinsicHeight)
+                        badgeIcon.draw(canvas)
+                        android.graphics.drawable.BitmapDrawable(context.resources, combinedBitmap)
+                    } else {
+                        baseIcon
+                    }
+
+                    // On applique le scale sur l'icône finale
+                    val scale = ((currentZoom - 11.0) / 6.5).coerceIn(0.5, 1.0).toFloat()
+                    if (scale < 1f && finalIcon is android.graphics.drawable.BitmapDrawable) {
+                        val originalBitmap = finalIcon.bitmap
                         val scaledWidth = (originalBitmap.width * scale).toInt()
                         val scaledHeight = (originalBitmap.height * scale).toInt()
-
                         if (scaledWidth > 0 && scaledHeight > 0) {
                             val scaledBitmap = android.graphics.Bitmap.createScaledBitmap(originalBitmap, scaledWidth, scaledHeight, true)
                             marker.icon = android.graphics.drawable.BitmapDrawable(context.resources, scaledBitmap)
-                        } else {
-                            marker.icon = baseIcon
-                        }
+                        } else { marker.icon = finalIcon }
                     } else {
-                        marker.icon = baseIcon
+                        marker.icon = finalIcon
                     }
                 }
                 map.invalidate()
@@ -395,4 +424,25 @@ class MiniMapAntennaMarker(
         }
         super.draw(canvas, projection)
     }
+}
+
+// 🚨 LE MÊME CODE QUE MAPSCREEN : DESSINE LE POINT D'EXCLAMATION
+fun createHsBadge(context: Context): android.graphics.drawable.BitmapDrawable {
+    val density = context.resources.displayMetrics.density
+    val size = (32 * density).toInt()
+    val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+    val maskPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.parseColor("#F5F5F5")
+        style = android.graphics.Paint.Style.FILL
+    }
+    canvas.drawCircle(size / 2f, size / 2f, size / 2f, maskPaint)
+    val textPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.parseColor("#E53935")
+        textSize = 24f * density
+        textAlign = android.graphics.Paint.Align.CENTER
+        typeface = android.graphics.Typeface.DEFAULT_BOLD
+    }
+    canvas.drawText("!", size / 2f, size / 2f - (textPaint.ascent() + textPaint.descent()) / 2f, textPaint)
+    return android.graphics.drawable.BitmapDrawable(context.resources, bitmap)
 }

@@ -61,6 +61,8 @@ import java.util.UUID
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import androidx.activity.compose.BackHandler
+import fr.geotower.ui.components.SiteStatusCard
+import fr.geotower.ui.components.formatOutageDetails
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -161,6 +163,7 @@ fun SiteDetailScreen(
     var antenna by remember { mutableStateOf<LocalisationEntity?>(null) }
     var physique by remember { mutableStateOf<PhysiqueEntity?>(null) }
     var technique by remember { mutableStateOf<TechniqueEntity?>(null) }
+    var hsDataMap by remember { mutableStateOf<Map<String, fr.geotower.data.models.SiteHsEntity>>(emptyMap()) } // 🚨 AJOUT
     var userLocation by remember { mutableStateOf<Location?>(null) }
     var communityPhotos by remember { mutableStateOf<List<CommunityPhoto>>(emptyList()) }
 
@@ -208,7 +211,8 @@ fun SiteDetailScreen(
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
-    val pageSiteOrder by remember { mutableStateOf(prefs.getString("page_site_order", "operator,bearing_height,map,support_details,photos,panel_heights,ids,nav,share,dates,address,freqs,links")!!.split(",")) }
+    // 🚨 MODIFICATION : On déplace "status" entre "address" et "freqs"
+    val pageSiteOrder by remember { mutableStateOf(prefs.getString("page_site_order", "operator,bearing_height,map,support_details,photos,panel_heights,ids,nav,share,dates,address,status,freqs,links")!!.split(",")) }
     val showOperator by remember { mutableStateOf(prefs.getBoolean("page_site_operator", true)) }
     val showBearingHeight by remember { mutableStateOf(prefs.getBoolean("page_site_bearing_height", true)) }
     val showMap by remember { mutableStateOf(prefs.getBoolean("page_site_map", true)) }
@@ -250,6 +254,17 @@ fun SiteDetailScreen(
         if (localData != null) {
             physique = repository.getPhysiqueByAnfr(localData.idAnfr).firstOrNull()
             technique = repository.getTechniqueByAnfr(localData.idAnfr).firstOrNull()
+
+            // 🚨 TÉLÉCHARGEMENT DES PANNES
+            try {
+                val allHs = repository.getSitesHs()
+                val tempOutageMap = mutableMapOf<String, fr.geotower.data.models.SiteHsEntity>()
+                val hsData = allHs.firstOrNull { hs ->
+                    hs.idAnfr.toLongOrNull() == localData.idAnfr.toLongOrNull()
+                }
+                if (hsData != null) tempOutageMap[localData.idAnfr] = hsData
+                hsDataMap = tempOutageMap
+            } catch (e: Exception) { e.printStackTrace() }
         }
 
         if (localData != null && localData.idAnfr.isNotBlank()) {
@@ -508,6 +523,50 @@ fun SiteDetailScreen(
 
                 pageSiteOrder.forEach { block ->
                     when (block) {
+                        "status" -> if (AppConfig.siteShowStatus.value) {
+                            val hsEntity = hsDataMap.values.firstOrNull()
+                            val isOutage = hsEntity != null
+                            val outageText = hsEntity?.let { fr.geotower.ui.components.formatOutageDetails(it) }
+
+                            // 1. Quelles technologies sont physiquement sur l'antenne ?
+                            val rawTechs = technique?.technologies?.takeIf { it.isNotBlank() } ?: info.frequences ?: ""
+                            val has2G = rawTechs.contains("2G", ignoreCase = true)
+                            val has3G = rawTechs.contains("3G", ignoreCase = true)
+                            val has4G = rawTechs.contains("4G", ignoreCase = true)
+                            val has5G = rawTechs.contains("5G", ignoreCase = true)
+
+                            // 2. On croise la présence avec l'état de la panne réelle
+                            val realTechStatus = mapOf(
+                                "2G" to fr.geotower.ui.components.ServiceStatus(
+                                    isVoixOk = if (has2G) hsEntity?.let { it.voix2g != "HS" } ?: true else null,
+                                    isSmsOk = if (has2G) hsEntity?.let { it.voix2g != "HS" } ?: true else null, // En 2G, les SMS passent par la Voix
+                                    isInternetOk = if (has2G) hsEntity?.let { it.data2g != "HS" } ?: true else null
+                                ),
+                                "3G" to fr.geotower.ui.components.ServiceStatus(
+                                    isVoixOk = if (has3G) hsEntity?.let { it.voix3g != "HS" } ?: true else null,
+                                    isSmsOk = if (has3G) hsEntity?.let { it.voix3g != "HS" } ?: true else null, // En 3G, les SMS passent par la Voix
+                                    isInternetOk = if (has3G) hsEntity?.let { it.data3g != "HS" } ?: true else null
+                                ),
+                                "4G" to fr.geotower.ui.components.ServiceStatus(
+                                    isVoixOk = if (has4G) hsEntity?.let { it.voix4g != "HS" } ?: true else null,
+                                    isSmsOk = if (has4G) hsEntity?.let { it.voix4g != "HS" } ?: true else null, // En 4G (VoLTE), SMS = Voix
+                                    isInternetOk = if (has4G) hsEntity?.let { it.data4g != "HS" } ?: true else null
+                                ),
+                                "5G" to fr.geotower.ui.components.ServiceStatus(
+                                    isVoixOk = if (has5G) hsEntity?.let { it.voix5g != "HS" } ?: true else null,
+                                    isSmsOk = if (has5G) hsEntity?.let { it.voix5g != "HS" } ?: true else null,
+                                    isInternetOk = if (has5G) hsEntity?.let { it.data5g != "HS" } ?: true else null
+                                )
+                            )
+
+                            fr.geotower.ui.components.SiteStatusCard(
+                                isOutage = isOutage,
+                                outageText = outageText,
+                                cardBgColor = cardBgColor,
+                                blockShape = blockShape,
+                                techStatus = realTechStatus // ✅ ON ENVOIE LA MATRICE EXACTE
+                            )
+                        }
                         "operator" -> {
                             if (showOperator) {
                                 Card(modifier = Modifier.fillMaxWidth(), shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
@@ -562,6 +621,7 @@ fun SiteDetailScreen(
                                     centerLat = info.latitude,
                                     centerLon = info.longitude,
                                     mappedAntennas = mappedAntennas,
+                                    sitesHs = hsDataMap.values.toList(),
                                     blockShape = blockShape,
                                     cardBorder = cardBorder,
                                     onMapReady = { globalMapRef = it },
@@ -618,6 +678,7 @@ fun SiteDetailScreen(
                                     info = info,
                                     physique = physique,
                                     technique = technique,
+                                    hsDataMap = hsDataMap,
                                     distanceStr = distanceStr,
                                     bearingStr = bearingStr,
                                     useOneUi = useOneUi,

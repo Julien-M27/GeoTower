@@ -55,15 +55,26 @@ import fr.geotower.utils.AppStrings
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SharePreferencesSheet(
-    shareOrder: List<String>, onOrderChange: (List<String>) -> Unit,
-    mapEnabled: Boolean, onMapChange: (Boolean) -> Unit,
-    supportEnabled: Boolean, onSupportChange: (Boolean) -> Unit,
-    idsEnabled: Boolean, onIdsChange: (Boolean) -> Unit,
-    datesEnabled: Boolean, onDatesChange: (Boolean) -> Unit,
-    addressEnabled: Boolean, onAddressChange: (Boolean) -> Unit,
-    freqEnabled: Boolean, onFreqChange: (Boolean) -> Unit,
-    qrEnabled: Boolean, onQrChange: (Boolean) -> Unit,
-    confidentialEnabled: Boolean, onConfidentialChange: (Boolean) -> Unit,
+    shareOrder: List<String>,
+    onOrderChange: (List<String>) -> Unit,
+    mapEnabled: Boolean,
+    onMapChange: (Boolean) -> Unit,
+    supportEnabled: Boolean,
+    onSupportChange: (Boolean) -> Unit,
+    idsEnabled: Boolean,
+    onIdsChange: (Boolean) -> Unit,
+    datesEnabled: Boolean,
+    onDatesChange: (Boolean) -> Unit,
+    addressEnabled: Boolean,
+    onAddressChange: (Boolean) -> Unit,
+    statusEnabled: Boolean, // 🚨 NEW
+    onStatusChange: (Boolean) -> Unit, // 🚨 NEW
+    freqEnabled: Boolean,
+    onFreqChange: (Boolean) -> Unit,
+    qrEnabled: Boolean,
+    onQrChange: (Boolean) -> Unit,
+    confidentialEnabled: Boolean,
+    onConfidentialChange: (Boolean) -> Unit,
     onDismiss: () -> Unit,
     onBack: () -> Unit,
     sheetState: SheetState,
@@ -175,6 +186,7 @@ fun SharePreferencesSheet(
                             "ids" -> DraggableSwitchCard(AppStrings.shareIdsOption, idsEnabled, onIdsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "dates" -> DraggableSwitchCard(AppStrings.shareDatesOption, datesEnabled, onDatesChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "address" -> DraggableSwitchCard(AppStrings.shareAddressOption, addressEnabled, onAddressChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "status" -> DraggableSwitchCard(AppStrings.shareStatusOption, statusEnabled, onStatusChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "freq" -> DraggableSwitchCard(AppStrings.shareFreqOption, freqEnabled, onFreqChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                         }
                     }
@@ -186,12 +198,13 @@ fun SharePreferencesSheet(
             // --- BOUTON RÉINITIALISER (TOUT PAR DÉFAUT) ---
             TextButton(
                 onClick = {
-                    onOrderChange(listOf("map", "support", "ids", "dates", "address", "freq"))
+                    onOrderChange(listOf("map", "support", "ids", "dates", "address", "status", "freq"))
                     onMapChange(true)
                     onSupportChange(true)
                     onIdsChange(true)
                     onDatesChange(true)
                     onAddressChange(true)
+                    onStatusChange(true)
                     onFreqChange(true)
                     // Note : On ne réinitialise volontairement pas le mode "Confidentiel" par sécurité
                 }
@@ -381,6 +394,8 @@ fun MapSharePreferencesSheet(
     speedometerEnabled: Boolean, onSpeedometerChange: (Boolean) -> Unit,
     scaleEnabled: Boolean, onScaleChange: (Boolean) -> Unit,
     attributionEnabled: Boolean, onAttributionChange: (Boolean) -> Unit,
+    statusEnabled: Boolean, // 🚨 AJOUT
+    onStatusChange: (Boolean) -> Unit, // 🚨 AJOUT
     confidentialEnabled: Boolean, onConfidentialChange: (Boolean) -> Unit,
     onDismiss: () -> Unit,
     onBack: () -> Unit,
@@ -431,6 +446,7 @@ fun MapSharePreferencesSheet(
 
             Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
                 SimpleSwitchCard(AppStrings.shareMapAzimuthsOption, azimuthsEnabled, onAzimuthsChange, shape, border, bubbleColor, useOneUi)
+                SimpleSwitchCard(AppStrings.shareStatusOption, statusEnabled, onStatusChange, shape, border, bubbleColor, useOneUi) // 🚨 AJOUT
                 SimpleSwitchCard(AppStrings.shareMapSpeedometerOption, speedometerEnabled, onSpeedometerChange, shape, border, bubbleColor, useOneUi)
                 SimpleSwitchCard(AppStrings.shareMapScaleOption, scaleEnabled, onScaleChange, shape, border, bubbleColor, useOneUi)
                 SimpleSwitchCard(AppStrings.shareMapAttributionOption, attributionEnabled, onAttributionChange, shape, border, bubbleColor, useOneUi)

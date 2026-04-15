@@ -154,6 +154,7 @@ fun MapScreen(
     val density = LocalDensity.current
     val antennas by viewModel.antennas.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
+    val sitesHs by viewModel.sitesHs.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val rawPrimaryColor = MaterialTheme.colorScheme.primary.toArgb()
@@ -559,17 +560,15 @@ fun MapScreen(
         map.invalidate()
     }
 
-    // ✅ NOUVELLE FONCTION UPDATE MARKERS CORRIGÉE
-    fun updateMarkers(map: MapView, antennasList: List<LocalisationEntity>) {
-        // 🚀 On récupère l'état actuel des filtres AVANT de lancer le calcul
+    // ✅ AJOUT DU PARAMÈTRE sitesHsList
+    suspend fun updateMarkers(map: MapView, antennasList: List<LocalisationEntity>, sitesHsList: List<fr.geotower.data.models.SiteHsEntity> = emptyList()) {
         val sOrange = AppConfig.showOrange.value
         val sSfr = AppConfig.showSfr.value
         val sBouygues = AppConfig.showBouygues.value
         val sFree = AppConfig.showFree.value
 
-        scope.launch(kotlinx.coroutines.Dispatchers.Default) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
 
-            // 🧹 Nettoyage de sécurité
             if (antennasList.isEmpty()) {
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                     macroOverlay.items.clear()
@@ -577,91 +576,119 @@ fun MapScreen(
                     markersOverlay.invalidate()
                     map.invalidate()
                 }
-                return@launch
+                return@withContext
             }
+
+            // 🚀 Optimisation : on garde juste les pannes valides sans convertir en texte
+            val validHsSites = sitesHsList.filter { it.latitude != 0.0 && it.longitude != 0.0 }
 
             val isClusterMode = antennasList.first().idAnfr.startsWith("CLUSTER_")
 
             if (isClusterMode) {
-                // ========================================================
-                // 🚀 MODE MACRO (Clusters SQL)
-                // ========================================================
+                // ... (Ton code actuel MACRO reste identique)
                 val clusterMarkers = antennasList.map { fakeAntenna ->
                     val count = fakeAntenna.idAnfr.removePrefix("CLUSTER_").toIntOrNull() ?: 1
-                    Marker(map).apply {
+                    org.osmdroid.views.overlay.Marker(map).apply {
                         position = GeoPoint(fakeAntenna.latitude, fakeAntenna.longitude)
-                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
-
-                        // ✨ CORRECTION : On filtre les logos à afficher sur le gros cluster
+                        setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
                         val rawOps = fakeAntenna.operateur?.split(",")?.map { it.trim().uppercase() } ?: emptyList()
                         val activeOps = rawOps.filter { op ->
-                            (sOrange && op.contains("ORANGE")) ||
-                                    (sSfr && op.contains("SFR")) ||
-                                    (sBouygues && op.contains("BOUYGUES")) ||
-                                    (sFree && op.contains("FREE"))
+                            (sOrange && op.contains("ORANGE")) || (sSfr && op.contains("SFR")) || (sBouygues && op.contains("BOUYGUES")) || (sFree && op.contains("FREE"))
                         }
-
-                        val currentDefaultOp = AppConfig.defaultOperator.value
-                        icon = MapUtils.createClusterIcon(context, activeOps, count, currentDefaultOp)
-
+                        icon = MapUtils.createClusterIcon(context, activeOps, count, AppConfig.defaultOperator.value)
                         setOnMarkerClickListener { clickedMarker, m ->
                             val targetPoint = org.osmdroid.util.GeoPoint(clickedMarker.position.latitude, clickedMarker.position.longitude)
-                            m.post {
-                                m.controller.stopAnimation(false)
-                                m.controller.setZoom(m.zoomLevelDouble + 1.5)
-                                m.controller.setCenter(targetPoint)
-                            }
+                            m.post { m.controller.stopAnimation(false); m.controller.setZoom(m.zoomLevelDouble + 1.5); m.controller.setCenter(targetPoint) }
                             true
                         }
                     }
                 }
-
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    markersOverlay.items.clear()
-                    markersOverlay.invalidate()
-                    macroOverlay.items.clear()
-                    macroOverlay.items.addAll(clusterMarkers)
-                    map.invalidate()
+                    markersOverlay.items.clear(); markersOverlay.invalidate(); macroOverlay.items.clear(); macroOverlay.items.addAll(clusterMarkers); map.invalidate()
                 }
-
             } else {
-                // ========================================================
-                // 🔍 MODE MICRO (Vrais pylônes)
-                // ========================================================
+                // 🔍 MODE MICRO
                 val groupedSites = antennasList.groupBy { "${it.latitude}_${it.longitude}" }.values.take(6000)
 
+                // ✅ RETOUR À map : 1 seul marqueur définitif par pylône
                 val newMarkers = groupedSites.map { siteAntennas ->
                     val mainAntenna = siteAntennas.first()
 
-                    // ✨ CORRECTION : On ne garde que les opérateurs cochés pour l'icône du pylône
-                    val operatorsOnSite = siteAntennas.mapNotNull { it.operateur }
-                        .flatMap { it.split(Regex("[/,\\-]")) }
-                        .map { it.trim().uppercase() }
-                        .filter { op ->
-                            (sOrange && op.contains("ORANGE")) ||
-                                    (sSfr && op.contains("SFR")) ||
-                                    (sBouygues && op.contains("BOUYGUES")) ||
-                                    (sFree && op.contains("FREE"))
+                    val filteredSiteAntennas = siteAntennas.map { antenna ->
+                        val rawOps = antenna.operateur?.split(Regex("[/,\\-]"))?.map { it.trim().uppercase() } ?: emptyList()
+                        val activeOps = rawOps.filter { op ->
+                            (sOrange && op.contains("ORANGE")) || (sSfr && op.contains("SFR")) || (sBouygues && op.contains("BOUYGUES")) || (sFree && op.contains("FREE"))
                         }
+                        antenna.copy(operateur = activeOps.joinToString(", "))
+                    }
 
-                    AntennaMarker(map, siteAntennas, safePrimaryColor).apply {
+                    // Le marqueur UNIQUE (L'antenne)
+                    AntennaMarker(map, filteredSiteAntennas, safePrimaryColor).apply {
                         position = GeoPoint(mainAntenna.latitude, mainAntenna.longitude)
-                        setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                        setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
 
-                        // ✅ On passe les opérateurs FILTRÉS au clusterer (RadiusMarkerClusterer)
+                        infoWindow = null // Pas de bulle grise par défaut
+
+                        val operatorsOnSite = filteredSiteAntennas.mapNotNull { it.operateur }.flatMap { it.split(",") }.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
                         relatedObject = operatorsOnSite
 
-                        val isZoomCloseEnough = map.zoomLevelDouble >= 13.0
-                        val defaultOp = AppConfig.defaultOperator.value
+                        // 1. On génère l'icône de base (avec la bordure de couleur de l'opérateur)
+                        val baseIcon = MapUtils.createAdaptiveMarker(context, filteredSiteAntennas, map.zoomLevelDouble >= 13.0 && AppConfig.showAzimuths.value, AppConfig.defaultOperator.value)
 
-                        // L'icône individuelle ne montrera plus les logos décochés
-                        icon = MapUtils.createAdaptiveMarker(context, siteAntennas, isZoomCloseEnough && AppConfig.showAzimuths.value, defaultOp)
+                        // 2. LOGIQUE DE FUSION : Comparaison exacte par ID ANFR !
+                        // C'est la méthode la plus fiable (Zéro erreur de GPS)
+                        val isHs = validHsSites.any { hs ->
+                            // On convertit en Long pour ignorer les zéros au début (ex: "0012750001" devient 12750001)
+                            val hsId = hs.idAnfr.toLongOrNull()
+                            val antId = mainAntenna.idAnfr.toLongOrNull()
 
+                            // Si les deux IDs sont valides et identiques, l'antenne est bien en panne !
+                            hsId != null && hsId == antId
+                        }
+
+                        if (isHs) {
+
+                            val badgeIcon = createHsBadge(context) // Notre point d'exclamation
+
+                            // A. Création d'une "toile" vide de la taille de l'icône de base
+                            val combinedBitmap = android.graphics.Bitmap.createBitmap(
+                                baseIcon.intrinsicWidth,
+                                baseIcon.intrinsicHeight,
+                                android.graphics.Bitmap.Config.ARGB_8888
+                            )
+                            val canvas = android.graphics.Canvas(combinedBitmap)
+
+                            // B. On dessine l'icône colorée de l'opérateur au fond
+                            baseIcon.setBounds(0, 0, canvas.width, canvas.height)
+                            baseIcon.draw(canvas)
+
+                            // C. On dessine le point d'exclamation parfaitement centré par-dessus
+                            val offsetX = (canvas.width - badgeIcon.intrinsicWidth) / 2
+                            val offsetY = (canvas.height - badgeIcon.intrinsicHeight) / 2
+                            badgeIcon.setBounds(offsetX, offsetY, offsetX + badgeIcon.intrinsicWidth, offsetY + badgeIcon.intrinsicHeight)
+                            badgeIcon.draw(canvas)
+
+                            // D. On applique l'image fusionnée au marqueur
+                            icon = android.graphics.drawable.BitmapDrawable(context.resources, combinedBitmap)
+                        } else {
+                            // Si pas en panne, on applique l'icône normale
+                            icon = baseIcon
+                        }
+
+                        // L'action de clic reste unique et propre !
                         setOnMarkerClickListener { _, _ ->
-                            // ... (ton code de clic actuel reste identique) ...
+                            if (isMeasuringMode) {
+                                val id = mainAntenna.idAnfr
+                                if (measuredSites.containsKey(id)) measuredSites.remove(id) else if (myCurrentLoc != null) measuredSites[id] = mainAntenna
+                                refreshMeasureLayers(map)
+                            } else {
+                                val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+                                prefs.edit().putFloat("clicked_lat", mainAntenna.latitude.toFloat()).putFloat("clicked_lon", mainAntenna.longitude.toFloat()).apply()
+                                navController.navigate("support_detail/${mainAntenna.idAnfr.toLongOrNull() ?: 0L}")
+                            }
                             true
                         }
-                    }
+                    } // Fin du apply (retourne 1 seul marqueur)
                 }
 
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
@@ -679,6 +706,7 @@ fun MapScreen(
     // Dès qu'une case est cochée/décochée, la carte sera forcée de se redessiner !
     LaunchedEffect(
         filteredAntennas,
+        sitesHs, // ✅ AJOUT ICI
         isMeasuringMode,
         safePrimaryColor,
         AppConfig.showAzimuths.value,
@@ -688,7 +716,7 @@ fun MapScreen(
         AppConfig.showFree.value
     ) {
         mapViewRef?.let { map ->
-            updateMarkers(map, filteredAntennas)
+            updateMarkers(map, filteredAntennas, sitesHs)
         }
     }
 
@@ -945,7 +973,6 @@ fun MapScreen(
                             map.tileProvider = forgeProvider
                         }
                     } else {
-                        Toast.makeText(context, txtNoMapFileNotFound, Toast.LENGTH_LONG).show()
                         AppConfig.mapProvider.value = 1
                     }
                 } else {
@@ -2365,4 +2392,35 @@ fun isNetworkAvailable(context: Context): Boolean {
     return activeNetwork.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) ||
             activeNetwork.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) ||
             activeNetwork.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)
+}
+
+// 🚨 DESSINE LE POINT D'EXCLAMATION DE PANNE AVEC UN CACHE
+fun createHsBadge(context: Context): android.graphics.drawable.BitmapDrawable {
+    val density = context.resources.displayMetrics.density
+
+    // ✅ ON AGRANDIT ENCORE : 32 au lieu de 26 pour être sûr de tout masquer !
+    // (Vous pouvez ajuster ce chiffre librement : 30, 32, 34...)
+    val size = (32 * density).toInt()
+    val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
+    val canvas = android.graphics.Canvas(bitmap)
+
+    // 1. LE CACHE (Le fond pour effacer le logo de l'antenne)
+    val maskPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.parseColor("#F5F5F5")
+        style = android.graphics.Paint.Style.FILL
+    }
+    canvas.drawCircle(size / 2f, size / 2f, size / 2f, maskPaint)
+
+    // 2. LE TEXTE (Le point d'exclamation)
+    val textPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        color = android.graphics.Color.parseColor("#E53935") // Rouge vif
+        // ✅ On grossit aussi le point d'exclamation (de 20 à 24) pour qu'il reste proportionnel
+        textSize = 24f * density
+        textAlign = android.graphics.Paint.Align.CENTER
+        typeface = android.graphics.Typeface.DEFAULT_BOLD
+    }
+
+    canvas.drawText("!", size / 2f, size / 2f - (textPaint.ascent() + textPaint.descent()) / 2f, textPaint)
+
+    return android.graphics.drawable.BitmapDrawable(context.resources, bitmap)
 }

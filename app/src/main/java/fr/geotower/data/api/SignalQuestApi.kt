@@ -5,6 +5,7 @@ import retrofit2.converter.gson.GsonConverterFactory // <-- ON UTILISE GSON ICI
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.Path
+import retrofit2.http.Query // ✅ AJOUT DE L'IMPORT QUERY
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
 import okhttp3.ResponseBody
@@ -12,7 +13,7 @@ import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
 
-// 1. Les modèles de données
+// 1. Les modèles de données (Photos)
 data class SqPhotosResponse(
     val data: List<SqPhotoData>
 )
@@ -32,7 +33,6 @@ interface SignalQuestApiService {
         @Path("siteId") siteId: String
     ): retrofit2.Response<SqPhotosResponse>
 
-    // --- NOUVELLE MÉTHODE POUR L'UPLOAD ---
     @Multipart
     @POST("api/external/v1/sites/{siteId}/photos")
     suspend fun uploadSitePhoto(

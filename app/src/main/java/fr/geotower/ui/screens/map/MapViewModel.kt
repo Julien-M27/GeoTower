@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
+import fr.geotower.data.models.SiteHsEntity
 
 class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
 
@@ -89,7 +90,31 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
         }
     }
 
-    // ✅ CORRECTION ICI : On passe bien le zoom en paramètre !
+    // =================================================================
+    // ✅ PANNES RÉSEAU (GeoTower GeoJSON)
+    // =================================================================
+    private val _sitesHs = MutableStateFlow<List<SiteHsEntity>>(emptyList())
+    val sitesHs = _sitesHs.asStateFlow()
+
+    init {
+        fetchSitesHs()
+    }
+
+    fun fetchSitesHs() {
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                // On télécharge toutes les pannes de tous les opérateurs en une seule fois !
+                val allHs = repository.getSitesHs()
+                _sitesHs.value = allHs
+                Log.d("GeoTower", "✅ ${allHs.size} antennes en panne récupérées via le nouveau GeoJSON !")
+            } catch (e: Exception) {
+                Log.e("GeoTower", "❌ Erreur lors de la récupération des pannes : ${e.message}")
+            }
+        }
+    }
+
+    // =================================================================
+
     fun clearCityFilterAndReload(zoom: Double, latNorth: Double, lonEast: Double, latSouth: Double, lonWest: Double) {
         isCityLocked = false // ✅ ON DÉVERROUILLE
         cityPolygons = null
@@ -104,7 +129,6 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
         _antennas.value = emptyList()
     }
 
-    // ✅ CORRECTION : La fonction est bien à L'INTÉRIEUR de la classe MapViewModel
     suspend fun searchSiteById(query: String): LocalisationEntity? {
         return try {
             val results = repository.searchAntennasById(query)

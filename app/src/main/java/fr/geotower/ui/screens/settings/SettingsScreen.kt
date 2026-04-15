@@ -214,7 +214,7 @@ fun SettingsScreen(
     var shareConfidentialEnabled by remember { mutableStateOf(prefs.getBoolean("share_confidential_enabled", false)) }
     var shareSiteQrEnabled by remember { mutableStateOf(prefs.getBoolean("share_site_qr_enabled", true)) }
     var shareSupQrEnabled by remember { mutableStateOf(prefs.getBoolean("share_sup_qr_enabled", true)) }
-    var shareOrder by remember { mutableStateOf(prefs.getString("share_order", "map,support,heights,ids,dates,address,freq")!!.split(",")) }
+    var shareOrder by remember { mutableStateOf(prefs.getString("share_order", "map,support,ids,dates,address,status,freq")!!.split(",")) }
 
     // 2. Variables du Pylône (Support) - SEULEMENT 3 BLOCS !
     var shareSupMapEnabled by remember { mutableStateOf(prefs.getBoolean("share_sup_map_enabled", true)) }
@@ -256,8 +256,7 @@ fun SettingsScreen(
     var pageSupportOperators by remember { mutableStateOf(prefs.getBoolean("page_support_operators", true)) }
 
     // --- Variables d'état pour l'Antenne (Site) ---
-    var pageSiteOrder by remember { mutableStateOf(prefs.getString("page_site_order", "operator,bearing_height,map,support_details,photos,panel_heights,ids,nav,share,dates,address,freqs,links")!!.split(",")) }
-    var pageSiteOperator by remember { mutableStateOf(prefs.getBoolean("page_site_operator", true)) }
+    var pageSiteOrder by remember { mutableStateOf(prefs.getString("page_site_order", "operator,bearing_height,map,support_details,photos,ids,nav,share,dates,address,status,freqs,links")!!.split(",")) };    var pageSiteOperator by remember { mutableStateOf(prefs.getBoolean("page_site_operator", true)) }
     var pageSiteBearingHeight by remember { mutableStateOf(prefs.getBoolean("page_site_bearing_height", true)) }
     var pageSiteMap by remember { mutableStateOf(prefs.getBoolean("page_site_map", true)) }
     var pageSiteSupportDetails by remember { mutableStateOf(prefs.getBoolean("page_site_support_details", true)) }
@@ -707,6 +706,7 @@ fun SettingsScreen(
                 showShare = pageSiteShare, onShareChange = { pageSiteShare = it; prefs.edit().putBoolean("page_site_share", it).apply() },
                 showDates = pageSiteDates, onDatesChange = { pageSiteDates = it; prefs.edit().putBoolean("page_site_dates", it).apply() },
                 showAddress = pageSiteAddress, onAddressChange = { pageSiteAddress = it; prefs.edit().putBoolean("page_site_address", it).apply() },
+                showStatus = AppConfig.siteShowStatus.value, onStatusChange = { AppConfig.siteShowStatus.value = it; prefs.edit().putBoolean("site_show_status", it).apply() }, // 🚨 AJOUT DU STATUT
                 showFreqs = pageSiteFreqs, onFreqsChange = { pageSiteFreqs = it; prefs.edit().putBoolean("page_site_freqs", it).apply() },
                 showLinks = pageSiteLinks, onLinksChange = { pageSiteLinks = it; prefs.edit().putBoolean("page_site_links", it).apply() },
                 onOpenFrequencies = {
@@ -858,6 +858,10 @@ fun SettingsScreen(
                     shareAddressEnabled = it; prefs.edit().putBoolean("share_address_enabled", it)
                     .apply()
                 },
+                statusEnabled = AppConfig.shareSiteStatus.value, // 🚨 AJOUT DU STATUT
+                onStatusChange = {
+                    AppConfig.shareSiteStatus.value = it; prefs.edit().putBoolean("share_site_status", it).apply()
+                },
                 freqEnabled = shareFreqEnabled,
                 onFreqChange = {
                     shareFreqEnabled = it; prefs.edit().putBoolean("share_freq_enabled", it).apply()
@@ -904,6 +908,10 @@ fun SettingsScreen(
             onAttributionChange = {
                 shareMapAttribution = it; prefs.edit().putBoolean("share_map_attribution", it).apply()
                 AppConfig.shareMapAttribution.value = it
+            },
+            statusEnabled = AppConfig.shareSiteStatus.value, // 🚨 C'EST ICI QU'IL MANQUAIT LES VARIABLES !
+            onStatusChange = {
+                AppConfig.shareSiteStatus.value = it; prefs.edit().putBoolean("share_site_status", it).apply()
             },
             confidentialEnabled = shareMapConfidential,
             onConfidentialChange = {

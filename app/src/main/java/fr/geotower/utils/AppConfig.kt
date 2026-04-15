@@ -17,6 +17,10 @@ object AppConfig {
     //Notification de téléchargement
     var enableUpdateNotifications = mutableStateOf(true) // Désactivé par défaut
 
+    // Statut de l'antenne
+    var siteShowStatus = mutableStateOf(true)
+    var shareSiteStatus = mutableStateOf(true) // 🚨 AJOUT DE LA VARIABLE MANQUANTE
+
     // Langue globale de l'application (Système par défaut au 1er lancement)
     val appLanguage = mutableStateOf("Système")
 
@@ -159,6 +163,9 @@ object AppConfig {
         // 🛠️ ASTUCE DÉBOGAGE : Regarde dans le Logcat d'Android Studio pour voir ces valeurs !
         android.util.Log.d("GeoTower_Fold", "Modèle (MODEL) : $model | Appareil (DEVICE) : $device")
 
+        //Statut
+        shareSiteStatus.value = prefs.getBoolean("share_site_status", true)
+
         // ✅ DÉTECTION GALAXY Z FOLD (Samsung)
         val isGalaxyZFold = model.startsWith("SM-F9", ignoreCase = true)
 
@@ -237,6 +244,14 @@ object AppConfig {
         siteShowSpectrum.value = prefs.getBoolean("site_show_spectrum", true)
         siteShowSpectrumBand.value = prefs.getBoolean("site_show_spectrum_band", true)
         siteShowSpectrumTotal.value = prefs.getBoolean("site_show_spectrum_total", true)
+
+        // 🚨 AJOUTEZ CE BLOC ICI :
+        // Chargement de la visibilité du nouveau bloc Statut
+        siteShowStatus.value = prefs.getBoolean("site_show_status", true)
+
+        // Chargement de l'ordre des blocs (incluant 'status' par défaut)
+        val pageOrder = prefs.getString("page_support_order", "map,status,details,photos,nav,share,operators")
+        // Note : Si vous utilisez une variable globale pour stocker cet ordre, assurez-vous de la mettre à jour ici.
 
         // --- CHARGEMENT DE L'ORDRE DES TECHNOLOGIES ET FRÉQUENCES ---
         val tOrder = prefs.getString("site_techno_order", "5G,4G,3G,2G,FH")
