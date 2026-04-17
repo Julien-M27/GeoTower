@@ -200,14 +200,34 @@ fun SiteDetailScreen(
                 val encodedUris = uris.joinToString(",") { Uri.encode(it.toString()) }
                 val uploadSiteId = physique?.idSupport ?: antenna!!.idAnfr
                 val safeOperator = Uri.encode(antenna!!.operateur ?: "Inconnu")
-
-                // ✅ NOUVEAU : On sécurise et on ajoute les azimuts au voyage
                 val safeAzimuts = Uri.encode(antenna!!.azimuts ?: "")
-
                 navController.navigate("sq_upload/${uploadSiteId}/${safeOperator}?uris=$encodedUris&lat=${antenna!!.latitude}&lon=${antenna!!.longitude}&azimuts=$safeAzimuts")
             }
         }
     )
+
+    var showImageSourceDialog by remember { mutableStateOf(false) }
+    var currentCameraUri by remember { mutableStateOf<Uri?>(null) }
+
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && currentCameraUri != null && antenna != null) {
+            val encodedUri = Uri.encode(currentCameraUri.toString())
+            val uploadSiteId = physique?.idSupport ?: antenna!!.idAnfr
+            val safeOperator = Uri.encode(antenna!!.operateur ?: "Inconnu")
+            val safeAzimuts = Uri.encode(antenna!!.azimuts ?: "")
+            navController.navigate("sq_upload/${uploadSiteId}/${safeOperator}?uris=$encodedUri&lat=${antenna!!.latitude}&lon=${antenna!!.longitude}&azimuts=$safeAzimuts")
+        }
+    }
+
+    fun createCameraUri(): Uri {
+        val tempFile = java.io.File.createTempFile("sq_camera_${System.currentTimeMillis()}_", ".jpg", context.cacheDir).apply {
+            createNewFile()
+            deleteOnExit()
+        }
+        return androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tempFile)
+    }
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
@@ -535,36 +555,70 @@ fun SiteDetailScreen(
                             val has4G = rawTechs.contains("4G", ignoreCase = true)
                             val has5G = rawTechs.contains("5G", ignoreCase = true)
 
-                            // 2. On croise la présence avec l'état de la panne réelle
+                            // 2. Lecture de l'état individuel précis dans la DB (details_frequences)
+                            val detailsStr = technique?.detailsFrequences ?: ""
+                            val globalStatut = technique?.statut ?: ""
+                            val globalIsProject = globalStatut.contains("Projet", ignoreCase = true)
+
+                            fun isTechPlanned(keywords: List<String>): Boolean {
+                                if (detailsStr.isBlank()) return globalIsProject // Sécurité si base vide
+
+                                val lines = detailsStr.split("\n").filter { line ->
+                                    keywords.any { k -> line.contains(k, ignoreCase = true) }
+                                }
+                                if (lines.isEmpty()) return globalIsProject // Sécurité si techno introuvable
+
+                                // 🚨 LA MAGIE OPÈRE ICI :
+                                // La techno est en projet SI ET SEULEMENT SI TOUTES ses fréquences sont en projet
+                                // (S'il y a au moins un "En service", elle est considérée comme fonctionnelle)
+                                return lines.all { it.contains("Projet", ignoreCase = true) }
+                            }
+
+                            val is2gProject = has2G && isTechPlanned(listOf("GSM", "2G"))
+                            val is3gProject = has3G && isTechPlanned(listOf("UMTS", "3G"))
+                            val is4gProject = has4G && isTechPlanned(listOf("LTE", "4G"))
+                            val is5gProject = has5G && isTechPlanned(listOf("NR", "5G"))
+
+                            // 3. Le site entier est-il en projet ? (Seulement si TOUTES les technos présentes sont en projet)
+                            val totalTechs = listOf(has2G, has3G, has4G, has5G).count { it }
+                            val projectTechs = listOf(is2gProject, is3gProject, is4gProject, is5gProject).count { it }
+                            val isEntirelyProject = totalTechs > 0 && totalTechs == projectTechs
+
+                            // 4. On croise la présence avec l'état de la panne réelle ET le projet DB
                             val realTechStatus = mapOf(
                                 "2G" to fr.geotower.ui.components.ServiceStatus(
                                     isVoixOk = if (has2G) hsEntity?.let { it.voix2g != "HS" } ?: true else null,
-                                    isSmsOk = if (has2G) hsEntity?.let { it.voix2g != "HS" } ?: true else null, // En 2G, les SMS passent par la Voix
-                                    isInternetOk = if (has2G) hsEntity?.let { it.data2g != "HS" } ?: true else null
+                                    isSmsOk = if (has2G) hsEntity?.let { it.voix2g != "HS" } ?: true else null,
+                                    isInternetOk = if (has2G) hsEntity?.let { it.data2g != "HS" } ?: true else null,
+                                    isProject = is2gProject
                                 ),
                                 "3G" to fr.geotower.ui.components.ServiceStatus(
                                     isVoixOk = if (has3G) hsEntity?.let { it.voix3g != "HS" } ?: true else null,
-                                    isSmsOk = if (has3G) hsEntity?.let { it.voix3g != "HS" } ?: true else null, // En 3G, les SMS passent par la Voix
-                                    isInternetOk = if (has3G) hsEntity?.let { it.data3g != "HS" } ?: true else null
+                                    isSmsOk = if (has3G) hsEntity?.let { it.voix3g != "HS" } ?: true else null,
+                                    isInternetOk = if (has3G) hsEntity?.let { it.data3g != "HS" } ?: true else null,
+                                    isProject = is3gProject
                                 ),
                                 "4G" to fr.geotower.ui.components.ServiceStatus(
                                     isVoixOk = if (has4G) hsEntity?.let { it.voix4g != "HS" } ?: true else null,
-                                    isSmsOk = if (has4G) hsEntity?.let { it.voix4g != "HS" } ?: true else null, // En 4G (VoLTE), SMS = Voix
-                                    isInternetOk = if (has4G) hsEntity?.let { it.data4g != "HS" } ?: true else null
+                                    isSmsOk = if (has4G) hsEntity?.let { it.voix4g != "HS" } ?: true else null,
+                                    isInternetOk = if (has4G) hsEntity?.let { it.data4g != "HS" } ?: true else null,
+                                    isProject = is4gProject
                                 ),
                                 "5G" to fr.geotower.ui.components.ServiceStatus(
                                     isVoixOk = if (has5G) hsEntity?.let { it.voix5g != "HS" } ?: true else null,
                                     isSmsOk = if (has5G) hsEntity?.let { it.voix5g != "HS" } ?: true else null,
-                                    isInternetOk = if (has5G) hsEntity?.let { it.data5g != "HS" } ?: true else null
+                                    isInternetOk = if (has5G) hsEntity?.let { it.data5g != "HS" } ?: true else null,
+                                    isProject = is5gProject
                                 )
                             )
 
                             fr.geotower.ui.components.SiteStatusCard(
+                                isProjectSite = isEntirelyProject, // Ne s'affiche en jaune que si TOUT le site est en projet
                                 isOutage = isOutage,
                                 outageText = outageText,
                                 cardBgColor = cardBgColor,
                                 blockShape = blockShape,
-                                techStatus = realTechStatus // ✅ ON ENVOIE LA MATRICE EXACTE
+                                techStatus = realTechStatus
                             )
                         }
                         "operator" -> {
@@ -650,7 +704,7 @@ fun SiteDetailScreen(
                                     operatorName = opName,
                                     bgColor = cardBgColor,
                                     shape = blockShape,
-                                    onAddPhotoClick = { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                                    onAddPhotoClick = { safeClick { showImageSourceDialog = true } }
                                 )
                             }
                         }
@@ -717,6 +771,53 @@ fun SiteDetailScreen(
                     }
                 }
                 Spacer(modifier = Modifier.height(60.dp))
+            }
+
+            if (showImageSourceDialog) {
+                AlertDialog(
+                    onDismissRequest = { showImageSourceDialog = false },
+                    shape = blockShape,
+                    containerColor = sheetBgColor,
+                    title = { Text(AppStrings.get("Ajouter des photos", "Add photos", "Añadir fotos"), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+                    text = {
+                        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            Button(
+                                onClick = {
+                                    safeClick {
+                                        showImageSourceDialog = false
+                                        val uri = createCameraUri()
+                                        currentCameraUri = uri
+                                        cameraLauncher.launch(uri)
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                shape = buttonShape,
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                            ) {
+                                Icon(Icons.Default.PhotoCamera, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(AppStrings.get("Appareil photo", "Camera", "Cámara"), fontWeight = FontWeight.Bold)
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    safeClick {
+                                        showImageSourceDialog = false
+                                        photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                shape = buttonShape,
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                            ) {
+                                Icon(Icons.Default.PhotoLibrary, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(AppStrings.get("Galerie", "Gallery", "Galería"), fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    },
+                    confirmButton = {}
+                )
             }
         }
     }

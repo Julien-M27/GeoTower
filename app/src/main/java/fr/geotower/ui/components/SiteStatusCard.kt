@@ -7,6 +7,7 @@ import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Warning
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -26,24 +27,27 @@ import java.util.Locale
 data class ServiceStatus(
     val isVoixOk: Boolean? = null,
     val isSmsOk: Boolean? = null,
-    val isInternetOk: Boolean? = null
+    val isInternetOk: Boolean? = null,
+    val isProject: Boolean = false // 🚨 AJOUT : Permet de cibler une techno spécifique "en projet"
 )
 
 @Composable
 fun SiteStatusCard(
+    isProjectSite: Boolean, // 🚨 AJOUT : Vrai si tout le site est un projet
     isOutage: Boolean,
     outageText: String?,
     cardBgColor: Color,
     blockShape: Shape,
-    techStatus: Map<String, ServiceStatus> = emptyMap() // Pour le futur, si vous avez les vraies données
+    techStatus: Map<String, ServiceStatus> = emptyMap()
 ) {
     // Couleurs
     val colorOk = Color(0xFF4CAF50) // Vert
     val colorKo = Color(0xFFE53935) // Rouge
+    val colorProject = Color(0xFFFFA000) // Jaune/Orange (Projet)
     val colorNeutral = Color.Gray.copy(alpha = 0.5f) // Gris
 
     Card(
-        modifier = Modifier.fillMaxWidth(), // Pas de double marge !
+        modifier = Modifier.fillMaxWidth(),
         shape = blockShape,
         colors = CardDefaults.cardColors(containerColor = cardBgColor)
     ) {
@@ -55,18 +59,32 @@ fun SiteStatusCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = AppStrings.statusTitle, // "Statut du Site"
+                    text = AppStrings.statusTitle,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
 
-                val statusIcon = if (isOutage) Icons.Default.Warning else Icons.Default.CheckCircle
-                val statusColor = if (isOutage) colorKo else colorOk
+                // 🚨 NOUVEAU : Logique d'affichage de l'état global
+                val statusIcon = when {
+                    isProjectSite -> Icons.Default.Schedule
+                    isOutage -> Icons.Default.Warning
+                    else -> Icons.Default.CheckCircle
+                }
+
+                val statusColor = when {
+                    isProjectSite -> colorProject
+                    isOutage -> colorKo
+                    else -> colorOk
+                }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = if (isOutage) AppStrings.statusOutage else AppStrings.statusFunctional,
+                        text = when {
+                            isProjectSite -> AppStrings.statusProject
+                            isOutage -> AppStrings.statusOutage
+                            else -> AppStrings.statusFunctional
+                        },
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
                         color = statusColor
@@ -100,9 +118,8 @@ fun SiteStatusCard(
             // --- SECTION 2 : GRILLE DES SERVICES ---
             val technologies = listOf("2G", "3G", "4G", "5G")
 
-            // En-têtes (2G, 3G, 4G, 5G)
             Row(modifier = Modifier.fillMaxWidth()) {
-                Box(modifier = Modifier.weight(1.5f)) // Espace vide à gauche
+                Box(modifier = Modifier.weight(1.5f))
                 technologies.forEach { tech ->
                     Text(
                         text = tech,
@@ -117,13 +134,12 @@ fun SiteStatusCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Lignes de services
             ServiceRow(AppStrings.serviceVoice, technologies, techStatus) { _, it -> it.isVoixOk }
             Spacer(modifier = Modifier.height(10.dp))
             ServiceRow(AppStrings.serviceSms, technologies, techStatus) { _, it -> it.isSmsOk }
             Spacer(modifier = Modifier.height(10.dp))
             ServiceRow(AppStrings.serviceInternet, technologies, techStatus) { tech, it ->
-                if (tech == "2G") null else it.isInternetOk // 🚨 ON FORCE LE "NULL" POUR LA 2G
+                if (tech == "2G") null else it.isInternetOk
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -142,23 +158,23 @@ fun SiteStatusCard(
         }
     }
 }
-// 3. Composant réutilisable pour dessiner une ligne de la grille (Voix, SMS, etc.)
+
 @Composable
 private fun ServiceRow(
     serviceName: String,
     technologies: List<String>,
     techStatus: Map<String, ServiceStatus>,
-    statusSelector: (String, ServiceStatus) -> Boolean? // 🚨 AJOUT DU STRING
+    statusSelector: (String, ServiceStatus) -> Boolean?
 ) {
     val colorOk = Color(0xFF4CAF50)
     val colorKo = Color(0xFFE53935)
+    val colorProject = Color(0xFFFFA000)
     val colorNeutral = Color.Gray.copy(alpha = 0.3f)
 
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Nom du service (Voix, SMS, Internet)
         Text(
             text = serviceName,
             fontSize = 13.sp,
@@ -167,17 +183,21 @@ private fun ServiceRow(
             modifier = Modifier.weight(1.5f)
         )
 
-        // Icônes pour chaque technologie
         technologies.forEach { tech ->
-            val status = techStatus[tech]?.let { statusSelector(tech, it) } // 🚨 ON TRANSMET LA TECHNO
+            val techItem = techStatus[tech]
+            val status = techItem?.let { statusSelector(tech, it) }
+            val isProj = techItem?.isProject == true // 🚨 NOUVEAU : On regarde si la techno est en projet
+
             Box(
                 modifier = Modifier.weight(1f),
                 contentAlignment = Alignment.Center
             ) {
-                when (status) {
-                    true -> Icon(Icons.Default.Check, null, tint = colorOk, modifier = Modifier.size(20.dp))
-                    false -> Icon(Icons.Default.Close, null, tint = colorKo, modifier = Modifier.size(20.dp))
-                    null -> Icon(Icons.Default.Remove, null, tint = colorNeutral, modifier = Modifier.size(20.dp))
+                // 🚨 NOUVEAU : Logique d'affichage de la case (Priorité au projet)
+                when {
+                    isProj && status != null -> Text("~", color = colorProject, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+                    status == true -> Icon(Icons.Default.Check, null, tint = colorOk, modifier = Modifier.size(20.dp))
+                    status == false -> Icon(Icons.Default.Close, null, tint = colorKo, modifier = Modifier.size(20.dp))
+                    else -> Icon(Icons.Default.Remove, null, tint = colorNeutral, modifier = Modifier.size(20.dp))
                 }
             }
         }

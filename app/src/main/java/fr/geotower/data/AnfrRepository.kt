@@ -11,6 +11,9 @@ import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.models.SiteHsEntity
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class AnfrRepository(
     private val api: AnfrService,
@@ -36,6 +39,10 @@ class AnfrRepository(
             e.printStackTrace()
             emptyList()
         }
+    }
+
+    suspend fun getNearest100(lat: Double, lon: Double): List<LocalisationEntity> {
+        return dao.getNearest100(lat, lon)
     }
 
     // =================================================================
@@ -198,6 +205,12 @@ class AnfrRepository(
                 )
                 hsList.add(site)
             }
+
+            // 🚨 AJOUT : Sauvegarde de la date du jour (Dernière vérification réussie)
+            val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+            val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
+            prefs.edit().putString("last_hs_update", currentDate).apply()
+
             hsList
         } catch (e: Exception) {
             e.printStackTrace()

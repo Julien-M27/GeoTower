@@ -80,6 +80,11 @@ import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.NewReleases as FilledNewReleases
+import android.database.sqlite.SQLiteDatabase
+import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun AboutScreen(navController: NavController) {
@@ -145,9 +150,10 @@ fun AboutScreen(navController: NavController) {
     val menuItems = listOf(
         Triple(AppStrings.aboutPresentation, Icons.Outlined.Info, 0),
         Triple(AppStrings.aboutNew, Icons.Outlined.NewReleases, 1),
-        Triple(AppStrings.privacyCategory, Icons.Outlined.Lock, 2), // <-- NOUVEL ONGLET
-        Triple(AppStrings.aboutSources, Icons.Outlined.Folder, 3),  // Décalé à 3
-        Triple(AppStrings.aboutDev, Icons.Default.EditNote, 4)      // Décalé à 4
+        Triple(AppStrings.privacyCategory, Icons.Outlined.Lock, 2),
+        Triple(AppStrings.aboutSources, Icons.Outlined.Folder, 3),
+        Triple(AppStrings.aboutVersionsTitle, Icons.Outlined.Storage, 4),
+        Triple(AppStrings.aboutDev, Icons.Default.EditNote, 5)
     )
 
     // --- LOGIQUE DE SYNCHRONISATION FLUIDE ---
@@ -333,7 +339,8 @@ fun AboutScreen(navController: NavController) {
                                     1 -> SectionNouveautes(appVersion, cardShape, bubbleBaseColor)
                                     2 -> SectionConfidentialite(cardShape, bubbleBaseColor)
                                     3 -> SectionSources(cardShape, bubbleBaseColor)
-                                    4 -> SectionDeveloppement()
+                                    4 -> SectionVersions(cardShape, bubbleBaseColor)
+                                    5 -> SectionDeveloppement()
                                 }
                             }
                         }
@@ -409,6 +416,8 @@ fun AllAboutContent(appTitle: String, appVersion: String, logoResId: Int, cardSh
 
     SectionSources(cardShape, bubbleColor)
     Spacer(modifier = Modifier.height(48.dp))
+    SectionVersions(cardShape, bubbleColor)
+    Spacer(modifier = Modifier.height(16.dp))
     SectionDeveloppement()
 }
 
@@ -430,12 +439,17 @@ fun SectionPresentation(appTitle: String, appVersion: String, logoResId: Int) {
 fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) {
     val releaseNotes = mapOf(
         "Interface & Design" to listOf(
-            "Carte des Antennes :" to listOf(
-                "Ajout des cartes Hors-Ligne",
-                "Modification des clusters"
+            "Antennes à proximité :" to listOf(
+                "Suppression de la limite des 50km de rayon de recherche"
             ),
             "Détail des sites :" to listOf(
                 "Ajout du statut des antennes"
+            ),
+            "Upload vers SignalQuest :" to listOf(
+                "Ajout de la possibilité de prendre des photos directement dans l'application pour l'envoi vers SignalQuest"
+            ),
+            "À propos :" to listOf(
+                "Ajout des informations de version"
             )
         )
     )
@@ -586,6 +600,129 @@ private fun AboutDrawableImage(resId: Int, modifier: Modifier = Modifier, conten
             imageView.contentDescription = contentDescription
         }
     )
+}
+
+@Composable
+fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var appVersion by remember { mutableStateOf("-") }
+    var dbVersion by remember { mutableStateOf("-") }
+    var anfrDate by remember { mutableStateOf("-") }
+    var rawMonthlyVersion by remember { mutableStateOf("-") } // ✅ Changé en "rawMonthlyVersion"
+    var hsDate by remember { mutableStateOf("-") }
+
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            // 1. Version de l'application
+            try {
+                val pInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+                appVersion = pInfo.versionName ?: "-"
+            } catch (e: Exception) {}
+
+            // 2. Base de données locale (Extraction Directe)
+            try {
+                val dbPath = context.getDatabasePath("geotower.db")
+                if (dbPath.exists()) {
+                    val db = android.database.sqlite.SQLiteDatabase.openDatabase(dbPath.absolutePath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY)
+
+                    // 🚨 Requêtes en "cascade" pour ne pas planter avec l'ancienne BDD
+                    val cursor = try {
+                        db.rawQuery("SELECT version, date_maj_anfr, zip_version FROM metadata LIMIT 1", null)
+                    } catch (e: Exception) {
+                        try {
+                            db.rawQuery("SELECT version, date_maj_anfr FROM metadata LIMIT 1", null)
+                        } catch (e2: Exception) {
+                            db.rawQuery("SELECT version FROM metadata LIMIT 1", null)
+                        }
+                    }
+
+                    if (cursor.moveToFirst()) {
+                        // A. Version interne
+                        val rawVersion = cursor.getString(0)
+                        if (rawVersion != null && rawVersion.length == 13) {
+                            dbVersion = "${rawVersion.substring(9, 11)}:${rawVersion.substring(11, 13)} - ${rawVersion.substring(6, 8)}/${rawVersion.substring(4, 6)}/${rawVersion.substring(0, 4)}"
+                        } else {
+                            dbVersion = rawVersion ?: "-"
+                        }
+
+                        // B. Date Hebdo (ANFR)
+                        if (cursor.columnCount > 1 && !cursor.isNull(1)) {
+                            val rawAnfr = cursor.getString(1)
+                            anfrDate = try {
+                                if (rawAnfr.contains("T")) {
+                                    val datePart = rawAnfr.substringBefore("T")
+                                    val dParts = datePart.split("-")
+                                    if (dParts.size >= 3) "${dParts[2]}/${dParts[1]}/${dParts[0]}" else rawAnfr
+                                } else {
+                                    when (rawAnfr.length) {
+                                        13, 8 -> "${rawAnfr.substring(6, 8)}/${rawAnfr.substring(4, 6)}/${rawAnfr.substring(0, 4)}"
+                                        else -> rawAnfr
+                                    }
+                                }
+                            } catch (e: Exception) { rawAnfr }
+                        }
+
+                        // C. ✅ Version Mensuelle Brute
+                        if (cursor.columnCount > 2 && !cursor.isNull(2)) {
+                            rawMonthlyVersion = cursor.getString(2) ?: "-"
+                        } else {
+                            rawMonthlyVersion = "Téléchargez la nouvelle base"
+                        }
+                    }
+                    cursor.close()
+                    db.close()
+                } else {
+                    dbVersion = "Non installée"
+                }
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+
+            // 3. Date des sites HS (depuis les préférences)
+            val prefs = context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
+            hsDate = prefs.getString("last_hs_update", "-") ?: "-"
+        }
+    }
+
+    SectionTitle(AppStrings.aboutVersionsTitle)
+    val cardColor = if (bubbleColor == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else bubbleColor
+
+    Card(
+        colors = CardDefaults.cardColors(containerColor = cardColor),
+        shape = cardShape,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            VersionLine(AppStrings.versionAppLabel, appVersion)
+            VersionLine(AppStrings.versionDbLabel, dbVersion)
+            VersionLine(AppStrings.versionWeeklyLabel, AppStrings.formatWeeklyVersionWithWeekNumber(anfrDate))
+            VersionLine(AppStrings.versionMonthlyLabel, AppStrings.formatMonthlyVersion(rawMonthlyVersion))
+            VersionLine(AppStrings.versionHsLabel, hsDate)
+        }
+    }
+}
+
+@Composable
+private fun VersionLine(label: String, value: String) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically // 🚨 Centre le texte verticalement si la gauche passe sur 2 lignes
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f).padding(end = 8.dp) // 🚨 Force le texte à la ligne s'il est trop long
+        )
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary,
+            textAlign = androidx.compose.ui.text.style.TextAlign.End // 🚨 Assure que la valeur reste alignée à droite
+        )
+    }
 }
 
 @Composable

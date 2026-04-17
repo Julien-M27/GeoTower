@@ -61,10 +61,3 @@ data class DbCluster(
     @androidx.room.ColumnInfo(name = "centerLon") val centerLon: Double,
     @androidx.room.ColumnInfo(name = "count") val count: Int
 )
-// 🕒 Table 5 : Métadonnées (Pour la version de la base)
-@Entity(tableName = "metadata")
-data class MetadataEntity(
-    @PrimaryKey
-    @ColumnInfo(name = "version") val version: String,
-    @ColumnInfo(name = "date_maj_anfr") val dateMajAnfr: String?
-)

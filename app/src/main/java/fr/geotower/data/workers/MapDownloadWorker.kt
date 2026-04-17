@@ -13,16 +13,42 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.zip.ZipInputStream
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.os.Build
+import androidx.core.app.NotificationCompat
+import androidx.work.ForegroundInfo
+import android.app.PendingIntent
+import android.content.Intent
+import fr.geotower.MainActivity
+import fr.geotower.R
+import java.util.Locale
 
 class MapDownloadWorker(
     context: Context,
     params: WorkerParameters
 ) : CoroutineWorker(context, params) {
 
+    // 🚨 AJOUT DES VARIABLES POUR LA NOTIFICATION
+    private val notificationManager by lazy {
+        applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+    }
+    private val channelId = "map_download_channel"
+
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val zipUrl = inputData.getString("zip_url") ?: return@withContext Result.failure()
         val mapFilename = inputData.getString("map_filename") ?: return@withContext Result.failure()
         val estimatedSizeMb = inputData.getInt("estimated_size_mb", 2000)
+
+        // 🚨 NOUVEAU : On crée un ID unique pour cette carte spécifique
+        val uniqueNotifId = mapFilename.hashCode()
+
+        // Initialisation de la notification à 0% avec son ID unique
+        try {
+            setForeground(createForegroundInfo(0, false, mapFilename, uniqueNotifId))
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         // 1️⃣ SÉCURITÉ : Vérification de l'espace libre
         if (!hasEnoughSpace(estimatedSizeMb)) {
@@ -30,11 +56,9 @@ class MapDownloadWorker(
             return@withContext Result.failure()
         }
 
-        // On utilise le stockage externe de l'appli (idéal pour les gros fichiers)
         val mapsDir = File(applicationContext.getExternalFilesDir(null), "maps")
         if (!mapsDir.exists()) mapsDir.mkdirs()
 
-        // On rend le nom du fichier ZIP temporaire UNIQUE pour chaque carte !
         val tempZipFile = File(mapsDir, "temp_${mapFilename}.zip")
         val finalMapFile = File(mapsDir, mapFilename)
 
@@ -45,22 +69,19 @@ class MapDownloadWorker(
             val request = Request.Builder().url(zipUrl).build()
             val response = RetrofitClient.currentClient.newCall(request).execute()
 
-            if (!response.isSuccessful) {
-                return@withContext Result.failure()
-            }
+            if (!response.isSuccessful) return@withContext Result.failure()
 
             val body = response.body ?: return@withContext Result.failure()
             val fileLength = body.contentLength()
             val inputStream = body.byteStream()
             val outputStream = FileOutputStream(tempZipFile)
 
-            val buffer = ByteArray(16 * 1024) // Buffer de 16 Ko pour aller vite
+            val buffer = ByteArray(16 * 1024)
             var bytesCopied: Long = 0
             var bytes = inputStream.read(buffer)
             var lastProgress = 0
 
             while (bytes >= 0) {
-                // ✅ CORRECTION : Utilisation de isStopped propre au Worker
                 if (isStopped) {
                     outputStream.close()
                     inputStream.close()
@@ -74,9 +95,12 @@ class MapDownloadWorker(
                 // Mise à jour de la barre de progression UI
                 if (fileLength > 0) {
                     val progress = ((bytesCopied * 100) / fileLength).toInt()
+
                     if (progress > lastProgress) {
                         lastProgress = progress
                         setProgress(workDataOf("state" to "DOWNLOADING", "progress" to progress))
+                        // 🚨 On met à jour la notification SPÉCIFIQUE à cette carte
+                        notificationManager.notify(uniqueNotifId, createNotification(progress, false, mapFilename))
                     }
                 }
                 bytes = inputStream.read(buffer)
@@ -88,22 +112,24 @@ class MapDownloadWorker(
 
             // 3️⃣ EXTRACTION DU FICHIER .MAP
             setProgress(workDataOf("state" to "EXTRACTING", "progress" to 100))
+            // 🚨 Mise à jour pour l'extraction de CETTE carte
+            notificationManager.notify(uniqueNotifId, createNotification(100, true, mapFilename))
+
             val extracted = extractMapFromZip(tempZipFile, mapsDir, mapFilename)
 
-            // 4️⃣ NETTOYAGE (Suppression du fichier ZIP de 2 Go)
+            // 4️⃣ NETTOYAGE
             tempZipFile.delete()
 
-            if (extracted) {
-                return@withContext Result.success()
+            return@withContext if (extracted) {
+                Result.success()
             } else {
                 setProgress(workDataOf("error" to "no_map_in_zip"))
                 if (finalMapFile.exists()) finalMapFile.delete()
-                return@withContext Result.failure()
+                Result.failure()
             }
 
         } catch (e: Exception) {
             e.printStackTrace()
-            // En cas de coupure wifi ou crash, on efface le fichier cassé
             if (tempZipFile.exists()) tempZipFile.delete()
             return@withContext Result.failure()
         }
@@ -162,5 +188,66 @@ class MapDownloadWorker(
             e.printStackTrace()
         }
         return false
+    }
+
+    /**
+     * Crée une notification persistante unique pour cette carte.
+     */
+    private fun createForegroundInfo(progress: Int, isExtracting: Boolean, mapName: String, notifId: Int): ForegroundInfo {
+        val notification = createNotification(progress, isExtracting, mapName)
+
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            ForegroundInfo(notifId, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+        } else {
+            ForegroundInfo(notifId, notification)
+        }
+    }
+
+    private fun createNotification(progress: Int, isExtracting: Boolean, mapName: String): android.app.Notification {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                getLocalString("Téléchargement de cartes", "Maps download", "Descarga de mapas"),
+                NotificationManager.IMPORTANCE_LOW
+            )
+            notificationManager.createNotificationChannel(channel)
+        }
+
+        val intent = Intent(applicationContext, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            applicationContext, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // 🚨 NOUVEAU : On intègre le nom du fichier dans le titre
+        val title = getLocalString("Carte : $mapName", "Map: $mapName", "Mapa: $mapName")
+
+        val content = if (isExtracting) {
+            getLocalString("Extraction en cours...", "Extracting...", "Extrayendo...")
+        } else {
+            getLocalString("Téléchargement... $progress%", "Downloading... $progress%", "Descargando... $progress%")
+        }
+
+        return NotificationCompat.Builder(applicationContext, channelId)
+            .setContentTitle(title)
+            .setContentText(content)
+            .setSmallIcon(R.mipmap.ic_launcher_geotower)
+            .setContentIntent(pendingIntent)
+            .setProgress(100, progress, isExtracting)
+            .setOngoing(true)
+            .build()
+    }
+
+    /**
+     * Petite fonction pour traduire la notification en arrière-plan
+     */
+    private fun getLocalString(fr: String, en: String, es: String): String {
+        return when (Locale.getDefault().language) {
+            "fr" -> fr
+            "es" -> es
+            else -> en
+        }
     }
 }

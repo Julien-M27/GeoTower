@@ -8,15 +8,15 @@ import fr.geotower.data.models.FaisceauxEntity
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
-import fr.geotower.data.models.MetadataEntity
+// (Tu peux aussi supprimer l'import de MetadataEntity en haut)
 
 @Database(
     entities = [
         LocalisationEntity::class,
         TechniqueEntity::class,
         PhysiqueEntity::class,
-        FaisceauxEntity::class,
-        MetadataEntity::class
+        FaisceauxEntity::class
+        // ✅ ON A SUPPRIMÉ METADATA ICI !
     ],
     version = 1,
     exportSchema = false

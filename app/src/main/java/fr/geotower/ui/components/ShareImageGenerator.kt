@@ -301,43 +301,68 @@ fun shareFullAntennaCapture(
                                         val isOutage = hsEntity != null
                                         val outageText = hsEntity?.let { fr.geotower.ui.components.formatOutageDetails(it) }
 
-                                        // 1. Calcul des technologies présentes (comme dans l'écran de détail)
                                         val rawTechs = technique?.technologies?.takeIf { it.isNotBlank() } ?: info.frequences ?: ""
                                         val has2G = rawTechs.contains("2G", ignoreCase = true)
                                         val has3G = rawTechs.contains("3G", ignoreCase = true)
                                         val has4G = rawTechs.contains("4G", ignoreCase = true)
                                         val has5G = rawTechs.contains("5G", ignoreCase = true)
 
-                                        // 2. Création de la matrice de statut pour l'image
+                                        val detailsStr = technique?.detailsFrequences ?: ""
+                                        val globalStatut = technique?.statut ?: ""
+                                        val globalIsProject = globalStatut.contains("Projet", ignoreCase = true)
+
+                                        fun isTechPlanned(keywords: List<String>): Boolean {
+                                            if (detailsStr.isBlank()) return globalIsProject
+                                            val lines = detailsStr.split("\n").filter { line ->
+                                                keywords.any { k -> line.contains(k, ignoreCase = true) }
+                                            }
+                                            if (lines.isEmpty()) return globalIsProject
+                                            return lines.all { it.contains("Projet", ignoreCase = true) }
+                                        }
+
+                                        val is2gProject = has2G && isTechPlanned(listOf("GSM", "2G"))
+                                        val is3gProject = has3G && isTechPlanned(listOf("UMTS", "3G"))
+                                        val is4gProject = has4G && isTechPlanned(listOf("LTE", "4G"))
+                                        val is5gProject = has5G && isTechPlanned(listOf("NR", "5G"))
+
+                                        val totalTechs = listOf(has2G, has3G, has4G, has5G).count { it }
+                                        val projectTechs = listOf(is2gProject, is3gProject, is4gProject, is5gProject).count { it }
+                                        val isEntirelyProject = totalTechs > 0 && totalTechs == projectTechs
+
                                         val realTechStatus = mapOf(
                                             "2G" to fr.geotower.ui.components.ServiceStatus(
                                                 isVoixOk = if (has2G) hsEntity?.let { it.voix2g != "HS" } ?: true else null,
                                                 isSmsOk = if (has2G) hsEntity?.let { it.voix2g != "HS" } ?: true else null,
-                                                isInternetOk = if (has2G) hsEntity?.let { it.data2g != "HS" } ?: true else null
+                                                isInternetOk = if (has2G) hsEntity?.let { it.data2g != "HS" } ?: true else null,
+                                                isProject = is2gProject
                                             ),
                                             "3G" to fr.geotower.ui.components.ServiceStatus(
                                                 isVoixOk = if (has3G) hsEntity?.let { it.voix3g != "HS" } ?: true else null,
                                                 isSmsOk = if (has3G) hsEntity?.let { it.voix3g != "HS" } ?: true else null,
-                                                isInternetOk = if (has3G) hsEntity?.let { it.data3g != "HS" } ?: true else null
+                                                isInternetOk = if (has3G) hsEntity?.let { it.data3g != "HS" } ?: true else null,
+                                                isProject = is3gProject
                                             ),
                                             "4G" to fr.geotower.ui.components.ServiceStatus(
                                                 isVoixOk = if (has4G) hsEntity?.let { it.voix4g != "HS" } ?: true else null,
                                                 isSmsOk = if (has4G) hsEntity?.let { it.voix4g != "HS" } ?: true else null,
-                                                isInternetOk = if (has4G) hsEntity?.let { it.data4g != "HS" } ?: true else null
+                                                isInternetOk = if (has4G) hsEntity?.let { it.data4g != "HS" } ?: true else null,
+                                                isProject = is4gProject
                                             ),
                                             "5G" to fr.geotower.ui.components.ServiceStatus(
                                                 isVoixOk = if (has5G) hsEntity?.let { it.voix5g != "HS" } ?: true else null,
                                                 isSmsOk = if (has5G) hsEntity?.let { it.voix5g != "HS" } ?: true else null,
-                                                isInternetOk = if (has5G) hsEntity?.let { it.data5g != "HS" } ?: true else null
+                                                isInternetOk = if (has5G) hsEntity?.let { it.data5g != "HS" } ?: true else null,
+                                                isProject = is5gProject
                                             )
                                         )
 
                                         SiteStatusCard(
+                                            isProjectSite = isEntirelyProject,
                                             isOutage = isOutage,
                                             outageText = outageText,
                                             cardBgColor = MaterialTheme.colorScheme.surfaceVariant,
                                             blockShape = RoundedCornerShape(12.dp),
-                                            techStatus = realTechStatus // ✅ ON ENVOIE ENFIN LES DONNÉES !
+                                            techStatus = realTechStatus
                                         )
                                     }
                                 }

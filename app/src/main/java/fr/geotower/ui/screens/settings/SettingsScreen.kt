@@ -1427,7 +1427,7 @@ fun SectionDatabase(
         shape = shape,
         border = border,
         bubbleColor = bubbleColor,
-        title = AppStrings.offlineMode
+        title = AppStrings.database
     )
 
     if (!isWideScreen) {

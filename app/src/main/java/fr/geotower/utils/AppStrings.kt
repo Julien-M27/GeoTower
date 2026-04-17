@@ -963,6 +963,7 @@ object AppStrings {
     val statusTitle @Composable get() = get("Statut du site", "Site Status", "Status do site")
     val statusFunctional @Composable get() = get("Fonctionnel", "Functional", "Funcional")
     val statusOutage @Composable get() = get("En panne", "Out of service", "Em manutenção")
+    val statusProject @Composable get() = get("En projet", "Planned", "Em projeto")
     val showStatusOption @Composable get() = get("Afficher le statut", "Show status", "Mostrar status")
     val shareStatusOption @Composable get() = get("Partager le statut", "Share status", "Partilhar o status")
 
@@ -976,5 +977,85 @@ object AppStrings {
     val apiDetailIncident @Composable get() = get("Incident en cours", "Ongoing incident", "Incidente em curso")
     val apiDetailMaintenance @Composable get() = get("Travaux de maintenance", "Maintenance work", "Trabalhos de manutenção")
     val outageStart @Composable get() = get("Depuis le", "Since", "Desde")
-    // (Note : outageEndExpected existe déjà normalement dans votre fichier)
+
+    // ==========================================
+    // ℹ️ ÉCRAN À PROPOS - VERSIONS
+    // ==========================================
+    val aboutVersionsTitle @Composable get() = get("Versions", "Versions", "Versões")
+    val versionAppLabel @Composable get() = get("Version de l'application", "App version", "Versão do app")
+    val versionDbLabel @Composable get() = get("Version de la base de données", "Database version", "Versão da base de dados")
+    val versionWeeklyLabel @Composable get() = get("Mise à jour hebdomadaire", "Weekly update", "Atualização semanal")
+    val versionMonthlyLabel @Composable get() = get("Mise à jour mensuelle", "Monthly update", "Atualização mensal")
+    val versionHsLabel @Composable get() = get("Date des sites HS", "HS sites date", "Data dos sites HS")
+
+    // ==========================================
+    // 📅 FORMATAGE DE LA DATE MENSUELLE
+    // ==========================================
+    @Composable
+    fun formatMonthlyVersion(rawName: String): String {
+        // Si la chaîne est vide, un tiret, ou un message d'erreur, on la retourne telle quelle
+        if (rawName.isBlank() || rawName == "-" || rawName == "Téléchargez la nouvelle base") return rawName
+
+        // Le Regex cherche 4 chiffres (Année) suivis de 2 chiffres (Mois) au tout début du nom
+        val regex = Regex("^(\\d{4})(\\d{2})\\d{2}.*")
+        val match = regex.find(rawName)
+
+        if (match != null) {
+            val year = match.groupValues[1]
+            val monthName = when (match.groupValues[2]) {
+                "01" -> get("Janvier", "January", "Janeiro")
+                "02" -> get("Février", "February", "Fevereiro")
+                "03" -> get("Mars", "March", "Março")
+                "04" -> get("Avril", "April", "Abril")
+                "05" -> get("Mai", "May", "Maio")
+                "06" -> get("Juin", "June", "Junho")
+                "07" -> get("Juillet", "July", "Julho")
+                "08" -> get("Août", "August", "Agosto")
+                "09" -> get("Septembre", "September", "Setembro")
+                "10" -> get("Octobre", "October", "Outubro")
+                "11" -> get("Novembre", "November", "Novembro")
+                "12" -> get("Décembre", "December", "Dezembro")
+                else -> ""
+            }
+            if (monthName.isNotEmpty()) {
+                return "$monthName $year"
+            }
+        }
+
+        // Si le nom du fichier ne correspond pas au format attendu, on l'affiche brut par sécurité
+        return rawName
+    }
+
+    // ==========================================
+    // 📅 FORMATAGE DE LA DATE HEBDOMADAIRE (Avec Semaine)
+    // ==========================================
+    @Composable
+    fun formatWeeklyVersionWithWeekNumber(dateStr: String): String {
+        // On vérifie qu'on a bien une date au format attendu (ex: 15/04/2026)
+        if (dateStr.isBlank() || dateStr == "-" || !dateStr.contains("/")) return dateStr
+
+        // ✅ CORRECTION : On appelle la fonction Composable HORS du bloc try-catch !
+        val weekWord = get("Semaine", "Week", "Semana")
+
+        return try {
+            val format = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+            val date = format.parse(dateStr)
+
+            if (date != null) {
+                val cal = java.util.Calendar.getInstance()
+                // Norme ISO 8601 (Utilisée en Europe pour le calcul des semaines)
+                cal.firstDayOfWeek = java.util.Calendar.MONDAY
+                cal.minimalDaysInFirstWeek = 4
+                cal.time = date
+
+                val weekNumber = cal.get(java.util.Calendar.WEEK_OF_YEAR)
+
+                "$weekWord $weekNumber  -  $dateStr"
+            } else {
+                dateStr
+            }
+        } catch (e: Exception) {
+            dateStr
+        }
+    }
 }

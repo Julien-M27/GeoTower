@@ -219,13 +219,8 @@ fun NearEmittersScreen(
         if (currentLoc != null) {
             isLoading = true
             withContext(Dispatchers.IO) {
-                val offset = 0.05 * searchRadiusMultiplier
-                val boxAntennas = repository.getAntennasInBox(
-                    latNorth = currentLoc.latitude + offset,
-                    lonEast = currentLoc.longitude + offset,
-                    latSouth = currentLoc.latitude - offset,
-                    lonWest = currentLoc.longitude - offset
-                )
+                // On demande directement les 100 plus proches à SQLite (recherche mondiale)
+                val boxAntennas = repository.getNearest100(currentLoc.latitude, currentLoc.longitude)
                 localAntennas = boxAntennas
             }
         }
@@ -583,7 +578,7 @@ fun NearEmittersScreen(
                                                     ) {
                                                         Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
                                                         Spacer(modifier = Modifier.width(8.dp))
-                                                        Text(AppStrings.expandSearchArea, fontWeight = FontWeight.Bold)
+                                                        Text(AppStrings.get("Afficher plus de sites", "Show more sites", "Mostrar mais"), fontWeight = FontWeight.Bold)
                                                     }
                                                 }
                                             }

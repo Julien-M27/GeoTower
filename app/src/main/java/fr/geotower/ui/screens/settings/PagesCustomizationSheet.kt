@@ -554,7 +554,6 @@ fun NearbySettingsSheet(
     }
 }
 
-// === COMPOSANT : CURSEUR DU RAYON DE RECHERCHE ===
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SearchRadiusCard(
@@ -565,61 +564,61 @@ fun SearchRadiusCard(
     bubbleColor: Color,
     useOneUi: Boolean
 ) {
-    // Les valeurs possibles pour le curseur
+    // 🚨 ON GARDE TOUTE LA LOGIQUE CI-DESSOUS INTACTE
     val steps = listOf(1, 2, 5, 10, 20, 30, 50)
     val labels = listOf("1 km", "2 km", "5 km", "10 km", "20 km", "30 km", "50 km")
-
     var currentIndex by remember { mutableFloatStateOf(steps.indexOf(currentRadius).coerceAtLeast(0).toFloat()) }
     val accentColor = MaterialTheme.colorScheme.primary
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
 
-    Surface(shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(AppStrings.searchRadiusTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(labels[currentIndex.toInt()], style = MaterialTheme.typography.titleMedium, color = accentColor, fontWeight = FontWeight.Bold)
-            }
+    // 🚨 ON ENVELOPPE LE DESSIN DANS UN "if (false)"
+    if (false) {
+        Surface(shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(AppStrings.searchRadiusTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(labels[currentIndex.toInt()], style = MaterialTheme.typography.titleMedium, color = accentColor, fontWeight = FontWeight.Bold)
+                }
 
-            Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
-            if (useOneUi) {
-                Slider(
-                    value = currentIndex,
-                    onValueChange = { currentIndex = it },
-                    onValueChangeFinished = { onValueChange(steps[currentIndex.toInt()]) },
-                    valueRange = 0f..(steps.size - 1).toFloat(),
-                    steps = steps.size - 2,
-                    thumb = {
-                        Box(
-                            modifier = Modifier
-                                .size(24.dp)
-                                .background(MaterialTheme.colorScheme.surface, CircleShape)
-                                .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                        )
-                    },
-                    track = { _ ->
-                        androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxWidth().height(14.dp)) {
-                            val trackColor = Color.Gray.copy(alpha = 0.3f)
-                            val dotColor = Color.Gray.copy(alpha = 0.6f)
-
-                            drawLine(color = trackColor, start = androidx.compose.ui.geometry.Offset(0f, size.height / 2), end = androidx.compose.ui.geometry.Offset(size.width, size.height / 2), strokeWidth = 14.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
-
-                            val dotCount = steps.size
-                            val stepWidth = size.width / (dotCount - 1)
-                            for (i in 0 until dotCount) {
-                                drawCircle(color = dotColor, radius = 4.dp.toPx(), center = androidx.compose.ui.geometry.Offset(i * stepWidth, size.height / 2))
+                if (useOneUi) {
+                    Slider(
+                        value = currentIndex,
+                        onValueChange = { currentIndex = it },
+                        onValueChangeFinished = { onValueChange(steps[currentIndex.toInt()]) },
+                        valueRange = 0f..(steps.size - 1).toFloat(),
+                        steps = steps.size - 2,
+                        thumb = {
+                            Box(
+                                modifier = Modifier
+                                    .size(24.dp)
+                                    .background(MaterialTheme.colorScheme.surface, CircleShape)
+                                    .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                            )
+                        },
+                        track = { _ ->
+                            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxWidth().height(14.dp)) {
+                                val trackColor = Color.Gray.copy(alpha = 0.3f)
+                                val dotColor = Color.Gray.copy(alpha = 0.6f)
+                                drawLine(color = trackColor, start = androidx.compose.ui.geometry.Offset(0f, size.height / 2), end = androidx.compose.ui.geometry.Offset(size.width, size.height / 2), strokeWidth = 14.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                                val dotCount = steps.size
+                                val stepWidth = size.width / (dotCount - 1)
+                                for (i in 0 until dotCount) {
+                                    drawCircle(color = dotColor, radius = 4.dp.toPx(), center = androidx.compose.ui.geometry.Offset(i * stepWidth, size.height / 2))
+                                }
                             }
                         }
-                    }
-                )
-            } else {
-                Slider(
-                    value = currentIndex,
-                    onValueChange = { currentIndex = it },
-                    onValueChangeFinished = { onValueChange(steps[currentIndex.toInt()]) },
-                    valueRange = 0f..(steps.size - 1).toFloat(),
-                    steps = steps.size - 2
-                )
+                    )
+                } else {
+                    Slider(
+                        value = currentIndex,
+                        onValueChange = { currentIndex = it },
+                        onValueChangeFinished = { onValueChange(steps[currentIndex.toInt()]) },
+                        valueRange = 0f..(steps.size - 1).toFloat(),
+                        steps = steps.size - 2
+                    )
+                }
             }
         }
     }

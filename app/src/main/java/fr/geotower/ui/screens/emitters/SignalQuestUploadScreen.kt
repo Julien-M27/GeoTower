@@ -27,10 +27,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import android.net.Uri // 🚨 NOUVEAU
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.Add // 🚨 NOUVEAU
+import androidx.compose.material.icons.filled.PhotoLibrary // 🚨 NOUVEAU
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -40,18 +43,24 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton // 🚨 NOUVEAU
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+// The crucial imports that fix the delegation error:
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -90,7 +99,7 @@ fun SignalQuestUploadScreen(
     val context = androidx.compose.ui.platform.LocalContext.current
 
     // --- 0. ANTI-SPAM CLIC (Debounce) ---
-    var lastClickTime by remember { mutableLongStateOf(0L) }
+    var lastClickTime by remember { mutableStateOf(0L) }
     val debounceTime = 700L
 
     fun safeClick(action: () -> Unit) {
@@ -105,6 +114,7 @@ fun SignalQuestUploadScreen(
     val currentUris = remember { mutableStateListOf<String>().apply { addAll(imageUris) } }
     var description by remember { mutableStateOf("") }
     var showConfirmDialog by remember { mutableStateOf(false) }
+    var showImageSourceDialog by remember { mutableStateOf(false) }
 
     // Pour la carte
     val ignStyle by AppConfig.ignStyle
@@ -128,14 +138,36 @@ fun SignalQuestUploadScreen(
         }
     }
 
-    // --- 1.5 LANCEUR DE GALERIE (Si la liste est vidée) ---
+    // --- 1.5 LANCEURS GALERIE ET CAMERA ---
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 10)
     ) { uris ->
         if (uris.isNotEmpty()) {
-            currentUris.clear()
-            currentUris.addAll(uris.map { it.toString() })
+            val newUris = uris.map { it.toString() }.filter { !currentUris.contains(it) }
+            val availableSlots = 10 - currentUris.size
+            if (availableSlots > 0) {
+                currentUris.addAll(newUris.take(availableSlots))
+            }
         }
+    }
+
+    var currentCameraUri by remember { mutableStateOf<Uri?>(null) }
+    val cameraLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.TakePicture()
+    ) { success ->
+        if (success && currentCameraUri != null) {
+            if (currentUris.size < 10) {
+                currentUris.add(currentCameraUri.toString())
+            }
+        }
+    }
+
+    fun createCameraUri(): Uri {
+        val tempFile = java.io.File.createTempFile("sq_camera_${System.currentTimeMillis()}_", ".jpg", context.cacheDir).apply {
+            createNewFile()
+            deleteOnExit()
+        }
+        return androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tempFile)
     }
 
     // Thème et couleurs
@@ -202,7 +234,7 @@ fun SignalQuestUploadScreen(
                     modifier = Modifier
                         .size(width = 240.dp, height = 280.dp)
                         .clip(photoShape)
-                        .clickable { safeClick { photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) } },
+                        .clickable { safeClick { showImageSourceDialog = true } },
                     shape = photoShape,
                     colors = CardDefaults.cardColors(containerColor = surfaceColor.copy(alpha = 0.3f)),
                     border = BorderStroke(2.dp, activeColor.copy(alpha = 0.5f))
@@ -246,6 +278,28 @@ fun SignalQuestUploadScreen(
                                     .size(32.dp)
                             ) {
                                 Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                            }
+                        }
+                    }
+
+                    if (currentUris.size < 10) {
+                        item {
+                            Card(
+                                modifier = Modifier
+                                    .size(width = 100.dp, height = 280.dp)
+                                    .clip(photoShape)
+                                    .clickable { safeClick { showImageSourceDialog = true } },
+                                shape = photoShape,
+                                colors = CardDefaults.cardColors(containerColor = surfaceColor.copy(alpha = 0.3f)),
+                                border = BorderStroke(2.dp, activeColor.copy(alpha = 0.5f))
+                            ) {
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(Icons.Default.Add, null, modifier = Modifier.size(36.dp), tint = activeColor)
+                                }
                             }
                         }
                     }
@@ -301,6 +355,53 @@ fun SignalQuestUploadScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
             Text(AppStrings.uploadSqLimit, fontSize = 12.sp, color = textColor.copy(alpha = 0.5f))
+        }
+
+        if (showImageSourceDialog) {
+            AlertDialog(
+                onDismissRequest = { showImageSourceDialog = false },
+                shape = blockShape,
+                containerColor = surfaceColor,
+                title = { Text(AppStrings.get("Ajouter des photos", "Add photos", "Añadir fotos"), fontWeight = FontWeight.Bold, color = textColor) },
+                text = {
+                    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Button(
+                            onClick = {
+                                safeClick {
+                                    showImageSourceDialog = false
+                                    val uri = createCameraUri()
+                                    currentCameraUri = uri
+                                    cameraLauncher.launch(uri)
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                            shape = buttonShape,
+                            colors = ButtonDefaults.buttonColors(containerColor = activeColor)
+                        ) {
+                            Icon(Icons.Default.PhotoCamera, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(AppStrings.get("Appareil photo", "Camera", "Cámara"), fontWeight = FontWeight.Bold)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                safeClick {
+                                    showImageSourceDialog = false
+                                    photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                            shape = buttonShape,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = textColor),
+                            border = BorderStroke(1.dp, textColor.copy(alpha = 0.3f))
+                        ) {
+                            Icon(Icons.Default.PhotoLibrary, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(AppStrings.get("Galerie", "Gallery", "Galería"), fontWeight = FontWeight.Bold)
+                        }
+                    }
+                },
+                confirmButton = {}
+            )
         }
 
         // --- 5. POP-UP DE CONFIRMATION AVEC LA CARTE ---

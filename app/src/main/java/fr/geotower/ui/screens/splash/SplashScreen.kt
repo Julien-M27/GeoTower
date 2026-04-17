@@ -44,33 +44,45 @@ fun SplashScreen(
     val scale = remember { Animatable(0f) }
 
     // --- 1. LOGIQUE RÉACTIVE (Titre & Logo) ---
-    // Titre désormais fixe sur GeoTower
     val appTitle = "GeoTower"
-
-    // Le logo observe l'état global pour être toujours raccord avec les paramètres
     val logoResId by AppIconManager.currentIconRes
 
     LaunchedEffect(key1 = true) {
-        // Initialisation du logo si nécessaire
         if (logoResId == 0) AppIconManager.getLogoResId(context)
 
-        // ✅ CORRECTION : On utilise directement "launch" et "Dispatchers" grâce aux imports
+        // ✅ CORRECTION : Vérification des mises à jour en accès direct à la BDD
         launch(Dispatchers.IO) {
             try {
                 // 1. On récupère la version sur le serveur
                 val latestVersion = fr.geotower.data.api.DatabaseDownloader.getLatestDatabaseVersion()
 
-                // 2. On récupère la version actuelle dans le téléphone
-                val currentVersion = fr.geotower.data.db.AppDatabase.getDatabase(context).geoTowerDao().getDatabaseVersion()
+                // 2. On lit le fichier SQLite local SANS utiliser Room (Anti-Crash)
+                var currentVersion: String? = null
+                val dbPath = context.getDatabasePath("geotower.db")
 
-                // 3. Si les versions sont différentes, on prévient l'AppConfig
+                if (dbPath.exists()) {
+                    val db = android.database.sqlite.SQLiteDatabase.openDatabase(
+                        dbPath.absolutePath,
+                        null,
+                        android.database.sqlite.SQLiteDatabase.OPEN_READONLY
+                    )
+                    val cursor = db.rawQuery("SELECT version FROM metadata LIMIT 1", null)
+                    if (cursor.moveToFirst()) {
+                        currentVersion = cursor.getString(0)
+                    }
+                    cursor.close()
+                    db.close()
+                }
+
+                // 3. Si les versions sont différentes, on affiche la bannière
                 if (latestVersion != null && latestVersion != currentVersion) {
                     withContext(Dispatchers.Main) {
                         fr.geotower.utils.AppConfig.isDbUpdateAvailable.value = true
                     }
                 }
             } catch (e: Exception) {
-                // Pas d'internet ou erreur serveur ? On ignore silencieusement pour ne pas bloquer l'app.
+                // Pas d'internet, BDD corrompue ou serveur HS : On ignore pour laisser l'app s'ouvrir
+                e.printStackTrace()
             }
         }
 

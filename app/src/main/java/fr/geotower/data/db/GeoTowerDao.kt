@@ -23,6 +23,14 @@ interface GeoTowerDao {
     """)
     suspend fun getLocalisationsInBox(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<LocalisationEntity>
 
+    // Nouvelle fonction pour la liste "Near Emitters" (recherche mondiale)
+    @Query("""
+        SELECT * FROM localisation 
+        ORDER BY ((latitude - :lat) * (latitude - :lat) + (longitude - :lon) * (longitude - :lon)) ASC 
+        LIMIT 100
+    """)
+    suspend fun getNearest100(lat: Double, lon: Double): List<LocalisationEntity>
+
     // 2. Pour le tiroir de détails quand on clique sur un point (rapide, sans jointure)
     @Query("SELECT * FROM technique WHERE id_anfr = :idAnfr")
     suspend fun getTechniqueDetails(idAnfr: String): TechniqueEntity?
@@ -107,8 +115,6 @@ interface GeoTowerDao {
     """)
     suspend fun getL7Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
 
-    @androidx.room.Query("SELECT version FROM metadata LIMIT 1")
-    suspend fun getDatabaseVersion(): String?
 
     // Cherche dans les ID ANFR, ou cherche l'ID ANFR correspondant à un ID Support
     @Query("SELECT * FROM localisation WHERE id_anfr LIKE '%' || :query || '%' OR id_anfr IN (SELECT id_anfr FROM physique WHERE id_support LIKE '%' || :query || '%') LIMIT 50")
