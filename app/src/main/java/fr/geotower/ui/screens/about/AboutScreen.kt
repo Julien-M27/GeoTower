@@ -452,10 +452,10 @@ fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) 
                 "Correction des marges en bas de l'écran"
             ),
             "Détail des sites :" to listOf(
-                "Ajout des images génériques si aucune photographie n'est disponible"
+                "Ajout du record de débit en speedtest sur les sites SFR et Bouygues"
             ),
             "Carte :" to listOf(
-                "Modification de la carte hors ligne"
+                "Ajout de l'affichage des azimuts en cône"
             )
         )
     )
