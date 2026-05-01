@@ -77,6 +77,9 @@ import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import androidx.compose.material.icons.filled.CloudOff
+import androidx.compose.ui.res.painterResource // 🚨 Pour régler "painterResource"
+import fr.geotower.R // 🚨 Pour régler "R" (le lien vers vos dossiers res/)
+import androidx.compose.foundation.Image
 
 // Modèle de données unifié
 data class CommunityPhoto(
@@ -102,6 +105,7 @@ fun formatPhotoDate(isoDate: String?): String {
 fun CommunityPhotosSectionShared(
     photos: List<CommunityPhoto>,
     operatorName: String?,
+    supportNature: String? = null, // 🚨 AJOUT DE LA NATURE DU SUPPORT
     bgColor: Color,
     shape: Shape,
     onAddPhotoClick: (() -> Unit)? = null
@@ -110,19 +114,19 @@ fun CommunityPhotosSectionShared(
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
     val linksOrder = prefs.getString("external_links_order", "cartoradio,cellularfr,signalquest,rncmobile,enbanalytics")!!.split(",")
-    val showCellularFr = prefs.getBoolean("link_cellularfr", true)
-    val showRncMobile = prefs.getBoolean("link_rncmobile", true)
-    val showSignalQuest = prefs.getBoolean("link_signalquest", true)
+    val showCellularFr = AppConfig.siteShowCellularFrPhotos.value
+    val showSignalQuest = AppConfig.siteShowSignalQuestPhotos.value
+    val showRncMobile = prefs.getBoolean("link_rncmobile", true) // Fallback to link pref if no specific site pref
     val showEnbAnalytics = prefs.getBoolean("link_enbanalytics", true)
 
     // FILTRAGE
-    val filteredPhotos = remember(photos, linksOrder, showCellularFr, showRncMobile, showSignalQuest, showEnbAnalytics) {
+    val filteredPhotos = remember(photos, linksOrder, showCellularFr, showSignalQuest, showRncMobile, showEnbAnalytics) {
         photos.filter { photo ->
             val name = photo.communityName.lowercase()
             when {
                 name.contains("cellular") -> showCellularFr
-                name.contains("rnc") -> showRncMobile
                 name.contains("signal") -> showSignalQuest
+                name.contains("rnc") -> showRncMobile
                 name.contains("enb") -> showEnbAnalytics
                 else -> true
             }
@@ -147,9 +151,23 @@ fun CommunityPhotosSectionShared(
     // ✅ NOUVEAU : On vérifie si on est en ligne en réutilisant ta fonction MapScreen
     val isOnline = fr.geotower.ui.screens.map.isNetworkAvailable(context)
 
-    // --- SÉCURITÉ : On cache tout si c'est vide ET qu'on n'a pas le droit d'uploader (SEULEMENT EN LIGNE) ---
-    if (filteredPhotos.isEmpty() && (!canUpload || onAddPhotoClick == null) && isOnline) return
-
+    // 🚨 NOUVEAU : On choisit la bonne image générique en fonction du mot-clé !
+    val placeholderRes = if (AppConfig.siteShowSchemes.value) {
+        when {
+            supportNature != null && (supportNature.contains("chateau", true) || supportNature.contains("château", true)) -> R.drawable.chateau_deau
+            supportNature != null && supportNature.contains("autostable", true) -> R.drawable.pylone_autostable
+            supportNature != null && supportNature.contains("tubulaire", true) -> R.drawable.pylone_tubulaire
+            supportNature != null && (supportNature.contains("haubane", true) || supportNature.contains("haubané", true)) -> R.drawable.pylone_haubane
+            supportNature != null && (supportNature.contains("immeuble", true) || supportNature.contains("bâtiment", true) || supportNature.contains("toit", true)) -> R.drawable.immeuble
+            supportNature != null && (supportNature.contains("religieux", true) || supportNature.contains("eglise", true) || supportNature.contains("église", true) || supportNature.contains("clocher", true) || supportNature.contains("chapelle", true)) -> R.drawable.monument_religieux
+            supportNature != null && supportNature.contains("phare", true) -> R.drawable.phare
+            supportNature != null && (supportNature.contains("semaphore", true) || supportNature.contains("sémaphore", true)) -> R.drawable.semaphore
+            supportNature != null && supportNature.contains("silo", true) -> R.drawable.silo
+            supportNature != null && (supportNature.contains("terrasse", true) || supportNature.contains("toit-terrasse", true)) -> R.drawable.immeuble
+            supportNature != null && supportNature.contains("pylône", true) -> R.drawable.pylone_autostable
+            else -> null // Si aucun mot-clé ne correspond
+        }
+    } else null
     val themeMode by AppConfig.themeMode
     val useOneUi by AppConfig.forceOneUiTheme
     val isSystemDark = isSystemInDarkTheme()
@@ -164,9 +182,26 @@ fun CommunityPhotosSectionShared(
     val overlayButtonBg = if (isDark) Color.Black.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.7f)
 
     var selectedPhotoIndex by remember { mutableStateOf<Int?>(null) }
+    // 🚨 AJOUT : Variable pour afficher le château d'eau en grand
+    var showPlaceholderFullScreen by remember { mutableStateOf(false) }
 
-    // --- On utilise filteredPhotos.size ---
-    val sectionTitle = AppStrings.communityPhotosTitleShort(filteredPhotos.size)
+    // 🚨 NOUVEAU : On gère le titre dynamiquement
+    val isFree = operatorName != null && operatorName.contains("FREE", ignoreCase = true)
+
+    // On veut le titre "Schéma" si on n'a pas de vraies photos (ou si c'est Free) ET qu'on a bien un schéma à montrer
+    val showSchemaTitle = (filteredPhotos.isEmpty() || isFree) && placeholderRes != null
+
+    val sectionTitle = if (showSchemaTitle) {
+        // On utilise AppStrings.get() pour que ça marche dans les 3 langues de ton appli !
+        AppStrings.get("Schéma du support", "Support diagram", "Esquema do suporte")
+    } else {
+        AppStrings.sitePhotosAndSchemesOption
+    }
+
+    // 🚨 NOUVEAU : Si on n'a ni photos, ni schéma, ET qu'on ne peut pas uploader, on masque TOUT !
+    if (filteredPhotos.isEmpty() && placeholderRes == null && (!canUpload || onAddPhotoClick == null)) {
+        return // On ne dessine absolument rien, le bloc disparaît !
+    }
 
     Card(
         shape = shape,
@@ -205,75 +240,154 @@ fun CommunityPhotosSectionShared(
                     )
                 }
             } else {
-                // 🌐 LOGIQUE EN LIGNE (Le code que tu avais déjà)
-                // --- On utilise filteredPhotos.isEmpty() ET on vérifie l'opérateur ---
-                if (filteredPhotos.isEmpty() && canUpload && onAddPhotoClick != null) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(100.dp)
-                            .clip(thumbnailShape)
-                            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                            .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), thumbnailShape)
-                            .clickable { onAddPhotoClick() },
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(Icons.Default.Outbox, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(28.dp))
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text(AppStrings.uploadPhotosPrompt, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                        }
-                    }
-                }
-
-                // --- On utilise filteredPhotos ---
+                // 🌐 LOGIQUE EN LIGNE
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
-                    itemsIndexed(filteredPhotos) { index, photo ->
-                        AsyncImage(
-                            model = photo.url,
-                            contentDescription = AppStrings.sitePhotoDesc,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(120.dp)
-                                .clip(thumbnailShape)
-                                .clickable { selectedPhotoIndex = index }
-                        )
-                    }
 
-                    // --- NOUVEAU : Carré d'upload à la fin de la liste ---
-                    if (filteredPhotos.isNotEmpty() && canUpload && onAddPhotoClick != null) {
-                        item {
-                            Box(
-                                modifier = Modifier
-                                    .size(120.dp) // Même taille que les photos
-                                    .clip(thumbnailShape)
-                                    .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
-                                    .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), thumbnailShape)
-                                    .clickable { onAddPhotoClick() },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Column(
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
+                    // 🚨 VÉRIFICATION : EST-CE QUE L'OPÉRATEUR EST FREE ?
+                    if (operatorName != null && operatorName.contains("FREE", ignoreCase = true)) {
+
+                        // 1. POUR FREE : ON AFFICHE L'IMAGE (Si on en a trouvé une correspondante)
+                        if (placeholderRes != null) {
+                            item {
+                                Image(
+                                    painter = painterResource(id = placeholderRes), // 🪄 L'image s'adapte toute seule !
+                                    contentDescription = "Image du support",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(120.dp)
+                                        .clip(thumbnailShape)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .clickable { showPlaceholderFullScreen = true }
+                                )
+                            }
+                        }
+
+                    } else {
+
+                        // 2. POUR LES AUTRES OPÉRATEURS : ON AFFICHE D'ABORD LES VRAIES PHOTOS
+                        if (filteredPhotos.isNotEmpty()) {
+                            itemsIndexed(filteredPhotos) { index, photo ->
+                                AsyncImage(
+                                    model = photo.url,
+                                    contentDescription = AppStrings.sitePhotoDesc,
+                                    contentScale = ContentScale.Crop,
+                                    error = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
+                                    fallback = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
+                                    placeholder = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
+                                    modifier = Modifier
+                                        .size(120.dp)
+                                        .clip(thumbnailShape)
+                                        .clickable { selectedPhotoIndex = index }
+                                )
+                            }
+                        }
+
+                        // 🚨 AJOUT : LA BARRE DE SÉPARATION VERTICALE
+                        // Elle s'affiche uniquement si on a des vraies photos ET un schéma à montrer
+                        if (filteredPhotos.isNotEmpty() && placeholderRes != null) {
+                            item {
+                                Box(
+                                    modifier = Modifier.height(120.dp), // Même hauteur que le carrousel
+                                    contentAlignment = Alignment.Center
                                 ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Outbox,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(28.dp)
-                                    )
-                                    Spacer(modifier = Modifier.height(8.dp))
-                                    Text(
-                                        text = AppStrings.uploadPhotosPrompt,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        textAlign = TextAlign.Center,
-                                        modifier = Modifier.padding(horizontal = 8.dp)
+                                    Box(
+                                        modifier = Modifier
+                                            .width(2.dp) // Épaisseur de la ligne
+                                            .height(80.dp) // Un peu plus petite que les photos pour faire élégant
+                                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                                     )
                                 }
                             }
                         }
+
+                        // 3. ENSUITE, ON AFFICHE L'IMAGE GÉNÉRIQUE (Si on en a trouvé une correspondante)
+                        if (placeholderRes != null) {
+                            item {
+                                Image(
+                                    painter = painterResource(id = placeholderRes), // 🪄 L'image s'adapte toute seule !
+                                    contentDescription = "Image du support",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(120.dp)
+                                        .clip(thumbnailShape)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                                        .clickable { showPlaceholderFullScreen = true }
+                                )
+                            }
+                        }
+
+                        // 4. ENFIN, LE BOUTON D'UPLOAD (Seulement pour SFR / Bouygues)
+                        // Il se mettra en tout dernier
+                        if (canUpload && onAddPhotoClick != null) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .size(120.dp)
+                                        .clip(thumbnailShape)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), thumbnailShape)
+                                        .clickable { onAddPhotoClick() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Outbox,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(28.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = AppStrings.uploadPhotosPrompt,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.padding(horizontal = 8.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // 🚨 DIALOGUE PLEIN ÉCRAN POUR LE SUPPORT GÉNÉRIQUE
+    // On l'affiche seulement si on a cliqué ET qu'on a bien une image à montrer
+    if (showPlaceholderFullScreen && placeholderRes != null) {
+        androidx.compose.ui.window.Dialog(
+            onDismissRequest = { showPlaceholderFullScreen = false },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            Surface(modifier = Modifier.fillMaxSize(), color = viewerBgBaseColor) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // L'image au centre
+                    Image(
+                        painter = painterResource(id = placeholderRes), // 🪄 L'image en plein écran s'adapte !
+                        contentDescription = "Image en plein écran",
+                        contentScale = ContentScale.Fit,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .pointerInput(Unit) {
+                                detectTapGestures(onTap = { showPlaceholderFullScreen = false })
+                            }
+                    )
+
+                    // La croix de fermeture
+                    IconButton(
+                        onClick = { showPlaceholderFullScreen = false },
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 20.dp, end = 4.dp)
+                            .background(overlayButtonBg, shape = CircleShape)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = AppStrings.close, tint = viewerContentColor)
                     }
                 }
             }

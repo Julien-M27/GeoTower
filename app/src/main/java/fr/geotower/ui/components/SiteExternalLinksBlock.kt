@@ -37,7 +37,7 @@ fun SiteExternalLinksBlock(
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val txtExternalLinks = AppStrings.externalLinks
-    val txtOpenApp = AppStrings.openApp
+    val txtOpen = AppStrings.open
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
     var lastClickTime by remember { mutableLongStateOf(0L) }
@@ -74,7 +74,7 @@ fun SiteExternalLinksBlock(
                     when (block) {
                         "cartoradio" -> {
                             if (showCartoradio) {
-                                CommunityLinkRow("Cartoradio", txtOpenApp, R.drawable.logo_cartoradio, buttonShape) {
+                                CommunityLinkRow("Cartoradio", txtOpen, R.drawable.logo_cartoradio, buttonShape) {
                                     safeClick {
                                         // ✅ Lien Cartoradio avec les coordonnées (Longitude d'abord, puis Latitude)
                                         uriHandler.openUri("https://cartoradio.fr/index.html#/cartographie/lonlat/${info.longitude}/${info.latitude}")
@@ -84,17 +84,17 @@ fun SiteExternalLinksBlock(
                         }
                         "cellularfr" -> {
                             if (showCellularFr && info.operateur?.contains("ORANGE", true) == true) {
-                                CommunityLinkRow("CellularFR", txtOpenApp, R.drawable.logo_cellularfr, buttonShape) { safeClick { onShowCellularFr() } }
+                                CommunityLinkRow("CellularFR", txtOpen, R.drawable.logo_cellularfr, buttonShape) { safeClick { onShowCellularFr() } }
                             }
                         }
                         "rncmobile" -> {
                             if (showRncMobile && info.operateur?.contains("FREE", true) == true) {
-                                CommunityLinkRow("RNC Mobile", txtOpenApp, R.drawable.logo_rncmobile, buttonShape) { safeClick { onShowRnc() } }
+                                CommunityLinkRow("RNC Mobile", txtOpen, R.drawable.logo_rncmobile, buttonShape) { safeClick { onShowRnc() } }
                             }
                         }
                         "signalquest" -> {
                             if (showSignalQuest && (info.operateur?.contains("SFR", true) == true || info.operateur?.contains("BOUYGUES", true) == true)) {
-                                CommunityLinkRow("Signal Quest", txtOpenApp, R.drawable.logo_signalquest, buttonShape) {
+                                CommunityLinkRow("Signal Quest", txtOpen, R.drawable.logo_signalquest, buttonShape) {
                                     safeClick {
                                         if (isSignalQuestInstalled) {
                                             context.packageManager.getLaunchIntentForPackage("com.sfrmap.android")?.let { context.startActivity(it) }
@@ -107,12 +107,12 @@ fun SiteExternalLinksBlock(
                         }
                         "enbanalytics" -> {
                             if (showEnbAnalytics) {
-                                CommunityLinkRow("eNB-Analytics", txtOpenApp, R.drawable.logo_enbanalytics, buttonShape) { safeClick { onShowEnb() } }
+                                CommunityLinkRow("eNB-Analytics", txtOpen, R.drawable.logo_enbanalytics, buttonShape) { safeClick { onShowEnb() } }
                             }
                         }
                         "anfr" -> {
                             if (showAnfr) {
-                                CommunityLinkRow("data.gouv.fr", txtOpenApp, R.drawable.logo_anfr, buttonShape) {
+                                CommunityLinkRow("data.gouv.fr", txtOpen, R.drawable.logo_anfr, buttonShape) {
                                     safeClick {
                                         // ✅ Lien data.gouv.fr (ANFR) avec zoom 17, Latitude puis Longitude
                                         uriHandler.openUri("https://data.anfr.fr/visualisation/map/?id=observatoire_2g_3g_4g&location=17,${info.latitude},${info.longitude}")

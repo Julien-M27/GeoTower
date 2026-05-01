@@ -20,9 +20,11 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -207,39 +209,41 @@ fun NearEmittersScreen(
         onDispose { locationManager.removeUpdates(locationListener) }
     }
 
-    var localAntennas by remember { mutableStateOf<List<LocalisationEntity>>(emptyList()) }
-
-    // --- 1. CHARGEMENT LOCAL INSTANTANÉ ---
+    // --- 1 & 2. CHARGEMENT ET TRAITEMENT (Fusionnés pour un chargement fluide) ---
     LaunchedEffect(userLocation, searchRadiusMultiplier) {
         val currentLoc = userLocation ?: Location("").apply {
             latitude = 48.8566
             longitude = 2.3522
         }
 
-        if (currentLoc != null) {
-            isLoading = true
-            withContext(Dispatchers.IO) {
-                // On demande directement les 100 plus proches à SQLite (recherche mondiale)
-                val boxAntennas = repository.getNearest100(currentLoc.latitude, currentLoc.longitude)
-                localAntennas = boxAntennas
-            }
-        }
-    }
+        isLoading = true
 
-    // --- 2. TRAITEMENT ET CARTOGRAPHIE POUR L'UI ---
-    LaunchedEffect(localAntennas, userLocation) {
-        if (localAntennas.isNotEmpty()) {
-            withContext(Dispatchers.Default) {
-                val groupedSites = localAntennas.groupBy {
+        withContext(Dispatchers.IO) {
+            // A. RÉCUPÉRATION DES DONNÉES
+            val newAntennas = if (searchRadiusMultiplier > 1) {
+                // Si on a cliqué sur "Plus de sites", on élargit la zone de recherche !
+                val offset = 0.05 * searchRadiusMultiplier
+                repository.getAntennasInBox(
+                    latNorth = currentLoc.latitude + offset,
+                    lonEast = currentLoc.longitude + offset,
+                    latSouth = currentLoc.latitude - offset,
+                    lonWest = currentLoc.longitude - offset
+                )
+            } else {
+                // Chargement initial ultra-rapide des 100 plus proches
+                repository.getNearest100(currentLoc.latitude, currentLoc.longitude)
+            }
+
+            // B. TRAITEMENT ET FORMATAGE
+            if (newAntennas.isNotEmpty()) {
+                val groupedSites = newAntennas.groupBy {
                     "${String.format(java.util.Locale.US, "%.4f", it.latitude)}_${String.format(java.util.Locale.US, "%.4f", it.longitude)}"
                 }
 
                 val mappedSites = mutableListOf<UiSite>()
                 for ((_, list) in groupedSites) {
                     val main = list.first()
-                    val dist = if (userLocation != null) {
-                        calculateDistance(userLocation!!.latitude, userLocation!!.longitude, main.latitude, main.longitude)
-                    } else 0f
+                    val dist = calculateDistance(currentLoc.latitude, currentLoc.longitude, main.latitude, main.longitude)
 
                     val ops = list.mapNotNull { it.operateur }
                         .flatMap { it.split(Regex("[/,\\-]")) }
@@ -265,16 +269,18 @@ fun NearEmittersScreen(
                         longitude = main.longitude
                     ))
                 }
+
                 val finalSites = mappedSites.sortedBy { it.distance }
 
                 withContext(Dispatchers.Main) {
                     sites = finalSites
-                    isLoading = false
                 }
             }
-        } else {
-            delay(500)
-            isLoading = false
+
+            // C. ON ARRÊTE LE CHARGEMENT (Garanti de s'exécuter à 100%)
+            withContext(Dispatchers.Main) {
+                isLoading = false
+            }
         }
     }
 
@@ -473,7 +479,8 @@ fun NearEmittersScreen(
             }
         }
     ) { padding ->
-        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+        // 🚨 CORRECTION : On applique uniquement le padding du haut pour glisser sous les boutons
+        Column(modifier = Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize()) {
             nearbyOrder.forEach { block ->
                 when (block) {
                     "search" -> {
@@ -539,7 +546,13 @@ fun NearEmittersScreen(
                                         LazyColumn(
                                             state = lazyListState,
                                             modifier = Modifier.fillMaxSize().nearEmittersFadingEdge(lazyListState),
-                                            contentPadding = PaddingValues(16.dp),
+                                            // 🚨 CORRECTION : On ajoute l'espacement de la barre de navigation à la fin
+                                            contentPadding = PaddingValues(
+                                                start = 16.dp,
+                                                top = 16.dp,
+                                                end = 16.dp,
+                                                bottom = 16.dp + androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                                            ),
                                             verticalArrangement = Arrangement.spacedBy(12.dp)
                                         ) {
                                             items(filteredSites, key = { it.id }) { site ->

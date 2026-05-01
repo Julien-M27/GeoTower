@@ -123,6 +123,7 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SimCard
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.foundation.layout.navigationBarsPadding
 
 @Composable
 fun SettingsScreen(
@@ -210,11 +211,20 @@ fun SettingsScreen(
     var shareIdsEnabled by remember { mutableStateOf(prefs.getBoolean("share_ids_enabled", true)) }
     var shareDatesEnabled by remember { mutableStateOf(prefs.getBoolean("share_dates_enabled", true)) }
     var shareAddressEnabled by remember { mutableStateOf(prefs.getBoolean("share_address_enabled", true)) }
+    var shareSpeedtestEnabled by remember { mutableStateOf(prefs.getBoolean("share_speedtest_enabled", true)) } // 🚨 NEW
     var shareFreqEnabled by remember { mutableStateOf(prefs.getBoolean("share_freq_enabled", true)) }
     var shareConfidentialEnabled by remember { mutableStateOf(prefs.getBoolean("share_confidential_enabled", false)) }
     var shareSiteQrEnabled by remember { mutableStateOf(prefs.getBoolean("share_site_qr_enabled", true)) }
     var shareSupQrEnabled by remember { mutableStateOf(prefs.getBoolean("share_sup_qr_enabled", true)) }
-    var shareOrder by remember { mutableStateOf(prefs.getString("share_order", "map,support,ids,dates,address,status,freq")!!.split(",")) }
+    var shareOrder by remember {
+        mutableStateOf(
+            (prefs.getString("share_order", "map,support,ids,dates,address,speedtest,status,freq") ?: "map,support,ids,dates,address,speedtest,status,freq")
+                .split(",")
+                .toMutableList()
+                .apply { if (!contains("speedtest")) { val idx = indexOf("address"); if (idx >= 0) add(idx + 1, "speedtest") else add("speedtest") } }
+                .toList()
+        )
+    }
 
     // 2. Variables du Pylône (Support) - SEULEMENT 3 BLOCS !
     var shareSupMapEnabled by remember { mutableStateOf(prefs.getBoolean("share_sup_map_enabled", true)) }
@@ -247,6 +257,7 @@ fun SettingsScreen(
     // --- Variables d'état pour le Pylône et l'Antenne ---
     var showSupportSettingsSheet by remember { mutableStateOf(false) }
     var showSiteSettingsSheet by remember { mutableStateOf(false) }
+    var showPhotosSettingsSheet by remember { mutableStateOf(false) }
     var pageSupportOrder by remember { mutableStateOf(prefs.getString("page_support_order", "map,details,photos,nav,share,operators")!!.split(",")) }
     var pageSupportMap by remember { mutableStateOf(prefs.getBoolean("page_support_map", true)) }
     var pageSupportDetails by remember { mutableStateOf(prefs.getBoolean("page_support_details", true)) }
@@ -256,11 +267,18 @@ fun SettingsScreen(
     var pageSupportOperators by remember { mutableStateOf(prefs.getBoolean("page_support_operators", true)) }
 
     // --- Variables d'état pour l'Antenne (Site) ---
-    var pageSiteOrder by remember { mutableStateOf(prefs.getString("page_site_order", "operator,bearing_height,map,support_details,photos,ids,nav,share,dates,address,status,freqs,links")!!.split(",")) };    var pageSiteOperator by remember { mutableStateOf(prefs.getBoolean("page_site_operator", true)) }
+    var pageSiteOrder by remember {
+        mutableStateOf(
+            (prefs.getString("page_site_order", "operator,bearing_height,map,support_details,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links") ?: "operator,bearing_height,map,support_details,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links")
+                .split(",")
+                .toMutableList()
+                .apply { if (!contains("speedtest")) { val idx = indexOf("photos"); if (idx >= 0) add(idx + 1, "speedtest") else add("speedtest") } }
+                .toList()
+        )
+    };    var pageSiteOperator by remember { mutableStateOf(prefs.getBoolean("page_site_operator", true)) }
     var pageSiteBearingHeight by remember { mutableStateOf(prefs.getBoolean("page_site_bearing_height", true)) }
     var pageSiteMap by remember { mutableStateOf(prefs.getBoolean("page_site_map", true)) }
     var pageSiteSupportDetails by remember { mutableStateOf(prefs.getBoolean("page_site_support_details", true)) }
-    var pageSitePhotos by remember { mutableStateOf(prefs.getBoolean("page_site_photos", true)) }
     var pageSitePanelHeights by remember { mutableStateOf(prefs.getBoolean("page_site_panel_heights", true)) }
     var pageSiteIds by remember { mutableStateOf(prefs.getBoolean("page_site_ids", true)) }
     var pageSiteNav by remember { mutableStateOf(prefs.getBoolean("page_site_nav", true)) }
@@ -332,12 +350,18 @@ fun SettingsScreen(
     ) { innerPadding ->
         // 🚀 NOUVEL AFFICHAGE QUI UTILISE LE COMPOSANT COMMUN
         fr.geotower.ui.components.ResponsiveDualPaneLayout(
-            modifier = Modifier.padding(innerPadding),
+            // 🚨 CORRECTION 1 : On utilise uniquement le padding du haut
+            modifier = Modifier.padding(top = innerPadding.calculateTopPadding()),
             // ✅ AJOUT : onCloseSidebar
             sidebar = { width, onCloseSidebar ->
                 Row(modifier = Modifier.width(width).fillMaxHeight().background(mainBgColor)) {
                     Column(
-                        modifier = Modifier.weight(1f).fillMaxHeight().padding(top = 16.dp, bottom = 16.dp)
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            // 🚨 CORRECTION 2 : Marge pour les boutons de navigation
+                            .navigationBarsPadding()
+                            .padding(top = 16.dp, bottom = 16.dp)
                     ) {
                         // ✅ RETOUR DU ROW AVEC LES DEUX BOUTONS
                         Row(
@@ -408,6 +432,8 @@ fun SettingsScreen(
                             .then(if (navMode == 0 || !isExpanded) Modifier.settingsFadingEdge(scrollState) else Modifier)
                             .then(if (navMode == 0 || !isExpanded) Modifier.verticalScroll(scrollState) else Modifier)
                             .padding(horizontal = if (isExpanded) 48.dp else 24.dp)
+                            // 🚨 CORRECTION 3 : Marge pour pouvoir scroller jusqu'au bout
+                            .navigationBarsPadding()
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                             if (navMode == 0 || !isExpanded) {
@@ -502,6 +528,17 @@ fun SettingsScreen(
                 onBack = {
                     // ✅ 3. LOGIQUE DE RETOUR
                     showFrequenciesSheet = false
+                    showSiteSettingsSheet = true
+                }
+            )
+        }
+
+        // ✅ AJOUT : Fenêtre des Photos & Schémas
+        if (showPhotosSettingsSheet) {
+            fr.geotower.ui.screens.settings.SitePhotosSettingsSheet(
+                onDismiss = { showPhotosSettingsSheet = false },
+                onBack = {
+                    showPhotosSettingsSheet = false
                     showSiteSettingsSheet = true
                 }
             )
@@ -699,7 +736,7 @@ fun SettingsScreen(
                 showBearingHeight = pageSiteBearingHeight, onBearingHeightChange = { pageSiteBearingHeight = it; prefs.edit().putBoolean("page_site_bearing_height", it).apply() },
                 showMap = pageSiteMap, onMapChange = { pageSiteMap = it; prefs.edit().putBoolean("page_site_map", it).apply() },
                 showSupportDetails = pageSiteSupportDetails, onSupportDetailsChange = { pageSiteSupportDetails = it; prefs.edit().putBoolean("page_site_support_details", it).apply() },
-                showPhotos = pageSitePhotos, onPhotosChange = { pageSitePhotos = it; prefs.edit().putBoolean("page_site_photos", it).apply() },
+                showPhotos = AppConfig.siteShowPhotos.value, onPhotosChange = { AppConfig.siteShowPhotos.value = it; prefs.edit().putBoolean("page_site_photos", it).apply() },
                 showPanelHeights = pageSitePanelHeights, onPanelHeightsChange = { pageSitePanelHeights = it; prefs.edit().putBoolean("page_site_panel_heights", it).apply() },
                 showIds = pageSiteIds, onIdsChange = { pageSiteIds = it; prefs.edit().putBoolean("page_site_ids", it).apply() },
                 showNav = pageSiteNav, onNavChange = { pageSiteNav = it; prefs.edit().putBoolean("page_site_nav", it).apply() },
@@ -707,11 +744,16 @@ fun SettingsScreen(
                 showDates = pageSiteDates, onDatesChange = { pageSiteDates = it; prefs.edit().putBoolean("page_site_dates", it).apply() },
                 showAddress = pageSiteAddress, onAddressChange = { pageSiteAddress = it; prefs.edit().putBoolean("page_site_address", it).apply() },
                 showStatus = AppConfig.siteShowStatus.value, onStatusChange = { AppConfig.siteShowStatus.value = it; prefs.edit().putBoolean("site_show_status", it).apply() }, // 🚨 AJOUT DU STATUT
+                showSpeedtest = AppConfig.siteShowSpeedtest.value, onSpeedtestChange = { AppConfig.siteShowSpeedtest.value = it; prefs.edit().putBoolean("site_show_speedtest", it).apply() }, // 🚨 NEW
                 showFreqs = pageSiteFreqs, onFreqsChange = { pageSiteFreqs = it; prefs.edit().putBoolean("page_site_freqs", it).apply() },
                 showLinks = pageSiteLinks, onLinksChange = { pageSiteLinks = it; prefs.edit().putBoolean("page_site_links", it).apply() },
                 onOpenFrequencies = {
                     showSiteSettingsSheet = false
                     showFrequenciesSheet = true
+                },
+                onOpenPhotosSettings = {
+                    showSiteSettingsSheet = false
+                    showPhotosSettingsSheet = true
                 },
                 onDismiss = { showSiteSettingsSheet = false },
                 onBack = { safeClick { showSiteSettingsSheet = false; showPagesCustomizationSheet = true } },
@@ -855,12 +897,15 @@ fun SettingsScreen(
                 },
                 addressEnabled = shareAddressEnabled,
                 onAddressChange = {
-                    shareAddressEnabled = it; prefs.edit().putBoolean("share_address_enabled", it)
-                    .apply()
+                    shareAddressEnabled = it; prefs.edit().putBoolean("share_address_enabled", it).apply()
                 },
-                statusEnabled = AppConfig.shareSiteStatus.value, // 🚨 AJOUT DU STATUT
+                statusEnabled = AppConfig.shareSiteStatus.value,
                 onStatusChange = {
                     AppConfig.shareSiteStatus.value = it; prefs.edit().putBoolean("share_site_status", it).apply()
+                },
+                speedtestEnabled = shareSpeedtestEnabled, // 🚨 NEW
+                onSpeedtestChange = {
+                    shareSpeedtestEnabled = it; prefs.edit().putBoolean("share_speedtest_enabled", it).apply()
                 },
                 freqEnabled = shareFreqEnabled,
                 onFreqChange = {

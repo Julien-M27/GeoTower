@@ -97,9 +97,9 @@ fun MapDownloadCard(
 
                                     if (!isDownloaded && !isSyncing) {
                                         val data = workDataOf(
-                                            "zip_url" to map.zipUrl,
+                                            "map_url" to map.mapUrl,
                                             "map_filename" to map.mapFilename,
-                                            "estimated_size_mb" to map.estimatedZipSizeMb
+                                            "estimated_size_mb" to map.estimatedSizeMb
                                         )
                                         val request = OneTimeWorkRequestBuilder<fr.geotower.data.workers.MapDownloadWorker>()
                                             .setInputData(data)
@@ -137,13 +137,13 @@ fun MapDownloadCard(
                     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.weight(1f)) {
-                                // On utilise l'ID pour aller chercher le nom traduit dans nos strings
+                                // On utilise notre nouvelle fonction de formatage pour un affichage propre
                                 Text(
-                                    text = AppStrings.getMapName(map.id),
+                                    text = AppStrings.formatMapName(map.mapFilename),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp
                                 )
-                                Text(text = "~ ${map.estimatedZipSizeMb} Mo", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(text = "${map.estimatedSizeMb} Mo", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
 
                             if (isSyncing) {
@@ -158,7 +158,7 @@ fun MapDownloadCard(
                                 IconButton(
                                     onClick = {
                                         onSafeClick {
-                                            val data = workDataOf("zip_url" to map.zipUrl, "map_filename" to map.mapFilename, "estimated_size_mb" to map.estimatedZipSizeMb)
+                                            val data = workDataOf("map_url" to map.mapUrl, "map_filename" to map.mapFilename, "estimated_size_mb" to map.estimatedSizeMb)
                                             val request = OneTimeWorkRequestBuilder<fr.geotower.data.workers.MapDownloadWorker>()
                                                 .setInputData(data).addTag("map_download").addTag("map_id_${map.id}").build()
                                             workManager.enqueueUniqueWork("map_dl_${map.id}", ExistingWorkPolicy.REPLACE, request)
@@ -178,7 +178,8 @@ fun MapDownloadCard(
                                 color = MaterialTheme.colorScheme.primary,
                                 trackColor = MaterialTheme.colorScheme.surfaceVariant
                             )
-                            val statusText = if (workState == "EXTRACTING") AppStrings.mapExtracting else AppStrings.downloadProgress(progressValue)
+                            // 🚨 L'extraction n'existe plus, on affiche juste la progression !
+                            val statusText = AppStrings.downloadProgress(progressValue)
                             Text(text = statusText, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         }
                     }

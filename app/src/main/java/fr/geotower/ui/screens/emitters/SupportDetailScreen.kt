@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -71,6 +72,9 @@ import fr.geotower.ui.components.SupportShareMenu
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import java.util.Locale
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -136,128 +140,129 @@ fun SupportDetailScreen(
     val scrollState = rememberScrollState()
 
     LaunchedEffect(siteId) {
+        // 1️⃣ CHARGEMENT RAPIDE (Base de données) -> Bloque l'écran une fraction de seconde
         try {
             isLoading = true
+            withContext(Dispatchers.IO) {
+                val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+                val savedLat = prefs.getFloat("clicked_lat", 0f).toDouble()
+                val savedLon = prefs.getFloat("clicked_lon", 0f).toDouble()
 
-            val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-            val savedLat = prefs.getFloat("clicked_lat", 0f).toDouble()
-            val savedLon = prefs.getFloat("clicked_lon", 0f).toDouble()
+                val initialSearch = repository.getAntennasByExactId(siteId.toString())
 
-            val initialSearch = repository.getAntennasByExactId(siteId.toString())
+                var lat = 0.0
+                var lon = 0.0
 
-            var lat = 0.0
-            var lon = 0.0
+                if (initialSearch.isNotEmpty()) {
+                    var site = initialSearch.find {
+                        Math.abs(it.latitude - savedLat) < 0.005 && Math.abs(it.longitude - savedLon) < 0.005
+                    }
 
-            if (initialSearch.isNotEmpty()) {
-                // 1. On cherche d'abord via la mémoire (quand on vient de la carte)
-                var site = initialSearch.find {
-                    Math.abs(it.latitude - savedLat) < 0.005 && Math.abs(it.longitude - savedLon) < 0.005
-                }
-
-                // 2. ✅ INTELLIGENCE QR CODE : Si on ne vient pas de la carte, on prend l'antenne la plus proche du GPS !
-                if (site == null) {
-                    val userLoc = getLocalLastKnownLocation(context)
-                    site = if (userLoc != null) {
-                        initialSearch.minByOrNull {
-                            val dLat = it.latitude - userLoc.latitude
-                            val dLon = it.longitude - userLoc.longitude
-                            (dLat * dLat) + (dLon * dLon)
+                    if (site == null) {
+                        val userLoc = getLocalLastKnownLocation(context)
+                        site = if (userLoc != null) {
+                            initialSearch.minByOrNull {
+                                val dLat = it.latitude - userLoc.latitude
+                                val dLon = it.longitude - userLoc.longitude
+                                (dLat * dLat) + (dLon * dLon)
+                            }
+                        } else {
+                            initialSearch.first()
                         }
-                    } else {
-                        initialSearch.first()
+                    }
+
+                    lat = site!!.latitude
+                    lon = site.longitude
+
+                    prefs.edit()
+                        .putFloat("clicked_lat", lat.toFloat())
+                        .putFloat("clicked_lon", lon.toFloat())
+                        .apply()
+                } else {
+                    lat = savedLat
+                    lon = savedLon
+                }
+
+                val fetchedAntennas = if (lat != 0.0 && lon != 0.0) {
+                    repository.getAntennasInBox(
+                        latNorth = lat + 0.0005,
+                        lonEast = lon + 0.0005,
+                        latSouth = lat - 0.0005,
+                        lonWest = lon - 0.0005
+                    ).filter { it.latitude.toFloat() == lat.toFloat() && it.longitude.toFloat() == lon.toFloat() }
+                } else {
+                    emptyList()
+                }
+
+                val defaultOp = AppConfig.defaultOperator.value.uppercase()
+                val baseOrder = listOf("ORANGE", "BOUYGUES", "SFR", "FREE")
+                val priorityList = mutableListOf<String>()
+
+                if (defaultOp != "AUCUN" && baseOrder.any { defaultOp.contains(it) }) {
+                    priorityList.add(baseOrder.first { defaultOp.contains(it) })
+                }
+                baseOrder.forEach { if (!priorityList.contains(it)) priorityList.add(it) }
+
+                antennas = fetchedAntennas.sortedBy { antenna ->
+                    val name = (antenna.operateur ?: "").uppercase()
+                    val matchedOp = priorityList.firstOrNull { name.contains(it) }
+                    if (matchedOp != null) priorityList.indexOf(matchedOp) else 99
+                }
+
+                val techMap = mutableMapOf<String, TechniqueEntity>()
+                if (antennas.isNotEmpty()) {
+                    physique = repository.getPhysiqueByAnfr(antennas.first().idAnfr).firstOrNull()
+
+                    antennas.forEach { ant ->
+                        val tech = repository.getTechniqueByAnfr(ant.idAnfr).firstOrNull()
+                        if (tech != null) techMap[ant.idAnfr] = tech
                     }
                 }
+                techniquesMap = techMap
 
-                lat = site!!.latitude
-                lon = site.longitude
-
-                // On met à jour la mémoire
-                prefs.edit()
-                    .putFloat("clicked_lat", lat.toFloat())
-                    .putFloat("clicked_lon", lon.toFloat())
-                    .apply()
-            } else {
-                lat = savedLat
-                lon = savedLon
-            }
-
-            var fetchedAntennas = if (lat != 0.0 && lon != 0.0) {
-                repository.getAntennasInBox(
-                    latNorth = lat + 0.0005,
-                    lonEast = lon + 0.0005,
-                    latSouth = lat - 0.0005,
-                    lonWest = lon - 0.0005
-                ).filter { it.latitude.toFloat() == lat.toFloat() && it.longitude.toFloat() == lon.toFloat() }
-            } else {
-                emptyList()
-            }
-
-            val defaultOp = AppConfig.defaultOperator.value.uppercase()
-            val baseOrder = listOf("ORANGE", "BOUYGUES", "SFR", "FREE")
-            val priorityList = mutableListOf<String>()
-
-            if (defaultOp != "AUCUN" && baseOrder.any { defaultOp.contains(it) }) {
-                priorityList.add(baseOrder.first { defaultOp.contains(it) })
-            }
-            baseOrder.forEach { if (!priorityList.contains(it)) priorityList.add(it) }
-
-            antennas = fetchedAntennas.sortedBy { antenna ->
-                val name = (antenna.operateur ?: "").uppercase()
-                val matchedOp = priorityList.firstOrNull { name.contains(it) }
-                if (matchedOp != null) priorityList.indexOf(matchedOp) else 99
-            }
-
-            val techMap = mutableMapOf<String, TechniqueEntity>()
-            if (antennas.isNotEmpty()) {
-                physique = repository.getPhysiqueByAnfr(antennas.first().idAnfr).firstOrNull()
-
-                antennas.forEach { ant ->
-                    val tech = repository.getTechniqueByAnfr(ant.idAnfr).firstOrNull()
-                    if (tech != null) techMap[ant.idAnfr] = tech
+                // TÉLÉCHARGEMENT DES PANNES
+                try {
+                    val allHs = repository.getSitesHs()
+                    val tempOutageMap = mutableMapOf<String, fr.geotower.data.models.SiteHsEntity>()
+                    antennas.forEach { ant ->
+                        val hsData = allHs.firstOrNull { hs ->
+                            val hsId = hs.idAnfr.toLongOrNull()
+                            val antId = ant.idAnfr.toLongOrNull()
+                            hsId != null && hsId == antId
+                        }
+                        if (hsData != null) {
+                            tempOutageMap[ant.idAnfr] = hsData
+                        }
+                    }
+                    hsDataMap = tempOutageMap
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-            }
-            techniquesMap = techMap
+            } // Fin du bloc IO Base de données
+        } catch (e: Exception) {
+            e.printStackTrace()
+        } finally {
+            isLoading = false // 🚨 L'ÉCRAN S'AFFICHE IMMÉDIATEMENT ICI !
+        }
 
-            // 🚨 TÉLÉCHARGEMENT DES PANNES (Nouveau système GeoJSON GeoTower)
+        // 2️⃣ CHARGEMENT RÉSEAU DES PHOTOS (En arrière-plan, ne bloque pas l'écran)
+        launch(Dispatchers.IO) {
             try {
-                // 1. On récupère directement toutes les pannes via ton Repository ! (C'est lui qui fait le travail)
-                val allHs = repository.getSitesHs()
+                val photosTemp = mutableListOf<CommunityPhoto>()
+                val hasOrange = antennas.any { (it.operateur ?: "").contains("ORANGE", true) }
+                val hasSfrOrBouygues = antennas.any { (it.operateur ?: "").contains("SFR", true) || (it.operateur ?: "").contains("BOUYGUES", true) }
+                val trueSupportId = physique?.idSupport ?: antennas.firstOrNull()?.idAnfr
 
-                val tempOutageMap = mutableMapOf<String, fr.geotower.data.models.SiteHsEntity>()
-
-                // 2. On associe les pannes aux antennes de la page
-                antennas.forEach { ant ->
-                    // Comparaison exacte et infaillible par ID ANFR (comme sur la carte)
-                    val hsData = allHs.firstOrNull { hs ->
-                        val hsId = hs.idAnfr.toLongOrNull()
-                        val antId = ant.idAnfr.toLongOrNull()
-                        hsId != null && hsId == antId
-                    }
-
-                    if (hsData != null) {
-                        tempOutageMap[ant.idAnfr] = hsData
-                    }
-                }
-                hsDataMap = tempOutageMap
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-
-            val photosTemp = mutableListOf<CommunityPhoto>()
-            val hasOrange = antennas.any { (it.operateur ?: "").contains("ORANGE", true) }
-            val hasSfrOrBouygues = antennas.any { (it.operateur ?: "").contains("SFR", true) || (it.operateur ?: "").contains("BOUYGUES", true) }
-
-            // ✅ CORRECTION MAJEURE : On utilise le VRAI ID du Support
-            val trueSupportId = physique?.idSupport ?: antennas.firstOrNull()?.idAnfr
-
-            if (!trueSupportId.isNullOrBlank()) {
-                if (hasOrange) {
-                    try {
-                        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                if (!trueSupportId.isNullOrBlank()) {
+                    if (hasOrange) {
+                        try {
                             val apiUrl = java.net.URL("https://cellularfr.fr/api/photos?siteId=$trueSupportId")
                             val connection = apiUrl.openConnection() as java.net.HttpURLConnection
                             connection.requestMethod = "GET"
+                            connection.connectTimeout = 5000 // 🚨 TIMEOUT POUR ÉVITER LE BLOCAGE INFINI
+                            connection.readTimeout = 5000
                             connection.connect()
+
                             if (connection.responseCode == 200) {
                                 val jsonString = connection.inputStream.bufferedReader().use { it.readText() }
                                 val jsonObject = org.json.JSONObject(jsonString)
@@ -272,30 +277,27 @@ fun SupportDetailScreen(
                                     }
                                 }
                             }
-                        }
-                    } catch (e: Exception) { e.printStackTrace() }
-                }
+                        } catch (e: Exception) { e.printStackTrace() }
+                    }
 
-                if (hasSfrOrBouygues) {
-                    try {
-                        val response = fr.geotower.data.api.SignalQuestClient.api.getSitePhotos(
-                            authHeader = "Bearer ${fr.geotower.BuildConfig.SQ_API_KEY}",
-                            siteId = trueSupportId
-                        )
-                        if (response.isSuccessful) {
-                            response.body()?.data?.forEach { photo ->
-                                photosTemp.add(CommunityPhoto(photo.imageUrl, "Signal Quest", photo.authorName, photo.uploadedAt))
+                    if (hasSfrOrBouygues) {
+                        try {
+                            val response = fr.geotower.data.api.SignalQuestClient.api.getSitePhotos(
+                                authHeader = "Bearer ${fr.geotower.BuildConfig.SQ_API_KEY}",
+                                siteId = trueSupportId
+                            )
+                            if (response.isSuccessful) {
+                                response.body()?.data?.forEach { photo ->
+                                    photosTemp.add(CommunityPhoto(photo.imageUrl, "Signal Quest", photo.authorName, photo.uploadedAt))
+                                }
                             }
-                        }
-                    } catch (e: Exception) { e.printStackTrace() }
+                        } catch (e: Exception) { e.printStackTrace() }
+                    }
                 }
+                communityPhotos = photosTemp
+            } catch (e: Exception) {
+                e.printStackTrace()
             }
-            communityPhotos = photosTemp
-
-        } catch (e: Exception) {
-            e.printStackTrace()
-        } finally {
-            isLoading = false
         }
     }
 
@@ -431,7 +433,8 @@ fun SupportDetailScreen(
             }
         }
     ) { padding ->
-        Box(modifier = Modifier.padding(padding).fillMaxSize().background(mainBgColor)) {
+        // 🚨 CORRECTION : On applique UNIQUEMENT le padding du haut (top) pour passer sous les boutons en bas !
+        Box(modifier = Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().background(mainBgColor)) {
             if (isLoading) {
                 CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (antennas.isEmpty()) {
@@ -443,6 +446,8 @@ fun SupportDetailScreen(
                         .fillMaxSize()
                         .siteDetailFadingEdge(scrollState)
                         .verticalScroll(scrollState)
+                        // 🚨 AJOUT : Ajoute un espace à la fin du défilement pour ne pas cacher le dernier élément sous les boutons
+                        .navigationBarsPadding()
                         .padding(bottom = 32.dp)
                 ) {
                     Spacer(modifier = Modifier.height(8.dp))
@@ -477,11 +482,13 @@ fun SupportDetailScreen(
                                 }
                             }
                             "photos" -> {
-                                if (showPhotos && communityPhotos.isNotEmpty()) {
+                                // 🚨 CORRECTION : On retire "&& communityPhotos.isNotEmpty()"
+                                if (showPhotos) {
                                     Box(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
                                         CommunityPhotosSectionShared(
                                             photos = communityPhotos,
                                             operatorName = null,
+                                            supportNature = physique?.natureSupport, // ✅ LE BON NOM DE VARIABLE
                                             bgColor = cardBgColor,
                                             shape = blockShape,
                                             onAddPhotoClick = null

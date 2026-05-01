@@ -135,16 +135,19 @@ class AnfrRepository(
 
             val hsList = mutableListOf<SiteHsEntity>()
 
-            // 3. On extrait chaque point
+            // 3. On extrait chaque point (Version blindée anti-crash)
             for (i in 0 until features.length()) {
                 val feature = features.getJSONObject(i)
-                val properties = feature.getJSONObject("properties")
-                val geometry = feature.getJSONObject("geometry")
-                val coordinates = geometry.getJSONArray("coordinates")
+                val properties = feature.optJSONObject("properties") ?: org.json.JSONObject()
+
+                // 🚨 CORRECTION : L'ARCEP publie parfois des pannes SANS coordonnées GPS !
+                // optJSONObject évite que l'application ne crashe si la géométrie est absente.
+                val geometry = feature.optJSONObject("geometry")
+                val coordinates = geometry?.optJSONArray("coordinates")
 
                 // GeoJSON range toujours [Longitude, Latitude]
-                val lon = coordinates.getDouble(0)
-                val lat = coordinates.getDouble(1)
+                val lon = coordinates?.optDouble(0, 0.0) ?: 0.0
+                val lat = coordinates?.optDouble(1, 0.0) ?: 0.0
 
                 // 1. Extraction de toutes les propriétés du JSON
                 val stationAnfr = properties.optString("station_anfr", "")

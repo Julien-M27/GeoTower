@@ -67,8 +67,10 @@ fun SharePreferencesSheet(
     onDatesChange: (Boolean) -> Unit,
     addressEnabled: Boolean,
     onAddressChange: (Boolean) -> Unit,
-    statusEnabled: Boolean, // 🚨 NEW
-    onStatusChange: (Boolean) -> Unit, // 🚨 NEW
+    statusEnabled: Boolean,
+    onStatusChange: (Boolean) -> Unit,
+    speedtestEnabled: Boolean, // 🚨 NEW
+    onSpeedtestChange: (Boolean) -> Unit, // 🚨 NEW
     freqEnabled: Boolean,
     onFreqChange: (Boolean) -> Unit,
     qrEnabled: Boolean,
@@ -186,6 +188,7 @@ fun SharePreferencesSheet(
                             "ids" -> DraggableSwitchCard(AppStrings.shareIdsOption, idsEnabled, onIdsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "dates" -> DraggableSwitchCard(AppStrings.shareDatesOption, datesEnabled, onDatesChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "address" -> DraggableSwitchCard(AppStrings.shareAddressOption, addressEnabled, onAddressChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "speedtest" -> DraggableSwitchCard(AppStrings.shareSpeedtestOption, speedtestEnabled, onSpeedtestChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "status" -> DraggableSwitchCard(AppStrings.shareStatusOption, statusEnabled, onStatusChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "freq" -> DraggableSwitchCard(AppStrings.shareFreqOption, freqEnabled, onFreqChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                         }
@@ -198,12 +201,13 @@ fun SharePreferencesSheet(
             // --- BOUTON RÉINITIALISER (TOUT PAR DÉFAUT) ---
             TextButton(
                 onClick = {
-                    onOrderChange(listOf("map", "support", "ids", "dates", "address", "status", "freq"))
+                    onOrderChange(listOf("map", "support", "ids", "dates", "address", "speedtest", "status", "freq"))
                     onMapChange(true)
                     onSupportChange(true)
                     onIdsChange(true)
                     onDatesChange(true)
                     onAddressChange(true)
+                    onSpeedtestChange(true)
                     onStatusChange(true)
                     onFreqChange(true)
                     // Note : On ne réinitialise volontairement pas le mode "Confidentiel" par sécurité
@@ -213,6 +217,7 @@ fun SharePreferencesSheet(
                 Spacer(Modifier.width(8.dp))
                 Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
+            Spacer(modifier = Modifier.height(24.dp).navigationBarsPadding())
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
             val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
@@ -351,6 +356,7 @@ fun SupportSharePreferencesSheet(
                 Spacer(Modifier.width(8.dp))
                 Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
+            Spacer(modifier = Modifier.height(24.dp).navigationBarsPadding())
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
             val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
@@ -467,6 +473,7 @@ fun MapSharePreferencesSheet(
                 Spacer(Modifier.width(8.dp))
                 Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
+            Spacer(modifier = Modifier.height(24.dp).navigationBarsPadding())
 
             // Bouton mode confidentiel séparé
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))

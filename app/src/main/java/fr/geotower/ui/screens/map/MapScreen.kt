@@ -248,7 +248,21 @@ fun MapScreen(
     val markersOverlay = remember {
         object : org.osmdroid.bonuspack.clustering.RadiusMarkerClusterer(context) {
             override fun buildClusterMarker(cluster: org.osmdroid.bonuspack.clustering.StaticCluster, mapView: MapView): Marker {
-                val m = Marker(mapView)
+                // 🚨 MODIFICATION : On écrase la zone de clic pour la forcer à être ronde !
+                val m = object : Marker(mapView) {
+                    override fun hitTest(event: android.view.MotionEvent, mapView: MapView): Boolean {
+                        val pj = mapView.projection
+                        val screenCoords = android.graphics.Point()
+                        pj.toPixels(position, screenCoords)
+
+                        val dx = event.x - screenCoords.x
+                        val dy = event.y - screenCoords.y
+
+                        // Rayon de clic mathématique de 22dp (parfait pour le doigt)
+                        val clickRadius = 22f * mapView.context.resources.displayMetrics.density
+                        return (dx * dx + dy * dy) <= (clickRadius * clickRadius)
+                    }
+                }
 
                 m.position = GeoPoint(cluster.position.latitude, cluster.position.longitude)
                 m.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
@@ -635,15 +649,11 @@ fun MapScreen(
                         // 1. On génère l'icône de base (avec la bordure de couleur de l'opérateur)
                         val baseIcon = MapUtils.createAdaptiveMarker(context, filteredSiteAntennas, map.zoomLevelDouble >= 13.0 && AppConfig.showAzimuths.value, AppConfig.defaultOperator.value)
 
-                        // 2. LOGIQUE DE FUSION : Comparaison exacte par ID ANFR !
-                        // C'est la méthode la plus fiable (Zéro erreur de GPS)
+                        // 2. LOGIQUE DE FUSION : On vérifie TOUTES les antennes du pylône partagé !
                         val isHs = validHsSites.any { hs ->
-                            // On convertit en Long pour ignorer les zéros au début (ex: "0012750001" devient 12750001)
                             val hsId = hs.idAnfr.toLongOrNull()
-                            val antId = mainAntenna.idAnfr.toLongOrNull()
-
-                            // Si les deux IDs sont valides et identiques, l'antenne est bien en panne !
-                            hsId != null && hsId == antId
+                            // Au lieu de vérifier juste mainAntenna, on fouille dans toutes les antennes de ce point GPS
+                            hsId != null && siteAntennas.any { it.idAnfr.toLongOrNull() == hsId }
                         }
 
                         if (isHs) {
@@ -951,19 +961,21 @@ fun MapScreen(
                     if (mapFiles.isNotEmpty()) {
                         if (map.tileProvider !is MapsForgeTileProvider) {
 
-                            // ✅ NOUVEAU : On charge le thème depuis les Assets de l'app
+                            // 🚨 CORRECTION : Détection native du mode sombre d'Android
+                            val isDarkMode = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
+
+                            // On tente de charger le magnifique thème Elevate
                             val renderTheme = try {
-                                // On passe bien "context.assets" (AssetManager)
-                                AssetsRenderTheme(context.assets, "themes/", "Elevate.xml")
+                                AssetsRenderTheme(context.assets, "themes/", "freizeitkarte-v5.xml")
                             } catch (e: Exception) {
-                                // Fallback si le fichier est mal placé dans les assets
+                                // S'il manque, on repasse sur le thème par défaut pour ne pas planter
                                 InternalRenderTheme.OSMARENDER
                             }
 
                             val forgeSource = MapsForgeTileSource.createFromFiles(
                                 mapFiles,
                                 renderTheme,
-                                "geotower_asset_theme"
+                                "geotower_internal_theme"
                             )
                             val forgeProvider = MapsForgeTileProvider(
                                 org.osmdroid.tileprovider.util.SimpleRegisterReceiver(context),
@@ -2170,11 +2182,27 @@ class AntennaMarker(
     private val density = mapView.context.resources.displayMetrics.density
     private val ptCenter = android.graphics.Point()
 
+    // 🚨 NOUVEAU : On redéfinit la HitBox pour qu'elle ignore les faisceaux et soit 100% ronde
+    override fun hitTest(event: android.view.MotionEvent, mapView: org.osmdroid.views.MapView): Boolean {
+        val pj = mapView.projection
+        val screenCoords = android.graphics.Point()
+        pj.toPixels(position, screenCoords)
+
+        val dx = event.x - screenCoords.x
+        val dy = event.y - screenCoords.y
+
+        // Rayon cliquable fixe de 22dp (englobe juste le rond central, ignore le carré transparent)
+        val clickRadius = 22f * density
+        return (dx * dx + dy * dy) <= (clickRadius * clickRadius)
+    }
+
     // ✅ NOUVELLE STRUCTURE : On regroupe les couleurs par azimut !
     private class GroupedAzimuthData(
+        val azimuth: Float,
         val cos: Float,
         val sin: Float,
         val linePaint: android.graphics.Paint,
+        val conePaint: android.graphics.Paint?, // 🚨 NOUVEAU : Le pinceau translucide
         val dotColors: List<Int>
     )
 
@@ -2233,7 +2261,13 @@ class AntennaMarker(
                 strokeCap = android.graphics.Paint.Cap.ROUND
             }
 
-            precalculatedMobileAzimuths.add(GroupedAzimuthData(cos, sin, linePaint, sortedColors))
+            // Le pinceau pour le cône (Alpha = 40/255, soit environ 15% d'opacité)
+            val conePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                style = android.graphics.Paint.Style.FILL
+                color = androidx.core.graphics.ColorUtils.setAlphaComponent(mainColor, 50)
+            }
+
+            precalculatedMobileAzimuths.add(GroupedAzimuthData(az, cos, sin, linePaint, conePaint, sortedColors))
         }
 
         // Pareil pour les faisceaux hertziens (FH)
@@ -2253,7 +2287,8 @@ class AntennaMarker(
                 pathEffect = android.graphics.DashPathEffect(floatArrayOf(5f * density, 5f * density), 0f)
             }
 
-            precalculatedFhAzimuths.add(GroupedAzimuthData(cos, sin, dashedPaint, sortedColors))
+            // On passe bien "az" et "null" (Pas de cône pour les FH)
+            precalculatedFhAzimuths.add(GroupedAzimuthData(az, cos, sin, dashedPaint, null, sortedColors))
         }
     }
 
@@ -2269,7 +2304,13 @@ class AntennaMarker(
 
     override fun draw(canvas: android.graphics.Canvas, projection: org.osmdroid.views.Projection) {
         val zoom = mapView.zoomLevelDouble
-        if (zoom >= 14.0 && fr.geotower.utils.AppConfig.showAzimuths.value) {
+
+        // 🚨 NOUVEAU : On lit les préférences en direct
+        val showLines = fr.geotower.utils.AppConfig.showAzimuths.value
+        val showCones = fr.geotower.utils.AppConfig.showAzimuthsCone.value
+
+        // On ne rentre dans le bloc que si au moins l'un des deux est activé
+        if (zoom >= 14.0 && (showLines || showCones)) {
             projection.toPixels(mPosition, ptCenter)
 
             val beamLengthPx = when {
@@ -2286,31 +2327,49 @@ class AntennaMarker(
             val circleOffsetPx = 17f * density
             val totalRadiusPx = circleOffsetPx + beamLengthPx
 
-            // ✅ NOUVEAU : On calcule l'écart parfait pour que les cercles se touchent (Rayon x 2 = Diamètre)
-            // Astuce : tu peux mettre 1.8f au lieu de 2.0f si tu veux qu'ils se chevauchent très légèrement !
             val gapMobile = pointRadius * 2.0f
             val gapFh = fhRadius * 2.0f
 
+            // 🚨 NOUVEAU : Rectangle de délimitation (Bounding Box) pour tracer les cônes
+            val rectF = android.graphics.RectF(
+                ptCenter.x - totalRadiusPx,
+                ptCenter.y - totalRadiusPx,
+                ptCenter.x + totalRadiusPx,
+                ptCenter.y + totalRadiusPx
+            )
+
             // --- DESSIN DES MOBILES ---
             precalculatedMobileAzimuths.forEach { data ->
-                val startX = ptCenter.x + circleOffsetPx * data.cos
-                val startY = ptCenter.y + circleOffsetPx * data.sin
-                val endX = ptCenter.x + totalRadiusPx * data.cos
-                val endY = ptCenter.y + totalRadiusPx * data.sin
 
-                canvas.drawLine(startX, startY, endX, endY, data.linePaint)
+                // 1. DESSIN DU CÔNE (Toujours en premier pour qu'il soit "au fond")
+                if (showCones && data.conePaint != null) {
+                    // L'angle 0 d'Android est à l'Est (3h), l'azimut 0 est au Nord (12h) -> On enlève 90°.
+                    // Pour un cône de 70°, on doit reculer de 35° pour que le centre du cône pointe sur l'azimut exact.
+                    val startAngle = data.azimuth - 90f - 35f
+                    canvas.drawArc(rectF, startAngle, 70f, true, data.conePaint)
+                }
 
-                data.dotColors.forEachIndexed { index, colorInt ->
-                    val offsetMag = index * gapMobile // Utilise le gap des mobiles
-                    val dotX = endX + (data.cos * offsetMag)
-                    val dotY = endY + (data.sin * offsetMag)
+                // 2. DESSIN DE LA LIGNE ET DES PASTILLES D'OPÉRATEURS
+                if (showLines) {
+                    val startX = ptCenter.x + circleOffsetPx * data.cos
+                    val startY = ptCenter.y + circleOffsetPx * data.sin
+                    val endX = ptCenter.x + totalRadiusPx * data.cos
+                    val endY = ptCenter.y + totalRadiusPx * data.sin
 
-                    canvas.drawCircle(dotX, dotY, pointRadius, getDotPaint(colorInt))
+                    canvas.drawLine(startX, startY, endX, endY, data.linePaint)
+
+                    data.dotColors.forEachIndexed { index, colorInt ->
+                        val offsetMag = index * gapMobile
+                        val dotX = endX + (data.cos * offsetMag)
+                        val dotY = endY + (data.sin * offsetMag)
+
+                        canvas.drawCircle(dotX, dotY, pointRadius, getDotPaint(colorInt))
+                    }
                 }
             }
 
             // --- DESSIN DES FAISCEAUX HERTZIENS (FH) ---
-            if (fr.geotower.utils.AppConfig.showTechnoFH.value) {
+            if (fr.geotower.utils.AppConfig.showTechnoFH.value && showLines) {
                 precalculatedFhAzimuths.forEach { data ->
                     val startX = ptCenter.x + circleOffsetPx * data.cos
                     val startY = ptCenter.y + circleOffsetPx * data.sin
@@ -2320,7 +2379,7 @@ class AntennaMarker(
                     canvas.drawLine(startX, startY, endX, endY, data.linePaint)
 
                     data.dotColors.forEachIndexed { index, colorInt ->
-                        val offsetMag = index * gapFh // Utilise le gap réduit des FH
+                        val offsetMag = index * gapFh
                         val dotX = endX + (data.cos * offsetMag)
                         val dotY = endY + (data.sin * offsetMag)
 

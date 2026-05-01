@@ -19,7 +19,9 @@ object AppConfig {
 
     // Statut de l'antenne
     var siteShowStatus = mutableStateOf(true)
-    var shareSiteStatus = mutableStateOf(true) // 🚨 AJOUT DE LA VARIABLE MANQUANTE
+    var siteShowPhotos = mutableStateOf(true)
+    var shareSiteStatus = mutableStateOf(true)
+    var shareSiteSpeedtest = mutableStateOf(true) // 🚨 NEW
 
     // Langue globale de l'application (Système par défaut au 1er lancement)
     val appLanguage = mutableStateOf("Système")
@@ -47,6 +49,8 @@ object AppConfig {
 
     // --- FILTRES : AZIMUTS ---
     var showAzimuths = mutableStateOf(true)
+
+    var showAzimuthsCone = mutableStateOf(false)
 
     // --- FILTRES : TECHNOLOGIES ---
     var showTechno2G = mutableStateOf(true)
@@ -152,6 +156,14 @@ object AppConfig {
     // --- Capteurs matériels ---
     var hasCompass = mutableStateOf(true) // Vrai par défaut, vérifié au lancement
 
+    // --- AFFICHAGE DES SPEEDTESTS
+    var siteShowSpeedtest = mutableStateOf(true)
+
+    // --- FILTRES : PHOTOS & SCHÉMAS ---
+    var siteShowCellularFrPhotos = mutableStateOf(true)
+    var siteShowSignalQuestPhotos = mutableStateOf(true)
+    var siteShowSchemes = mutableStateOf(true)
+
     // --- FONCTION POUR CHARGER LA MÉMOIRE AU DÉMARRAGE ---
     fun loadSavedFilters(prefs: android.content.SharedPreferences) {
 
@@ -165,6 +177,7 @@ object AppConfig {
 
         //Statut
         shareSiteStatus.value = prefs.getBoolean("share_site_status", true)
+        shareSiteSpeedtest.value = prefs.getBoolean("share_site_speedtest", true) // 🚨 NEW
 
         // ✅ DÉTECTION GALAXY Z FOLD (Samsung)
         val isGalaxyZFold = model.startsWith("SM-F9", ignoreCase = true)
@@ -194,6 +207,9 @@ object AppConfig {
         showSfr.value = prefs.getBoolean("show_sfr", true)
         showBouygues.value = prefs.getBoolean("show_bouygues", true)
         showFree.value = prefs.getBoolean("show_free", true)
+
+        showAzimuths.value = prefs.getBoolean("show_azimuths", true)
+        showAzimuthsCone.value = prefs.getBoolean("show_azimuths_cone", false)
 
         showTechno2G.value = prefs.getBoolean("show_techno_2g", true)
         showTechno3G.value = prefs.getBoolean("show_techno_3g", true)
@@ -245,9 +261,17 @@ object AppConfig {
         siteShowSpectrumBand.value = prefs.getBoolean("site_show_spectrum_band", true)
         siteShowSpectrumTotal.value = prefs.getBoolean("site_show_spectrum_total", true)
 
-        // 🚨 AJOUTEZ CE BLOC ICI :
-        // Chargement de la visibilité du nouveau bloc Statut
+        // AFFICHAGE DU STATUT
         siteShowStatus.value = prefs.getBoolean("site_show_status", true)
+        siteShowPhotos.value = prefs.getBoolean("page_site_photos", true)
+
+        // --- AFFICHAGE DES SPEEDTESTS
+        siteShowSpeedtest.value = prefs.getBoolean("site_show_speedtest", true)
+
+        // --- AFFICHAGE DES PHOTOS & SCHÉMAS ---
+        siteShowCellularFrPhotos.value = prefs.getBoolean("site_show_cellularfr_photos", true)
+        siteShowSignalQuestPhotos.value = prefs.getBoolean("site_show_signalquest_photos", true)
+        siteShowSchemes.value = prefs.getBoolean("site_show_schemes", true)
 
         // Chargement de l'ordre des blocs (incluant 'status' par défaut)
         val pageOrder = prefs.getString("page_support_order", "map,status,details,photos,nav,share,operators")

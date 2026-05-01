@@ -85,6 +85,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.navigationBarsPadding
 
 @Composable
 fun AboutScreen(navController: NavController) {
@@ -193,12 +194,18 @@ fun AboutScreen(navController: NavController) {
     ) { innerPadding ->
         // 🚀 NOUVEL AFFICHAGE QUI UTILISE LE COMPOSANT COMMUN
         fr.geotower.ui.components.ResponsiveDualPaneLayout(
-            modifier = Modifier.padding(innerPadding),
+            // 🚨 CORRECTION 1 : Seulement le topPadding pour passer sous la barre
+            modifier = Modifier.padding(top = innerPadding.calculateTopPadding()),
             // ✅ AJOUT : onCloseSidebar
             sidebar = { width, onCloseSidebar ->
                 Row(modifier = Modifier.width(width).fillMaxHeight().background(mainBgColor)) {
                     Column(
-                        modifier = Modifier.weight(1f).fillMaxHeight().padding(top = 16.dp, bottom = 24.dp)
+                        // 🚨 CORRECTION 2 : Ajout du navigationBarsPadding
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight()
+                            .navigationBarsPadding()
+                            .padding(top = 16.dp, bottom = 24.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -326,6 +333,8 @@ fun AboutScreen(navController: NavController) {
                             .then(if (navMode == 0 || !isExpanded) Modifier.aboutFadingEdge(scrollState) else Modifier)
                             .then(if (navMode == 0 || !isExpanded) Modifier.verticalScroll(scrollState) else Modifier)
                             .padding(horizontal = if (isExpanded) 48.dp else 24.dp)
+                            // 🚨 CORRECTION 3 : Ajout de la marge de sécurité
+                            .navigationBarsPadding()
                     ) {
                         if (navMode == 0 || !isExpanded) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -439,17 +448,14 @@ fun SectionPresentation(appTitle: String, appVersion: String, logoResId: Int) {
 fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) {
     val releaseNotes = mapOf(
         "Interface & Design" to listOf(
-            "Antennes à proximité :" to listOf(
-                "Suppression de la limite des 50km de rayon de recherche"
+            "Global :" to listOf(
+                "Correction des marges en bas de l'écran"
             ),
             "Détail des sites :" to listOf(
-                "Ajout du statut des antennes"
+                "Ajout des images génériques si aucune photographie n'est disponible"
             ),
-            "Upload vers SignalQuest :" to listOf(
-                "Ajout de la possibilité de prendre des photos directement dans l'application pour l'envoi vers SignalQuest"
-            ),
-            "À propos :" to listOf(
-                "Ajout des informations de version"
+            "Carte :" to listOf(
+                "Modification de la carte hors ligne"
             )
         )
     )

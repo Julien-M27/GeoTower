@@ -25,6 +25,19 @@ data class SqPhotoData(
     val uploadedAt: String?
 )
 
+// --- Modèles pour les Speedtests ---
+data class SqSpeedtestsResponse(
+    val data: List<SqSpeedtestData>
+)
+
+data class SqSpeedtestData(
+    val id: String?,          // 🚨 C'est un String dans le JSON !
+    val downloadSpeed: Float?,// 🚨 Nom exact du JSON
+    val uploadSpeed: Float?,  // 🚨 Nom exact du JSON
+    val ping: Float?,         // 🚨 Changé de Int? à Float? car l'API peut renvoyer 39.125
+    val timestamp: String?    // 🚨 Nom exact du JSON
+)
+
 // 2. L'interface de l'API
 interface SignalQuestApiService {
     @GET("api/external/v1/sites/{siteId}/photos")
@@ -42,13 +55,25 @@ interface SignalQuestApiService {
         @Part("description") description: RequestBody?,
         @Part("operator") operator: RequestBody?
     ): retrofit2.Response<ResponseBody>
+
+    @GET("api/external/v1/speedtests/site")
+    suspend fun getSiteSpeedtests(
+        @Header("Authorization") authHeader: String,
+        @Query("siteId") siteId: String? = null,
+        @Query("anfrCode") anfrCode: String? = null,
+        @Query("enb") enb: String? = null,
+        @Query("operator") operator: String? = null,
+        @Query("market") market: String = "FR",
+        @Query("bestOnly") bestOnly: Boolean = true
+    ): retrofit2.Response<SqSpeedtestsResponse>
 }
 
 // 3. Le Client Retrofit dédié à SignalQuest
 object SignalQuestClient {
     val api: SignalQuestApiService by lazy {
         Retrofit.Builder()
-            .baseUrl("https://sfr.alexandregermain.eu/")
+            .baseUrl("https://signalquest.fr/")
+            .client(RetrofitClient.currentClient) // ✅ UTILISATION DU CLIENT SÉCURISÉ/UNSAFE SELON ANDROID
             .addConverterFactory(GsonConverterFactory.create()) // <-- GSON CONVERTER ICI
             .build()
             .create(SignalQuestApiService::class.java)

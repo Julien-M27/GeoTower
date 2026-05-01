@@ -58,7 +58,7 @@ object AppStrings {
     val oledMode @Composable get() = get("Mode OLED", "OLED Mode", "Modo OLED")
     val oledDesc @Composable get() = get("Noir pur", "Pure black", "Preto puro")
     val appIcon @Composable get() = get("Icône de l'application", "App Icon", "Ícone da aplicação")
-    val restartToApply @Composable get() = get("L'app redémarrera pour appliquer le changement.", "The app will restart to apply the change.", "O aplicativo será reiniciado para aplicar a alteração.")
+    val restartToApply @Composable get() = get("L'app redémarrera pour appliquer le changement.", "The app will restart to apply the change.", "O aplicativo será reiniciado para appliquer a alteração.")
     val systemLanguage @Composable get() = get("Langage système", "System language", "Idioma do sistema")
 
     val mapIgn @Composable get() = get("IGN (Gouv)", "IGN (Gov)", "IGN (Gov)")
@@ -70,14 +70,14 @@ object AppStrings {
     val navScroll @Composable get() = get("Défilement continu", "Continuous scroll", "Deslocamento contínuo")
     val navPages @Composable get() = get("Système par pages", "Page system", "Sistema de páginas")
     val navScrollTitle @Composable get() = get("Défilant", "Scrolling", "Rolagem")
-    val navScrollDesc @Composable get() = get("Toutes les options sur une page", "All options on one page", "Todas as opções numa página")
+    val navScrollDesc @Composable get() = get("Toutes les options sur une page", "All options on one page", "Todas as options numa page")
     val navPagesTitle @Composable get() = get("Pages", "Pages", "Páginas")
-    val navPagesDesc @Composable get() = get("Afficher une catégorie à la fois", "Show one category at a time", "Mostrar uma categoria de cada vez")
+    val navPagesDesc @Composable get() = get("Afficher une catégorie à la fois", "Show one category at a time", "Mostrar uma catégorie de cada vez")
 
     val oneUiInterface @Composable get() = get("Interface One UI", "One UI Interface", "Interface One UI")
     val oneUiDesc @Composable get() = get("Activer le design Samsung", "Enable Samsung design", "Ativar o design Samsung")
     val scrollBlur @Composable get() = get("Flou de défilement", "Scroll Blur", "Desfoque de rolagem")
-    val scrollBlurDesc @Composable get() = get("Activer ou désactiver l'effet de flou", "Enable or disable blur effect", "Ativar ou desativar o efeito de desfoque")
+    val scrollBlurDesc @Composable get() = get("Activer ou désactiver l'effet de flou", "Enable or disable blur effect", "Ativar ou desativar o effect de desfoque")
 
     val defaultOperator @Composable get() = get("Opérateur par défaut", "Default Operator", "Operadora padrão")
     val appLanguageLabel @Composable get() = get("Langue de l'application", "App Language", "Idioma da aplicação")
@@ -92,13 +92,13 @@ object AppStrings {
     val permissionsDesc @Composable get() = get("Localisation et Notifications", "Location and Notifications", "Localização e Notificações")
 
     val offlineMode @Composable get() = get("Mode hors-ligne", "Offline Mode", "Modo offline")
-    val offlineDesc @Composable get() = get("Télécharge toute la base pour utiliser la liste sans réseau. Attention : fichier volumineux.", "Download the entire database to use the list offline. Warning : large file.", "Transfere toda a base de dados para utilizar a lista offline. Aviso : ficheiro grande.")
+    val offlineDesc @Composable get() = get("Télécharge toute la base pour utiliser la liste sans réseau. Attention : fichier volumineux.", "Download the entire database to use the list offline. Warning : large file.", "Transfere toute a base de données para utiliser a liste offline. Aviso : ficheiro grande.")
     val downloadAntennas @Composable get() = get("Télécharger les antennes", "Download antennas", "Transferir antenas")
     val cancelDownload @Composable get() = get("Annuler le téléchargement", "Cancel download", "Cancelar transferência")
-    val downloadSuccess @Composable get() = get("Base de données téléchargée !", "Database downloaded!", "Base de dados transferida!")
+    val downloadSuccess @Composable get() = get("Base de données téléchargée !", "Database downloaded!", "Base de données transferida!")
     val downloadError @Composable get() = get("Erreur de téléchargement", "Download error", "Erro de transferência")
 
-    val pagesVisibilityTitle @Composable get() = get("Choix des pages à afficher", "Choice of pages to display", "Escolha das páginas a apresentar")
+    val pagesVisibilityTitle @Composable get() = get("Choix des pages à afficher", "Choice of pages to display", "Escolha das páginas a présenter")
     val pagesVisibilityDesc @Composable get() = get("Personnaliser l'écran d'accueil", "Customize home screen", "Personalizar ecrã inicial")
     val pagesVisibilitySheetTitle @Composable get() = get("Choisissez quels écrans vous souhaitez afficher", "Choose which screens you want to display", "Escolha quais ecrãs deseja exibir")
 
@@ -130,7 +130,7 @@ object AppStrings {
     val noMapFileNotFound @Composable get() = get("Aucun fichier .map trouvé", "No .map file found", "Nenhum arquivo .map encontrado")
     // --- PERSONNALISATION DES PAGES ---
     val pagesCustomizationTitle @Composable get() = get("Personnalisation des pages", "Pages customization", "Personalização das páginas")
-    val pagesCustomizationDesc @Composable get() = get("Personnalisez l'affichage des différentes pages de l'application", "Customize the display of the different pages of the application", "Personalize a exibição das diferentes páginas do aplicativo")
+    val pagesCustomizationDesc @Composable get() = get("Personnalisez l'affichage des différentes pages de l'application", "Customize the display of the different pages of the application", "Personalize a exibição das differentes páginas do aplicativo")
 
     val startupPageSettings @Composable get() = get("Page de démarrage", "Startup page", "Página de inicialização")
     val pageHomeSettings @Composable get() = get("Page d'accueil", "Home page", "Página inicial")
@@ -139,12 +139,12 @@ object AppStrings {
     val pageCompassSettings @Composable get() = get("Boussole", "Compass", "Bússola")
     val statsGroupTitle @Composable get() = get("Statistiques", "Statistics", "Estatísticas")
     val nearbySearchOption @Composable get() = get("Barre de recherche", "Search bar", "Barra de pesquisa")
-    val nearbySitesOption @Composable get() = get("Sites les plus proches", "Nearest sites", "Locais mais próximos")
+    val nearbySitesOption @Composable get() = get("Sites les plus proches", "Nearest sites", "Locais mais prochains")
     val searchRadiusTitle @Composable get() = get("Rayon de recherche", "Search radius", "Raio de pesquisa")
     val compassLocationOption @Composable get() = get("Lieu", "Location", "Local")
     val compassGpsOption @Composable get() = get("Localisation", "Coordinates", "Coordenadas")
     val compassAccuracyOption @Composable get() = get("Précision", "Accuracy", "Precisão")
-    val mapLocationOption @Composable get() = get("Bouton de localisation", "Location button", "Botão de localização")
+    val mapLocationOption @Composable get() = get("Bouton de localisation", "Location button", "Botão de localisation")
     val mapZoomOption @Composable get() = get("Boutons de zoom", "Zoom buttons", "Botões de zoom")
     val mapToolboxOption @Composable get() = get("Toolbox (Outils)", "Toolbox", "Ferramentas")
     val mapCompassOption @Composable get() = get("Boussole de la carte", "Map compass", "Bússola do mapa")
@@ -153,6 +153,11 @@ object AppStrings {
     val resetToDefault @Composable get() = get("Rétablir les paramètres par défaut", "Reset to default settings", "Restaurar configurações padrão")
     val pageSupportSettings @Composable get() = get("Détail du pylône (Support)", "Support details", "Detalhes do suporte")
     val pageSiteSettings @Composable get() = get("Détail de l'antenne (Site)", "Site details", "Detalhes do site")
+    val sitePhotosAndSchemesOption @Composable get() = get("Photos communautaires et schémas", "Community photos and diagrams", "Fotos da comunidade e esquemas")
+    val sitePhotosSettingsTitle @Composable get() = get("Réglages des photos et schémas", "Photos and diagrams settings", "Configurações de fotos e esquemas")
+    val showCellularFrPhotosLabel @Composable get() = get("Afficher les photos de CellularFR", "Show CellularFR photos", "Mostrar fotos do CellularFR")
+    val showSignalQuestPhotosLabel @Composable get() = get("Afficher les photos de SignalQuest", "Show SignalQuest photos", "Mostrar fotos do SignalQuest")
+    val showSchemesLabel @Composable get() = get("Afficher les schémas du support", "Show support diagrams", "Mostrar esquemas do suporte")
     val supportMapOption @Composable get() = get("Mini-carte", "Mini-map", "Mini-mapa")
     val supportDetailsOption @Composable get() = get("Détails du pylône", "Support details", "Detalhes do suporte")
     val supportPhotosOption @Composable get() = get("Photos communautaires", "Community photos", "Fotos da comunidade")
@@ -169,20 +174,20 @@ object AppStrings {
     val siteNavOption @Composable get() = get("Bouton Naviguer", "Navigate button", "Botão Navegar")
     val siteShareOption @Composable get() = get("Bouton Partager", "Share button", "Botão Compartilhar")
     val siteDatesOption @Composable get() = get("Dates d'activation", "Activation dates", "Datas de ativação")
-    val siteAddressOption @Composable get() = get("Adresse et Coordonnées", "Address & Coordinates", "Endereço e Coordenadas")
+    val siteAddressOption @Composable get() = get("Adresse et Coordonnées", "Address & Coordinates", "Endereço e Coordonadas")
     val siteFreqsOption @Composable get() = get("Fréquences, Spectres et Azimuts", "Frequencies, Spectrum & Azimuths", "Frequências, Espectros e Azimutes")
-    val siteLinksOption @Composable get() = get("Liens externes", "External links", "Links externos")
-    val externalLinksSettingsTitle @Composable get() = get("Liens externes & Communautés", "External links & Communities", "Links externos e Comunidades")
-    val externalLinksSettingsDesc @Composable get() = get("Gérer l'ordre et l'affichage des raccourcis", "Manage the order and display of shortcuts", "Gerir a ordem e apresentação dos atalhos")
+    val siteLinksOption @Composable get() = get("Liens externes", "External links", "Links externes")
+    val externalLinksSettingsTitle @Composable get() = get("Liens externes & Communautés", "External links & Communities", "Links externes e Communidades")
+    val externalLinksSettingsDesc @Composable get() = get("Gérer l'ordre et l'affichage des raccourcis", "Manage the order and display of shortcuts", "Gerir a ordre e présentation dos atalhos")
     val resetSettings @Composable get() = get("Réinitialiser les paramètres", "Reset settings", "Redefinir configurações")
     val resetWarningTitle @Composable get() = get("Attention", "Warning", "Aviso")
-    val resetWarningDesc @Composable get() = get("Êtes-vous sûr de vouloir rétablir les paramètres par défaut ? Cela supprimera tous les réglages que vous avez faits dans l'application.", "Are you sure you want to restore default settings? This will delete all settings you have made in the app.", "Tem certeza de que deseja restaurar as configurações padrão? Isso excluirá todas as configurações que você fez no aplicativo.")
+    val resetWarningDesc @Composable get() = get("Êtes-vous sûr de vouloir rétablir les paramètres par défaut ? Cela supprimera tous les réglages que vous avez faits dans l'application.", "Are you sure you want to restore default settings? This will delete all settings you have made in the app.", "Tem certeza de que deseja restaurar as configurações padrão? Isso excluirá toutes as configurações que vous avez fez no aplicativo.")
     val yes @Composable get() = get("Oui", "Yes", "Sim")
     val no @Composable get() = get("Non", "No", "Não")
     val siteAnfrOption @Composable get() = get("Bouton data.gouv.fr", "data.gouv.fr Button", "Botão data.gouv.fr")
     val offlineMessage @Composable get() = get("Vous êtes hors ligne", "You are offline", "Você está offline")
     val pageHomeLogoSettings @Composable get() = get("Logo de l'application", "App logo", "Logótipo da aplicação")
-    val homeLogoSettingTitle @Composable get() = get("Logo de la page d'accueil", "Home page logo", "Logótipo da página inicial")
+    val homeLogoSettingTitle @Composable get() = get("Logo de la page d'accueil", "Home page logo", "Logótipo da page inicial")
     val logoApp @Composable get() = get("Application", "Application", "Aplicação")
     val logoOrange @Composable get() = get("Orange", "Orange", "Orange")
     val logoSfr @Composable get() = get("SFR", "SFR", "SFR")
@@ -192,32 +197,32 @@ object AppStrings {
     val unknownSize @Composable get() = get("Taille inconnue", "Unknown size", "Tamanho desconhecido")
 
     val showSpeedometer @Composable get() = get("Compteur de vitesse", "Speedometer", "Velocímetro")
-    val showSpeedometerDesc @Composable get() = get("Afficher la vitesse sur la carte", "Show speed on the map", "Mostrar a velocidade no mapa")
-    val siteFreqFiltersTitle @Composable get() = get("Filtres des fréquences de l'antenne", "Antenna frequency filters", "Filtros de frequência da antena")
+    val showSpeedometerDesc @Composable get() = get("Afficher la vitesse sur la carte", "Show speed on the map", "Mostrar a vitesse no mapa")
+    val siteFreqFiltersTitle @Composable get() = get("Filtres des fréquences de l'antenne", "Antenna frequency filters", "Filtros de fréquence da antena")
     val shareMapAzimuthsOption @Composable get() = get("Afficher les azimuts", "Show azimuths", "Mostrar azimutes")
 
-    val liveNotificationTitle @Composable get() = get("Notification Live", "Live Notification", "Notificação ao vivo")
-    val liveNotificationDesc @Composable get() = get("Activer les notifications en temps réel", "Enable real-time notifications", "Ativar notificações em tempo real")
+    val liveNotificationTitle @Composable get() = get("Notification Live", "Live Notification", "Notificação au vivo")
+    val liveNotificationDesc @Composable get() = get("Activer les notifications en temps réel", "Enable real-time notifications", "Ativar notifications em tempo real")
     val updateNotifSettingTitle @Composable get() = get("Notifications de mise à jour", "Update notifications", "Notificações de atualização")
-    val updateNotifSettingDesc @Composable get() = get("Être alerté quand une nouvelle base est disponible", "Get alerted when a new database is available", "Ser alertado quando uma nova base de dados estiver disponível")
+    val updateNotifSettingDesc @Composable get() = get("Être alerté quand une nouvelle base est disponible", "Get alerted when a new database is available", "Ser alertado quand uma nova base de données estiver disponible")
     val liveNotificationRequiresOp @Composable get() = get("Nécessite de choisir un opérateur par défaut", "Requires choosing a default operator", "Requer a escolha de uma operadora padrão")
 
-    val liveTrackingTitle @Composable get() = get("Recherche d'antennes en direct", "Live antenna tracking", "Rastreamento de antenas ao vivo")
+    val liveTrackingTitle @Composable get() = get("Recherche d'antennes en direct", "Live antenna tracking", "Rastreamento de antennes ao vivo")
     val stopLiveTracking @Composable get() = get("Quitter", "Stop", "Sair")
     val searchingAntenna @Composable get() = get("Recherche de l'antenne la plus proche...", "Searching for nearest antenna...", "Buscando a antena mais próxima...")
 
     // ✅ NOUVEAU : Messages d'avertissement pour les filtres
     val minOneTechnoWarning @Composable get() = get("Vous devez garder au moins une technologie mobile (2G, 3G, 4G ou 5G).", "You must keep at least one mobile technology (2G, 3G, 4G, or 5G).", "Deve manter pelo menos uma tecnologia móvel (2G, 3G, 4G ou 5G).")
-    val minOneFreqWarning @Composable get() = get("Vous devez garder au moins une fréquence.", "You must keep at least one frequency.", "Deve manter pelo menos uma frequência.")
-    val anfrDatabaseFrom @Composable get() = get("Base de données hebdomadaire actuellement téléchargée :", "Weekly database currently being downloaded :", "Base de dados semanal atualmente a ser descarregada :")
+    val minOneFreqWarning @Composable get() = get("Vous devez garder au moins une fréquence.", "You must keep at least one frequency.", "Deve manter pelo menos uma fréquence.")
+    val anfrDatabaseFrom @Composable get() = get("Base de données hebdomadaire actuellement téléchargée :", "Weekly database currently being downloaded :", "Base de données semanal atualmente a ser descarregada :")
 
     val deleteData @Composable get() = get("Supprimer les données", "Delete data", "Eliminar dados")
     val deleteDbWarningTitle @Composable get() = get("Attention", "Warning", "Atenção")
-    val deleteDbWarningDesc @Composable get() = get("Êtes-vous sûr de vouloir supprimer la base de données ?", "Are you sure you want to delete the database?", "Tem certeza de que deseja excluir a base de dados?")
+    val deleteDbWarningDesc @Composable get() = get("Êtes-vous sûr de vouloir supprimer la base de données ?", "Are you sure you want to delete the database?", "Tem certeza de que deseja excluir a base de données?")
 
     val offlineMapsTitle @Composable get() = get("Cartes Hors-Ligne", "Offline Maps", "Mapas Offline")
     val offlineMapsDesc @Composable get() = get("Téléchargez des cartes de la France pour naviguer sans réseau.", "Download maps of France to navigate without an internet connection.", "Descarregue mapas de França para navegar sem rede.")
-    val mapExtracting @Composable get() = get("Extraction en cours...", "Extracting...", "A extrair...")
+    val mapExtracting @Composable get() = get("Extraction en cours...", "Extraction en cours...", "A extrair...")
     val mapDeleteWarningTitle @Composable get() = get("Supprimer la carte ?", "Delete map?", "Eliminar mapa?")
     val mapDeleteWarningDesc @Composable get() = get("Voulez-vous vraiment supprimer cette carte de votre appareil ?", "Do you really want to delete this map from your device?", "Tem a certeza de que pretende eliminar este mapa do seu dispositivo?")
     val downloadAll @Composable get() = get("Tout télécharger", "Download All", "Descarregar tudo")
@@ -259,8 +264,8 @@ object AppStrings {
     val noSitesFound @Composable get() = get("Aucun site trouvé.", "No sites found.", "Nenhum local encontrado.")
     val loadMoreSites @Composable get() = get("Afficher plus de sites", "Load more sites", "Carregar mais sites")
     val expandSearchArea @Composable get() = get("Élargir la zone de recherche", "Expand search area", "Expandir a área de pesquisa")
-    val searchingNewSites @Composable get() = get("Recherche de nouveaux sites...", "Searching for new sites...", "Procurando novos sites...")
-    val openApp @Composable get() = get("Ouvrir l'application", "Open application", "Abrir a aplicação")
+    val searchingNewSites @Composable get() = get("Recherche de nouveaux sites...", "Searching for new sites...", "Procurando nouveaux sites...")
+    val open @Composable get() = get("Ouvrir", "Open", "Abrir")
 
     val supportDetailsTitle @Composable get() = get("Détails du support", "Support details", "Detalhes do suporte")
     val supportNature @Composable get() = get("Nature du support", "Support nature", "Natureza do suporte")
@@ -273,7 +278,7 @@ object AppStrings {
     val signalQuestUploadPrompt @Composable get() = get(
         "Vous pouvez envoyer vos photos directement depuis cette application",
         "You can send your photos directly from this app",
-        "Pode enviar as suas fotos diretamente a partir desta aplicação"
+        "Pode enviar as suas fotos directement a partir desta application"
     )
     val uploadPhotosPrompt @Composable get() = get("Envoyer des photos", "Upload photos", "Enviar fotos")
     val unknownAuthor @Composable get() = get("Auteur inconnu", "Unknown author", "Autor desconhecido")
@@ -305,13 +310,13 @@ object AppStrings {
     val welcomeTitle @Composable get() = get("Bienvenue !", "Welcome!", "Bem-vindo!")
     val welcomeDesc @Composable get() = get("Pour fonctionner correctement, GeoTower a besoin de quelques autorisations :", "To work properly, GeoTower needs a few permissions :", "Para funcionar corretamente, a GeoTower precisa de algumas permissões :")
     val permLocation @Composable get() = get("Localisation", "Location", "Localização")
-    val permLocationDesc @Composable get() = get("Nécessaire pour afficher votre position sur la carte et trouver les antennes autour de vous.", "Necessary to display your position on the map and find antennas around you.", "Necessário para apresentar a sua posição no mapa e encontrar antenas à sua volta.")
+    val permLocationDesc @Composable get() = get("Nécessaire pour afficher votre position sur la carte et trouver les antennes autour de vous.", "Necessary to display your position on the map and find antennas around you.", "Necessário para apresentar a sua posição no mapa e encontrar antennes à sua volta.")
     val permNotifications @Composable get() = get("Notifications", "Notifications", "Notificações")
     val permNotificationsDesc @Composable get() = get("Pour vous prévenir lors de mises à jour importantes des données ou d'alertes.", "To notify you of important data updates or alerts.", "Para o notificar de atualizações de dados importantes ou alertas.")
 
     val themeDesc @Composable get() = get("Choisissez le style qui vous convient.", "Choose the style that suits you.", "Escolha o estilo que mais lhe convém.")
     val oledTitle @Composable get() = get("Mode OLED (Noir Pur)", "OLED Mode (Pure Black)", "Modo OLED (Preto Puro)")
-    val oledSubtitle @Composable get() = get("Économise la batterie", "Saves battery", "Poupa bateria")
+    val oledSubtitle @Composable get() = get("Économise la batterie", "Saves battery", "Poupa batterie")
     val blurTitle @Composable get() = get("Flou de défilement", "Scroll Blur", "Desfoque de rolagem")
     val blurSubtitle @Composable get() = get("Activer ou désactiver le flou (plus énergivore)", "Enable or disable blur (consumes more battery)", "Ativar ou desativar o desfoque (consome mais bateria)")
 
@@ -324,8 +329,8 @@ object AppStrings {
     val chooseLanguage @Composable get() = get("Choisissez la langue de l'application.", "Choose the application language.", "Escolha o idioma do aplicativo.")
 
     val warningNoOpTitle @Composable get() = get("Aucun opérateur sélectionné", "No operator selected", "Nenhuma operadora selecionada")
-    val warningNoOpDesc @Composable get() = get("Vous n'avez pas choisi d'opérateur par défaut. Les outils de filtrage sur la carte seront désactivés.\n\nVoulez-vous vraiment continuer ?", "You have not chosen a default operator. The filtering tools on the map will be disabled.\n\nDo you really want to continue?", "Não escolheu uma operadora por defeito. As ferramentas de filtragem no mapa serão desativadas.\n\nTem a certeza de que pretende continuar?")
-    val warningContinue @Composable get() = get("Continuer quand même", "Continue anyway", "Continuar mesmo assim")
+    val warningNoOpDesc @Composable get() = get("Vous n'avez pas choisi d'opérateur par défaut. Les outils de filtrage sur la carte seront désactivés.\n\nVoulez-vous vraiment continuer ?", "You have not chosen a default operator. The filtering tools on the map will be disabled.\n\nDo you really want to continue?", "Não escolheu uma operadora por defeito. As ferramentas de filtragem no mapa serão desativadas.\n\nTem a certeza de que pretende continuer?")
+    val warningContinue @Composable get() = get("Continuer quand même", "Continue anyway", "Continuer mesmo assim")
     val warningChooseOp @Composable get() = get("Choisir un opérateur", "Choose an operator", "Escolher uma operadora")
 
     // --- Style d'affichage ---
@@ -333,7 +338,7 @@ object AppStrings {
     val displayStyleFullScreen @Composable get() = get("Plein écran", "Full screen", "Ecrã inteiro")
     val displayStyleFullScreenDesc @Composable get() = get("Affichage du détail du support et du détail du site individuellement en plein écran", "Display support details and site details individually in full screen", "Exibição de detalhes de suporte e detalhes do site individualmente em tela cheia")
     val displayStyleSplit @Composable get() = get("Fractionné", "Split", "Dividido")
-    val displayStyleSplitDesc @Composable get() = get("Affichage fractionné du détail du support et détail du site avec le détail du support à gauche et détail du site à droite.", "Split display of support details and site details with support details on the left and site details on the right", "Exibição dividida de detalhes de suporte e detalhes do site com detalhes de suporte à esquerda e detalhes do site à direita.")
+    val displayStyleSplitDesc @Composable get() = get("Affichage fractionné du détail du support et détail du site avec le détail du support à gauche et détail du site à droite.", "Split display of support details and site details with support details on the left and site details on the right", "Exibição dividida de detalhes de suporte e détails du site avec détails de suporte à gauche e détails du site à droite.")
 
     // ==========================================
     // 🎉 SUCCÈS TÉLÉCHARGEMENT (ONBOARDING)
@@ -342,7 +347,7 @@ object AppStrings {
     val dbSuccessDesc @Composable get() = get(
         "La base de données hors-ligne a été installée avec succès. L'application est prête à fonctionner à pleine vitesse.",
         "The offline database has been successfully installed. The application is ready to run at full speed.",
-        "A base de dados offline foi instalada com sucesso. A aplicação está pronta para funcionar a toda a velocidade."
+        "A base de données offline foi instalada com sucesso. A application est prête à fonctionner à toute a vitesse."
     )
     val btnContinue @Composable get() = get("Continuer", "Continue", "Continuar")
 
@@ -351,11 +356,10 @@ object AppStrings {
     // ==========================================
     val aboutPresentation @Composable get() = get("Présentation", "Presentation", "Apresentação")
     val aboutNew @Composable get() = get("Nouveautés", "What's New", "Novidades")
-    val aboutSources @Composable get() = get("Sources de données", "Data Sources", "Fontes de dados")
+    val aboutSources @Composable get() = get("Sources de données", "Data Sources", "Fontes de données")
     val aboutDev @Composable get() = get("Développement", "Development", "Desenvolvimento")
-    val aboutIntro @Composable get() = get("GeoTower vous permet de localiser les antennes relais autour de vous et d'identifier les technologies disponibles.", "GeoTower allows you to locate cell towers around you and identify available technologies.", "A GeoTower permite-lhe localizar torres de celular à sua volta e identificar as tecnologias disponíveis.")
-    val lastChanges @Composable get() = get("Dernières modifications", "Last changes", "Últimas modificações")
-    val devCredit @Composable get() = get("Développé par Julien, Gemini et les contributeurs de GitHub 😉", "Developed by Julien, Gemini, and GitHub contributors 😉", "Desenvolvido por Julien, Gemini e os colaboradores do GitHub 😉")
+    val aboutIntro @Composable get() = get("GeoTower vous permet de localiser les antennes relais autour de vous et d'identifier les technologies disponibles.", "GeoTower allows you to locate cell towers around you and identify available technologies.", "A GeoTower permite-lhe localizar torres de celular à sua volta e identificar as tecnologias disponibles.")
+    val devCredit @Composable get() = get("Développé par Julien, Gemini et les contributeurs de GitHub 😉", "Developed by Julien, Gemini, and GitHub contributors 😉", "Desenvolvido por Julien, Gemini e os collaborateurs do GitHub 😉")
     val srcAntennas @Composable get() = get("Données Antennes", "Antenna Data", "Dados de Antenas")
     val srcAntennasDesc @Composable get() = get("Agence Nationale des Fréquences (ANFR).\nDonnées issues de Cartoradio (Open Data).", "National Frequency Agency (ANFR).\nData from Cartoradio (Open Data).", "Agência Nacional de Frequências (ANFR).\nDados do Cartoradio (Open Data).")
     val srcIgn @Composable get() = get("Fond de carte IGN", "IGN Basemap", "Mapa base IGN")
@@ -363,7 +367,7 @@ object AppStrings {
     val srcOsm @Composable get() = get("Fond de carte OSM", "OSM Basemap", "Mapa base OSM")
     val srcOsmDesc @Composable get() = get("© les contributeurs d'OpenStreetMap.", "© OpenStreetMap contributors.", "© os colaboradores do OpenStreetMap.")
     val srcInspo @Composable get() = get("Inspiration & Sources Externes", "Inspiration & External Sources", "Inspiração e Fontes Externas")
-    val srcInspoDesc @Composable get() = get("• © CellularFR développé par Luis Baker\n• © Signal Quest développé par Alexandre Germain\n• © RNC Mobile développé par Cédric\n• © eNB-Analytics développé par Tristan\n• © GeoRadio - L'icône alternative provient de l'application GéoRadio sur iOS développée par Hugo Martin.\n• Concept original basé sur l'application GéoRadio\n• Icône fun dessinée par Johan", "• © CellularFR developed by Luis Baker\n• © Signal Quest developed by Alexandre Germain\n• © RNC Mobile developed by Cédric\n• © eNB-Analytics developed by Tristan\n• © GeoRadio - The alternative icon comes from the GéoRadio iOS app developed by Hugo Martin.\n• Original concept based on the GéoRadio app\n• Fun icon designed by Johan", "• © CellularFR desenvolvido por Luis Baker\n• © Signal Quest desenvolvido por Alexandre Germain\n• © RNC Mobile desenvolvido por Cédric\n• © eNB-Analytics desenvolvido por Tristan\n• © GeoRadio - O ícone alternativo vem da aplicação GéoRadio para iOS desenvolvida por Hugo Martin.\n• Conceito original baseado na aplicação GéoRadio\n• Ícone divertido desenhado por Johan")
+    val srcInspoDesc @Composable get() = get("• © CellularFR développé par Luis Baker\n• © Signal Quest développé par Alexandre Germain\n• © RNC Mobile développé par Cédric\n• © eNB-Analytics développé par Tristan\n• © GeoRadio - L'icône alternative provient de l'application GéoRadio sur iOS développée par Hugo Martin.\n• Concept original basé sur l'application GéoRadio\n• Icône fun dessinée par Johan", "• © CellularFR developed by Luis Baker\n• © Signal Quest developed by Alexandre Germain\n• © RNC Mobile developed by Cédric\n• © eNB-Analytics developed par Tristan\n• © GeoRadio - The alternative icon comes from the GéoRadio iOS app developed by Hugo Martin.\n• Original concept based on the GéoRadio app\n• Fun icon designed by Johan", "• © CellularFR desenvolvido por Luis Baker\n• © Signal Quest desenvolvido par Alexandre Germain\n• © RNC Mobile desenvolvido por Cédric\n• © eNB-Analytics desenvolvido par Tristan\n• © GeoRadio - O ícone alternativo vem da application GéoRadio para iOS desenvolvida por Hugo Martin.\n• Conceito original baseado na application GéoRadio\n• Ícone divertido desenhado por Johan")
 
     // ==========================================
     // 🗺️ CRÉDITS CARTES (AboutScreen)
@@ -383,11 +387,11 @@ object AppStrings {
     // 🔒 CONFIDENTIALITÉ
     // ==========================================
     val privacyCategory @Composable get() = get("Confidentialité", "Privacy", "Privacidade")
-    val yourDataTitle @Composable get() = get("Vos données", "Your data", "Os seus dados")
+    val yourDataTitle @Composable get() = get("Vos données", "Your data", "Os seus données")
     val yourDataDesc @Composable get() = get(
         "GeoTower ne collecte aucune donnée personnelle. Vos réglages et favoris sont stockés uniquement sur votre appareil.",
         "GeoTower does not collect any personal data. Your settings and favorites are stored only on your device.",
-        "O GeoTower não recolhe quaisquer dados pessoais. As suas definições e favoritos são guardados apenas no seu dispositivo."
+        "O GeoTower não recolhe quaisquer données pessoais. As suas definições e favoritos sont guardados apenas no seu dispositivo."
     )
 
     // ==========================================
@@ -398,12 +402,11 @@ object AppStrings {
     val idNumber @Composable get() = get("Numéro d'identification : ", "Identification number : ", "Número de identificação : ")
     val idCopied @Composable get() = get("Numéro d'identification copié", "Identification number copied", "Número de identificação copiado")
     val idUnavailable @Composable get() = get("Numéro indisponible pour le moment", "Number unavailable at the moment", "Número indisponível no momento")
-    val comingSoon @Composable get() = get("À venir", "Coming soon", "Em breve")
     val addressLabel @Composable get() = get("Adresse : ", "Address : ", "Endereço : ")
     val notSpecified @Composable get() = get("Non spécifiée", "Not specified", "Não especificado")
     val addressCopied @Composable get() = get("Adresse copiée", "Address copied", "Endereço copiado")
     val gpsLabel @Composable get() = get("GPS : ", "GPS : ", "GPS : ")
-    val coordsCopied @Composable get() = get("Coordonnées copiées", "Coordinates copied", "Coordenadas copiadas")
+    val coordsCopied @Composable get() = get("Coordonnées copiées", "Coordinates copied", "Coordonadas copiadas")
     val supportHeight @Composable get() = get("Hauteur du support : ", "Support height : ", "Altura do suporte : ")
     val distanceLabel @Composable get() = get("Distance : ", "Distance : ", "Distância : ")
     val fromMyPosition @Composable get() = get("de vous", "from you", "de si")
@@ -412,7 +415,7 @@ object AppStrings {
     val shareSite @Composable get() = get("Partager ce site", "Share this site", "Partilhar este local")
     @Composable
     fun operatorCount(count: Int) = get("↓ Nombre d'opérateurs : ( $count / 4 )", "↓ Number of operators : ( $count / 4 )", "↓ Número de operadoras : ( $count / 4 )")
-    val shareAs @Composable get() = get("Partager en...", "Share as...", "Partilhar como...")
+    val shareAs @Composable get() = get("Partager en...", "Share as...", "Partilhar comme...")
     val lightModeDesc @Composable get() = get("Idéal pour les emails ou messages", "Ideal for emails or messages", "Ideal para e-mails ou mensagens")
     val darkModeDesc @Composable get() = get("Idéal pour les réseaux sociaux (Twitter, Discord)", "Ideal for social media (Twitter, Discord)", "Ideal para redes sociais (Twitter, Discord)")
     val openRouteWith @Composable get() = get("Ouvrir l'itinéraire avec...", "Open route with...", "Abrir rota com...")
@@ -425,7 +428,7 @@ object AppStrings {
     val shareSiteVia @Composable get() = get("Partager le site via...", "Share site via...", "Partilhar o local via...")
     val implementation @Composable get() = get("Implémentation : ", "Implementation : ", "Implementação : ")
     val lastModification @Composable get() = get("Dernière modification : ", "Last modification : ", "Última modificação : ")
-    val generatedBy @Composable get() = get("Généré via l'application GeoTower", "Generated via the GeoTower app", "Gerado através da aplicação GeoTower")
+    val generatedBy @Composable get() = get("Généré via l'application GeoTower", "Generated via the GeoTower app", "Gerado através da application GeoTower")
     val operatorsTitle @Composable get() = get("Opérateurs", "Operators", "Operadoras")
 
     val frequenciesTitle @Composable get() = get("Fréquences", "Frequencies", "Frequências")
@@ -447,21 +450,16 @@ object AppStrings {
     val error @Composable get() = get("Erreur", "Error", "Erro")
     val initError @Composable get() = get("Erreur d'initialisation", "Initialization error", "Erro de inicialização")
 
-    // Fréquences précises et Spectre
-    val preciseFrequencies @Composable get() = get("Fréquences", "Frequencies", "Frequências")
     val totalspectrum @Composable get() = get("Spectre total", "Total spectrum", "Espectro total")
     val spectrumTitle @Composable get() = get("Spectre", "Spectrum", "Espectro")
-    val spectrumByBand @Composable get() = get("Spectre par plage de fréquence", "Spectrum by frequency band", "Espectro por faixa de frequência")
+    val spectrumByBand @Composable get() = get("Spectre par plage de fréquence", "Spectrum by frequency band", "Espectro por faixa de fréquence")
 
-    // ==========================================
-    // 🗺️ CARTE
-    // ==========================================
     val searchCityOrId @Composable get() = get("Ville, adresse ou ID de site...", "City, address or site ID...", "Cidade, endereço ou ID do local...")
     val siteNotInArea @Composable get() = get("n'est pas dans la zone affichée. Déplacez la carte vers sa ville d'abord.", "is not in the displayed area. Move the map to its city first.", "não está na área apresentada. Mova o mapa para a sua cidade primeiro.")
     val locationNotFound @Composable get() = get("Lieu introuvable", "Location not found", "Localização não encontrada")
     val networkErrorSearch @Composable get() = get("Erreur réseau lors de la recherche", "Network error during search", "Erro de rede durante a pesquisa")
     val deleteTraces @Composable get() = get("Supprimer les tracés", "Delete traces", "Eliminar traços")
-    val closestSite @Composable get() = get("Site le plus proche", "Closest site", "Local mais próximo")
+    val closestSite @Composable get() = get("Site le plus proche", "Closest site", "Local mais prochain")
     val noSiteNearby @Composable get() = get("Aucun site", "No site", "Nenhum local")
     val nearby @Composable get() = get("à proximité", "nearby", "nas proximidades")
     val filter @Composable get() = get("Filtres", "Filters", "Filtros")
@@ -472,8 +470,6 @@ object AppStrings {
     val mapDark @Composable get() = get("Sombre", "Dark", "Escuro")
     val mapSatellite @Composable get() = get("Satellite", "Satellite", "Satélite")
     val technologiesTitle @Composable get() = get("Technologies", "Technologies", "Tecnologias")
-
-
 
     val siteDetailTitle @Composable get() = get("Détail du site", "Site Detail", "Detalhes do site")
 
@@ -486,21 +482,15 @@ object AppStrings {
 
     val azimuthsLabel @Composable get() = get("Azimuts", "Azimuths", "Azimutes")
 
-    // Ajouts pour la cohérence
     val orientationsTitle @Composable get() = get("Orientations (Azimuts)", "Orientations (Azimuths)", "Orientações (Azimutes)")
     val panelHeightsTitle @Composable get() = get("Hauteur des panneaux", "Panel heights", "Altura dos painéis")
     val idSupportLabel @Composable get() = get("ID Support : ", "Support ID : ", "ID do Suporte : ")
-    val heightAbbr @Composable get() = get("hauteur", "height", "altura")
 
-    // Titre de la section
     val azimuthsTitle @Composable get() = get("Azimuts", "Azimuths", "Azimutes")
 
-    // Label du bouton
     val showAzimuthsLabel @Composable get() = get("Afficher les azimuts (direction de l'antenne)", "Show azimuths (antenna direction)", "Mostrar azimutes (direção da antena)")
+    val showAzimuthsConeLabel @Composable get() = get("Afficher les azimuts (représentation en cône)", "Show azimuths (cone representation)", "Mostrar azimutes (représentação em cone)")
 
-    // ==========================================
-    // 📍 BOUTONS DE SUIVI (CARTE)
-    // ==========================================
     val trackGlobalActive @Composable get() = get(
         "Suivi global en cours...",
         "Global tracking active...",
@@ -516,9 +506,6 @@ object AppStrings {
         )
     }
 
-    // ==========================================
-    // 📊 STATISTIQUES DE VILLE
-    // ==========================================
     val cityStatsTitle @Composable get() = get("Consulter les statistiques", "View statistics", "Ver estatísticas")
     val mobileTelephony @Composable get() = get("Téléphonie mobile", "Mobile telephony", "Telefonia móvel")
     val details @Composable get() = get("Détails", "Details", "Detalhes")
@@ -529,45 +516,30 @@ object AppStrings {
     val sitesLabel @Composable get() = get("Sites", "Sites", "Locais")
     val others @Composable get() = get("Autres", "Others", "Outros")
 
-    // ==========================================
-    // 📊 STATISTIQUES
-    // ==========================================
     val statsSupportsTitle @Composable get() = get("Supports (Pylônes)", "Supports (Pylons)", "Suportes (Pilões)")
     val statsSupportsDesc @Composable get() = get("Nombre de sites physiques par opérateur", "Number of physical sites per operator", "Número de locais físicos por operadora")
     val stats4GTitle @Composable get() = get("Sites 4G", "4G Sites", "Locais 4G")
-    val stats4GDesc @Composable get() = get("Nombre de sites équipés en 4G par opérateur", "Number of 4G-equipped sites per operator", "Número de locais equipados com 4G por operadora")
+    val stats4GDesc @Composable get() = get("Nombre de sites équipés en 4G par opérateur", "Number of 4G-equipped sites per operator", "Número de locaux équipés avec 4G por operadora")
     val stats5GTitle @Composable get() = get("Sites 5G", "5G Sites", "Locais 5G")
-    val stats5GDesc @Composable get() = get("Nombre de sites équipés en 5G par opérateur", "Number of 5G-equipped sites per operator", "Número de locais equipados com 5G por operadora")
+    val stats5GDesc @Composable get() = get("Nombre de sites équipés en 5G par opérateur", "Number of 5G-equipped sites per operator", "Número de locaux équipés com 5G por operadora")
 
-    // ==========================================
-    // 📱 WIDGET
-    // ==========================================
     val widgetTitle @Composable get() = get("📍 Antennes à proximité", "📍 Nearby antennas", "📍 Antenas próximas")
     val bgLocationPermTitle @Composable get() = get("Autorisation Widget", "Widget Permission", "Permissão do Widget")
     val bgLocationPermDesc @Composable get() = get("Autorisez \"Toujours\" pour que le widget s'actualise", "Allow \"Always\" for the widget to refresh", "Permita \"Sempre\" para o widget atualizar")
-    val bgLocationToast @Composable get() = get("Allez dans Autorisations > Localisation > Toujours autoriser", "Go to Permissions > Location > Allow all the time", "Vá em Permissões > Localização > Permitir o tempo todo")
 
-    // ==========================================
-    // 📸 PHOTOS DE LA COMMUNAUTÉ
-    // ==========================================
     @Composable
     fun communityPhotosTitle(count: Int, communityName: String): String {
-        // 1. On remplace l'espace normal par un espace insécable (\u00A0)
-        // Cela force "Signal Quest" à rester soudé sur une seule ligne.
         val cleanName = communityName.replace(" ", "\u00A0")
-
-        // 2. On ajoute un retour à la ligne (\n) avant le nom pour l'isoler
         val fr = if (count > 1) "Photos de la communauté\n$cleanName" else "Photo de la communauté\n$cleanName"
         val en = if (count > 1) "Community photos from\n$cleanName" else "Community photo from\n$cleanName"
-        val pt = if (count > 1) "Fotos da comunidade\n$cleanName" else "Foto da comunidade\n$cleanName"
-
+        val pt = if (count > 1) "Fotos da communauté\n$cleanName" else "Foto da comunidade\n$cleanName"
         return get(fr, en, pt)
     }
 
     val communityPhotosOffline @Composable get() = get(
         "Vous êtes hors ligne.\nConnexion internet requise pour voir les photos.",
         "You are offline.\nInternet connection required to view photos.",
-        "Você está offline.\nConexão à internet necessária para ver as fotos."
+        "Você está offline.\nConexão à internet nécessaire para ver as fotos."
     )
 
     @Composable
@@ -580,7 +552,7 @@ object AppStrings {
     fun communityPhotosTitleShort(count: Int): String {
         val fr = if (count > 1) "Photos de la communauté" else "Photo de la communauté"
         val en = if (count > 1) "Community photos" else "Community photo"
-        val pt = if (count > 1) "Fotos da comunidade" else "Foto da comunidade"
+        val pt = if (count > 1) "Fotos da communauté" else "Foto da communauté"
         return get(fr, en, pt)
     }
 
@@ -588,38 +560,27 @@ object AppStrings {
     val fullScreenPhotoDesc @Composable get() = get("Photo en plein écran", "Full screen photo", "Foto em tela cheia")
     val close @Composable get() = get("Fermer", "Close", "Fechar")
 
-    // ==========================================
-    // 📤 PARTAGE (OPTIONS)
-    // ==========================================
     val defaultShareContentTitle @Composable get() = get("Contenu du partage par défaut", "Default share content", "Conteúdo de partilha predefinido")
-    val defaultShareContentDesc @Composable get() = get("Choisir les éléments à inclure sur l'image", "Choose the elements to include on the image", "Escolher os elementos a incluir na imagem")
+    val defaultShareContentDesc @Composable get() = get("Choisir les éléments à inclure sur l'image", "Choose the elements to include on the image", "Escolher os éléments a incluir na image")
 
-    // --- NOUVEAUX AJOUTS POUR LA CARTE ---
     val shareMapDetailsTitle @Composable get() = get("Carte", "Map", "Mapa")
-    val shareMapCompassOption @Composable get() = get("Boussole", "Compass", "Bússola")
     val shareMapSpeedometerOption @Composable get() = get("Compteur de vitesse", "Speedometer", "Velocímetro")
     val shareMapScaleOption @Composable get() = get("Échelle", "Scale", "Escala")
     val shareMapAttributionOption @Composable get() = get("Crédits (Attribution)", "Credits (Attribution)", "Créditos (Atribuição)")
 
     val shareMapOption @Composable get() = get("Afficher la carte", "Display the map", "Mostrar o mapa")
     val shareSupportOption @Composable get() = get("Détails du support", "Support details", "Detalhes do suporte")
+    val shareSpeedtestOption @Composable get() = get("Meilleur Speedtest", "Best Speedtest", "Melhor Speedtest") // 🚨 NEW
     val shareFreqOption @Composable get() = get("Fréquences", "Frequencies", "Frequências")
     val shareDatesOption @Composable get() = get("Dates d'activation", "Activation dates", "Datas de ativação")
-    val shareAddressOption @Composable get() = get("Adresse et Coordonnées", "Address and Coordinates", "Endereço e Coordenadas")
-    val shareHeightsOption @Composable get() = get("Hauteurs des panneaux", "Panel heights", "Alturas dos painéis")
+    val shareAddressOption @Composable get() = get("Adresse et Coordonnées", "Address and Coordinates", "Endereço e Coordonadas")
     val shareIdsOption @Composable get() = get("Identifiants de l'antenne", "Antenna identifiers", "Identificadores da antena")
     val shareConfidentialOption @Composable get() = get("Partage confidentiel", "Confidential share", "Partilha confidencial")
-    val shareConfidentialDesc @Composable get() = get("Supprime les données permettant l'identification du lieu", "Removes data allowing location identification", "Remove dados que permitem a identificação do local")
+    val shareConfidentialDesc @Composable get() = get("Supprime les données permettant l'identification du lieu", "Removes data allowing location identification", "Remove dados que permettent a identificação do local")
 
-    // ==========================================
-    // 📸 GÉNÉRATION D'IMAGE ET PARTAGE
-    // ==========================================
-    val scanToOpen @Composable get() = get("Scannez pour ouvrir dans", "Scan to open in", "Escaneie para abrir no")
+    val scanToOpen @Composable get() = get("Scannez pour ouvrir dans", "Scan to open in", "Escaneie para ouvrir no")
     val geoTowerApp @Composable get() = get("l'application GeoTower", "the GeoTower app", "aplicativo GeoTower")
 
-    // ==========================================
-    // 🌍 TRADUCTIONS AJOUTÉES POUR LE SUPPORT
-    // ==========================================
     val back @Composable get() = get("Retour", "Back", "Voltar")
     val imageContent @Composable get() = get("Contenu de l'image", "Image content", "Conteúdo da imagem")
     val move @Composable get() = get("Déplacer", "Move", "Mover")
@@ -627,28 +588,21 @@ object AppStrings {
     val copy @Composable get() = get("Copier", "Copy", "Copiar")
     val distanceHidden @Composable get() = get("Distance masquée (Mode confidentiel)", "Distance hidden (Confidential mode)", "Distância oculta (Modo confidencial)")
 
-    // Labels techniques pour le presse-papiers (invisibles la plupart du temps, mais plus propres si traduits)
     val idSupportCopy @Composable get() = get("ID Support", "Support ID", "ID do Suporte")
     val addressCopy @Composable get() = get("Adresse", "Address", "Endereço")
     val gpsCoordsCopy @Composable get() = get("Coordonnées GPS", "GPS Coordinates", "Coordenadas GPS")
 
-    // ==========================================
-    // ⚠️ AVERTISSEMENT COULEUR CARTE
-    // ==========================================
     val warningTitle @Composable get() = get("Attention", "Warning", "Atenção")
     val lightColorWarning @Composable get() = get(
         "Votre couleur MaterialUi est trop claire. Pour plus de lisibilité, la couleur bleu foncé a été appliquée.",
         "Your MaterialUi color is too light. For better readability, dark blue has been applied.",
-        "A sua cor MaterialUi é muito clara. Para melhor legibilidade, a cor azul escuro foi aplicada."
+        "A sua couleur MaterialUi é muito clara. Para melhor legibilidade, a cor azul escuro foi appliquée."
     )
     val doNotShowAgain @Composable get() = get("Ne plus afficher ce message", "Do not show this message again", "Não mostrar esta mensagem novamente")
     val understood @Composable get() = get("J'ai compris", "Understood", "Entendi")
 
-    // ==========================================
-    // UPLOAD SIGNAL QUEST
-    // ==========================================
     val uploadSqTitle @Composable get() = get("Envoi vers Signal Quest", "Send to Signal Quest", "Enviar para Signal Quest")
-    val uploadSqDescPlaceholder @Composable get() = get("Ajouter une description pour ce lot (optionnel)...", "Add a description for this batch (optional)...", "Adicionar uma descrição para este lote (opcional)...")
+    val uploadSqDescPlaceholder @Composable get() = get("Ajouter une description pour ce lot (optionnel)...", "Add a description for this batch (optional)...", "Adicionar uma descrição pour este lote (optionnal)...")
     val uploadSqTargetOperator @Composable get() = get("Opérateur cible", "Target operator", "Operadora destino")
     val uploadSqTargetSite @Composable get() = get("Support N°", "Site ID", "ID do Suporte")
 
@@ -658,11 +612,6 @@ object AppStrings {
         "Send $count photo${if (count > 1) "s" else ""}",
         "Enviar $count foto${if (count > 1) "s" else ""}"
     )
-
-    // Textes pour les futures notifications du WorkManager
-    val notifUploadInProgress @Composable get() = get("Envoi en cours vers Signal Quest...", "Uploading to Signal Quest...", "Enviando para Signal Quest...")
-    val notifUploadSuccess @Composable get() = get("Photos envoyées avec succès !", "Photos sent successfully!", "Fotos enviadas com sucesso!")
-    val notifUploadFailed @Composable get() = get("Échec de l'envoi des photos", "Failed to send photos", "Falha ao enviar fotos")
 
     val uploadSqLimit @Composable get() = get("Limite : 20 Mo par photo", "Limit: 20 MB per photo", "Limite: 20 MB por foto")
     val uploadConfirmTitle @Composable get() = get("Confirmation d'envoi", "Upload Confirmation", "Confirmação de envio")
@@ -708,32 +657,21 @@ object AppStrings {
     )
 
     val awesome @Composable get() = get("Super !", "Awesome!", "¡Genial!")
-    // ==========================================
-    // 💾 NOTIFICATIONS BASE DE DONNÉES
-    // ==========================================
-    val notifDbDownloadTitle @Composable get() = get("Mise à jour de la base", "Database update", "Atualização da base de dados")
+    val notifDbDownloadTitle @Composable get() = get("Mise à jour de la base", "Database update", "Atualização da base de données")
     val notifDbDownloadInProgress @Composable get() = get("Téléchargement en cours...", "Downloading...", "A transferir...")
     val notifDbDownloadSuccess @Composable get() = get("Téléchargement terminé", "Download finished", "Transferência concluída")
-    val notifDbDownloadSuccessDesc @Composable get() = get("Appuyez pour ouvrir l'application.", "Tap to open the app.", "Toque para abrir o aplicativo.")
-    val dbDownloadSuccessDesc @Composable get() = get("La base de données a été téléchargée avec succès !", "The database was successfully downloaded!", "A base de dados foi transferida com sucesso!")
+    val dbDownloadSuccessDesc @Composable get() = get("La base de données a été téléchargée avec succès !", "The database was successfully downloaded!", "A base de données foi transferida com sucesso!")
     val dbDownloadTermine @Composable get() = get("Terminer", "Finish", "Terminar")
 
-    // ==========================================
-    // ⚠️ AVERTISSEMENTS TUTO
-    // ==========================================
-    val dbWarningTitle @Composable get() = get("Base de donnée non téléchargée", "Database not downloaded", "Base de dados não transferida")
-    val dbWarningDesc @Composable get() = get("Vous n'avez pas téléchargé la base de donnée de l'application, vous n'aurez donc aucun élément affiché à l'écran.", "You haven't downloaded the app's database, so you won't have any items displayed on the screen.", "Você não transferiu a base de dados da aplicação, portanto não terá nenhum item exibido na tela.")
+    val dbWarningTitle @Composable get() = get("Base de donnée non téléchargée", "Database not downloaded", "Base de données não transferida")
+    val dbWarningDesc @Composable get() = get("Vous n'avez pas téléchargé la base de donnée de l'application, vous n'aurez donc aucun élément affiché à l'écran.", "You haven't downloaded the app's database, so you won't have any items displayed on the screen.", "Você não transferiu a base de données da aplicação, portanto não terá nenhum item exibido na tela.")
     val dbWarningQuestion @Composable get() = get("Êtes-vous sûr de vouloir continuer ?", "Are you sure you want to continue?", "Tem certeza que deseja continuar?")
     val continueAnyway @Composable get() = get("Continuer", "Continue", "Continuar")
 
-    val missingDbBannerTitle @Composable get() = get("Base de données manquante", "Missing database", "Base de dados ausente")
-    val updateDbBannerTitle @Composable get() = get("Mise à jour disponible", "Update available", "Atualização disponível")
-    val missingDbBannerDesc @Composable get() = get("Téléchargez la base pour utiliser l'appli.", "Download the database to use the app.", "Baixe o banco de dados para usar o app.")
+    val missingDbBannerTitle @Composable get() = get("Base de données manquante", "Missing database", "Base de données ausente")
+    val updateDbBannerTitle @Composable get() = get("Mise à jour disponible", "Update available", "Atualização disponible")
+    val missingDbBannerDesc @Composable get() = get("Téléchargez la base pour utiliser l'appli.", "Download the database to use the app.", "Baixe o banco de données para usar o app.")
     val btnDownloadBanner @Composable get() = get("Télécharger", "Download", "Baixar")
-
-    // ==========================================
-    // 🗄️ TRADUCTIONS DYNAMIQUES DE LA BASE DE DONNÉES
-    // ==========================================
 
     @Composable
     fun translateNature(nature: String?): String {
@@ -745,7 +683,7 @@ object AppStrings {
             "Phare" -> get("Phare", "Lighthouse", "Farol")
             "Château d'eau - réservoir" -> get("Château d'eau - réservoir", "Water tower / reservoir", "Castelo d'água / reservatório")
             "Immeuble" -> get("Immeuble", "Building", "Prédio")
-            "Local technique" -> get("Local technique", "Technical room / equipment shelter", "Sala técnica / abrigo de equipamentos")
+            "Local technique" -> get("Local technique", "Technical room / equipment shelter", "Sala técnica / abrigo de équipements")
             "Mât" -> get("Mât", "Mast", "Mastro")
             "Intérieur galerie" -> get("Intérieur galerie", "Inside gallery", "Interior de galeria")
             "Intérieur sous-terrain" -> get("Intérieur sous-terrain", "Underground interior", "Interior subterrâneo")
@@ -777,7 +715,7 @@ object AppStrings {
             "XXX" -> get("XXX", "Unknown", "Desconhecido")
             "Eolienne" -> get("Eolienne", "Wind turbine", "Turbina eólica")
             "Mobilier urbain" -> get("Mobilier urbain", "Urban furniture / street structure", "Mobiliário urbano / estrutura de rua")
-            else -> nature // Retourne le mot français original si non listé
+            else -> nature
         }
     }
 
@@ -885,27 +823,9 @@ object AppStrings {
             "Etablissement de soins" -> get("Établissement de soins", "Healthcare facility", "Estabelecimento de saúde")
             "Etat Ministère" -> get("Etat Ministère", "State / Ministry", "Estado / Ministério")
             "Aviation Civile" -> get("Aviation Civile", "Civil Aviation", "Aviação Civil")
-            else -> owner // Ex: "ORANGE", "EDF", "SNCF" resteront tels quels
+            else -> owner
         }
     }
-
-    @Composable
-    fun getMapName(id: String): String {
-        return when (id) {
-            "france_north_oam" -> get("France (Moitié Nord)", "France (North)", "França (Norte)")
-            "france_south_oam" -> get("France (Moitié Sud)", "France (South)", "França (Sul)")
-            "corse_oam" -> get("Corse", "Corsica", "Córsega")
-            "caribbean_oam" -> get("Caraïbes (Antilles)", "Caribbean", "Caraíbas")
-            "guyana_oam" -> get("Guyane & Suriname", "Guyana & Suriname", "Guiana e Suriname")
-            "madagascar_oam" -> get("Océan Indien (Réunion...)", "Indian Ocean", "Oceano Índico")
-            "polynesia_oam" -> get("Polynésie Française", "French Polynesia", "Polinésia Francesa")
-            else -> id // Retourne l'ID brut si pas de traduction trouvée
-        }
-    }
-
-    // ==========================================
-    // ⚙️ TRADUCTIONS HORS-COMPOSE (POUR LES SERVICES)
-    // ==========================================
 
     // Fonction utilitaire spéciale pour lire la langue sans @Composable
     fun getForService(context: android.content.Context, fr: String, en: String, pt: String): String {
@@ -920,18 +840,18 @@ object AppStrings {
         }
     }
 
-    fun newDbNotifTitle(ctx: android.content.Context) = getForService(ctx, "Nouvelle base de données", "New database", "Nova base de dados")
-    fun newDbNotifDesc(ctx: android.content.Context) = getForService(ctx, "Une mise à jour des antennes est disponible ! Touchez pour l'installer.", "An antenna update is available! Tap to install.", "Uma atualização de antenas está disponível! Toque para instalar.")
+    fun newDbNotifTitle(ctx: android.content.Context) = getForService(ctx, "Nouvelle base de données", "New database", "Nova base de données")
+    fun newDbNotifDesc(ctx: android.content.Context) = getForService(ctx, "Une mise à jour des antennes est disponible ! Touchez pour l'installer.", "An antenna update is available! Tap to install.", "Uma atualização de antennes está disponible! Toque para instalar.")
     fun nearestAntennaTitle(ctx: android.content.Context) = getForService(ctx, "À proximité", "Nearby", "Nas proximidades")
-    fun liveTrackingChannelDesc(ctx: android.content.Context) = getForService(ctx, "Suivi d'antennes en direct", "Live antenna tracking", "Rastreamento de antenas ao vivo")
+    fun liveTrackingChannelDesc(ctx: android.content.Context) = getForService(ctx, "Suivi d'antennes en direct", "Live antenna tracking", "Rastreamento de antennes ao vivo")
     fun searchInProgress(ctx: android.content.Context) = getForService(ctx, "Recherche en cours...", "Searching...", "Buscando...")
     fun quitAction(ctx: android.content.Context) = getForService(ctx, "Quitter", "Stop", "Sair")
     fun noneOpService(ctx: android.content.Context) = getForService(ctx, "Aucun", "None", "Nenhum")
 
-    fun noAntennaFound(ctx: android.content.Context, op: String) = getForService(ctx, "Aucune antenne $op trouvée à proximité.", "No $op antenna found nearby.", "Nenhuma antena $op encontrada nas proximidades.")
-    fun antennaDistance(ctx: android.content.Context, op: String, dist: String) = getForService(ctx, "Antenne $op : $dist", "$op antenna : $dist", "Antena $op : $dist")
+    fun noAntennaFound(ctx: android.content.Context, op: String) = getForService(ctx, "Aucune antenne $op trouvée à proximité.", "No $op antenna found nearby.", "Nenhuma antenne $op encontrada nas proximidades.")
+    fun antennaDistance(ctx: android.content.Context, op: String, dist: String) = getForService(ctx, "Antenne $op : $dist", "$op antenna : $dist", "Antenne $op : $dist")
 
-    fun widgetBgLocationWarning(ctx: android.content.Context) = getForService(ctx, "⚠️ Localisation arrière-plan requise", "⚠️ Background location required", "⚠️ Localização em segundo plano necessária")
+    fun widgetBgLocationWarning(ctx: android.content.Context) = getForService(ctx, "⚠️ Localisation arrière-plan requise", "⚠️ Background location required", "⚠️ Localização em segundo plano nécessaire")
     fun widgetBgLocationDesc(ctx: android.content.Context) = getForService(
         ctx,
         "Touchez ici, allez dans Autorisations > Localisation, puis choisissez \"Toujours autoriser\".",
@@ -939,16 +859,12 @@ object AppStrings {
         "Toque aqui, vá em Permissões > Localização e selecione \"Permitir o tempo todo\"."
     )
 
-    // ==========================================
-    // ⚠️ PANNES SIGNAL QUEST (DÉTAILS)
-    // ==========================================
     val outageAttentionDesc @Composable get() = get("Attention panne", "Outage warning", "Aviso de falha")
     val unknownOutageReason @Composable get() = get("Raison inconnue", "Unknown reason", "Motivo desconhecido")
     val outageReasonMaintenance @Composable get() = get("Maintenance", "Maintenance", "Manutenção")
     val outageReasonIncident @Composable get() = get("Incident", "Incident", "Incidente")
     val outageReasonTechnical @Composable get() = get("Intervention technique", "Technical intervention", "Intervenção técnica")
 
-    // Statuts détaillés
     val outageVoice @Composable get() = get("Voix", "Voice", "Voz")
     val outageData @Composable get() = get("Data", "Data", "Dados")
     val outageStatusDegraded @Composable get() = get("Dégradé", "Degraded", "Degradado")
@@ -957,9 +873,6 @@ object AppStrings {
     val outageStatusNe @Composable get() = get("Non Équipé", "Not Equipped", "Não Equipado")
     val outageEndExpected @Composable get() = get("Fin prévue le", "Expected end on", "Fim previsto em")
 
-    // ==========================================
-    // 📊 BLOC STATUT (DÉTAIL SITE)
-    // ==========================================
     val statusTitle @Composable get() = get("Statut du site", "Site Status", "Status do site")
     val statusFunctional @Composable get() = get("Fonctionnel", "Functional", "Funcional")
     val statusOutage @Composable get() = get("En panne", "Out of service", "Em manutenção")
@@ -967,95 +880,113 @@ object AppStrings {
     val showStatusOption @Composable get() = get("Afficher le statut", "Show status", "Mostrar status")
     val shareStatusOption @Composable get() = get("Partager le statut", "Share status", "Partilhar o status")
 
-    // 🚨 NOUVELLES TRADUCTIONS
     val serviceVoice @Composable get() = get("Voix", "Voice", "Voz")
     val serviceSms @Composable get() = get("SMS", "SMS", "SMS")
     val serviceInternet @Composable get() = get("Internet", "Internet", "Internet")
     val lastUpdatedText @Composable get() = get("Dernière mise à jour à", "Last updated at", "Última atualização às")
 
-    // 🚨 TRADUCTIONS DES RETOURS BRUTS DE L'API (JSON)
     val apiDetailIncident @Composable get() = get("Incident en cours", "Ongoing incident", "Incidente em curso")
     val apiDetailMaintenance @Composable get() = get("Travaux de maintenance", "Maintenance work", "Trabalhos de manutenção")
     val outageStart @Composable get() = get("Depuis le", "Since", "Desde")
 
-    // ==========================================
-    // ℹ️ ÉCRAN À PROPOS - VERSIONS
-    // ==========================================
     val aboutVersionsTitle @Composable get() = get("Versions", "Versions", "Versões")
     val versionAppLabel @Composable get() = get("Version de l'application", "App version", "Versão do app")
-    val versionDbLabel @Composable get() = get("Version de la base de données", "Database version", "Versão da base de dados")
+    val versionDbLabel @Composable get() = get("Version de la base de données", "Database version", "Versão da base de données")
     val versionWeeklyLabel @Composable get() = get("Mise à jour hebdomadaire", "Weekly update", "Atualização semanal")
     val versionMonthlyLabel @Composable get() = get("Mise à jour mensuelle", "Monthly update", "Atualização mensal")
     val versionHsLabel @Composable get() = get("Date des sites HS", "HS sites date", "Data dos sites HS")
 
-    // ==========================================
-    // 📅 FORMATAGE DE LA DATE MENSUELLE
-    // ==========================================
+    fun formatMapName(rawName: String): String {
+        val cleanName = rawName.replace(".map", "", ignoreCase = true)
+        return when (cleanName.lowercase()) {
+            "alsace" -> "Alsace"
+            "aquitaine" -> "Aquitaine"
+            "auvergne" -> "Auvergne"
+            "basse-normandie" -> "Basse-Normandie"
+            "bourgogne" -> "Bourgogne"
+            "bretagne" -> "Bretagne"
+            "centre" -> "Centre-Val de Loire"
+            "champagne-ardenne" -> "Champagne-Ardenne"
+            "corse" -> "Corse"
+            "franche-comte" -> "Franche-Comté"
+            "guadeloupe" -> "Guadeloupe"
+            "guyane" -> "Guyane"
+            "haute-normandie" -> "Haute-Normandie"
+            "ile-de-france" -> "Île-de-France"
+            "languedoc-roussillon" -> "Languedoc-Roussillon"
+            "limousin" -> "Limousin"
+            "lorraine" -> "Lorraine"
+            "martinique" -> "Martinique"
+            "mayotte" -> "Mayotte"
+            "midi-pyrenees" -> "Midi-Pyrénées"
+            "nord-pas-de-calais" -> "Nord-Pas-de-Calais"
+            "pays-de-la-loire" -> "Pays de la Loire"
+            "picardie" -> "Picardie"
+            "poitou-charentes" -> "Poitou-Charentes"
+            "provence-alpes-cote-d-azur", "provence-alpes-cote-d-azur.map" -> "Provence-Alpes-Côte d'Azur"
+            "reunion" -> "La Réunion"
+            "rhone-alpes" -> "Rhône-Alpes"
+            else -> cleanName.replaceFirstChar { if (it.isLowerCase()) it.titlecase(java.util.Locale.getDefault()) else it.toString() }
+        }
+    }
+
     @Composable
     fun formatMonthlyVersion(rawName: String): String {
-        // Si la chaîne est vide, un tiret, ou un message d'erreur, on la retourne telle quelle
         if (rawName.isBlank() || rawName == "-" || rawName == "Téléchargez la nouvelle base") return rawName
-
-        // Le Regex cherche 4 chiffres (Année) suivis de 2 chiffres (Mois) au tout début du nom
         val regex = Regex("^(\\d{4})(\\d{2})\\d{2}.*")
         val match = regex.find(rawName)
-
         if (match != null) {
             val year = match.groupValues[1]
-            val monthName = when (match.groupValues[2]) {
-                "01" -> get("Janvier", "January", "Janeiro")
-                "02" -> get("Février", "February", "Fevereiro")
-                "03" -> get("Mars", "March", "Março")
-                "04" -> get("Avril", "April", "Abril")
-                "05" -> get("Mai", "May", "Maio")
-                "06" -> get("Juin", "June", "Junho")
-                "07" -> get("Juillet", "July", "Julho")
-                "08" -> get("Août", "August", "Agosto")
-                "09" -> get("Septembre", "September", "Setembro")
-                "10" -> get("Octobre", "October", "Outubro")
-                "11" -> get("Novembre", "November", "Novembro")
-                "12" -> get("Décembre", "December", "Dezembro")
-                else -> ""
-            }
-            if (monthName.isNotEmpty()) {
-                return "$monthName $year"
-            }
+            val monthName = getMonthName(match.groupValues[2])
+            if (monthName.isNotEmpty()) return "$monthName $year"
         }
-
-        // Si le nom du fichier ne correspond pas au format attendu, on l'affiche brut par sécurité
         return rawName
     }
 
-    // ==========================================
-    // 📅 FORMATAGE DE LA DATE HEBDOMADAIRE (Avec Semaine)
-    // ==========================================
+    @Composable
+    fun getMonthName(monthIndex: String): String {
+        return when (monthIndex) {
+            "01" -> get("Janvier", "January", "Janeiro")
+            "02" -> get("Février", "February", "Fevereiro")
+            "03" -> get("Mars", "March", "Março")
+            "04" -> get("Avril", "April", "Abril")
+            "05" -> get("Mai", "May", "Maio")
+            "06" -> get("Juin", "June", "Junho")
+            "07" -> get("Juillet", "July", "Julho")
+            "08" -> get("Août", "August", "Agosto")
+            "09" -> get("Septembre", "September", "Setembro")
+            "10" -> get("Octobre", "October", "Outubro")
+            "11" -> get("Novembre", "November", "Novembro")
+            "12" -> get("Décembre", "December", "Dezembro")
+            else -> ""
+        }
+    }
+
     @Composable
     fun formatWeeklyVersionWithWeekNumber(dateStr: String): String {
-        // On vérifie qu'on a bien une date au format attendu (ex: 15/04/2026)
         if (dateStr.isBlank() || dateStr == "-" || !dateStr.contains("/")) return dateStr
-
-        // ✅ CORRECTION : On appelle la fonction Composable HORS du bloc try-catch !
         val weekWord = get("Semaine", "Week", "Semana")
-
         return try {
             val format = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
             val date = format.parse(dateStr)
-
             if (date != null) {
                 val cal = java.util.Calendar.getInstance()
-                // Norme ISO 8601 (Utilisée en Europe pour le calcul des semaines)
                 cal.firstDayOfWeek = java.util.Calendar.MONDAY
                 cal.minimalDaysInFirstWeek = 4
                 cal.time = date
-
                 val weekNumber = cal.get(java.util.Calendar.WEEK_OF_YEAR)
-
                 "$weekWord $weekNumber  -  $dateStr"
-            } else {
-                dateStr
-            }
-        } catch (e: Exception) {
-            dateStr
-        }
+            } else dateStr
+        } catch (e: Exception) { dateStr }
     }
+
+    // ==========================================
+    // 🚀 SPEEDTEST (Signal Quest)
+    // ==========================================
+    val showSpeedtestLabel @Composable get() = get("Afficher le meilleur Speedtest (SFR/Bouygues)", "Show best Speedtest (SFR/Bouygues)", "Mostrar o meilleur Speedtest (SFR/Bouygues)")
+    val speedtestTitle @Composable get() = get("Meilleur Speedtest", "Best Speedtest", "Melhor Speedtest")
+    val speedtestDownload @Composable get() = get("Descendant", "Download", "Download")
+    val speedtestUpload @Composable get() = get("Montant", "Upload", "Upload")
+    val speedtestPing @Composable get() = get("Ping", "Ping", "Ping")
+    val speedtestNoData @Composable get() = get("Aucun test de débit répertorié pour ce site.", "No speedtest recorded for this site.", "Nenhum teste de velocidade registado para este site.")
 }

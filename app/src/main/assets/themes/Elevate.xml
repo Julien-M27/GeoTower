@@ -23,8 +23,8 @@ Please have a look at read_me_elevate.txt for reuse and licenses of resources us
 <rendertheme xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" map-background="#F8F8F8"
     map-background-outside="#EEEEEE" version="5" xmlns="http://mapsforge.org/renderTheme"
     xsi:schemaLocation="http://mapsforge.org/renderTheme https://raw.githubusercontent.com/mapsforge/mapsforge/master/resources/renderTheme.xsd">
-    
-<stylemenu id="elv-menu" defaultvalue="elv-hiking" defaultlang="en">
+
+	<stylemenu id="elevate" defaultvalue="city" defaultlang="en">
 
 	<!-- overlays special -->
 	<layer id="elv-h_routes" enabled="true">

@@ -146,13 +146,28 @@ fun MapSettingsSheet(
             // 2. AZIMUTS
             // ==========================================
             SectionTitle(AppStrings.azimuthsTitle)
-            SelectableButton(
-                label = AppStrings.showAzimuthsLabel.replace(" (", "\n("),
-                isSelected = showAzimuths,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                showAzimuths = it
-                prefs.edit().putBoolean("show_azimuths", it).apply()
+
+            // On récupère la nouvelle variable
+            var showAzimuthsCone by AppConfig.showAzimuthsCone
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SelectableButton(
+                    label = AppStrings.showAzimuthsLabel.replace(" (", "\n("),
+                    isSelected = showAzimuths,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    showAzimuths = it
+                    prefs.edit().putBoolean("show_azimuths", it).apply()
+                }
+
+                SelectableButton(
+                    label = AppStrings.showAzimuthsConeLabel.replace(" (", "\n("),
+                    isSelected = showAzimuthsCone,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    showAzimuthsCone = it
+                    prefs.edit().putBoolean("show_azimuths_cone", it).apply()
+                }
             }
 
             Spacer(modifier = Modifier.height(32.dp))

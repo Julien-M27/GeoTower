@@ -78,7 +78,8 @@ fun shareFullAntennaCapture(
     info: LocalisationEntity,
     physique: PhysiqueEntity?,
     technique: TechniqueEntity?,
-    hsDataMap: Map<String, fr.geotower.data.models.SiteHsEntity>, // 🚨 AJOUT
+    hsDataMap: Map<String, fr.geotower.data.models.SiteHsEntity>,
+    speedtestData: fr.geotower.data.api.SqSpeedtestData?, // 🚨 NEW
     distanceStr: String,
     bearingStr: String,
     forceDarkTheme: Boolean,
@@ -125,6 +126,7 @@ fun shareFullAntennaCapture(
     incDates: Boolean,
     incAddress: Boolean,
     incFreqs: Boolean,
+    incSpeedtest: Boolean, // 🚨 NEW
     incConfidential: Boolean,
     incQrCode: Boolean,
     shareOrder: List<String>
@@ -290,6 +292,44 @@ fun shareFullAntennaCapture(
                                                     Text(AppStrings.distanceHidden, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                                                 } else {
                                                     Text("$txtDistanceLabel $distanceStr$txtFromMyPosition", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                                "speedtest" -> {
+                                    if (incSpeedtest && speedtestData != null) {
+                                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
+                                            Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.primary)
+                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                    Text(AppStrings.speedtestTitle, fontWeight = FontWeight.Bold)
+                                                }
+                                                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                                
+                                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+                                                    // Download
+                                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                        Icon(Icons.Default.KeyboardArrowDown, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(24.dp))
+                                                        Text(if (speedtestData.downloadSpeed != null) String.format(Locale.US, "%.1f", speedtestData.downloadSpeed) else "--", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                                        Text("Mbps", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        Text(AppStrings.speedtestDownload, fontSize = 10.sp)
+                                                    }
+                                                    // Upload
+                                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                        Icon(Icons.Default.KeyboardArrowUp, null, tint = Color(0xFF2196F3), modifier = Modifier.size(24.dp))
+                                                        Text(if (speedtestData.uploadSpeed != null) String.format(Locale.US, "%.1f", speedtestData.uploadSpeed) else "--", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                                        Text("Mbps", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        Text(AppStrings.speedtestUpload, fontSize = 10.sp)
+                                                    }
+                                                    // Ping
+                                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                        Icon(Icons.Default.Timer, null, tint = Color(0xFFFF9800), modifier = Modifier.size(24.dp))
+                                                        Text(if (speedtestData.ping != null) speedtestData.ping.toInt().toString() else "--", fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                                        Text("ms", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                                        Text(AppStrings.speedtestPing, fontSize = 10.sp)
+                                                    }
                                                 }
                                             }
                                         }
@@ -890,7 +930,8 @@ fun AntennaShareMenu(
     useOneUi: Boolean,
     buttonShape: Shape,
     globalMapRef: org.osmdroid.views.MapView?,
-    communityPhotosSize: Int
+    communityPhotosSize: Int,
+    speedtestData: fr.geotower.data.api.SqSpeedtestData? // 🚨 NEW
 ) {
     val context = LocalContext.current
     val currentView = LocalView.current
@@ -921,10 +962,19 @@ fun AntennaShareMenu(
     var incIds by remember { mutableStateOf(prefs.getBoolean("share_ids_enabled", true)) }
     var incDates by remember { mutableStateOf(prefs.getBoolean("share_dates_enabled", true)) }
     var incAddress by remember { mutableStateOf(prefs.getBoolean("share_address_enabled", true)) }
+    var incSpeedtest by remember { mutableStateOf(prefs.getBoolean("share_speedtest_enabled", true)) } // 🚨 NEW
     var incFreqs by remember { mutableStateOf(prefs.getBoolean("share_freq_enabled", true)) }
     var incConfidential by remember { mutableStateOf(prefs.getBoolean("share_confidential_enabled", false)) }
     var incQrCode by remember { mutableStateOf(prefs.getBoolean("share_site_qr_enabled", true)) } // ✅ NOUVELLE VARIABLE
-    var shareOrder by remember { mutableStateOf(prefs.getString("share_order", "map,support,ids,dates,address,status,freq")!!.split(",")) }
+    var shareOrder by remember {
+        mutableStateOf(
+            (prefs.getString("share_order", "map,support,ids,dates,address,speedtest,status,freq") ?: "map,support,ids,dates,address,speedtest,status,freq")
+                .split(",")
+                .toMutableList()
+                .apply { if (!contains("speedtest")) { val idx = indexOf("address"); if (idx >= 0) add(idx + 1, "speedtest") else add("speedtest") } }
+                .toList()
+        )
+    }
 
     // ✅ FORCE LE RECHARGEMENT DES PARAMÈTRES PAR DÉFAUT À CHAQUE OUVERTURE
     LaunchedEffect(showShareSheet) {
@@ -934,11 +984,16 @@ fun AntennaShareMenu(
             incIds = prefs.getBoolean("share_ids_enabled", true)
             incDates = prefs.getBoolean("share_dates_enabled", true)
             incAddress = prefs.getBoolean("share_address_enabled", true)
+            incSpeedtest = prefs.getBoolean("share_speedtest_enabled", true) // 🚨 NEW
             incFreqs = prefs.getBoolean("share_freq_enabled", true)
             incConfidential = prefs.getBoolean("share_confidential_enabled", false)
             incQrCode = prefs.getBoolean("share_site_qr_enabled", true)
-            shareOrder = prefs.getString("share_order", "map,support,ids,dates,address,status,freq")!!
-                .split(",").filter { it != "heights" }
+            shareOrder = (prefs.getString("share_order", "map,support,ids,dates,address,speedtest,status,freq") ?: "map,support,ids,dates,address,speedtest,status,freq")
+                .split(",")
+                .toMutableList()
+                .apply { if (!contains("speedtest")) { val idx = indexOf("address"); if (idx >= 0) add(idx + 1, "speedtest") else add("speedtest") } }
+                .filter { it != "heights" }
+                .toList()
         }
     }
 
@@ -1060,6 +1115,7 @@ fun AntennaShareMenu(
                                 "ids" -> Triple(AppStrings.shareIdsOption, incIds, { it: Boolean -> incIds = it })
                                 "dates" -> Triple(AppStrings.shareDatesOption, incDates, { it: Boolean -> incDates = it })
                                 "address" -> Triple(AppStrings.shareAddressOption, incAddress, { it: Boolean -> incAddress = it })
+                                "speedtest" -> Triple(AppStrings.shareSpeedtestOption, incSpeedtest, { it: Boolean -> incSpeedtest = it })
                                 "status" -> Triple(AppStrings.shareStatusOption, AppConfig.shareSiteStatus.value, { it: Boolean -> AppConfig.shareSiteStatus.value = it })
                                 "freq" -> Triple(AppStrings.shareFreqOption, incFreqs, { it: Boolean -> incFreqs = it })
                                 else -> Triple("", false, { _: Boolean -> })
@@ -1091,9 +1147,9 @@ fun AntennaShareMenu(
                     // ✅ AJOUT DU BOUTON RÉINITIALISER
                     TextButton(
                         onClick = {
-                            shareOrder = listOf("map", "support", "ids", "dates", "address", "status", "freq")
+                            shareOrder = listOf("map", "support", "ids", "dates", "address", "speedtest", "status", "freq")
                             prefs.edit().putString("share_order", shareOrder.joinToString(",")).apply()
-                            incMap = true; incSupport = true; incIds = true; incDates = true; incAddress = true; incFreqs = true; incQrCode = true
+                            incMap = true; incSupport = true; incIds = true; incDates = true; incAddress = true; incSpeedtest = true; incFreqs = true; incQrCode = true
                             AppConfig.shareSiteStatus.value = true
                         },
                         modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -1130,12 +1186,13 @@ fun AntennaShareMenu(
                                 shareFullAntennaCapture(
                                     context, currentView, info,
                                     physique, technique,
-                                    hsDataMap, // 🚨 AJOUT ICI : C'est le 6ème paramètre attendu
+                                    hsDataMap,
+                                    speedtestData, // 🚨 NEW
                                     distanceStr, bearingStr, selectedShareTheme,
                                     txtSiteDetailsTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtGeneratedBy, txtShareSiteVia, txtimplementation, txtLastModification, txtIdentifiers, txtIdNumber, txtFrequenciesTitle, txtBandsNotSpecified, txtInService, txtTechnically, txtUnknownStatus, txtAnfrStationNumber, txtDates, txtError, txtProjectApproved, txtActivatedOn, txtDateNotSpecifiedAnfr, txtPanelHeightsTitle, txtAzimuths, txtIdSupportLabel, txtSupportDetailsTitle, txtSupportNature, txtOwner, txtAntennaType,
                                     mapBmp, txtInitError, emptyList(), txtCommunityPhotosTitle,
                                     // ✅ CORRECTION DE L'APPEL : ON PASSE incQrCode JUSTE AVANT shareOrder !
-                                    incMap, incSupport, incHeights, incIds, incDates, incAddress, incFreqs, incConfidential, incQrCode, shareOrder
+                                    incMap, incSupport, incHeights, incIds, incDates, incAddress, incFreqs, incSpeedtest, incConfidential, incQrCode, shareOrder
                                 )
                             }, 300)
                         },

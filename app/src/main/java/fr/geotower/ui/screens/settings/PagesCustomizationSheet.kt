@@ -79,6 +79,7 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.MutableState
@@ -198,6 +199,7 @@ fun StartupPageSelectionSheet(
                     Spacer(Modifier.width(8.dp))
                     Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
+                Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
 
                 // Bouton Valider classique
                 Button(
@@ -370,6 +372,7 @@ fun HomeSettingsSheet(
                 Spacer(Modifier.width(8.dp))
                 Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
+            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
     }
 }
@@ -395,7 +398,7 @@ fun DraggableSwitchCard(
         color = if (isDragged) MaterialTheme.colorScheme.surfaceVariant else cardBg,
         modifier = Modifier
             .fillMaxWidth()
-            .height(height)
+            .defaultMinSize(minHeight = height)
             .zIndex(if (isDragged) 10f else 0f)
             .graphicsLayer {
                 translationY = if (isDragged) dragOffset else 0f
@@ -405,10 +408,17 @@ fun DraggableSwitchCard(
             }
             .then(dragModifier)
     ) {
-        Row(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.DragHandle, contentDescription = AppStrings.move, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.width(16.dp))
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
 
             // ✅ AJOUT DE L'ENGRENAGE (S'affiche si on passe une action)
             if (onSettingsClick != null) {
@@ -537,6 +547,7 @@ fun NearbySettingsSheet(
                     color = MaterialTheme.colorScheme.primary
                 )
             }
+            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
             Spacer(modifier = Modifier.height(8.dp))
@@ -707,6 +718,7 @@ fun CompassSettingsSheet(
                 Spacer(Modifier.width(8.dp))
                 Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
+            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
     }
 }
@@ -724,7 +736,6 @@ fun MapSettingsSheet(
     onDismiss: () -> Unit, onBack: () -> Unit,
     sheetState: SheetState, useOneUi: Boolean, bubbleColor: Color
 ) {
-    // ... (Logique de thème identique)
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
@@ -742,20 +753,17 @@ fun MapSettingsSheet(
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SimpleSwitchCard(AppStrings.mapLocationOption, showLocation, onLocationChange, shape, border, bubbleColor, useOneUi)
-                SimpleSwitchCard(AppStrings.mapZoomOption, showZoom, onZoomChange, shape, border, bubbleColor, useOneUi)
-                SimpleSwitchCard(AppStrings.mapToolboxOption, showToolbox, onToolboxChange, shape, border, bubbleColor, useOneUi)
+                SimpleSwitchCard(AppStrings.mapLocationOption, showMapLocation = showLocation, onLocationChange = onLocationChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                SimpleSwitchCard(AppStrings.mapZoomOption, showMapLocation = showZoom, onLocationChange = onZoomChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                SimpleSwitchCard(AppStrings.mapToolboxOption, showMapLocation = showToolbox, onLocationChange = onToolboxChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                 if (AppConfig.hasCompass.value) {
-                    SimpleSwitchCard(AppStrings.mapCompassOption, showCompass, onCompassChange, shape, border, bubbleColor, useOneUi)
+                    SimpleSwitchCard(AppStrings.mapCompassOption, showMapLocation = showCompass, onLocationChange = onCompassChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                 }
-                // ✅ 2. AJOUTE LE BOUTON DU COMPTEUR (Il prendra automatiquement le design sans icône)
-                SimpleSwitchCard(AppStrings.showSpeedometer, showSpeedometer, onSpeedometerChange, shape, border, bubbleColor, useOneUi)
-                // --- NOUVELLES CARTES ---
-                SimpleSwitchCard(AppStrings.mapScaleOption, showScale, onScaleChange, shape, border, bubbleColor, useOneUi)
-                SimpleSwitchCard(AppStrings.mapAttributionOption, showAttribution, onAttributionChange, shape, border, bubbleColor, useOneUi)
-            } // Fin de la Column des Switch
+                SimpleSwitchCard(AppStrings.showSpeedometer, showMapLocation = showSpeedometer, onLocationChange = onSpeedometerChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                SimpleSwitchCard(AppStrings.mapScaleOption, showMapLocation = showScale, onLocationChange = onScaleChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                SimpleSwitchCard(AppStrings.mapAttributionOption, showMapLocation = showAttribution, onLocationChange = onAttributionChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+            }
 
-            // --- NOUVEAU BOUTON AJOUTÉ POUR LA CARTE ---
             Spacer(modifier = Modifier.height(24.dp))
             TextButton(onClick = {
                 onLocationChange(true)
@@ -770,34 +778,35 @@ fun MapSettingsSheet(
                 Spacer(Modifier.width(8.dp))
                 Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
+            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
     }
 }
 
-// Petit composant Switch simple (sans Drag) pour la carte
 @Composable
-fun SimpleSwitchCard(title: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, shape: androidx.compose.ui.graphics.Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean) {
-    val themeMode by AppConfig.themeMode
-    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
-
-    // ✅ MODIFICATION : On force la couleur primaire ici aussi !
+fun SimpleSwitchCard(title: String, showMapLocation: Boolean, onLocationChange: (Boolean) -> Unit, shape: androidx.compose.ui.graphics.Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean) {
     val switchColor = MaterialTheme.colorScheme.primary
-
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
 
     Surface(shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
             if (useOneUi) {
-                fr.geotower.ui.components.OneUiSwitch(checked, onCheckedChange)
+                fr.geotower.ui.components.OneUiSwitch(showMapLocation, onLocationChange)
             } else {
-                // ✅ MODIFICATION : On utilise switchColor
-                Switch(checked = checked, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
+                Switch(checked = showMapLocation, onCheckedChange = onLocationChange, colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
             }
         }
     }
 }
-// === LE SOUS-MENU POUR LE DÉTAIL DU PYLÔNE (SUPPORT) ===
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SupportSettingsSheet(
@@ -823,7 +832,7 @@ fun SupportSettingsSheet(
         containerColor = sheetBgColor,
         dragHandle = {
             Column(
-                modifier = Modifier.fillMaxWidth().statusBarsPadding(), // Protège la caméra !
+                modifier = Modifier.fillMaxWidth().statusBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 BottomSheetDefaults.DragHandle(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
@@ -902,11 +911,11 @@ fun SupportSettingsSheet(
                 Spacer(Modifier.width(8.dp))
                 Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
+            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
     }
 }
 
-// === LE SOUS-MENU POUR LE DÉTAIL DE L'ANTENNE (SITE) ===
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SiteSettingsSheet(
@@ -922,10 +931,12 @@ fun SiteSettingsSheet(
     showShare: Boolean, onShareChange: (Boolean) -> Unit,
     showDates: Boolean, onDatesChange: (Boolean) -> Unit,
     showAddress: Boolean, onAddressChange: (Boolean) -> Unit,
-    showStatus: Boolean, onStatusChange: (Boolean) -> Unit, // 🚨 NEW
+    showStatus: Boolean, onStatusChange: (Boolean) -> Unit,
+    showSpeedtest: Boolean, onSpeedtestChange: (Boolean) -> Unit,
     showFreqs: Boolean, onFreqsChange: (Boolean) -> Unit,
     showLinks: Boolean, onLinksChange: (Boolean) -> Unit,
     onOpenFrequencies: () -> Unit,
+    onOpenPhotosSettings: () -> Unit,
     onDismiss: () -> Unit,
     onBack: () -> Unit,
     sheetState: SheetState,
@@ -938,7 +949,6 @@ fun SiteSettingsSheet(
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
 
-    // ✅ ON RETIRE LE "if (!showFreqFiltersSheet)" : le menu principal reste en fond
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -1011,17 +1021,20 @@ fun SiteSettingsSheet(
                             "bearing_height" -> if (AppConfig.hasCompass.value) DraggableSwitchCard(AppStrings.siteBearingHeightOption, showBearingHeight, onBearingHeightChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "map" -> DraggableSwitchCard(AppStrings.siteMapOption, showMap, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "support_details" -> DraggableSwitchCard(AppStrings.siteSupportDetailsOption, showSupportDetails, onSupportDetailsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "photos" -> DraggableSwitchCard(AppStrings.sitePhotosOption, showPhotos, onPhotosChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "photos" -> DraggableSwitchCard(AppStrings.sitePhotosAndSchemesOption, showPhotos, onPhotosChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = {
+                                onDismiss()
+                                onOpenPhotosSettings()
+                            })
                             "ids" -> DraggableSwitchCard(AppStrings.siteIdsOption, showIds, onIdsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "nav" -> DraggableSwitchCard(AppStrings.siteNavOption, showNav, onNavChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "share" -> DraggableSwitchCard(AppStrings.siteShareOption, showShare, onShareChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "dates" -> DraggableSwitchCard(AppStrings.siteDatesOption, showDates, onDatesChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "address" -> DraggableSwitchCard(AppStrings.siteAddressOption, showAddress, onAddressChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "status" -> DraggableSwitchCard(AppStrings.showStatusOption, showStatus, onStatusChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            // ✅ L'ENGRENAGE MODIFIE BIEN LA VARIABLE UNIQUE
+                            "speedtest" -> DraggableSwitchCard(AppStrings.showSpeedtestLabel, showSpeedtest, onSpeedtestChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "freqs" -> DraggableSwitchCard(AppStrings.siteFreqsOption, showFreqs, onFreqsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = {
-                                onDismiss() // ✅ Ferme le menu Site actuel
-                                onOpenFrequencies() // ✅ Demande l'ouverture du menu Fréquences
+                                onDismiss()
+                                onOpenFrequencies()
                             })
                             "links" -> DraggableSwitchCard(AppStrings.siteLinksOption, showLinks, onLinksChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                         }
@@ -1031,19 +1044,19 @@ fun SiteSettingsSheet(
 
             Spacer(modifier = Modifier.height(24.dp))
             TextButton(onClick = {
-                // 🚨 NOUVEAU CODE DE RESET COMPLET
-                onOrderChange(listOf("operator", "bearing_height", "map", "support_details", "photos", "ids", "nav", "share", "dates", "address", "status", "freqs", "links"))
+                onOrderChange(listOf("operator", "bearing_height", "map", "support_details", "photos", "speedtest", "ids", "nav", "share", "dates", "address", "status", "freqs", "links"))
                 onOperatorChange(true)
                 onBearingHeightChange(true)
                 onMapChange(true)
                 onSupportDetailsChange(true)
                 onPhotosChange(true)
+                onSpeedtestChange(true)
                 onIdsChange(true)
                 onNavChange(true)
                 onShareChange(true)
                 onDatesChange(true)
                 onAddressChange(true)
-                onStatusChange(true) // On active le statut par défaut
+                onStatusChange(true)
                 onFreqsChange(true)
                 onLinksChange(true)
             }) {
@@ -1051,9 +1064,11 @@ fun SiteSettingsSheet(
                 Spacer(Modifier.width(8.dp))
                 Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
+            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
     }
 }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SiteFreqFiltersSheet(
@@ -1064,24 +1079,20 @@ fun SiteFreqFiltersSheet(
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val switchColor = MaterialTheme.colorScheme.primary
     val density = LocalDensity.current
-    val useOneUi = AppConfig.useOneUiDesign // ✅ AJOUT DU MODE ONE UI
+    val useOneUi = AppConfig.useOneUiDesign
 
-    // États pour le Drag & Drop des Technologies
     var draggedTechno by remember { mutableStateOf<String?>(null) }
     var technoDragOffset by remember { mutableFloatStateOf(0f) }
     val emptyFreqOrderState = remember { mutableStateOf(emptyList<String>()) }
 
-    // ✅ ON RÉCUPÈRE LES TRADUCTIONS ICI
     val txtMinOneTechno = AppStrings.minOneTechnoWarning
     val txtMinOneFreq = AppStrings.minOneFreqWarning
 
-    // ✅ RÉACTIVATION de la fonction de sauvegarde pour les switchs
     fun saveBool(key: String, state: MutableState<Boolean>, value: Boolean) {
         state.value = value
         prefs.edit().putBoolean(key, value).apply()
     }
 
-    // ✅ CORRECTION : On ne compte QUE les technos mobiles (Sans la FH)
     fun getActiveMobileTechnosCount(): Int {
         return listOf(
             AppConfig.siteShowTechno5G.value,
@@ -1090,7 +1101,6 @@ fun SiteFreqFiltersSheet(
             AppConfig.siteShowTechno2G.value
         ).count { it }
     }
-    // ✅ NOUVEAU : On compte TOUTES les fréquences actives globalement
     fun getTotalActiveFrequenciesCount(): Int {
         return listOf(
             AppConfig.siteF5G_3500.value, AppConfig.siteF5G_2100.value, AppConfig.siteF5G_700.value,
@@ -1107,10 +1117,9 @@ fun SiteFreqFiltersSheet(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp, top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = onBack) { // ✅ 2. MODIFIÉ onDismiss PAR onBack ICI
+                IconButton(onClick = onBack) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                 }
-
                 Text(
                     text = AppStrings.siteFreqFiltersTitle,
                     style = MaterialTheme.typography.titleLarge,
@@ -1118,17 +1127,12 @@ fun SiteFreqFiltersSheet(
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
-
-                // Ce Spacer de 48.dp équilibre la largeur du bouton retour à gauche
-                // pour que le texte au milieu soit parfaitement centré !
                 Spacer(Modifier.width(48.dp))
             }
 
             AppConfig.siteTechnoOrder.value.forEach { technoId ->
                 key(technoId) {
                     val isTechnoDragged = draggedTechno == technoId
-
-                    // 1. On stocke tout dans une variable technoData
                     val technoData = when(technoId) {
                         "5G" -> Triple("5G (NR)", AppConfig.siteShowTechno5G, "site_show_techno_5g") to (listOf("3500" to AppConfig.siteF5G_3500, "2100" to AppConfig.siteF5G_2100, "700" to AppConfig.siteF5G_700) to AppConfig.siteFreqOrder5G)
                         "4G" -> Triple("4G (LTE)", AppConfig.siteShowTechno4G, "site_show_techno_4g") to (listOf("2600" to AppConfig.siteF4G_2600, "2100" to AppConfig.siteF4G_2100, "1800" to AppConfig.siteF4G_1800, "900" to AppConfig.siteF4G_900, "800" to AppConfig.siteF4G_800, "700" to AppConfig.siteF4G_700) to AppConfig.siteFreqOrder4G)
@@ -1137,17 +1141,16 @@ fun SiteFreqFiltersSheet(
                         else -> Triple("FH", AppConfig.siteShowTechnoFH, "site_show_techno_fh") to (emptyList<Pair<String, MutableState<Boolean>>>() to emptyFreqOrderState)
                     }
 
-                    // 2. On extrait les morceaux correctement
                     @Suppress("UNCHECKED_CAST")
-                    val title = technoData.first.first as String
+                    val title = technoData.first.first
                     @Suppress("UNCHECKED_CAST")
-                    val technoState = technoData.first.second as MutableState<Boolean>
+                    val technoState = technoData.first.second
                     @Suppress("UNCHECKED_CAST")
-                    val technoKey = technoData.first.third as String
+                    val technoKey = technoData.first.third
                     @Suppress("UNCHECKED_CAST")
-                    val freqList = technoData.second.first as List<Pair<String, MutableState<Boolean>>>
+                    val freqList = technoData.second.first
                     @Suppress("UNCHECKED_CAST")
-                    val freqOrder = technoData.second.second as MutableState<List<String>>
+                    val freqOrder = technoData.second.second
 
                     Card(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
@@ -1162,11 +1165,9 @@ fun SiteFreqFiltersSheet(
                                         val currentList = AppConfig.siteTechnoOrder.value
                                         val currentIndex = currentList.indexOf(technoId)
                                         val stepPx = with(density) { 80.dp.toPx() }
-
                                         var newIndex = currentIndex
                                         while (technoDragOffset > stepPx * 0.5f && newIndex < currentList.size - 1) { technoDragOffset -= stepPx; newIndex++ }
                                         while (technoDragOffset < -stepPx * 0.5f && newIndex > 0) { technoDragOffset += stepPx; newIndex-- }
-
                                         if (newIndex != currentIndex) {
                                             val newList = currentList.toMutableList()
                                             val item = newList.removeAt(currentIndex)
@@ -1185,9 +1186,7 @@ fun SiteFreqFiltersSheet(
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.DragHandle, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                                 Spacer(Modifier.width(8.dp))
-                                Text(title as String, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), fontSize = 16.sp)
-
-                                // ✅ NOUVEAU : Gestion globale + One UI
+                                Text(title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), fontSize = 16.sp)
                                 val onTechnoChange = { newValue: Boolean ->
                                     if (!newValue) {
                                         val remainingFreqs = getTotalActiveFrequenciesCount() - freqList.count { it.second.value }
@@ -1197,59 +1196,34 @@ fun SiteFreqFiltersSheet(
                                             android.widget.Toast.makeText(context, txtMinOneFreq, android.widget.Toast.LENGTH_SHORT).show()
                                         } else {
                                             saveBool(technoKey, technoState, false)
-                                            freqList.forEach { freqPair -> saveBool("site_f${technoId.lowercase()}_${freqPair.first}", freqPair.second, false) }
+                                            freqList.forEach { saveBool("site_f${technoId.lowercase()}_${it.first}", it.second, false) }
                                         }
                                     } else {
                                         saveBool(technoKey, technoState, true)
-                                        freqList.forEach { freqPair -> saveBool("site_f${technoId.lowercase()}_${freqPair.first}", freqPair.second, true) }
+                                        freqList.forEach { saveBool("site_f${technoId.lowercase()}_${it.first}", it.second, true) }
                                     }
                                 }
-
-                                if (useOneUi) {
-                                    fr.geotower.ui.components.OneUiSwitch(
-                                        checked = technoState.value,
-                                        onCheckedChange = onTechnoChange
-                                    )
-                                } else {
-                                    Switch(
-                                        checked = technoState.value,
-                                        onCheckedChange = onTechnoChange,
-                                        colors = SwitchDefaults.colors(checkedTrackColor = switchColor)
-                                    )
-                                }
+                                if (useOneUi) fr.geotower.ui.components.OneUiSwitch(technoState.value, onTechnoChange)
+                                else Switch(checked = technoState.value, onCheckedChange = onTechnoChange, colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
                             }
-
                             AnimatedVisibility(visible = technoState.value && freqList.isNotEmpty()) {
                                 Column(modifier = Modifier.padding(top = 8.dp)) {
                                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-
-                                    // --- ✅ NOUVEAU : LOGIQUE DE DRAG & DROP POUR LES FRÉQUENCES ---
                                     var draggedFreq by remember { mutableStateOf<String?>(null) }
                                     var freqDragOffset by remember { mutableFloatStateOf(0f) }
-
                                     freqOrder.value.forEach { freqLabel ->
                                         key(freqLabel) {
                                             val freqStatePair = freqList.find { it.first == freqLabel }
                                             if (freqStatePair != null) {
                                                 val freqState = freqStatePair.second
                                                 val isFreqDragged = draggedFreq == freqLabel
-                                                // Nom de la clé pour sauvegarder le switch (ex: site_f5g_3500)
                                                 val freqPrefKey = "site_f${technoId.lowercase()}_${freqLabel}"
-
                                                 Row(
-                                                    // ... (Garde bien tous les modifiers de ta Row intacts ici) ...
                                                     verticalAlignment = Alignment.CenterVertically,
-                                                    modifier = Modifier
-                                                        .fillMaxWidth()
-                                                        .zIndex(if (isFreqDragged) 1f else 0f)
-                                                        .graphicsLayer {
-                                                            translationY = if (isFreqDragged) freqDragOffset else 0f
-                                                            scaleX = if (isFreqDragged) 1.02f else 1f
-                                                            scaleY = if (isFreqDragged) 1.02f else 1f
-                                                        }
+                                                    modifier = Modifier.fillMaxWidth().zIndex(if (isFreqDragged) 1f else 0f)
+                                                        .graphicsLayer { translationY = if (isFreqDragged) freqDragOffset else 0f; scaleX = if (isFreqDragged) 1.02f else 1f; scaleY = if (isFreqDragged) 1.02f else 1f }
                                                         .background(if (isFreqDragged) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent, RoundedCornerShape(8.dp))
                                                         .pointerInput(freqLabel) {
-                                                            // ... (Ton code de Drag & Drop) ...
                                                             detectDragGesturesAfterLongPress(
                                                                 onDragStart = { draggedFreq = freqLabel; freqDragOffset = 0f },
                                                                 onDrag = { change, dragAmount ->
@@ -1257,61 +1231,36 @@ fun SiteFreqFiltersSheet(
                                                                     freqDragOffset += dragAmount.y
                                                                     val currentList = freqOrder.value
                                                                     val currentIndex = currentList.indexOf(freqLabel)
-                                                                    val stepPx = with(density) { 48.dp.toPx() } // Hauteur de la ligne
-
+                                                                    val stepPx = with(density) { 48.dp.toPx() }
                                                                     var newIndex = currentIndex
                                                                     while (freqDragOffset > stepPx * 0.5f && newIndex < currentList.size - 1) { freqDragOffset -= stepPx; newIndex++ }
                                                                     while (freqDragOffset < -stepPx * 0.5f && newIndex > 0) { freqDragOffset += stepPx; newIndex-- }
-
                                                                     if (newIndex != currentIndex) {
                                                                         val newList = currentList.toMutableList()
                                                                         val item = newList.removeAt(currentIndex)
                                                                         newList.add(newIndex, item)
                                                                         freqOrder.value = newList
-                                                                        val prefKey = "site_freq_${technoId.lowercase()}_order"
-                                                                        prefs.edit().putString(prefKey, newList.joinToString(",")).apply()
+                                                                        prefs.edit().putString("site_freq_${technoId.lowercase()}_order", newList.joinToString(",")).apply()
                                                                     }
                                                                 },
                                                                 onDragEnd = { draggedFreq = null; freqDragOffset = 0f },
                                                                 onDragCancel = { draggedFreq = null; freqDragOffset = 0f }
                                                             )
-                                                        }
-                                                        .padding(vertical = 4.dp, horizontal = 4.dp)
+                                                        }.padding(vertical = 4.dp, horizontal = 4.dp)
                                                 ) {
                                                     Icon(Icons.Default.DragHandle, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f))
                                                     Text("$freqLabel MHz", modifier = Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.bodyMedium, fontWeight = if(isFreqDragged) FontWeight.Bold else FontWeight.Normal)
-
-                                                    // ✅ NOUVEAU : Blocage global + One UI
                                                     val onFreqChange = { newValue: Boolean ->
                                                         if (!newValue && getTotalActiveFrequenciesCount() <= 1) {
                                                             android.widget.Toast.makeText(context, txtMinOneFreq, android.widget.Toast.LENGTH_SHORT).show()
                                                         } else {
                                                             saveBool(freqPrefKey, freqState, newValue)
-
-                                                            val activeFreqsInThisBlock = freqList.count { it.second.value }
-                                                            if (!newValue && activeFreqsInThisBlock == 0) {
-                                                                saveBool(technoKey, technoState, false)
-                                                            } else if (newValue && !technoState.value) {
-                                                                saveBool(technoKey, technoState, true)
-                                                            }
+                                                            if (!newValue && freqList.count { it.second.value } == 0) saveBool(technoKey, technoState, false)
+                                                            else if (newValue && !technoState.value) saveBool(technoKey, technoState, true)
                                                         }
                                                     }
-
-                                                    if (useOneUi) {
-                                                        Box(modifier = Modifier.scale(0.85f)) {
-                                                            fr.geotower.ui.components.OneUiSwitch(
-                                                                checked = freqState.value,
-                                                                onCheckedChange = onFreqChange
-                                                            )
-                                                        }
-                                                    } else {
-                                                        Switch(
-                                                            checked = freqState.value,
-                                                            onCheckedChange = onFreqChange,
-                                                            modifier = Modifier.scale(0.8f),
-                                                            colors = SwitchDefaults.colors(checkedTrackColor = switchColor)
-                                                        )
-                                                    }
+                                                    if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { fr.geotower.ui.components.OneUiSwitch(freqState.value, onFreqChange) }
+                                                    else Switch(checked = freqState.value, onCheckedChange = onFreqChange, modifier = Modifier.scale(0.8f), colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
                                                 }
                                             }
                                         }
@@ -1323,95 +1272,57 @@ fun SiteFreqFiltersSheet(
                 }
             }
 
-            // --- SECTION FIXE : SPECTRE ---
             Card(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    // Header avec Switch Principal Maître
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = AppStrings.spectrumTitle,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp,
-                            modifier = Modifier.weight(1f)
-                        )
+                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        Text(AppStrings.spectrumTitle, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.weight(1f))
                         val onSpectrumChange = { newValue: Boolean ->
                             saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, newValue)
                             saveBool("site_show_spectrum_band", AppConfig.siteShowSpectrumBand, newValue)
                             saveBool("site_show_spectrum_total", AppConfig.siteShowSpectrumTotal, newValue)
                         }
-                        if (useOneUi) {
-                            fr.geotower.ui.components.OneUiSwitch(checked = AppConfig.siteShowSpectrum.value, onCheckedChange = onSpectrumChange)
-                        } else {
-                            Switch(checked = AppConfig.siteShowSpectrum.value, onCheckedChange = onSpectrumChange, colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
-                        }
+                        if (useOneUi) fr.geotower.ui.components.OneUiSwitch(AppConfig.siteShowSpectrum.value, onSpectrumChange)
+                        else Switch(checked = AppConfig.siteShowSpectrum.value, onCheckedChange = onSpectrumChange, colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
                     }
-
-                    // Options secondaires (visibles seulement si le switch principal est ON)
                     AnimatedVisibility(visible = AppConfig.siteShowSpectrum.value) {
                         Column {
-                            HorizontalDivider(
-                                modifier = Modifier.padding(vertical = 8.dp),
-                                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                            )
-
-                            // Switch 1 : Spectre par plage de fréquence
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(text = AppStrings.spectrumByBand, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(AppStrings.spectrumByBand, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                                 val onBandChange = { newValue: Boolean ->
                                     saveBool("site_show_spectrum_band", AppConfig.siteShowSpectrumBand, newValue)
                                     if (!newValue && !AppConfig.siteShowSpectrumTotal.value) saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, false)
                                     else if (newValue && !AppConfig.siteShowSpectrum.value) saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, true)
                                 }
-                                if (useOneUi) {
-                                    Box(modifier = Modifier.scale(0.85f)) { fr.geotower.ui.components.OneUiSwitch(checked = AppConfig.siteShowSpectrumBand.value, onCheckedChange = onBandChange) }
-                                } else {
-                                    Switch(checked = AppConfig.siteShowSpectrumBand.value, onCheckedChange = onBandChange, modifier = Modifier.scale(0.8f), colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
-                                }
+                                if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { fr.geotower.ui.components.OneUiSwitch(AppConfig.siteShowSpectrumBand.value, onBandChange) }
+                                else Switch(checked = AppConfig.siteShowSpectrumBand.value, onCheckedChange = onBandChange, modifier = Modifier.scale(0.8f), colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
                             }
-
-                            // Switch 2 : Spectre total
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(text = AppStrings.totalspectrum, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(AppStrings.totalspectrum, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                                 val onTotalChange = { newValue: Boolean ->
                                     saveBool("site_show_spectrum_total", AppConfig.siteShowSpectrumTotal, newValue)
                                     if (!newValue && !AppConfig.siteShowSpectrumBand.value) saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, false)
                                     else if (newValue && !AppConfig.siteShowSpectrum.value) saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, true)
                                 }
-                                if (useOneUi) {
-                                    Box(modifier = Modifier.scale(0.85f)) { fr.geotower.ui.components.OneUiSwitch(checked = AppConfig.siteShowSpectrumTotal.value, onCheckedChange = onTotalChange) }
-                                } else {
-                                    Switch(checked = AppConfig.siteShowSpectrumTotal.value, onCheckedChange = onTotalChange, modifier = Modifier.scale(0.8f), colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
-                                }
+                                if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { fr.geotower.ui.components.OneUiSwitch(AppConfig.siteShowSpectrumTotal.value, onTotalChange) }
+                                else Switch(checked = AppConfig.siteShowSpectrumTotal.value, onCheckedChange = onTotalChange, modifier = Modifier.scale(0.8f), colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
                             }
                         }
                     }
                 }
             }
 
-            // --- BOUTON DE RÉINITIALISATION ---
             Spacer(modifier = Modifier.height(24.dp))
             TextButton(
                 onClick = {
-                    // 1. Réinitialiser l'ordre des listes dans la variable
                     AppConfig.siteTechnoOrder.value = listOf("5G", "4G", "3G", "2G", "FH")
                     AppConfig.siteFreqOrder5G.value = listOf("3500", "2100", "700")
                     AppConfig.siteFreqOrder4G.value = listOf("2600", "2100", "1800", "900", "800", "700")
                     AppConfig.siteFreqOrder3G.value = listOf("2100", "900")
                     AppConfig.siteFreqOrder2G.value = listOf("1800", "900")
-
-                    // 2. Sauvegarder ce nouvel ordre dans les préférences
                     prefs.edit()
                         .putString("site_techno_order", "5G,4G,3G,2G,FH")
                         .putString("site_freq_5g_order", "3500,2100,700")
@@ -1419,33 +1330,24 @@ fun SiteFreqFiltersSheet(
                         .putString("site_freq_3g_order", "2100,900")
                         .putString("site_freq_2g_order", "1800,900")
                         .apply()
-
-                    // 3. Réactiver tous les interrupteurs (technologies)
                     saveBool("site_show_techno_5g", AppConfig.siteShowTechno5G, true)
                     saveBool("site_show_techno_4g", AppConfig.siteShowTechno4G, true)
                     saveBool("site_show_techno_3g", AppConfig.siteShowTechno3G, true)
                     saveBool("site_show_techno_2g", AppConfig.siteShowTechno2G, true)
                     saveBool("site_show_techno_fh", AppConfig.siteShowTechnoFH, true)
-
-                    // 4. Réactiver tous les interrupteurs (fréquences)
                     saveBool("site_f5g_3500", AppConfig.siteF5G_3500, true)
                     saveBool("site_f5g_2100", AppConfig.siteF5G_2100, true)
                     saveBool("site_f5g_700", AppConfig.siteF5G_700, true)
-
                     saveBool("site_f4g_2600", AppConfig.siteF4G_2600, true)
                     saveBool("site_f4g_2100", AppConfig.siteF4G_2100, true)
                     saveBool("site_f4g_1800", AppConfig.siteF4G_1800, true)
                     saveBool("site_f4g_900", AppConfig.siteF4G_900, true)
                     saveBool("site_f4g_800", AppConfig.siteF4G_800, true)
                     saveBool("site_f4g_700", AppConfig.siteF4G_700, true)
-
                     saveBool("site_f3g_2100", AppConfig.siteF3G_2100, true)
                     saveBool("site_f3g_900", AppConfig.siteF3G_900, true)
-
                     saveBool("site_f2g_1800", AppConfig.siteF2G_1800, true)
                     saveBool("site_f2g_900", AppConfig.siteF2G_900, true)
-
-                    // 5. Réactiver les affichages du spectre
                     saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, true)
                     saveBool("site_show_spectrum_band", AppConfig.siteShowSpectrumBand, true)
                     saveBool("site_show_spectrum_total", AppConfig.siteShowSpectrumTotal, true)
@@ -1456,7 +1358,105 @@ fun SiteFreqFiltersSheet(
                 Spacer(Modifier.width(8.dp))
                 Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
-            Spacer(Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
     }
 }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SitePhotosSettingsSheet(
+    onDismiss: () -> Unit,
+    onBack: () -> Unit
+) {
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val switchColor = MaterialTheme.colorScheme.primary
+    val useOneUi = AppConfig.useOneUiDesign
+
+    fun saveBool(key: String, state: androidx.compose.runtime.MutableState<Boolean>, value: Boolean) {
+        state.value = value
+        prefs.edit().putBoolean(key, value).apply()
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface) {
+        Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp, top = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                }
+                Text(
+                    text = AppStrings.sitePhotosSettingsTitle,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.width(48.dp))
+            }
+
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(AppStrings.sitePhotosAndSchemesOption, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), fontSize = 16.sp)
+                        val onMasterChange = { newValue: Boolean ->
+                            saveBool("page_site_photos", AppConfig.siteShowPhotos, newValue)
+                        }
+                        if (useOneUi) fr.geotower.ui.components.OneUiSwitch(AppConfig.siteShowPhotos.value, onMasterChange)
+                        else Switch(checked = AppConfig.siteShowPhotos.value, onCheckedChange = onMasterChange, colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
+                    }
+                    
+                    androidx.compose.animation.AnimatedVisibility(visible = AppConfig.siteShowPhotos.value) {
+                        Column {
+                            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                            
+                            // CellularFR
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(AppStrings.showCellularFrPhotosLabel, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                                if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { fr.geotower.ui.components.OneUiSwitch(AppConfig.siteShowCellularFrPhotos.value) { saveBool("site_show_cellularfr_photos", AppConfig.siteShowCellularFrPhotos, it) } }
+                                else Switch(checked = AppConfig.siteShowCellularFrPhotos.value, onCheckedChange = { saveBool("site_show_cellularfr_photos", AppConfig.siteShowCellularFrPhotos, it) }, modifier = Modifier.scale(0.8f), colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
+                            }
+                            
+                            // SignalQuest
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(AppStrings.showSignalQuestPhotosLabel, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                                if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { fr.geotower.ui.components.OneUiSwitch(AppConfig.siteShowSignalQuestPhotos.value) { saveBool("site_show_signalquest_photos", AppConfig.siteShowSignalQuestPhotos, it) } }
+                                else Switch(checked = AppConfig.siteShowSignalQuestPhotos.value, onCheckedChange = { saveBool("site_show_signalquest_photos", AppConfig.siteShowSignalQuestPhotos, it) }, modifier = Modifier.scale(0.8f), colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
+                            }
+                            
+                            // Schematics
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(AppStrings.showSchemesLabel, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                                if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { fr.geotower.ui.components.OneUiSwitch(AppConfig.siteShowSchemes.value) { saveBool("site_show_schemes", AppConfig.siteShowSchemes, it) } }
+                                else Switch(checked = AppConfig.siteShowSchemes.value, onCheckedChange = { saveBool("site_show_schemes", AppConfig.siteShowSchemes, it) }, modifier = Modifier.scale(0.8f), colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
+                            }
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            TextButton(
+                onClick = {
+                    saveBool("page_site_photos", AppConfig.siteShowPhotos, true)
+                    saveBool("site_show_cellularfr_photos", AppConfig.siteShowCellularFrPhotos, true)
+                    saveBool("site_show_signalquest_photos", AppConfig.siteShowSignalQuestPhotos, true)
+                    saveBool("site_show_schemes", AppConfig.siteShowSchemes, true)
+                },
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(8.dp))
+                Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
+        }
+    }
+}
+

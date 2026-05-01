@@ -17,27 +17,73 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Launch
+import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.VerticalAlignTop
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
@@ -53,16 +99,14 @@ import androidx.work.WorkManager
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.PhysiqueEntity
+import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.UUID
-import fr.geotower.data.models.PhysiqueEntity
-import fr.geotower.data.models.TechniqueEntity
-import androidx.activity.compose.BackHandler
-import fr.geotower.ui.components.SiteStatusCard
-import fr.geotower.ui.components.formatOutageDetails
+import fr.geotower.ui.components.SpeedtestCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,15 +161,15 @@ fun SiteDetailScreen(
     }
 
     if (!isReady) {
-        Box(modifier = Modifier.fillMaxSize().background(androidx.compose.material3.MaterialTheme.colorScheme.background), contentAlignment = androidx.compose.ui.Alignment.Center) {
-            androidx.compose.material3.CircularProgressIndicator(color = androidx.compose.material3.MaterialTheme.colorScheme.primary)
+        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
         }
         return
     }
     val haptic = LocalHapticFeedback.current
-    val coroutineScope = rememberCoroutineScope()
+    rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
-    val currentView = LocalView.current
+    LocalView.current
 
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
@@ -162,6 +206,11 @@ fun SiteDetailScreen(
 
     var antenna by remember { mutableStateOf<LocalisationEntity?>(null) }
     var physique by remember { mutableStateOf<PhysiqueEntity?>(null) }
+
+    // --- ÉTATS POUR LE SPEEDTEST ---
+    var speedtestData by remember { mutableStateOf<fr.geotower.data.api.SqSpeedtestData?>(null) }
+    var isSpeedtestLoading by remember { mutableStateOf(false) }
+
     var technique by remember { mutableStateOf<TechniqueEntity?>(null) }
     var hsDataMap by remember { mutableStateOf<Map<String, fr.geotower.data.models.SiteHsEntity>>(emptyMap()) } // 🚨 AJOUT
     var userLocation by remember { mutableStateOf<Location?>(null) }
@@ -231,8 +280,16 @@ fun SiteDetailScreen(
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
-    // 🚨 MODIFICATION : On déplace "status" entre "address" et "freqs"
-    val pageSiteOrder by remember { mutableStateOf(prefs.getString("page_site_order", "operator,bearing_height,map,support_details,photos,panel_heights,ids,nav,share,dates,address,status,freqs,links")!!.split(",")) }
+    // 🚨 MODIFICATION : L'ordre par défaut (photos, speedtest, nav, share...)
+    val pageSiteOrder by remember {
+        mutableStateOf(
+            (prefs.getString("page_site_order", "operator,bearing_height,map,support_details,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links") ?: "operator,bearing_height,map,support_details,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links")
+                .split(",")
+                .toMutableList()
+                .apply { if (!contains("speedtest")) { val idx = indexOf("photos"); if (idx >= 0) add(idx + 1, "speedtest") else add("speedtest") } }
+                .toList()
+        )
+    }
     val showOperator by remember { mutableStateOf(prefs.getBoolean("page_site_operator", true)) }
     val showBearingHeight by remember { mutableStateOf(prefs.getBoolean("page_site_bearing_height", true)) }
     val showMap by remember { mutableStateOf(prefs.getBoolean("page_site_map", true)) }
@@ -341,6 +398,53 @@ fun SiteDetailScreen(
         }
     }
 
+    // 🚀 CHARGEMENT DU SPEEDTEST (Signal Quest) - Séparé pour plus de stabilité
+    LaunchedEffect(antenna?.idAnfr, antenna?.operateur) {
+        val currentAntenna = antenna
+        if (currentAntenna == null || currentAntenna.idAnfr.isBlank()) return@LaunchedEffect
+
+        val opName = currentAntenna.operateur ?: ""
+        val isOpCompatible = opName.contains("SFR", true) || opName.contains("BOUYGUES", true)
+
+        if (fr.geotower.utils.AppConfig.siteShowSpeedtest.value && isOpCompatible) {
+            speedtestData = null
+            isSpeedtestLoading = true
+            try {
+                val anfrCodeToSend = currentAntenna.idAnfr
+                val apiOperator = when {
+                    opName.contains("SFR", true) -> "SFR"
+                    opName.contains("BOUYGUES", true) -> "BOUYGUES"
+                    else -> null
+                }
+
+                android.util.Log.d("SpeedtestDebug", "👉 1. Envoi du Code ANFR : $anfrCodeToSend (Opérateur: $apiOperator)")
+
+                val response = fr.geotower.data.api.SignalQuestClient.api.getSiteSpeedtests(
+                    authHeader = "Bearer ${fr.geotower.BuildConfig.SQ_API_KEY}",
+                    anfrCode = anfrCodeToSend,
+                    operator = apiOperator,
+                    bestOnly = true
+                )
+
+                android.util.Log.d("SpeedtestDebug", "👉 2. Code HTTP de réponse: ${response.code()}")
+
+                if (response.isSuccessful) {
+                    val body = response.body()
+                    speedtestData = body?.data?.firstOrNull()
+                    android.util.Log.d("SpeedtestDebug", "👉 3. Donnée finale : $speedtestData")
+                } else {
+                    val errorMsg = response.errorBody()?.string() ?: "Erreur inconnue"
+                    android.util.Log.e("SpeedtestDebug", "❌ Erreur API (${response.code()}): $errorMsg")
+                }
+            } catch (e: Exception) {
+                android.util.Log.e("SpeedtestDebug", "💥 Exception lors de l'appel Speedtest", e)
+                e.printStackTrace()
+            } finally {
+                isSpeedtestLoading = false
+            }
+        }
+    }
+
     DisposableEffect(Unit) {
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val locationListener = object : android.location.LocationListener {
@@ -382,12 +486,12 @@ fun SiteDetailScreen(
 
     val txtSiteDetailsTitle = AppStrings.siteDetailTitle
     val txtIdCopied = AppStrings.idCopied
-    val txtDistanceLabel = AppStrings.distanceLabel
-    val txtFromMyPosition = AppStrings.fromMyPosition
+    AppStrings.distanceLabel
+    AppStrings.fromMyPosition
     val txtBearingLabel = AppStrings.bearingLabel
     val txtSupportHeight = AppStrings.supportHeight
     val txtNavToSite = AppStrings.navToSite
-    val txtOpenApp = AppStrings.openApp
+    val txtOpen = AppStrings.open
     val txtInstallApp = AppStrings.installApp
     val txtMap4G = AppStrings.map4G
     val txtMap5G = AppStrings.map5G
@@ -481,7 +585,7 @@ fun SiteDetailScreen(
                             }
                         }
                         Spacer(modifier = Modifier.height(24.dp))
-                        AppLauncherButton(isInstalled = isEnbAppInstalled, appName = "eNB-Analytics", txtOpen = txtOpenApp, txtInstall = txtInstallApp, useOneUi = useOneUi) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); showEnbSheet = false; if (isEnbAppInstalled) launchApp(context, "fr.enb_analytics.enb4g") else uriHandler.openUri("https://play.google.com/store/apps/details?id=fr.enb_analytics.enb4g") }
+                        AppLauncherButton(isInstalled = isEnbAppInstalled, appName = "eNB-Analytics", txtOpen = txtOpen, txtInstall = txtInstallApp, useOneUi = useOneUi) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); showEnbSheet = false; if (isEnbAppInstalled) launchApp(context, "fr.enb_analytics.enb4g") else uriHandler.openUri("https://play.google.com/store/apps/details?id=fr.enb_analytics.enb4g") }
                     }
                 }
             }
@@ -499,7 +603,7 @@ fun SiteDetailScreen(
                             }
                         }
                         Spacer(modifier = Modifier.height(24.dp))
-                        AppLauncherButton(isInstalled = isCellularFrInstalled, appName = "CellularFR", txtOpen = txtOpenApp, txtInstall = txtInstallApp, useOneUi = useOneUi) {
+                        AppLauncherButton(isInstalled = isCellularFrInstalled, appName = "CellularFR", txtOpen = txtOpen, txtInstall = txtInstallApp, useOneUi = useOneUi) {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress); showCellularFrSheet = false; if (isCellularFrInstalled) launchApp(context, "com.luisbaker.cellularfr") else uriHandler.openUri("https://play.google.com/store/apps/details?id=com.luisbaker.cellularfr")
                         }
                     }
@@ -518,7 +622,7 @@ fun SiteDetailScreen(
                             }
                         }
                         Spacer(modifier = Modifier.height(24.dp))
-                        AppLauncherButton(isInstalled = isRncMobileInstalled, appName = "RNC Mobile", txtOpen = txtOpenApp, txtInstall = txtInstallApp, useOneUi = useOneUi) {
+                        AppLauncherButton(isInstalled = isRncMobileInstalled, appName = "RNC Mobile", txtOpen = txtOpen, txtInstall = txtInstallApp, useOneUi = useOneUi) {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress); showRncSheet = false; if (isRncMobileInstalled) launchApp(context, "org.rncteam.rncfreemobile") else uriHandler.openUri("https://play.google.com/store/apps/details?id=org.rncteam.rncfreemobile")
                         }
                     }
@@ -530,7 +634,7 @@ fun SiteDetailScreen(
             }
 
             Column(
-                modifier = Modifier.padding(padding).fillMaxSize().background(mainBgColor).antennaFadingEdge(scrollState).verticalScroll(scrollState).padding(16.dp),
+                modifier = Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().background(mainBgColor).antennaFadingEdge(scrollState).verticalScroll(scrollState).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 val formattedAzimuths = remember(info.azimuts) {
@@ -697,16 +801,27 @@ fun SiteDetailScreen(
                         }
                         "photos" -> {
                             val opName = info.operateur ?: ""
-                            val canUpload = opName.contains("SFR", true) || opName.contains("BOUYGUES", true)
-                            if (showPhotos && info.idAnfr.isNotBlank() && (communityPhotos.isNotEmpty() || canUpload)) {
+                            // 🚨 CORRECTION : On affiche toujours le composant (plus de condition de liste vide)
+                            if (showPhotos && info.idAnfr.isNotBlank()) {
                                 CommunityPhotosSectionShared(
                                     photos = communityPhotos,
                                     operatorName = opName,
+                                    supportNature = physique?.natureSupport, // ✅ LE BON NOM DE VARIABLE
                                     bgColor = cardBgColor,
                                     shape = blockShape,
                                     onAddPhotoClick = { safeClick { showImageSourceDialog = true } }
                                 )
                             }
+                        }
+                        "speedtest" -> {
+                            SpeedtestCard(
+                                operatorName = info.operateur,
+                                speedtestData = speedtestData,
+                                isLoading = isSpeedtestLoading,
+                                shape = blockShape,
+                                bgColor = cardBgColor,
+                                contentColor = MaterialTheme.colorScheme.onSurface
+                            )
                         }
                         "panel_heights" -> { if (showPanelHeights) fr.geotower.ui.components.SitePanelHeightsBlock(info = info, cardBgColor = cardBgColor, blockShape = blockShape) }
                         "ids" -> {
@@ -738,7 +853,8 @@ fun SiteDetailScreen(
                                     useOneUi = useOneUi,
                                     buttonShape = buttonShape,
                                     globalMapRef = globalMapRef,
-                                    communityPhotosSize = communityPhotos.size
+                                    communityPhotosSize = communityPhotos.size,
+                                    speedtestData = speedtestData // 🚨 NEW
                                 )
                             }
                         }
@@ -770,7 +886,7 @@ fun SiteDetailScreen(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(60.dp))
+                Spacer(modifier = Modifier.height(24.dp).navigationBarsPadding())
             }
 
             if (showImageSourceDialog) {
