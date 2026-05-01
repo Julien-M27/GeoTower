@@ -12,9 +12,11 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.graphics.BitmapFactory
 import android.location.Location
+import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.os.Looper
+import android.provider.Settings
 import androidx.annotation.RequiresApi
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
@@ -74,33 +76,18 @@ class LiveTrackingService : Service() {
             serviceStartTime = System.currentTimeMillis()
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            if (!manager.canPostPromotedNotifications()) {
-                try {
-                    val settingsIntent = Intent("android.settings.MANAGE_APP_PROMOTED_NOTIFICATIONS").also { i ->
-                        i.data = android.net.Uri.parse("package:$packageName")
-                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    startActivity(settingsIntent)
-                } catch (e: Exception) {
-                    android.util.Log.d("LiveNotif", "Impossible d'ouvrir les parametres Live: ${e.message}")
-                }
-            }
-        }
-
         val defaultOp = currentOperator
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val initialNotification = if (
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA &&
-            manager.canPostPromotedNotifications()
+            canPostPromotedNotifications(this)
         ) {
             buildLiveNotification(
                 contentText = AppStrings.searchInProgress(this),
                 progress = 0,
                 operator = defaultOp,
                 antLoc = null,
-                address = ""
+                address = "",
+                indeterminate = true
             )
         } else {
             buildNotification(
@@ -237,7 +224,7 @@ class LiveTrackingService : Service() {
 
         val notification = if (
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA &&
-            manager.canPostPromotedNotifications()
+            canPostPromotedNotifications(this)
         ) {
             buildLiveNotification(text, progress, operator, antLoc, address)
         } else {
@@ -253,11 +240,12 @@ class LiveTrackingService : Service() {
         progress: Int,
         operator: String,
         antLoc: LocalisationEntity?,
-        address: String
+        address: String,
+        indeterminate: Boolean = false
     ): Notification {
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            data = android.net.Uri.parse("geotower://site/${antLoc?.idAnfr}")
+            data = Uri.parse("geotower://site/${antLoc?.idAnfr}")
             antLoc?.idAnfr?.toString()?.let { putExtra("TARGET_SITE_ID", it) }
         }
 
@@ -275,18 +263,23 @@ class LiveTrackingService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val progressStyle = Notification.ProgressStyle()
-            .setProgress(progress)
+        val progressValue = progress.coerceIn(0, 100)
+        val progressStyle = NotificationCompat.ProgressStyle()
             .setProgressSegments(
-                listOf(Notification.ProgressStyle.Segment(100).setColor(operatorColor(operator)))
+                listOf(NotificationCompat.ProgressStyle.Segment(100).setColor(operatorColor(operator)))
             )
 
-        operatorLogo(operator)?.let { logoResId ->
-            progressStyle.setProgressTrackerIcon(IconCompat.createWithResource(this, logoResId).toIcon(this))
+        if (indeterminate) {
+            progressStyle.setProgressIndeterminate(true)
+        } else {
+            progressStyle.setProgress(progressValue)
+            operatorLogo(operator)?.let { logoResId ->
+                progressStyle.setProgressTrackerIcon(IconCompat.createWithResource(this, logoResId))
+            }
         }
 
-        val shortCriticalText = extractShortCriticalText(contentText)
-        val builder = Notification.Builder(this, liveTrackingChannelV3)
+        val shortCriticalText = buildShortCriticalText(contentText, operator, progressValue, indeterminate)
+        val builder = NotificationCompat.Builder(this, liveTrackingChannelV3)
             .setContentTitle(AppStrings.nearestAntennaTitle(this))
             .setContentText(contentText)
             .setSubText(address.takeIf { it.isNotBlank() })
@@ -295,9 +288,12 @@ class LiveTrackingService : Service() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(Notification.CATEGORY_PROGRESS)
-            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setShowWhen(false)
             .setColor(operatorColor(operator))
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .setRequestPromotedOngoing(true)
+            .setShortCriticalText(shortCriticalText)
             .setStyle(progressStyle)
             .addAction(0, AppStrings.quitAction(this), stopPendingIntent)
 
@@ -305,27 +301,10 @@ class LiveTrackingService : Service() {
             builder.setLargeIcon(BitmapFactory.decodeResource(resources, logoResId))
         }
 
-        runCatching {
-            Notification.Builder::class.java
-                .getMethod("setForegroundServiceBehavior", Int::class.javaPrimitiveType)
-                .invoke(builder, Notification.FOREGROUND_SERVICE_IMMEDIATE)
-        }
-        runCatching {
-            Notification.Builder::class.java
-                .getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
-                .invoke(builder, true)
-        }
-        shortCriticalText?.let { text ->
-            runCatching {
-                Notification.Builder::class.java
-                    .getMethod("setShortCriticalText", String::class.java)
-                    .invoke(builder, text)
+        return builder.build().also { notification ->
+            if (!NotificationCompat.hasPromotableCharacteristics(notification)) {
+                android.util.Log.w("LiveNotif", "Notification Live Update non promotable")
             }
-        }
-
-        return builder.build().apply {
-            extras.putBoolean("android.requestPromotedOngoing", true)
-            shortCriticalText?.let { extras.putString("android.shortCriticalText", it) }
         }
     }
 
@@ -339,7 +318,7 @@ class LiveTrackingService : Service() {
     ): Notification {
         val intent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            data = android.net.Uri.parse("geotower://site/${antLoc?.idAnfr}")
+            data = Uri.parse("geotower://site/${antLoc?.idAnfr}")
             antLoc?.idAnfr?.toString()?.let { putExtra("TARGET_SITE_ID", it) }
         }
 
@@ -490,6 +469,24 @@ class LiveTrackingService : Service() {
             ?.ifBlank { null }
     }
 
+    private fun buildShortCriticalText(
+        contentText: String,
+        operator: String,
+        progress: Int,
+        indeterminate: Boolean
+    ): String {
+        extractShortCriticalText(contentText)?.let { return it }
+        if (indeterminate) return "GPS"
+        if (progress > 0) return "${progress.coerceIn(0, 100)}%"
+        return when {
+            operator.contains("ORANGE") -> "ORANGE"
+            operator.contains("BOUYGUES") -> "BYTEL"
+            operator.contains("SFR") -> "SFR"
+            operator.contains("FREE") -> "FREE"
+            else -> "LIVE"
+        }
+    }
+
     private fun operatorColor(operator: String): Int {
         return when {
             operator.contains("ORANGE") -> android.graphics.Color.parseColor("#FF7900")
@@ -520,5 +517,38 @@ class LiveTrackingService : Service() {
 
     companion object {
         private const val ACTION_STOP_SERVICE = "ACTION_STOP_SERVICE"
+
+        fun start(context: Context) {
+            val serviceIntent = Intent(context, LiveTrackingService::class.java)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent)
+            } else {
+                context.startService(serviceIntent)
+            }
+        }
+
+        fun stop(context: Context) {
+            context.stopService(Intent(context, LiveTrackingService::class.java))
+        }
+
+        fun promotedSettingsIntent(context: Context): Intent {
+            return Intent(Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        }
+
+        fun appNotificationSettingsIntent(context: Context): Intent {
+            return Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).apply {
+                putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        }
+
+        fun canPostPromotedNotifications(context: Context): Boolean {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) return true
+            val manager = context.getSystemService(NotificationManager::class.java) ?: return false
+            return manager.canPostPromotedNotifications()
+        }
     }
 }

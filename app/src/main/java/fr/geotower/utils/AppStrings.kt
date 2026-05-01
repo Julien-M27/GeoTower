@@ -198,6 +198,8 @@ object AppStrings {
 
     val liveNotificationTitle @Composable get() = get("Notification Live", "Live Notification", "Notificação ao vivo")
     val liveNotificationDesc @Composable get() = get("Activer les notifications en temps réel", "Enable real-time notifications", "Ativar notificações em tempo real")
+    val liveNotificationPromotedDisabled @Composable get() = get("Live Updates désactivées dans Android", "Live Updates disabled in Android", "Live Updates desativadas no Android")
+    val liveNotificationPromotedSettings @Composable get() = get("Activer dans Android", "Enable in Android", "Ativar no Android")
     val updateNotifSettingTitle @Composable get() = get("Notifications de mise à jour", "Update notifications", "Notificações de atualização")
     val updateNotifSettingDesc @Composable get() = get("Être alerté quand une nouvelle base est disponible", "Get alerted when a new database is available", "Ser alertado quando uma nova base de dados estiver disponível")
     val liveNotificationRequiresOp @Composable get() = get("Nécessite de choisir un opérateur par défaut", "Requires choosing a default operator", "Requer a escolha de uma operadora padrão")

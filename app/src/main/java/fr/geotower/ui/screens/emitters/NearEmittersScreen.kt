@@ -174,12 +174,7 @@ fun NearEmittersScreen(
             if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU ||
                 androidx.core.content.ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
 
-                val serviceIntent = android.content.Intent(context, fr.geotower.services.LiveTrackingService::class.java)
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    context.startForegroundService(serviceIntent)
-                } else {
-                    context.startService(serviceIntent)
-                }
+                fr.geotower.services.LiveTrackingService.start(context)
             }
         }
     }
