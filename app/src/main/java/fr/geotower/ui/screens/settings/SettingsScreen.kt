@@ -124,6 +124,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SimCard
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.foundation.layout.navigationBarsPadding
+import fr.geotower.services.LiveTrackingController
 
 @Composable
 fun SettingsScreen(
@@ -468,7 +469,17 @@ fun SettingsScreen(
         if (showOperatorSheet) {
             fr.geotower.ui.components.OperatorSheet(
                 defaultOperator,
-                { defaultOperator = it; prefs.edit().putString("default_operator", it).apply() },
+                { selectedOperator ->
+                    defaultOperator = selectedOperator
+                    prefs.edit().putString("default_operator", selectedOperator).apply()
+                    if (selectedOperator == "Aucun") {
+                        AppConfig.enableLiveNotifications.value = false
+                        prefs.edit().putBoolean("enable_live_notifications", false).apply()
+                        LiveTrackingController.stop(context)
+                    } else if (AppConfig.enableLiveNotifications.value) {
+                        LiveTrackingController.startIfEligible(context)
+                    }
+                },
                 { showOperatorSheet = false },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
@@ -1257,6 +1268,7 @@ fun SectionPreferences(
         if (!isOperatorSelected && liveNotifsEnabled) {
             AppConfig.enableLiveNotifications.value = false
             prefs.edit().putBoolean("enable_live_notifications", false).apply()
+            LiveTrackingController.stop(context)
         }
     }
 
@@ -1265,8 +1277,35 @@ fun SectionPreferences(
         desc = if (isOperatorSelected) AppStrings.liveNotificationDesc else AppStrings.liveNotificationRequiresOp,
         checked = liveNotifsEnabled && isOperatorSelected,
         onCheckedChange = { isChecked ->
-            AppConfig.enableLiveNotifications.value = isChecked
-            prefs.edit().putBoolean("enable_live_notifications", isChecked).apply()
+            if (isChecked) {
+                val eligibility = LiveTrackingController.eligibility(context)
+                if (
+                    eligibility == LiveTrackingController.StartResult.MissingNotifications &&
+                    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
+                ) {
+                    (context as? android.app.Activity)?.requestPermissions(
+                        arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                        1004
+                    )
+                }
+
+                if (eligibility == LiveTrackingController.StartResult.Started) {
+                    AppConfig.enableLiveNotifications.value = true
+                    prefs.edit().putBoolean("enable_live_notifications", true).apply()
+                    if (LiveTrackingController.shouldOpenPromotedNotificationSettings(context)) {
+                        LiveTrackingController.openPromotedNotificationSettings(context)
+                    }
+                    LiveTrackingController.startIfEligible(context)
+                } else {
+                    AppConfig.enableLiveNotifications.value = false
+                    prefs.edit().putBoolean("enable_live_notifications", false).apply()
+                    LiveTrackingController.stop(context)
+                }
+            } else {
+                AppConfig.enableLiveNotifications.value = false
+                prefs.edit().putBoolean("enable_live_notifications", false).apply()
+                LiveTrackingController.stop(context)
+            }
         },
         enabled = isOperatorSelected,
         shape = shape,
@@ -1343,7 +1382,7 @@ fun SectionPreferences(
         }
 
         // ✅ 2. On écoute le retour sur l'application pour revérifier la permission instantanément
-        val lifecycleOwner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+        val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
         androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
             val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
                 if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
@@ -1834,5 +1873,3 @@ fun Modifier.settingsFadingEdge(scrollState: ScrollState): Modifier { if (!AppCo
 
 @Composable
 fun DrawableImage(resId: Int, modifier: Modifier = Modifier) { AndroidView({ ctx -> ImageView(ctx).apply { scaleType = ImageView.ScaleType.FIT_CENTER } }, modifier, { view -> view.setImageResource(resId) }) }
-
-

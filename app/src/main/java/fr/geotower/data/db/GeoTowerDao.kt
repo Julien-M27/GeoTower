@@ -23,6 +23,34 @@ interface GeoTowerDao {
     """)
     suspend fun getLocalisationsInBox(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<LocalisationEntity>
 
+    @Query("""
+        SELECT l.* FROM localisation l
+        INNER JOIN technique t ON l.id_anfr = t.id_anfr
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+        AND UPPER(l.operateur) LIKE '%' || UPPER(:operatorName) || '%'
+        AND (
+            COALESCE(t.details_frequences, '') LIKE '%En service%' COLLATE NOCASE
+            OR COALESCE(t.details_frequences, '') LIKE '%Techniquement opérationnel%' COLLATE NOCASE
+            OR COALESCE(t.details_frequences, '') LIKE '%Techniquement operationnel%' COLLATE NOCASE
+            OR (
+                TRIM(COALESCE(t.details_frequences, '')) = ''
+                AND (
+                    t.statut = 'En service'
+                    OR t.statut = 'Techniquement opérationnel'
+                    OR t.statut = 'Techniquement operationnel'
+                )
+            )
+        )
+    """)
+    suspend fun getActiveLocalisationsInBoxByOperator(
+        operatorName: String,
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double
+    ): List<LocalisationEntity>
+
     // Nouvelle fonction pour la liste "Near Emitters" (recherche mondiale)
     @Query("""
         SELECT * FROM localisation 

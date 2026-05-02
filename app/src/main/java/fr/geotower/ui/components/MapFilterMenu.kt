@@ -49,7 +49,7 @@ fun MapFilterMenu(onDismiss: () -> Unit) {
                     }
                 }
 
-                Divider()
+                HorizontalDivider()
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Section Opérateurs

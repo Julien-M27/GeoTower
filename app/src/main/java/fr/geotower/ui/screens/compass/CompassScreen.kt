@@ -183,7 +183,7 @@ fun CompassScreen(
                     val orientation = FloatArray(3)
                     SensorManager.getOrientation(rotationMatrix, orientation)
                     newAzimuth = Math.toDegrees(orientation[0].toDouble()).toFloat()
-                } else if (event.sensor.type == Sensor.TYPE_ORIENTATION) {
+                } else if (isLegacyOrientationSensor(event.sensor)) {
                     newAzimuth = event.values[0]
                 }
 
@@ -532,6 +532,11 @@ fun CompassScreen(
             Spacer(modifier = Modifier.height(32.dp))
         }
     }
+}
+
+@Suppress("DEPRECATION")
+private fun isLegacyOrientationSensor(sensor: Sensor): Boolean {
+    return sensor.type == Sensor.TYPE_ORIENTATION
 }
 
 // Fonction utilitaire pour formater en Degrés Minutes Secondes (DMS)

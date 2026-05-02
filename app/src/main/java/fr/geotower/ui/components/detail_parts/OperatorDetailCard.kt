@@ -57,7 +57,7 @@ fun OperatorDetailCard(
         // CORPS DÉPLIABLE
         AnimatedVisibility(visible = expanded) {
             Column(modifier = Modifier.padding(top = 16.dp)) {
-                Divider()
+                HorizontalDivider()
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Technologies

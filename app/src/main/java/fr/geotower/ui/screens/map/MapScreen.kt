@@ -98,7 +98,6 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
@@ -110,6 +109,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.ColorUtils
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.utils.AppConfig
@@ -1097,9 +1097,11 @@ fun MapScreen(
                                         fun extractHolesAndOutlines(overlay: org.osmdroid.views.overlay.Overlay) {
                                             when (overlay) {
                                                 is org.osmdroid.views.overlay.Polygon -> {
-                                                    holesList.add(overlay.points)
+                                                    @Suppress("DEPRECATION")
+                                                    val overlayPoints = overlay.points
+                                                    holesList.add(overlayPoints)
                                                     val outline = org.osmdroid.views.overlay.Polyline(map).apply {
-                                                        setPoints(overlay.points)
+                                                        setPoints(overlayPoints)
                                                         outlinePaint.color = android.graphics.Color.RED
                                                         outlinePaint.strokeWidth = 4f
                                                         outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 15f), 0f)
@@ -1107,8 +1109,10 @@ fun MapScreen(
                                                     outlinesOverlay.add(outline)
                                                 }
                                                 is org.osmdroid.views.overlay.Polyline -> {
+                                                    @Suppress("DEPRECATION")
+                                                    val overlayPoints = overlay.points
                                                     val outline = org.osmdroid.views.overlay.Polyline(map).apply {
-                                                        setPoints(overlay.points)
+                                                        setPoints(overlayPoints)
                                                         outlinePaint.color = android.graphics.Color.RED
                                                         outlinePaint.strokeWidth = 4f
                                                         outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 15f), 0f)
@@ -1187,6 +1191,7 @@ fun MapScreen(
 
                 try {
                     val geocoder = android.location.Geocoder(context)
+                    @Suppress("DEPRECATION")
                     val results = geocoder.getFromLocationName(cleanQuery, 1)
 
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {

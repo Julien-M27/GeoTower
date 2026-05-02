@@ -79,6 +79,7 @@ fun GeoRadioTheme(
         SideEffect {
             val window = (view.context as Activity).window
             // La barre d'état prend la couleur du fond (donc Noir si OLED)
+            @Suppress("DEPRECATION")
             window.statusBarColor = finalScheme.background.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !effectiveDarkTheme
         }

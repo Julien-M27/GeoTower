@@ -52,7 +52,7 @@ object DatabaseDownloader {
                     val bodyString = response.body?.string()
                     if (bodyString != null) {
                         val json = org.json.JSONObject(bodyString)
-                        json.optString("version", null)
+                        if (json.isNull("version")) null else json.optString("version")
                     } else null
                 } else null
             } catch (e: Exception) {
