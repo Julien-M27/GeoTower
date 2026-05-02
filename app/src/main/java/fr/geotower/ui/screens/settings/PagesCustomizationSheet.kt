@@ -24,10 +24,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Launch
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.NearMe
@@ -132,7 +132,7 @@ fun PagesCustomizationSheet(
             )
 
             // 1. La page de démarrage
-            NavigationMenuItem(title = AppStrings.startupPageSettings, icon = Icons.Default.Launch, isSelected = false, isDark = isDark) { onStartupPageClick() }
+            NavigationMenuItem(title = AppStrings.startupPageSettings, icon = Icons.AutoMirrored.Filled.Launch, isSelected = false, isDark = isDark) { onStartupPageClick() }
             Spacer(Modifier.height(12.dp))
 
             // 2. Les menus individuels des pages
@@ -1459,4 +1459,3 @@ fun SitePhotosSettingsSheet(
         }
     }
 }
-

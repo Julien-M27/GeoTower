@@ -27,7 +27,7 @@ fun UserLocationArrow(
             moveTo(centerX, centerY) // Part du centre
             lineTo(centerX - 40f, centerY - 90f) // Coin haut gauche
             // Arc arrondi en haut
-            quadraticBezierTo(centerX, centerY - 120f, centerX + 40f, centerY - 90f)
+            quadraticTo(centerX, centerY - 120f, centerX + 40f, centerY - 90f)
             lineTo(centerX, centerY) // Retour au centre
             close()
         }

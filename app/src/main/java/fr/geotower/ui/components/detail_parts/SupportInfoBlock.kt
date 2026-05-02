@@ -5,7 +5,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Height
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.SettingsInputAntenna
-import androidx.compose.material3.Divider
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -45,8 +45,7 @@ fun SupportInfoBlock(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // LIGNE CORRIGÉE : On utilise Divider classique
-            Divider()
+            HorizontalDivider()
 
             Spacer(modifier = Modifier.height(16.dp))
 

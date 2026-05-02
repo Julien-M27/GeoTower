@@ -22,7 +22,6 @@ import androidx.navigation.navArgument
 import androidx.work.*
 import fr.geotower.data.workers.SignalQuestUploadWorker
 import fr.geotower.widget.AntennaWidgetWorker
-import android.content.pm.PackageManager
 import android.content.Intent
 import kotlinx.coroutines.flow.MutableSharedFlow
 
@@ -30,6 +29,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import fr.geotower.data.AnfrRepository
 import fr.geotower.utils.AppConfig
 import fr.geotower.data.api.RetrofitClient
+import fr.geotower.services.LiveTrackingController
 
 
 // --- ÉCRANS ---
@@ -84,7 +84,9 @@ class MainActivity : ComponentActivity() {
         // On garde la gestion des anciens Extras si jamais l'URL est absente
         val siteIdFromNotif = intent.getStringExtra("TARGET_SITE_ID")
         if (siteIdFromNotif != null && intent.data == null) {
-            navigateToSiteFlow.tryEmit("support_detail/$siteIdFromNotif")
+            navigateToSiteFlow.tryEmit("site_detail/$siteIdFromNotif")
+        } else if (intent.getStringExtra("widget_dest") == "nearby") {
+            navigateToSiteFlow.tryEmit("emitters")
         }
     }
 
@@ -199,7 +201,7 @@ class MainActivity : ComponentActivity() {
         } else if (isDeepLink) {
             "home" // ✅ On laisse le NavHost gérer la navigation profonde
         } else if (notifSiteId != null) {
-            "support_detail/$notifSiteId" // 🌟 Ouvre le détail si on vient de la notif
+            "site_detail/$notifSiteId" // 🌟 Ouvre le détail si on vient de la notif
         } else if (widgetDest == "nearby") {
             "emitters" // Ouvre la page NearEmittersScreen
         } else if (widgetDest == "detail" && widgetSiteId != null) {
@@ -254,6 +256,9 @@ class MainActivity : ComponentActivity() {
         AppConfig.navMode.intValue = appPrefs.getInt("nav_mode", 0)
         AppConfig.defaultOperator.value = appPrefs.getString("default_operator", "Aucun") ?: "Aucun"
         AppConfig.loadSavedFilters(appPrefs)
+        if (!isFirstRun) {
+            LiveTrackingController.sync(this)
+        }
         // ========================================================
 
         // --- VÉRIFICATION DU MAGNÉTOMÈTRE (BOUSSOLE) ---
@@ -267,21 +272,6 @@ class MainActivity : ComponentActivity() {
         // Si le téléphone n'a ni boussole magnétique, ni vecteur de rotation, on désactive la boussole
         if (magneticSensor == null && rotationSensor == null) {
             AppConfig.hasCompass.value = false
-        }
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-            if (checkSelfPermission("android.permission.POST_PROMOTED_NOTIFICATIONS")
-                != PackageManager.PERMISSION_GRANTED
-            ) {
-                // Force l'affichage même si déjà refusée une fois
-                requestPermissions(
-                    arrayOf("android.permission.POST_PROMOTED_NOTIFICATIONS"),
-                    1002
-                )
-                android.util.Log.d("LiveNotif", "Permission POST_PROMOTED demandée")
-            } else {
-                android.util.Log.d("LiveNotif", "Permission POST_PROMOTED déjà accordée")
-            }
         }
 
         setContent {

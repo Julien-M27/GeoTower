@@ -154,19 +154,19 @@ class AnfrRepository(
                 val operateurStr = properties.optString("operateur", "")
 
                 // Détail technique des pannes par technologie
-                val v2g = properties.optString("voix2g", null)
-                val v3g = properties.optString("voix3g", null)
-                val v4g = properties.optString("voix4g", null)
+                val v2g = properties.optNullableString("voix2g")
+                val v3g = properties.optNullableString("voix3g")
+                val v4g = properties.optNullableString("voix4g")
 
-                val d3g = properties.optString("data3g", null)
-                val d4g = properties.optString("data4g", null)
-                val d5g = properties.optString("data5g", null)
+                val d3g = properties.optNullableString("data3g")
+                val d4g = properties.optNullableString("data4g")
+                val d5g = properties.optNullableString("data5g")
 
                 // Infos de localisation
-                val dept = properties.optString("departement", null)
-                val cp = properties.optString("code_postal", null)
-                val insee = properties.optString("code_insee", null)
-                val com = properties.optString("commune", null)
+                val dept = properties.optNullableString("departement")
+                val cp = properties.optNullableString("code_postal")
+                val insee = properties.optNullableString("code_insee")
+                val com = properties.optNullableString("commune")
 
                 // 2. Création de l'objet complet
                 val site = SiteHsEntity(
@@ -192,19 +192,19 @@ class AnfrRepository(
                     data5g = d5g,
 
                     // Global et Détails
-                    voixGlobal = properties.optString("voix", null),
-                    dataGlobal = properties.optString("data", null),
-                    raison = properties.optString("raison", null),
-                    detail = properties.optString("detail", null),
+                    voixGlobal = properties.optNullableString("voix"),
+                    dataGlobal = properties.optNullableString("data"),
+                    raison = properties.optNullableString("raison"),
+                    detail = properties.optNullableString("detail"),
                     propre = properties.optInt("propre", 0),
 
                     // Dates
-                    debutVoix = properties.optString("debut_voix", null),
-                    finVoix = properties.optString("fin_voix", null),
-                    debutData = properties.optString("debut_data", null),
-                    finData = properties.optString("fin_data", null),
-                    dateDebut = properties.optString("debut", null),
-                    dateFin = properties.optString("fin", null)
+                    debutVoix = properties.optNullableString("debut_voix"),
+                    finVoix = properties.optNullableString("fin_voix"),
+                    debutData = properties.optNullableString("debut_data"),
+                    finData = properties.optNullableString("fin_data"),
+                    dateDebut = properties.optNullableString("debut"),
+                    dateFin = properties.optNullableString("fin")
                 )
                 hsList.add(site)
             }
@@ -219,5 +219,9 @@ class AnfrRepository(
             e.printStackTrace()
             emptyList()
         }
+    }
+
+    private fun org.json.JSONObject.optNullableString(name: String): String? {
+        return if (isNull(name)) null else optString(name)
     }
 }

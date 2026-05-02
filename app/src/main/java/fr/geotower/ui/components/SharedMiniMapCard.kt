@@ -189,7 +189,7 @@ fun SharedMiniMapCard(
                         }
                     } else false
 
-                    val finalIcon = if (isHs && baseIcon is android.graphics.drawable.BitmapDrawable) {
+                    val finalIcon = if (isHs) {
                         val badgeIcon = createHsBadge(context)
                         val combinedBitmap = android.graphics.Bitmap.createBitmap(
                             baseIcon.intrinsicWidth, baseIcon.intrinsicHeight, android.graphics.Bitmap.Config.ARGB_8888
@@ -208,7 +208,7 @@ fun SharedMiniMapCard(
 
                     // On applique le scale sur l'icône finale
                     val scale = ((currentZoom - 11.0) / 6.5).coerceIn(0.5, 1.0).toFloat()
-                    if (scale < 1f && finalIcon is android.graphics.drawable.BitmapDrawable) {
+                    if (scale < 1f) {
                         val originalBitmap = finalIcon.bitmap
                         val scaledWidth = (originalBitmap.width * scale).toInt()
                         val scaledHeight = (originalBitmap.height * scale).toInt()
