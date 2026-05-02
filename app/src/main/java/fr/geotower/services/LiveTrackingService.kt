@@ -1,6 +1,5 @@
 package fr.geotower.services
 
-import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -8,15 +7,13 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
-import android.graphics.BitmapFactory
 import android.location.Location
+import android.net.Uri
 import android.os.Build
 import android.os.IBinder
 import android.os.Looper
 import androidx.annotation.RequiresApi
-import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.google.android.gms.location.FusedLocationProviderClient
@@ -29,9 +26,15 @@ import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.db.AppDatabase
+import fr.geotower.data.db.GeoTowerDao
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import java.util.Locale
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.max
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -49,6 +52,10 @@ class LiveTrackingService : Service() {
     private lateinit var repository: AnfrRepository
 
     private var serviceStartTime: Long = 0L
+    private var processingJob: Job? = null
+    private var lastProcessedLocation: Location? = null
+    private var lastProcessedAt: Long = 0L
+    private var lockedOperator: String? = null
     private var lockedAntennaId: String? = null
     private var initialDistance: Float? = null
 
@@ -64,32 +71,25 @@ class LiveTrackingService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP_SERVICE) {
-            stopLocationUpdates()
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
-            return START_NOT_STICKY
+            disableLiveTrackingPreference()
+            return stopTrackingAndSelf()
         }
 
         if (serviceStartTime == 0L) {
             serviceStartTime = System.currentTimeMillis()
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            if (!manager.canPostPromotedNotifications()) {
-                try {
-                    val settingsIntent = Intent("android.settings.MANAGE_APP_PROMOTED_NOTIFICATIONS").also { i ->
-                        i.data = android.net.Uri.parse("package:$packageName")
-                        i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    startActivity(settingsIntent)
-                } catch (e: Exception) {
-                    android.util.Log.d("LiveNotif", "Impossible d'ouvrir les parametres Live: ${e.message}")
-                }
-            }
+        val defaultOp = currentOperator
+        if (
+            defaultOp == "AUCUN" ||
+            !LiveTrackingController.hasPreciseLocationPermission(this) ||
+            !LiveTrackingController.hasPostNotificationsPermission(this)
+        ) {
+            return stopTrackingAndSelf()
         }
 
-        val defaultOp = currentOperator
+        resetIfOperatorChanged(defaultOp)
+
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val initialNotification = if (
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA &&
@@ -113,21 +113,21 @@ class LiveTrackingService : Service() {
             )
         }
 
-        startAsForeground(initialNotification)
+        if (!startAsForeground(initialNotification)) {
+            return START_NOT_STICKY
+        }
         startLocationUpdates()
 
         return START_STICKY
     }
 
     private fun startLocationUpdates() {
-        if (
-            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) !=
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            stopSelf()
+        if (!LiveTrackingController.hasPreciseLocationPermission(this)) {
+            stopTrackingAndSelf()
             return
         }
 
+        stopLocationUpdates()
         val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000L).build()
 
         locationCallback = object : LocationCallback() {
@@ -142,22 +142,21 @@ class LiveTrackingService : Service() {
 
     private fun processLocationUpdate(location: Location) {
         val defaultOp = currentOperator
-        if (defaultOp == "AUCUN") return
+        if (defaultOp == "AUCUN") {
+            stopTrackingAndSelf()
+            return
+        }
 
-        serviceScope.launch {
+        if (!shouldProcessLocation(location)) return
+        lastProcessedLocation = Location(location)
+        lastProcessedAt = System.currentTimeMillis()
+
+        processingJob?.cancel()
+
+        processingJob = serviceScope.launch {
             try {
                 val dao = AppDatabase.getDatabase(applicationContext).geoTowerDao()
-                val offsetLat = 0.05
-                val offsetLon = 0.05 / kotlin.math.cos(Math.toRadians(location.latitude))
-
-                val antennas = dao.getLocalisationsInBox(
-                    minLat = location.latitude - offsetLat,
-                    maxLat = location.latitude + offsetLat,
-                    minLon = location.longitude - offsetLon,
-                    maxLon = location.longitude + offsetLon
-                )
-
-                val opAntennas = antennas.filter { it.operateur?.uppercase()?.contains(defaultOp) == true }
+                val opAntennas = findActiveAntennasByRadius(dao, location, defaultOp)
 
                 if (opAntennas.isEmpty()) {
                     updateNotification(
@@ -169,6 +168,12 @@ class LiveTrackingService : Service() {
                         address = ""
                     )
                     return@launch
+                }
+
+                if (lockedOperator != defaultOp) {
+                    lockedOperator = defaultOp
+                    lockedAntennaId = null
+                    initialDistance = null
                 }
 
                 var minDistance = Float.MAX_VALUE
@@ -185,7 +190,7 @@ class LiveTrackingService : Service() {
                     }
                 }
 
-                val currentId = closestAntenna.idAnfr?.toString() ?: ""
+                val currentId = closestAntenna.idAnfr
                 if (lockedAntennaId != currentId) {
                     lockedAntennaId = currentId
                     initialDistance = minDistance
@@ -219,10 +224,55 @@ class LiveTrackingService : Service() {
                     progress = progress,
                     address = fullAddress
                 )
+            } catch (_: CancellationException) {
+                // Newer GPS updates replace older calculations.
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
+    }
+
+    private fun shouldProcessLocation(location: Location): Boolean {
+        val previous = lastProcessedLocation ?: return true
+        val elapsedMs = System.currentTimeMillis() - lastProcessedAt
+        return elapsedMs >= MIN_PROCESS_INTERVAL_MS ||
+            previous.distanceTo(location) >= MIN_PROCESS_DISTANCE_METERS
+    }
+
+    private suspend fun findActiveAntennasByRadius(
+        dao: GeoTowerDao,
+        location: Location,
+        operator: String
+    ): List<LocalisationEntity> {
+        val safeCos = max(0.1, abs(cos(Math.toRadians(location.latitude))))
+
+        SEARCH_RADII_KM.forEach { radiusKm ->
+            val radiusMeters = (radiusKm * 1000.0).toFloat()
+            val offsetLat = radiusKm / KM_PER_LATITUDE_DEGREE
+            val offsetLon = offsetLat / safeCos
+            val candidates = dao.getActiveLocalisationsInBoxByOperator(
+                operatorName = operator,
+                minLat = location.latitude - offsetLat,
+                maxLat = location.latitude + offsetLat,
+                minLon = location.longitude - offsetLon,
+                maxLon = location.longitude + offsetLon
+            )
+
+            val insideRadius = candidates.filter { antenna ->
+                val results = FloatArray(1)
+                Location.distanceBetween(
+                    location.latitude,
+                    location.longitude,
+                    antenna.latitude,
+                    antenna.longitude,
+                    results
+                )
+                results[0] <= radiusMeters
+            }
+            if (insideRadius.isNotEmpty()) return insideRadius
+        }
+
+        return emptyList()
     }
 
     private fun updateNotification(
@@ -233,6 +283,11 @@ class LiveTrackingService : Service() {
         progress: Int = 0,
         address: String = ""
     ) {
+        if (!LiveTrackingController.hasPostNotificationsPermission(this)) {
+            stopTrackingAndSelf()
+            return
+        }
+
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         val notification = if (
@@ -255,16 +310,10 @@ class LiveTrackingService : Service() {
         antLoc: LocalisationEntity?,
         address: String
     ): Notification {
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            data = android.net.Uri.parse("geotower://site/${antLoc?.idAnfr}")
-            antLoc?.idAnfr?.toString()?.let { putExtra("TARGET_SITE_ID", it) }
-        }
-
         val pendingIntent = PendingIntent.getActivity(
             this,
-            antLoc?.idAnfr?.hashCode() ?: 0,
-            intent,
+            notificationRequestCode(antLoc),
+            notificationIntent(antLoc),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
@@ -277,19 +326,24 @@ class LiveTrackingService : Service() {
 
         val progressStyle = Notification.ProgressStyle()
             .setProgress(progress)
+            .setProgressTrackerIcon(
+                IconCompat.createWithResource(this, R.drawable.ic_live_user_tracker).toIcon(this)
+            )
             .setProgressSegments(
                 listOf(Notification.ProgressStyle.Segment(100).setColor(operatorColor(operator)))
             )
 
         operatorLogo(operator)?.let { logoResId ->
-            progressStyle.setProgressTrackerIcon(IconCompat.createWithResource(this, logoResId).toIcon(this))
+            progressStyle.setProgressEndIcon(IconCompat.createWithResource(this, logoResId).toIcon(this))
         }
 
+        val hasAddress = address.isNotBlank()
+        val liveTitle = if (hasAddress) contentText else AppStrings.nearestAntennaTitle(this)
+        val liveContentText = if (hasAddress) notificationAddressText(address) else contentText
         val shortCriticalText = extractShortCriticalText(contentText)
         val builder = Notification.Builder(this, liveTrackingChannelV3)
-            .setContentTitle(AppStrings.nearestAntennaTitle(this))
-            .setContentText(contentText)
-            .setSubText(address.takeIf { it.isNotBlank() })
+            .setContentTitle(liveTitle)
+            .setContentText(liveContentText)
             .setSmallIcon(R.drawable.geotower_logo)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
@@ -299,11 +353,13 @@ class LiveTrackingService : Service() {
             .setShowWhen(false)
             .setColor(operatorColor(operator))
             .setStyle(progressStyle)
-            .addAction(0, AppStrings.quitAction(this), stopPendingIntent)
-
-        operatorLogo(operator)?.let { logoResId ->
-            builder.setLargeIcon(BitmapFactory.decodeResource(resources, logoResId))
-        }
+            .addAction(
+                Notification.Action.Builder(
+                    IconCompat.createWithResource(this, R.drawable.ic_launcher_monochrome).toIcon(this),
+                    AppStrings.quitAction(this),
+                    stopPendingIntent
+                ).build()
+            )
 
         runCatching {
             Notification.Builder::class.java
@@ -337,16 +393,10 @@ class LiveTrackingService : Service() {
         progress: Int = 0,
         address: String = ""
     ): Notification {
-        val intent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            data = android.net.Uri.parse("geotower://site/${antLoc?.idAnfr}")
-            antLoc?.idAnfr?.toString()?.let { putExtra("TARGET_SITE_ID", it) }
-        }
-
         val pendingIntent = PendingIntent.getActivity(
             this,
-            antLoc?.idAnfr?.hashCode() ?: 0,
-            intent,
+            notificationRequestCode(antLoc),
+            notificationIntent(antLoc),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
@@ -357,16 +407,7 @@ class LiveTrackingService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val expandedView = android.widget.RemoteViews(packageName, R.layout.notif_expanded_bar)
-        expandedView.setTextViewText(R.id.notif_title, AppStrings.nearestAntennaTitle(this))
-        expandedView.setTextViewText(R.id.notif_text, contentText)
-        if (address.isNotEmpty()) {
-            expandedView.setViewVisibility(R.id.notif_address, android.view.View.VISIBLE)
-            expandedView.setTextViewText(R.id.notif_address, "📍 $address")
-        } else {
-            expandedView.setViewVisibility(R.id.notif_address, android.view.View.GONE)
-        }
-        expandedView.setProgressBar(R.id.notif_progress, 100, progress, false)
+        val expandedText = notificationContentText(contentText, address)
 
         val builder = NotificationCompat.Builder(this, liveTrackingChannelV3)
             .setContentTitle(AppStrings.nearestAntennaTitle(this))
@@ -380,16 +421,50 @@ class LiveTrackingService : Service() {
             .setWhen(serviceStartTime)
             .setUsesChronometer(true)
             .setColor(operatorColor(operator))
+            .setProgress(100, progress, false)
             .addAction(0, AppStrings.quitAction(this), stopPendingIntent)
-            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
-            .setCustomBigContentView(expandedView)
-
-        operatorLogo(operator)?.let { logoResId ->
-            val largeIconBitmap = BitmapFactory.decodeResource(resources, logoResId)
-            builder.setLargeIcon(largeIconBitmap)
-        }
+            .setStyle(NotificationCompat.BigTextStyle().bigText(expandedText))
 
         return builder.build()
+    }
+
+    private fun notificationIntent(antLoc: LocalisationEntity?): Intent {
+        return Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            val siteId = antLoc?.idAnfr?.takeIf { it.isNotBlank() }
+            if (siteId != null) {
+                data = Uri.parse("geotower://site/${Uri.encode(siteId)}")
+                putExtra("TARGET_SITE_ID", siteId)
+            } else {
+                putExtra("widget_dest", "nearby")
+            }
+        }
+    }
+
+    private fun notificationRequestCode(antLoc: LocalisationEntity?): Int {
+        return antLoc?.idAnfr?.hashCode() ?: notificationId
+    }
+
+    private fun notificationContentText(contentText: String, address: String): String {
+        val cleanAddress = address.trim()
+        return if (cleanAddress.isBlank()) {
+            contentText
+        } else {
+            "$contentText\n${notificationAddressText(cleanAddress)}"
+        }
+    }
+
+    private fun notificationAddressText(address: String): String {
+        val parts = address
+            .split(',')
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+
+        return when {
+            parts.isEmpty() -> address.trim()
+            parts.size == 1 -> parts.first()
+            else -> "${parts.dropLast(1).joinToString(", ")}\n${parts.last()}"
+        }
     }
 
     private fun createNotificationChannel() {
@@ -412,41 +487,55 @@ class LiveTrackingService : Service() {
         }
     }
 
-    private fun startAsForeground(notification: Notification) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            startForegroundWithType(notification, foregroundServiceTypeMask())
-        } else {
-            startForeground(notificationId, notification)
-        }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.Q)
-    private fun startForegroundWithType(notification: Notification, typeMask: Int) {
-        try {
-            startForeground(notificationId, notification, typeMask)
+    private fun startAsForeground(notification: Notification): Boolean {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    notificationId,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+                )
+            } else {
+                startForeground(notificationId, notification)
+            }
+            true
         } catch (e: SecurityException) {
-            if (typeMask == ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC) throw e
-            startForeground(notificationId, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
+            android.util.Log.w("LiveNotif", "Impossible de demarrer le service de localisation: ${e.message}")
+            stopTrackingAndSelf()
+            false
         }
-    }
-
-    @RequiresApi(Build.VERSION_CODES.Q)
-    private fun foregroundServiceTypeMask(): Int {
-        var mask = ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-        if (hasLocationPermission()) {
-            mask = mask or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-        }
-        return mask
-    }
-
-    private fun hasLocationPermission(): Boolean {
-        return ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-            ActivityCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun stopLocationUpdates() {
         if (::fusedLocationClient.isInitialized && ::locationCallback.isInitialized) {
             fusedLocationClient.removeLocationUpdates(locationCallback)
+        }
+    }
+
+    private fun stopTrackingAndSelf(): Int {
+        processingJob?.cancel()
+        stopLocationUpdates()
+        runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
+        stopSelf()
+        return START_NOT_STICKY
+    }
+
+    private fun disableLiveTrackingPreference() {
+        getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("enable_live_notifications", false)
+            .apply()
+        AppConfig.enableLiveNotifications.value = false
+    }
+
+    private fun resetIfOperatorChanged(operator: String) {
+        if (lockedOperator != null && lockedOperator != operator) {
+            processingJob?.cancel()
+            lastProcessedLocation = null
+            lastProcessedAt = 0L
+            lockedOperator = null
+            lockedAntennaId = null
+            initialDistance = null
         }
     }
 
@@ -493,9 +582,9 @@ class LiveTrackingService : Service() {
     private fun operatorColor(operator: String): Int {
         return when {
             operator.contains("ORANGE") -> android.graphics.Color.parseColor("#FF7900")
-            operator.contains("BOUYGUES") -> android.graphics.Color.parseColor("#00295F")
+            operator.contains("BOUYGUES") -> android.graphics.Color.parseColor("#009FE3")
             operator.contains("SFR") -> android.graphics.Color.parseColor("#E2001A")
-            operator.contains("FREE") -> android.graphics.Color.parseColor("#757575")
+            operator.contains("FREE") -> android.graphics.Color.parseColor("#55565A")
             else -> android.graphics.Color.GRAY
         }
     }
@@ -512,6 +601,8 @@ class LiveTrackingService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        processingJob?.cancel()
+        runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
         stopLocationUpdates()
         serviceScope.cancel()
     }
@@ -520,5 +611,9 @@ class LiveTrackingService : Service() {
 
     companion object {
         private const val ACTION_STOP_SERVICE = "ACTION_STOP_SERVICE"
+        private const val MIN_PROCESS_INTERVAL_MS = 30_000L
+        private const val MIN_PROCESS_DISTANCE_METERS = 15f
+        private const val KM_PER_LATITUDE_DEGREE = 111.0
+        private val SEARCH_RADII_KM = doubleArrayOf(5.0, 10.0, 25.0, 50.0, 100.0)
     }
 }

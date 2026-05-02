@@ -5,7 +5,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    id("kotlin-kapt")
+    alias(libs.plugins.ksp)
 }
 // --- BLOC UNIQUE DE LECTURE ---
 val properties = Properties()
@@ -50,18 +50,22 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        jvmTarget = "11"
-    }
     buildFeatures {
         compose = true
         buildConfig = true
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+    }
+}
+
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
@@ -97,11 +101,10 @@ dependencies {
     implementation("org.mapsforge:mapsforge-themes:0.20.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // --- ROOM (BASE DE DONNÉES) ---
-    // J'ai nettoyé les doublons pour ne garder que la version qui marche avec notre code (KAPT)
     val room_version = "2.6.1"
     implementation("androidx.room:room-runtime:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
-    kapt("androidx.room:room-compiler:$room_version")
+    ksp("androidx.room:room-compiler:$room_version")
 
     // Pour parler à l'API (Retrofit)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")

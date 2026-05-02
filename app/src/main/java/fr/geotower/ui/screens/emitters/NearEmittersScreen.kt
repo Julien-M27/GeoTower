@@ -166,26 +166,6 @@ fun NearEmittersScreen(
     val showNearbySites by remember { mutableStateOf(prefs.getBoolean("show_nearby_sites", true)) }
     val nearbyOrder by remember { mutableStateOf(prefs.getString("nearby_order", "search,sites")!!.split(",")) }
 
-
-    // --- NOUVEAU : DÉMARRAGE DU SERVICE DE NOTIFICATION LIVE ---
-    val liveNotifsEnabled by AppConfig.enableLiveNotifications
-
-    LaunchedEffect(liveNotifsEnabled) {
-        if (liveNotifsEnabled && AppConfig.defaultOperator.value != "Aucun") {
-            // Vérifie si on a la permission des notifications sur Android 13+
-            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU ||
-                androidx.core.content.ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED) {
-
-                val serviceIntent = android.content.Intent(context, fr.geotower.services.LiveTrackingService::class.java)
-                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                    context.startForegroundService(serviceIntent)
-                } else {
-                    context.startService(serviceIntent)
-                }
-            }
-        }
-    }
-
     // --- GESTION DU GPS ---
     DisposableEffect(Unit) {
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
@@ -833,9 +813,9 @@ fun GridCell(opName: String?, modifier: Modifier = Modifier) {
             .background(if (isPresent) Color.Transparent else Color.Gray.copy(alpha = 0.1f)),
         contentAlignment = Alignment.Center
     ) {
-        if (isPresent && iconRes != null) {
+        iconRes?.let { icon ->
             Image(
-                painter = painterResource(id = iconRes),
+                painter = painterResource(id = icon),
                 contentDescription = null,
                 modifier = Modifier
                     .fillMaxSize()

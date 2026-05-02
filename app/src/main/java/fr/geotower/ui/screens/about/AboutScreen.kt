@@ -446,7 +446,7 @@ fun SectionPresentation(appTitle: String, appVersion: String, logoResId: Int) {
 
 @Composable
 fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) {
-    val releaseNotes = mapOf(
+    val releaseNotes: Map<String, List<Any>> = mapOf(
         "Interface & Design" to listOf(
             "Global :" to listOf(
                 "Correction des marges en bas de l'écran"
