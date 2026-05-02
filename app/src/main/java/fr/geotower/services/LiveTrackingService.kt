@@ -11,6 +11,7 @@ import android.content.pm.ServiceInfo
 import android.location.Location
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.os.IBinder
 import android.os.Looper
 import androidx.annotation.RequiresApi
@@ -90,11 +91,7 @@ class LiveTrackingService : Service() {
 
         resetIfOperatorChanged(defaultOp)
 
-        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val initialNotification = if (
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA &&
-            manager.canPostPromotedNotifications()
-        ) {
+        val initialNotification = if (supportsProgressStyle()) {
             buildLiveNotification(
                 contentText = AppStrings.searchInProgress(this),
                 progress = 0,
@@ -289,11 +286,7 @@ class LiveTrackingService : Service() {
         }
 
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
-        val notification = if (
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA &&
-            manager.canPostPromotedNotifications()
-        ) {
+        val notification = if (supportsProgressStyle()) {
             buildLiveNotification(text, progress, operator, antLoc, address)
         } else {
             buildNotification(text, userLoc, antLoc, operator, progress, address)
@@ -382,6 +375,14 @@ class LiveTrackingService : Service() {
         return builder.build().apply {
             extras.putBoolean("android.requestPromotedOngoing", true)
             shortCriticalText?.let { extras.putString("android.shortCriticalText", it) }
+            extras.putAll(
+                samsungOngoingActivityExtras(
+                    operator = operator,
+                    primaryInfo = liveTitle,
+                    secondaryInfo = liveContentText,
+                    shortCriticalText = shortCriticalText
+                )
+            )
         }
     }
 
@@ -425,7 +426,16 @@ class LiveTrackingService : Service() {
             .addAction(0, AppStrings.quitAction(this), stopPendingIntent)
             .setStyle(NotificationCompat.BigTextStyle().bigText(expandedText))
 
-        return builder.build()
+        return builder.build().apply {
+            extras.putAll(
+                samsungOngoingActivityExtras(
+                    operator = operator,
+                    primaryInfo = contentText,
+                    secondaryInfo = expandedText,
+                    shortCriticalText = extractShortCriticalText(contentText)
+                )
+            )
+        }
     }
 
     private fun notificationIntent(antLoc: LocalisationEntity?): Intent {
@@ -465,6 +475,62 @@ class LiveTrackingService : Service() {
             parts.size == 1 -> parts.first()
             else -> "${parts.dropLast(1).joinToString(", ")}\n${parts.last()}"
         }
+    }
+
+    private fun samsungOngoingActivityExtras(
+        operator: String,
+        primaryInfo: String,
+        secondaryInfo: String,
+        shortCriticalText: String?
+    ): Bundle {
+        if (!isSamsungDevice()) return Bundle.EMPTY
+
+        val compactSecondary = secondaryInfo
+            .replace('\n', ' ')
+            .replace(Regex("\\s+"), " ")
+            .trim()
+            .take(MAX_SAMSUNG_NOW_BAR_TEXT_LENGTH)
+        val chipText = samsungChipText(operator, shortCriticalText, primaryInfo)
+        val operatorIcon = operatorLogo(operator)?.let { logoResId ->
+            IconCompat.createWithResource(this, logoResId).toIcon(this)
+        }
+
+        return Bundle().apply {
+            putInt("android.ongoingActivityNoti.style", 1)
+            putString("android.ongoingActivityNoti.primaryInfo", primaryInfo)
+            putString("android.ongoingActivityNoti.secondaryInfo", compactSecondary)
+            putString("android.ongoingActivityNoti.nowbarPrimaryInfo", chipText)
+            putString("android.ongoingActivityNoti.nowbarSecondaryInfo", compactSecondary)
+            putString("android.ongoingActivityNoti.chipExpandedText", chipText)
+            putInt("android.ongoingActivityNoti.chipBgColor", operatorColor(operator))
+            operatorIcon?.let { icon ->
+                putParcelable("android.ongoingActivityNoti.chipIcon", icon)
+                putParcelable("android.ongoingActivityNoti.secondaryInfoIcon", icon)
+            }
+        }
+    }
+
+    private fun supportsProgressStyle(): Boolean {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA
+    }
+
+    private fun isSamsungDevice(): Boolean {
+        return Build.MANUFACTURER.equals("samsung", ignoreCase = true)
+    }
+
+    private fun samsungChipText(operator: String, shortCriticalText: String?, fallback: String): String {
+        val label = when {
+            operator.contains("ORANGE") -> "Orange"
+            operator.contains("BOUYGUES") -> "Bouygues"
+            operator.contains("SFR") -> "SFR"
+            operator.contains("FREE") -> "Free"
+            else -> null
+        }
+
+        return listOfNotNull(label, shortCriticalText)
+            .joinToString(" • ")
+            .ifBlank { fallback }
+            .take(MAX_SAMSUNG_CHIP_TEXT_LENGTH)
     }
 
     private fun createNotificationChannel() {
@@ -614,6 +680,8 @@ class LiveTrackingService : Service() {
         private const val MIN_PROCESS_INTERVAL_MS = 30_000L
         private const val MIN_PROCESS_DISTANCE_METERS = 15f
         private const val KM_PER_LATITUDE_DEGREE = 111.0
+        private const val MAX_SAMSUNG_NOW_BAR_TEXT_LENGTH = 80
+        private const val MAX_SAMSUNG_CHIP_TEXT_LENGTH = 24
         private val SEARCH_RADII_KM = doubleArrayOf(5.0, 10.0, 25.0, 50.0, 100.0)
     }
 }

@@ -32,6 +32,10 @@
         android:theme="@style/Theme.GeoRadio"
         tools:targetApi="31">
 
+        <meta-data
+            android:name="com.samsung.android.support.ongoing_activity"
+            android:value="true" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
