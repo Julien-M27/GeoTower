@@ -9,10 +9,10 @@ import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
@@ -28,6 +28,7 @@ import fr.geotower.data.models.OfflineMapDto
 import fr.geotower.utils.AppStrings
 import java.io.File
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MapDownloadCard(
     useOneUi: Boolean,
@@ -129,7 +130,6 @@ fun MapDownloadCard(
                     val currentWork = workInfos.find { it.tags.contains("map_id_${map.id}") }
                     val isSyncing = currentWork?.state == WorkInfo.State.RUNNING || currentWork?.state == WorkInfo.State.ENQUEUED
                     val progressValue = currentWork?.progress?.getInt("progress", 0) ?: 0
-                    val workState = currentWork?.progress?.getString("state") ?: ""
                     val isDownloaded = remember(fileRefreshTrigger, currentWork?.state) {
                         File(mapsDir, map.mapFilename).exists()
                     }
@@ -172,9 +172,9 @@ fun MapDownloadCard(
 
                         if (isSyncing) {
                             Spacer(Modifier.height(8.dp))
-                            LinearProgressIndicator(
+                            LinearWavyProgressIndicator(
                                 progress = { progressValue / 100f },
-                                modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)),
+                                modifier = Modifier.fillMaxWidth().height(8.dp),
                                 color = MaterialTheme.colorScheme.primary,
                                 trackColor = MaterialTheme.colorScheme.surfaceVariant
                             )
@@ -184,6 +184,27 @@ fun MapDownloadCard(
                         }
                     }
                     if (index < catalog.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                }
+
+                // 🚀 NOUVEAU : Bouton pour annuler TOUS les téléchargements de cartes
+                val isAnySyncing = workInfos.any { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED }
+                if (isAnySyncing) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    OutlinedButton(
+                        onClick = {
+                            onSafeClick {
+                                workManager.cancelAllWorkByTag("map_download")
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 50.dp),
+                        shape = RoundedCornerShape(12.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text(text = AppStrings.cancelDownload, fontWeight = FontWeight.Bold)
+                    }
                 }
 
                 // 🚀 BOUTON : TOUT SUPPRIMER (Style calqué sur DatabaseDownloadCard)

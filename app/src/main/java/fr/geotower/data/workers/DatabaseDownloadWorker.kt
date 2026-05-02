@@ -87,18 +87,68 @@ class DatabaseDownloadWorker(
         val title = getLocalString("Mise à jour de la base", "Database update", "Actualización de base de datos")
         val content = getLocalString("Téléchargement en cours... $progress%", "Downloading... $progress%", "Descargando... $progress%")
 
-        return NotificationCompat.Builder(context, channelId)
+        // ✅ AJOUT : Intent pour ouvrir les paramètres DB au clic
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            data = android.net.Uri.parse("geotower://settings?section=database")
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            0,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val builder = NotificationCompat.Builder(context, channelId)
             .setContentTitle(title)
             .setContentText(content)
             .setSmallIcon(R.mipmap.ic_launcher_geotower)
+            .setContentIntent(pendingIntent) // ✅ On ajoute le clic !
             .setProgress(100, progress, false)
             .setOngoing(true)
-            .build()
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+            val progressStyle = android.app.Notification.ProgressStyle()
+                .setProgress(progress)
+                .setProgressSegments(listOf(android.app.Notification.ProgressStyle.Segment(100)))
+
+            val nativeBuilder = android.app.Notification.Builder(context, channelId)
+                .setContentTitle(title)
+                .setContentText(content)
+                .setSmallIcon(R.drawable.geotower_logo)
+                .setContentIntent(pendingIntent) // ✅ On ajoute le clic ici aussi !
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setCategory(android.app.Notification.CATEGORY_PROGRESS)
+                .setStyle(progressStyle)
+
+            // ✅ Utilisation de la réflexion pour compatibilité A16
+            runCatching {
+                android.app.Notification.Builder::class.java
+                    .getMethod("setShortCriticalText", CharSequence::class.java)
+                    .invoke(nativeBuilder, "$progress%")
+            }
+            runCatching {
+                android.app.Notification.Builder::class.java
+                    .getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
+                    .invoke(nativeBuilder, true)
+            }
+
+            return nativeBuilder.build().apply {
+                extras.putBoolean("android.requestPromotedOngoing", true)
+                extras.putString("android.shortCriticalText", "$progress%")
+            }
+        }
+
+        return builder.build()
     }
 
     private fun showSuccessNotification() {
         val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            data = android.net.Uri.parse("geotower://settings?section=database")
             putExtra("SHOW_DB_SUCCESS_POPUP", true)
         }
 

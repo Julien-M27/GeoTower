@@ -30,6 +30,8 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularWavyProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -69,6 +71,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun HomeScreen(navController: NavController) {
@@ -534,6 +537,7 @@ fun DrawableImage(resId: Int, modifier: Modifier = Modifier) {
     )
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun DatabaseWarningBanner(
     isMissing: Boolean,
@@ -602,10 +606,10 @@ fun DatabaseWarningBanner(
                         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End // On aligne à droite
                     ) {
-                        // ✅ CORRECTION : Utilisation de la version "Small"
-                        fr.geotower.ui.components.SmallWavyLoader(
-                            color = contentColor,
-                            modifier = androidx.compose.ui.Modifier.size(24.dp)
+                        // ✅ CORRECTION : Utilisation de CircularWavyProgressIndicator
+                        CircularWavyProgressIndicator(
+                            modifier = androidx.compose.ui.Modifier.size(24.dp),
+                            color = contentColor
                         )
                         androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(8.dp))
                         androidx.compose.material3.Text(

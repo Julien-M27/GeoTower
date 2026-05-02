@@ -27,7 +27,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
-import fr.geotower.ui.components.SequentialWavyLoader
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.delay
@@ -35,6 +36,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SplashScreen(
     navController: NavController,
@@ -136,7 +138,7 @@ fun SplashScreen(
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            SequentialWavyLoader(
+            LoadingIndicator(
                 modifier = Modifier.size(42.dp),
                 color = MaterialTheme.colorScheme.primary
             )

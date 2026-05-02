@@ -413,9 +413,14 @@ class MainActivity : ComponentActivity() {
                             }
 
                             // Paramètres
-                            composable("settings") {
+                            composable(
+                                route = "settings?section={section}",
+                                arguments = listOf(navArgument("section") { type = NavType.StringType; nullable = true; defaultValue = null }),
+                                deepLinks = listOf(navDeepLink { uriPattern = "geotower://settings?section={section}" })
+                            ) { backStackEntry ->
+                                val section = backStackEntry.arguments?.getString("section")
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    SettingsScreen(navController, repository)
+                                    SettingsScreen(navController, repository, section)
                                 }
                             }
 

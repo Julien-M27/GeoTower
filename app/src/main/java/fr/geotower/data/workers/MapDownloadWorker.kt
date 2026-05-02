@@ -156,7 +156,8 @@ class MapDownloadWorker(
         }
 
         val intent = Intent(applicationContext, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            data = android.net.Uri.parse("geotower://settings?section=database")
         }
         val pendingIntent = PendingIntent.getActivity(
             applicationContext, 0, intent,
@@ -166,14 +167,50 @@ class MapDownloadWorker(
         val title = getLocalString("Carte : $mapName", "Map: $mapName", "Mapa: $mapName")
         val content = getLocalString("Téléchargement... $progress%", "Downloading... $progress%", "Descargando... $progress%")
 
-        return NotificationCompat.Builder(applicationContext, channelId)
+        val builder = NotificationCompat.Builder(applicationContext, channelId)
             .setContentTitle(title)
             .setContentText(content)
             .setSmallIcon(R.mipmap.ic_launcher_geotower)
             .setContentIntent(pendingIntent)
-            .setProgress(100, progress, false) // Plus besoin du flag isExtracting
+            .setProgress(100, progress, false)
             .setOngoing(true)
-            .build()
+            .setOnlyAlertOnce(true)
+            .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+            val progressStyle = android.app.Notification.ProgressStyle()
+                .setProgress(progress)
+                .setProgressSegments(listOf(android.app.Notification.ProgressStyle.Segment(100)))
+
+            val nativeBuilder = android.app.Notification.Builder(applicationContext, channelId)
+                .setContentTitle(title)
+                .setContentText(content)
+                .setSmallIcon(R.drawable.geotower_logo)
+                .setContentIntent(pendingIntent)
+                .setOngoing(true)
+                .setOnlyAlertOnce(true)
+                .setCategory(android.app.Notification.CATEGORY_PROGRESS)
+                .setStyle(progressStyle)
+
+            // ✅ Utilisation de la réflexion pour compatibilité A16
+            runCatching {
+                android.app.Notification.Builder::class.java
+                    .getMethod("setShortCriticalText", CharSequence::class.java)
+                    .invoke(nativeBuilder, "$progress%")
+            }
+            runCatching {
+                android.app.Notification.Builder::class.java
+                    .getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
+                    .invoke(nativeBuilder, true)
+            }
+
+            return nativeBuilder.build().apply {
+                extras.putBoolean("android.requestPromotedOngoing", true)
+                extras.putString("android.shortCriticalText", "$progress%")
+            }
+        }
+
+        return builder.build()
     }
 
     private fun getLocalString(fr: String, en: String, es: String): String {

@@ -87,6 +87,7 @@ object AppStrings {
     @Composable
     fun current(value: String) = get("Actuel : $value", "Current : $value", "Atual : $value")
     val validate @Composable get() = get("Valider", "Validate", "Validar")
+    val upToDate @Composable get() = get("À jour", "Up to date", "Atualizado")
 
     val managePermissions @Composable get() = get("Gérer les permissions", "Manage Permissions", "Gerir permissões")
     val permissionsDesc @Composable get() = get("Localisation et Notifications", "Location and Notifications", "Localização e Notificações")

@@ -128,7 +128,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 @Composable
 fun SettingsScreen(
     navController: NavController,
-    repository: AnfrRepository
+     repository: AnfrRepository,
+    initialSection: String? = null
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -183,6 +184,18 @@ fun SettingsScreen(
     var defaultOperator by AppConfig.defaultOperator
     val navMode = AppConfig.navMode.intValue
     var activeSectionIndex by remember { mutableIntStateOf(0) }
+
+    // ✅ NOUVEAU : Auto-scroll vers la section demandée (ex: database)
+    LaunchedEffect(initialSection) {
+        if (initialSection == "database") {
+            // On laisse un tout petit délai pour que le layout soit prêt
+            kotlinx.coroutines.delay(300)
+            if (navMode == 0 || !isWideScreen) {
+                scrollState.animateScrollTo(scrollState.maxValue)
+            }
+            activeSectionIndex = 4
+        }
+    }
 
     var appLanguage by remember { mutableStateOf(prefs.getString("app_language", "Français") ?: "Français") }
     var showLanguageSheet by remember { mutableStateOf(false) }
@@ -1456,16 +1469,6 @@ fun SectionDatabase(
     // On génère la bordure si on n'est pas en OneUI
     val border = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
 
-    // 🚀 NOUVEAU : LA CARTE DES CARTES HORS-LIGNE
-    fr.geotower.ui.components.MapDownloadCard(
-        useOneUi = useOneUi,
-        shape = shape,
-        border = border,
-        bubbleColor = bubbleColor
-    )
-
-    Spacer(modifier = Modifier.height(16.dp)) // Espace entre les deux cartes
-
     // 🚀 LA CARTE DE LA BASE DE DONNÉES (Existante)
     fr.geotower.ui.components.DatabaseDownloadCard(
         useOneUi = useOneUi,
@@ -1473,6 +1476,16 @@ fun SectionDatabase(
         border = border,
         bubbleColor = bubbleColor,
         title = AppStrings.database
+    )
+
+    Spacer(modifier = Modifier.height(16.dp)) // Espace entre les deux cartes
+
+    // 🚀 NOUVEAU : LA CARTE DES CARTES HORS-LIGNE
+    fr.geotower.ui.components.MapDownloadCard(
+        useOneUi = useOneUi,
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor
     )
 
     if (!isWideScreen) {

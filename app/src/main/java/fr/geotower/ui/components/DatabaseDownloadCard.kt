@@ -6,15 +6,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cloud
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
@@ -26,6 +27,7 @@ import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun DatabaseDownloadCard(
     useOneUi: Boolean,
@@ -158,13 +160,24 @@ fun DatabaseDownloadCard(
         Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
 
             if (title != null) {
-                Text(
-                    text = title,
-                    fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleMedium,
+                Row(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                    textAlign = TextAlign.Start
-                )
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Storage,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = title,
+                        fontWeight = FontWeight.Bold,
+                        style = MaterialTheme.typography.titleMedium,
+                        textAlign = TextAlign.Start
+                    )
+                }
             }
 
             Row(
@@ -217,9 +230,9 @@ fun DatabaseDownloadCard(
 
             if (isSyncing) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-                    LinearProgressIndicator(
+                    LinearWavyProgressIndicator(
                         progress = { downloadProgress },
-                        modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
+                        modifier = Modifier.fillMaxWidth().height(8.dp),
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
@@ -246,6 +259,11 @@ fun DatabaseDownloadCard(
                     }
                 }
             } else {
+                val isUpToDate = localDbVersion != txtSearching &&
+                                localDbVersion != txtNoDb &&
+                                localDbVersion != txtUnknown &&
+                                localDbVersion == remoteDbVersion
+
                 Button(
                     onClick = {
                         onSafeClick {
@@ -253,12 +271,24 @@ fun DatabaseDownloadCard(
                             workManager.enqueueUniqueWork("db_download", androidx.work.ExistingWorkPolicy.REPLACE, request)
                         }
                     },
+                    enabled = !isUpToDate, // ✅ Grise le bouton si déjà à jour
                     modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 56.dp),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = if (isUpToDate) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
+                        contentColor = if (isUpToDate) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onPrimary
+                    )
                 ) {
-                    Icon(Icons.Default.CloudDownload, contentDescription = null)
+                    if (isUpToDate) {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null)
+                    } else {
+                        Icon(Icons.Default.CloudDownload, contentDescription = null)
+                    }
                     Spacer(Modifier.width(8.dp))
-                    Text(text = AppStrings.downloadAntennas, fontWeight = FontWeight.Bold)
+                    Text(
+                        text = if (isUpToDate) AppStrings.upToDate else AppStrings.downloadAntennas,
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
 
