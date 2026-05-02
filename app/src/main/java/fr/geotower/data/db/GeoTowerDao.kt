@@ -29,7 +29,19 @@ interface GeoTowerDao {
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
         AND UPPER(l.operateur) LIKE '%' || UPPER(:operatorName) || '%'
-        AND (t.statut = 'En service' OR t.statut = 'Techniquement opérationnel')
+        AND (
+            COALESCE(t.details_frequences, '') LIKE '%En service%' COLLATE NOCASE
+            OR COALESCE(t.details_frequences, '') LIKE '%Techniquement opérationnel%' COLLATE NOCASE
+            OR COALESCE(t.details_frequences, '') LIKE '%Techniquement operationnel%' COLLATE NOCASE
+            OR (
+                TRIM(COALESCE(t.details_frequences, '')) = ''
+                AND (
+                    t.statut = 'En service'
+                    OR t.statut = 'Techniquement opérationnel'
+                    OR t.statut = 'Techniquement operationnel'
+                )
+            )
+        )
     """)
     suspend fun getActiveLocalisationsInBoxByOperator(
         operatorName: String,

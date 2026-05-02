@@ -378,6 +378,7 @@ class LiveTrackingService : Service() {
             extras.putAll(
                 samsungOngoingActivityExtras(
                     operator = operator,
+                    progress = progress,
                     primaryInfo = liveTitle,
                     secondaryInfo = liveContentText,
                     shortCriticalText = shortCriticalText
@@ -430,6 +431,7 @@ class LiveTrackingService : Service() {
             extras.putAll(
                 samsungOngoingActivityExtras(
                     operator = operator,
+                    progress = progress,
                     primaryInfo = contentText,
                     secondaryInfo = expandedText,
                     shortCriticalText = extractShortCriticalText(contentText)
@@ -479,33 +481,48 @@ class LiveTrackingService : Service() {
 
     private fun samsungOngoingActivityExtras(
         operator: String,
+        progress: Int,
         primaryInfo: String,
         secondaryInfo: String,
         shortCriticalText: String?
     ): Bundle {
         if (!isSamsungDevice()) return Bundle.EMPTY
 
+        val chipText = samsungChipText(shortCriticalText, primaryInfo)
+        val drawerPrimaryInfo = samsungDrawerPrimaryInfo(chipText)
         val compactSecondary = secondaryInfo
             .replace('\n', ' ')
             .replace(Regex("\\s+"), " ")
             .trim()
             .take(MAX_SAMSUNG_NOW_BAR_TEXT_LENGTH)
-        val chipText = samsungChipText(shortCriticalText, primaryInfo)
         val operatorIcon = operatorLogo(operator)?.let { logoResId ->
             IconCompat.createWithResource(this, logoResId).toIcon(this)
+        }
+        val trackerIcon = IconCompat.createWithResource(this, R.drawable.ic_live_user_tracker).toIcon(this)
+        val progressSegment = Bundle().apply {
+            putFloat("android.ongoingActivityNoti.progressSegments.segmentStart", 0.0f)
+            putInt("android.ongoingActivityNoti.progressSegments.segmentColor", operatorColor(operator))
         }
 
         return Bundle().apply {
             putInt("android.ongoingActivityNoti.style", 1)
-            putString("android.ongoingActivityNoti.primaryInfo", primaryInfo)
+            putString("android.ongoingActivityNoti.primaryInfo", drawerPrimaryInfo)
             putString("android.ongoingActivityNoti.secondaryInfo", compactSecondary)
+            putInt("android.ongoingActivityNoti.progress", progress)
+            putInt("android.ongoingActivityNoti.progressMax", 100)
+            putParcelable("android.ongoingActivityNoti.progressSegments.icon", trackerIcon)
+            putInt("android.ongoingActivityNoti.progressSegments.progressColor", operatorColor(operator))
+            putParcelableArray("android.ongoingActivityNoti.progressSegments", arrayOf(progressSegment))
+            putInt("android.ongoingActivityNoti.actionType", 1)
+            putInt("android.ongoingActivityNoti.actionPrimarySet", 0)
             putString("android.ongoingActivityNoti.nowbarPrimaryInfo", chipText)
             putString("android.ongoingActivityNoti.nowbarSecondaryInfo", compactSecondary)
             putString("android.ongoingActivityNoti.chipExpandedText", chipText)
             putInt("android.ongoingActivityNoti.chipBgColor", operatorColor(operator))
             operatorIcon?.let { icon ->
                 putParcelable("android.ongoingActivityNoti.chipIcon", icon)
-                putParcelable("android.ongoingActivityNoti.secondaryInfoIcon", icon)
+                putParcelable("android.ongoingActivityNoti.nowbarIcon", icon)
+                putParcelable("android.ongoingActivityNoti.secondIcon", icon)
             }
         }
     }
@@ -521,6 +538,11 @@ class LiveTrackingService : Service() {
     private fun samsungChipText(shortCriticalText: String?, fallback: String): String {
         return (shortCriticalText ?: fallback)
             .take(MAX_SAMSUNG_CHIP_TEXT_LENGTH)
+    }
+
+    private fun samsungDrawerPrimaryInfo(chipText: String): String {
+        return "${AppStrings.nearestAntennaTitle(this)} • $chipText"
+            .take(MAX_SAMSUNG_DRAWER_TITLE_LENGTH)
     }
 
     private fun createNotificationChannel() {
@@ -672,6 +694,7 @@ class LiveTrackingService : Service() {
         private const val KM_PER_LATITUDE_DEGREE = 111.0
         private const val MAX_SAMSUNG_NOW_BAR_TEXT_LENGTH = 80
         private const val MAX_SAMSUNG_CHIP_TEXT_LENGTH = 24
+        private const val MAX_SAMSUNG_DRAWER_TITLE_LENGTH = 36
         private val SEARCH_RADII_KM = doubleArrayOf(5.0, 10.0, 25.0, 50.0, 100.0)
     }
 }
