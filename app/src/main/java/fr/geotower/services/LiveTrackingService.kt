@@ -490,7 +490,7 @@ class LiveTrackingService : Service() {
             .replace(Regex("\\s+"), " ")
             .trim()
             .take(MAX_SAMSUNG_NOW_BAR_TEXT_LENGTH)
-        val chipText = samsungChipText(operator, shortCriticalText, primaryInfo)
+        val chipText = samsungChipText(shortCriticalText, primaryInfo)
         val operatorIcon = operatorLogo(operator)?.let { logoResId ->
             IconCompat.createWithResource(this, logoResId).toIcon(this)
         }
@@ -518,18 +518,8 @@ class LiveTrackingService : Service() {
         return Build.MANUFACTURER.equals("samsung", ignoreCase = true)
     }
 
-    private fun samsungChipText(operator: String, shortCriticalText: String?, fallback: String): String {
-        val label = when {
-            operator.contains("ORANGE") -> "Orange"
-            operator.contains("BOUYGUES") -> "Bouygues"
-            operator.contains("SFR") -> "SFR"
-            operator.contains("FREE") -> "Free"
-            else -> null
-        }
-
-        return listOfNotNull(label, shortCriticalText)
-            .joinToString(" • ")
-            .ifBlank { fallback }
+    private fun samsungChipText(shortCriticalText: String?, fallback: String): String {
+        return (shortCriticalText ?: fallback)
             .take(MAX_SAMSUNG_CHIP_TEXT_LENGTH)
     }
 
