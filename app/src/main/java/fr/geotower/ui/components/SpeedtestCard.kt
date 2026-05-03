@@ -6,6 +6,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -21,6 +22,7 @@ import fr.geotower.utils.AppStrings
 
 import java.util.Locale
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SpeedtestCard(
     operatorName: String?,
@@ -61,7 +63,7 @@ fun SpeedtestCard(
             // État 1 : En cours de chargement (Appel API)
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxWidth().height(60.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                    LoadingIndicator(modifier = Modifier.size(32.dp))
                 }
             }
             // État 2 : Aucun test de débit trouvé

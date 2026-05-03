@@ -48,6 +48,8 @@ import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -108,7 +110,7 @@ import java.util.Locale
 import java.util.UUID
 import fr.geotower.ui.components.SpeedtestCard
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SiteDetailScreen(
     navController: NavController,
@@ -162,7 +164,7 @@ fun SiteDetailScreen(
 
     if (!isReady) {
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            LoadingIndicator(color = MaterialTheme.colorScheme.primary)
         }
         return
     }
@@ -553,7 +555,7 @@ fun SiteDetailScreen(
         }
     ) { padding ->
         if (antenna == null) {
-            Box(Modifier.fillMaxSize().padding(padding).background(mainBgColor), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
+            Box(Modifier.fillMaxSize().padding(padding).background(mainBgColor), contentAlignment = Alignment.Center) { LoadingIndicator() }
         } else {
             val info = antenna!!
             val scrollState = rememberScrollState()
@@ -878,10 +880,21 @@ fun SiteDetailScreen(
                                     blockShape = blockShape
                                 )
                             }
-                        }                        "freqs" -> { if (showFreqs) fr.geotower.ui.components.SiteFrequenciesBlock(info = info, technique = technique, formattedAzimuths = formattedAzimuths, cardBgColor = cardBgColor, blockShape = blockShape) }
+                        }
+                        "freqs" -> { if (showFreqs) fr.geotower.ui.components.SiteFrequenciesBlock(info = info, technique = technique, formattedAzimuths = formattedAzimuths, cardBgColor = cardBgColor, blockShape = blockShape) }
                         "links" -> {
                             if (showLinks && opNameUrl.isNotEmpty()) {
-                                fr.geotower.ui.components.SiteExternalLinksBlock(info = info, cardBgColor = cardBgColor, blockShape = blockShape, buttonShape = buttonShape, isSignalQuestInstalled = isSignalQuestInstalled, onShowCellularFr = { showCellularFrSheet = true }, onShowRnc = { showRncSheet = true }, onShowEnb = { showEnbSheet = true })
+                                fr.geotower.ui.components.SiteExternalLinksBlock(
+                                    info = info,
+                                    idSupport = physique?.idSupport,
+                                    cardBgColor = cardBgColor,
+                                    blockShape = blockShape,
+                                    buttonShape = buttonShape,
+                                    isSignalQuestInstalled = isSignalQuestInstalled,
+                                    onShowCellularFr = { showCellularFrSheet = true },
+                                    onShowRnc = { showRncSheet = true },
+                                    onShowEnb = { showEnbSheet = true }
+                                )
                             }
                         }
                     }

@@ -373,12 +373,12 @@ object AppStrings {
     // ==========================================
     // 🗺️ CRÉDITS CARTES (AboutScreen)
     // ==========================================
-    val openAndroMapsTitle @Composable get() = get(
-        "OpenAndroMaps",
-        "OpenAndroMaps",
-        "OpenAndroMaps"
+    val mapsForgesTitle @Composable get() = get(
+        "MapsForges",
+        "MapsForges",
+        "MapsForges"
     )
-    val openAndroMapsDesc @Composable get() = get(
+    val mapsForgesDesc @Composable get() = get(
         "Cartes vectorielles hors-ligne et thème de rendu (Elevate).",
         "Offline vector maps and render theme (Elevate).",
         "Mapas vetoriais offline e tema de renderização (Elevate)."

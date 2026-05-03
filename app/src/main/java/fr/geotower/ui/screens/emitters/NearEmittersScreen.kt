@@ -44,7 +44,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.LoadingIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -103,7 +104,7 @@ data class UiSite(
     val longitude: Double
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun NearEmittersScreen(
     navController: NavController,
@@ -479,7 +480,7 @@ fun NearEmittersScreen(
                                     ),
                                     trailingIcon = {
                                         if (isSearchingRemote) {
-                                            CircularProgressIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.primary, strokeWidth = 2.dp)
+                                            LoadingIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.primary)
                                         } else if (searchQuery.isNotEmpty()) {
                                             IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, "Effacer") }
                                         }
@@ -511,13 +512,13 @@ fun NearEmittersScreen(
                                 when {
                                     userLocation == null -> {
                                         Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-                                            CircularProgressIndicator()
+                                            LoadingIndicator()
                                             Spacer(modifier = Modifier.height(8.dp))
                                             Text(AppStrings.searchGps, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                                         }
                                     }
                                     isLoading -> {
-                                        CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+                                        LoadingIndicator(modifier = Modifier.align(Alignment.Center))
                                     }
                                     filteredSites.isEmpty() -> {
                                         Text(AppStrings.noSitesFound, modifier = Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.secondary)

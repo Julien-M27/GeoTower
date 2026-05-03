@@ -122,7 +122,7 @@ fun MapDownloadCard(
             Spacer(modifier = Modifier.height(16.dp))
 
             if (isLoading) {
-                CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                LoadingIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
             } else if (isError) {
                 Text(AppStrings.networkErrorSearch, color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.CenterHorizontally))
             } else {

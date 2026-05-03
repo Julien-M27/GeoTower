@@ -449,13 +449,12 @@ fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) 
     val releaseNotes: Map<String, List<Any>> = mapOf(
         "Interface & Design" to listOf(
             "Global :" to listOf(
-                "Correction des marges en bas de l'écran"
+                "Correction des notifications live maintenant disponibles sur Samsung",
+                "Ajout des animations MaterialUi Expressive 3"
             ),
             "Détail des sites :" to listOf(
-                "Ajout du record de débit en speedtest sur les sites SFR et Bouygues"
-            ),
-            "Carte :" to listOf(
-                "Ajout de l'affichage des azimuts en cône"
+                "Ajout du record de débit en speedtest sur les sites SFR et Bouygues",
+                "Ajout des liens qui mènent à l'application Signal Quest"
             )
         )
     )
@@ -537,14 +536,14 @@ fun SectionSources(cardShape: Shape, bubbleColor: Color) {
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
-            // 4. OpenAndroMaps (Cliquable)
+            // 4. MapsForge (Cliquable)
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { uriHandler.openUri("https://www.openandromaps.org/") }
+                    .clickable { uriHandler.openUri("https://mapsforge.org") }
             ) {
-                CreditItem(AppStrings.openAndroMapsTitle, AppStrings.openAndroMapsDesc)
-                Text("www.openandromaps.org", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                CreditItem(AppStrings.mapsForgesTitle, AppStrings.mapsForgesDesc)
+                Text("www.mapsforge.org", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)

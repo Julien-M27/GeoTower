@@ -26,6 +26,7 @@ import fr.geotower.utils.AppStrings
 @Composable
 fun SiteExternalLinksBlock(
     info: LocalisationEntity,
+    idSupport: String?,
     cardBgColor: Color,
     blockShape: Shape,
     buttonShape: Shape,
@@ -96,9 +97,29 @@ fun SiteExternalLinksBlock(
                             if (showSignalQuest && (info.operateur?.contains("SFR", true) == true || info.operateur?.contains("BOUYGUES", true) == true)) {
                                 CommunityLinkRow("Signal Quest", txtOpenApp, R.drawable.logo_signalquest, buttonShape) {
                                     safeClick {
+                                        // 1. Formatage de l'opérateur pour l'URL
+                                        val operator = when {
+                                            info.operateur?.contains("SFR", true) == true -> "SFR"
+                                            info.operateur?.contains("BOUYGUES", true) == true -> "BOUYGUES"
+                                            else -> info.operateur ?: ""
+                                        }
+
+                                        // 2. Construction de l'URL avec id_support comme siteId
+                                        val deeplinkUrl = "https://signalquest.fr/site?siteId=${idSupport ?: ""}&operator=$operator&lat=${info.latitude}&lng=${info.longitude}&open=antenna&autoOpen=0"
+
                                         if (isSignalQuestInstalled) {
-                                            context.packageManager.getLaunchIntentForPackage("com.sfrmap.android")?.let { context.startActivity(it) }
+                                            // 3. Création de l'Intent pour ouvrir le deeplink dans l'application
+                                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(deeplinkUrl)).apply {
+                                                setPackage("com.sfrmap.android")
+                                            }
+                                            try {
+                                                context.startActivity(intent)
+                                            } catch (e: Exception) {
+                                                // Fallback : si l'application crash ou ne gère pas l'intent, on ouvre dans le navigateur
+                                                uriHandler.openUri(deeplinkUrl)
+                                            }
                                         } else {
+                                            // 4. Si non installée, on garde la redirection vers le Play Store
                                             uriHandler.openUri("https://play.google.com/store/apps/details?id=com.sfrmap.android")
                                         }
                                     }
