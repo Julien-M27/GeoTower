@@ -46,6 +46,13 @@ object LiveTrackingController {
         }
     }
 
+    fun startOnAppLaunchIfEnabled(context: Context): StartResult {
+        val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("enable_live_notifications", false)) return StartResult.Stopped
+        if (LiveTrackingService.isRunning) return StartResult.Started
+        return startIfEligible(context)
+    }
+
     fun stop(context: Context) {
         context.applicationContext.stopService(
             Intent(context.applicationContext, LiveTrackingService::class.java)

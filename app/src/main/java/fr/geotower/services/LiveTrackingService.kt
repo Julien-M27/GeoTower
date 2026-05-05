@@ -29,7 +29,6 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.data.db.AppDatabase
 import fr.geotower.data.db.GeoTowerDao
 import fr.geotower.data.models.LocalisationEntity
-import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import java.util.Locale
 import kotlin.math.abs
@@ -62,6 +61,7 @@ class LiveTrackingService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        isRunning = true
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
         repository = AnfrRepository(
             api = fr.geotower.data.api.RetrofitClient.apiService,
@@ -72,7 +72,6 @@ class LiveTrackingService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP_SERVICE) {
-            disableLiveTrackingPreference()
             return stopTrackingAndSelf()
         }
 
@@ -598,14 +597,6 @@ class LiveTrackingService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun disableLiveTrackingPreference() {
-        getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-            .edit()
-            .putBoolean("enable_live_notifications", false)
-            .apply()
-        AppConfig.enableLiveNotifications.value = false
-    }
-
     private fun resetIfOperatorChanged(operator: String) {
         if (lockedOperator != null && lockedOperator != operator) {
             processingJob?.cancel()
@@ -679,6 +670,7 @@ class LiveTrackingService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        isRunning = false
         processingJob?.cancel()
         runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
         stopLocationUpdates()
@@ -688,6 +680,10 @@ class LiveTrackingService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
+        @Volatile
+        internal var isRunning: Boolean = false
+            private set
+
         private const val ACTION_STOP_SERVICE = "ACTION_STOP_SERVICE"
         private const val MIN_PROCESS_INTERVAL_MS = 30_000L
         private const val MIN_PROCESS_DISTANCE_METERS = 15f

@@ -227,7 +227,7 @@ object AppStrings {
     // ✅ NOUVEAU : Messages d'avertissement pour les filtres
     val minOneTechnoWarning @Composable get() = get("Vous devez garder au moins une technologie mobile (2G, 3G, 4G ou 5G).", "You must keep at least one mobile technology (2G, 3G, 4G, or 5G).", "Deve manter pelo menos uma tecnologia móvel (2G, 3G, 4G ou 5G).")
     val minOneFreqWarning @Composable get() = get("Vous devez garder au moins une fréquence.", "You must keep at least one frequency.", "Deve manter pelo menos uma fréquence.")
-    val anfrDatabaseFrom @Composable get() = get("Base de données hebdomadaire actuellement téléchargée :", "Weekly database currently being downloaded :", "Base de données semanal atualmente a ser descarregada :")
+    val anfrDatabaseFrom @Composable get() = get("Données hebdomadaires actuellement téléchargées :", "Weekly data currently downloaded:", "Dados semanais atualmente transferidos:")
 
     val deleteData @Composable get() = get("Supprimer les données", "Delete data", "Eliminar dados")
     val deleteDbWarningTitle @Composable get() = get("Attention", "Warning", "Atenção")
@@ -907,9 +907,9 @@ object AppStrings {
     val aboutVersionsTitle @Composable get() = get("Versions", "Versions", "Versões")
     val versionAppLabel @Composable get() = get("Version de l'application", "App version", "Versão do app")
     val versionDbLabel @Composable get() = get("Version de la base de données", "Database version", "Versão da base de données")
-    val versionWeeklyLabel @Composable get() = get("Mise à jour hebdomadaire", "Weekly update", "Atualização semanal")
-    val versionMonthlyLabel @Composable get() = get("Mise à jour mensuelle", "Monthly update", "Atualização mensal")
-    val versionHsLabel @Composable get() = get("Date des sites HS", "HS sites date", "Data dos sites HS")
+    val versionWeeklyLabel @Composable get() = get("Données hebdomadaires", "Weekly data", "Dados semanais")
+    val versionMonthlyLabel @Composable get() = get("Données mensuelles", "Monthly data", "Dados mensais")
+    val versionHsLabel @Composable get() = get("Données des sites HS", "HS sites data", "Dados dos sites HS")
 
     fun formatMapName(rawName: String): String {
         val cleanName = rawName.replace(".map", "", ignoreCase = true)

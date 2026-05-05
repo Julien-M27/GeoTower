@@ -449,12 +449,12 @@ fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) 
     val releaseNotes: Map<String, List<Any>> = mapOf(
         "Interface & Design" to listOf(
             "Global :" to listOf(
-                "Correction des notifications live maintenant disponibles sur Samsung",
-                "Ajout des animations MaterialUi Expressive 3"
+                "Correction des notifications en direct qui se désactivaient totalement lorsqu'on appuyait sur Quitter",
+                "Ajout des animations MaterialUi Expressive 3",
+                "Ajout de bouton de réglages rapide sur certaines pages de l'application"
             ),
             "Détail des sites :" to listOf(
-                "Ajout du record de débit en speedtest sur les sites SFR et Bouygues",
-                "Ajout des liens qui mènent à l'application Signal Quest"
+                "Ajout du d'un nouvel affichage pour les fréquences"
             )
         )
     )
@@ -683,7 +683,7 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
                 e.printStackTrace()
             }
 
-            // 3. Date des sites HS (depuis les préférences)
+            // 3. Données des sites HS (depuis les préférences)
             val prefs = context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
             hsDate = prefs.getString("last_hs_update", "-") ?: "-"
         }

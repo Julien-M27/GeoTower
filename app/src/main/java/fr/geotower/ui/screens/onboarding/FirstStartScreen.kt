@@ -75,7 +75,6 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.launch
-import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.runtime.collectAsState
 
 @Composable
@@ -652,7 +651,12 @@ fun StepMapDesign(useOneUi: Boolean, bubbleColor: Color, onSafeClick: (() -> Uni
 fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStroke?, bubbleColor: Color, onSafeClick: (() -> Unit) -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         Spacer(modifier = Modifier.height(16.dp))
-        Icon(Icons.Outlined.Storage, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
+        Icon(
+            painter = painterResource(R.drawable.ic_material_database),
+            contentDescription = null,
+            modifier = Modifier.size(80.dp),
+            tint = MaterialTheme.colorScheme.primary
+        )
         Spacer(modifier = Modifier.height(24.dp))
 
         Text(AppStrings.database, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)

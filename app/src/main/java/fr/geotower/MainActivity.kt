@@ -67,8 +67,15 @@ class MainActivity : ComponentActivity() {
         extraBufferCapacity = 1,
         onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST
     )
-
     // 🌟 2. ATTRAPER LE CLIC QUAND L'APP EST EN ARRIÈRE-PLAN
+    override fun onResume() {
+        super.onResume()
+        val prefs = getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+        if (!prefs.getBoolean("isFirstRun", true)) {
+            LiveTrackingController.startOnAppLaunchIfEnabled(this)
+        }
+    }
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
@@ -256,9 +263,6 @@ class MainActivity : ComponentActivity() {
         AppConfig.navMode.intValue = appPrefs.getInt("nav_mode", 0)
         AppConfig.defaultOperator.value = appPrefs.getString("default_operator", "Aucun") ?: "Aucun"
         AppConfig.loadSavedFilters(appPrefs)
-        if (!isFirstRun) {
-            LiveTrackingController.sync(this)
-        }
         // ========================================================
 
         // --- VÉRIFICATION DU MAGNÉTOMÈTRE (BOUSSOLE) ---
