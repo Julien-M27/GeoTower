@@ -386,12 +386,14 @@ fun SiteDetailScreen(
 
             if (opName.contains("SFR", true) || opName.contains("BOUYGUES", true)) {
                 try {
-                    val response = fr.geotower.data.api.SignalQuestClient.api.getSitePhotos(
-                        authHeader = "Bearer ${fr.geotower.BuildConfig.SQ_API_KEY}",
-                        siteId = trueSupportId
-                    )
-                    response.body()?.data?.forEach {
-                        photosTemp.add(CommunityPhoto(it.imageUrl, "Signal Quest", it.authorName, it.uploadedAt))
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        val response = fr.geotower.data.api.SignalQuestClient.api.getSitePhotos(
+                            authHeader = "Bearer ${fr.geotower.BuildConfig.SQ_API_KEY}",
+                            siteId = trueSupportId
+                        )
+                        response.body()?.data?.forEach {
+                            photosTemp.add(CommunityPhoto(it.imageUrl, "Signal Quest", it.authorName, it.uploadedAt))
+                        }
                     }
                 } catch (e: Exception) { e.printStackTrace() }
             }

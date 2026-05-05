@@ -105,6 +105,8 @@ object AppConfig {
     var siteF5G_3500 = mutableStateOf(true)
     var siteF5G_26000 = mutableStateOf(true)
 
+    var siteFreqGridDisplay = mutableStateOf(false)
+
     // --- FILTRES : SPECTRE (DÉTAILS DU SITE) ---
     var siteShowSpectrum = mutableStateOf(true) // Switch principal maître
     var siteShowSpectrumBand = mutableStateOf(true)
@@ -255,6 +257,9 @@ object AppConfig {
         siteF5G_2100.value = prefs.getBoolean("site_f5g_2100", true)
         siteF5G_3500.value = prefs.getBoolean("site_f5g_3500", true)
         siteF5G_26000.value = prefs.getBoolean("site_f5g_26000", true)
+
+        //AFFICHAGE DES FREQUENCES EN GRILLE
+        siteFreqGridDisplay.value = prefs.getBoolean("site_freq_grid_display", false)
 
         // --- CHARGEMENT SPECTRE ---
         siteShowSpectrum.value = prefs.getBoolean("site_show_spectrum", true)

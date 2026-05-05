@@ -73,6 +73,8 @@ fun SharePreferencesSheet(
     onSpeedtestChange: (Boolean) -> Unit, // 🚨 NEW
     freqEnabled: Boolean,
     onFreqChange: (Boolean) -> Unit,
+    splitImageEnabled: Boolean,
+    onSplitImageChange: (Boolean) -> Unit,
     qrEnabled: Boolean,
     onQrChange: (Boolean) -> Unit,
     confidentialEnabled: Boolean,
@@ -194,7 +196,7 @@ fun SharePreferencesSheet(
                         }
                     }
                 }
-            }
+            } // Fin de la Column(verticalArrangement = Arrangement.spacedBy(spacing))
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -203,6 +205,7 @@ fun SharePreferencesSheet(
                 onClick = {
                     onOrderChange(listOf("map", "support", "ids", "dates", "address", "speedtest", "status", "freq"))
                     onMapChange(true)
+                    onSplitImageChange(false) // Réinitialise aussi la scission
                     onSupportChange(true)
                     onIdsChange(true)
                     onDatesChange(true)
@@ -222,6 +225,19 @@ fun SharePreferencesSheet(
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
             val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+
+            // ✅ INTERRUPTEUR : SCINDER L'IMAGE (Juste au-dessus du QR Code)
+            SimpleSwitchCardWithDesc(
+                title = AppStrings.splitShareImage,
+                desc = AppStrings.splitShareImageDesc,
+                checked = splitImageEnabled,
+                onCheckedChange = onSplitImageChange,
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                useOneUi = useOneUi
+            )
+            Spacer(modifier = Modifier.height(8.dp))
 
             // ✅ LE BOUTON QR CODE EST ICI !
             SimpleSwitchCard("QR Code", qrEnabled, onQrChange, shape, border, bubbleColor, useOneUi)

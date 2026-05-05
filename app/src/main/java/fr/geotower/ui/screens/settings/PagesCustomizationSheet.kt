@@ -80,6 +80,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.MutableState
@@ -1128,6 +1129,40 @@ fun SiteFreqFiltersSheet(
                     textAlign = TextAlign.Center
                 )
                 Spacer(Modifier.width(48.dp))
+            }
+
+            // ✅ NOUVEAU : BOUTON AFFICHAGE EN GRILLE
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(Icons.Default.GridView, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Text(
+                        text = AppStrings.freqGridDisplayOption,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
+                        fontSize = 16.sp
+                    )
+
+                    val onGridChange = { newValue: Boolean ->
+                        saveBool("site_freq_grid_display", AppConfig.siteFreqGridDisplay, newValue)
+                    }
+
+                    if (useOneUi) {
+                        fr.geotower.ui.components.OneUiSwitch(AppConfig.siteFreqGridDisplay.value, onGridChange)
+                    } else {
+                        Switch(
+                            checked = AppConfig.siteFreqGridDisplay.value,
+                            onCheckedChange = onGridChange,
+                            colors = SwitchDefaults.colors(checkedTrackColor = switchColor)
+                        )
+                    }
+                }
             }
 
             AppConfig.siteTechnoOrder.value.forEach { technoId ->

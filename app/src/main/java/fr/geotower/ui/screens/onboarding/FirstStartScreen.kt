@@ -267,8 +267,8 @@ fun FirstStartScreen(
                                 val dbFile = context.getDatabasePath("geotower.db")
                                 val isDbDownloaded = dbFile.exists() && dbFile.length() > 100 * 1024
 
-                                // ✅ CORRECTION 2 : On remplace la condition pour bloquer si c'est en cours de synchro OU non téléchargé
-                                if (currentStep == 3 && (isSyncing || !isDbDownloaded)) {
+                                // ✅ CORRECTION : On affiche l'avertissement UNIQUEMENT si ça ne télécharge pas ET que ce n'est pas installé
+                                if (currentStep == 3 && !isSyncing && !isDbDownloaded) {
                                     // 🚨 Bloque sur la page 3 (Base de données) et affiche le pop-up
                                     showDbWarning = true
                                 } else {

@@ -230,6 +230,7 @@ fun SettingsScreen(
     var shareConfidentialEnabled by remember { mutableStateOf(prefs.getBoolean("share_confidential_enabled", false)) }
     var shareSiteQrEnabled by remember { mutableStateOf(prefs.getBoolean("share_site_qr_enabled", true)) }
     var shareSupQrEnabled by remember { mutableStateOf(prefs.getBoolean("share_sup_qr_enabled", true)) }
+    var shareSplitImageEnabled by remember { mutableStateOf(prefs.getBoolean("share_split_image_enabled", false)) } // ✅ NOUVELLE VARIABLE
     var shareOrder by remember {
         mutableStateOf(
             (prefs.getString("share_order", "map,support,ids,dates,address,speedtest,status,freq") ?: "map,support,ids,dates,address,speedtest,status,freq")
@@ -937,6 +938,13 @@ fun SettingsScreen(
                 },
                 qrEnabled = shareSiteQrEnabled,
                 onQrChange = { shareSiteQrEnabled = it; prefs.edit().putBoolean("share_site_qr_enabled", it).apply() },
+
+                // ✅ AJOUT DES DEUX PARAMÈTRES MANQUANTS ICI :
+                splitImageEnabled = shareSplitImageEnabled,
+                onSplitImageChange = {
+                    shareSplitImageEnabled = it; prefs.edit().putBoolean("share_split_image_enabled", it).apply()
+                },
+
                 confidentialEnabled = shareConfidentialEnabled,
                 onConfidentialChange = {
                     shareConfidentialEnabled = it; prefs.edit()

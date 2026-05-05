@@ -200,6 +200,7 @@ object AppStrings {
     val showSpeedometer @Composable get() = get("Compteur de vitesse", "Speedometer", "Velocímetro")
     val showSpeedometerDesc @Composable get() = get("Afficher la vitesse sur la carte", "Show speed on the map", "Mostrar a vitesse no mapa")
     val siteFreqFiltersTitle @Composable get() = get("Filtres des fréquences de l'antenne", "Antenna frequency filters", "Filtros de fréquence da antena")
+    val freqGridDisplayOption @Composable get() = get("Afficher les fréquences en grille", "Display frequencies in a grid", "Exibir frequências em grade")
     val shareMapAzimuthsOption @Composable get() = get("Afficher les azimuts", "Show azimuths", "Mostrar azimutes")
 
     val liveNotificationTitle @Composable get() = get("Notification Live", "Live Notification", "Notificação au vivo")
@@ -231,6 +232,8 @@ object AppStrings {
     val deleteAllMapsWarningTitle @Composable get() = get("Supprimer toutes les cartes ?", "Delete all maps?", "Eliminar todos os mapas?")
     val deleteAllMapsWarningDesc @Composable get() = get("Voulez-vous vraiment supprimer toutes les cartes téléchargées ?", "Do you really want to delete all downloaded maps?", "Tem a certeza de que pretende eliminar todos os mapas descarregados?")
 
+    val splitShareImage @Composable get() = get("Scinder l'image de partage", "Split share image", "Dividir a imagem de partilha")
+    val splitShareImageDesc @Composable get() = get("Sépare les fréquences sur une 2ème image", "Separates frequencies on a 2nd image", "Separa as frequências numa 2ª imagem")
     // ==========================================
     // 📏 UNITÉS DE MESURE
     // ==========================================

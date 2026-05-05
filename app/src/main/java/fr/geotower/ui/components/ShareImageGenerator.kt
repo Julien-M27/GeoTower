@@ -68,6 +68,7 @@ import fr.geotower.utils.AppStrings
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
+import android.net.Uri
 import fr.geotower.ui.components.SiteStatusCard
 
 private fun Int.dpToPx(context: Context): Int = (this * context.resources.displayMetrics.density).toInt()
@@ -129,6 +130,7 @@ fun shareFullAntennaCapture(
     incSpeedtest: Boolean, // 🚨 NEW
     incConfidential: Boolean,
     incQrCode: Boolean,
+    incSplitImage: Boolean,
     shareOrder: List<String>
 ) {
     val composeView = ComposeView(context).apply {
@@ -137,454 +139,877 @@ fun shareFullAntennaCapture(
         setViewTreeViewModelStoreOwner(currentView.findViewTreeViewModelStoreOwner())
         setContent {
             MaterialTheme(colorScheme = if (forceDarkTheme) darkColorScheme() else lightColorScheme()) {
-                Surface(color = MaterialTheme.colorScheme.background) {
+                Surface(color = Color.Transparent) { // ⚠️ TRÈS IMPORTANT : Fond transparent pour ne pas colorer le vide
 
                     val formattedHeights = if (info.azimuts.isNullOrBlank()) ""
                     else {
                         val heights = info.azimuts?.split(",")
-                            ?.mapNotNull { it.substringAfter("(", "").substringBefore("m", "").trim().toFloatOrNull() }
+                            ?.mapNotNull {
+                                it.substringAfter("(", "").substringBefore("m", "").trim()
+                                    .toFloatOrNull()
+                            }
                             ?.filter { it > 0f }?.distinct()?.sorted() ?: emptyList()
                         if (heights.isNotEmpty()) heights.joinToString(" m - ") + " m" else ""
                     }
 
-                    Column(
-                        modifier = Modifier.width(400.dp).wrapContentHeight().padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
-                    ) {
-                        Text(txtTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                    // ✅ DÉTECTION DU MODE SCINDÉ
+                    val isSplit = incSplitImage && incFreqs
 
-                        Card(modifier = Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                val logoRes = getDetailLogoRes(info.operateur ?: "")
-                                if (logoRes != null) { Image(painter = painterResource(id = logoRes), contentDescription = null, modifier = Modifier.size(60.dp).clip(RoundedCornerShape(8.dp))) }
-                                Spacer(modifier = Modifier.width(16.dp))
-                                Column {
-                                    Text(info.operateur ?: "Inconnu", fontWeight = FontWeight.Bold)
-                                    val rawTechs =
-                                        technique?.technologies?.takeIf { it.isNotBlank() }
-                                            ?: info.frequences
-                                    Text(
-                                        formatTechnologies(rawTechs, AppStrings.unknown),
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                            }
-                        }
+                    // On génère le QR Code une seule fois pour l'utiliser sur les deux images
+                    val qrUri = "geotower://site/${info.idAnfr}"
+                    val qrBitmap = remember(qrUri) { generateQrCodeBitmap(qrUri, 200) }
 
-                        if (incSupport) {
-                            Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                                if (!incConfidential) {
-                                    val rotation = bearingStr.replace("°", "").toFloatOrNull() ?: 0f
-                                    Card(modifier = Modifier.weight(1f).fillMaxHeight(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                                        Column(modifier = Modifier.padding(16.dp).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
-                                            Text(txtBearingLabel.replace(" : ", ""), style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
-                                            Spacer(Modifier.height(8.dp))
-                                            Icon(Icons.Default.Navigation, null, Modifier.size(40.dp).rotate(rotation), tint = MaterialTheme.colorScheme.primary)
-                                            Spacer(Modifier.height(8.dp))
-                                            Text(bearingStr, fontWeight = FontWeight.Bold)
-                                        }
-                                    }
-                                }
-                                Card(modifier = Modifier.weight(1f).fillMaxHeight(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)) {
-                                    Column(modifier = Modifier.padding(16.dp).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
-                                        Text(txtSupportHeight.replace(" : ", ""), style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
-                                        Spacer(Modifier.height(8.dp))
-                                        Icon(Icons.Default.VerticalAlignTop, null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
-                                        Spacer(Modifier.height(8.dp))
-                                        // ✅ ON UTILISE LA VRAIE HAUTEUR
-                                        Text("${physique?.hauteur ?: "--"} m", fontWeight = FontWeight.Bold)
-                                    }
-                                }
-                            }
-                        }
+                    // ✅ ROW GLOBALE (800dp de large au total si split)
+                    Row(modifier = Modifier.wrapContentSize()) {
 
-                        shareOrder.forEach { block ->
-                            when (block) {
-                                "map" -> {
-                                    if (incMap && mapBitmap != null) {
+                        // ==========================================
+                        // 📸 IMAGE 1 : Contenu principal
+                        // ==========================================
+                        Column(
+                            modifier = Modifier
+                                .width(400.dp)
+                                .wrapContentHeight()
+                                .background(MaterialTheme.colorScheme.background) // ✅ Le fond est appliqué ici
+                                .padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            Text(
+                                txtTitle,
+                                style = MaterialTheme.typography.titleLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    val logoRes = getDetailLogoRes(info.operateur ?: "")
+                                    if (logoRes != null) {
                                         Image(
-                                            bitmap = mapBitmap.asImageBitmap(),
+                                            painter = painterResource(id = logoRes),
                                             contentDescription = null,
-                                            modifier = Modifier.fillMaxWidth().height(180.dp).clip(RoundedCornerShape(12.dp)),
-                                            contentScale = ContentScale.Crop
+                                            modifier = Modifier.size(60.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Column {
+                                        Text(
+                                            info.operateur ?: "Inconnu",
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        val rawTechs =
+                                            technique?.technologies?.takeIf { it.isNotBlank() }
+                                                ?: info.frequences
+                                        Text(
+                                            formatTechnologies(rawTechs, AppStrings.unknown),
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
                                 }
-                                "support" -> {
-                                    if (incSupport) {
-                                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
-                                            Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.primary)
-                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                    Text(txtSupportDetailsTitle, fontWeight = FontWeight.Bold)
-                                                }
-                                                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                                                // ✅ ON UTILISE LA VRAIE NATURE ET PROPRIÉTAIRE
-                                                val nature = physique?.natureSupport?.takeIf { it.isNotBlank() } ?: txtNotSpecified
-                                                val proprietaire = physique?.proprietaire?.takeIf { it.isNotBlank() } ?: "Inconnu"
-                                                Text("$txtSupportNature : $nature", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                Text("$txtOwner : $proprietaire", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            }
-                                        }
-                                    }
-                                }
-                                "ids" -> {
-                                    if (incIds) {
-                                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
-                                            Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Icon(Icons.Default.Tag, null, tint = MaterialTheme.colorScheme.primary)
-                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                    Text(txtIdentifiers, fontWeight = FontWeight.Bold)
-                                                }
-                                                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                                                val idSupportValue = physique?.idSupport?.takeIf { it.isNotBlank() } ?: txtNotSpecified
-                                                Text("$txtIdSupportLabel $idSupportValue", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                Text("$txtAnfrStationNumber ${info.idAnfr}", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                            }
-                                        }
-                                    }
-                                }
-                                "dates" -> {
-                                    if (incDates) {
-                                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
-                                            Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Icon(Icons.Default.DateRange, null, tint = MaterialTheme.colorScheme.primary)
-                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                    Text(txtDates, fontWeight = FontWeight.Bold)
-                                                }
-                                                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                                                // ✅ ON UTILISE LES VRAIES DATES
-                                                val dateImpStr = technique?.dateImplantation?.takeIf { it.isNotBlank() }?.let { formatDateToFrench(it) } ?: "-"
-                                                val dateSerStr = technique?.dateService?.takeIf { it.isNotBlank() }?.let { formatDateToFrench(it) } ?: "-"
-                                                val dateModStr = technique?.dateModif?.takeIf { it.isNotBlank() }?.let { formatDateToFrench(it) } ?: "-"
-                                                if (dateModStr != "-") {
-                                                    Text("$txtLastModification $dateModStr", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                }
+                            }
 
-                                                Text("$txtimplementation $dateImpStr", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                Text("$txtActivatedOn $dateSerStr", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                if (dateModStr != "-") {
-                                                    Text("$txtLastModification $dateModStr", color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                "address" -> {
-                                    if (incAddress) {
-                                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
-                                            Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Icon(Icons.Default.Place, null, tint = MaterialTheme.colorScheme.primary)
-                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                    Text(txtAddressLabel.replace(" : ", ""), fontWeight = FontWeight.Bold)
-                                                }
-                                                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                                                // ✅ ON UTILISE LA VRAIE ADRESSE
-                                                val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: "Adresse non spécifiée"
-                                                Text(fullAddress, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                Spacer(modifier = Modifier.height(8.dp))
-                                                Text("$txtGpsLabel ${String.format(Locale.US, "%.5f, %.5f", info.latitude, info.longitude)}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                if (incConfidential) {
-                                                    Text(AppStrings.distanceHidden, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-                                                } else {
-                                                    Text("$txtDistanceLabel $distanceStr$txtFromMyPosition", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                "speedtest" -> {
-                                    if (incSpeedtest && speedtestData != null) {
-                                        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), modifier = Modifier.fillMaxWidth()) {
-                                            Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.primary)
-                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                    Text(AppStrings.speedtestTitle, fontWeight = FontWeight.Bold)
-                                                }
-                                                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                                                
-                                                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                                                    // Download
-                                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                        Icon(Icons.Default.KeyboardArrowDown, null, tint = Color(0xFF4CAF50), modifier = Modifier.size(24.dp))
-                                                        Text(if (speedtestData.downloadSpeed != null) String.format(Locale.US, "%.1f", speedtestData.downloadSpeed) else "--", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                                        Text("Mbps", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                        Text(AppStrings.speedtestDownload, fontSize = 10.sp)
-                                                    }
-                                                    // Upload
-                                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                        Icon(Icons.Default.KeyboardArrowUp, null, tint = Color(0xFF2196F3), modifier = Modifier.size(24.dp))
-                                                        Text(if (speedtestData.uploadSpeed != null) String.format(Locale.US, "%.1f", speedtestData.uploadSpeed) else "--", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                                        Text("Mbps", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                        Text(AppStrings.speedtestUpload, fontSize = 10.sp)
-                                                    }
-                                                    // Ping
-                                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                                        Icon(Icons.Default.Timer, null, tint = Color(0xFFFF9800), modifier = Modifier.size(24.dp))
-                                                        Text(if (speedtestData.ping != null) speedtestData.ping.toInt().toString() else "--", fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                                                        Text("ms", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                        Text(AppStrings.speedtestPing, fontSize = 10.sp)
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                "status" -> {
-                                    if (AppConfig.shareSiteStatus.value) {
-                                        val hsEntity = hsDataMap[info.idAnfr]
-                                        val isOutage = hsEntity != null
-                                        val outageText = hsEntity?.let { fr.geotower.ui.components.formatOutageDetails(it) }
-
-                                        val rawTechs = technique?.technologies?.takeIf { it.isNotBlank() } ?: info.frequences ?: ""
-                                        val has2G = rawTechs.contains("2G", ignoreCase = true)
-                                        val has3G = rawTechs.contains("3G", ignoreCase = true)
-                                        val has4G = rawTechs.contains("4G", ignoreCase = true)
-                                        val has5G = rawTechs.contains("5G", ignoreCase = true)
-
-                                        val detailsStr = technique?.detailsFrequences ?: ""
-                                        val globalStatut = technique?.statut ?: ""
-                                        val globalIsProject = globalStatut.contains("Projet", ignoreCase = true)
-
-                                        fun isTechPlanned(keywords: List<String>): Boolean {
-                                            if (detailsStr.isBlank()) return globalIsProject
-                                            val lines = detailsStr.split("\n").filter { line ->
-                                                keywords.any { k -> line.contains(k, ignoreCase = true) }
-                                            }
-                                            if (lines.isEmpty()) return globalIsProject
-                                            return lines.all { it.contains("Projet", ignoreCase = true) }
-                                        }
-
-                                        val is2gProject = has2G && isTechPlanned(listOf("GSM", "2G"))
-                                        val is3gProject = has3G && isTechPlanned(listOf("UMTS", "3G"))
-                                        val is4gProject = has4G && isTechPlanned(listOf("LTE", "4G"))
-                                        val is5gProject = has5G && isTechPlanned(listOf("NR", "5G"))
-
-                                        val totalTechs = listOf(has2G, has3G, has4G, has5G).count { it }
-                                        val projectTechs = listOf(is2gProject, is3gProject, is4gProject, is5gProject).count { it }
-                                        val isEntirelyProject = totalTechs > 0 && totalTechs == projectTechs
-
-                                        val realTechStatus = mapOf(
-                                            "2G" to fr.geotower.ui.components.ServiceStatus(
-                                                isVoixOk = if (has2G) hsEntity?.let { it.voix2g != "HS" } ?: true else null,
-                                                isSmsOk = if (has2G) hsEntity?.let { it.voix2g != "HS" } ?: true else null,
-                                                isInternetOk = if (has2G) hsEntity?.let { it.data2g != "HS" } ?: true else null,
-                                                isProject = is2gProject
-                                            ),
-                                            "3G" to fr.geotower.ui.components.ServiceStatus(
-                                                isVoixOk = if (has3G) hsEntity?.let { it.voix3g != "HS" } ?: true else null,
-                                                isSmsOk = if (has3G) hsEntity?.let { it.voix3g != "HS" } ?: true else null,
-                                                isInternetOk = if (has3G) hsEntity?.let { it.data3g != "HS" } ?: true else null,
-                                                isProject = is3gProject
-                                            ),
-                                            "4G" to fr.geotower.ui.components.ServiceStatus(
-                                                isVoixOk = if (has4G) hsEntity?.let { it.voix4g != "HS" } ?: true else null,
-                                                isSmsOk = if (has4G) hsEntity?.let { it.voix4g != "HS" } ?: true else null,
-                                                isInternetOk = if (has4G) hsEntity?.let { it.data4g != "HS" } ?: true else null,
-                                                isProject = is4gProject
-                                            ),
-                                            "5G" to fr.geotower.ui.components.ServiceStatus(
-                                                isVoixOk = if (has5G) hsEntity?.let { it.voix5g != "HS" } ?: true else null,
-                                                isSmsOk = if (has5G) hsEntity?.let { it.voix5g != "HS" } ?: true else null,
-                                                isInternetOk = if (has5G) hsEntity?.let { it.data5g != "HS" } ?: true else null,
-                                                isProject = is5gProject
-                                            )
-                                        )
-
-                                        SiteStatusCard(
-                                            isProjectSite = isEntirelyProject,
-                                            isOutage = isOutage,
-                                            outageText = outageText,
-                                            cardBgColor = MaterialTheme.colorScheme.surfaceVariant,
-                                            blockShape = RoundedCornerShape(12.dp),
-                                            techStatus = realTechStatus
-                                        )
-                                    }
-                                }
-                                "freq" -> {
-                                    if (incFreqs) {
-                                        val rawFreqs = technique?.detailsFrequences ?: info.frequences
-                                        // ✅ 1. CORRECTION : On passe les traductions à la fonction de parsing
-                                        // ✅ ON APPLIQUE LE MÊME FILTRE QUE SUR L'ÉCRAN DE DÉTAILS
-                                        val parsedBands = parseAndSortFrequencies(rawFreqs, AppStrings.unknown, AppStrings.azimuthNotSpecified).filter { band ->
-                                            when (band.gen) {
-                                                5 -> AppConfig.siteShowTechno5G.value && when (band.value) {
-                                                    700 -> AppConfig.siteF5G_700.value
-                                                    2100 -> AppConfig.siteF5G_2100.value
-                                                    3500 -> AppConfig.siteF5G_3500.value
-                                                    26000 -> AppConfig.siteF5G_26000.value
-                                                    else -> true
-                                                }
-                                                4 -> AppConfig.siteShowTechno4G.value && when (band.value) {
-                                                    700 -> AppConfig.siteF4G_700.value
-                                                    800 -> AppConfig.siteF4G_800.value
-                                                    900 -> AppConfig.siteF4G_900.value
-                                                    1800 -> AppConfig.siteF4G_1800.value
-                                                    2100 -> AppConfig.siteF4G_2100.value
-                                                    2600 -> AppConfig.siteF4G_2600.value
-                                                    else -> true
-                                                }
-                                                3 -> AppConfig.siteShowTechno3G.value && when (band.value) {
-                                                    900 -> AppConfig.siteF3G_900.value
-                                                    2100 -> AppConfig.siteF3G_2100.value
-                                                    else -> true
-                                                }
-                                                2 -> AppConfig.siteShowTechno2G.value && when (band.value) {
-                                                    900 -> AppConfig.siteF2G_900.value
-                                                    1800 -> AppConfig.siteF2G_1800.value
-                                                    else -> true
-                                                }
-                                                else -> AppConfig.siteShowTechnoFH.value
-                                            }
-                                        }
-
+                            if (incSupport) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+                                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    if (!incConfidential) {
+                                        val rotation =
+                                            bearingStr.replace("°", "").toFloatOrNull() ?: 0f
                                         Card(
-                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                                            modifier = Modifier.fillMaxWidth()
+                                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
                                         ) {
-                                            Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
-                                                // --- EN-TÊTE DU BLOC ---
-                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                    Icon(Icons.Default.WifiTethering, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                    Text(txtFrequenciesTitle, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                            Column(
+                                                modifier = Modifier.padding(16.dp).fillMaxSize(),
+                                                horizontalAlignment = Alignment.CenterHorizontally,
+                                                verticalArrangement = Arrangement.SpaceBetween
+                                            ) {
+                                                Text(
+                                                    txtBearingLabel.replace(" : ", ""),
+                                                    style = MaterialTheme.typography.labelMedium,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                                Spacer(Modifier.height(8.dp))
+                                                Icon(
+                                                    Icons.Default.Navigation,
+                                                    null,
+                                                    Modifier.size(40.dp).rotate(rotation),
+                                                    tint = MaterialTheme.colorScheme.primary
+                                                )
+                                                Spacer(Modifier.height(8.dp))
+                                                Text(bearingStr, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+                                    Card(
+                                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                    ) {
+                                        Column(
+                                            modifier = Modifier.padding(16.dp).fillMaxSize(),
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.SpaceBetween
+                                        ) {
+                                            Text(
+                                                txtSupportHeight.replace(" : ", ""),
+                                                style = MaterialTheme.typography.labelMedium,
+                                                textAlign = TextAlign.Center
+                                            )
+                                            Spacer(Modifier.height(8.dp))
+                                            Icon(
+                                                Icons.Default.VerticalAlignTop,
+                                                null,
+                                                Modifier.size(40.dp),
+                                                tint = MaterialTheme.colorScheme.primary
+                                            )
+                                            Spacer(Modifier.height(8.dp))
+                                            Text(
+                                                "${physique?.hauteur ?: "--"} m",
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+
+                            // 🚨 ON FILTRE L'ORDRE POUR L'IMAGE 1 : Pas de bloc "freq" ni "ids" si l'image est scindée
+                            val orderImage1 =
+                                if (isSplit) shareOrder.filter { it != "freq" && it != "ids" } else shareOrder
+
+                            orderImage1.forEach { block ->
+                                when (block) {
+                                    "map" -> {
+                                        if (incMap && mapBitmap != null) {
+                                            Image(
+                                                bitmap = mapBitmap.asImageBitmap(),
+                                                contentDescription = null,
+                                                modifier = Modifier.fillMaxWidth().height(180.dp)
+                                                    .clip(RoundedCornerShape(12.dp)),
+                                                contentScale = ContentScale.Crop
+                                            )
+                                        }
+                                    }
+
+                                    "support" -> {
+                                        if (incSupport) {
+                                            Card(
+                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(16.dp)
+                                                        .fillMaxWidth()
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(
+                                                            Icons.Default.Info,
+                                                            null,
+                                                            tint = MaterialTheme.colorScheme.primary
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(
+                                                            txtSupportDetailsTitle,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                    HorizontalDivider(
+                                                        modifier = Modifier.padding(
+                                                            vertical = 12.dp
+                                                        ),
+                                                        color = MaterialTheme.colorScheme.outlineVariant.copy(
+                                                            alpha = 0.5f
+                                                        )
+                                                    )
+                                                    val nature =
+                                                        physique?.natureSupport?.takeIf { it.isNotBlank() }
+                                                            ?: txtNotSpecified
+                                                    val proprietaire =
+                                                        physique?.proprietaire?.takeIf { it.isNotBlank() }
+                                                            ?: "Inconnu"
+                                                    Text(
+                                                        "$txtSupportNature : $nature",
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                    Text(
+                                                        "$txtOwner : $proprietaire",
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
                                                 }
-                                                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                            }
+                                        }
+                                    }
 
-                                                if (parsedBands.isEmpty()) {
-                                                    Text(txtBandsNotSpecified, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                                                } else {
-                                                    // --- LISTE DES FRÉQUENCES ---
-                                                    parsedBands.forEachIndexed { bandIndex, band ->
-                                                        if (bandIndex > 0) {
-                                                            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                                                        }
+                                    "ids" -> {
+                                        if (incIds) {
+                                            Card(
+                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(16.dp)
+                                                        .fillMaxWidth()
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(
+                                                            Icons.Default.Tag,
+                                                            null,
+                                                            tint = MaterialTheme.colorScheme.primary
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(
+                                                            txtIdentifiers,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                    HorizontalDivider(
+                                                        modifier = Modifier.padding(
+                                                            vertical = 12.dp
+                                                        ),
+                                                        color = MaterialTheme.colorScheme.outlineVariant.copy(
+                                                            alpha = 0.5f
+                                                        )
+                                                    )
+                                                    val idSupportValue =
+                                                        physique?.idSupport?.takeIf { it.isNotBlank() }
+                                                            ?: txtNotSpecified
+                                                    Text(
+                                                        "$txtIdSupportLabel $idSupportValue",
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                    Text(
+                                                        "$txtAnfrStationNumber ${info.idAnfr}",
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
 
-                                                        // 1. Nom du Système et Statut aligné à droite
-                                                        val (statusColor, statusText) = when {
-                                                            band.status.contains("En service", true) -> Pair(Color(0xFF4CAF50), txtInService)
-                                                            band.status.contains("Techniquement", true) -> Pair(Color(0xFF4CAF50), txtTechnically)
-                                                            band.status.contains("Approuvé", true) -> Pair(Color(0xFF2196F3), txtProjectApproved)
-                                                            else -> Pair(Color.Gray, txtUnknownStatus)
-                                                        }
+                                    "dates" -> {
+                                        if (incDates) {
+                                            Card(
+                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(16.dp)
+                                                        .fillMaxWidth()
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(
+                                                            Icons.Default.DateRange,
+                                                            null,
+                                                            tint = MaterialTheme.colorScheme.primary
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(txtDates, fontWeight = FontWeight.Bold)
+                                                    }
+                                                    HorizontalDivider(
+                                                        modifier = Modifier.padding(
+                                                            vertical = 12.dp
+                                                        ),
+                                                        color = MaterialTheme.colorScheme.outlineVariant.copy(
+                                                            alpha = 0.5f
+                                                        )
+                                                    )
+                                                    val dateImpStr =
+                                                        technique?.dateImplantation?.takeIf { it.isNotBlank() }
+                                                            ?.let { formatDateToFrench(it) } ?: "-"
+                                                    val dateSerStr =
+                                                        technique?.dateService?.takeIf { it.isNotBlank() }
+                                                            ?.let { formatDateToFrench(it) } ?: "-"
+                                                    val dateModStr =
+                                                        technique?.dateModif?.takeIf { it.isNotBlank() }
+                                                            ?.let { formatDateToFrench(it) } ?: "-"
 
-                                                        Row(
-                                                            modifier = Modifier.fillMaxWidth(),
-                                                            verticalAlignment = Alignment.CenterVertically
-                                                        ) {
-                                                            Text(
-                                                                text = band.rawFreq.substringBefore(":").trim(),
-                                                                fontWeight = FontWeight.SemiBold,
-                                                                color = MaterialTheme.colorScheme.onSurface,
-                                                                fontSize = 14.sp,
-                                                                modifier = Modifier.weight(1f) // Pousse le statut tout à droite
+                                                    Text(
+                                                        "$txtimplementation $dateImpStr",
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                    Text(
+                                                        "$txtActivatedOn $dateSerStr",
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                    if (dateModStr != "-") {
+                                                        Text(
+                                                            "$txtLastModification $dateModStr",
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    "address" -> {
+                                        if (incAddress) {
+                                            Card(
+                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(16.dp)
+                                                        .fillMaxWidth()
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(
+                                                            Icons.Default.Place,
+                                                            null,
+                                                            tint = MaterialTheme.colorScheme.primary
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(
+                                                            txtAddressLabel.replace(" : ", ""),
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                    HorizontalDivider(
+                                                        modifier = Modifier.padding(
+                                                            vertical = 12.dp
+                                                        ),
+                                                        color = MaterialTheme.colorScheme.outlineVariant.copy(
+                                                            alpha = 0.5f
+                                                        )
+                                                    )
+                                                    val fullAddress =
+                                                        technique?.adresse?.takeIf { it.isNotBlank() }
+                                                            ?: "Adresse non spécifiée"
+                                                    Text(
+                                                        fullAddress,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                    Spacer(modifier = Modifier.height(8.dp))
+                                                    Text(
+                                                        "$txtGpsLabel ${
+                                                            String.format(
+                                                                Locale.US,
+                                                                "%.5f, %.5f",
+                                                                info.latitude,
+                                                                info.longitude
                                                             )
-                                                            Spacer(modifier = Modifier.width(6.dp))
-                                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        }",
+                                                        fontSize = 12.sp,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                    if (incConfidential) {
+                                                        Text(
+                                                            AppStrings.distanceHidden,
+                                                            fontSize = 12.sp,
+                                                            color = MaterialTheme.colorScheme.primary,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    } else {
+                                                        Text(
+                                                            "$txtDistanceLabel $distanceStr$txtFromMyPosition",
+                                                            fontSize = 12.sp,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    "speedtest" -> {
+                                        if (incSpeedtest && speedtestData != null) {
+                                            Card(
+                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(16.dp)
+                                                        .fillMaxWidth()
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(
+                                                            Icons.Default.Speed,
+                                                            null,
+                                                            tint = MaterialTheme.colorScheme.primary
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(
+                                                            AppStrings.speedtestTitle,
+                                                            fontWeight = FontWeight.Bold
+                                                        )
+                                                    }
+                                                    HorizontalDivider(
+                                                        modifier = Modifier.padding(
+                                                            vertical = 12.dp
+                                                        ),
+                                                        color = MaterialTheme.colorScheme.outlineVariant.copy(
+                                                            alpha = 0.5f
+                                                        )
+                                                    )
+
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        horizontalArrangement = Arrangement.SpaceEvenly
+                                                    ) {
+                                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                            Icon(
+                                                                Icons.Default.KeyboardArrowDown,
+                                                                null,
+                                                                tint = Color(0xFF4CAF50),
+                                                                modifier = Modifier.size(24.dp)
+                                                            )
+                                                            Text(
+                                                                if (speedtestData.downloadSpeed != null) String.format(
+                                                                    Locale.US,
+                                                                    "%.1f",
+                                                                    speedtestData.downloadSpeed
+                                                                ) else "--",
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontSize = 16.sp
+                                                            )
+                                                            Text(
+                                                                "Mbps",
+                                                                fontSize = 10.sp,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                            Text(
+                                                                AppStrings.speedtestDownload,
+                                                                fontSize = 10.sp
+                                                            )
+                                                        }
+                                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                            Icon(
+                                                                Icons.Default.KeyboardArrowUp,
+                                                                null,
+                                                                tint = Color(0xFF2196F3),
+                                                                modifier = Modifier.size(24.dp)
+                                                            )
+                                                            Text(
+                                                                if (speedtestData.uploadSpeed != null) String.format(
+                                                                    Locale.US,
+                                                                    "%.1f",
+                                                                    speedtestData.uploadSpeed
+                                                                ) else "--",
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontSize = 16.sp
+                                                            )
+                                                            Text(
+                                                                "Mbps",
+                                                                fontSize = 10.sp,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                            Text(
+                                                                AppStrings.speedtestUpload,
+                                                                fontSize = 10.sp
+                                                            )
+                                                        }
+                                                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                                            Icon(
+                                                                Icons.Default.Timer,
+                                                                null,
+                                                                tint = Color(0xFFFF9800),
+                                                                modifier = Modifier.size(24.dp)
+                                                            )
+                                                            Text(
+                                                                if (speedtestData.ping != null) speedtestData.ping.toInt()
+                                                                    .toString() else "--",
+                                                                fontWeight = FontWeight.Bold,
+                                                                fontSize = 16.sp
+                                                            )
+                                                            Text(
+                                                                "ms",
+                                                                fontSize = 10.sp,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                            )
+                                                            Text(
+                                                                AppStrings.speedtestPing,
+                                                                fontSize = 10.sp
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+
+                                    "status" -> {
+                                        if (AppConfig.shareSiteStatus.value) {
+                                            val hsEntity = hsDataMap[info.idAnfr]
+                                            val isOutage = hsEntity != null
+                                            val outageText =
+                                                hsEntity?.let { formatOutageDetails(it) }
+
+                                            val rawTechs =
+                                                technique?.technologies?.takeIf { it.isNotBlank() }
+                                                    ?: info.frequences ?: ""
+                                            val has2G = rawTechs.contains("2G", ignoreCase = true)
+                                            val has3G = rawTechs.contains("3G", ignoreCase = true)
+                                            val has4G = rawTechs.contains("4G", ignoreCase = true)
+                                            val has5G = rawTechs.contains("5G", ignoreCase = true)
+
+                                            val detailsStr = technique?.detailsFrequences ?: ""
+                                            val globalStatut = technique?.statut ?: ""
+                                            val globalIsProject =
+                                                globalStatut.contains("Projet", ignoreCase = true)
+
+                                            fun isTechPlanned(keywords: List<String>): Boolean {
+                                                if (detailsStr.isBlank()) return globalIsProject
+                                                val lines = detailsStr.split("\n").filter { line ->
+                                                    keywords.any { k ->
+                                                        line.contains(
+                                                            k,
+                                                            ignoreCase = true
+                                                        )
+                                                    }
+                                                }
+                                                if (lines.isEmpty()) return globalIsProject
+                                                return lines.all {
+                                                    it.contains(
+                                                        "Projet",
+                                                        ignoreCase = true
+                                                    )
+                                                }
+                                            }
+
+                                            val is2gProject =
+                                                has2G && isTechPlanned(listOf("GSM", "2G"))
+                                            val is3gProject =
+                                                has3G && isTechPlanned(listOf("UMTS", "3G"))
+                                            val is4gProject =
+                                                has4G && isTechPlanned(listOf("LTE", "4G"))
+                                            val is5gProject =
+                                                has5G && isTechPlanned(listOf("NR", "5G"))
+
+                                            val totalTechs =
+                                                listOf(has2G, has3G, has4G, has5G).count { it }
+                                            val projectTechs = listOf(
+                                                is2gProject,
+                                                is3gProject,
+                                                is4gProject,
+                                                is5gProject
+                                            ).count { it }
+                                            val isEntirelyProject =
+                                                totalTechs > 0 && totalTechs == projectTechs
+
+                                            val realTechStatus = mapOf(
+                                                "2G" to ServiceStatus(isVoixOk = if (has2G) hsEntity?.let { it.voix2g != "HS" }
+                                                    ?: true else null,
+                                                    isSmsOk = if (has2G) hsEntity?.let { it.voix2g != "HS" }
+                                                        ?: true else null,
+                                                    isInternetOk = if (has2G) hsEntity?.let { it.data2g != "HS" }
+                                                        ?: true else null,
+                                                    isProject = is2gProject),
+                                                "3G" to ServiceStatus(isVoixOk = if (has3G) hsEntity?.let { it.voix3g != "HS" }
+                                                    ?: true else null,
+                                                    isSmsOk = if (has3G) hsEntity?.let { it.voix3g != "HS" }
+                                                        ?: true else null,
+                                                    isInternetOk = if (has3G) hsEntity?.let { it.data3g != "HS" }
+                                                        ?: true else null,
+                                                    isProject = is3gProject),
+                                                "4G" to ServiceStatus(isVoixOk = if (has4G) hsEntity?.let { it.voix4g != "HS" }
+                                                    ?: true else null,
+                                                    isSmsOk = if (has4G) hsEntity?.let { it.voix4g != "HS" }
+                                                        ?: true else null,
+                                                    isInternetOk = if (has4G) hsEntity?.let { it.data4g != "HS" }
+                                                        ?: true else null,
+                                                    isProject = is4gProject),
+                                                "5G" to ServiceStatus(isVoixOk = if (has5G) hsEntity?.let { it.voix5g != "HS" }
+                                                    ?: true else null,
+                                                    isSmsOk = if (has5G) hsEntity?.let { it.voix5g != "HS" }
+                                                        ?: true else null,
+                                                    isInternetOk = if (has5G) hsEntity?.let { it.data5g != "HS" }
+                                                        ?: true else null,
+                                                    isProject = is5gProject)
+                                            )
+
+                                            SiteStatusCard(
+                                                isProjectSite = isEntirelyProject,
+                                                isOutage = isOutage,
+                                                outageText = outageText,
+                                                cardBgColor = MaterialTheme.colorScheme.surfaceVariant,
+                                                blockShape = RoundedCornerShape(12.dp),
+                                                techStatus = realTechStatus
+                                            )
+                                        }
+                                    }
+
+                                    "freq" -> {
+                                        // Géré dans l'image 2 si scindé, sinon affiché ici (code d'origine)
+                                        if (incFreqs) {
+                                            val rawFreqs =
+                                                technique?.detailsFrequences ?: info.frequences
+                                            val parsedBands = parseAndSortFrequencies(
+                                                rawFreqs,
+                                                AppStrings.unknown,
+                                                AppStrings.azimuthNotSpecified
+                                            ).filter { band ->
+                                                when (band.gen) {
+                                                    5 -> AppConfig.siteShowTechno5G.value && when (band.value) {
+                                                        700 -> AppConfig.siteF5G_700.value; 2100 -> AppConfig.siteF5G_2100.value; 3500 -> AppConfig.siteF5G_3500.value; 26000 -> AppConfig.siteF5G_26000.value; else -> true
+                                                    }
+
+                                                    4 -> AppConfig.siteShowTechno4G.value && when (band.value) {
+                                                        700 -> AppConfig.siteF4G_700.value; 800 -> AppConfig.siteF4G_800.value; 900 -> AppConfig.siteF4G_900.value; 1800 -> AppConfig.siteF4G_1800.value; 2100 -> AppConfig.siteF4G_2100.value; 2600 -> AppConfig.siteF4G_2600.value; else -> true
+                                                    }
+
+                                                    3 -> AppConfig.siteShowTechno3G.value && when (band.value) {
+                                                        900 -> AppConfig.siteF3G_900.value; 2100 -> AppConfig.siteF3G_2100.value; else -> true
+                                                    }
+
+                                                    2 -> AppConfig.siteShowTechno2G.value && when (band.value) {
+                                                        900 -> AppConfig.siteF2G_900.value; 1800 -> AppConfig.siteF2G_1800.value; else -> true
+                                                    }
+
+                                                    else -> AppConfig.siteShowTechnoFH.value
+                                                }
+                                            }
+
+                                            Card(
+                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                                modifier = Modifier.fillMaxWidth()
+                                            ) {
+                                                Column(
+                                                    modifier = Modifier.padding(16.dp)
+                                                        .fillMaxWidth()
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Icon(
+                                                            Icons.Default.WifiTethering,
+                                                            null,
+                                                            tint = MaterialTheme.colorScheme.primary,
+                                                            modifier = Modifier.size(20.dp)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(8.dp))
+                                                        Text(
+                                                            txtFrequenciesTitle,
+                                                            fontWeight = FontWeight.Bold,
+                                                            fontSize = 16.sp
+                                                        )
+                                                    }
+                                                    HorizontalDivider(
+                                                        modifier = Modifier.padding(
+                                                            vertical = 12.dp
+                                                        ),
+                                                        color = MaterialTheme.colorScheme.outlineVariant.copy(
+                                                            alpha = 0.5f
+                                                        )
+                                                    )
+
+                                                    if (parsedBands.isEmpty()) {
+                                                        Text(
+                                                            txtBandsNotSpecified,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    } else {
+                                                        parsedBands.forEachIndexed { bandIndex, band ->
+                                                            if (bandIndex > 0) HorizontalDivider(
+                                                                modifier = Modifier.padding(vertical = 12.dp),
+                                                                color = MaterialTheme.colorScheme.outlineVariant.copy(
+                                                                    alpha = 0.3f
+                                                                )
+                                                            )
+                                                            val (statusColor, statusText) = when {
+                                                                band.status.contains(
+                                                                    "En service",
+                                                                    true
+                                                                ) -> Pair(
+                                                                    Color(0xFF4CAF50),
+                                                                    txtInService
+                                                                )
+
+                                                                band.status.contains(
+                                                                    "Techniquement",
+                                                                    true
+                                                                ) -> Pair(
+                                                                    Color(0xFF4CAF50),
+                                                                    txtTechnically
+                                                                )
+
+                                                                band.status.contains(
+                                                                    "Approuvé",
+                                                                    true
+                                                                ) -> Pair(
+                                                                    Color(0xFF2196F3),
+                                                                    txtProjectApproved
+                                                                )
+
+                                                                else -> Pair(
+                                                                    Color.Gray,
+                                                                    txtUnknownStatus
+                                                                )
+                                                            }
+                                                            Row(
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                                verticalAlignment = Alignment.CenterVertically
+                                                            ) {
                                                                 Text(
-                                                                    text = statusText,
-                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                    fontWeight = FontWeight.Normal,
-                                                                    fontSize = 12.sp
+                                                                    text = band.rawFreq.substringBefore(
+                                                                        ":"
+                                                                    ).trim(),
+                                                                    fontWeight = FontWeight.SemiBold,
+                                                                    color = MaterialTheme.colorScheme.onSurface,
+                                                                    fontSize = 14.sp,
+                                                                    modifier = Modifier.weight(1f)
                                                                 )
                                                                 Spacer(modifier = Modifier.width(6.dp))
-                                                                Icon(Icons.Default.Circle, contentDescription = null, tint = statusColor, modifier = Modifier.size(10.dp))
-                                                            }
-                                                        }
-                                                        Spacer(modifier = Modifier.height(4.dp))
-
-                                                        // 2. Fréquences détaillées et calculs
-                                                        Column(modifier = Modifier.padding(start = 8.dp)) {
-                                                            val preciseFreqs = band.rawFreq.substringAfter(":", "").trim()
-
-                                                            // ✅ ON INTÈGRE LES CONDITIONS DU SPECTRE POUR LE PARTAGE D'IMAGE
-                                                            if (AppConfig.siteShowSpectrum.value && preciseFreqs.isNotBlank() && preciseFreqs != band.rawFreq.trim()) {
-                                                                var totalBandwidth = 0.0
-                                                                var detectedUnit = "MHz"
-
-                                                                val regex = Regex("""([0-9]+(?:[.,][0-9]+)?)\s*-\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]*Hz)?""")
-
-                                                                val detailedFreqs = regex.replace(preciseFreqs) { match ->
-                                                                    val n1 = match.groupValues[1].replace(',', '.').toDoubleOrNull() ?: 0.0
-                                                                    val n2 = match.groupValues[2].replace(',', '.').toDoubleOrNull() ?: 0.0
-                                                                    val unit = match.groupValues[3].takeIf { it.isNotBlank() } ?: "MHz"
-
-                                                                    detectedUnit = unit
-
-                                                                    val diff = kotlin.math.abs(n2 - n1)
-                                                                    totalBandwidth += diff
-                                                                    val diffStr = if (diff % 1.0 == 0.0) diff.toInt().toString() else String.format(java.util.Locale.US, "%.1f", diff)
-                                                                    "${match.groupValues[1]}-${match.groupValues[2]} $unit [$diffStr $unit]".trim()
-                                                                }
-
-                                                                if (AppConfig.siteShowSpectrumBand.value) {
+                                                                Row(verticalAlignment = Alignment.CenterVertically) {
                                                                     Text(
-                                                                        text = "${AppStrings.spectrumByBand} : $detailedFreqs",
+                                                                        text = statusText,
                                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                        fontSize = 12.sp,
-                                                                        fontWeight = FontWeight.Normal
+                                                                        fontWeight = FontWeight.Normal,
+                                                                        fontSize = 12.sp
+                                                                    ); Spacer(
+                                                                    modifier = Modifier.width(
+                                                                        6.dp
                                                                     )
+                                                                ); Icon(
+                                                                    Icons.Default.Circle,
+                                                                    null,
+                                                                    tint = statusColor,
+                                                                    modifier = Modifier.size(10.dp)
+                                                                )
                                                                 }
-
-                                                                if (AppConfig.siteShowSpectrumTotal.value && totalBandwidth > 0) {
-                                                                    val totalStr = if (totalBandwidth % 1.0 == 0.0) totalBandwidth.toInt().toString() else String.format(java.util.Locale.US, "%.1f", totalBandwidth)
+                                                            }
+                                                            Spacer(modifier = Modifier.height(4.dp))
+                                                            Column(modifier = Modifier.padding(start = 8.dp)) {
+                                                                val preciseFreqs =
+                                                                    band.rawFreq.substringAfter(
+                                                                        ":",
+                                                                        ""
+                                                                    ).trim()
+                                                                if (AppConfig.siteShowSpectrum.value && preciseFreqs.isNotBlank() && preciseFreqs != band.rawFreq.trim()) {
+                                                                    var totalBandwidth = 0.0
+                                                                    var detectedUnit = "MHz"
+                                                                    val regex =
+                                                                        Regex("""([0-9]+(?:[.,][0-9]+)?)\s*-\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]*Hz)?""")
+                                                                    val detailedFreqs =
+                                                                        regex.replace(preciseFreqs) { match ->
+                                                                            val n1 =
+                                                                                match.groupValues[1].replace(
+                                                                                    ',',
+                                                                                    '.'
+                                                                                ).toDoubleOrNull()
+                                                                                    ?: 0.0
+                                                                            val n2 =
+                                                                                match.groupValues[2].replace(
+                                                                                    ',',
+                                                                                    '.'
+                                                                                ).toDoubleOrNull()
+                                                                                    ?: 0.0
+                                                                            val unit =
+                                                                                match.groupValues[3].takeIf { it.isNotBlank() }
+                                                                                    ?: "MHz"
+                                                                            detectedUnit = unit
+                                                                            val diff =
+                                                                                kotlin.math.abs(n2 - n1)
+                                                                            totalBandwidth += diff
+                                                                            val diffStr =
+                                                                                if (diff % 1.0 == 0.0) diff.toInt()
+                                                                                    .toString() else String.format(
+                                                                                    java.util.Locale.US,
+                                                                                    "%.1f",
+                                                                                    diff
+                                                                                )
+                                                                            "${match.groupValues[1]}-${match.groupValues[2]} $unit [$diffStr $unit]".trim()
+                                                                        }
                                                                     if (AppConfig.siteShowSpectrumBand.value) {
-                                                                        Spacer(modifier = Modifier.height(2.dp))
+                                                                        Text(
+                                                                            text = "${AppStrings.spectrumByBand} : $detailedFreqs",
+                                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                            fontSize = 12.sp,
+                                                                            fontWeight = FontWeight.Normal
+                                                                        )
                                                                     }
+                                                                    if (AppConfig.siteShowSpectrumTotal.value && totalBandwidth > 0) {
+                                                                        val totalStr =
+                                                                            if (totalBandwidth % 1.0 == 0.0) totalBandwidth.toInt()
+                                                                                .toString() else String.format(
+                                                                                java.util.Locale.US,
+                                                                                "%.1f",
+                                                                                totalBandwidth
+                                                                            )
+                                                                        if (AppConfig.siteShowSpectrumBand.value) Spacer(
+                                                                            modifier = Modifier.height(
+                                                                                2.dp
+                                                                            )
+                                                                        )
+                                                                        Text(
+                                                                            text = "${AppStrings.totalspectrum} : $totalStr $detectedUnit",
+                                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                            fontSize = 12.sp,
+                                                                            fontWeight = FontWeight.Medium
+                                                                        )
+                                                                    }
+                                                                    if (AppConfig.siteShowSpectrumBand.value || (AppConfig.siteShowSpectrumTotal.value && totalBandwidth > 0)) {
+                                                                        Spacer(
+                                                                            modifier = Modifier.height(
+                                                                                4.dp
+                                                                            )
+                                                                        )
+                                                                    }
+                                                                }
+                                                                val dateFormatted =
+                                                                    formatDateToFrench(band.date)
+                                                                if (dateFormatted.isNotBlank() && dateFormatted != "-") {
                                                                     Text(
-                                                                        text = "${AppStrings.totalspectrum} : $totalStr $detectedUnit",
+                                                                        "$txtActivatedOn$dateFormatted",
                                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                        fontSize = 12.sp,
-                                                                        fontWeight = FontWeight.Medium
+                                                                        fontSize = 12.sp
+                                                                    )
+                                                                } else {
+                                                                    Text(
+                                                                        txtDateNotSpecifiedAnfr,
+                                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                        fontSize = 12.sp
                                                                     )
                                                                 }
-
-                                                                if (AppConfig.siteShowSpectrumBand.value || (AppConfig.siteShowSpectrumTotal.value && totalBandwidth > 0)) {
-                                                                    Spacer(modifier = Modifier.height(4.dp))
-                                                                }
-                                                            }
-
-                                                            // 3. Date d'activation
-                                                            val dateFormatted = formatDateToFrench(band.date)
-                                                            if (dateFormatted.isNotBlank() && dateFormatted != "-") {
-                                                                Text("$txtActivatedOn$dateFormatted", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                                                            } else {
-                                                                Text(txtDateNotSpecifiedAnfr, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
-                                                            }
-
-                                                            // 4. Détails Physiques
-                                                            if (band.physDetails.isNotEmpty()) {
-                                                                Spacer(modifier = Modifier.height(6.dp))
-                                                                band.physDetails.forEach { physDetail ->
-                                                                    Row(
-                                                                        verticalAlignment = Alignment.CenterVertically,
-                                                                        modifier = Modifier.padding(top = 4.dp)
-                                                                    ) {
-                                                                        Icon(
-                                                                            Icons.Default.Explore,
-                                                                            contentDescription = null,
-                                                                            tint = MaterialTheme.colorScheme.primary,
-                                                                            modifier = Modifier.size(14.dp)
+                                                                if (band.physDetails.isNotEmpty()) {
+                                                                    Spacer(
+                                                                        modifier = Modifier.height(
+                                                                            6.dp
                                                                         )
-                                                                        Spacer(modifier = Modifier.width(6.dp))
-
-                                                                        // ✅ 4. SÉPARATION ET TRADUCTION DU TYPE D'ANTENNE
-                                                                        val typePart = physDetail.substringBefore(" : ").trim()
-                                                                        val restPart = physDetail.substringAfter(" : ", "").trim()
-                                                                        val translatedType = AppStrings.translateAntennaType(typePart)
-                                                                        val finalPhysText = if (restPart.isNotEmpty()) "$translatedType : $restPart" else translatedType
-
-                                                                        Text(
-                                                                            text = finalPhysText,
-                                                                            color = MaterialTheme.colorScheme.onSurface,
-                                                                            fontWeight = FontWeight.Medium,
-                                                                            fontSize = 12.sp
+                                                                    )
+                                                                    band.physDetails.forEach { physDetail ->
+                                                                        Row(
+                                                                            verticalAlignment = Alignment.CenterVertically,
+                                                                            modifier = Modifier.padding(
+                                                                                top = 4.dp
+                                                                            )
+                                                                        ) {
+                                                                            Icon(
+                                                                                Icons.Default.Explore,
+                                                                                null,
+                                                                                tint = MaterialTheme.colorScheme.primary,
+                                                                                modifier = Modifier.size(
+                                                                                    14.dp
+                                                                                )
+                                                                            ); Spacer(
+                                                                            modifier = Modifier.width(
+                                                                                6.dp
+                                                                            )
                                                                         )
+                                                                            val typePart =
+                                                                                physDetail.substringBefore(
+                                                                                    " : "
+                                                                                ).trim()
+                                                                            val restPart =
+                                                                                physDetail.substringAfter(
+                                                                                    " : ",
+                                                                                    ""
+                                                                                ).trim()
+                                                                            val translatedType =
+                                                                                AppStrings.translateAntennaType(
+                                                                                    typePart
+                                                                                )
+                                                                            val finalPhysText =
+                                                                                if (restPart.isNotEmpty()) "$translatedType : $restPart" else translatedType
+                                                                            Text(
+                                                                                text = finalPhysText,
+                                                                                color = MaterialTheme.colorScheme.onSurface,
+                                                                                fontWeight = FontWeight.Medium,
+                                                                                fontSize = 12.sp
+                                                                            )
+                                                                        }
                                                                     }
                                                                 }
                                                             }
@@ -596,31 +1021,413 @@ fun shareFullAntennaCapture(
                                     }
                                 }
                             }
-                        }
-                        // ✅ NOUVEAU : Le pied de page avec le QR Code (Détail Antenne)
-                        // ✅ NOUVEAU : On l'entoure avec la condition
-                        if (incQrCode) {
-                            val qrUri = "geotower://site/${info.idAnfr}"
-                            val qrBitmap = remember(qrUri) { generateQrCodeBitmap(qrUri, 200) }
 
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.Center
-                            ) {
-                                if (qrBitmap != null) {
-                                    Image(bitmap = qrBitmap.asImageBitmap(), contentDescription = "QR Code", modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp)))
-                                    Spacer(modifier = Modifier.width(16.dp))
-                                }
-                                Column(horizontalAlignment = Alignment.Start) {
-                                    Text(text = fr.geotower.utils.AppStrings.scanToOpen, fontSize = 11.sp, color = Color.Gray)
-                                    Text(text = fr.geotower.utils.AppStrings.geoTowerApp, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            if (incQrCode) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.Center
+                                ) {
+                                    if (qrBitmap != null) {
+                                        Image(
+                                            bitmap = qrBitmap.asImageBitmap(),
+                                            contentDescription = "QR Code",
+                                            modifier = Modifier.size(56.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                        ); Spacer(modifier = Modifier.width(16.dp))
+                                    }
+                                    Column(horizontalAlignment = Alignment.Start) {
+                                        Text(
+                                            text = AppStrings.scanToOpen,
+                                            fontSize = 11.sp,
+                                            color = Color.Gray
+                                        ); Text(
+                                        text = AppStrings.geoTowerApp,
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    }
                                 }
                             }
+                            Text(
+                                text = txtGeneratedBy,
+                                fontSize = 12.sp,
+                                color = Color.Gray,
+                                modifier = Modifier.align(Alignment.CenterHorizontally)
+                            )
                         }
 
-                        // ✅ RETOUR DU TEXTE "Généré via"
-                        Text(text = txtGeneratedBy, fontSize = 12.sp, color = Color.Gray, modifier = Modifier.align(Alignment.CenterHorizontally))
+                        // ==========================================
+                        // 📸 IMAGE 2 : Identifiants & Fréquences (Uniquement si Split)
+                        // ==========================================
+                        if (isSplit) {
+                            Column(
+                                modifier = Modifier
+                                    .width(400.dp)
+                                    .wrapContentHeight()
+                                    .background(MaterialTheme.colorScheme.background)
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Text(
+                                    txtTitle,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                Card(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        val logoRes = getDetailLogoRes(info.operateur ?: "")
+                                        if (logoRes != null) {
+                                            Image(
+                                                painter = painterResource(id = logoRes),
+                                                contentDescription = null,
+                                                modifier = Modifier.size(60.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                            )
+                                        }
+                                        Spacer(modifier = Modifier.width(16.dp))
+                                        Column {
+                                            Text(
+                                                info.operateur ?: "Inconnu",
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            val rawTechs =
+                                                technique?.technologies?.takeIf { it.isNotBlank() }
+                                                    ?: info.frequences
+                                            Text(
+                                                formatTechnologies(rawTechs, AppStrings.unknown),
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (incIds && shareOrder.contains("ids")) {
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    Icons.Default.Tag,
+                                                    null,
+                                                    tint = MaterialTheme.colorScheme.primary
+                                                ); Spacer(modifier = Modifier.width(8.dp)); Text(
+                                                txtIdentifiers,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                            }
+                                            HorizontalDivider(
+                                                modifier = Modifier.padding(vertical = 12.dp),
+                                                color = MaterialTheme.colorScheme.outlineVariant.copy(
+                                                    alpha = 0.5f
+                                                )
+                                            )
+                                            val idSupportValue =
+                                                physique?.idSupport?.takeIf { it.isNotBlank() }
+                                                    ?: txtNotSpecified
+                                            Text(
+                                                "$txtIdSupportLabel $idSupportValue",
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            Text(
+                                                "$txtAnfrStationNumber ${info.idAnfr}",
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                        }
+                                    }
+                                }
+
+                                if (incFreqs && shareOrder.contains("freq")) {
+                                    val rawFreqs = technique?.detailsFrequences ?: info.frequences
+                                    val parsedBands = parseAndSortFrequencies(
+                                        rawFreqs,
+                                        AppStrings.unknown,
+                                        AppStrings.azimuthNotSpecified
+                                    ).filter { band ->
+                                        when (band.gen) {
+                                            5 -> AppConfig.siteShowTechno5G.value && when (band.value) {
+                                                700 -> AppConfig.siteF5G_700.value; 2100 -> AppConfig.siteF5G_2100.value; 3500 -> AppConfig.siteF5G_3500.value; 26000 -> AppConfig.siteF5G_26000.value; else -> true
+                                            }
+
+                                            4 -> AppConfig.siteShowTechno4G.value && when (band.value) {
+                                                700 -> AppConfig.siteF4G_700.value; 800 -> AppConfig.siteF4G_800.value; 900 -> AppConfig.siteF4G_900.value; 1800 -> AppConfig.siteF4G_1800.value; 2100 -> AppConfig.siteF4G_2100.value; 2600 -> AppConfig.siteF4G_2600.value; else -> true
+                                            }
+
+                                            3 -> AppConfig.siteShowTechno3G.value && when (band.value) {
+                                                900 -> AppConfig.siteF3G_900.value; 2100 -> AppConfig.siteF3G_2100.value; else -> true
+                                            }
+
+                                            2 -> AppConfig.siteShowTechno2G.value && when (band.value) {
+                                                900 -> AppConfig.siteF2G_900.value; 1800 -> AppConfig.siteF2G_1800.value; else -> true
+                                            }
+
+                                            else -> AppConfig.siteShowTechnoFH.value
+                                        }
+                                    }
+
+                                    Card(
+                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(
+                                                    Icons.Default.WifiTethering,
+                                                    null,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(20.dp)
+                                                ); Spacer(modifier = Modifier.width(8.dp)); Text(
+                                                txtFrequenciesTitle,
+                                                fontWeight = FontWeight.Bold,
+                                                fontSize = 16.sp
+                                            )
+                                            }
+                                            HorizontalDivider(
+                                                modifier = Modifier.padding(vertical = 12.dp),
+                                                color = MaterialTheme.colorScheme.outlineVariant.copy(
+                                                    alpha = 0.5f
+                                                )
+                                            )
+
+                                            if (parsedBands.isEmpty()) {
+                                                Text(
+                                                    txtBandsNotSpecified,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            } else {
+                                                parsedBands.forEachIndexed { bandIndex, band ->
+                                                    if (bandIndex > 0) HorizontalDivider(
+                                                        modifier = Modifier.padding(
+                                                            vertical = 12.dp
+                                                        ),
+                                                        color = MaterialTheme.colorScheme.outlineVariant.copy(
+                                                            alpha = 0.3f
+                                                        )
+                                                    )
+                                                    val (statusColor, statusText) = when {
+                                                        band.status.contains(
+                                                            "En service",
+                                                            true
+                                                        ) -> Pair(Color(0xFF4CAF50), txtInService)
+
+                                                        band.status.contains(
+                                                            "Techniquement",
+                                                            true
+                                                        ) -> Pair(Color(0xFF4CAF50), txtTechnically)
+
+                                                        band.status.contains(
+                                                            "Approuvé",
+                                                            true
+                                                        ) -> Pair(
+                                                            Color(0xFF2196F3),
+                                                            txtProjectApproved
+                                                        )
+
+                                                        else -> Pair(Color.Gray, txtUnknownStatus)
+                                                    }
+                                                    Row(
+                                                        modifier = Modifier.fillMaxWidth(),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        Text(
+                                                            text = band.rawFreq.substringBefore(":")
+                                                                .trim(),
+                                                            fontWeight = FontWeight.SemiBold,
+                                                            color = MaterialTheme.colorScheme.onSurface,
+                                                            fontSize = 14.sp,
+                                                            modifier = Modifier.weight(1f)
+                                                        )
+                                                        Spacer(modifier = Modifier.width(6.dp))
+                                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                                            Text(
+                                                                text = statusText,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                fontWeight = FontWeight.Normal,
+                                                                fontSize = 12.sp
+                                                            ); Spacer(modifier = Modifier.width(6.dp)); Icon(
+                                                            Icons.Default.Circle,
+                                                            null,
+                                                            tint = statusColor,
+                                                            modifier = Modifier.size(10.dp)
+                                                        )
+                                                        }
+                                                    }
+                                                    Spacer(modifier = Modifier.height(4.dp))
+                                                    Column(modifier = Modifier.padding(start = 8.dp)) {
+                                                        val preciseFreqs =
+                                                            band.rawFreq.substringAfter(":", "")
+                                                                .trim()
+                                                        if (AppConfig.siteShowSpectrum.value && preciseFreqs.isNotBlank() && preciseFreqs != band.rawFreq.trim()) {
+                                                            var totalBandwidth = 0.0
+                                                            var detectedUnit = "MHz"
+                                                            val regex =
+                                                                Regex("""([0-9]+(?:[.,][0-9]+)?)\s*-\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]*Hz)?""")
+                                                            val detailedFreqs =
+                                                                regex.replace(preciseFreqs) { match ->
+                                                                    val n1 =
+                                                                        match.groupValues[1].replace(
+                                                                            ',',
+                                                                            '.'
+                                                                        ).toDoubleOrNull() ?: 0.0
+                                                                    val n2 =
+                                                                        match.groupValues[2].replace(
+                                                                            ',',
+                                                                            '.'
+                                                                        ).toDoubleOrNull() ?: 0.0
+                                                                    val unit =
+                                                                        match.groupValues[3].takeIf { it.isNotBlank() }
+                                                                            ?: "MHz"
+                                                                    detectedUnit = unit
+                                                                    val diff =
+                                                                        kotlin.math.abs(n2 - n1)
+                                                                    totalBandwidth += diff
+                                                                    val diffStr =
+                                                                        if (diff % 1.0 == 0.0) diff.toInt()
+                                                                            .toString() else String.format(
+                                                                            java.util.Locale.US,
+                                                                            "%.1f",
+                                                                            diff
+                                                                        )
+                                                                    "${match.groupValues[1]}-${match.groupValues[2]} $unit [$diffStr $unit]".trim()
+                                                                }
+                                                            if (AppConfig.siteShowSpectrumBand.value) {
+                                                                Text(
+                                                                    text = "${AppStrings.spectrumByBand} : $detailedFreqs",
+                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                    fontSize = 12.sp,
+                                                                    fontWeight = FontWeight.Normal
+                                                                )
+                                                            }
+                                                            if (AppConfig.siteShowSpectrumTotal.value && totalBandwidth > 0) {
+                                                                val totalStr =
+                                                                    if (totalBandwidth % 1.0 == 0.0) totalBandwidth.toInt()
+                                                                        .toString() else String.format(
+                                                                        java.util.Locale.US,
+                                                                        "%.1f",
+                                                                        totalBandwidth
+                                                                    )
+                                                                if (AppConfig.siteShowSpectrumBand.value) Spacer(
+                                                                    modifier = Modifier.height(2.dp)
+                                                                )
+                                                                Text(
+                                                                    text = "${AppStrings.totalspectrum} : $totalStr $detectedUnit",
+                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                    fontSize = 12.sp,
+                                                                    fontWeight = FontWeight.Medium
+                                                                )
+                                                            }
+                                                            if (AppConfig.siteShowSpectrumBand.value || (AppConfig.siteShowSpectrumTotal.value && totalBandwidth > 0)) {
+                                                                Spacer(modifier = Modifier.height(4.dp))
+                                                            }
+                                                        }
+                                                        val dateFormatted =
+                                                            formatDateToFrench(band.date)
+                                                        if (dateFormatted.isNotBlank() && dateFormatted != "-") {
+                                                            Text(
+                                                                "$txtActivatedOn$dateFormatted",
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                fontSize = 12.sp
+                                                            )
+                                                        } else {
+                                                            Text(
+                                                                txtDateNotSpecifiedAnfr,
+                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                                fontSize = 12.sp
+                                                            )
+                                                        }
+                                                        if (band.physDetails.isNotEmpty()) {
+                                                            Spacer(modifier = Modifier.height(6.dp))
+                                                            band.physDetails.forEach { physDetail ->
+                                                                Row(
+                                                                    verticalAlignment = Alignment.CenterVertically,
+                                                                    modifier = Modifier.padding(top = 4.dp)
+                                                                ) {
+                                                                    Icon(
+                                                                        Icons.Default.Explore,
+                                                                        null,
+                                                                        tint = MaterialTheme.colorScheme.primary,
+                                                                        modifier = Modifier.size(14.dp)
+                                                                    ); Spacer(
+                                                                    modifier = Modifier.width(
+                                                                        6.dp
+                                                                    )
+                                                                )
+                                                                    val typePart =
+                                                                        physDetail.substringBefore(" : ")
+                                                                            .trim()
+                                                                    val restPart =
+                                                                        physDetail.substringAfter(
+                                                                            " : ",
+                                                                            ""
+                                                                        ).trim()
+                                                                    val translatedType =
+                                                                        AppStrings.translateAntennaType(
+                                                                            typePart
+                                                                        )
+                                                                    val finalPhysText =
+                                                                        if (restPart.isNotEmpty()) "$translatedType : $restPart" else translatedType
+                                                                    Text(
+                                                                        text = finalPhysText,
+                                                                        color = MaterialTheme.colorScheme.onSurface,
+                                                                        fontWeight = FontWeight.Medium,
+                                                                        fontSize = 12.sp
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                if (incQrCode) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.Center
+                                    ) {
+                                        if (qrBitmap != null) {
+                                            Image(
+                                                bitmap = qrBitmap.asImageBitmap(),
+                                                contentDescription = "QR Code",
+                                                modifier = Modifier.size(56.dp)
+                                                    .clip(RoundedCornerShape(8.dp))
+                                            ); Spacer(modifier = Modifier.width(16.dp))
+                                        }
+                                        Column(horizontalAlignment = Alignment.Start) {
+                                            Text(
+                                                text = AppStrings.scanToOpen,
+                                                fontSize = 11.sp,
+                                                color = Color.Gray
+                                            ); Text(
+                                            text = AppStrings.geoTowerApp,
+                                            fontSize = 14.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary
+                                        )
+                                        }
+                                    }
+                                }
+                                Text(
+                                    text = txtGeneratedBy,
+                                    fontSize = 12.sp,
+                                    color = Color.Gray,
+                                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -634,7 +1441,12 @@ fun shareFullAntennaCapture(
         if (composeView.parent != null) {
             (composeView.parent as ViewGroup).removeView(composeView)
         }
-        rootView.addView(composeView, ViewGroup.LayoutParams(400.dpToPx(context), ViewGroup.LayoutParams.WRAP_CONTENT))
+
+        // ✅ CORRECTION : On s'assure que la vue fait 800dp de large si elle est scindée
+        val isSplit = incSplitImage && incFreqs
+        val expectedWidthDp = if (isSplit) 800 else 400
+        rootView.addView(composeView, ViewGroup.LayoutParams(expectedWidthDp.dpToPx(context), ViewGroup.LayoutParams.WRAP_CONTENT))
+
     } catch (e: Exception) {
         e.printStackTrace()
         Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
@@ -643,32 +1455,60 @@ fun shareFullAntennaCapture(
 
     composeView.postDelayed({
         try {
-            val widthSpec = View.MeasureSpec.makeMeasureSpec(400.dpToPx(context), View.MeasureSpec.EXACTLY)
+            val isSplit = incSplitImage && incFreqs
+            // Si on split, la largeur demandée est de 800dp (400 x 2)
+            val expectedWidthDp = if (isSplit) 800 else 400
+            val widthSpec = View.MeasureSpec.makeMeasureSpec(expectedWidthDp.dpToPx(context), View.MeasureSpec.EXACTLY)
             val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
             composeView.measure(widthSpec, heightSpec)
             composeView.layout(0, 0, composeView.measuredWidth, composeView.measuredHeight)
 
             if (composeView.measuredWidth > 0 && composeView.measuredHeight > 0) {
-                val bitmap = Bitmap.createBitmap(composeView.measuredWidth, composeView.measuredHeight, Bitmap.Config.ARGB_8888)
-                val canvas = Canvas(bitmap)
+                val fullBitmap = Bitmap.createBitmap(composeView.measuredWidth, composeView.measuredHeight, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(fullBitmap)
                 composeView.draw(canvas)
 
                 rootView.removeView(composeView)
-
                 val imagesDir = File(context.cacheDir, "images")
                 imagesDir.mkdirs()
-                val file = File(imagesDir, "Geotower_site_${info.idAnfr}.png")
 
-                FileOutputStream(file).use { out ->
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, out)
+                val urisToShare = java.util.ArrayList<Uri>()
+
+                if (isSplit) {
+                    val halfWidth = fullBitmap.width / 2
+                    val bmp1 = Bitmap.createBitmap(fullBitmap, 0, 0, halfWidth, fullBitmap.height)
+                    val bmp2 = Bitmap.createBitmap(fullBitmap, halfWidth, 0, halfWidth, fullBitmap.height)
+
+                    val file1 = File(imagesDir, "Geotower_site_${info.idAnfr}_part1.png")
+                    val file2 = File(imagesDir, "Geotower_site_${info.idAnfr}_part2.png")
+
+                    FileOutputStream(file1).use { bmp1.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                    FileOutputStream(file2).use { bmp2.compress(Bitmap.CompressFormat.PNG, 100, it) }
+
+                    urisToShare.add(FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file1))
+                    urisToShare.add(FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file2))
+                } else {
+                    // Image unique classique
+                    val file = File(imagesDir, "Geotower_site_${info.idAnfr}.png")
+                    FileOutputStream(file).use { fullBitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                    urisToShare.add(FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file))
                 }
 
-                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-
-                val intent = Intent(Intent.ACTION_SEND).apply {
+                // Lancement de l'intention de partage
+                val intent = Intent(if (isSplit) Intent.ACTION_SEND_MULTIPLE else Intent.ACTION_SEND).apply {
                     type = "image/png"
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    clipData = ClipData.newUri(context.contentResolver, "Capture", uri)
+                    if (isSplit) {
+                        putParcelableArrayListExtra(Intent.EXTRA_STREAM, urisToShare)
+                        // ✅ CORRECTION : Ajout de toutes les URIs au ClipData pour autoriser la lecture
+                        val clipDataMulti = ClipData.newUri(context.contentResolver, "Capture", urisToShare[0])
+                        for (i in 1 until urisToShare.size) {
+                            clipDataMulti.addItem(ClipData.Item(urisToShare[i]))
+                        }
+                        clipData = clipDataMulti
+                    } else {
+                        putExtra(Intent.EXTRA_STREAM, urisToShare.first())
+                        clipData = ClipData.newUri(context.contentResolver, "Capture", urisToShare.first())
+                    }
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
 
@@ -965,7 +1805,8 @@ fun AntennaShareMenu(
     var incSpeedtest by remember { mutableStateOf(prefs.getBoolean("share_speedtest_enabled", true)) } // 🚨 NEW
     var incFreqs by remember { mutableStateOf(prefs.getBoolean("share_freq_enabled", true)) }
     var incConfidential by remember { mutableStateOf(prefs.getBoolean("share_confidential_enabled", false)) }
-    var incQrCode by remember { mutableStateOf(prefs.getBoolean("share_site_qr_enabled", true)) } // ✅ NOUVELLE VARIABLE
+    var incQrCode by remember { mutableStateOf(prefs.getBoolean("share_site_qr_enabled", true)) }
+    var incSplitImage by remember { mutableStateOf(prefs.getBoolean("share_split_image_enabled", false)) } // ✅ NOUVELLE VARIABLE SCINDER
     var shareOrder by remember {
         mutableStateOf(
             (prefs.getString("share_order", "map,support,ids,dates,address,speedtest,status,freq") ?: "map,support,ids,dates,address,speedtest,status,freq")
@@ -988,6 +1829,7 @@ fun AntennaShareMenu(
             incFreqs = prefs.getBoolean("share_freq_enabled", true)
             incConfidential = prefs.getBoolean("share_confidential_enabled", false)
             incQrCode = prefs.getBoolean("share_site_qr_enabled", true)
+            incSplitImage = prefs.getBoolean("share_split_image_enabled", false) // ✅ CHARGEMENT DE L'ÉTAT
             shareOrder = (prefs.getString("share_order", "map,support,ids,dates,address,speedtest,status,freq") ?: "map,support,ids,dates,address,speedtest,status,freq")
                 .split(",")
                 .toMutableList()
@@ -1149,7 +1991,7 @@ fun AntennaShareMenu(
                         onClick = {
                             shareOrder = listOf("map", "support", "ids", "dates", "address", "speedtest", "status", "freq")
                             prefs.edit().putString("share_order", shareOrder.joinToString(",")).apply()
-                            incMap = true; incSupport = true; incIds = true; incDates = true; incAddress = true; incSpeedtest = true; incFreqs = true; incQrCode = true
+                            incMap = true; incSupport = true; incIds = true; incDates = true; incAddress = true; incSpeedtest = true; incFreqs = true; incQrCode = true; incSplitImage = false
                             AppConfig.shareSiteStatus.value = true
                         },
                         modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -1161,7 +2003,17 @@ fun AntennaShareMenu(
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
-                    // ✅ NOUVEAU BOUTON : INTERRUPTEUR QR CODE
+                    // ✅ INTERRUPTEUR : SCINDER L'IMAGE
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(AppStrings.splitShareImage, fontWeight = FontWeight.Bold, color = if(incSplitImage) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                            Text(AppStrings.splitShareImageDesc, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { OneUiSwitch(checked = incSplitImage, onCheckedChange = { incSplitImage = it; prefs.edit().putBoolean("share_split_image_enabled", it).apply() }) }
+                        else Switch(checked = incSplitImage, onCheckedChange = { incSplitImage = it; prefs.edit().putBoolean("share_split_image_enabled", it).apply() }, modifier = Modifier.scale(0.8f))
+                    }
+
+                    // ✅ INTERRUPTEUR : QR CODE
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                         Text("QR Code", modifier = Modifier.weight(1f))
                         if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { OneUiSwitch(checked = incQrCode, onCheckedChange = { incQrCode = it }) }
@@ -1187,12 +2039,13 @@ fun AntennaShareMenu(
                                     context, currentView, info,
                                     physique, technique,
                                     hsDataMap,
-                                    speedtestData, // 🚨 NEW
+                                    speedtestData,
                                     distanceStr, bearingStr, selectedShareTheme,
                                     txtSiteDetailsTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtGeneratedBy, txtShareSiteVia, txtimplementation, txtLastModification, txtIdentifiers, txtIdNumber, txtFrequenciesTitle, txtBandsNotSpecified, txtInService, txtTechnically, txtUnknownStatus, txtAnfrStationNumber, txtDates, txtError, txtProjectApproved, txtActivatedOn, txtDateNotSpecifiedAnfr, txtPanelHeightsTitle, txtAzimuths, txtIdSupportLabel, txtSupportDetailsTitle, txtSupportNature, txtOwner, txtAntennaType,
                                     mapBmp, txtInitError, emptyList(), txtCommunityPhotosTitle,
-                                    // ✅ CORRECTION DE L'APPEL : ON PASSE incQrCode JUSTE AVANT shareOrder !
-                                    incMap, incSupport, incHeights, incIds, incDates, incAddress, incFreqs, incSpeedtest, incConfidential, incQrCode, shareOrder
+                                    incMap, incSupport, incHeights, incIds, incDates, incAddress, incFreqs, incSpeedtest, incConfidential, incQrCode,
+                                    incSplitImage,
+                                    shareOrder
                                 )
                             }, 300)
                         },
