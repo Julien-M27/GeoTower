@@ -17,6 +17,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.data.models.LocalisationEntity
@@ -109,8 +110,21 @@ fun SiteFrequenciesBlock(
             if (parsedBands.isEmpty()) {
                 Text(text = txtBandsNotSpecified, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
-                parsedBands.forEachIndexed { index, band ->
-                    val (statusColor, statusText) = when {
+                // ✅ NOUVEAU : On vérifie l'option d'affichage
+                if (AppConfig.siteFreqGridDisplay.value) {
+                    FrequenciesGridView(
+                        parsedBands = parsedBands,
+                        txtUnknown = txtUnknown,
+                        txtDateNotSpecifiedAnfr = txtDateNotSpecifiedAnfr,
+                        txtInService = txtInService,
+                        txtTechnically = txtTechnically,
+                        txtProjectApproved = txtProjectApproved,
+                        txtUnknownStatus = txtUnknownStatus
+                    )
+                } else {
+                    // 👇 TON CODE ACTUEL COMMENCE ICI 👇
+                    parsedBands.forEachIndexed { index, band ->
+                        val (statusColor, statusText) = when {
                         band.status.contains("En service", true) -> Pair(Color(0xFF4CAF50), txtInService)
                         band.status.contains("Techniquement", true) -> Pair(Color(0xFF4CAF50), txtTechnically)
                         band.status.contains("Approuvé", true) -> Pair(Color(0xFF2196F3), txtProjectApproved)
@@ -133,10 +147,14 @@ fun SiteFrequenciesBlock(
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                // ✅ NOUVEAU : Formatage propre "4G 700" ici aussi
+                                val rawTechnoName = band.rawFreq.substringBefore(":").trim()
+                                val technoName = if (band.gen in 2..5 && band.value > 0) "${band.gen}G ${band.value}" else rawTechnoName
+
                                 Text(
-                                    text = "• ${band.rawFreq.substringBefore(":").trim()}",
+                                    text = "• $technoName",
                                     fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface,
-                                    fontSize = 12.sp, // ✅ Nom de la fréquence plus petit (avant: 14.sp)
+                                    fontSize = 12.sp,
                                     maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
@@ -220,14 +238,23 @@ fun SiteFrequenciesBlock(
                                             Spacer(modifier = Modifier.width(6.dp))
 
                                             // ✅ SÉPARATION ET TRADUCTION DU TYPE D'ANTENNE (Version Ultra-Robuste)
-                                            val typePart = if (physDetail.contains(":")) physDetail.substringBefore(":").trim() else physDetail.trim()
-                                            val restPart = if (physDetail.contains(":")) physDetail.substringAfter(":").trim() else ""
+                                            val typePart =
+                                                if (physDetail.contains(":")) physDetail.substringBefore(
+                                                    ":"
+                                                ).trim() else physDetail.trim()
+                                            val restPart =
+                                                if (physDetail.contains(":")) physDetail.substringAfter(
+                                                    ":"
+                                                ).trim() else ""
 
-                                            val translatedType = AppStrings.translateAntennaType(typePart)
+                                            val translatedType =
+                                                AppStrings.translateAntennaType(typePart)
                                             // ✅ SÉCURITÉ : Si la traduction renvoie du vide, on force l'affichage du mot original (ex: "Panneau")
-                                            val safeType = if (translatedType.isNotBlank()) translatedType else typePart
+                                            val safeType =
+                                                if (translatedType.isNotBlank()) translatedType else typePart
 
-                                            val finalPhysText = if (restPart.isNotEmpty()) "$safeType : $restPart" else safeType
+                                            val finalPhysText =
+                                                if (restPart.isNotEmpty()) "$safeType : $restPart" else safeType
 
                                             Text(
                                                 text = finalPhysText, // Ex: "Panel : 120° (15.5m)"
@@ -237,6 +264,7 @@ fun SiteFrequenciesBlock(
                                             )
                                         }
                                     }
+                                }
                                 }
                             }
                         }
@@ -313,4 +341,407 @@ fun parseAndSortFrequencies(freqStr: String?, txtUnknown: String, txtAzimuthNotS
             if (idx == -1) 999 else idx // Si fréquence inconnue, on la met à la fin
         }
     ))
+}
+
+private fun bandEquivalentLabel(gen: Int, value: Int): String? {
+    return when (gen) {
+        5 -> when (value) {
+            700 -> "n28"
+            800 -> "n20"
+            900 -> "n8"
+            1800 -> "n3"
+            2100 -> "n1"
+            2600 -> "n7"
+            3500 -> "n78"
+            26000 -> "n258"
+            else -> null
+        }
+        4 -> when (value) {
+            700 -> "B28"
+            800 -> "B20"
+            900 -> "B8"
+            1800 -> "B3"
+            2100 -> "B1"
+            2600 -> "B7"
+            3500 -> "B42"
+            else -> null
+        }
+        3 -> when (value) {
+            900 -> "B8"
+            2100 -> "B1"
+            else -> null
+        }
+        2 -> when (value) {
+            900 -> "GSM 900"
+            1800 -> "DCS 1800"
+            else -> null
+        }
+        else -> null
+    }
+}
+
+// ==========================================
+// 🚀 NOUVEAU DESIGN EN GRILLE (EXPERT)
+// ==========================================
+@Composable
+fun FrequenciesGridView(
+    parsedBands: List<FreqBand>,
+    txtUnknown: String,
+    txtDateNotSpecifiedAnfr: String,
+    txtInService: String,
+    txtTechnically: String,
+    txtProjectApproved: String,
+    txtUnknownStatus: String
+) {
+    val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+    val headerBgColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
+    val subHeaderBgColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+
+    // --- TABLEAU 1 : ÉMETTEURS (Techno / Date / État) ---
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        border = BorderStroke(1.dp, borderColor),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Titre du tableau 1
+            Box(
+                modifier = Modifier.fillMaxWidth().background(headerBgColor).padding(8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    AppStrings.emittersTableTitle,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            HorizontalDivider(color = borderColor)
+
+            // En-têtes des colonnes
+            Row(
+                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)
+                    .background(subHeaderBgColor), verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    AppStrings.colTechno,
+                    modifier = Modifier.weight(1.3f).padding(8.dp),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center
+                )
+                VerticalDivider(color = borderColor)
+                Text(
+                    AppStrings.colService,
+                    modifier = Modifier.weight(1f).padding(8.dp),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center
+                )
+                VerticalDivider(color = borderColor)
+                Text(
+                    AppStrings.colState,
+                    modifier = Modifier.weight(1.1f).padding(8.dp),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+            HorizontalDivider(color = borderColor)
+
+            // Lignes de données
+            parsedBands.forEachIndexed { index, band ->
+                val technoName = band.rawFreq.substringBefore(":").trim()
+                val dateFormatted = fr.geotower.ui.screens.emitters.formatDateToFrench(band.date)
+                val dateDisplay =
+                    if (dateFormatted.isNotBlank() && dateFormatted != "-") dateFormatted else txtDateNotSpecifiedAnfr
+
+                val statusColor = when {
+                    band.status.contains("En service", true) -> Color(0xFF4CAF50) // Vert
+                    band.status.contains(
+                        "Techniquement",
+                        true
+                    ) -> MaterialTheme.colorScheme.primary // Bleu/Primaire
+                    band.status.contains("Approuvé", true) -> Color(0xFF2196F3) // Bleu clair
+                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                }
+                val statusText = when {
+                    band.status.contains("En service", true) -> txtInService
+                    band.status.contains("Techniquement", true) -> txtTechnically
+                    band.status.contains("Approuvé", true) -> txtProjectApproved
+                    else -> txtUnknownStatus
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)
+                        .background(MaterialTheme.colorScheme.surface),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        technoName,
+                        modifier = Modifier.weight(1.3f).padding(8.dp),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center
+                    )
+                    VerticalDivider(color = borderColor)
+                    Text(
+                        dateDisplay,
+                        modifier = Modifier.weight(1f).padding(8.dp),
+                        fontSize = 12.sp,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        textAlign = TextAlign.Center
+                    )
+                    VerticalDivider(color = borderColor)
+                    Text(
+                        statusText,
+                        modifier = Modifier.weight(1.1f).padding(8.dp),
+                        fontSize = 12.sp,
+                        color = statusColor,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center
+                    )
+                }
+                if (index < parsedBands.lastIndex) HorizontalDivider(color = borderColor)
+            }
+        }
+    }
+
+    // --- TABLEAU 2 : ANTENNES (Azimut / Hauteur / Techno / Fréquence) ---
+    // Regroupement des données par Azimut, PUIS par Hauteur
+    data class AntennaRow(
+        val techno: String,
+        val bandEquivalent: String?,
+        val freqs: String,
+        val gen: Int,
+        val value: Int
+    )
+    val groupedAntennas = mutableMapOf<String, MutableMap<String, MutableList<AntennaRow>>>()
+
+    parsedBands.forEach { band ->
+        // ✅ NOUVEAU : Formatage propre "4G 700"
+        val rawTechnoName = band.rawFreq.substringBefore(":").trim()
+        val technoName = if (band.gen in 2..5 && band.value > 0) "${band.gen}G ${band.value}" else rawTechnoName
+        val bandEquivalent = bandEquivalentLabel(band.gen, band.value)
+
+        val freqs = band.rawFreq.substringAfter(":", "").trim()
+
+        // Remplacement élégant des tirets par des "à" comme sur l'image modèle
+        val displayFreqs = if (freqs.isNotBlank()) {
+            Regex("""([0-9]+(?:[.,][0-9]+)?)\s*-\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]*Hz)?""")
+                .replace(freqs) { match ->
+                    val unit = match.groupValues[3].takeIf { it.isNotBlank() }
+                    buildString {
+                        append(match.groupValues[1])
+                        append(" à ")
+                        append(match.groupValues[2])
+                        if (unit != null) append(" ").append(unit)
+                    }
+                }
+                .replace(Regex("""\s*,\s*"""), ", ")
+                .replace(Regex("""\s+"""), " ")
+                .trim()
+        } else {
+            "-"
+        }
+
+        if (band.physDetails.isEmpty()) {
+            groupedAntennas.getOrPut("-") { mutableMapOf() }
+                .getOrPut("-") { mutableListOf() }
+                .add(AntennaRow(technoName, bandEquivalent, displayFreqs, band.gen, band.value))
+        } else {
+            band.physDetails.forEach { phys ->
+                // Séparation robuste: "Panneau : 60° (28.9m)" -> On récupère "60" et "28.9m"
+                val details =
+                    if (phys.contains(":")) phys.substringAfter(":").trim() else phys.trim()
+                val azimut =
+                    details.substringBefore("(").replace("°", "").trim().takeIf { it.isNotBlank() }
+                        ?: "-"
+                val hauteur =
+                    if (details.contains("(")) details.substringAfter("(").substringBefore(")")
+                        .trim() else "-"
+
+                groupedAntennas.getOrPut(azimut) { mutableMapOf() }
+                    .getOrPut(hauteur) { mutableListOf() }
+                    .add(AntennaRow(technoName, bandEquivalent, displayFreqs, band.gen, band.value))
+            }
+        }
+    }
+
+    // Tri des azimuts (croissant)
+    val sortedAzimuts = groupedAntennas.entries.sortedBy {
+        it.key.replace(Regex("[^0-9]"), "").toIntOrNull() ?: 9999
+    }
+
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        border = BorderStroke(1.dp, borderColor),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Titre du tableau 2
+            Box(
+                modifier = Modifier.fillMaxWidth().background(headerBgColor).padding(8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    AppStrings.antennasTableTitle,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            HorizontalDivider(color = borderColor)
+
+            // En-têtes des colonnes
+            Row(
+                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)
+                    .background(subHeaderBgColor), verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    AppStrings.colAzimuth,
+                    modifier = Modifier.weight(0.8f).padding(6.dp),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center
+                )
+                VerticalDivider(color = borderColor)
+                Text(
+                    AppStrings.colHeight,
+                    modifier = Modifier.weight(1f).padding(6.dp),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center
+                )
+                VerticalDivider(color = borderColor)
+                Text(
+                    AppStrings.colBand,
+                    modifier = Modifier.weight(1f).padding(6.dp),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center
+                )
+                VerticalDivider(color = borderColor)
+                Text(
+                    AppStrings.colFreqs,
+                    modifier = Modifier.weight(1.6f).padding(6.dp),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+            HorizontalDivider(color = borderColor)
+
+            // Lignes groupées avec double "IntrinsicSize.Min" pour fusionner verticalement
+            sortedAzimuts.forEachIndexed { azimutIndex, azimutEntry ->
+                val azimut = azimutEntry.key
+                val azimutDisplay = if (azimut == "-") "-" else "$azimut°"
+                // Tri optionnel des hauteurs (par exemple par ordre décroissant)
+                val sortedHauteurs = azimutEntry.value.entries.sortedByDescending {
+                    it.key.replace(
+                        Regex("[^0-9.]"),
+                        ""
+                    ).toFloatOrNull() ?: 0f
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)
+                        .background(MaterialTheme.colorScheme.surface)
+                ) {
+                    // 1. Cellule fusionnée : Azimut (englobe toutes les hauteurs)
+                    Box(
+                        modifier = Modifier.weight(0.8f).fillMaxHeight(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            azimutDisplay,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            modifier = Modifier.padding(4.dp)
+                        )
+                    }
+                    VerticalDivider(color = borderColor)
+
+                    // 2. Colonne des hauteurs
+                    Column(modifier = Modifier.weight(3.6f)) { // 1.0 + 1.0 + 1.6 = 3.6
+                        sortedHauteurs.forEachIndexed { hauteurIndex, hauteurEntry ->
+                            val hauteur = hauteurEntry.key
+                            val rows = hauteurEntry.value
+
+                            Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+                                // 2A. Cellule fusionnée : Hauteur (englobe toutes les technos pour cette hauteur)
+                                Box(
+                                    modifier = Modifier.weight(1f).fillMaxHeight(),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        hauteur,
+                                        fontSize = 12.sp,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        textAlign = TextAlign.Center,
+                                        maxLines = 1,
+                                        modifier = Modifier.padding(4.dp)
+                                    )
+                                }
+                                VerticalDivider(color = borderColor)
+
+                                // 2B. Sous-tableau : Technologies et Fréquences
+                                Column(modifier = Modifier.weight(2.6f)) { // 1.0 + 1.6 = 2.6
+                                    rows.forEachIndexed { rowIndex, rowItem ->
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth()
+                                                .height(IntrinsicSize.Min),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Column(
+                                                modifier = Modifier.weight(1f)
+                                                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                                                horizontalAlignment = Alignment.CenterHorizontally
+                                            ) {
+                                                Text(
+                                                    text = rowItem.techno,
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    color = MaterialTheme.colorScheme.primary,
+                                                    textAlign = TextAlign.Center
+                                                )
+                                                rowItem.bandEquivalent?.let { equivalent ->
+                                                    Text(
+                                                        text = "($equivalent)",
+                                                        fontSize = 10.sp,
+                                                        fontWeight = FontWeight.Medium,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                        textAlign = TextAlign.Center,
+                                                        lineHeight = 12.sp
+                                                    )
+                                                }
+                                            }
+                                            VerticalDivider(color = borderColor)
+                                            Text(
+                                                text = rowItem.freqs,
+                                                modifier = Modifier.weight(1.6f)
+                                                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                textAlign = TextAlign.Center,
+                                                lineHeight = 16.sp
+                                            )
+                                        }
+                                        if (rowIndex < rows.lastIndex) HorizontalDivider(color = borderColor)
+                                    }
+                                }
+                            }
+                            if (hauteurIndex < sortedHauteurs.lastIndex) HorizontalDivider(color = borderColor)
+                        }
+                    }
+                }
+                if (azimutIndex < sortedAzimuts.lastIndex) HorizontalDivider(color = borderColor)
+            }
+        }
+    }
 }

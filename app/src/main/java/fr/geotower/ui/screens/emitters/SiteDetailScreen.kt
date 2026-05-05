@@ -44,6 +44,7 @@ import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -552,7 +553,16 @@ fun SiteDetailScreen(
                         }.padding(horizontal = 16.dp, vertical = 4.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(48.dp))
+                IconButton(
+                    onClick = { safeClick { navController.navigate("settings?section=site") } },
+                    modifier = Modifier.padding(end = 4.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = AppStrings.settingsTitle,
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
     ) { padding ->

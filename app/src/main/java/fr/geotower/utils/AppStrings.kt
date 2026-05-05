@@ -201,6 +201,17 @@ object AppStrings {
     val showSpeedometerDesc @Composable get() = get("Afficher la vitesse sur la carte", "Show speed on the map", "Mostrar a vitesse no mapa")
     val siteFreqFiltersTitle @Composable get() = get("Filtres des fréquences de l'antenne", "Antenna frequency filters", "Filtros de fréquence da antena")
     val freqGridDisplayOption @Composable get() = get("Afficher les fréquences en grille", "Display frequencies in a grid", "Exibir frequências em grade")
+
+    val emittersTableTitle @Composable get() = get("Émetteurs", "Emitters", "Emissores")
+    val antennasTableTitle @Composable get() = get("Antennes", "Antennas", "Antenas")
+    val colTechno @Composable get() = get("Techno.", "Techno.", "Tecno.")
+    val colBand @Composable get() = get("Bande", "Band", "Banda")
+    val colService @Composable get() = get("Mise en service", "In service", "Em serviço")
+    val colState @Composable get() = get("État", "State", "Estado")
+    val colAzimuth @Composable get() = get("Azimut", "Azimuth", "Azimute")
+    val colHeight @Composable get() = get("Hauteur", "Height", "Altura")
+    val colFreqs @Composable get() = get("Fréquences", "Frequencies", "Frequências")
+
     val shareMapAzimuthsOption @Composable get() = get("Afficher les azimuts", "Show azimuths", "Mostrar azimutes")
 
     val liveNotificationTitle @Composable get() = get("Notification Live", "Live Notification", "Notificação au vivo")

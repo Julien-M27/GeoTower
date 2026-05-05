@@ -73,6 +73,34 @@ import fr.geotower.ui.components.SiteStatusCard
 
 private fun Int.dpToPx(context: Context): Int = (this * context.resources.displayMetrics.density).toInt()
 
+private fun Bitmap.trimTransparentBottom(): Bitmap {
+    val row = IntArray(width)
+    var bottom = height - 1
+
+    while (bottom >= 0) {
+        getPixels(row, 0, width, 0, bottom, width, 1)
+        if (row.any { pixel -> (pixel ushr 24) != 0 }) break
+        bottom--
+    }
+
+    if (bottom < 0 || bottom == height - 1) return this
+    return Bitmap.createBitmap(this, 0, 0, width, bottom + 1)
+}
+
+@Composable
+private fun ShareSiteFrequenciesBlock(
+    info: LocalisationEntity,
+    technique: TechniqueEntity?
+) {
+    SiteFrequenciesBlock(
+        info = info,
+        technique = technique,
+        formattedAzimuths = "",
+        cardBgColor = MaterialTheme.colorScheme.surfaceVariant,
+        blockShape = RoundedCornerShape(12.dp)
+    )
+}
+
 fun shareFullAntennaCapture(
     context: Context,
     currentView: View,
@@ -736,6 +764,14 @@ fun shareFullAntennaCapture(
                                     "freq" -> {
                                         // Géré dans l'image 2 si scindé, sinon affiché ici (code d'origine)
                                         if (incFreqs) {
+                                            if (AppConfig.siteFreqGridDisplay.value) {
+                                                ShareSiteFrequenciesBlock(
+                                                    info = info,
+                                                    technique = technique
+                                                )
+                                                return@forEach
+                                            }
+
                                             val rawFreqs =
                                                 technique?.detailsFrequences ?: info.frequences
                                             val parsedBands = parseAndSortFrequencies(
@@ -1148,6 +1184,12 @@ fun shareFullAntennaCapture(
                                 }
 
                                 if (incFreqs && shareOrder.contains("freq")) {
+                                    if (AppConfig.siteFreqGridDisplay.value) {
+                                        ShareSiteFrequenciesBlock(
+                                            info = info,
+                                            technique = technique
+                                        )
+                                    } else {
                                     val rawFreqs = technique?.detailsFrequences ?: info.frequences
                                     val parsedBands = parseAndSortFrequencies(
                                         rawFreqs,
@@ -1390,6 +1432,7 @@ fun shareFullAntennaCapture(
                                             }
                                         }
                                     }
+                                    }
                                 }
 
                                 if (incQrCode) {
@@ -1477,7 +1520,9 @@ fun shareFullAntennaCapture(
                 if (isSplit) {
                     val halfWidth = fullBitmap.width / 2
                     val bmp1 = Bitmap.createBitmap(fullBitmap, 0, 0, halfWidth, fullBitmap.height)
+                        .trimTransparentBottom()
                     val bmp2 = Bitmap.createBitmap(fullBitmap, halfWidth, 0, halfWidth, fullBitmap.height)
+                        .trimTransparentBottom()
 
                     val file1 = File(imagesDir, "Geotower_site_${info.idAnfr}_part1.png")
                     val file2 = File(imagesDir, "Geotower_site_${info.idAnfr}_part2.png")

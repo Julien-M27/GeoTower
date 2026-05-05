@@ -336,6 +336,23 @@ fun SettingsScreen(
     val logoResId by AppIconManager.currentIconRes
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
+    LaunchedEffect(initialSection) {
+        when (initialSection) {
+            "nearby", "support", "site" -> {
+                kotlinx.coroutines.delay(300)
+                activeSectionIndex = 2
+                if (navMode == 0 || !isWideScreen) {
+                    scrollState.animateScrollTo((scrollState.maxValue * 0.55f).toInt())
+                }
+                when (initialSection) {
+                    "nearby" -> showNearbySettingsSheet = true
+                    "support" -> showSupportSettingsSheet = true
+                    "site" -> showSiteSettingsSheet = true
+                }
+            }
+        }
+    }
+
     val menuItems = listOf(
         Triple(AppStrings.appearance, Icons.Outlined.Palette, 0),
         Triple(AppStrings.mapping, Icons.Outlined.Map, 1),

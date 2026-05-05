@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -456,7 +457,16 @@ fun NearEmittersScreen(
                     modifier = Modifier.weight(1f),
                     textAlign = androidx.compose.ui.text.style.TextAlign.Center
                 )
-                Spacer(modifier = Modifier.width(48.dp))
+                IconButton(
+                    onClick = { safeClick { navController.navigate("settings?section=nearby") } },
+                    modifier = Modifier.padding(end = 4.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = AppStrings.settingsTitle,
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
     ) { padding ->

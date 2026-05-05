@@ -30,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.LoadingIndicator
@@ -430,7 +431,16 @@ fun SupportDetailScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.width(48.dp))
+                IconButton(
+                    onClick = { safeClick { navController.navigate("settings?section=support") } },
+                    modifier = Modifier.padding(end = 4.dp)
+                ) {
+                    Icon(
+                        Icons.Default.Settings,
+                        contentDescription = AppStrings.settingsTitle,
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
             }
         }
     ) { padding ->
