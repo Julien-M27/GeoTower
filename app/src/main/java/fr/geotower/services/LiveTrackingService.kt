@@ -1,5 +1,6 @@
 package fr.geotower.services
 
+import android.Manifest
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -7,6 +8,7 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.location.Location
 import android.net.Uri
@@ -16,6 +18,7 @@ import android.os.IBinder
 import android.os.Looper
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
@@ -118,7 +121,7 @@ class LiveTrackingService : Service() {
     }
 
     private fun startLocationUpdates() {
-        if (!LiveTrackingController.hasPreciseLocationPermission(this)) {
+        if (!hasFineLocationPermission()) {
             stopTrackingAndSelf()
             return
         }
@@ -133,7 +136,19 @@ class LiveTrackingService : Service() {
             }
         }
 
-        fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
+        try {
+            fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
+        } catch (e: SecurityException) {
+            android.util.Log.w("LiveTracking", "Location permission revoked before updates could start: ${e.message}")
+            stopTrackingAndSelf()
+        }
+    }
+
+    private fun hasFineLocationPermission(): Boolean {
+        return ContextCompat.checkSelfPermission(
+            this,
+            Manifest.permission.ACCESS_FINE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
     }
 
     private fun processLocationUpdate(location: Location) {

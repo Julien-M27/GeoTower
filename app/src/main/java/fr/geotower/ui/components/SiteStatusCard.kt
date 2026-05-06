@@ -147,7 +147,7 @@ fun SiteStatusCard(
             Spacer(modifier = Modifier.height(12.dp))
 
             // --- SECTION 3 : PIED DE PAGE ---
-            val currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date())
+            val currentTime = SimpleDateFormat("HH:mm", Locale.ROOT).format(Date())
             Text(
                 text = "${AppStrings.lastUpdatedText} $currentTime",
                 fontSize = 12.sp,
