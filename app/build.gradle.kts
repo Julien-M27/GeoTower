@@ -24,7 +24,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "1.9.9.1.3"
+        versionName = "1.9.9.1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -74,6 +74,8 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation("androidx.compose.material:material-icons-extended:1.7.5")
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.car.app)
+    implementation(libs.androidx.car.app.projected)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     // implementation(libs.androidx.material.icons.extended) // Doublon retiré
 
@@ -121,6 +123,7 @@ dependencies {
 
     // INDISPENSABLE pour .await()
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+    implementation("com.google.guava:guava:33.2.1-android")
 
     // CSV & Net
     implementation(libs.okhttp)

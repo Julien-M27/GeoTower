@@ -1,6 +1,8 @@
 package fr.geotower.utils
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.text.intl.Locale as ComposeLocale
+import java.util.Locale
 
 object AppStrings {
     // Lecture en temps réel de la langue choisie dans les paramètres
@@ -14,7 +16,7 @@ object AppStrings {
 
         // Si "Système" est sélectionné, on récupère le code langue du téléphone
         val langToCheck = if (currentLang == "Système") {
-            java.util.Locale.getDefault().language
+            currentSystemLanguage()
         } else {
             currentLang
         }
@@ -26,6 +28,12 @@ object AppStrings {
             else -> en
         }
     }
+
+    @Composable
+    private fun currentSystemLanguage(): String = ComposeLocale.current.language
+
+    @Composable
+    private fun currentJavaLocale(): Locale = Locale.forLanguageTag(ComposeLocale.current.language.ifBlank { "en" })
 
     // ==========================================
     // 🚀 SPLASH SCREEN
@@ -162,6 +170,7 @@ object AppStrings {
     val supportMapOption @Composable get() = get("Mini-carte", "Mini-map", "Mini-mapa")
     val supportDetailsOption @Composable get() = get("Détails du pylône", "Support details", "Detalhes do suporte")
     val supportPhotosOption @Composable get() = get("Photos communautaires", "Community photos", "Fotos da comunidade")
+    val supportOpenMapOption @Composable get() = get("Bouton Ouvrir la carte", "Open map button", "Botao Abrir o mapa")
     val supportNavOption @Composable get() = get("Bouton Naviguer", "Navigate button", "Botão Navegar")
     val supportShareOption @Composable get() = get("Bouton Partager", "Share button", "Botão Compartilhar")
     val supportOperatorsOption @Composable get() = get("Liste des opérateurs", "Operators list", "Lista de operadoras")
@@ -172,6 +181,8 @@ object AppStrings {
     val sitePhotosOption @Composable get() = get("Photos communautaires", "Community photos", "Fotos da comunidade")
     val sitePanelHeightsOption @Composable get() = get("Hauteurs des panneaux", "Panel heights", "Alturas dos painéis")
     val siteIdsOption @Composable get() = get("Identifiants", "Identifiers", "Identificadores")
+    val siteOpenMapOption @Composable get() = get("Bouton Ouvrir la carte", "Open map button", "Botao Abrir o mapa")
+    val siteElevationProfileOption @Composable get() = get("Bouton Profil altimétrique", "Elevation profile button", "Botão Perfil altimétrico")
     val siteNavOption @Composable get() = get("Bouton Naviguer", "Navigate button", "Botão Navegar")
     val siteShareOption @Composable get() = get("Bouton Partager", "Share button", "Botão Compartilhar")
     val siteDatesOption @Composable get() = get("Dates d'activation", "Activation dates", "Datas de ativação")
@@ -213,6 +224,39 @@ object AppStrings {
     val colFreqs @Composable get() = get("Fréquences", "Frequencies", "Frequências")
 
     val shareMapAzimuthsOption @Composable get() = get("Afficher les azimuts", "Show azimuths", "Mostrar azimutes")
+
+    val elevationProfileTitle @Composable get() = get("Profil Altimétrique", "Elevation Profile", "Perfil Altimétrico")
+    val elevationProfileButton @Composable get() = get("Profil altimétrique", "Elevation profile", "Perfil altimétrico")
+    val elevationProfileLoading @Composable get() = get("Calcul du profil altimétrique...", "Calculating elevation profile...", "A calcular o perfil altimétrico...")
+    val elevationProfileCalculationInProgress @Composable get() = get("Analyse du relief et de la zone de Fresnel en cours.", "Terrain and Fresnel zone analysis in progress.", "Análise do relevo e da zona de Fresnel em curso.")
+    val elevationProfileNoLocation @Composable get() = get("Position utilisateur indisponible. Activez la localisation puis réessayez.", "User location unavailable. Enable location and try again.", "Localização do utilizador indisponível. Ative a localização e tente novamente.")
+    val elevationProfileNoSite @Composable get() = get("Site introuvable pour ce profil.", "Site not found for this profile.", "Site não encontrado para este perfil.")
+    val elevationProfileError @Composable get() = get("Impossible de charger le profil altimétrique.", "Unable to load elevation profile.", "Não foi possível carregar o perfil altimétrico.")
+    val elevationProfileOfflineTitle @Composable get() = get("Profil altimétrique indisponible hors ligne", "Elevation profile unavailable offline", "Perfil altimétrico indisponível offline")
+    val elevationProfileOfflineDetail @Composable get() = get("Le calcul utilise les altitudes IGN et nécessite une connexion internet. Réessayez quand le réseau sera disponible.", "The calculation uses IGN elevation data and requires an internet connection. Try again when the network is available.", "O cálculo usa dados de altitude IGN e requer ligação à internet. Tente novamente quando a rede estiver disponível.")
+    val elevationProfileOfflineSaveDetail @Composable get() = get("Le calcul utilise les altitudes IGN et nécessite une connexion internet. Vous pouvez enregistrer temporairement votre position actuelle pour lancer le calcul automatiquement quand le réseau reviendra.", "The calculation uses IGN elevation data and requires an internet connection. You can temporarily save your current position to run the calculation automatically when the network returns.", "O cálculo usa dados de altitude IGN e requer ligação à internet. Pode guardar temporariamente a sua posição atual para iniciar o cálculo automaticamente quando a rede voltar.")
+    val elevationProfileSaveForLater @Composable get() = get("Calculer plus tard", "Calculate later", "Calcular mais tarde")
+    val elevationProfilePendingSavedTitle @Composable get() = get("Calcul enregistré pour plus tard", "Calculation saved for later", "Cálculo guardado para mais tarde")
+    val elevationProfilePendingSavedDetail @Composable get() = get("Votre position actuelle et ce site sont enregistrés temporairement. Le profil altimétrique sera calculé automatiquement dès que la connexion reviendra.", "Your current position and this site are temporarily saved. The elevation profile will be calculated automatically when the connection returns.", "A sua posição atual e este site foram guardados temporariamente. O perfil altimétrico será calculado automaticamente quando a ligação voltar.")
+    val elevationProfileCalculatedAt @Composable get() = get("Calculé à", "Calculated at", "Calculado às")
+    val elevationProfileUsedGps @Composable get() = get("Coordonnées GPS utilisées", "GPS coordinates used", "Coordenadas GPS utilizadas")
+    val elevationProfileSavedDialogTitle @Composable get() = get("Profil enregistré disponible", "Saved profile available", "Perfil guardado disponível")
+    val elevationProfileSavedDialogMessage @Composable get() = get("Vous êtes hors ligne. Un profil altimétrique calculé précédemment existe pour ce site. Voulez-vous l'afficher ?", "You are offline. A previously calculated elevation profile exists for this site. Do you want to display it?", "Está offline. Existe um perfil altimétrico calculado anteriormente para este site. Quer apresentá-lo?")
+    val elevationProfileSavedDialogShow @Composable get() = get("Afficher", "Show", "Mostrar")
+    val elevationProfileSavedDialogHide @Composable get() = get("Ne pas afficher", "Do not show", "Não mostrar")
+    val elevationProfileDistance @Composable get() = get("Distance", "Distance", "Distância")
+    val elevationProfileSupportHeight @Composable get() = get("Hauteur support", "Support height", "Altura do suporte")
+    val elevationProfileStartAltitude @Composable get() = get("Altitude départ", "Start altitude", "Altitude inicial")
+    val elevationProfileSiteAltitude @Composable get() = get("Altitude site", "Site altitude", "Altitude do site")
+    val elevationProfileFrequency @Composable get() = get("Fréquence", "Frequency", "Frequência")
+    val elevationProfileDirectLineLabel @Composable get() = get("Trajet direct du signal", "Direct signal path", "Trajeto direto do sinal")
+    val elevationProfileFresnelLabel @Composable get() = get("Zone de Fresnel", "Fresnel zone", "Zona de Fresnel")
+    val elevationProfileLineClear @Composable get() = get("Le relief ne coupe pas le trajet direct entre vous et le support", "Terrain does not cut the direct path between you and the support", "O relevo não corta o trajeto direto entre si e o suporte")
+    val elevationProfileLineBlocked @Composable get() = get("Le relief coupe potentiellement le trajet direct", "Terrain may cut the direct path", "O relevo pode cortar o trajeto direto")
+    val elevationProfileFresnelClear @Composable get() = get("Fresnel 60 % dégagé", "60% Fresnel clear", "Fresnel 60% livre")
+    val elevationProfileFresnelBlocked @Composable get() = get("Fresnel 60 % obstrué", "60% Fresnel obstructed", "Fresnel 60% obstruído")
+    val elevationProfileFresnelExplanation @Composable get() = get("La zone de Fresnel est le volume autour du trajet radio. Pour une liaison plus fiable, on cherche généralement à garder au moins 60 % de cette zone sans obstacle : un relief peut donc gêner le signal même s'il ne coupe pas exactement le trajet direct.", "The Fresnel zone is the volume around the radio path. For a more reliable link, at least 60% of this zone is usually kept clear, so terrain can affect the signal even if it does not exactly cut the direct path.", "A zona de Fresnel é o volume em torno do trajeto rádio. Para uma ligação mais fiável, normalmente tenta-se manter pelo menos 60% desta zona livre de obstáculos; por isso, o relevo pode afetar o sinal mesmo sem cortar exatamente o trajeto direto.")
+    val elevationProfileIgnSource @Composable get() = get("Source : IGN Géoplateforme - RGE ALTI", "Source: IGN Geoplatform - RGE ALTI", "Fonte: IGN Geoplataforma - RGE ALTI")
 
     val liveNotificationTitle @Composable get() = get("Notification Live", "Live Notification", "Notificação au vivo")
     val liveNotificationDesc @Composable get() = get("Activer les notifications en temps réel", "Enable real-time notifications", "Ativar notifications em tempo real")
@@ -426,6 +470,7 @@ object AppStrings {
     val distanceLabel @Composable get() = get("Distance : ", "Distance : ", "Distância : ")
     val fromMyPosition @Composable get() = get("de vous", "from you", "de si")
     val bearingLabel @Composable get() = get("Cap mesuré depuis l’antenne : ", "Bearing measured from the antenna : ", "Rumo medido a partir da antena : ")
+    val openMap @Composable get() = get("Ouvrir la carte", "Open map", "Abrir o mapa")
     val navToSite @Composable get() = get("Naviguer vers ce site", "Navigate to this site", "Navegar para este local")
     val shareSite @Composable get() = get("Partager ce site", "Share this site", "Partilhar este local")
     @Composable
@@ -505,6 +550,9 @@ object AppStrings {
 
     val showAzimuthsLabel @Composable get() = get("Afficher les azimuts (direction de l'antenne)", "Show azimuths (antenna direction)", "Mostrar azimutes (direção da antena)")
     val showAzimuthsConeLabel @Composable get() = get("Afficher les azimuts (représentation en cône)", "Show azimuths (cone representation)", "Mostrar azimutes (représentação em cone)")
+    val siteDisplayTitle @Composable get() = get("Affichage des sites", "Site display", "Exibição dos sites")
+    val sitesInServiceLabel @Composable get() = get("En service", "In service", "Em serviço")
+    val sitesOutOfServiceLabel @Composable get() = get("Hors Service", "Out of Service", "Fora de Serviço")
 
     val trackGlobalActive @Composable get() = get(
         "Suivi global en cours...",
@@ -552,9 +600,9 @@ object AppStrings {
     }
 
     val communityPhotosOffline @Composable get() = get(
-        "Vous êtes hors ligne.\nConnexion internet requise pour voir les photos.",
-        "You are offline.\nInternet connection required to view photos.",
-        "Você está offline.\nConexão à internet nécessaire para ver as fotos."
+        "Vous êtes hors ligne.\nLes photos communautaires ne peuvent pas être récupérées sans connexion internet. Le schéma reste affiché s'il est disponible.",
+        "You are offline.\nCommunity photos cannot be retrieved without an internet connection. The diagram remains visible when available.",
+        "Você está offline.\nAs fotos da comunidade não podem ser recuperadas sem ligação à internet. O esquema permanece visível quando disponível."
     )
 
     @Composable
@@ -584,6 +632,7 @@ object AppStrings {
     val shareMapAttributionOption @Composable get() = get("Crédits (Attribution)", "Credits (Attribution)", "Créditos (Atribuição)")
 
     val shareMapOption @Composable get() = get("Afficher la carte", "Display the map", "Mostrar o mapa")
+    val shareElevationProfileOption @Composable get() = get("Profil altimétrique (image séparée)", "Elevation profile (separate image)", "Perfil altimétrico (imagem separada)")
     val shareSupportOption @Composable get() = get("Détails du support", "Support details", "Detalhes do suporte")
     val shareSpeedtestOption @Composable get() = get("Meilleur Speedtest", "Best Speedtest", "Melhor Speedtest") // 🚨 NEW
     val shareFreqOption @Composable get() = get("Fréquences", "Frequencies", "Frequências")
@@ -600,6 +649,9 @@ object AppStrings {
     val imageContent @Composable get() = get("Contenu de l'image", "Image content", "Conteúdo da imagem")
     val move @Composable get() = get("Déplacer", "Move", "Mover")
     val generateImage @Composable get() = get("Générer l'image", "Generate image", "Gerar imagem")
+    val shareImageGenerationInProgress @Composable get() = get("Génération des images de partage...", "Generating share images...", "A gerar as imagens de partilha...")
+    val shareImagePreparingInProgress @Composable get() = get("Préparation de l'image principale...", "Preparing the main image...", "A preparar a imagem principal...")
+    val shareElevationProfileOnlyUnavailable @Composable get() = get("Profil altimétrique indisponible pour le partage.", "Elevation profile unavailable for sharing.", "Perfil altimétrico indisponível para partilha.")
     val copy @Composable get() = get("Copier", "Copy", "Copiar")
     val distanceHidden @Composable get() = get("Distance masquée (Mode confidentiel)", "Distance hidden (Confidential mode)", "Distância oculta (Modo confidencial)")
 
@@ -981,11 +1033,12 @@ object AppStrings {
     fun formatWeeklyVersionWithWeekNumber(dateStr: String): String {
         if (dateStr.isBlank() || dateStr == "-" || !dateStr.contains("/")) return dateStr
         val weekWord = get("Semaine", "Week", "Semana")
+        val locale = currentJavaLocale()
         return try {
-            val format = java.text.SimpleDateFormat("dd/MM/yyyy", java.util.Locale.getDefault())
+            val format = java.text.SimpleDateFormat("dd/MM/yyyy", locale)
             val date = format.parse(dateStr)
             if (date != null) {
-                val cal = java.util.Calendar.getInstance()
+                val cal = java.util.Calendar.getInstance(locale)
                 cal.firstDayOfWeek = java.util.Calendar.MONDAY
                 cal.minimalDaysInFirstWeek = 4
                 cal.time = date

@@ -59,6 +59,8 @@ fun SharePreferencesSheet(
     onOrderChange: (List<String>) -> Unit,
     mapEnabled: Boolean,
     onMapChange: (Boolean) -> Unit,
+    elevationProfileEnabled: Boolean,
+    onElevationProfileChange: (Boolean) -> Unit,
     supportEnabled: Boolean,
     onSupportChange: (Boolean) -> Unit,
     idsEnabled: Boolean,
@@ -186,6 +188,7 @@ fun SharePreferencesSheet(
 
                         when (pageId) {
                             "map" -> DraggableSwitchCard(AppStrings.shareMapOption, mapEnabled, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "elevation_profile" -> DraggableSwitchCard(AppStrings.shareElevationProfileOption, elevationProfileEnabled, onElevationProfileChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "support" -> DraggableSwitchCard(AppStrings.shareSupportOption, supportEnabled, onSupportChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "ids" -> DraggableSwitchCard(AppStrings.shareIdsOption, idsEnabled, onIdsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "dates" -> DraggableSwitchCard(AppStrings.shareDatesOption, datesEnabled, onDatesChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
@@ -203,9 +206,10 @@ fun SharePreferencesSheet(
             // --- BOUTON RÉINITIALISER (TOUT PAR DÉFAUT) ---
             TextButton(
                 onClick = {
-                    onOrderChange(listOf("map", "support", "ids", "dates", "address", "speedtest", "status", "freq"))
+                    onOrderChange(listOf("map", "elevation_profile", "support", "ids", "dates", "address", "speedtest", "status", "freq"))
                     onMapChange(true)
-                    onSplitImageChange(false) // Réinitialise aussi la scission
+                    onElevationProfileChange(true)
+                    onSplitImageChange(true) // Réinitialise aussi la scission
                     onSupportChange(true)
                     onIdsChange(true)
                     onDatesChange(true)

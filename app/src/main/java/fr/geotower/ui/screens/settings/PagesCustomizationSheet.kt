@@ -815,6 +815,7 @@ fun SupportSettingsSheet(
     showMap: Boolean, onMapChange: (Boolean) -> Unit,
     showDetails: Boolean, onDetailsChange: (Boolean) -> Unit,
     showPhotos: Boolean, onPhotosChange: (Boolean) -> Unit,
+    showOpenMap: Boolean, onOpenMapChange: (Boolean) -> Unit,
     showNav: Boolean, onNavChange: (Boolean) -> Unit,
     showShare: Boolean, onShareChange: (Boolean) -> Unit,
     showOperators: Boolean, onOperatorsChange: (Boolean) -> Unit,
@@ -890,6 +891,7 @@ fun SupportSettingsSheet(
                             "map" -> DraggableSwitchCard(AppStrings.supportMapOption, showMap, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "details" -> DraggableSwitchCard(AppStrings.supportDetailsOption, showDetails, onDetailsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "photos" -> DraggableSwitchCard(AppStrings.supportPhotosOption, showPhotos, onPhotosChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "open_map" -> DraggableSwitchCard(AppStrings.supportOpenMapOption, showOpenMap, onOpenMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "nav" -> DraggableSwitchCard(AppStrings.supportNavOption, showNav, onNavChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "share" -> DraggableSwitchCard(AppStrings.supportShareOption, showShare, onShareChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "operators" -> DraggableSwitchCard(AppStrings.supportOperatorsOption, showOperators, onOperatorsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
@@ -900,10 +902,11 @@ fun SupportSettingsSheet(
 
             Spacer(modifier = Modifier.height(24.dp))
             TextButton(onClick = {
-                onOrderChange(listOf("map", "details", "photos", "nav", "share", "operators"))
+                onOrderChange(listOf("map", "details", "photos", "nav", "share", "open_map", "operators"))
                 onMapChange(true)
                 onDetailsChange(true)
                 onPhotosChange(true)
+                onOpenMapChange(true)
                 onNavChange(true)
                 onShareChange(true)
                 onOperatorsChange(true)
@@ -928,6 +931,8 @@ fun SiteSettingsSheet(
     showPhotos: Boolean, onPhotosChange: (Boolean) -> Unit,
     showPanelHeights: Boolean, onPanelHeightsChange: (Boolean) -> Unit,
     showIds: Boolean, onIdsChange: (Boolean) -> Unit,
+    showOpenMap: Boolean, onOpenMapChange: (Boolean) -> Unit,
+    showElevationProfile: Boolean, onElevationProfileChange: (Boolean) -> Unit,
     showNav: Boolean, onNavChange: (Boolean) -> Unit,
     showShare: Boolean, onShareChange: (Boolean) -> Unit,
     showDates: Boolean, onDatesChange: (Boolean) -> Unit,
@@ -1027,6 +1032,8 @@ fun SiteSettingsSheet(
                                 onOpenPhotosSettings()
                             })
                             "ids" -> DraggableSwitchCard(AppStrings.siteIdsOption, showIds, onIdsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "open_map" -> DraggableSwitchCard(AppStrings.siteOpenMapOption, showOpenMap, onOpenMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "elevation_profile" -> DraggableSwitchCard(AppStrings.siteElevationProfileOption, showElevationProfile, onElevationProfileChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "nav" -> DraggableSwitchCard(AppStrings.siteNavOption, showNav, onNavChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "share" -> DraggableSwitchCard(AppStrings.siteShareOption, showShare, onShareChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "dates" -> DraggableSwitchCard(AppStrings.siteDatesOption, showDates, onDatesChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
@@ -1045,14 +1052,17 @@ fun SiteSettingsSheet(
 
             Spacer(modifier = Modifier.height(24.dp))
             TextButton(onClick = {
-                onOrderChange(listOf("operator", "bearing_height", "map", "support_details", "photos", "speedtest", "ids", "nav", "share", "dates", "address", "status", "freqs", "links"))
+                onOrderChange(listOf("operator", "bearing_height", "map", "support_details", "open_map", "elevation_profile", "photos", "speedtest", "nav", "share", "panel_heights", "ids", "dates", "address", "status", "freqs", "links"))
                 onOperatorChange(true)
                 onBearingHeightChange(true)
                 onMapChange(true)
                 onSupportDetailsChange(true)
                 onPhotosChange(true)
                 onSpeedtestChange(true)
+                onPanelHeightsChange(true)
                 onIdsChange(true)
+                onOpenMapChange(true)
+                onElevationProfileChange(true)
                 onNavChange(true)
                 onShareChange(true)
                 onDatesChange(true)

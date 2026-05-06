@@ -41,10 +41,12 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -104,6 +106,7 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
+import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import java.text.SimpleDateFormat
@@ -283,14 +286,47 @@ fun SiteDetailScreen(
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
+    fun normalizeSiteOrder(order: List<String>): List<String> {
+        val mutableOrder = order.filter { it.isNotBlank() }.toMutableList()
+        if (!mutableOrder.contains("elevation_profile") && mutableOrder.contains("open_map") && mutableOrder.contains("support_details")) {
+            mutableOrder.remove("open_map")
+            val supportDetailsIndex = mutableOrder.indexOf("support_details")
+            mutableOrder.add(supportDetailsIndex + 1, "open_map")
+        }
+        if (!mutableOrder.contains("speedtest")) {
+            val photosIndex = mutableOrder.indexOf("photos")
+            if (photosIndex >= 0) mutableOrder.add(photosIndex + 1, "speedtest") else mutableOrder.add("speedtest")
+        }
+        if (!mutableOrder.contains("open_map")) {
+            val supportDetailsIndex = mutableOrder.indexOf("support_details")
+            if (supportDetailsIndex >= 0) mutableOrder.add(supportDetailsIndex + 1, "open_map") else mutableOrder.add("open_map")
+        }
+        if (!mutableOrder.contains("elevation_profile")) {
+            val openMapIndex = mutableOrder.indexOf("open_map")
+            if (openMapIndex >= 0) mutableOrder.add(openMapIndex + 1, "elevation_profile") else mutableOrder.add("elevation_profile")
+        }
+        return mutableOrder
+    }
+
+    fun openMapAt(latitude: Double, longitude: Double) {
+        prefs.edit()
+            .putFloat("clicked_lat", latitude.toFloat())
+            .putFloat("clicked_lon", longitude.toFloat())
+            .putFloat("last_map_lat", latitude.toFloat())
+            .putFloat("last_map_lon", longitude.toFloat())
+            .putFloat("last_map_zoom", 18f)
+            .apply()
+        if (isSplitScreen) onCloseSplitScreen()
+        navController.navigate("map")
+    }
+
     // 🚨 MODIFICATION : L'ordre par défaut (photos, speedtest, nav, share...)
     val pageSiteOrder by remember {
         mutableStateOf(
-            (prefs.getString("page_site_order", "operator,bearing_height,map,support_details,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links") ?: "operator,bearing_height,map,support_details,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links")
-                .split(",")
-                .toMutableList()
-                .apply { if (!contains("speedtest")) { val idx = indexOf("photos"); if (idx >= 0) add(idx + 1, "speedtest") else add("speedtest") } }
-                .toList()
+            normalizeSiteOrder(
+                (prefs.getString("page_site_order", "operator,bearing_height,map,support_details,open_map,elevation_profile,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links") ?: "operator,bearing_height,map,support_details,open_map,elevation_profile,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links")
+                    .split(",")
+            )
         )
     }
     val showOperator by remember { mutableStateOf(prefs.getBoolean("page_site_operator", true)) }
@@ -300,6 +336,8 @@ fun SiteDetailScreen(
     val showPhotos by remember { mutableStateOf(prefs.getBoolean("page_site_photos", true)) }
     val showPanelHeights by remember { mutableStateOf(prefs.getBoolean("page_site_panel_heights", true)) }
     val showIds by remember { mutableStateOf(prefs.getBoolean("page_site_ids", true)) }
+    val showOpenMap by remember { mutableStateOf(prefs.getBoolean("page_site_open_map", true)) }
+    val showElevationProfile by remember { mutableStateOf(prefs.getBoolean("page_site_elevation_profile", true)) }
     val showNav by remember { mutableStateOf(prefs.getBoolean("page_site_nav", true)) }
     val showShare by remember { mutableStateOf(prefs.getBoolean("page_site_share", true)) }
     val showDates by remember { mutableStateOf(prefs.getBoolean("page_site_dates", true)) }
@@ -504,23 +542,19 @@ fun SiteDetailScreen(
     val txtWhichMap = AppStrings.whichMap
     val txtIdSupportCopy = AppStrings.idSupportCopy
 
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "support_detail/$antennaId")
+
     // ✅ 1. ON PLACE LA FONCTION ICI POUR QU'ELLE SOIT VISIBLE PAR TOUT L'ÉCRAN
     fun handleBackNavigation() {
         if (isSplitScreen) {
             onCloseSplitScreen()
         } else {
-            if (navController.previousBackStackEntry != null) {
-                navController.popBackStack()
-            } else {
-                navController.navigate("support_detail/$antennaId") {
-                    popUpTo(0)
-                }
-            }
+            safeBackNavigation.navigateBack()
         }
     }
 
     // ✅ 2. ON GÈRE LE BOUTON RETOUR PHYSIQUE ICI
-    androidx.activity.compose.BackHandler {
+    androidx.activity.compose.BackHandler(enabled = isSplitScreen || !safeBackNavigation.isLocked) {
         handleBackNavigation()
     }
 
@@ -530,10 +564,9 @@ fun SiteDetailScreen(
             Row(modifier = Modifier.fillMaxWidth().background(mainBgColor).padding(top = 2.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
                     onClick = {
-                        safeClick {
-                            handleBackNavigation() // ✅ 3. ON APPELLE NOTRE FONCTION DANS LA TOPBAR
-                        }
+                        handleBackNavigation() // ✅ 3. ON APPELLE NOTRE FONCTION DANS LA TOPBAR
                     },
+                    enabled = isSplitScreen || !safeBackNavigation.isLocked,
                     modifier = Modifier.padding(start = 4.dp)
                 ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, AppStrings.back, tint = MaterialTheme.colorScheme.onSurface)
@@ -846,6 +879,40 @@ fun SiteDetailScreen(
                                     cardBgColor = cardBgColor,
                                     blockShape = blockShape
                                 )
+                            }
+                        }
+                        "open_map" -> {
+                            if (showOpenMap) {
+                                Button(
+                                    onClick = { safeClick { openMapAt(info.latitude, info.longitude) } },
+                                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                                    shape = buttonShape,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                ) {
+                                    Icon(Icons.Default.Map, null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(AppStrings.openMap, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        "elevation_profile" -> {
+                            if (showElevationProfile) {
+                                Button(
+                                    onClick = { safeClick { navController.navigate("elevation_profile/${info.idAnfr}") } },
+                                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                                    shape = buttonShape,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                ) {
+                                    Icon(Icons.Default.Terrain, null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(AppStrings.elevationProfileButton, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                         "nav" -> {

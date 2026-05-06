@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
 import fr.geotower.data.models.SiteHsEntity
+import fr.geotower.utils.AppConfig
 
 class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
 
@@ -56,7 +57,9 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
             _isLoading.value = true
             try {
                 // ✅ 2. ON EMPÊCHE LE CLUSTERING GLOBAL SI UNE VILLE EST RECHERCHÉE
-                if (zoom < 13.0 && cityPolygons == null) {
+                val hasSiteDisplayFilter = !AppConfig.showSitesInService.value || !AppConfig.showSitesOutOfService.value
+
+                if (zoom < 13.0 && cityPolygons == null && !hasSiteDisplayFilter) {
                     val clusters = repository.getClusteredAntennas(zoom, latNorth, lonEast, latSouth, lonWest)
 
                     // On transforme ces DbCluster en fausses LocalisationEntity

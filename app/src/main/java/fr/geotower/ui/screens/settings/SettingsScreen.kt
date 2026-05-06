@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.Settings
 import android.widget.ImageView
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -124,7 +125,29 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SimCard
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.foundation.layout.navigationBarsPadding
+import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.services.LiveTrackingController
+
+private const val DEFAULT_SITE_SHARE_ORDER = "map,elevation_profile,support,ids,dates,address,speedtest,status,freq"
+
+private fun normalizeSiteShareOrder(rawOrder: String?): List<String> {
+    return (rawOrder ?: DEFAULT_SITE_SHARE_ORDER)
+        .split(",")
+        .filter { it.isNotBlank() }
+        .toMutableList()
+        .apply {
+            if (!contains("elevation_profile")) {
+                val mapIndex = indexOf("map")
+                if (mapIndex >= 0) add(mapIndex + 1, "elevation_profile") else add("elevation_profile")
+            }
+            if (!contains("speedtest")) {
+                val addressIndex = indexOf("address")
+                if (addressIndex >= 0) add(addressIndex + 1, "speedtest") else add("speedtest")
+            }
+            removeAll { it == "heights" }
+        }
+        .distinct()
+}
 
 @Composable
 fun SettingsScreen(
@@ -178,6 +201,11 @@ fun SettingsScreen(
             action()
         }
     }
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
+
+    BackHandler(enabled = !safeBackNavigation.isLocked) {
+        safeBackNavigation.navigateBack()
+    }
 
     var isBlurEnabled by AppConfig.isBlurEnabled
     var mapProvider by AppConfig.mapProvider
@@ -220,6 +248,7 @@ fun SettingsScreen(
 
     // 1. Variables de l'Antenne (Site)
     var shareMapEnabled by remember { mutableStateOf(prefs.getBoolean("share_map_enabled", true)) }
+    var shareElevationProfileEnabled by remember { mutableStateOf(prefs.getBoolean("share_elevation_profile_enabled", true)) }
     var shareSupportEnabled by remember { mutableStateOf(prefs.getBoolean("share_support_enabled", true)) }
     var shareHeightsEnabled by remember { mutableStateOf(prefs.getBoolean("share_heights_enabled", true)) }
     var shareIdsEnabled by remember { mutableStateOf(prefs.getBoolean("share_ids_enabled", true)) }
@@ -230,14 +259,10 @@ fun SettingsScreen(
     var shareConfidentialEnabled by remember { mutableStateOf(prefs.getBoolean("share_confidential_enabled", false)) }
     var shareSiteQrEnabled by remember { mutableStateOf(prefs.getBoolean("share_site_qr_enabled", true)) }
     var shareSupQrEnabled by remember { mutableStateOf(prefs.getBoolean("share_sup_qr_enabled", true)) }
-    var shareSplitImageEnabled by remember { mutableStateOf(prefs.getBoolean("share_split_image_enabled", false)) } // ✅ NOUVELLE VARIABLE
+    var shareSplitImageEnabled by remember { mutableStateOf(prefs.getBoolean("share_split_image_enabled", true)) } // ✅ NOUVELLE VARIABLE
     var shareOrder by remember {
         mutableStateOf(
-            (prefs.getString("share_order", "map,support,ids,dates,address,speedtest,status,freq") ?: "map,support,ids,dates,address,speedtest,status,freq")
-                .split(",")
-                .toMutableList()
-                .apply { if (!contains("speedtest")) { val idx = indexOf("address"); if (idx >= 0) add(idx + 1, "speedtest") else add("speedtest") } }
-                .toList()
+            normalizeSiteShareOrder(prefs.getString("share_order", DEFAULT_SITE_SHARE_ORDER))
         )
     }
 
@@ -273,10 +298,41 @@ fun SettingsScreen(
     var showSupportSettingsSheet by remember { mutableStateOf(false) }
     var showSiteSettingsSheet by remember { mutableStateOf(false) }
     var showPhotosSettingsSheet by remember { mutableStateOf(false) }
-    var pageSupportOrder by remember { mutableStateOf(prefs.getString("page_support_order", "map,details,photos,nav,share,operators")!!.split(",")) }
+
+    fun insertMissingAfter(order: MutableList<String>, item: String, after: String) {
+        if (!order.contains(item)) {
+            val afterIndex = order.indexOf(after)
+            if (afterIndex >= 0) order.add(afterIndex + 1, item) else order.add(item)
+        }
+    }
+
+    fun normalizeSupportOrder(order: List<String>): List<String> {
+        val mutableOrder = order.filter { it.isNotBlank() }.toMutableList()
+        insertMissingAfter(mutableOrder, "open_map", "share")
+        return mutableOrder
+    }
+
+    fun normalizeSiteOrder(order: List<String>): List<String> {
+        val mutableOrder = order.filter { it.isNotBlank() }.toMutableList()
+        if (!mutableOrder.contains("elevation_profile") && mutableOrder.contains("open_map") && mutableOrder.contains("support_details")) {
+            mutableOrder.remove("open_map")
+            val supportDetailsIndex = mutableOrder.indexOf("support_details")
+            mutableOrder.add(supportDetailsIndex + 1, "open_map")
+        }
+        if (!mutableOrder.contains("speedtest")) {
+            val photosIndex = mutableOrder.indexOf("photos")
+            if (photosIndex >= 0) mutableOrder.add(photosIndex + 1, "speedtest") else mutableOrder.add("speedtest")
+        }
+        insertMissingAfter(mutableOrder, "open_map", "support_details")
+        insertMissingAfter(mutableOrder, "elevation_profile", "open_map")
+        return mutableOrder
+    }
+
+    var pageSupportOrder by remember { mutableStateOf(normalizeSupportOrder(prefs.getString("page_support_order", "map,details,photos,nav,share,open_map,operators")!!.split(","))) }
     var pageSupportMap by remember { mutableStateOf(prefs.getBoolean("page_support_map", true)) }
     var pageSupportDetails by remember { mutableStateOf(prefs.getBoolean("page_support_details", true)) }
     var pageSupportPhotos by remember { mutableStateOf(prefs.getBoolean("page_support_photos", true)) }
+    var pageSupportOpenMap by remember { mutableStateOf(prefs.getBoolean("page_support_open_map", true)) }
     var pageSupportNav by remember { mutableStateOf(prefs.getBoolean("page_support_nav", true)) }
     var pageSupportShare by remember { mutableStateOf(prefs.getBoolean("page_support_share", true)) }
     var pageSupportOperators by remember { mutableStateOf(prefs.getBoolean("page_support_operators", true)) }
@@ -284,11 +340,10 @@ fun SettingsScreen(
     // --- Variables d'état pour l'Antenne (Site) ---
     var pageSiteOrder by remember {
         mutableStateOf(
-            (prefs.getString("page_site_order", "operator,bearing_height,map,support_details,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links") ?: "operator,bearing_height,map,support_details,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links")
-                .split(",")
-                .toMutableList()
-                .apply { if (!contains("speedtest")) { val idx = indexOf("photos"); if (idx >= 0) add(idx + 1, "speedtest") else add("speedtest") } }
-                .toList()
+            normalizeSiteOrder(
+                (prefs.getString("page_site_order", "operator,bearing_height,map,support_details,open_map,elevation_profile,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links") ?: "operator,bearing_height,map,support_details,open_map,elevation_profile,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links")
+                    .split(",")
+            )
         )
     };    var pageSiteOperator by remember { mutableStateOf(prefs.getBoolean("page_site_operator", true)) }
     var pageSiteBearingHeight by remember { mutableStateOf(prefs.getBoolean("page_site_bearing_height", true)) }
@@ -296,6 +351,8 @@ fun SettingsScreen(
     var pageSiteSupportDetails by remember { mutableStateOf(prefs.getBoolean("page_site_support_details", true)) }
     var pageSitePanelHeights by remember { mutableStateOf(prefs.getBoolean("page_site_panel_heights", true)) }
     var pageSiteIds by remember { mutableStateOf(prefs.getBoolean("page_site_ids", true)) }
+    var pageSiteOpenMap by remember { mutableStateOf(prefs.getBoolean("page_site_open_map", true)) }
+    var pageSiteElevationProfile by remember { mutableStateOf(prefs.getBoolean("page_site_elevation_profile", true)) }
     var pageSiteNav by remember { mutableStateOf(prefs.getBoolean("page_site_nav", true)) }
     var pageSiteShare by remember { mutableStateOf(prefs.getBoolean("page_site_share", true)) }
     var pageSiteDates by remember { mutableStateOf(prefs.getBoolean("page_site_dates", true)) }
@@ -376,7 +433,7 @@ fun SettingsScreen(
         topBar = {
             if (!isWideScreen) {
                 // On remet la vraie barre supérieure pour les téléphones !
-                SettingsTopBar(onBack = { safeClick { navController.popBackStack() } })
+                SettingsTopBar(onBack = { safeBackNavigation.navigateBack() })
             }
         }
     ) { innerPadding ->
@@ -402,7 +459,8 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             IconButton(
-                                onClick = { safeClick { navController.popBackStack() } },
+                                onClick = { safeBackNavigation.navigateBack() },
+                                enabled = !safeBackNavigation.isLocked,
                                 modifier = Modifier.padding(start = 8.dp)
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
@@ -760,6 +818,7 @@ fun SettingsScreen(
                 showMap = pageSupportMap, onMapChange = { pageSupportMap = it; prefs.edit().putBoolean("page_support_map", it).apply() },
                 showDetails = pageSupportDetails, onDetailsChange = { pageSupportDetails = it; prefs.edit().putBoolean("page_support_details", it).apply() },
                 showPhotos = pageSupportPhotos, onPhotosChange = { pageSupportPhotos = it; prefs.edit().putBoolean("page_support_photos", it).apply() },
+                showOpenMap = pageSupportOpenMap, onOpenMapChange = { pageSupportOpenMap = it; prefs.edit().putBoolean("page_support_open_map", it).apply() },
                 showNav = pageSupportNav, onNavChange = { pageSupportNav = it; prefs.edit().putBoolean("page_support_nav", it).apply() },
                 showShare = pageSupportShare, onShareChange = { pageSupportShare = it; prefs.edit().putBoolean("page_support_share", it).apply() },
                 showOperators = pageSupportOperators, onOperatorsChange = { pageSupportOperators = it; prefs.edit().putBoolean("page_support_operators", it).apply() },
@@ -781,6 +840,8 @@ fun SettingsScreen(
                 showPhotos = AppConfig.siteShowPhotos.value, onPhotosChange = { AppConfig.siteShowPhotos.value = it; prefs.edit().putBoolean("page_site_photos", it).apply() },
                 showPanelHeights = pageSitePanelHeights, onPanelHeightsChange = { pageSitePanelHeights = it; prefs.edit().putBoolean("page_site_panel_heights", it).apply() },
                 showIds = pageSiteIds, onIdsChange = { pageSiteIds = it; prefs.edit().putBoolean("page_site_ids", it).apply() },
+                showOpenMap = pageSiteOpenMap, onOpenMapChange = { pageSiteOpenMap = it; prefs.edit().putBoolean("page_site_open_map", it).apply() },
+                showElevationProfile = pageSiteElevationProfile, onElevationProfileChange = { pageSiteElevationProfile = it; prefs.edit().putBoolean("page_site_elevation_profile", it).apply() },
                 showNav = pageSiteNav, onNavChange = { pageSiteNav = it; prefs.edit().putBoolean("page_site_nav", it).apply() },
                 showShare = pageSiteShare, onShareChange = { pageSiteShare = it; prefs.edit().putBoolean("page_site_share", it).apply() },
                 showDates = pageSiteDates, onDatesChange = { pageSiteDates = it; prefs.edit().putBoolean("page_site_dates", it).apply() },
@@ -922,6 +983,10 @@ fun SettingsScreen(
                 mapEnabled = shareMapEnabled,
                 onMapChange = {
                     shareMapEnabled = it; prefs.edit().putBoolean("share_map_enabled", it).apply()
+                },
+                elevationProfileEnabled = shareElevationProfileEnabled,
+                onElevationProfileChange = {
+                    shareElevationProfileEnabled = it; prefs.edit().putBoolean("share_elevation_profile_enabled", it).apply()
                 },
                 supportEnabled = shareSupportEnabled,
                 onSupportChange = {

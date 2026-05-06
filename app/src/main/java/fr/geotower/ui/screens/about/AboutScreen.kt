@@ -2,6 +2,7 @@
 package fr.geotower.ui.screens.about
 
 import android.widget.ImageView
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
@@ -86,6 +87,7 @@ import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.navigationBarsPadding
+import fr.geotower.ui.navigation.rememberSafeBackNavigation
 
 @Composable
 fun AboutScreen(navController: NavController) {
@@ -100,6 +102,11 @@ fun AboutScreen(navController: NavController) {
             lastClickTime = currentTime
             action()
         }
+    }
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
+
+    BackHandler(enabled = !safeBackNavigation.isLocked) {
+        safeBackNavigation.navigateBack()
     }
 
     val context = LocalContext.current
@@ -188,7 +195,7 @@ fun AboutScreen(navController: NavController) {
         containerColor = mainBgColor, // Utilisation de la couleur de fond dynamique
         topBar = {
             if (!isWideScreen) {
-                AboutTopBar { safeClick { navController.popBackStack() } }
+                AboutTopBar { safeBackNavigation.navigateBack() }
             }
         }
     ) { innerPadding ->
@@ -212,7 +219,11 @@ fun AboutScreen(navController: NavController) {
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            IconButton(onClick = { safeClick { navController.popBackStack() } }, modifier = Modifier.padding(start = 8.dp)) {
+                            IconButton(
+                                onClick = { safeBackNavigation.navigateBack() },
+                                enabled = !safeBackNavigation.isLocked,
+                                modifier = Modifier.padding(start = 8.dp)
+                            ) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", tint = MaterialTheme.colorScheme.onSurface)
                             }
                             // ✅ RETOUR DU BOUTON MENU
@@ -267,7 +278,7 @@ fun AboutScreen(navController: NavController) {
                                         }
                                     } catch (e: IllegalArgumentException) {
                                         e.printStackTrace()
-                                        navController.popBackStack()
+                                        safeBackNavigation.navigateBack()
                                     }
                                 }
                             }
@@ -449,12 +460,10 @@ fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) 
     val releaseNotes: Map<String, List<Any>> = mapOf(
         "Interface & Design" to listOf(
             "Global :" to listOf(
-                "Correction des notifications en direct qui se désactivaient totalement lorsqu'on appuyait sur Quitter",
-                "Ajout des animations MaterialUi Expressive 3",
-                "Ajout de bouton de réglages rapide sur certaines pages de l'application"
+                "Correction de certaines animations",
             ),
             "Détail des sites :" to listOf(
-                "Ajout du d'un nouvel affichage pour les fréquences"
+                "Ajout du profil altimétrique"
             )
         )
     )

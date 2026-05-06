@@ -218,9 +218,10 @@ fun CommunityPhotosSectionShared(
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
             if (!isOnline) {
-                // 📵 MESSAGE HORS-LIGNE
                 Column(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = if (placeholderRes != null) 16.dp else 32.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Center
                 ) {
@@ -238,6 +239,27 @@ fun CommunityPhotosSectionShared(
                         fontWeight = FontWeight.Medium,
                         style = MaterialTheme.typography.bodyMedium
                     )
+                }
+
+                if (placeholderRes != null) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        item {
+                            Image(
+                                painter = painterResource(id = placeholderRes),
+                                contentDescription = "Image du support",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(120.dp)
+                                    .clip(thumbnailShape)
+                                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                                    .clickable { showPlaceholderFullScreen = true }
+                            )
+                        }
+                    }
                 }
             } else {
                 // 🌐 LOGIQUE EN LIGNE

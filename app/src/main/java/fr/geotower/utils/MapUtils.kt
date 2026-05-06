@@ -51,8 +51,10 @@ object MapUtils {
         showAzimuths: Boolean,
         defaultOp: String
     ): BitmapDrawable {
-        val siteId = siteAntennas.firstOrNull()?.idAnfr ?: "0"
-        val cacheKey = "${siteId}_${showAzimuths}_${defaultOp}"
+        val markerSignature = siteAntennas.joinToString("|") { antenna ->
+            "${antenna.idAnfr}:${antenna.operateur}:${antenna.azimuts}:${antenna.azimutsFh}"
+        }
+        val cacheKey = "${markerSignature}_${showAzimuths}_${defaultOp}"
 
         markerIconCache.get(cacheKey)?.let { return it }
 

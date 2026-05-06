@@ -52,6 +52,10 @@ object AppConfig {
 
     var showAzimuthsCone = mutableStateOf(false)
 
+    // --- FILTRES : AFFICHAGE DES SITES ---
+    var showSitesInService = mutableStateOf(true)
+    var showSitesOutOfService = mutableStateOf(true)
+
     // --- FILTRES : TECHNOLOGIES ---
     var showTechno2G = mutableStateOf(true)
     var showTechno3G = mutableStateOf(true)
@@ -212,6 +216,9 @@ object AppConfig {
 
         showAzimuths.value = prefs.getBoolean("show_azimuths", true)
         showAzimuthsCone.value = prefs.getBoolean("show_azimuths_cone", false)
+
+        showSitesInService.value = prefs.getBoolean("show_sites_in_service", true)
+        showSitesOutOfService.value = prefs.getBoolean("show_sites_out_of_service", true)
 
         showTechno2G.value = prefs.getBoolean("show_techno_2g", true)
         showTechno3G.value = prefs.getBoolean("show_techno_3g", true)

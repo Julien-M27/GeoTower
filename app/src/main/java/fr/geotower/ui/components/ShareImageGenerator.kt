@@ -16,8 +16,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -49,6 +51,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.zIndex
 import androidx.core.content.FileProvider
 import androidx.lifecycle.findViewTreeLifecycleOwner
@@ -60,11 +63,18 @@ import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity // ✅ NOUVEAU
 import fr.geotower.data.models.TechniqueEntity // ✅ NOUVEAU
+import fr.geotower.ui.screens.emitters.DEFAULT_ELEVATION_PROFILE_FREQUENCY_MHZ
+import fr.geotower.ui.screens.emitters.extractElevationProfileFrequencies
+import fr.geotower.ui.screens.emitters.fetchIgnElevationProfileData
 import fr.geotower.ui.screens.emitters.formatDateToFrench
 import fr.geotower.ui.screens.emitters.formatTechnologies
+import fr.geotower.ui.screens.emitters.getElevationProfileLastKnownLocation
 import fr.geotower.ui.screens.emitters.getDetailLogoRes
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
@@ -72,6 +82,74 @@ import android.net.Uri
 import fr.geotower.ui.components.SiteStatusCard
 
 private fun Int.dpToPx(context: Context): Int = (this * context.resources.displayMetrics.density).toInt()
+
+private const val DEFAULT_SITE_SHARE_ORDER = "map,elevation_profile,support,ids,dates,address,speedtest,status,freq"
+
+private fun normalizeSiteShareOrder(rawOrder: String?): List<String> {
+    return (rawOrder ?: DEFAULT_SITE_SHARE_ORDER)
+        .split(",")
+        .filter { it.isNotBlank() }
+        .toMutableList()
+        .apply {
+            if (!contains("elevation_profile")) {
+                val mapIndex = indexOf("map")
+                if (mapIndex >= 0) add(mapIndex + 1, "elevation_profile") else add("elevation_profile")
+            }
+            if (!contains("speedtest")) {
+                val addressIndex = indexOf("address")
+                if (addressIndex >= 0) add(addressIndex + 1, "speedtest") else add("speedtest")
+            }
+            removeAll { it == "heights" }
+        }
+        .distinct()
+}
+
+private fun isOnlyElevationProfileSelected(
+    shareOrder: List<String>,
+    incElevationProfile: Boolean,
+    incMap: Boolean,
+    incSupport: Boolean,
+    incIds: Boolean,
+    incDates: Boolean,
+    incAddress: Boolean,
+    incFreqs: Boolean,
+    incSpeedtest: Boolean
+): Boolean {
+    if (!incElevationProfile || !shareOrder.contains("elevation_profile")) return false
+    return shareOrder.none { block ->
+        when (block) {
+            "map" -> incMap
+            "support" -> incSupport
+            "ids" -> incIds
+            "dates" -> incDates
+            "address" -> incAddress
+            "speedtest" -> incSpeedtest
+            "status" -> AppConfig.shareSiteStatus.value
+            "freq" -> incFreqs
+            else -> false
+        }
+    }
+}
+
+private fun shareElevationProfileBitmapOnly(
+    context: Context,
+    info: LocalisationEntity,
+    bitmap: Bitmap,
+    txtShareSiteVia: String
+) {
+    val imagesDir = File(context.cacheDir, "images")
+    imagesDir.mkdirs()
+    val file = File(imagesDir, "Geotower_site_${info.idAnfr}_profil_altimetrique.png")
+    FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+    val intent = Intent(Intent.ACTION_SEND).apply {
+        type = "image/png"
+        putExtra(Intent.EXTRA_STREAM, uri)
+        clipData = ClipData.newUri(context.contentResolver, "Profil altimetrique", uri)
+        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    context.startActivity(Intent.createChooser(intent, txtShareSiteVia))
+}
 
 private fun Bitmap.trimTransparentBottom(): Bitmap {
     val row = IntArray(width)
@@ -159,7 +237,9 @@ fun shareFullAntennaCapture(
     incConfidential: Boolean,
     incQrCode: Boolean,
     incSplitImage: Boolean,
-    shareOrder: List<String>
+    shareOrder: List<String>,
+    elevationProfileBitmap: Bitmap? = null,
+    onComplete: (() -> Unit)? = null
 ) {
     val composeView = ComposeView(context).apply {
         setViewTreeLifecycleOwner(currentView.findViewTreeLifecycleOwner())
@@ -1539,10 +1619,17 @@ fun shareFullAntennaCapture(
                     urisToShare.add(FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file))
                 }
 
+                elevationProfileBitmap?.let { profileBitmap ->
+                    val profileFile = File(imagesDir, "Geotower_site_${info.idAnfr}_profil_altimetrique.png")
+                    FileOutputStream(profileFile).use { profileBitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                    urisToShare.add(FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", profileFile))
+                }
+
                 // Lancement de l'intention de partage
-                val intent = Intent(if (isSplit) Intent.ACTION_SEND_MULTIPLE else Intent.ACTION_SEND).apply {
+                val sendMultipleImages = urisToShare.size > 1
+                val intent = Intent(if (sendMultipleImages) Intent.ACTION_SEND_MULTIPLE else Intent.ACTION_SEND).apply {
                     type = "image/png"
-                    if (isSplit) {
+                    if (sendMultipleImages) {
                         putParcelableArrayListExtra(Intent.EXTRA_STREAM, urisToShare)
                         // ✅ CORRECTION : Ajout de toutes les URIs au ClipData pour autoriser la lecture
                         val clipDataMulti = ClipData.newUri(context.contentResolver, "Capture", urisToShare[0])
@@ -1558,12 +1645,15 @@ fun shareFullAntennaCapture(
                 }
 
                 context.startActivity(Intent.createChooser(intent, txtShareSiteVia))
+                onComplete?.invoke()
             } else {
                 rootView.removeView(composeView)
+                onComplete?.invoke()
             }
         } catch (e: Exception) {
             e.printStackTrace()
             if (composeView.parent != null) rootView.removeView(composeView)
+            onComplete?.invoke()
         }
     }, 500)
 }
@@ -1601,7 +1691,8 @@ fun shareFullSiteCapture(
     incOperators: Boolean,
     incConfidential: Boolean,
     incQrCode: Boolean,
-    shareOrder: List<String>
+    shareOrder: List<String>,
+    onComplete: (() -> Unit)? = null
 ) {
     try {
         val composeView = ComposeView(context).apply {
@@ -1729,7 +1820,10 @@ fun shareFullSiteCapture(
             }
         }
 
-        val rootView = currentView.rootView as? ViewGroup ?: return
+        val rootView = currentView.rootView as? ViewGroup ?: run {
+            onComplete?.invoke()
+            return
+        }
         composeView.translationX = 10000f
         rootView.addView(composeView)
 
@@ -1760,13 +1854,44 @@ fun shareFullSiteCapture(
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
                 context.startActivity(Intent.createChooser(shareIntent, txtShareSiteVia))
+                onComplete?.invoke()
             } catch (e: Exception) {
                 e.printStackTrace()
                 Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
-                rootView.removeView(composeView)
+                if (composeView.parent != null) rootView.removeView(composeView)
+                onComplete?.invoke()
             }
         }
-    } catch (e: Exception) { e.printStackTrace() }
+    } catch (e: Exception) {
+        e.printStackTrace()
+        onComplete?.invoke()
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun ShareGenerationDialog(message: String) {
+    Dialog(onDismissRequest = {}) {
+        Surface(
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 6.dp
+        ) {
+            Column(
+                modifier = Modifier.padding(horizontal = 28.dp, vertical = 26.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                CircularWavyProgressIndicator(modifier = Modifier.size(58.dp))
+                Text(
+                    text = message,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
+            }
+        }
+    }
 }
 
 @Composable
@@ -1822,6 +1947,7 @@ fun AntennaShareMenu(
     val currentView = LocalView.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val scope = rememberCoroutineScope()
 
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
@@ -1840,8 +1966,11 @@ fun AntennaShareMenu(
     var showShareSheet by remember { mutableStateOf(false) }
     var showSelectionSheet by remember { mutableStateOf(false) }
     var selectedShareTheme by remember { mutableStateOf(false) }
+    var isGeneratingShare by remember { mutableStateOf(false) }
+    var generationMessage by remember { mutableStateOf("") }
 
     var incMap by remember { mutableStateOf(prefs.getBoolean("share_map_enabled", true)) }
+    var incElevationProfile by remember { mutableStateOf(prefs.getBoolean("share_elevation_profile_enabled", true)) }
     var incSupport by remember { mutableStateOf(prefs.getBoolean("share_support_enabled", true)) }
     var incHeights by remember { mutableStateOf(prefs.getBoolean("share_heights_enabled", true)) }
     var incIds by remember { mutableStateOf(prefs.getBoolean("share_ids_enabled", true)) }
@@ -1851,14 +1980,10 @@ fun AntennaShareMenu(
     var incFreqs by remember { mutableStateOf(prefs.getBoolean("share_freq_enabled", true)) }
     var incConfidential by remember { mutableStateOf(prefs.getBoolean("share_confidential_enabled", false)) }
     var incQrCode by remember { mutableStateOf(prefs.getBoolean("share_site_qr_enabled", true)) }
-    var incSplitImage by remember { mutableStateOf(prefs.getBoolean("share_split_image_enabled", false)) } // ✅ NOUVELLE VARIABLE SCINDER
+    var incSplitImage by remember { mutableStateOf(prefs.getBoolean("share_split_image_enabled", true)) } // ✅ NOUVELLE VARIABLE SCINDER
     var shareOrder by remember {
         mutableStateOf(
-            (prefs.getString("share_order", "map,support,ids,dates,address,speedtest,status,freq") ?: "map,support,ids,dates,address,speedtest,status,freq")
-                .split(",")
-                .toMutableList()
-                .apply { if (!contains("speedtest")) { val idx = indexOf("address"); if (idx >= 0) add(idx + 1, "speedtest") else add("speedtest") } }
-                .toList()
+            normalizeSiteShareOrder(prefs.getString("share_order", DEFAULT_SITE_SHARE_ORDER))
         )
     }
 
@@ -1866,6 +1991,7 @@ fun AntennaShareMenu(
     LaunchedEffect(showShareSheet) {
         if (showShareSheet) {
             incMap = prefs.getBoolean("share_map_enabled", true)
+            incElevationProfile = prefs.getBoolean("share_elevation_profile_enabled", true)
             incSupport = prefs.getBoolean("share_support_enabled", true)
             incIds = prefs.getBoolean("share_ids_enabled", true)
             incDates = prefs.getBoolean("share_dates_enabled", true)
@@ -1874,13 +2000,8 @@ fun AntennaShareMenu(
             incFreqs = prefs.getBoolean("share_freq_enabled", true)
             incConfidential = prefs.getBoolean("share_confidential_enabled", false)
             incQrCode = prefs.getBoolean("share_site_qr_enabled", true)
-            incSplitImage = prefs.getBoolean("share_split_image_enabled", false) // ✅ CHARGEMENT DE L'ÉTAT
-            shareOrder = (prefs.getString("share_order", "map,support,ids,dates,address,speedtest,status,freq") ?: "map,support,ids,dates,address,speedtest,status,freq")
-                .split(",")
-                .toMutableList()
-                .apply { if (!contains("speedtest")) { val idx = indexOf("address"); if (idx >= 0) add(idx + 1, "speedtest") else add("speedtest") } }
-                .filter { it != "heights" }
-                .toList()
+            incSplitImage = prefs.getBoolean("share_split_image_enabled", true) // ✅ CHARGEMENT DE L'ÉTAT
+            shareOrder = normalizeSiteShareOrder(prefs.getString("share_order", DEFAULT_SITE_SHARE_ORDER))
         }
     }
 
@@ -1929,6 +2050,25 @@ fun AntennaShareMenu(
     val txtGenerateImage = AppStrings.generateImage
     val txtMove = AppStrings.move
     val txtInitError = AppStrings.initError
+    val txtUnknown = AppStrings.unknown
+    val txtShareImageGenerationInProgress = AppStrings.shareImageGenerationInProgress
+    val txtShareImagePreparingInProgress = AppStrings.shareImagePreparingInProgress
+    val txtShareElevationProfileOnlyUnavailable = AppStrings.shareElevationProfileOnlyUnavailable
+    val txtElevationProfileTitle = AppStrings.elevationProfileTitle
+    val txtElevationProfileLoading = AppStrings.elevationProfileLoading
+    val txtElevationProfileDistance = AppStrings.elevationProfileDistance
+    val txtElevationProfileSupportHeight = AppStrings.elevationProfileSupportHeight
+    val txtElevationProfileStartAltitude = AppStrings.elevationProfileStartAltitude
+    val txtElevationProfileSiteAltitude = AppStrings.elevationProfileSiteAltitude
+    val txtElevationProfileFrequency = AppStrings.elevationProfileFrequency
+    val txtElevationProfileDirectLineLabel = AppStrings.elevationProfileDirectLineLabel
+    val txtElevationProfileFresnelLabel = AppStrings.elevationProfileFresnelLabel
+    val txtElevationProfileLineClear = AppStrings.elevationProfileLineClear
+    val txtElevationProfileLineBlocked = AppStrings.elevationProfileLineBlocked
+    val txtElevationProfileFresnelClear = AppStrings.elevationProfileFresnelClear
+    val txtElevationProfileFresnelBlocked = AppStrings.elevationProfileFresnelBlocked
+    val txtElevationProfileFresnelExplanation = AppStrings.elevationProfileFresnelExplanation
+    val txtElevationProfileIgnSource = AppStrings.elevationProfileIgnSource
 
     Button(
         onClick = { safeClick { showShareSheet = true } },
@@ -1939,6 +2079,10 @@ fun AntennaShareMenu(
         Icon(Icons.Default.Share, null, modifier = Modifier.size(24.dp))
         Spacer(modifier = Modifier.width(12.dp))
         Text(txtShareSite, fontWeight = FontWeight.Bold)
+    }
+
+    if (isGeneratingShare) {
+        ShareGenerationDialog(generationMessage.ifBlank { txtShareImageGenerationInProgress })
     }
 
     if (showShareSheet) {
@@ -1954,7 +2098,13 @@ fun AntennaShareMenu(
 
     if (showSelectionSheet) {
         ModalBottomSheet(onDismissRequest = { showSelectionSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
-            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp, start = 24.dp, end = 24.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 32.dp, start = 24.dp, end = 24.dp)
+            ) {
                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { safeClick { showSelectionSheet = false; showShareSheet = true } }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }
                     Text(text = txtImageContent, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
@@ -1998,6 +2148,7 @@ fun AntennaShareMenu(
                             val (label, checked, onChecked) = when (blockId) {
                                 // ✅ ON SUPPRIME prefs.edit() : les changements restent locaux au menu
                                 "map" -> Triple(AppStrings.shareMapOption, incMap, { it: Boolean -> incMap = it })
+                                "elevation_profile" -> Triple(AppStrings.shareElevationProfileOption, incElevationProfile, { it: Boolean -> incElevationProfile = it })
                                 "support" -> Triple(AppStrings.shareSupportOption, incSupport, { it: Boolean -> incSupport = it })
                                 "ids" -> Triple(AppStrings.shareIdsOption, incIds, { it: Boolean -> incIds = it })
                                 "dates" -> Triple(AppStrings.shareDatesOption, incDates, { it: Boolean -> incDates = it })
@@ -2034,9 +2185,9 @@ fun AntennaShareMenu(
                     // ✅ AJOUT DU BOUTON RÉINITIALISER
                     TextButton(
                         onClick = {
-                            shareOrder = listOf("map", "support", "ids", "dates", "address", "speedtest", "status", "freq")
+                            shareOrder = DEFAULT_SITE_SHARE_ORDER.split(",")
                             prefs.edit().putString("share_order", shareOrder.joinToString(",")).apply()
-                            incMap = true; incSupport = true; incIds = true; incDates = true; incAddress = true; incSpeedtest = true; incFreqs = true; incQrCode = true; incSplitImage = false
+                            incMap = true; incElevationProfile = true; incSupport = true; incIds = true; incDates = true; incAddress = true; incSpeedtest = true; incFreqs = true; incQrCode = true; incSplitImage = true
                             AppConfig.shareSiteStatus.value = true
                         },
                         modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -2077,24 +2228,114 @@ fun AntennaShareMenu(
                     Spacer(modifier = Modifier.height(24.dp))
                     Button(
                         onClick = {
+                            if (isGeneratingShare) return@Button
+                            isGeneratingShare = true
+                            generationMessage = txtShareImageGenerationInProgress
                             showSelectionSheet = false
-                            currentView.postDelayed({
-                                val mapBmp = if (incMap) { globalMapRef?.let { map -> try { val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888); map.draw(Canvas(bmp)); bmp } catch (e: Exception) { null } } } else null
-                                shareFullAntennaCapture(
-                                    context, currentView, info,
-                                    physique, technique,
-                                    hsDataMap,
-                                    speedtestData,
-                                    distanceStr, bearingStr, selectedShareTheme,
-                                    txtSiteDetailsTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtGeneratedBy, txtShareSiteVia, txtimplementation, txtLastModification, txtIdentifiers, txtIdNumber, txtFrequenciesTitle, txtBandsNotSpecified, txtInService, txtTechnically, txtUnknownStatus, txtAnfrStationNumber, txtDates, txtError, txtProjectApproved, txtActivatedOn, txtDateNotSpecifiedAnfr, txtPanelHeightsTitle, txtAzimuths, txtIdSupportLabel, txtSupportDetailsTitle, txtSupportNature, txtOwner, txtAntennaType,
-                                    mapBmp, txtInitError, emptyList(), txtCommunityPhotosTitle,
-                                    incMap, incSupport, incHeights, incIds, incDates, incAddress, incFreqs, incSpeedtest, incConfidential, incQrCode,
-                                    incSplitImage,
-                                    shareOrder
-                                )
-                            }, 300)
+                            val shareOnlyElevationProfile = isOnlyElevationProfileSelected(
+                                shareOrder = shareOrder,
+                                incElevationProfile = incElevationProfile,
+                                incMap = incMap,
+                                incSupport = incSupport,
+                                incIds = incIds,
+                                incDates = incDates,
+                                incAddress = incAddress,
+                                incFreqs = incFreqs,
+                                incSpeedtest = incSpeedtest
+                            )
+                            val elevationProfileTexts = ElevationProfileShareTexts(
+                                title = txtElevationProfileTitle,
+                                distance = txtElevationProfileDistance,
+                                supportHeight = txtElevationProfileSupportHeight,
+                                startAltitude = txtElevationProfileStartAltitude,
+                                siteAltitude = txtElevationProfileSiteAltitude,
+                                frequency = txtElevationProfileFrequency,
+                                directLine = txtElevationProfileDirectLineLabel,
+                                fresnelZone = txtElevationProfileFresnelLabel,
+                                lineClear = txtElevationProfileLineClear,
+                                lineBlocked = txtElevationProfileLineBlocked,
+                                fresnelClear = txtElevationProfileFresnelClear,
+                                fresnelBlocked = txtElevationProfileFresnelBlocked,
+                                fresnelExplanation = txtElevationProfileFresnelExplanation,
+                                ignSource = txtElevationProfileIgnSource,
+                                generatedBy = txtGeneratedBy,
+                                unknown = txtUnknown
+                            )
+
+                            scope.launch {
+                                val elevationProfileBitmap = if (
+                                    incElevationProfile &&
+                                    shareOrder.contains("elevation_profile") &&
+                                    !incConfidential
+                                ) {
+                                    generationMessage = txtElevationProfileLoading
+                                    runCatching {
+                                        val userLocation = withContext(Dispatchers.IO) {
+                                            getElevationProfileLastKnownLocation(context)
+                                        } ?: return@runCatching null
+                                        val frequency = extractElevationProfileFrequencies(
+                                            technique?.detailsFrequences?.takeIf { it.isNotBlank() } ?: info.frequences
+                                        ).firstOrNull() ?: DEFAULT_ELEVATION_PROFILE_FREQUENCY_MHZ
+                                        val profile = withContext(Dispatchers.IO) {
+                                            fetchIgnElevationProfileData(
+                                                fromLatitude = userLocation.latitude,
+                                                fromLongitude = userLocation.longitude,
+                                                toLatitude = info.latitude,
+                                                toLongitude = info.longitude
+                                            )
+                                        }
+                                        createElevationProfileShareBitmap(
+                                            info = info,
+                                            profile = profile,
+                                            supportHeightMeters = physique?.hauteur,
+                                            frequencyMHz = frequency,
+                                            forceDarkTheme = selectedShareTheme,
+                                            texts = elevationProfileTexts
+                                        )
+                                    }.getOrNull()
+                                } else {
+                                    null
+                                }
+
+                                if (shareOnlyElevationProfile && elevationProfileBitmap == null) {
+                                    Toast.makeText(context, txtShareElevationProfileOnlyUnavailable, Toast.LENGTH_SHORT).show()
+                                    isGeneratingShare = false
+                                    return@launch
+                                }
+
+                                generationMessage = txtShareImagePreparingInProgress
+                                currentView.postDelayed({
+                                    try {
+                                        if (shareOnlyElevationProfile && elevationProfileBitmap != null) {
+                                            shareElevationProfileBitmapOnly(context, info, elevationProfileBitmap, txtShareSiteVia)
+                                            isGeneratingShare = false
+                                        } else {
+                                            val mapBmp = if (incMap) { globalMapRef?.let { map -> try { val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888); map.draw(Canvas(bmp)); bmp } catch (e: Exception) { null } } } else null
+                                            shareFullAntennaCapture(
+                                                context, currentView, info,
+                                                physique, technique,
+                                                hsDataMap,
+                                                speedtestData,
+                                                distanceStr, bearingStr, selectedShareTheme,
+                                                txtSiteDetailsTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtGeneratedBy, txtShareSiteVia, txtimplementation, txtLastModification, txtIdentifiers, txtIdNumber, txtFrequenciesTitle, txtBandsNotSpecified, txtInService, txtTechnically, txtUnknownStatus, txtAnfrStationNumber, txtDates, txtError, txtProjectApproved, txtActivatedOn, txtDateNotSpecifiedAnfr, txtPanelHeightsTitle, txtAzimuths, txtIdSupportLabel, txtSupportDetailsTitle, txtSupportNature, txtOwner, txtAntennaType,
+                                                mapBmp, txtInitError, emptyList(), txtCommunityPhotosTitle,
+                                                incMap, incSupport, incHeights, incIds, incDates, incAddress, incFreqs, incSpeedtest, incConfidential, incQrCode,
+                                                incSplitImage,
+                                                shareOrder,
+                                                elevationProfileBitmap = elevationProfileBitmap,
+                                                onComplete = { isGeneratingShare = false }
+                                            )
+                                        }
+                                    } catch (e: Exception) {
+                                        e.printStackTrace()
+                                        isGeneratingShare = false
+                                    }
+                                }, 300)
+                            }
                         },
-                        modifier = Modifier.fillMaxWidth().height(56.dp), shape = buttonShape
+                        modifier = Modifier.fillMaxWidth().height(56.dp),
+                        shape = buttonShape,
+                        enabled = !isGeneratingShare
                     ) { Text(txtGenerateImage, fontWeight = FontWeight.Bold) }
                 }
             }
@@ -2138,6 +2379,8 @@ fun SupportShareMenu(
     var showShareSheet by remember { mutableStateOf(false) }
     var showSelectionSheet by remember { mutableStateOf(false) }
     var selectedShareTheme by remember { mutableStateOf(false) }
+    var isGeneratingShare by remember { mutableStateOf(false) }
+    var generationMessage by remember { mutableStateOf("") }
 
     var incMap by remember { mutableStateOf(prefs.getBoolean("share_sup_map_enabled", true)) }
     var incSupport by remember { mutableStateOf(prefs.getBoolean("share_sup_support_enabled", true)) }
@@ -2182,6 +2425,7 @@ fun SupportShareMenu(
     val txtShareConfidentialOption = AppStrings.shareConfidentialOption
     val txtShareConfidentialDesc = AppStrings.shareConfidentialDesc
     val txtGenerateImage = AppStrings.generateImage
+    val txtShareImagePreparingInProgress = AppStrings.shareImagePreparingInProgress
     val txtMove = AppStrings.move
     val txtInitError = AppStrings.initError
 
@@ -2198,6 +2442,10 @@ fun SupportShareMenu(
         }
     }
 
+    if (isGeneratingShare) {
+        ShareGenerationDialog(generationMessage.ifBlank { txtShareImagePreparingInProgress })
+    }
+
     if (showShareSheet && antennas.isNotEmpty()) {
         ModalBottomSheet(onDismissRequest = { showShareSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
             Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 16.dp, end = 16.dp)) {
@@ -2212,7 +2460,13 @@ fun SupportShareMenu(
     if (showSelectionSheet && antennas.isNotEmpty()) {
         val mainInfo = antennas.first()
         ModalBottomSheet(onDismissRequest = { showSelectionSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
-            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp, start = 24.dp, end = 24.dp)) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .navigationBarsPadding()
+                    .verticalScroll(rememberScrollState())
+                    .padding(bottom = 32.dp, start = 24.dp, end = 24.dp)
+            ) {
                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { safeClick { showSelectionSheet = false; showShareSheet = true } }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }
                     Text(text = txtImageContent, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
@@ -2318,23 +2572,33 @@ fun SupportShareMenu(
                     Spacer(modifier = Modifier.height(24.dp))
                     Button(
                         onClick = {
+                            if (isGeneratingShare) return@Button
+                            isGeneratingShare = true
+                            generationMessage = txtShareImagePreparingInProgress
                             showSelectionSheet = false
                             globalMapRef?.let { map -> map.controller.setZoom(17.5); map.controller.setCenter(org.osmdroid.util.GeoPoint(mainInfo.latitude, mainInfo.longitude)) }
                             currentView.postDelayed({
-                                val mapBmp = if (incMap) { try { globalMapRef?.let { map -> val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888); map.draw(Canvas(bmp)); bmp } } catch (e: Exception) { null } } else null
-                                shareFullSiteCapture(
-                                    context, currentView, siteId, antennas.first(), antennas,
-                                    physique, techniquesMap,
-                                    hsDataMap,
-                                    distanceStr, bearingStr, selectedShareTheme,
-                                    txtSupportDetailTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtOperatorsTitle, txtGeneratedBy, txtShareSiteVia, txtIdNumber,
-                                    txtInitError, txtSupportNature, txtOwner, mapBmp,
-                                    incMap, incSupport, incOperators, incConfidential, incQrCode, shareOrder
-                                )
+                                try {
+                                    val mapBmp = if (incMap) { try { globalMapRef?.let { map -> val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888); map.draw(Canvas(bmp)); bmp } } catch (e: Exception) { null } } else null
+                                    shareFullSiteCapture(
+                                        context, currentView, siteId, antennas.first(), antennas,
+                                        physique, techniquesMap,
+                                        hsDataMap,
+                                        distanceStr, bearingStr, selectedShareTheme,
+                                        txtSupportDetailTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtOperatorsTitle, txtGeneratedBy, txtShareSiteVia, txtIdNumber,
+                                        txtInitError, txtSupportNature, txtOwner, mapBmp,
+                                        incMap, incSupport, incOperators, incConfidential, incQrCode, shareOrder,
+                                        onComplete = { isGeneratingShare = false }
+                                    )
+                                } catch (e: Exception) {
+                                    e.printStackTrace()
+                                    isGeneratingShare = false
+                                }
                             }, 300)
                         },
                         modifier = Modifier.fillMaxWidth().height(56.dp),
-                        shape = buttonShape
+                        shape = buttonShape,
+                        enabled = !isGeneratingShare
                     ) {
                         Text(txtGenerateImage, fontWeight = FontWeight.Bold)
                     }

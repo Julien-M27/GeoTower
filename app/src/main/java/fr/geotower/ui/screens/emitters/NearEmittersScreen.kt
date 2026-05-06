@@ -85,6 +85,7 @@ import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
+import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.Dispatchers
@@ -142,15 +143,11 @@ fun NearEmittersScreen(
         }
     }
 
-    fun handleBackNavigation() {
-        if (navController.previousBackStackEntry != null) {
-            navController.popBackStack()
-        } else {
-            navController.navigate("home") { popUpTo(0) }
-        }
-    }
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
 
-    BackHandler { handleBackNavigation() }
+    BackHandler(enabled = !safeBackNavigation.isLocked) {
+        safeBackNavigation.navigateBack()
+    }
 
     var userLocation by remember { mutableStateOf<Location?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -444,7 +441,8 @@ fun NearEmittersScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = { safeClick { handleBackNavigation() } },
+                    onClick = { safeBackNavigation.navigateBack() },
+                    enabled = !safeBackNavigation.isLocked,
                     modifier = Modifier.padding(start = 4.dp)
                 ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", tint = MaterialTheme.colorScheme.onSurface)

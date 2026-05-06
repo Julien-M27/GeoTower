@@ -112,6 +112,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.SiteHsEntity
+import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.MapUtils
@@ -138,6 +140,88 @@ import org.osmdroid.tileprovider.MapTileProviderBasic
 import org.mapsforge.map.android.rendertheme.AssetsRenderTheme
 import java.io.File
 import android.os.Environment
+
+private const val HS_OPERATOR_WILDCARD = "*"
+private val MAP_OPERATOR_KEYS = listOf("ORANGE", "SFR", "BOUYGUES", "FREE")
+
+private fun normalizedAnfrId(value: String): String {
+    val trimmed = value.trim()
+    return trimmed.toLongOrNull()?.toString() ?: trimmed
+}
+
+private fun extractOperatorKeys(value: String?): List<String> {
+    val upper = value?.uppercase() ?: return emptyList()
+    return MAP_OPERATOR_KEYS.filter { upper.contains(it) }
+}
+
+private fun buildHsOperatorMap(sitesHs: List<SiteHsEntity>): Map<String, Set<String>> {
+    val result = mutableMapOf<String, MutableSet<String>>()
+
+    sitesHs.forEach { hs ->
+        val id = normalizedAnfrId(hs.idAnfr)
+        if (id.isBlank()) return@forEach
+
+        val parsedOperators = extractOperatorKeys(hs.operateur)
+        val operators = if (parsedOperators.isEmpty()) listOf(HS_OPERATOR_WILDCARD) else parsedOperators
+        result.getOrPut(id) { mutableSetOf() }.addAll(operators)
+    }
+
+    return result
+}
+
+private fun isOperatorSelected(
+    operatorKey: String,
+    showOrange: Boolean,
+    showSfr: Boolean,
+    showBouygues: Boolean,
+    showFree: Boolean
+): Boolean {
+    return when (operatorKey) {
+        "ORANGE" -> showOrange
+        "SFR" -> showSfr
+        "BOUYGUES" -> showBouygues
+        "FREE" -> showFree
+        else -> false
+    }
+}
+
+private fun isOperatorDeclaredHs(
+    antenna: LocalisationEntity,
+    operatorKey: String,
+    hsOperatorMap: Map<String, Set<String>>
+): Boolean {
+    val hsOperators = hsOperatorMap[normalizedAnfrId(antenna.idAnfr)] ?: return false
+    return HS_OPERATOR_WILDCARD in hsOperators || operatorKey in hsOperators
+}
+
+private fun visibleOperatorKeysForAntenna(
+    antenna: LocalisationEntity,
+    hsOperatorMap: Map<String, Set<String>>,
+    showSitesInService: Boolean,
+    showSitesOutOfService: Boolean,
+    showOrange: Boolean,
+    showSfr: Boolean,
+    showBouygues: Boolean,
+    showFree: Boolean
+): List<String> {
+    return extractOperatorKeys(antenna.operateur).filter { operatorKey ->
+        if (!isOperatorSelected(operatorKey, showOrange, showSfr, showBouygues, showFree)) {
+            false
+        } else if (isOperatorDeclaredHs(antenna, operatorKey, hsOperatorMap)) {
+            showSitesOutOfService
+        } else {
+            showSitesInService
+        }
+    }
+}
+
+private fun hasVisibleHsOperator(
+    antenna: LocalisationEntity,
+    hsOperatorMap: Map<String, Set<String>>
+): Boolean {
+    val operators = extractOperatorKeys(antenna.operateur)
+    return operators.any { operatorKey -> isOperatorDeclaredHs(antenna, operatorKey, hsOperatorMap) }
+}
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -172,6 +256,8 @@ fun MapScreen(
         AppConfig.defaultOperator.value = prefs.getString("default_operator", "Aucun") ?: "Aucun"
         // ✅ AJOUT : On lit la préférence, mais le défaut est 'true' si la clé n'existe pas
         AppConfig.showAzimuths.value = prefs.getBoolean("show_azimuths", true)
+        AppConfig.showSitesInService.value = prefs.getBoolean("show_sites_in_service", true)
+        AppConfig.showSitesOutOfService.value = prefs.getBoolean("show_sites_out_of_service", true)
 
         // ✅ LA LIGNE MANQUANTE EST ICI : On charge la préférence du compteur
         AppConfig.showSpeedometer.value = prefs.getBoolean("show_speedometer", true)
@@ -228,6 +314,7 @@ fun MapScreen(
     var myCurrentLoc by remember { mutableStateOf<GeoPoint?>(null) }
     var currentSpeedKmH by remember { mutableIntStateOf(0) }
     var isToolboxExpanded by remember { mutableStateOf(false) }
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
 
     // ✅ CORRECTION : Gère le geste "Retour" physique du téléphone
     androidx.activity.compose.BackHandler {
@@ -235,13 +322,7 @@ fun MapScreen(
             isMeasuringMode = false
             measuredSites.clear()
         } else {
-            if (navController.previousBackStackEntry != null) {
-                navController.popBackStack()
-            } else {
-                navController.navigate("home") {
-                    popUpTo(0)
-                }
-            }
+            safeBackNavigation.navigateBack()
         }
     }
 
@@ -449,11 +530,14 @@ fun MapScreen(
         AppConfig.showTechnoFH.value, AppConfig.showTechno2G.value, AppConfig.showTechno3G.value, AppConfig.showTechno4G.value, AppConfig.showTechno5G.value,
         AppConfig.f2G_900.value, AppConfig.f2G_1800.value, AppConfig.f3G_900.value, AppConfig.f3G_2100.value,
         AppConfig.f4G_700.value, AppConfig.f4G_800.value, AppConfig.f4G_900.value, AppConfig.f4G_1800.value, AppConfig.f4G_2100.value, AppConfig.f4G_2600.value,
-        AppConfig.f5G_700.value, AppConfig.f5G_2100.value, AppConfig.f5G_3500.value, AppConfig.f5G_26000.value, currentCityPolygons
+        AppConfig.f5G_700.value, AppConfig.f5G_2100.value, AppConfig.f5G_3500.value, AppConfig.f5G_26000.value,
+        AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, sitesHs, currentCityPolygons
     ) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             val sOrange = AppConfig.showOrange.value; val sSfr = AppConfig.showSfr.value
             val sBouygues = AppConfig.showBouygues.value; val sFree = AppConfig.showFree.value
+            val showSitesInService = AppConfig.showSitesInService.value
+            val showSitesOutOfService = AppConfig.showSitesOutOfService.value
             val sFh = AppConfig.showTechnoFH.value
             val s2G = AppConfig.showTechno2G.value; val s3G = AppConfig.showTechno3G.value
             val s4G = AppConfig.showTechno4G.value; val s5G = AppConfig.showTechno5G.value
@@ -462,19 +546,24 @@ fun MapScreen(
             val f4_700 = AppConfig.f4G_700.value; val f4_800 = AppConfig.f4G_800.value; val f4_900 = AppConfig.f4G_900.value
             val f4_1800 = AppConfig.f4G_1800.value; val f4_2100 = AppConfig.f4G_2100.value; val f4_2600 = AppConfig.f4G_2600.value
             val f5_700 = AppConfig.f5G_700.value; val f5_2100 = AppConfig.f5G_2100.value; val f5_3500 = AppConfig.f5G_3500.value; val f5_26000 = AppConfig.f5G_26000.value
+            val hsOperatorMap = buildHsOperatorMap(sitesHs)
 
             val result = antennas.filter { antenna ->
-                val op = antenna.operateur ?: ""
+                val visibleOperators = visibleOperatorKeysForAntenna(
+                    antenna = antenna,
+                    hsOperatorMap = hsOperatorMap,
+                    showSitesInService = showSitesInService,
+                    showSitesOutOfService = showSitesOutOfService,
+                    showOrange = sOrange,
+                    showSfr = sSfr,
+                    showBouygues = sBouygues,
+                    showFree = sFree
+                )
 
                 // ✅ 1. ON VÉRIFIE LES OPÉRATEURS TOUT DE SUITE
-                val matchOperator = (sOrange && op.contains("ORANGE", true)) ||
-                        (sSfr && op.contains("SFR", true)) ||
-                        (sBouygues && op.contains("BOUYGUES", true)) ||
-                        (sFree && op.contains("FREE", true))
-
                 // 🚨 2. LA CORRECTION : Si c'est un cluster, on vérifie au moins l'opérateur !
                 if (antenna.idAnfr.startsWith("CLUSTER_")) {
-                    return@filter matchOperator
+                    return@filter visibleOperators.isNotEmpty()
                 }
 
                 // --- 3. POUR LES VRAIES ANTENNES, ON CONTINUE AVEC LE RESTE DES FILTRES ---
@@ -498,7 +587,7 @@ fun MapScreen(
                     matchTechno = (s2G && s3G && s4G && s5G && sFh)
                 }
 
-                matchOperator && matchFh && isInCityBounds && matchTechno
+                visibleOperators.isNotEmpty() && matchFh && isInCityBounds && matchTechno
             }
             filteredAntennas = result
         }
@@ -575,11 +664,13 @@ fun MapScreen(
     }
 
     // ✅ AJOUT DU PARAMÈTRE sitesHsList
-    suspend fun updateMarkers(map: MapView, antennasList: List<LocalisationEntity>, sitesHsList: List<fr.geotower.data.models.SiteHsEntity> = emptyList()) {
+    suspend fun updateMarkers(map: MapView, antennasList: List<LocalisationEntity>, sitesHsList: List<SiteHsEntity> = emptyList()) {
         val sOrange = AppConfig.showOrange.value
         val sSfr = AppConfig.showSfr.value
         val sBouygues = AppConfig.showBouygues.value
         val sFree = AppConfig.showFree.value
+        val showSitesInService = AppConfig.showSitesInService.value
+        val showSitesOutOfService = AppConfig.showSitesOutOfService.value
 
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
 
@@ -593,8 +684,8 @@ fun MapScreen(
                 return@withContext
             }
 
-            // 🚀 Optimisation : on garde juste les pannes valides sans convertir en texte
-            val validHsSites = sitesHsList.filter { it.latitude != 0.0 && it.longitude != 0.0 }
+            // Table de correspondance ANFR -> operateurs declares HS.
+            val hsOperatorMap = buildHsOperatorMap(sitesHsList)
 
             val isClusterMode = antennasList.first().idAnfr.startsWith("CLUSTER_")
 
@@ -605,10 +696,16 @@ fun MapScreen(
                     org.osmdroid.views.overlay.Marker(map).apply {
                         position = GeoPoint(fakeAntenna.latitude, fakeAntenna.longitude)
                         setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
-                        val rawOps = fakeAntenna.operateur?.split(",")?.map { it.trim().uppercase() } ?: emptyList()
-                        val activeOps = rawOps.filter { op ->
-                            (sOrange && op.contains("ORANGE")) || (sSfr && op.contains("SFR")) || (sBouygues && op.contains("BOUYGUES")) || (sFree && op.contains("FREE"))
-                        }
+                        val activeOps = visibleOperatorKeysForAntenna(
+                            antenna = fakeAntenna,
+                            hsOperatorMap = hsOperatorMap,
+                            showSitesInService = showSitesInService,
+                            showSitesOutOfService = showSitesOutOfService,
+                            showOrange = sOrange,
+                            showSfr = sSfr,
+                            showBouygues = sBouygues,
+                            showFree = sFree
+                        )
                         icon = MapUtils.createClusterIcon(context, activeOps, count, AppConfig.defaultOperator.value)
                         setOnMarkerClickListener { clickedMarker, m ->
                             val targetPoint = org.osmdroid.util.GeoPoint(clickedMarker.position.latitude, clickedMarker.position.longitude)
@@ -625,16 +722,24 @@ fun MapScreen(
                 val groupedSites = antennasList.groupBy { "${it.latitude}_${it.longitude}" }.values.take(6000)
 
                 // ✅ RETOUR À map : 1 seul marqueur définitif par pylône
-                val newMarkers = groupedSites.map { siteAntennas ->
-                    val mainAntenna = siteAntennas.first()
+                val newMarkers = groupedSites.mapNotNull { siteAntennas ->
+                    val filteredSiteAntennas = siteAntennas.mapNotNull { antenna ->
+                        val activeOps = visibleOperatorKeysForAntenna(
+                            antenna = antenna,
+                            hsOperatorMap = hsOperatorMap,
+                            showSitesInService = showSitesInService,
+                            showSitesOutOfService = showSitesOutOfService,
+                            showOrange = sOrange,
+                            showSfr = sSfr,
+                            showBouygues = sBouygues,
+                            showFree = sFree
+                        )
 
-                    val filteredSiteAntennas = siteAntennas.map { antenna ->
-                        val rawOps = antenna.operateur?.split(Regex("[/,\\-]"))?.map { it.trim().uppercase() } ?: emptyList()
-                        val activeOps = rawOps.filter { op ->
-                            (sOrange && op.contains("ORANGE")) || (sSfr && op.contains("SFR")) || (sBouygues && op.contains("BOUYGUES")) || (sFree && op.contains("FREE"))
-                        }
-                        antenna.copy(operateur = activeOps.joinToString(", "))
+                        if (activeOps.isEmpty()) null else antenna.copy(operateur = activeOps.joinToString(", "))
                     }
+                    if (filteredSiteAntennas.isEmpty()) return@mapNotNull null
+
+                    val mainAntenna = filteredSiteAntennas.first()
 
                     // Le marqueur UNIQUE (L'antenne)
                     AntennaMarker(map, filteredSiteAntennas, safePrimaryColor).apply {
@@ -650,10 +755,8 @@ fun MapScreen(
                         val baseIcon = MapUtils.createAdaptiveMarker(context, filteredSiteAntennas, map.zoomLevelDouble >= 13.0 && AppConfig.showAzimuths.value, AppConfig.defaultOperator.value)
 
                         // 2. LOGIQUE DE FUSION : On vérifie TOUTES les antennes du pylône partagé !
-                        val isHs = validHsSites.any { hs ->
-                            val hsId = hs.idAnfr.toLongOrNull()
-                            // Au lieu de vérifier juste mainAntenna, on fouille dans toutes les antennes de ce point GPS
-                            hsId != null && siteAntennas.any { it.idAnfr.toLongOrNull() == hsId }
+                        val isHs = filteredSiteAntennas.any { antenna ->
+                            hasVisibleHsOperator(antenna, hsOperatorMap)
                         }
 
                         if (isHs) {
@@ -723,10 +826,19 @@ fun MapScreen(
         AppConfig.showOrange.value,
         AppConfig.showSfr.value,
         AppConfig.showBouygues.value,
-        AppConfig.showFree.value
+        AppConfig.showFree.value,
+        AppConfig.showSitesInService.value,
+        AppConfig.showSitesOutOfService.value
     ) {
         mapViewRef?.let { map ->
             updateMarkers(map, filteredAntennas, sitesHs)
+        }
+    }
+
+    LaunchedEffect(AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value) {
+        mapViewRef?.let { map ->
+            val box = map.boundingBox
+            viewModel.loadAntennasInBox(map.zoomLevelDouble, box.latNorth, box.lonEast, box.latSouth, box.lonWest)
         }
     }
 
@@ -960,9 +1072,6 @@ fun MapScreen(
                 if (effectiveProvider == 4) {
                     if (mapFiles.isNotEmpty()) {
                         if (map.tileProvider !is MapsForgeTileProvider) {
-
-                            // 🚨 CORRECTION : Détection native du mode sombre d'Android
-                            val isDarkMode = (context.resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES
 
                             // On tente de charger le magnifique thème Elevate
                             val renderTheme = try {
@@ -1549,17 +1658,7 @@ fun MapScreen(
                     desc = "Retour",
                     modifier = Modifier.align(Alignment.CenterStart)
                 ) {
-                    safeClick {
-                        if (navController.previousBackStackEntry != null) {
-                            // Si on vient d'une autre page, retour classique
-                            navController.popBackStack()
-                        } else {
-                            // Si on est sur la page de lancement (pas d'historique), on force l'accueil
-                            navController.navigate("home") {
-                                popUpTo(0)
-                            }
-                        }
-                    }
+                    safeBackNavigation.navigateBack()
                 }
                 Surface(modifier = Modifier.align(Alignment.Center), shape = RoundedCornerShape(32.dp), color = MaterialTheme.colorScheme.surface, shadowElevation = 4.dp, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
                     Text(txtMapTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))

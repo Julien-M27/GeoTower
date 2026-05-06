@@ -1,5 +1,6 @@
 package fr.geotower.ui.screens.stats
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -20,6 +21,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import fr.geotower.data.AnfrRepository
+import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.launch
@@ -42,6 +44,11 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
     var support5GCounts by remember { mutableStateOf<List<Pair<String, Int>>>(emptyList()) } // ✅ NOUVEAU
     var isLoading by remember { mutableStateOf(true) }
     val coroutineScope = rememberCoroutineScope()
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
+
+    BackHandler(enabled = !safeBackNavigation.isLocked) {
+        safeBackNavigation.navigateBack()
+    }
 
     LaunchedEffect(Unit) {
         coroutineScope.launch {
@@ -91,7 +98,11 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
                 modifier = Modifier.fillMaxWidth().background(mainBgColor).padding(vertical = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IconButton(onClick = { navController.popBackStack() }, modifier = Modifier.padding(start = 4.dp)) {
+                IconButton(
+                    onClick = { safeBackNavigation.navigateBack() },
+                    enabled = !safeBackNavigation.isLocked,
+                    modifier = Modifier.padding(start = 4.dp)
+                ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, AppStrings.back, tint = MaterialTheme.colorScheme.onSurface)
                 }
                 Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {

@@ -60,6 +60,10 @@ fun MapSettingsSheet(
     // Variables Azimuts
     var showAzimuths by AppConfig.showAzimuths
 
+    // Variables Affichage des sites
+    var showSitesInService by AppConfig.showSitesInService
+    var showSitesOutOfService by AppConfig.showSitesOutOfService
+
     // Variables Technos
     var show2G by AppConfig.showTechno2G
     var show3G by AppConfig.showTechno3G
@@ -243,6 +247,30 @@ fun MapSettingsSheet(
                         FilterToggleButton("3500 MHz", "f5g_3500", AppConfig.f5G_3500, prefs)
                         //FilterToggleButton("26 GHz", "f5g_26000", AppConfig.f5G_26000, prefs)
                     }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            SectionTitle(AppStrings.siteDisplayTitle)
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SelectableButton(
+                    label = AppStrings.sitesInServiceLabel,
+                    isSelected = showSitesInService,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    showSitesInService = it
+                    prefs.edit().putBoolean("show_sites_in_service", it).apply()
+                }
+
+                SelectableButton(
+                    label = AppStrings.sitesOutOfServiceLabel,
+                    isSelected = showSitesOutOfService,
+                    modifier = Modifier.weight(1f),
+                    selectedColor = MaterialTheme.colorScheme.error
+                ) {
+                    showSitesOutOfService = it
+                    prefs.edit().putBoolean("show_sites_out_of_service", it).apply()
                 }
             }
         }

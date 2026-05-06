@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -71,6 +72,7 @@ import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.ui.components.SupportShareMenu
+import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import java.util.Locale
@@ -117,16 +119,10 @@ fun SupportDetailScreen(
         }
     }
 
-    fun handleBackNavigation() {
-        if (navController.previousBackStackEntry != null) {
-            navController.popBackStack()
-        } else {
-            navController.navigate("emitters") { popUpTo(0) }
-        }
-    }
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "emitters")
 
-    BackHandler {
-        handleBackNavigation()
+    BackHandler(enabled = !safeBackNavigation.isLocked) {
+        safeBackNavigation.navigateBack()
     }
 
     var antennas by remember { mutableStateOf<List<LocalisationEntity>>(emptyList()) }
@@ -396,10 +392,31 @@ fun SupportDetailScreen(
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
-    val pageSupportOrder by remember { mutableStateOf(prefs.getString("page_support_order", "map,details,photos,nav,share,operators")!!.split(",")) }
+    fun normalizeSupportOrder(order: List<String>): List<String> {
+        val mutableOrder = order.filter { it.isNotBlank() }.toMutableList()
+        if (!mutableOrder.contains("open_map")) {
+            val shareIndex = mutableOrder.indexOf("share")
+            if (shareIndex >= 0) mutableOrder.add(shareIndex + 1, "open_map") else mutableOrder.add("open_map")
+        }
+        return mutableOrder
+    }
+
+    fun openMapAt(latitude: Double, longitude: Double) {
+        prefs.edit()
+            .putFloat("clicked_lat", latitude.toFloat())
+            .putFloat("clicked_lon", longitude.toFloat())
+            .putFloat("last_map_lat", latitude.toFloat())
+            .putFloat("last_map_lon", longitude.toFloat())
+            .putFloat("last_map_zoom", 18f)
+            .apply()
+        navController.navigate("map")
+    }
+
+    val pageSupportOrder by remember { mutableStateOf(normalizeSupportOrder(prefs.getString("page_support_order", "map,details,photos,nav,share,open_map,operators")!!.split(","))) }
     val showMap by remember { mutableStateOf(prefs.getBoolean("page_support_map", true)) }
     val showDetails by remember { mutableStateOf(prefs.getBoolean("page_support_details", true)) }
     val showPhotos by remember { mutableStateOf(prefs.getBoolean("page_support_photos", true)) }
+    val showOpenMap by remember { mutableStateOf(prefs.getBoolean("page_support_open_map", true)) }
     val showNav by remember { mutableStateOf(prefs.getBoolean("page_support_nav", true)) }
     val showShare by remember { mutableStateOf(prefs.getBoolean("page_support_share", true)) }
     val showOperators by remember { mutableStateOf(prefs.getBoolean("page_support_operators", true)) }
@@ -415,7 +432,8 @@ fun SupportDetailScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = { safeClick { handleBackNavigation() } },
+                    onClick = { safeBackNavigation.navigateBack() },
+                    enabled = !safeBackNavigation.isLocked,
                     modifier = Modifier.padding(start = 4.dp)
                 ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, txtBack, tint = MaterialTheme.colorScheme.onSurface)
@@ -504,6 +522,27 @@ fun SupportDetailScreen(
                                             shape = blockShape,
                                             onAddPhotoClick = null
                                         )
+                                    }
+                                }
+                            }
+                            "open_map" -> {
+                                if (showOpenMap) {
+                                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                        Button(
+                                            onClick = { safeClick { openMapAt(mainInfo.latitude, mainInfo.longitude) } },
+                                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                                            shape = buttonShape,
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = MaterialTheme.colorScheme.primary,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                            )
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(24.dp))
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Text(AppStrings.openMap, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                            }
+                                        }
                                     }
                                 }
                             }

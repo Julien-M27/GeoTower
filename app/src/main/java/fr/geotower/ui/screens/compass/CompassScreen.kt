@@ -85,6 +85,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
+import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.map.MapViewModel
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
@@ -129,20 +130,10 @@ fun CompassScreen(
 
     val defaultOp by AppConfig.defaultOperator
 
-    // --- NOUVEAU : GESTION INTELLIGENTE DU RETOUR ---
-    fun handleBackNavigation() {
-        if (navController.previousBackStackEntry != null) {
-            // S'il y a un historique, on fait un retour normal
-            navController.popBackStack()
-        } else {
-            // S'il n'y a pas d'historique (lancement direct), on force l'accueil
-            navController.navigate("home") { popUpTo(0) }
-        }
-    }
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
 
-    // Intercepte le geste de retour (glissement depuis le bord de l'écran ou bouton physique)
-    BackHandler {
-        handleBackNavigation()
+    BackHandler(enabled = !safeBackNavigation.isLocked) {
+        safeBackNavigation.navigateBack()
     }
 
     // --- VARIABLES BOUSSOLE ---
@@ -360,7 +351,10 @@ fun CompassScreen(
                     Text(AppStrings.compassTitle, color = oncompassBg, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                 },
                 navigationIcon = {
-                    IconButton(onClick = { handleBackNavigation() }) {
+                    IconButton(
+                        onClick = { safeBackNavigation.navigateBack() },
+                        enabled = !safeBackNavigation.isLocked
+                    ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", tint = oncompassBg)
                     }
                 },

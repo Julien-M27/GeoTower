@@ -1,6 +1,7 @@
 package fr.geotower.ui.screens.emitters
 
 // NOUVEAUX IMPORTS POUR LA CARTE
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -109,6 +110,20 @@ fun SignalQuestUploadScreen(
             action()
         }
     }
+    var isBackNavigationLocked by remember { mutableStateOf(false) }
+
+    fun handleBackNavigation() {
+        if (isBackNavigationLocked) return
+        isBackNavigationLocked = true
+        val didNavigate = runCatching { onNavigateBack() }.isSuccess
+        if (!didNavigate) {
+            isBackNavigationLocked = false
+        }
+    }
+
+    BackHandler(enabled = !isBackNavigationLocked) {
+        handleBackNavigation()
+    }
 
     // --- 1. ÉTATS ---
     val currentUris = remember { mutableStateListOf<String>().apply { addAll(imageUris) } }
@@ -199,7 +214,8 @@ fun SignalQuestUploadScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = { safeClick { onNavigateBack() } },
+                    onClick = { handleBackNavigation() },
+                    enabled = !isBackNavigationLocked,
                     modifier = Modifier.padding(start = 4.dp)
                 ) {
                     Icon(

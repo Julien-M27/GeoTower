@@ -37,6 +37,7 @@ import fr.geotower.ui.screens.splash.SplashScreen
 import fr.geotower.ui.screens.onboarding.FirstStartScreen
 import fr.geotower.ui.screens.home.HomeScreen
 import fr.geotower.ui.screens.settings.SettingsScreen
+import fr.geotower.ui.screens.emitters.ElevationProfileScreen
 import fr.geotower.ui.screens.emitters.NearEmittersScreen
 import fr.geotower.ui.screens.emitters.SiteDetailScreen
 import fr.geotower.ui.screens.stats.StatisticsScreen
@@ -458,6 +459,16 @@ class MainActivity : ComponentActivity() {
                                     SiteDetailScreen(navController, repository, idLong)
                                 }
                             }
+                            composable(
+                                route = "elevation_profile/{id}",
+                                arguments = listOf(navArgument("id") { type = NavType.StringType })
+                            ) { backStackEntry ->
+                                val id = backStackEntry.arguments?.getString("id") ?: ""
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    ElevationProfileScreen(navController, repository, id)
+                                }
+                            }
+
                             // --- 3. ÉCRAN D'ENVOI SIGNAL QUEST ---
                             composable(
                                 // ✅ AJOUT DE &azimuts={azimuts} À LA FIN

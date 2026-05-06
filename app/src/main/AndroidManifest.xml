@@ -13,6 +13,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="androidx.car.app.MAP_TEMPLATES" />
 
     <queries>
         <package android:name="fr.enb_analytics.enb4g" />
@@ -35,6 +36,10 @@
         <meta-data
             android:name="com.samsung.android.support.ongoing_activity"
             android:value="true" />
+
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -168,5 +173,19 @@
             android:name=".services.LiveTrackingService"
             android:exported="false"
             android:foregroundServiceType="location" />
+
+        <service
+            android:name=".services.GeoTowerCarAppService"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:icon="@mipmap/ic_launcher_geotower">
+            <intent-filter>
+                <action android:name="androidx.car.app.CarAppService" />
+                <category android:name="androidx.car.app.category.POI" />
+            </intent-filter>
+            <meta-data
+                android:name="androidx.car.app.minCarApiLevel"
+                android:value="1" />
+        </service>
     </application>
 </manifest>
