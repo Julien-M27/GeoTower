@@ -50,6 +50,8 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 import kotlin.math.tan
 
+private const val MAX_SHARE_FR_UPLINK_AGGREGATED_CARRIERS = 2
+
 @Composable
 fun ShareThroughputCalculatorBlock(
     info: LocalisationEntity,
@@ -673,7 +675,10 @@ private data class ShareThroughputResult(
     val totalDownMbps: Double
         get() = includedBands.sumOf { it.downMbps }
     val totalUpMbps: Double
-        get() = includedBands.sumOf { it.upMbps }
+        get() = includedBands
+            .sortedByDescending { it.upMbps }
+            .take(MAX_SHARE_FR_UPLINK_AGGREGATED_CARRIERS)
+            .sumOf { it.upMbps }
     val coneDistance: ShareConeDistance?
         get() {
             val distances = includedBands.mapNotNull { it.coneDistance }

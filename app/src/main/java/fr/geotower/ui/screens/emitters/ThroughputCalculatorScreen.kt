@@ -106,6 +106,7 @@ private const val USER_DEVICE_HEIGHT_METERS = 1.5
 private const val NOMINAL_DOWNTILT_DEGREES = 6.0
 private const val MIN_DOWNTILT_DEGREES = 4.0
 private const val MAX_DOWNTILT_DEGREES = 8.0
+private const val MAX_FR_UPLINK_AGGREGATED_CARRIERS = 2
 private const val THROUGHPUT_BLOCK_ORDER_PREF = "page_throughput_order"
 private const val DEFAULT_THROUGHPUT_BLOCK_ORDER = "header,summary,cone,controls,bands,assumptions"
 
@@ -1143,9 +1144,15 @@ private fun calculateThroughput(
             )
         }
 
+    val uplinkAggregationWarning = if (calculatedBands.count { it.isIncluded && it.upMbps > 0.0 } > MAX_FR_UPLINK_AGGREGATED_CARRIERS) {
+        listOf("Upload limite aux 2 meilleures frequences agregees, contrainte retenue pour les reseaux mobiles en France.")
+    } else {
+        emptyList()
+    }
+
     return ThroughputResult(
         bands = calculatedBands,
-        warnings = engineResult?.warnings.orEmpty(),
+        warnings = (engineResult?.warnings.orEmpty() + uplinkAggregationWarning).distinct(),
         assumptions = engineResult?.assumptions.orEmpty(),
         confidenceScore = engineResult?.confidenceScore ?: 35,
         calculationVersion = engineResult?.calculationVersion ?: fr.geotower.radio.THROUGHPUT_CALCULATION_VERSION,
@@ -1637,7 +1644,10 @@ private data class ThroughputResult(
     val totalDownMbps: Double
         get() = includedBands.sumOf { it.downMbps }
     val totalUpMbps: Double
-        get() = includedBands.sumOf { it.upMbps }
+        get() = includedBands
+            .sortedByDescending { it.upMbps }
+            .take(MAX_FR_UPLINK_AGGREGATED_CARRIERS)
+            .sumOf { it.upMbps }
     val strongAzimuths: List<Double>
         get() = includedBands.flatMap { it.azimuths }.distinctBy { it.roundToInt() }
     val coneDistance: ConeDistance?
