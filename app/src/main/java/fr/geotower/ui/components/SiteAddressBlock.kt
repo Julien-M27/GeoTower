@@ -17,9 +17,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.data.models.LocalisationEntity // ✅ NOUVEL IMPORT
+import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import java.util.Locale
 import fr.geotower.data.models.TechniqueEntity
+import kotlin.math.roundToInt
 
 @Composable
 fun SiteAddressBlock(
@@ -83,8 +85,25 @@ fun SiteAddressBlock(
 
             InfoLine(
                 label = txtDistanceLabel,
-                value = "$distanceStr $txtFromMyPosition"
+                value = "${formatAddressDistanceForUnit(distanceStr)} $txtFromMyPosition"
             )
         }
     }
+}
+
+private fun formatAddressDistanceForUnit(distanceStr: String): String {
+    if (AppConfig.distanceUnit.intValue != 1) return distanceStr
+    val normalized = distanceStr.trim().replace(',', '.')
+    val lower = normalized.lowercase(Locale.US)
+    if (lower.contains("mi") || lower.contains("ft")) return distanceStr
+
+    val value = Regex("""[0-9]+(?:\.[0-9]+)?""").find(normalized)?.value?.toDoubleOrNull()
+        ?: return distanceStr
+    val meters = when {
+        lower.contains("km") -> value * 1000.0
+        lower.endsWith("m") || lower.contains(" m") -> value
+        else -> return distanceStr
+    }
+    val miles = meters / 1609.344
+    return if (miles >= 0.1) String.format(Locale.US, "%.2f mi", miles) else "${(meters * 3.28084).roundToInt()} ft"
 }

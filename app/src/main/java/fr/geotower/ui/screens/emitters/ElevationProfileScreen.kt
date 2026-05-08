@@ -109,7 +109,9 @@ import org.json.JSONObject
 fun ElevationProfileScreen(
     navController: NavController,
     repository: AnfrRepository,
-    antennaId: String
+    antennaId: String,
+    isSplitScreen: Boolean = false,
+    onCloseSplitScreen: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val themeMode by AppConfig.themeMode
@@ -134,6 +136,7 @@ fun ElevationProfileScreen(
     var isProfileLoading by remember { mutableStateOf(false) }
     var profileError by remember { mutableStateOf<String?>(null) }
     var loadedProfileKey by remember { mutableStateOf<String?>(null) }
+    var lastProfileRecalculationAtMillis by remember(antennaId) { mutableStateOf(0L) }
     var selectedFrequencyMHz by remember { mutableStateOf<Int?>(null) }
     var pendingProfilePoint by remember(antennaId) { mutableStateOf(loadPendingElevationProfilePoint(context, antennaId)) }
     var profileCalculationInfo by remember { mutableStateOf<ProfileCalculationInfo?>(null) }
@@ -142,8 +145,16 @@ fun ElevationProfileScreen(
     var isUsingSavedProfile by remember(antennaId) { mutableStateOf(false) }
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "site_detail/$antennaId")
 
-    BackHandler(enabled = !safeBackNavigation.isLocked) {
-        safeBackNavigation.navigateBack()
+    fun handleBackNavigation() {
+        if (isSplitScreen) {
+            onCloseSplitScreen()
+        } else {
+            safeBackNavigation.navigateBack()
+        }
+    }
+
+    BackHandler(enabled = isSplitScreen || !safeBackNavigation.isLocked) {
+        handleBackNavigation()
     }
 
     val hasLocationPermission = remember {
@@ -163,9 +174,14 @@ fun ElevationProfileScreen(
         isSiteLoading = false
     }
 
-    val availableFrequencies = remember(site, technique) {
-        val rawFrequencies = technique?.detailsFrequences?.takeIf { it.isNotBlank() } ?: site?.frequences
-        extractProfileFrequencies(rawFrequencies)
+    val rawProfileFrequencies = remember(site, technique) {
+        technique?.detailsFrequences?.takeIf { it.isNotBlank() } ?: site?.frequences
+    }
+    val availableFrequencies = remember(rawProfileFrequencies) {
+        extractElevationProfileFrequencies(rawProfileFrequencies)
+    }
+    val antennaHeightsByFrequency = remember(rawProfileFrequencies) {
+        extractElevationProfileAntennaHeightsByFrequency(rawProfileFrequencies)
     }
 
     LaunchedEffect(availableFrequencies) {
@@ -190,8 +206,8 @@ fun ElevationProfileScreen(
         if (hasLocationPermission) {
             userLocation = getElevationLastKnownLocation(context)
             try {
-                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1500L, 2f, locationListener)
-                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1500L, 2f, locationListener)
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, ELEVATION_PROFILE_RECALC_INTERVAL_MS, 2f, locationListener)
+                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, ELEVATION_PROFILE_RECALC_INTERVAL_MS, 2f, locationListener)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
@@ -239,8 +255,17 @@ fun ElevationProfileScreen(
 
         val key = "${currentSite.idAnfr}:${(fromLatitude * 100000).roundToInt()}:${(fromLongitude * 100000).roundToInt()}"
         if (loadedProfileKey == key) return@LaunchedEffect
+        val now = System.currentTimeMillis()
+        if (
+            pendingPoint == null &&
+            lastProfileRecalculationAtMillis > 0L &&
+            now - lastProfileRecalculationAtMillis < ELEVATION_PROFILE_RECALC_INTERVAL_MS
+        ) {
+            return@LaunchedEffect
+        }
 
         loadedProfileKey = key
+        lastProfileRecalculationAtMillis = now
         isProfileLoading = true
         profileError = null
         profile = null
@@ -287,8 +312,8 @@ fun ElevationProfileScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = { safeBackNavigation.navigateBack() },
-                    enabled = !safeBackNavigation.isLocked,
+                    onClick = { handleBackNavigation() },
+                    enabled = isSplitScreen || !safeBackNavigation.isLocked,
                     modifier = Modifier.padding(start = 4.dp)
                 ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, AppStrings.back, tint = MaterialTheme.colorScheme.onSurface)
@@ -391,8 +416,9 @@ fun ElevationProfileScreen(
                         .verticalScroll(scrollState),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    val supportHeight = physique?.hauteur ?: 0.0
-                    val frequency = selectedFrequencyMHz ?: DEFAULT_PROFILE_FREQUENCY_MHZ
+                    val frequency = selectedFrequencyMHz ?: DEFAULT_ELEVATION_PROFILE_FREQUENCY_MHZ
+                    val selectedAntennaHeight = antennaHeightsByFrequency[frequency]
+                    val supportHeight = selectedAntennaHeight ?: physique?.hauteur ?: 0.0
                     val obstruction = remember(profile, supportHeight) {
                         calculateLineObstruction(profile!!, supportHeight)
                     }
@@ -434,7 +460,7 @@ fun ElevationProfileScreen(
                     ProfileStatsCard(
                         profile = profile!!,
                         calculationInfo = profileCalculationInfo,
-                        supportHeight = physique?.hauteur,
+                        supportHeight = selectedAntennaHeight ?: physique?.hauteur,
                         obstructionMeters = obstruction,
                         fresnelObstructionMeters = fresnelObstruction,
                         frequencyMHz = frequency,
@@ -679,9 +705,23 @@ private fun ProfileStatsCard(
         colors = CardDefaults.cardColors(containerColor = cardBgColor)
     ) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            ProfileInfoRow(AppStrings.elevationProfileSupportHeight, supportHeight?.let { "${it.roundToInt()} m" } ?: "--")
-            ProfileInfoRow(AppStrings.elevationProfileStartAltitude, "${profile.points.first().elevation.roundToInt()} m")
-            ProfileInfoRow(AppStrings.elevationProfileSiteAltitude, "${profile.points.last().elevation.roundToInt()} m")
+            val startHeightMeters = profile.points.first().elevation + USER_EYE_HEIGHT_METERS
+            val arrivalHeightMeters = supportHeight?.let { profile.points.last().elevation + it }
+            ProfileInfoRow(
+                label = AppStrings.elevationProfileSupportHeight,
+                value = supportHeight?.let { "${it.roundToInt()} m" } ?: "--",
+                detail = AppStrings.elevationProfileSupportHeightDetail
+            )
+            ProfileInfoRow(
+                label = AppStrings.elevationProfileStartAltitude,
+                value = "${startHeightMeters.roundToInt()} m",
+                detail = AppStrings.elevationProfileStartAltitudeDetail
+            )
+            ProfileInfoRow(
+                label = AppStrings.elevationProfileSiteAltitude,
+                value = arrivalHeightMeters?.let { "${it.roundToInt()} m" } ?: "--",
+                detail = AppStrings.elevationProfileSiteAltitudeDetail
+            )
             ProfileInfoRow(AppStrings.elevationProfileFrequency, "$frequencyMHz MHz")
             calculationInfo?.let { info ->
                 val gpsValue = formatProfileGps(info.fromLatitude, info.fromLongitude)
@@ -727,17 +767,26 @@ private fun ProfileStatsCard(
 }
 
 @Composable
-private fun ProfileInfoRow(label: String, value: String) {
-    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(
-            value,
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.onSurface,
-            textAlign = TextAlign.End
-        )
+private fun ProfileInfoRow(label: String, value: String, detail: String? = null) {
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+            Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(
+                value,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface,
+                textAlign = TextAlign.End
+            )
+        }
+        if (!detail.isNullOrBlank()) {
+            Text(
+                detail,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+            )
+        }
     }
 }
 
@@ -1092,41 +1141,6 @@ private fun fresnelClearanceMeters(
     return 0.6 * 17.32 * sqrt((d1Km * d2Km) / (frequencyGHz * totalKm))
 }
 
-private fun extractProfileFrequencies(raw: String?): List<Int> {
-    if (raw.isNullOrBlank()) return listOf(DEFAULT_PROFILE_FREQUENCY_MHZ)
-
-    val frequencyText = raw
-        .lineSequence()
-        .joinToString(" ") { line -> line.substringBefore("|") }
-
-    val frequencies = Regex("""\d{3,5}""")
-        .findAll(frequencyText)
-        .mapNotNull { match -> match.value.toIntOrNull()?.let(::normalizeProfileFrequency) }
-        .distinct()
-        .sortedWith(
-            compareBy<Int> { frequency ->
-                PROFILE_FREQUENCY_ORDER.indexOf(frequency).takeIf { it >= 0 } ?: Int.MAX_VALUE
-            }.thenBy { it }
-        )
-        .toList()
-
-    return frequencies.ifEmpty { listOf(DEFAULT_PROFILE_FREQUENCY_MHZ) }
-}
-
-private fun normalizeProfileFrequency(value: Int): Int? {
-    return when (value) {
-        in 650..760 -> 700
-        in 791..860 -> 800
-        in 870..960 -> 900
-        in 1700..1900 -> 1800
-        in 1901..2200 -> 2100
-        in 2400..2700 -> 2600
-        in 3300..3800 -> 3500
-        in 24000..28000 -> 26000
-        else -> null
-    }
-}
-
 private fun formatFrequencyLabel(frequencyMHz: Int): String {
     return if (frequencyMHz >= 10_000) {
         "${frequencyMHz / 1000} GHz"
@@ -1344,7 +1358,7 @@ private data class SavedElevationProfile(
 )
 
 private const val USER_EYE_HEIGHT_METERS = 1.5
-private const val DEFAULT_PROFILE_FREQUENCY_MHZ = 3500
+private const val ELEVATION_PROFILE_RECALC_INTERVAL_MS = 60_000L
 private const val PROFILE_ERROR_OFFLINE = "offline"
 private const val PROFILE_ERROR_OFFLINE_PENDING = "offline_pending"
 private const val SAVED_PROFILE_KEY_PREFIX = "saved_elevation_profile_"
@@ -1353,4 +1367,3 @@ private const val PENDING_PROFILE_FROM_LAT = "pending_elevation_profile_from_lat
 private const val PENDING_PROFILE_FROM_LON = "pending_elevation_profile_from_lon"
 private const val PENDING_PROFILE_TO_LAT = "pending_elevation_profile_to_lat"
 private const val PENDING_PROFILE_TO_LON = "pending_elevation_profile_to_lon"
-private val PROFILE_FREQUENCY_ORDER = listOf(3500, 2600, 2100, 1800, 900, 800, 700, 26000)

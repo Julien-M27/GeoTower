@@ -36,10 +36,12 @@ import fr.geotower.services.LiveTrackingController
 import fr.geotower.ui.screens.splash.SplashScreen
 import fr.geotower.ui.screens.onboarding.FirstStartScreen
 import fr.geotower.ui.screens.home.HomeScreen
+import fr.geotower.ui.screens.help.HelpScreen
 import fr.geotower.ui.screens.settings.SettingsScreen
 import fr.geotower.ui.screens.emitters.ElevationProfileScreen
-import fr.geotower.ui.screens.emitters.NearEmittersScreen
-import fr.geotower.ui.screens.emitters.SiteDetailScreen
+import fr.geotower.ui.screens.emitters.NearEmittersSupportWrapperScreen
+import fr.geotower.ui.screens.emitters.SiteDetailToolWrapperScreen
+import fr.geotower.ui.screens.emitters.ThroughputCalculatorScreen
 import fr.geotower.ui.screens.stats.StatisticsScreen
 import fr.geotower.ui.screens.about.AboutScreen
 import fr.geotower.ui.screens.compass.CompassScreen
@@ -381,6 +383,12 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
+                            composable("help") {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    HelpScreen(navController)
+                                }
+                            }
+
                             // Carte
                             composable("map") {
                                 MapScreen(
@@ -422,7 +430,7 @@ class MainActivity : ComponentActivity() {
                             // Emetteurs
                             composable("emitters") {
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    NearEmittersScreen(navController, repository)
+                                    NearEmittersSupportWrapperScreen(navController, repository)
                                 }
                             }
 
@@ -456,7 +464,7 @@ class MainActivity : ComponentActivity() {
                                 val id = backStackEntry.arguments?.getString("id") ?: ""
                                 val idLong = id.toLongOrNull() ?: 0L
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    SiteDetailScreen(navController, repository, idLong)
+                                    SiteDetailToolWrapperScreen(navController, repository, idLong)
                                 }
                             }
                             composable(
@@ -466,6 +474,15 @@ class MainActivity : ComponentActivity() {
                                 val id = backStackEntry.arguments?.getString("id") ?: ""
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     ElevationProfileScreen(navController, repository, id)
+                                }
+                            }
+                            composable(
+                                route = "throughput_calculator/{id}",
+                                arguments = listOf(navArgument("id") { type = NavType.StringType })
+                            ) { backStackEntry ->
+                                val id = backStackEntry.arguments?.getString("id") ?: ""
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    ThroughputCalculatorScreen(navController, repository, id)
                                 }
                             }
 

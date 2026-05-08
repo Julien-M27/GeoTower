@@ -1,6 +1,7 @@
 package fr.geotower.ui.screens.map
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -142,7 +143,22 @@ import java.io.File
 import android.os.Environment
 
 private const val HS_OPERATOR_WILDCARD = "*"
+private const val INITIAL_LOCATION_ZOOM = 16.0
 private val MAP_OPERATOR_KEYS = listOf("ORANGE", "SFR", "BOUYGUES", "FREE")
+
+private fun hasSavedMapPosition(prefs: SharedPreferences): Boolean {
+    if (!prefs.contains("last_map_lat") || !prefs.contains("last_map_lon") || !prefs.contains("last_map_zoom")) {
+        return false
+    }
+
+    val lat = prefs.getFloat("last_map_lat", Float.NaN).toDouble()
+    val lon = prefs.getFloat("last_map_lon", Float.NaN).toDouble()
+    val zoom = prefs.getFloat("last_map_zoom", Float.NaN).toDouble()
+
+    return lat in -90.0..90.0 &&
+        lon in -180.0..180.0 &&
+        zoom in 0.0..25.0
+}
 
 private fun normalizedAnfrId(value: String): String {
     val trimmed = value.trim()
@@ -971,6 +987,7 @@ fun MapScreen(
                     setMultiTouchControls(true)
                     zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
                     val prefs = ctx.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+                    val hasSavedPosition = hasSavedMapPosition(prefs)
 
                     controller.setCenter(GeoPoint(
                         prefs.getFloat("last_map_lat", 46.2276f).toDouble(),
@@ -998,7 +1015,22 @@ fun MapScreen(
                     locationOverlay.runOnFirstFix {
                         val initialLoc = locationOverlay.myLocation
                         if (initialLoc != null) {
-                            myCurrentLoc = initialLoc
+                            post {
+                                myCurrentLoc = initialLoc
+                                if (!hasSavedPosition) {
+                                    controller.stopAnimation(false)
+                                    controller.setZoom(INITIAL_LOCATION_ZOOM)
+                                    controller.setCenter(initialLoc)
+                                    currentZoom = INITIAL_LOCATION_ZOOM
+                                    currentLat = initialLoc.latitude
+
+                                    prefs.edit()
+                                        .putFloat("last_map_lat", initialLoc.latitude.toFloat())
+                                        .putFloat("last_map_lon", initialLoc.longitude.toFloat())
+                                        .putFloat("last_map_zoom", INITIAL_LOCATION_ZOOM.toFloat())
+                                        .apply()
+                                }
+                            }
                         }
                     }
 

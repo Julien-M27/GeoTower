@@ -13,7 +13,10 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fr.geotower.data.models.LocalisationEntity // ✅ NOUVEL IMPORT
+import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
+import java.util.Locale
+import kotlin.math.roundToInt
 
 @Composable
 fun SitePanelHeightsBlock(
@@ -23,13 +26,16 @@ fun SitePanelHeightsBlock(
 ) {
     val txtPanelHeightsTitle = AppStrings.panelHeightsTitle
 
-    val formattedHeights = remember(info.azimuts) {
+    val distanceUnit = AppConfig.distanceUnit.intValue
+    val formattedHeights = remember(info.azimuts, distanceUnit) {
         if (info.azimuts.isNullOrBlank()) ""
         else {
             val heights = info.azimuts?.split(",")
                 ?.mapNotNull { it.substringAfter("(", "").substringBefore("m", "").trim().toFloatOrNull() }
                 ?.filter { it > 0f }?.distinct()?.sorted() ?: emptyList()
-            if (heights.isNotEmpty()) heights.joinToString(" m - ") + " m" else ""
+            if (heights.isNotEmpty()) {
+                heights.joinToString(" - ") { formatPanelHeightForUnit(it.toDouble(), distanceUnit) }
+            } else ""
         }
     }
 
@@ -45,5 +51,13 @@ fun SitePanelHeightsBlock(
                 Text(text = formattedHeights, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             }
         }
+    }
+}
+
+private fun formatPanelHeightForUnit(heightMeters: Double, distanceUnit: Int): String {
+    return if (distanceUnit == 1) {
+        "${(heightMeters * 3.28084).roundToInt()} ft"
+    } else {
+        if (heightMeters % 1.0 == 0.0) "${heightMeters.toInt()} m" else String.format(Locale.US, "%.1f m", heightMeters)
     }
 }

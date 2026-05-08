@@ -1,6 +1,7 @@
 package fr.geotower.ui.screens.settings
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.BottomSheetDefaults
@@ -61,7 +63,9 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
@@ -87,6 +91,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -103,6 +108,7 @@ fun PagesCustomizationSheet(
     // --- NOUVEAUX PARAMÈTRES ---
     onSupportClick: () -> Unit,
     onSiteClick: () -> Unit,
+    onThroughputCalculatorClick: () -> Unit,
     onOpenFrequencies: () -> Unit
 ) {
     val themeMode by AppConfig.themeMode
@@ -147,6 +153,7 @@ fun PagesCustomizationSheet(
             // --- NOUVELLES SECTIONS ---
             NavigationMenuItem(title = AppStrings.pageSupportSettings, icon = Icons.Default.VerticalAlignTop, isSelected = false, isDark = isDark) { onSupportClick() }
             NavigationMenuItem(title = AppStrings.pageSiteSettings, icon = Icons.Default.WifiTethering, isSelected = false, isDark = isDark) { onSiteClick() }
+            NavigationMenuItem(title = AppStrings.throughputCalculatorTitle, icon = Icons.Default.Speed, isSelected = false, isDark = isDark) { onThroughputCalculatorClick() }
         }
     }
 }
@@ -255,6 +262,9 @@ fun HomeSettingsSheet(
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     var showLogo by remember { mutableStateOf(prefs.getBoolean("show_home_logo", true)) }
+    var showHelpButton by remember { mutableStateOf(prefs.getBoolean("show_home_help", true)) }
+    var helpButtonPosition by remember { mutableStateOf(prefs.getString("home_help_position", "bottom_end") ?: "bottom_end") }
+    var showHelpPositionSettings by remember { mutableStateOf(false) }
 
     // ---> 2. SÉCURITÉ ET RÉACTIVITÉ : Assure que le logo est dans la liste <---
     val safeOrder = remember(pagesOrder) {
@@ -270,25 +280,46 @@ fun HomeSettingsSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text(AppStrings.pageHomeSettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                Spacer(Modifier.width(48.dp))
-            }
-            Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
+            if (showHelpPositionSettings) {
+                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { showHelpPositionSettings = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                    Text(AppStrings.homeHelpPositionSettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                    Spacer(Modifier.width(48.dp))
+                }
 
-            val density = LocalDensity.current
-            val cardHeight = 64.dp
-            val spacing = 12.dp
-            val stepPx = with(density) { (cardHeight + spacing).toPx() }
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    val savePosition = { position: String ->
+                        helpButtonPosition = position
+                        prefs.edit().putString("home_help_position", position).apply()
+                    }
 
-            var draggedItem by remember { mutableStateOf<String?>(null) }
-            var dragOffset by remember { mutableFloatStateOf(0f) }
+                    SettingsRadioItem(AppStrings.positionTopLeft, helpButtonPosition == "top_start", useOneUi, bubbleColor) { savePosition("top_start") }
+                    SettingsRadioItem(AppStrings.positionTopRight, helpButtonPosition == "top_end", useOneUi, bubbleColor) { savePosition("top_end") }
+                    SettingsRadioItem(AppStrings.positionBottomLeft, helpButtonPosition == "bottom_start", useOneUi, bubbleColor) { savePosition("bottom_start") }
+                    SettingsRadioItem(AppStrings.positionBottomRight, helpButtonPosition == "bottom_end", useOneUi, bubbleColor) { savePosition("bottom_end") }
+                }
 
-            Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
+                Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
+            } else {
+                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                    Text(AppStrings.pageHomeSettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                    Spacer(Modifier.width(48.dp))
+                }
+                Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
+
+                val density = LocalDensity.current
+                val cardHeight = 64.dp
+                val spacing = 12.dp
+                val stepPx = with(density) { (cardHeight + spacing).toPx() }
+
+                var draggedItem by remember { mutableStateOf<String?>(null) }
+                var dragOffset by remember { mutableFloatStateOf(0f) }
+
                 val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
                 val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
+                Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
                 // --- MODIFICATION : On utilise 'currentOrder' au lieu de 'pagesOrder' partout ici ---
                 currentOrder.forEach { pageId ->
                     key(pageId) {
@@ -349,6 +380,20 @@ fun HomeSettingsSheet(
                         }
                     }
                 }
+                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    ConfigurableSwitchCard(
+                        title = AppStrings.homeHelpSettings,
+                        checked = showHelpButton,
+                        onCheckedChange = {
+                            showHelpButton = it
+                            prefs.edit().putBoolean("show_home_help", it).apply()
+                        },
+                        onSettingsClick = { showHelpPositionSettings = true },
+                        shape = shape,
+                        border = border,
+                        bubbleColor = bubbleColor,
+                        useOneUi = useOneUi
+                    )
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -367,7 +412,13 @@ fun HomeSettingsSheet(
 
                 // Réinitialise le logo
                 showLogo = true
-                prefs.edit().putBoolean("show_home_logo", true).apply()
+                showHelpButton = true
+                helpButtonPosition = "bottom_end"
+                prefs.edit()
+                    .putBoolean("show_home_logo", true)
+                    .putBoolean("show_home_help", true)
+                    .putString("home_help_position", "bottom_end")
+                    .apply()
             }) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
@@ -376,6 +427,7 @@ fun HomeSettingsSheet(
             Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
     }
+}
 }
 
 // === COMPOSANT UTILITAIRE POUR TOUS LES GLISSER-DÉPOSER ===
@@ -451,12 +503,56 @@ fun DraggableSwitchCard(
         }
     }
 }
+
+@Composable
+fun ConfigurableSwitchCard(
+    title: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    onSettingsClick: () -> Unit,
+    shape: androidx.compose.ui.graphics.Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
+    useOneUi: Boolean
+) {
+    val switchColor = MaterialTheme.colorScheme.primary
+    val cardBg = if (useOneUi) bubbleColor else Color.Transparent
+
+    Surface(shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f),
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+            IconButton(onClick = onSettingsClick) {
+                Icon(
+                    imageVector = Icons.Default.Settings,
+                    contentDescription = AppStrings.settingsTitle,
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+            if (useOneUi) {
+                fr.geotower.ui.components.OneUiSwitch(checked, onCheckedChange)
+            } else {
+                Switch(checked = checked, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
+            }
+        }
+    }
+}
 // === LE SOUS-MENU POUR LA PAGE ANTENNES À PROXIMITÉ ===
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NearbySettingsSheet(
     nearbyOrder: List<String>, onOrderChange: (List<String>) -> Unit,
     showSearch: Boolean, onSearchChange: (Boolean) -> Unit,
+    showSuggestions: Boolean, onSuggestionsChange: (Boolean) -> Unit,
     showSites: Boolean, onSitesChange: (Boolean) -> Unit,
     searchRadius: Int, onRadiusChange: (Int) -> Unit,
     onDismiss: () -> Unit,
@@ -526,12 +622,24 @@ fun NearbySettingsSheet(
             }
 
             Spacer(modifier = Modifier.height(24.dp))
-            // --- NOUVEAU : BOUTON RÉINITIALISER L'ORDRE ---
+            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            Spacer(modifier = Modifier.height(8.dp))
+            SimpleSwitchCard(
+                title = AppStrings.nearbySearchSuggestionsOption,
+                showMapLocation = showSuggestions,
+                onLocationChange = onSuggestionsChange,
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                useOneUi = useOneUi
+            )
             Spacer(modifier = Modifier.height(24.dp))
+            // --- NOUVEAU : BOUTON RÉINITIALISER L'ORDRE ---
             TextButton(
                 onClick = {
                     onOrderChange(listOf("search", "sites"))
                     onSearchChange(true)
+                    onSuggestionsChange(true)
                     onSitesChange(true)
                     onRadiusChange(5) // On remet le rayon par défaut (5 km)
                 }
@@ -549,9 +657,6 @@ fun NearbySettingsSheet(
                 )
             }
             Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
-
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-            Spacer(modifier = Modifier.height(8.dp))
 
             // --- 2. LE CURSEUR DU RAYON ---
             SearchRadiusCard(
@@ -808,6 +913,496 @@ fun SimpleSwitchCard(title: String, showMapLocation: Boolean, onLocationChange: 
     }
 }
 
+private val defaultThroughputBlockOrder = listOf("header", "summary", "cone", "controls", "bands", "assumptions")
+
+private fun normalizeThroughputBlockOrder(order: List<String>): List<String> {
+    val knownBlocks = defaultThroughputBlockOrder.toSet()
+    val normalized = order.map { it.trim() }.filter { it in knownBlocks }.distinct().toMutableList()
+    defaultThroughputBlockOrder.forEach { block ->
+        if (!normalized.contains(block)) normalized.add(block)
+    }
+    return normalized
+}
+
+@Composable
+private fun throughputBlockTitle(blockId: String): String {
+    return when (blockId) {
+        "header" -> AppStrings.get("En-tête du site", "Site header", "Cabeçalho do site")
+        "summary" -> AppStrings.get("Résumé des débits", "Throughput summary", "Resumo dos débitos")
+        "cone" -> AppStrings.get("Distance optimale", "Optimal distance", "Distância ideal")
+        "controls" -> AppStrings.get("Hypothèses et filtres", "Assumptions and filters", "Hipóteses e filtros")
+        "bands" -> AppStrings.get("Fréquences et modulation", "Frequencies and modulation", "Frequências e modulação")
+        "assumptions" -> AppStrings.get("Sources et avertissements", "Sources and warnings", "Fontes e avisos")
+        else -> blockId
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ThroughputCalculatorSettingsSheet(
+    showThroughputCalculator: Boolean,
+    onThroughputCalculatorChange: (Boolean) -> Unit,
+    throughputOrder: List<String>,
+    onThroughputOrderChange: (List<String>) -> Unit,
+    showHeader: Boolean,
+    onHeaderChange: (Boolean) -> Unit,
+    showSummary: Boolean,
+    onSummaryChange: (Boolean) -> Unit,
+    showCone: Boolean,
+    onConeChange: (Boolean) -> Unit,
+    showControls: Boolean,
+    onControlsChange: (Boolean) -> Unit,
+    showBands: Boolean,
+    onBandsChange: (Boolean) -> Unit,
+    showAssumptions: Boolean,
+    onAssumptionsChange: (Boolean) -> Unit,
+    onOpenCalculationDefaults: () -> Unit,
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    bubbleColor: Color
+) {
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
+    val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+    val currentOrder by rememberUpdatedState(normalizeThroughputBlockOrder(throughputOrder))
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        val density = LocalDensity.current
+        val cardHeight = 64.dp
+        val spacing = 12.dp
+        val stepPx = with(density) { (cardHeight + spacing).toPx() }
+        var draggedItem by remember { mutableStateOf<String?>(null) }
+        var dragOffset by remember { mutableFloatStateOf(0f) }
+
+        Column(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                Text(AppStrings.throughputCalculatorTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Spacer(Modifier.width(48.dp))
+            }
+
+            SimpleSwitchCard(
+                title = AppStrings.siteThroughputCalculatorOption,
+                showMapLocation = showThroughputCalculator,
+                onLocationChange = onThroughputCalculatorChange,
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                useOneUi = useOneUi
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 16.dp), textAlign = TextAlign.Center)
+
+            Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
+                currentOrder.forEach { blockId ->
+                    key(blockId) {
+                        val isDragged = draggedItem == blockId
+                        val dragModifier = Modifier.pointerInput(blockId) {
+                            detectDragGesturesAfterLongPress(
+                                onDragStart = { draggedItem = blockId; dragOffset = 0f },
+                                onDrag = { change, dragAmount ->
+                                    change.consume()
+                                    dragOffset += dragAmount.y
+                                    val currentIndex = currentOrder.indexOf(blockId)
+                                    if (currentIndex < 0) return@detectDragGesturesAfterLongPress
+                                    var newIndex = currentIndex
+                                    while (dragOffset > stepPx * 0.5f && newIndex < currentOrder.size - 1) {
+                                        dragOffset -= stepPx
+                                        newIndex++
+                                    }
+                                    while (dragOffset < -stepPx * 0.5f && newIndex > 0) {
+                                        dragOffset += stepPx
+                                        newIndex--
+                                    }
+                                    if (newIndex != currentIndex) {
+                                        val newList = currentOrder.toMutableList()
+                                        val item = newList.removeAt(currentIndex)
+                                        newList.add(newIndex, item)
+                                        onThroughputOrderChange(newList)
+                                    }
+                                },
+                                onDragEnd = { draggedItem = null; dragOffset = 0f },
+                                onDragCancel = { draggedItem = null; dragOffset = 0f }
+                            )
+                        }
+                        val checked = when (blockId) {
+                            "header" -> showHeader
+                            "summary" -> showSummary
+                            "cone" -> showCone
+                            "controls" -> showControls
+                            "bands" -> showBands
+                            "assumptions" -> showAssumptions
+                            else -> true
+                        }
+                        val onCheckedChange: (Boolean) -> Unit = when (blockId) {
+                            "header" -> onHeaderChange
+                            "summary" -> onSummaryChange
+                            "cone" -> onConeChange
+                            "controls" -> onControlsChange
+                            "bands" -> onBandsChange
+                            "assumptions" -> onAssumptionsChange
+                            else -> { _: Boolean -> }
+                        }
+                        DraggableSwitchCard(
+                            throughputBlockTitle(blockId),
+                            checked,
+                            onCheckedChange,
+                            shape,
+                            border,
+                            bubbleColor,
+                            useOneUi,
+                            dragModifier,
+                            isDragged,
+                            dragOffset,
+                            cardHeight,
+                            onSettingsClick = if (blockId == "controls") {
+                                {
+                                    onDismiss()
+                                    onOpenCalculationDefaults()
+                                }
+                            } else {
+                                null
+                            }
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            TextButton(onClick = {
+                onThroughputCalculatorChange(true)
+                onThroughputOrderChange(defaultThroughputBlockOrder)
+                onHeaderChange(true)
+                onSummaryChange(true)
+                onConeChange(true)
+                onControlsChange(true)
+                onBandsChange(true)
+                onAssumptionsChange(true)
+            }) {
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(8.dp))
+                Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ThroughputCalculationDefaultsSheet(
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    bubbleColor: Color
+) {
+    val context = LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE) }
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
+    val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+
+    var preset by remember { mutableStateOf(prefs.getString("throughput_default_preset", "conservative") ?: "conservative") }
+    var lteDownIndex by remember { mutableStateOf(prefs.getInt("throughput_custom_lte_down", 3).coerceIn(0, throughputModulationLabels.lastIndex)) }
+    var lteUpIndex by remember { mutableStateOf(prefs.getInt("throughput_custom_lte_up", 2).coerceIn(0, throughputModulationLabels.lastIndex)) }
+    var nrDownIndex by remember { mutableStateOf(prefs.getInt("throughput_custom_nr_down", 3).coerceIn(0, throughputModulationLabels.lastIndex)) }
+    var nrUpIndex by remember { mutableStateOf(prefs.getInt("throughput_custom_nr_up", 2).coerceIn(0, throughputModulationLabels.lastIndex)) }
+    var include4G by remember { mutableStateOf(prefs.getBoolean("throughput_include_4g", true)) }
+    var include5G by remember { mutableStateOf(prefs.getBoolean("throughput_include_5g", true)) }
+    var includePlanned by remember { mutableStateOf(prefs.getBoolean("throughput_include_planned", false)) }
+    var bandSelection by remember {
+        mutableStateOf(
+            throughputBandDefaults
+                .flatMap { it.bands }
+                .associate { band -> band.prefSuffix to prefs.getBoolean("throughput_band_${band.prefSuffix}", true) }
+        )
+    }
+
+    fun savePreset(value: String) {
+        preset = value
+        prefs.edit().putString("throughput_default_preset", value).apply()
+    }
+
+    fun saveInt(key: String, value: Int, update: (Int) -> Unit) {
+        val coerced = value.coerceIn(0, throughputModulationLabels.lastIndex)
+        update(coerced)
+        prefs.edit().putInt(key, coerced).apply()
+    }
+
+    fun saveBool(key: String, value: Boolean, update: (Boolean) -> Unit) {
+        update(value)
+        prefs.edit().putBoolean(key, value).apply()
+    }
+
+    fun saveBand(prefSuffix: String, value: Boolean) {
+        bandSelection = bandSelection + (prefSuffix to value)
+        prefs.edit().putBoolean("throughput_band_$prefSuffix", value).apply()
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        Column(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                Text(
+                    AppStrings.get("Réglages de calcul", "Calculation settings", "Definições de cálculo"),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.width(48.dp))
+            }
+
+            Text(
+                AppStrings.get("Mode de calcul par défaut", "Default calculation mode", "Modo de cálculo predefinido"),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                throughputPresetDefaults.forEach { option ->
+                    FilterChip(
+                        selected = preset == option.id,
+                        onClick = { savePreset(option.id) },
+                        label = { Text(option.label()) }
+                    )
+                }
+            }
+
+            AnimatedVisibility(visible = preset == "custom") {
+                Column(
+                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        AppStrings.get("Modulation personnalisée", "Custom modulation", "Modulação personalizada"),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    ThroughputDefaultModulationSlider(AppStrings.get("4G descendant", "4G download", "4G download"), lteDownIndex, useOneUi) {
+                        saveInt("throughput_custom_lte_down", it) { value -> lteDownIndex = value }
+                    }
+                    ThroughputDefaultModulationSlider(AppStrings.get("4G montant", "4G upload", "4G upload"), lteUpIndex, useOneUi) {
+                        saveInt("throughput_custom_lte_up", it) { value -> lteUpIndex = value }
+                    }
+                    ThroughputDefaultModulationSlider(AppStrings.get("5G descendant", "5G download", "5G download"), nrDownIndex, useOneUi) {
+                        saveInt("throughput_custom_nr_down", it) { value -> nrDownIndex = value }
+                    }
+                    ThroughputDefaultModulationSlider(AppStrings.get("5G montant", "5G upload", "5G upload"), nrUpIndex, useOneUi) {
+                        saveInt("throughput_custom_nr_up", it) { value -> nrUpIndex = value }
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(20.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+            Spacer(Modifier.height(12.dp))
+
+            SimpleSwitchCard(AppStrings.get("Inclure la 4G", "Include 4G", "Incluir 4G"), include4G, { saveBool("throughput_include_4g", it) { value -> include4G = value } }, shape, border, bubbleColor, useOneUi)
+            Spacer(Modifier.height(8.dp))
+            SimpleSwitchCard(AppStrings.get("Inclure la 5G", "Include 5G", "Incluir 5G"), include5G, { saveBool("throughput_include_5g", it) { value -> include5G = value } }, shape, border, bubbleColor, useOneUi)
+            Spacer(Modifier.height(8.dp))
+            SimpleSwitchCard(AppStrings.get("Inclure les projets", "Include planned", "Incluir projetos"), includePlanned, { saveBool("throughput_include_planned", it) { value -> includePlanned = value } }, shape, border, bubbleColor, useOneUi)
+
+            Spacer(Modifier.height(20.dp))
+            Text(
+                AppStrings.get("Bandes de fréquences par défaut", "Default frequency bands", "Bandas de frequência predefinidas"),
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            )
+
+            throughputBandDefaults.forEach { group ->
+                Text(
+                    text = group.title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp)
+                )
+                group.bands.forEach { band ->
+                    SimpleSwitchCard(
+                        title = band.label,
+                        showMapLocation = bandSelection[band.prefSuffix] != false,
+                        onLocationChange = { saveBand(band.prefSuffix, it) },
+                        shape = shape,
+                        border = border,
+                        bubbleColor = bubbleColor,
+                        useOneUi = useOneUi
+                    )
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            TextButton(onClick = {
+                preset = "conservative"
+                lteDownIndex = 3
+                lteUpIndex = 2
+                nrDownIndex = 3
+                nrUpIndex = 2
+                include4G = true
+                include5G = true
+                includePlanned = false
+                bandSelection = throughputBandDefaults.flatMap { it.bands }.associate { it.prefSuffix to true }
+                val editor = prefs.edit()
+                    .putString("throughput_default_preset", "conservative")
+                    .putInt("throughput_custom_lte_down", 3)
+                    .putInt("throughput_custom_lte_up", 2)
+                    .putInt("throughput_custom_nr_down", 3)
+                    .putInt("throughput_custom_nr_up", 2)
+                    .putBoolean("throughput_include_4g", true)
+                    .putBoolean("throughput_include_5g", true)
+                    .putBoolean("throughput_include_planned", false)
+                throughputBandDefaults.flatMap { it.bands }.forEach { band ->
+                    editor.putBoolean("throughput_band_${band.prefSuffix}", true)
+                }
+                editor.apply()
+            }) {
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(8.dp))
+                Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
+        }
+    }
+}
+
+@Composable
+private fun ThroughputDefaultModulationSlider(
+    label: String,
+    selectedIndex: Int,
+    useOneUi: Boolean,
+    onSelectedIndexChange: (Int) -> Unit
+) {
+    val coercedIndex = selectedIndex.coerceIn(0, throughputModulationLabels.lastIndex)
+    val onSliderChange: (Float) -> Unit = { value ->
+        onSelectedIndexChange(value.roundToInt().coerceIn(0, throughputModulationLabels.lastIndex))
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = "$label : ${throughputModulationLabels[coercedIndex]}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (useOneUi) {
+            Slider(
+                value = coercedIndex.toFloat(),
+                onValueChange = onSliderChange,
+                valueRange = 0f..throughputModulationLabels.lastIndex.toFloat(),
+                steps = (throughputModulationLabels.size - 2).coerceAtLeast(0),
+                thumb = {
+                    Box(
+                        modifier = Modifier
+                            .size(24.dp)
+                            .background(MaterialTheme.colorScheme.surface, CircleShape)
+                            .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                    )
+                },
+                track = { _ ->
+                    Canvas(modifier = Modifier.fillMaxWidth().height(14.dp)) {
+                        val centerY = size.height / 2
+                        drawLine(
+                            color = Color.Gray.copy(alpha = 0.3f),
+                            start = Offset(0f, centerY),
+                            end = Offset(size.width, centerY),
+                            strokeWidth = 14.dp.toPx(),
+                            cap = StrokeCap.Round
+                        )
+                        val stepWidth = size.width / throughputModulationLabels.lastIndex.coerceAtLeast(1)
+                        throughputModulationLabels.indices.forEach { index ->
+                            drawCircle(
+                                color = Color.Gray.copy(alpha = 0.6f),
+                                radius = 4.dp.toPx(),
+                                center = Offset(index * stepWidth, centerY)
+                            )
+                        }
+                    }
+                }
+            )
+        } else {
+            Slider(
+                value = coercedIndex.toFloat(),
+                onValueChange = onSliderChange,
+                valueRange = 0f..throughputModulationLabels.lastIndex.toFloat(),
+                steps = (throughputModulationLabels.size - 2).coerceAtLeast(0)
+            )
+        }
+    }
+}
+
+private data class ThroughputPresetDefault(
+    val id: String,
+    val label: @Composable () -> String
+)
+
+private data class ThroughputBandDefaultGroup(
+    val title: String,
+    val bands: List<ThroughputBandDefault>
+)
+
+private data class ThroughputBandDefault(
+    val prefSuffix: String,
+    val label: String
+)
+
+private val throughputModulationLabels = listOf("QPSK", "16-QAM", "64-QAM", "256-QAM")
+
+private val throughputPresetDefaults = listOf(
+    ThroughputPresetDefault("conservative") { AppStrings.get("Prudent", "Conservative", "Prudente") },
+    ThroughputPresetDefault("standard") { AppStrings.get("Standard", "Standard", "Padrão") },
+    ThroughputPresetDefault("ideal") { AppStrings.get("Idéal", "Ideal", "Ideal") },
+    ThroughputPresetDefault("custom") { AppStrings.get("Personnalisé", "Custom", "Personalizado") }
+)
+
+private val throughputBandDefaults = listOf(
+    ThroughputBandDefaultGroup(
+        title = "4G",
+        bands = listOf(
+            ThroughputBandDefault("4g_2600", "2600 MHz (B7)"),
+            ThroughputBandDefault("4g_2100", "2100 MHz (B1)"),
+            ThroughputBandDefault("4g_1800", "1800 MHz (B3)"),
+            ThroughputBandDefault("4g_900", "900 MHz (B8)"),
+            ThroughputBandDefault("4g_800", "800 MHz (B20)"),
+            ThroughputBandDefault("4g_700", "700 MHz (B28)")
+        )
+    ),
+    ThroughputBandDefaultGroup(
+        title = "5G",
+        bands = listOf(
+            ThroughputBandDefault("5g_3500", "3500 MHz (N78)"),
+            ThroughputBandDefault("5g_2100", "2100 MHz (N1)"),
+            ThroughputBandDefault("5g_700", "700 MHz (N28)")
+        )
+    )
+)
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SupportSettingsSheet(
@@ -902,7 +1497,7 @@ fun SupportSettingsSheet(
 
             Spacer(modifier = Modifier.height(24.dp))
             TextButton(onClick = {
-                onOrderChange(listOf("map", "details", "photos", "nav", "share", "open_map", "operators"))
+                onOrderChange(listOf("map", "details", "photos", "open_map", "nav", "share", "operators"))
                 onMapChange(true)
                 onDetailsChange(true)
                 onPhotosChange(true)
@@ -933,6 +1528,7 @@ fun SiteSettingsSheet(
     showIds: Boolean, onIdsChange: (Boolean) -> Unit,
     showOpenMap: Boolean, onOpenMapChange: (Boolean) -> Unit,
     showElevationProfile: Boolean, onElevationProfileChange: (Boolean) -> Unit,
+    showThroughputCalculator: Boolean, onThroughputCalculatorChange: (Boolean) -> Unit,
     showNav: Boolean, onNavChange: (Boolean) -> Unit,
     showShare: Boolean, onShareChange: (Boolean) -> Unit,
     showDates: Boolean, onDatesChange: (Boolean) -> Unit,
@@ -1034,6 +1630,7 @@ fun SiteSettingsSheet(
                             "ids" -> DraggableSwitchCard(AppStrings.siteIdsOption, showIds, onIdsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "open_map" -> DraggableSwitchCard(AppStrings.siteOpenMapOption, showOpenMap, onOpenMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "elevation_profile" -> DraggableSwitchCard(AppStrings.siteElevationProfileOption, showElevationProfile, onElevationProfileChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "throughput_calculator" -> DraggableSwitchCard(AppStrings.siteThroughputCalculatorOption, showThroughputCalculator, onThroughputCalculatorChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "nav" -> DraggableSwitchCard(AppStrings.siteNavOption, showNav, onNavChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "share" -> DraggableSwitchCard(AppStrings.siteShareOption, showShare, onShareChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "dates" -> DraggableSwitchCard(AppStrings.siteDatesOption, showDates, onDatesChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
@@ -1052,7 +1649,7 @@ fun SiteSettingsSheet(
 
             Spacer(modifier = Modifier.height(24.dp))
             TextButton(onClick = {
-                onOrderChange(listOf("operator", "bearing_height", "map", "support_details", "open_map", "elevation_profile", "photos", "speedtest", "nav", "share", "panel_heights", "ids", "dates", "address", "status", "freqs", "links"))
+                onOrderChange(listOf("operator", "bearing_height", "map", "support_details", "elevation_profile", "throughput_calculator", "open_map", "photos", "speedtest", "nav", "share", "panel_heights", "ids", "dates", "address", "status", "freqs", "links"))
                 onOperatorChange(true)
                 onBearingHeightChange(true)
                 onMapChange(true)
@@ -1063,6 +1660,7 @@ fun SiteSettingsSheet(
                 onIdsChange(true)
                 onOpenMapChange(true)
                 onElevationProfileChange(true)
+                onThroughputCalculatorChange(true)
                 onNavChange(true)
                 onShareChange(true)
                 onDatesChange(true)

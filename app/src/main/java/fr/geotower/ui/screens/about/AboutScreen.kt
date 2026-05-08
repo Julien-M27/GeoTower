@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -69,6 +71,8 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -88,6 +92,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.navigationBarsPadding
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
+import kotlin.math.roundToInt
 
 @Composable
 fun AboutScreen(navController: NavController) {
@@ -113,6 +118,11 @@ fun AboutScreen(navController: NavController) {
     val configuration = LocalConfiguration.current
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val sectionBringIntoViewRequesters = remember { List(6) { BringIntoViewRequester() } }
+    val sectionContentPositions = remember { mutableStateMapOf<Int, Float>() }
+    val sectionContentHeights = remember { mutableStateMapOf<Int, Float>() }
+    var scrollViewportTop by remember { mutableFloatStateOf(0f) }
+    var scrollViewportHeight by remember { mutableFloatStateOf(0f) }
 
     // --- 1. LECTURE RÉACTIVE DU THÈME (Comme sur l'accueil) ---
     val themeMode by AppConfig.themeMode
@@ -164,25 +174,88 @@ fun AboutScreen(navController: NavController) {
         Triple(AppStrings.aboutDev, Icons.Default.EditNote, 5)
     )
 
+    suspend fun alignAnchorToViewportTop(anchorContentY: Float?) {
+        if (anchorContentY == null || anchorContentY.isNaN() || scrollState.maxValue <= 0) return
+        val target = anchorContentY.roundToInt().coerceIn(0, scrollState.maxValue)
+        scrollState.animateScrollTo(target)
+    }
+
+    val sectionContentSnapshot = sectionContentPositions.toMap()
+    val sectionHeightSnapshot = sectionContentHeights.toMap()
+    val sectionAnchorModifiers = sectionBringIntoViewRequesters.mapIndexed { index, requester ->
+        Modifier
+            .bringIntoViewRequester(requester)
+            .onGloballyPositioned { coordinates ->
+                sectionContentPositions[index] =
+                    coordinates.positionInRoot().y - scrollViewportTop + scrollState.value
+                sectionContentHeights[index] = coordinates.size.height.toFloat()
+            }
+    }
+
     // --- LOGIQUE DE SYNCHRONISATION FLUIDE ---
-    if (isWideScreen && navMode == 0) {
-        LaunchedEffect(scrollState.value, scrollState.maxValue) {
-            val maxScroll = scrollState.maxValue.toFloat()
-            val currentScroll = scrollState.value.toFloat()
+    if (navMode == 0) {
+        LaunchedEffect(scrollState.value, sectionContentSnapshot, sectionHeightSnapshot, scrollViewportHeight) {
+            val sortedSections = sectionContentSnapshot
+                .filterKeys { it in menuItems.indices }
+                .toList()
+                .sortedBy { it.second }
 
-            if (maxScroll == 0f) {
-                activeSectionIndex = 0
-            } else {
-                val ratio = currentScroll / maxScroll
+            if (sortedSections.size >= menuItems.size && sectionHeightSnapshot.size >= menuItems.size) {
+                val viewportHeight = scrollViewportHeight.coerceAtLeast(1f)
+                val viewportStart = scrollState.value.toFloat()
+                val viewportEnd = viewportStart + viewportHeight
+                val focusStart = viewportStart + viewportHeight * 0.18f
+                val focusEnd = viewportStart + viewportHeight * 0.82f
+                val versionsIndex = menuItems[4].third
+                val developmentIndex = menuItems.last().third
 
-                activeSectionIndex = when {
-                    ratio >= 0.98f -> 4
-                    ratio < 0.20f -> 0
-                    ratio < 0.45f -> 1
-                    ratio < 0.70f -> 2
-                    ratio < 0.95f -> 3
-                    else -> 4
+                fun isSectionFullyVisible(index: Int): Boolean {
+                    val sectionStart = sectionContentSnapshot[index]
+                    val sectionEnd = sectionStart?.plus(sectionHeightSnapshot[index] ?: 0f)
+                    return sectionStart != null &&
+                        sectionEnd != null &&
+                        sectionStart >= viewportStart - 1f &&
+                        sectionEnd <= viewportEnd + 1f
                 }
+
+                val isVersionsFullyVisible = isSectionFullyVisible(versionsIndex)
+                val isDevelopmentFullyVisible = isSectionFullyVisible(developmentIndex)
+
+                val nextSection = if (scrollState.value <= 2) {
+                    sortedSections.first().first
+                } else if (isVersionsFullyVisible && (activeSectionIndex < versionsIndex || !isDevelopmentFullyVisible)) {
+                    versionsIndex
+                } else if (isDevelopmentFullyVisible) {
+                    developmentIndex
+                } else {
+                    sortedSections
+                        .mapIndexed { sectionIndex, section ->
+                            val sectionStart = section.second
+                            val measuredEnd = sectionStart + (sectionHeightSnapshot[section.first] ?: 0f)
+                            val nextStart = sortedSections.getOrNull(sectionIndex + 1)?.second
+                            val sectionEnd = maxOf(measuredEnd, nextStart ?: measuredEnd)
+                            val focusOverlap = (minOf(sectionEnd, focusEnd) - maxOf(sectionStart, focusStart))
+                                .coerceAtLeast(0f)
+                            val visibleOverlap = (minOf(sectionEnd, viewportEnd) - maxOf(sectionStart, viewportStart))
+                                .coerceAtLeast(0f)
+                            val titleBonus = if (sectionStart in viewportStart..viewportEnd) viewportHeight * 0.18f else 0f
+                            val score = focusOverlap * 2f + visibleOverlap * 0.5f + titleBonus
+                            section.first to score
+                        }
+                        .maxByOrNull { it.second }
+                        ?.first
+                        ?: activeSectionIndex
+                }
+
+                if (activeSectionIndex != nextSection) {
+                    activeSectionIndex = nextSection
+                }
+            } else {
+                sectionContentSnapshot
+                    .filterKeys { it in menuItems.indices }
+                    .minByOrNull { it.value }
+                    ?.key
+                    ?.let { activeSectionIndex = it }
             }
         }
     }
@@ -244,13 +317,11 @@ fun AboutScreen(navController: NavController) {
                                 onClick = {
                                     activeSectionIndex = index
                                     if (navMode == 0) {
-                                        val targetScroll = when(index) {
-                                            0 -> 0
-                                            1 -> 350
-                                            2 -> 1000
-                                            else -> 1450
+                                        scope.launch {
+                                            sectionBringIntoViewRequesters[index].bringIntoView()
+                                            kotlinx.coroutines.delay(80)
+                                            alignAnchorToViewportTop(sectionContentPositions[index])
                                         }
-                                        scope.launch { scrollState.animateScrollTo(targetScroll) }
                                     }
                                 }
                             )
@@ -270,10 +341,13 @@ fun AboutScreen(navController: NavController) {
                             onClick = {
                                 safeClick {
                                     try {
+                                        val currentDestinationId = navController.currentDestination?.id
                                         navController.navigate("settings") {
                                             launchSingleTop = true
-                                            popUpTo(navController.graph.startDestinationId) {
-                                                saveState = true
+                                            if (currentDestinationId != null) {
+                                                popUpTo(currentDestinationId) {
+                                                    inclusive = true
+                                                }
                                             }
                                         }
                                     } catch (e: IllegalArgumentException) {
@@ -341,6 +415,10 @@ fun AboutScreen(navController: NavController) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
+                            .onGloballyPositioned { coordinates ->
+                                scrollViewportTop = coordinates.positionInRoot().y
+                                scrollViewportHeight = coordinates.size.height.toFloat()
+                            }
                             .then(if (navMode == 0 || !isExpanded) Modifier.aboutFadingEdge(scrollState) else Modifier)
                             .then(if (navMode == 0 || !isExpanded) Modifier.verticalScroll(scrollState) else Modifier)
                             .padding(horizontal = if (isExpanded) 48.dp else 24.dp)
@@ -349,7 +427,19 @@ fun AboutScreen(navController: NavController) {
                     ) {
                         if (navMode == 0 || !isExpanded) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                AllAboutContent(appTitle, appVersion, logoResId, cardShape, bubbleBaseColor)
+                                AllAboutContent(
+                                    appTitle,
+                                    appVersion,
+                                    logoResId,
+                                    cardShape,
+                                    bubbleBaseColor,
+                                    sectionAnchorModifiers[0],
+                                    sectionAnchorModifiers[1],
+                                    sectionAnchorModifiers[2],
+                                    sectionAnchorModifiers[3],
+                                    sectionAnchorModifiers[4],
+                                    sectionAnchorModifiers[5]
+                                )
                                 Spacer(modifier = Modifier.height(60.dp))
                             }
                         } else {
@@ -423,22 +513,64 @@ fun AboutTopBar(onBack: () -> Unit) {
 // ============================================================
 
 @Composable
-fun AllAboutContent(appTitle: String, appVersion: String, logoResId: Int, cardShape: Shape, bubbleColor: Color) {
-    SectionPresentation(appTitle, appVersion, logoResId)
+fun AllAboutContent(
+    appTitle: String,
+    appVersion: String,
+    logoResId: Int,
+    cardShape: Shape,
+    bubbleColor: Color,
+    presentationModifier: Modifier = Modifier,
+    newsModifier: Modifier = Modifier,
+    privacyModifier: Modifier = Modifier,
+    sourcesModifier: Modifier = Modifier,
+    versionsModifier: Modifier = Modifier,
+    developmentModifier: Modifier = Modifier
+) {
+    Column(
+        modifier = presentationModifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        SectionPresentation(appTitle, appVersion, logoResId)
+    }
     Spacer(modifier = Modifier.height(48.dp))
-    SectionNouveautes(appVersion, cardShape, bubbleColor)
+    Column(
+        modifier = newsModifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        SectionNouveautes(appVersion, cardShape, bubbleColor)
+    }
     Spacer(modifier = Modifier.height(48.dp))
 
     // --- NOUVEAU ---
-    SectionConfidentialite(cardShape, bubbleColor)
+    Column(
+        modifier = privacyModifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        SectionConfidentialite(cardShape, bubbleColor)
+    }
     Spacer(modifier = Modifier.height(48.dp))
     // ---------------
 
-    SectionSources(cardShape, bubbleColor)
+    Column(
+        modifier = sourcesModifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        SectionSources(cardShape, bubbleColor)
+    }
     Spacer(modifier = Modifier.height(48.dp))
-    SectionVersions(cardShape, bubbleColor)
+    Column(
+        modifier = versionsModifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        SectionVersions(cardShape, bubbleColor)
+    }
     Spacer(modifier = Modifier.height(16.dp))
-    SectionDeveloppement()
+    Column(
+        modifier = developmentModifier.fillMaxWidth(),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        SectionDeveloppement()
+    }
 }
 
 @Composable
@@ -460,10 +592,31 @@ fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) 
     val releaseNotes: Map<String, List<Any>> = mapOf(
         "Interface & Design" to listOf(
             "Global :" to listOf(
-                "Correction de certaines animations",
+                "Correction des notifications de téléchargement des bases de données et cartes",
+                "Correction de certains éléments pour les rendre compatibles avec le système de mesure impérial"
+            ),
+            "Page d'accueil :" to listOf(
+                "Ajout d'un nouvel écran nommé Aides"
+            ),
+            "Antennes à proximités :" to listOf(
+                "Ajout des filtres rapides",
+                "Correction de certaines recherches qui n'aboutissaient pas"
+            ),
+            "Détails du support :" to listOf(
+                "Ajout d'un bouton pour ouvrir la carte"
             ),
             "Détail des sites :" to listOf(
-                "Ajout du profil altimétrique"
+                "Ajout du profil altimétrique",
+                "Ajout du calculateur de débit théoriques",
+                "Ajout d'un bouton pour ouvrir la carte",
+                "Ajout de l'écran coupé en deux pour le profil altimétrique ainsi que le calculateur de débits théoriques"
+            ),
+            "A propos :" to listOf(
+                "Correction de l'affichage pour les folds"
+            ),
+            "Paramètres :" to listOf(
+                "Ajout de la personnalisation de nouvelles pages comme celle des débits théoriques",
+                "Correction de l'affichage pour les folds"
             )
         )
     )

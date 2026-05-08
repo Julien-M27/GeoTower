@@ -25,6 +25,7 @@ import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.AppConfig
 import fr.geotower.ui.screens.emitters.formatDateToFrench
+import kotlin.math.roundToInt
 
 @Composable
 fun SiteFrequenciesBlock(
@@ -148,8 +149,7 @@ fun SiteFrequenciesBlock(
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                                 // ✅ NOUVEAU : Formatage propre "4G 700" ici aussi
-                                val rawTechnoName = band.rawFreq.substringBefore(":").trim()
-                                val technoName = if (band.gen in 2..5 && band.value > 0) "${band.gen}G ${band.value}" else rawTechnoName
+                                val technoName = displayFrequencyBandLabel(band)
 
                                 Text(
                                     text = "• $technoName",
@@ -257,7 +257,7 @@ fun SiteFrequenciesBlock(
                                                 if (restPart.isNotEmpty()) "$safeType : $restPart" else safeType
 
                                             Text(
-                                                text = finalPhysText, // Ex: "Panel : 120° (15.5m)"
+                                                text = formatFrequencyPhysicalDetailsForUnit(finalPhysText), // Ex: "Panel : 120° (15.5m)"
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 fontWeight = FontWeight.Medium,
                                                 fontSize = 12.sp
@@ -346,14 +346,14 @@ fun parseAndSortFrequencies(freqStr: String?, txtUnknown: String, txtAzimuthNotS
 private fun bandEquivalentLabel(gen: Int, value: Int): String? {
     return when (gen) {
         5 -> when (value) {
-            700 -> "n28"
-            800 -> "n20"
-            900 -> "n8"
-            1800 -> "n3"
-            2100 -> "n1"
-            2600 -> "n7"
-            3500 -> "n78"
-            26000 -> "n258"
+            700 -> "N28"
+            800 -> "N20"
+            900 -> "N8"
+            1800 -> "N3"
+            2100 -> "N1"
+            2600 -> "N7"
+            3500 -> "N78"
+            26000 -> "N258"
             else -> null
         }
         4 -> when (value) {
@@ -379,6 +379,38 @@ private fun bandEquivalentLabel(gen: Int, value: Int): String? {
         else -> null
     }
 }
+
+private fun displayFrequencyBandLabel(band: FreqBand): String {
+    if (band.gen in 2..5 && band.value > 0) {
+        val base = "${band.gen}G ${band.value} MHz"
+        return bandEquivalentLabel(band.gen, band.value)?.let { "$base ($it)" } ?: base
+    }
+    return band.rawFreq.substringBefore(":").trim().ifBlank { band.rawFreq }
+}
+
+private fun formatFrequencyPhysicalDetailsForUnit(text: String): String {
+    if (AppConfig.distanceUnit.intValue != 1) return text
+    return frequencyHeightMetersRegex.replace(text) { match ->
+        val meters = match.groupValues[1].replace(',', '.').toDoubleOrNull()
+        "(${formatFrequencyHeightMeters(meters)})"
+    }
+}
+
+private fun formatFrequencyHeightForUnit(rawHeight: String): String {
+    if (AppConfig.distanceUnit.intValue != 1) return rawHeight
+    val trimmed = rawHeight.trim()
+    if (trimmed == "-" || trimmed.contains("ft", ignoreCase = true)) return rawHeight
+    val meters = Regex("""[0-9]+(?:[.,][0-9]+)?""").find(trimmed)?.value?.replace(',', '.')?.toDoubleOrNull()
+        ?: return rawHeight
+    return formatFrequencyHeightMeters(meters)
+}
+
+private fun formatFrequencyHeightMeters(meters: Double?): String {
+    if (meters == null) return "--"
+    return "${(meters * 3.28084).roundToInt()} ft"
+}
+
+private val frequencyHeightMetersRegex = Regex("""\(([0-9]+(?:[.,][0-9]+)?)\s*m\)""", RegexOption.IGNORE_CASE)
 
 // ==========================================
 // 🚀 NOUVEAU DESIGN EN GRILLE (EXPERT)
@@ -451,7 +483,7 @@ fun FrequenciesGridView(
 
             // Lignes de données
             parsedBands.forEachIndexed { index, band ->
-                val technoName = band.rawFreq.substringBefore(":").trim()
+                val technoName = displayFrequencyBandLabel(band)
                 val dateFormatted = fr.geotower.ui.screens.emitters.formatDateToFrench(band.date)
                 val dateDisplay =
                     if (dateFormatted.isNotBlank() && dateFormatted != "-") dateFormatted else txtDateNotSpecifiedAnfr
@@ -521,9 +553,8 @@ fun FrequenciesGridView(
 
     parsedBands.forEach { band ->
         // ✅ NOUVEAU : Formatage propre "4G 700"
-        val rawTechnoName = band.rawFreq.substringBefore(":").trim()
-        val technoName = if (band.gen in 2..5 && band.value > 0) "${band.gen}G ${band.value}" else rawTechnoName
-        val bandEquivalent = bandEquivalentLabel(band.gen, band.value)
+        val technoName = displayFrequencyBandLabel(band)
+        val bandEquivalent = null
 
         val freqs = band.rawFreq.substringAfter(":", "").trim()
 
@@ -558,9 +589,10 @@ fun FrequenciesGridView(
                 val azimut =
                     details.substringBefore("(").replace("°", "").trim().takeIf { it.isNotBlank() }
                         ?: "-"
-                val hauteur =
+                val rawHauteur =
                     if (details.contains("(")) details.substringAfter("(").substringBefore(")")
                         .trim() else "-"
+                val hauteur = formatFrequencyHeightForUnit(rawHauteur)
 
                 groupedAntennas.getOrPut(azimut) { mutableMapOf() }
                     .getOrPut(hauteur) { mutableListOf() }

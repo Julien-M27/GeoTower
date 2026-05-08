@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,6 +23,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Info
@@ -32,6 +34,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -67,6 +70,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import kotlinx.coroutines.launch
@@ -78,6 +82,15 @@ fun HomeScreen(navController: NavController) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope() // ✅ AJOUT CRUCIAL ICI
     val logoResId by AppIconManager.currentIconRes
+    var lastClickTime by remember { mutableLongStateOf(0L) }
+
+    fun safeClick(action: () -> Unit) {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastClickTime > 700L) {
+            lastClickTime = currentTime
+            action()
+        }
+    }
 
     // ---> 1. LECTURE DU CHOIX DU LOGO D'ACCUEIL <---
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
@@ -260,93 +273,118 @@ fun HomeScreen(navController: NavController) {
                 val isExpanded = maxWidth >= 600.dp
                 // Hauteur minimale pour forcer l'espace entre le titre, les boutons et le "À propos"
                 val minHeight = maxHeight
+                val showHelpButton = prefs.getBoolean("show_home_help", true)
+                val helpButtonPosition = prefs.getString("home_help_position", "bottom_end") ?: "bottom_end"
+                val helpButtonAlignment = when (helpButtonPosition) {
+                    "top_start" -> Alignment.TopStart
+                    "top_end" -> Alignment.TopEnd
+                    "bottom_start" -> Alignment.BottomStart
+                    else -> Alignment.BottomEnd
+                }
 
-                if (isExpanded) {
-                    // --- DISPOSITION FOLD (TABLETTE) ---
-                    val prefsFold = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-                    val showLogo = prefsFold.getBoolean("show_home_logo", true)
+                Box(modifier = Modifier.fillMaxSize()) {
+                    if (isExpanded) {
+                        // --- DISPOSITION FOLD (TABLETTE) ---
+                        val prefsFold = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+                        val showLogo = prefsFold.getBoolean("show_home_logo", true)
 
-                    // ✅ CORRECTION : Si pas de logo OU pas de réseau OU BANDEAU AFFICHE, on passe en mode Grille
-                    val isGrid = !showLogo || !isOnline || isDbBannerVisible
+                        // ✅ CORRECTION : Si pas de logo OU pas de réseau OU BANDEAU AFFICHE, on passe en mode Grille
+                        val isGrid = !showLogo || !isOnline || isDbBannerVisible
 
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = minHeight)
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 32.dp, vertical = 24.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Spacer(modifier = Modifier.weight(1f))
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = minHeight)
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = 32.dp, vertical = 24.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Spacer(modifier = Modifier.weight(1f))
 
-                        // 📦 BLOC CENTRAL "SOUDÉ" (Titre + Menu)
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "GeoTower",
-                                style = MaterialTheme.typography.displayLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 64.sp,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)
-                            )
+                            // 📦 BLOC CENTRAL "SOUDÉ" (Titre + Menu)
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "GeoTower",
+                                    style = MaterialTheme.typography.displayLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 64.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)
+                                )
 
-                            if (isGrid) {
-                                // --- DISPOSITION EN GRILLE ---
-                                MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !isDbBannerVisible, displayLogoResId, isExpanded, isDbReady = isDbReady, isGrid = true)
-                            } else {
-                                // --- DISPOSITION CÔTE À CÔTE (Classique) ---
-                                Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                    Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                                        DrawableImage(
-                                            resId = displayLogoResId,
-                                            modifier = Modifier.size(280.dp).clip(RoundedCornerShape(32.dp))
-                                        )
-                                    }
-                                    Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                                        // ✅ CORRECTION : On passe "isOnline && !isDbBannerVisible" pour forcer le masquage du logo sur tous les appareils si besoin
-                                        MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !isDbBannerVisible, displayLogoResId, isExpanded, isDbReady = isDbReady, isGrid = false)
+                                if (isGrid) {
+                                    // --- DISPOSITION EN GRILLE ---
+                                    MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !isDbBannerVisible, displayLogoResId, isExpanded, isDbReady = isDbReady, isGrid = true)
+                                } else {
+                                    // --- DISPOSITION CÔTE À CÔTE (Classique) ---
+                                    Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                            DrawableImage(
+                                                resId = displayLogoResId,
+                                                modifier = Modifier.size(280.dp).clip(RoundedCornerShape(32.dp))
+                                            )
+                                        }
+                                        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                            // ✅ CORRECTION : On passe "isOnline && !isDbBannerVisible" pour forcer le masquage du logo sur tous les appareils si besoin
+                                            MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !isDbBannerVisible, displayLogoResId, isExpanded, isDbReady = isDbReady, isGrid = false)
+                                        }
                                     }
                                 }
                             }
+
+                            Spacer(modifier = Modifier.weight(1f))
+
+                            Spacer(modifier = Modifier.height(32.dp))
+                            AboutSection(navController, appVersion, paleColor)
                         }
+                    } else {
+                        // --- DISPOSITION SMARTPHONE ---
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .heightIn(min = minHeight)
+                                .verticalScroll(rememberScrollState())
+                                .padding(horizontal = 24.dp, vertical = 8.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Spacer(modifier = Modifier.weight(1f))
 
-                        Spacer(modifier = Modifier.weight(1f))
+                            // 📦 BLOC CENTRAL "SOUDÉ" (Titre + Menu)
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    text = "GeoTower",
+                                    style = MaterialTheme.typography.displayLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = 48.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)
+                                )
+                                // ✅ CORRECTION : On passe la condition ici aussi pour le téléphone
+                                MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !isDbBannerVisible, displayLogoResId, isExpanded, isDbReady = isDbReady, isGrid = false)
+                            }
 
-                        Spacer(modifier = Modifier.height(32.dp))
-                        AboutSection(navController, appVersion, paleColor)
+                            Spacer(modifier = Modifier.weight(1f))
+
+                            AboutSection(navController, appVersion, paleColor)
+                            Spacer(modifier = Modifier.height(24.dp))
+                        }
                     }
-                } else {
-                    // --- DISPOSITION SMARTPHONE ---
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(min = minHeight)
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 24.dp, vertical = 8.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Spacer(modifier = Modifier.weight(1f))
 
-                        // 📦 BLOC CENTRAL "SOUDÉ" (Titre + Menu)
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(
-                                text = "GeoTower",
-                                style = MaterialTheme.typography.displayLarge,
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.primary,
-                                fontSize = 48.sp,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)
-                            )
-                            // ✅ CORRECTION : On passe la condition ici aussi pour le téléphone
-                            MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !isDbBannerVisible, displayLogoResId, isExpanded, isDbReady = isDbReady, isGrid = false)
+                    if (showHelpButton) {
+                        FloatingActionButton(
+                            onClick = { safeClick { navController.navigate("help") { launchSingleTop = true } } },
+                            containerColor = paleColor,
+                            contentColor = onPaleColor,
+                            modifier = Modifier
+                                .align(helpButtonAlignment)
+                                .padding(20.dp)
+                                .navigationBarsPadding()
+                                .zIndex(2f)
+                        ) {
+                            Icon(Icons.AutoMirrored.Filled.Help, contentDescription = AppStrings.homeHelpSettings)
                         }
-
-                        Spacer(modifier = Modifier.weight(1f))
-
-                        AboutSection(navController, appVersion, paleColor)
-                        Spacer(modifier = Modifier.height(24.dp))
                     }
                 }
             }

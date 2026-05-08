@@ -148,6 +148,33 @@ interface GeoTowerDao {
     @Query("SELECT * FROM localisation WHERE id_anfr LIKE '%' || :query || '%' OR id_anfr IN (SELECT id_anfr FROM physique WHERE id_support LIKE '%' || :query || '%') LIMIT 50")
     suspend fun searchAntennasById(query: String): List<LocalisationEntity>
 
+    @Query("""
+        SELECT DISTINCT l.* FROM localisation l
+        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
+        LEFT JOIN physique p ON l.id_anfr = p.id_anfr
+        WHERE l.id_anfr LIKE '%' || :query || '%'
+           OR UPPER(COALESCE(l.operateur, '')) LIKE '%' || UPPER(:query) || '%'
+           OR UPPER(COALESCE(l.code_insee, '')) LIKE '%' || UPPER(:query) || '%'
+           OR UPPER(COALESCE(l.filtres, '')) LIKE '%' || UPPER(:query) || '%'
+           OR UPPER(COALESCE(t.technologies, '')) LIKE '%' || UPPER(:query) || '%'
+           OR UPPER(COALESCE(t.details_frequences, '')) LIKE '%' || UPPER(:query) || '%'
+           OR UPPER(COALESCE(t.adresse, '')) LIKE '%' || UPPER(:query) || '%'
+           OR UPPER(COALESCE(p.id_support, '')) LIKE '%' || UPPER(:query) || '%'
+           OR UPPER(COALESCE(p.nature_support, '')) LIKE '%' || UPPER(:query) || '%'
+           OR UPPER(COALESCE(p.proprietaire, '')) LIKE '%' || UPPER(:query) || '%'
+           OR UPPER(COALESCE(p.azimuts_et_types, '')) LIKE '%' || UPPER(:query) || '%'
+        LIMIT :limit
+    """)
+    suspend fun searchAntennasByText(query: String, limit: Int): List<LocalisationEntity>
+
+    @Query("""
+        SELECT DISTINCT l.* FROM localisation l
+        INNER JOIN technique t ON l.id_anfr = t.id_anfr
+        WHERE UPPER(COALESCE(t.adresse, '')) LIKE '%' || UPPER(:query) || '%'
+        LIMIT :limit
+    """)
+    suspend fun searchAntennasByAddress(query: String, limit: Int): List<LocalisationEntity>
+
     // ✅ CORRECTION : On compare les valeurs numériquement pour ignorer les zéros au début !
     @Query("SELECT * FROM localisation WHERE CAST(id_anfr AS INTEGER) = CAST(:exactId AS INTEGER) OR id_anfr IN (SELECT id_anfr FROM physique WHERE CAST(id_support AS INTEGER) = CAST(:exactId AS INTEGER))")
     suspend fun getAntennasByExactId(exactId: String): List<LocalisationEntity>

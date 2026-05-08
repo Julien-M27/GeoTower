@@ -25,8 +25,11 @@ data class ElevationProfileShareTexts(
     val title: String,
     val distance: String,
     val supportHeight: String,
+    val supportHeightDetail: String,
     val startAltitude: String,
+    val startAltitudeDetail: String,
     val siteAltitude: String,
+    val siteAltitudeDetail: String,
     val frequency: String,
     val directLine: String,
     val fresnelZone: String,
@@ -38,6 +41,12 @@ data class ElevationProfileShareTexts(
     val ignSource: String,
     val generatedBy: String,
     val unknown: String
+)
+
+private data class ProfileMetric(
+    val label: String,
+    val value: String,
+    val detail: String? = null
 )
 
 fun createElevationProfileShareBitmap(
@@ -106,25 +115,42 @@ fun createElevationProfileShareBitmap(
     )
 
     y = 780f
-    val metricCardHeight = 132f
+    val metricCardHeight = 170f
     val metricGap = 20f
     val metricWidth = (width - 96f - metricGap) / 2f
+    val startHeightMeters = profile.points.first().elevation + ELEVATION_USER_EYE_HEIGHT_METERS
+    val arrivalHeightMeters = supportHeightMeters?.let { profile.points.last().elevation + it }
     val metrics = listOf(
-        texts.distance to formatElevationProfileDistance(profile.distanceMeters),
-        texts.supportHeight to (supportHeightMeters?.let { "${it.roundToInt()} m" } ?: "--"),
-        texts.startAltitude to "${profile.points.first().elevation.roundToInt()} m",
-        texts.siteAltitude to "${profile.points.last().elevation.roundToInt()} m",
-        texts.frequency to "$frequencyMHz MHz"
+        ProfileMetric(texts.distance, formatElevationProfileDistance(profile.distanceMeters)),
+        ProfileMetric(
+            label = texts.supportHeight,
+            value = supportHeightMeters?.let { "${it.roundToInt()} m" } ?: "--",
+            detail = texts.supportHeightDetail
+        ),
+        ProfileMetric(
+            label = texts.startAltitude,
+            value = "${startHeightMeters.roundToInt()} m",
+            detail = texts.startAltitudeDetail
+        ),
+        ProfileMetric(
+            label = texts.siteAltitude,
+            value = arrivalHeightMeters?.let { "${it.roundToInt()} m" } ?: "--",
+            detail = texts.siteAltitudeDetail
+        ),
+        ProfileMetric(texts.frequency, "$frequencyMHz MHz")
     )
 
-    metrics.forEachIndexed { index, (label, value) ->
+    metrics.forEachIndexed { index, metric ->
         val col = index % 2
         val row = index / 2
         val left = 48f + col * (metricWidth + metricGap)
         val top = y + row * (metricCardHeight + metricGap)
         drawRoundedCard(canvas, RectF(left, top, left + metricWidth, top + metricCardHeight), colors.card)
-        canvas.drawText(label, left + 26f, top + 45f, labelPaint)
-        canvas.drawText(value, left + 26f, top + 94f, valuePaint)
+        canvas.drawText(metric.label, left + 26f, top + 45f, labelPaint)
+        canvas.drawText(metric.value, left + 26f, top + 94f, valuePaint)
+        metric.detail?.let { detail ->
+            drawWrappedText(canvas, detail, left + 26f, top + 126f, metricWidth - 52f, smallPaint, 26f, colors.warning)
+        }
     }
 
     val statusTop = y + 3 * (metricCardHeight + metricGap) + 8f

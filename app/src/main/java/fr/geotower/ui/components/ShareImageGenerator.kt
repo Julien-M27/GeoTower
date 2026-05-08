@@ -64,6 +64,7 @@ import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity // ✅ NOUVEAU
 import fr.geotower.data.models.TechniqueEntity // ✅ NOUVEAU
 import fr.geotower.ui.screens.emitters.DEFAULT_ELEVATION_PROFILE_FREQUENCY_MHZ
+import fr.geotower.ui.screens.emitters.extractElevationProfileAntennaHeightsByFrequency
 import fr.geotower.ui.screens.emitters.extractElevationProfileFrequencies
 import fr.geotower.ui.screens.emitters.fetchIgnElevationProfileData
 import fr.geotower.ui.screens.emitters.formatDateToFrench
@@ -78,12 +79,30 @@ import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
 import java.util.Locale
+import kotlin.math.roundToInt
 import android.net.Uri
 import fr.geotower.ui.components.SiteStatusCard
 
 private fun Int.dpToPx(context: Context): Int = (this * context.resources.displayMetrics.density).toInt()
 
-private const val DEFAULT_SITE_SHARE_ORDER = "map,elevation_profile,support,ids,dates,address,speedtest,status,freq"
+private const val DEFAULT_SITE_SHARE_ORDER = "map,elevation_profile,support,ids,dates,address,speedtest,throughput,status,freq"
+
+private fun formatShareHeightMeters(heightMeters: Double?): String {
+    if (heightMeters == null) return "--"
+    return if (AppConfig.distanceUnit.intValue == 1) {
+        "${(heightMeters * 3.28084).roundToInt()} ft"
+    } else {
+        if (heightMeters % 1.0 == 0.0) "${heightMeters.toInt()} m" else String.format(Locale.US, "%.1f m", heightMeters)
+    }
+}
+
+private fun formatSharePanelHeightMeters(heightMeters: Double, distanceUnit: Int = AppConfig.distanceUnit.intValue): String {
+    return if (distanceUnit == 1) {
+        "${(heightMeters * 3.28084).roundToInt()} ft"
+    } else {
+        if (heightMeters % 1.0 == 0.0) "${heightMeters.toInt()} m" else String.format(Locale.US, "%.1f m", heightMeters)
+    }
+}
 
 private fun normalizeSiteShareOrder(rawOrder: String?): List<String> {
     return (rawOrder ?: DEFAULT_SITE_SHARE_ORDER)
@@ -99,6 +118,10 @@ private fun normalizeSiteShareOrder(rawOrder: String?): List<String> {
                 val addressIndex = indexOf("address")
                 if (addressIndex >= 0) add(addressIndex + 1, "speedtest") else add("speedtest")
             }
+            if (!contains("throughput")) {
+                val speedtestIndex = indexOf("speedtest")
+                if (speedtestIndex >= 0) add(speedtestIndex + 1, "throughput") else add("throughput")
+            }
             removeAll { it == "heights" }
         }
         .distinct()
@@ -113,7 +136,8 @@ private fun isOnlyElevationProfileSelected(
     incDates: Boolean,
     incAddress: Boolean,
     incFreqs: Boolean,
-    incSpeedtest: Boolean
+    incSpeedtest: Boolean,
+    incThroughput: Boolean
 ): Boolean {
     if (!incElevationProfile || !shareOrder.contains("elevation_profile")) return false
     return shareOrder.none { block ->
@@ -124,6 +148,7 @@ private fun isOnlyElevationProfileSelected(
             "dates" -> incDates
             "address" -> incAddress
             "speedtest" -> incSpeedtest
+            "throughput" -> incThroughput
             "status" -> AppConfig.shareSiteStatus.value
             "freq" -> incFreqs
             else -> false
@@ -234,6 +259,7 @@ fun shareFullAntennaCapture(
     incAddress: Boolean,
     incFreqs: Boolean,
     incSpeedtest: Boolean, // 🚨 NEW
+    incThroughput: Boolean,
     incConfidential: Boolean,
     incQrCode: Boolean,
     incSplitImage: Boolean,
@@ -249,6 +275,7 @@ fun shareFullAntennaCapture(
             MaterialTheme(colorScheme = if (forceDarkTheme) darkColorScheme() else lightColorScheme()) {
                 Surface(color = Color.Transparent) { // ⚠️ TRÈS IMPORTANT : Fond transparent pour ne pas colorer le vide
 
+                    val distanceUnit = AppConfig.distanceUnit.intValue
                     val formattedHeights = if (info.azimuts.isNullOrBlank()) ""
                     else {
                         val heights = info.azimuts?.split(",")
@@ -257,7 +284,7 @@ fun shareFullAntennaCapture(
                                     .toFloatOrNull()
                             }
                             ?.filter { it > 0f }?.distinct()?.sorted() ?: emptyList()
-                        if (heights.isNotEmpty()) heights.joinToString(" m - ") + " m" else ""
+                        if (heights.isNotEmpty()) heights.joinToString(" - ") { formatSharePanelHeightMeters(it.toDouble(), distanceUnit) } else ""
                     }
 
                     // ✅ DÉTECTION DU MODE SCINDÉ
@@ -378,7 +405,7 @@ fun shareFullAntennaCapture(
                                             )
                                             Spacer(Modifier.height(8.dp))
                                             Text(
-                                                "${physique?.hauteur ?: "--"} m",
+                                                formatShareHeightMeters(physique?.hauteur),
                                                 fontWeight = FontWeight.Bold
                                             )
                                         }
@@ -737,6 +764,19 @@ fun shareFullAntennaCapture(
                                                     }
                                                 }
                                             }
+                                        }
+                                    }
+
+                                    "throughput" -> {
+                                        if (incThroughput) {
+                                            ShareThroughputCalculatorBlock(
+                                                info = info,
+                                                technique = technique,
+                                                physique = physique,
+                                                prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE),
+                                                cardBgColor = MaterialTheme.colorScheme.surfaceVariant,
+                                                blockShape = RoundedCornerShape(12.dp)
+                                            )
                                         }
                                     }
 
@@ -1741,7 +1781,7 @@ fun shareFullSiteCapture(
                                                     val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: "Adresse non spécifiée"
                                                     val nature = physique?.natureSupport?.takeIf { it.isNotBlank() } ?: txtNotSpecified
                                                     val proprietaire = physique?.proprietaire?.takeIf { it.isNotBlank() } ?: "Inconnu"
-                                                    val hauteur = "${physique?.hauteur ?: "--"} m"
+                                                    val hauteur = formatShareHeightMeters(physique?.hauteur)
                                                     val idSupportValue = physique?.idSupport?.takeIf { it.isNotBlank() } ?: txtNotSpecified
 
                                                     Text(buildAnnotatedString { withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) { append("$txtIdNumber ") }; withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(idSupportValue) } }, fontSize = 14.sp)
@@ -1977,6 +2017,7 @@ fun AntennaShareMenu(
     var incDates by remember { mutableStateOf(prefs.getBoolean("share_dates_enabled", true)) }
     var incAddress by remember { mutableStateOf(prefs.getBoolean("share_address_enabled", true)) }
     var incSpeedtest by remember { mutableStateOf(prefs.getBoolean("share_speedtest_enabled", true)) } // 🚨 NEW
+    var incThroughput by remember { mutableStateOf(prefs.getBoolean("share_throughput_enabled", true)) }
     var incFreqs by remember { mutableStateOf(prefs.getBoolean("share_freq_enabled", true)) }
     var incConfidential by remember { mutableStateOf(prefs.getBoolean("share_confidential_enabled", false)) }
     var incQrCode by remember { mutableStateOf(prefs.getBoolean("share_site_qr_enabled", true)) }
@@ -1997,6 +2038,7 @@ fun AntennaShareMenu(
             incDates = prefs.getBoolean("share_dates_enabled", true)
             incAddress = prefs.getBoolean("share_address_enabled", true)
             incSpeedtest = prefs.getBoolean("share_speedtest_enabled", true) // 🚨 NEW
+            incThroughput = prefs.getBoolean("share_throughput_enabled", true)
             incFreqs = prefs.getBoolean("share_freq_enabled", true)
             incConfidential = prefs.getBoolean("share_confidential_enabled", false)
             incQrCode = prefs.getBoolean("share_site_qr_enabled", true)
@@ -2058,8 +2100,11 @@ fun AntennaShareMenu(
     val txtElevationProfileLoading = AppStrings.elevationProfileLoading
     val txtElevationProfileDistance = AppStrings.elevationProfileDistance
     val txtElevationProfileSupportHeight = AppStrings.elevationProfileSupportHeight
+    val txtElevationProfileSupportHeightDetail = AppStrings.elevationProfileSupportHeightDetail
     val txtElevationProfileStartAltitude = AppStrings.elevationProfileStartAltitude
+    val txtElevationProfileStartAltitudeDetail = AppStrings.elevationProfileStartAltitudeDetail
     val txtElevationProfileSiteAltitude = AppStrings.elevationProfileSiteAltitude
+    val txtElevationProfileSiteAltitudeDetail = AppStrings.elevationProfileSiteAltitudeDetail
     val txtElevationProfileFrequency = AppStrings.elevationProfileFrequency
     val txtElevationProfileDirectLineLabel = AppStrings.elevationProfileDirectLineLabel
     val txtElevationProfileFresnelLabel = AppStrings.elevationProfileFresnelLabel
@@ -2154,6 +2199,7 @@ fun AntennaShareMenu(
                                 "dates" -> Triple(AppStrings.shareDatesOption, incDates, { it: Boolean -> incDates = it })
                                 "address" -> Triple(AppStrings.shareAddressOption, incAddress, { it: Boolean -> incAddress = it })
                                 "speedtest" -> Triple(AppStrings.shareSpeedtestOption, incSpeedtest, { it: Boolean -> incSpeedtest = it })
+                                "throughput" -> Triple(AppStrings.shareThroughputOption, incThroughput, { it: Boolean -> incThroughput = it })
                                 "status" -> Triple(AppStrings.shareStatusOption, AppConfig.shareSiteStatus.value, { it: Boolean -> AppConfig.shareSiteStatus.value = it })
                                 "freq" -> Triple(AppStrings.shareFreqOption, incFreqs, { it: Boolean -> incFreqs = it })
                                 else -> Triple("", false, { _: Boolean -> })
@@ -2187,7 +2233,7 @@ fun AntennaShareMenu(
                         onClick = {
                             shareOrder = DEFAULT_SITE_SHARE_ORDER.split(",")
                             prefs.edit().putString("share_order", shareOrder.joinToString(",")).apply()
-                            incMap = true; incElevationProfile = true; incSupport = true; incIds = true; incDates = true; incAddress = true; incSpeedtest = true; incFreqs = true; incQrCode = true; incSplitImage = true
+                            incMap = true; incElevationProfile = true; incSupport = true; incIds = true; incDates = true; incAddress = true; incSpeedtest = true; incThroughput = true; incFreqs = true; incQrCode = true; incSplitImage = true
                             AppConfig.shareSiteStatus.value = true
                         },
                         modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -2200,13 +2246,15 @@ fun AntennaShareMenu(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     // ✅ INTERRUPTEUR : SCINDER L'IMAGE
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(AppStrings.splitShareImage, fontWeight = FontWeight.Bold, color = if(incSplitImage) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
-                            Text(AppStrings.splitShareImageDesc, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (incFreqs) {
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(AppStrings.splitShareImage, fontWeight = FontWeight.Bold, color = if(incSplitImage) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                                Text(AppStrings.splitShareImageDesc, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { OneUiSwitch(checked = incSplitImage, onCheckedChange = { incSplitImage = it; prefs.edit().putBoolean("share_split_image_enabled", it).apply() }) }
+                            else Switch(checked = incSplitImage, onCheckedChange = { incSplitImage = it; prefs.edit().putBoolean("share_split_image_enabled", it).apply() }, modifier = Modifier.scale(0.8f))
                         }
-                        if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { OneUiSwitch(checked = incSplitImage, onCheckedChange = { incSplitImage = it; prefs.edit().putBoolean("share_split_image_enabled", it).apply() }) }
-                        else Switch(checked = incSplitImage, onCheckedChange = { incSplitImage = it; prefs.edit().putBoolean("share_split_image_enabled", it).apply() }, modifier = Modifier.scale(0.8f))
                     }
 
                     // ✅ INTERRUPTEUR : QR CODE
@@ -2241,14 +2289,18 @@ fun AntennaShareMenu(
                                 incDates = incDates,
                                 incAddress = incAddress,
                                 incFreqs = incFreqs,
-                                incSpeedtest = incSpeedtest
+                                incSpeedtest = incSpeedtest,
+                                incThroughput = incThroughput
                             )
                             val elevationProfileTexts = ElevationProfileShareTexts(
                                 title = txtElevationProfileTitle,
                                 distance = txtElevationProfileDistance,
                                 supportHeight = txtElevationProfileSupportHeight,
+                                supportHeightDetail = txtElevationProfileSupportHeightDetail,
                                 startAltitude = txtElevationProfileStartAltitude,
+                                startAltitudeDetail = txtElevationProfileStartAltitudeDetail,
                                 siteAltitude = txtElevationProfileSiteAltitude,
+                                siteAltitudeDetail = txtElevationProfileSiteAltitudeDetail,
                                 frequency = txtElevationProfileFrequency,
                                 directLine = txtElevationProfileDirectLineLabel,
                                 fresnelZone = txtElevationProfileFresnelLabel,
@@ -2273,9 +2325,9 @@ fun AntennaShareMenu(
                                         val userLocation = withContext(Dispatchers.IO) {
                                             getElevationProfileLastKnownLocation(context)
                                         } ?: return@runCatching null
-                                        val frequency = extractElevationProfileFrequencies(
-                                            technique?.detailsFrequences?.takeIf { it.isNotBlank() } ?: info.frequences
-                                        ).firstOrNull() ?: DEFAULT_ELEVATION_PROFILE_FREQUENCY_MHZ
+                                        val rawElevationProfileFrequencies = technique?.detailsFrequences?.takeIf { it.isNotBlank() } ?: info.frequences
+                                        val frequency = extractElevationProfileFrequencies(rawElevationProfileFrequencies).firstOrNull() ?: DEFAULT_ELEVATION_PROFILE_FREQUENCY_MHZ
+                                        val antennaHeight = extractElevationProfileAntennaHeightsByFrequency(rawElevationProfileFrequencies)[frequency]
                                         val profile = withContext(Dispatchers.IO) {
                                             fetchIgnElevationProfileData(
                                                 fromLatitude = userLocation.latitude,
@@ -2287,7 +2339,7 @@ fun AntennaShareMenu(
                                         createElevationProfileShareBitmap(
                                             info = info,
                                             profile = profile,
-                                            supportHeightMeters = physique?.hauteur,
+                                            supportHeightMeters = antennaHeight ?: physique?.hauteur,
                                             frequencyMHz = frequency,
                                             forceDarkTheme = selectedShareTheme,
                                             texts = elevationProfileTexts
@@ -2319,7 +2371,7 @@ fun AntennaShareMenu(
                                                 distanceStr, bearingStr, selectedShareTheme,
                                                 txtSiteDetailsTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtGeneratedBy, txtShareSiteVia, txtimplementation, txtLastModification, txtIdentifiers, txtIdNumber, txtFrequenciesTitle, txtBandsNotSpecified, txtInService, txtTechnically, txtUnknownStatus, txtAnfrStationNumber, txtDates, txtError, txtProjectApproved, txtActivatedOn, txtDateNotSpecifiedAnfr, txtPanelHeightsTitle, txtAzimuths, txtIdSupportLabel, txtSupportDetailsTitle, txtSupportNature, txtOwner, txtAntennaType,
                                                 mapBmp, txtInitError, emptyList(), txtCommunityPhotosTitle,
-                                                incMap, incSupport, incHeights, incIds, incDates, incAddress, incFreqs, incSpeedtest, incConfidential, incQrCode,
+                                                incMap, incSupport, incHeights, incIds, incDates, incAddress, incFreqs, incSpeedtest, incThroughput, incConfidential, incQrCode,
                                                 incSplitImage,
                                                 shareOrder,
                                                 elevationProfileBitmap = elevationProfileBitmap,

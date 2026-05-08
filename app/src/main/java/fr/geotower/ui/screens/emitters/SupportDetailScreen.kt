@@ -86,6 +86,8 @@ fun SupportDetailScreen(
     navController: NavController,
     repository: AnfrRepository,
     siteId: Long,
+    isSplitScreen: Boolean = false,
+    onCloseSplitScreen: () -> Unit = {},
     onAntennaClick: (Long) -> Unit = {}
 ) {
     val context = LocalContext.current
@@ -121,8 +123,12 @@ fun SupportDetailScreen(
 
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "emitters")
 
-    BackHandler(enabled = !safeBackNavigation.isLocked) {
-        safeBackNavigation.navigateBack()
+    BackHandler(enabled = isSplitScreen || !safeBackNavigation.isLocked) {
+        if (isSplitScreen) {
+            onCloseSplitScreen()
+        } else {
+            safeBackNavigation.navigateBack()
+        }
     }
 
     var antennas by remember { mutableStateOf<List<LocalisationEntity>>(emptyList()) }
@@ -394,10 +400,9 @@ fun SupportDetailScreen(
 
     fun normalizeSupportOrder(order: List<String>): List<String> {
         val mutableOrder = order.filter { it.isNotBlank() }.toMutableList()
-        if (!mutableOrder.contains("open_map")) {
-            val shareIndex = mutableOrder.indexOf("share")
-            if (shareIndex >= 0) mutableOrder.add(shareIndex + 1, "open_map") else mutableOrder.add("open_map")
-        }
+        mutableOrder.remove("open_map")
+        val navIndex = mutableOrder.indexOf("nav")
+        if (navIndex >= 0) mutableOrder.add(navIndex, "open_map") else mutableOrder.add("open_map")
         return mutableOrder
     }
 
@@ -412,7 +417,7 @@ fun SupportDetailScreen(
         navController.navigate("map")
     }
 
-    val pageSupportOrder by remember { mutableStateOf(normalizeSupportOrder(prefs.getString("page_support_order", "map,details,photos,nav,share,open_map,operators")!!.split(","))) }
+    val pageSupportOrder by remember { mutableStateOf(normalizeSupportOrder(prefs.getString("page_support_order", "map,details,photos,open_map,nav,share,operators")!!.split(","))) }
     val showMap by remember { mutableStateOf(prefs.getBoolean("page_support_map", true)) }
     val showDetails by remember { mutableStateOf(prefs.getBoolean("page_support_details", true)) }
     val showPhotos by remember { mutableStateOf(prefs.getBoolean("page_support_photos", true)) }
@@ -432,8 +437,14 @@ fun SupportDetailScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = { safeBackNavigation.navigateBack() },
-                    enabled = !safeBackNavigation.isLocked,
+                    onClick = {
+                        if (isSplitScreen) {
+                            onCloseSplitScreen()
+                        } else {
+                            safeBackNavigation.navigateBack()
+                        }
+                    },
+                    enabled = isSplitScreen || !safeBackNavigation.isLocked,
                     modifier = Modifier.padding(start = 4.dp)
                 ) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, txtBack, tint = MaterialTheme.colorScheme.onSurface)
@@ -533,8 +544,8 @@ fun SupportDetailScreen(
                                             modifier = Modifier.fillMaxWidth().height(56.dp),
                                             shape = buttonShape,
                                             colors = ButtonDefaults.buttonColors(
-                                                containerColor = MaterialTheme.colorScheme.primary,
-                                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                                             )
                                         ) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {

@@ -92,6 +92,24 @@ class AnfrRepository(
         return dao.searchAntennasById(query)
     }
 
+    suspend fun searchAntennasByText(query: String, limit: Int = 200): List<LocalisationEntity> {
+        return try {
+            dao.searchAntennasByText(query, limit)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
+    suspend fun searchAntennasByAddress(query: String, limit: Int = 5000): List<LocalisationEntity> {
+        return try {
+            dao.searchAntennasByAddress(query, limit)
+        } catch (e: Exception) {
+            e.printStackTrace()
+            emptyList()
+        }
+    }
+
     suspend fun getAntennasByExactId(exactId: String): List<LocalisationEntity> {
         return dao.getAntennasByExactId(exactId)
     }

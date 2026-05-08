@@ -13,6 +13,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -31,6 +32,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -39,9 +41,11 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -56,6 +60,7 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -94,6 +99,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import fr.geotower.data.models.LocalisationEntity
 import androidx.compose.runtime.saveable.rememberSaveable
+import java.text.Normalizer
+import java.util.Locale
 
 data class UiSite(
     val id: Long,
@@ -103,14 +110,51 @@ data class UiSite(
     val description: String,
     val operators: List<String>,
     val latitude: Double,
-    val longitude: Double
+    val longitude: Double,
+    val anfrIds: List<String> = emptyList(),
+    val supportIds: List<String> = emptyList(),
+    val supportTypes: List<String> = emptyList(),
+    val technologies: List<String> = emptyList(),
+    val postalCode: String? = null,
+    val city: String? = null,
+    val fullAddress: String = address,
+    val allAddresses: List<String> = emptyList(),
+    val technicalText: String = "",
+    val supportText: String = "",
+    val searchText: String = ""
+)
+
+private data class NearbySearchSuggestion(
+    val label: String,
+    val query: String
+)
+
+private enum class NearbySearchField {
+    All,
+    Operator,
+    Technology,
+    SupportType,
+    SupportId,
+    AnfrId,
+    Address,
+    City,
+    PostalCode,
+    Gps
+}
+
+private data class NearbySearchSpec(
+    val field: NearbySearchField,
+    val value: String,
+    val latitude: Double? = null,
+    val longitude: Double? = null
 )
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun NearEmittersScreen(
     navController: NavController,
-    repository: AnfrRepository
+    repository: AnfrRepository,
+    onSupportClick: ((UiSite) -> Unit)? = null
 ) {
     val context = LocalContext.current
 
@@ -153,7 +197,7 @@ fun NearEmittersScreen(
     var isLoading by remember { mutableStateOf(true) }
     var sites by remember { mutableStateOf<List<UiSite>>(emptyList()) }
     var filteredSites by remember { mutableStateOf<List<UiSite>>(emptyList()) }
-    var searchQuery by remember { mutableStateOf("") }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     var maxItemsToShow by rememberSaveable { mutableIntStateOf(100) }
     var searchRadiusMultiplier by remember { mutableIntStateOf(1) }
     var isSearchingRemote by remember { mutableStateOf(false) }
@@ -162,6 +206,7 @@ fun NearEmittersScreen(
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val showSearchBar by remember { mutableStateOf(prefs.getBoolean("show_search_bar", true)) }
+    val showSearchSuggestions by remember { mutableStateOf(prefs.getBoolean("show_search_suggestions", true)) }
     val showNearbySites by remember { mutableStateOf(prefs.getBoolean("show_nearby_sites", true)) }
     val nearbyOrder by remember { mutableStateOf(prefs.getString("nearby_order", "search,sites")!!.split(",")) }
 
@@ -215,41 +260,11 @@ fun NearEmittersScreen(
 
             // B. TRAITEMENT ET FORMATAGE
             if (newAntennas.isNotEmpty()) {
-                val groupedSites = newAntennas.groupBy {
-                    "${String.format(java.util.Locale.US, "%.4f", it.latitude)}_${String.format(java.util.Locale.US, "%.4f", it.longitude)}"
-                }
-
-                val mappedSites = mutableListOf<UiSite>()
-                for ((_, list) in groupedSites) {
-                    val main = list.first()
-                    val dist = calculateDistance(currentLoc.latitude, currentLoc.longitude, main.latitude, main.longitude)
-
-                    val ops = list.mapNotNull { it.operateur }
-                        .flatMap { it.split(Regex("[/,\\-]")) }
-                        .map { it.trim().uppercase() }
-                        .filter { it.isNotEmpty() }
-                        .distinct()
-
-                    val technique = repository.getTechniqueDetails(main.idAnfr)
-                    val fullAddress = technique?.adresse ?: "Adresse inconnue"
-                    val lastCommaIndex = fullAddress.lastIndexOf(",")
-
-                    val titreHaut = if (lastCommaIndex != -1) fullAddress.substring(0, lastCommaIndex).trim() else fullAddress
-                    val sousTitreGris = if (lastCommaIndex != -1) fullAddress.substring(lastCommaIndex + 1).trim() else "Site ANFR: ${main.idAnfr}"
-
-                    mappedSites.add(UiSite(
-                        id = main.idAnfr.toLongOrNull() ?: 0L,
-                        idSupport = null,
-                        distance = dist.toInt(),
-                        address = titreHaut,
-                        description = sousTitreGris,
-                        operators = ops,
-                        latitude = main.latitude,
-                        longitude = main.longitude
-                    ))
-                }
-
-                val finalSites = mappedSites.sortedBy { it.distance }
+                val finalSites = mapAntennasToUiSites(
+                    repository = repository,
+                    antennas = newAntennas,
+                    referenceLocation = currentLoc
+                ).sortedBy { it.distance }
 
                 withContext(Dispatchers.Main) {
                     sites = finalSites
@@ -273,55 +288,98 @@ fun NearEmittersScreen(
         }
 
         // A. RECHERCHE LOCALE (Rapide, filtre immédiat de ce qui est autour de l'utilisateur)
-        val localMatches = sites.filter {
-            it.address.contains(query, true) ||
-                    it.description.contains(query, true) ||
-                    it.id.toString().contains(query, true) ||
-                    it.operators.any { op -> op.contains(query, true) }
-        }
+        val searchSpec = parseNearbySearchQuery(query)
+        val searchValue = searchSpec.value.trim()
+        val localMatches = sites.filter { siteMatchesSearch(it, searchSpec) }
 
         // On affiche immédiatement ce qu'on a trouvé localement pour éviter un écran vide
         filteredSites = localMatches.take(maxItemsToShow)
 
         // B. RECHERCHE DISTANTE INTELLIGENTE
         // On vérifie si c'est juste le nom d'un opérateur (auquel cas on ne déclenche pas le GPS)
-        val isOperatorSearch = listOf("ORANGE", "BOUYGUES", "SFR", "FREE").any { query.equals(it, ignoreCase = true) }
+        val shouldSearchRemote = searchSpec.latitude != null ||
+                searchSpec.field != NearbySearchField.All ||
+                searchValue.length >= 3
 
         // On ne lance le scan distant que si ce n'est pas un opérateur ET qu'il y a au moins 3 caractères
-        if (!isOperatorSearch && query.length >= 3) {
+        if (shouldSearchRemote) {
 
             delay(800) // Petit délai pour ne pas spammer la recherche pendant la frappe
             isSearchingRemote = true
 
+            val referenceLocation = userLocation
             withContext(Dispatchers.IO) {
                 try {
                     val globalAntennas = mutableListOf<LocalisationEntity>()
                     var targetLat: Double? = null
                     var targetLon: Double? = null
 
-                    val isNumeric = query.all { it.isDigit() }
-                    val isPostalCode = isNumeric && query.length == 5
-                    val coordRegex = Regex("""^([-+]?\d{1,2}[.,]\d+)\s*[,;\s]\s*([-+]?\d{1,3}[.,]\d+)$""")
-                    val match = coordRegex.find(query)
-                    val isGps = match != null
+                    val isNumeric = searchValue.all { it.isDigit() }
+                    val isPostalCode = searchSpec.field == NearbySearchField.PostalCode || (isNumeric && searchValue.length == 5)
+                    val isGps = searchSpec.latitude != null && searchSpec.longitude != null
+                    val filtersOnWholeAddress = shouldFilterOnWholeAddress(searchSpec, searchValue, isPostalCode)
+                    val textSearchLimit = if (filtersOnWholeAddress) 2000 else 200
+                    val cityAreaIds = mutableSetOf<String>()
+                    var hasCityAreaSearch = false
+                    val fieldSearchesCurrentArea = searchSpec.field in setOf(
+                        NearbySearchField.Operator,
+                        NearbySearchField.Technology,
+                        NearbySearchField.SupportType
+                    )
 
                     // --- 1. RECHERCHE PAR ID (Base de données) ---
                     // ⚠️ CORRECTION ICI : On ne cherche un ID que si ce n'est PAS un code postal,
                     // PAS un GPS, et que la requête fait au moins 5 caractères (les vrais ID sont longs).
-                    if (!isPostalCode && !isGps && query.any { it.isDigit() } && query.length >= 5) {
-                        val idResults = repository.searchAntennasById(query)
+                    if (
+                        searchSpec.field == NearbySearchField.AnfrId ||
+                        searchSpec.field == NearbySearchField.SupportId ||
+                        (!isPostalCode && !isGps && searchValue.any { it.isDigit() } && searchValue.length >= 5)
+                    ) {
+                        val idResults = repository.searchAntennasById(searchValue)
                         globalAntennas.addAll(idResults)
+                    }
+
+                    if (searchValue.length >= 2 && !fieldSearchesCurrentArea && !isGps) {
+                        nearbyDatabaseSearchVariants(searchValue).forEach { variant ->
+                            if (filtersOnWholeAddress) {
+                                globalAntennas.addAll(repository.searchAntennasByAddress(variant, limit = 5000))
+                            } else {
+                                globalAntennas.addAll(repository.searchAntennasByText(variant, limit = textSearchLimit))
+                            }
+                        }
                     }
 
                     // --- 2. RECHERCHE GÉOGRAPHIQUE (GPS, Ville, Code Postal) ---
                     if (isGps) {
-                        targetLat = match!!.groupValues[1].replace(',', '.').toDoubleOrNull()
-                        targetLon = match.groupValues[2].replace(',', '.').toDoubleOrNull()
-                    } else {
+                        targetLat = searchSpec.latitude
+                        targetLon = searchSpec.longitude
+                    } else if (searchSpec.field in setOf(NearbySearchField.All, NearbySearchField.Address, NearbySearchField.City, NearbySearchField.PostalCode)) {
+                        val nominatimArea = if (shouldUseNearbyNominatimCitySearch(searchSpec, searchValue, isPostalCode)) {
+                            fetchNearbyNominatimArea(searchValue)
+                        } else {
+                            null
+                        }
+
+                        if (nominatimArea != null) {
+                            hasCityAreaSearch = true
+                            val boxResults = repository.getAntennasInBox(
+                                latNorth = nominatimArea.latNorth,
+                                lonEast = nominatimArea.lonEast,
+                                latSouth = nominatimArea.latSouth,
+                                lonWest = nominatimArea.lonWest
+                            )
+                            val cityResults = if (nominatimArea.polygons.isNotEmpty()) {
+                                boxResults.filter { isNearbyPointInPolygons(it.latitude, it.longitude, nominatimArea.polygons) }
+                            } else {
+                                boxResults
+                            }
+                            cityAreaIds.addAll(cityResults.map { it.idAnfr })
+                            globalAntennas.addAll(cityResults)
+                        }
                         // On interroge Google/OSM seulement si c'est un code postal ou si ça contient des lettres (ville/rue)
-                        if (isPostalCode || query.any { it.isLetter() }) {
+                        if (!hasCityAreaSearch && (isPostalCode || searchValue.any { it.isLetter() })) {
                             val geocoder = android.location.Geocoder(context, java.util.Locale.getDefault())
-                            val geoQuery = if (isPostalCode) "$query France" else query
+                            val geoQuery = if (isPostalCode) "$searchValue France" else searchValue
 
                             @Suppress("DEPRECATION")
                             val addresses = geocoder.getFromLocationName(geoQuery, 1)
@@ -333,6 +391,18 @@ fun NearEmittersScreen(
                     }
 
                     // Si on a trouvé des coordonnées, on récupère le bloc d'antennes autour
+                    if (fieldSearchesCurrentArea && referenceLocation != null) {
+                        val offset = 0.05 * searchRadiusMultiplier
+                        globalAntennas.addAll(
+                            repository.getAntennasInBox(
+                                latNorth = referenceLocation.latitude + offset,
+                                lonEast = referenceLocation.longitude + offset,
+                                latSouth = referenceLocation.latitude - offset,
+                                lonWest = referenceLocation.longitude - offset
+                            )
+                        )
+                    }
+
                     if (targetLat != null && targetLon != null) {
                         val offset = 0.05 * searchRadiusMultiplier
                         val boxResults = repository.getAntennasInBox(
@@ -349,47 +419,37 @@ fun NearEmittersScreen(
 
                     // --- FORMATAGE DES RÉSULTATS POUR L'UI ---
                     if (uniqueGlobalAntennas.isNotEmpty()) {
-                        val groupedGlobal = uniqueGlobalAntennas.groupBy {
-                            "${String.format(java.util.Locale.US, "%.4f", it.latitude)}_${String.format(java.util.Locale.US, "%.4f", it.longitude)}"
-                        }
+                        val mappedGlobal = mapAntennasToUiSites(
+                            repository = repository,
+                            antennas = uniqueGlobalAntennas,
+                            referenceLocation = referenceLocation
+                        )
 
-                        val mappedGlobal = mutableListOf<UiSite>()
-                        for ((_, list) in groupedGlobal) {
-                            val main = list.first()
+                        val keepsGeoAreaResults = targetLat != null && targetLon != null &&
+                                !filtersOnWholeAddress &&
+                                searchSpec.field in setOf(
+                                    NearbySearchField.All,
+                                    NearbySearchField.Address,
+                                    NearbySearchField.City,
+                                    NearbySearchField.PostalCode,
+                                    NearbySearchField.Gps
+                                )
 
-                            // Distance toujours par rapport au GPS de l'utilisateur !
-                            val dist = if (userLocation != null) {
-                                calculateDistance(userLocation!!.latitude, userLocation!!.longitude, main.latitude, main.longitude)
-                            } else 0f
-
-                            val ops = list.mapNotNull { it.operateur }
-                                .flatMap { it.split(Regex("[/,\\-]")) }
-                                .map { it.trim().uppercase() }
-                                .filter { it.isNotEmpty() }
-                                .distinct()
-
-                            val technique = repository.getTechniqueDetails(main.idAnfr)
-                            val fullAddress = technique?.adresse ?: "Adresse inconnue"
-
-                            val lastCommaIndex = fullAddress.lastIndexOf(",")
-                            val titreHaut = if (lastCommaIndex != -1) fullAddress.substring(0, lastCommaIndex).trim() else fullAddress
-                            val sousTitreGris = if (lastCommaIndex != -1) fullAddress.substring(lastCommaIndex + 1).trim() else "Site ANFR: ${main.idAnfr}"
-
-                            mappedGlobal.add(UiSite(
-                                id = main.idAnfr.toLongOrNull() ?: 0L,
-                                idSupport = null,
-                                distance = dist.toInt(),
-                                address = titreHaut,
-                                description = sousTitreGris,
-                                operators = ops,
-                                latitude = main.latitude,
-                                longitude = main.longitude
-                            ))
+                        val filteredGlobal = if (keepsGeoAreaResults) {
+                            mappedGlobal
+                        } else if (hasCityAreaSearch) {
+                            mappedGlobal.filter { site ->
+                                site.anfrIds.any { it in cityAreaIds } || siteAddressMatchesSearch(site, searchValue)
+                            }
+                        } else if (filtersOnWholeAddress) {
+                            mappedGlobal.filter { siteAddressMatchesSearch(it, searchValue) }
+                        } else {
+                            mappedGlobal.filter { siteMatchesSearch(it, searchSpec) }
                         }
 
                         // ✅ On combine les antennes locales filtrées AVEC les antennes lointaines trouvées,
                         // on retire les doublons et on trie tout ça par distance !
-                        val combined = (localMatches + mappedGlobal).distinctBy { it.id }.sortedBy { it.distance }
+                        val combined = (localMatches + filteredGlobal).distinctBy { it.id }.sortedBy { it.distance }
 
                         withContext(Dispatchers.Main) {
                             filteredSites = combined.take(maxItemsToShow)
@@ -476,7 +536,11 @@ fun NearEmittersScreen(
                         if (showSearchBar) {
                             Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
                                 OutlinedTextField(
-                                    value = searchQuery, onValueChange = { searchQuery = it },
+                                    value = searchQuery,
+                                    onValueChange = {
+                                        searchQuery = it
+                                        maxItemsToShow = 100
+                                    },
                                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
                                     placeholder = { Text(AppStrings.searchCityOrId) },
                                     leadingIcon = { Icon(Icons.Default.Search, null) },
@@ -502,6 +566,16 @@ fun NearEmittersScreen(
                                         focusedContainerColor = if (useOneUi) cardColor else Color.Transparent
                                     )
                                 )
+
+                                if (showSearchSuggestions) {
+                                    NearbyQuickSearchSuggestions(
+                                        useOneUi = useOneUi,
+                                        onSuggestionClick = { suggestion ->
+                                            searchQuery = suggestion
+                                            maxItemsToShow = 100
+                                        }
+                                    )
+                                }
 
                                 if (!isLoading && filteredSites.isNotEmpty()) {
                                     Text(
@@ -552,7 +626,11 @@ fun NearEmittersScreen(
                                                         .putFloat("clicked_lon", site.longitude.toFloat())
                                                         .apply()
 
-                                                    navController.navigate("support_detail/${site.id}")
+                                                    if (onSupportClick != null) {
+                                                        onSupportClick(site)
+                                                    } else {
+                                                        navController.navigate("support_detail/${site.id}")
+                                                    }
                                                 }
                                             }
 
@@ -697,6 +775,132 @@ private fun Modifier.nearEmittersFadingEdge(lazyListState: LazyListState): Modif
 }
 
 @Composable
+private fun NearbyQuickSearchSuggestions(
+    useOneUi: Boolean,
+    onSuggestionClick: (String) -> Unit
+) {
+    var showSearchHelp by remember { mutableStateOf(false) }
+    val suggestions = listOf(
+        NearbySearchSuggestion(AppStrings.nearbySearchSuggestionCity, "ville:"),
+        NearbySearchSuggestion("Orange", "op:Orange"),
+        NearbySearchSuggestion("SFR", "op:SFR"),
+        NearbySearchSuggestion("Bouygues", "op:Bouygues"),
+        NearbySearchSuggestion("Free", "op:Free"),
+        NearbySearchSuggestion("5G", "tech:5G"),
+        NearbySearchSuggestion("4G", "tech:4G"),
+        NearbySearchSuggestion(AppStrings.nearbySearchSuggestionPylon, "type:pylone"),
+        NearbySearchSuggestion(AppStrings.nearbySearchSuggestionRoof, "type:toit"),
+        NearbySearchSuggestion("ID ANFR", "anfr:"),
+        NearbySearchSuggestion("Support", "support:"),
+        NearbySearchSuggestion(AppStrings.nearbySearchSuggestionPostalCode, "cp:"),
+        NearbySearchSuggestion("GPS", "gps:")
+    )
+
+    if (showSearchHelp) {
+        NearbySearchHelpDialog(onDismiss = { showSearchHelp = false })
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(start = 16.dp, top = 8.dp, end = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        OutlinedButton(
+            onClick = { showSearchHelp = true },
+            shape = if (useOneUi) RoundedCornerShape(50) else RoundedCornerShape(16.dp),
+            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+            colors = ButtonDefaults.outlinedButtonColors(
+                contentColor = MaterialTheme.colorScheme.secondary
+            )
+        ) {
+            Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = AppStrings.nearbySearchHelpContentDescription,
+                modifier = Modifier.size(16.dp)
+            )
+        }
+
+        suggestions.forEach { suggestion ->
+            OutlinedButton(
+                onClick = { onSuggestionClick(suggestion.query) },
+                shape = if (useOneUi) RoundedCornerShape(50) else RoundedCornerShape(16.dp),
+                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                colors = ButtonDefaults.outlinedButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
+                Text(
+                    text = suggestion.label,
+                    style = MaterialTheme.typography.labelMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NearbySearchHelpDialog(onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        icon = {
+            Icon(
+                imageVector = Icons.Default.Info,
+                contentDescription = null
+            )
+        },
+        title = {
+            Text(
+                text = AppStrings.nearbySearchHelpTitle,
+                fontWeight = FontWeight.Bold
+            )
+        },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                NearbySearchHelpLine("ville:Lyon", AppStrings.nearbySearchHelpCityDesc)
+                NearbySearchHelpLine("adresse:rue de Paris", AppStrings.nearbySearchHelpAddressDesc)
+                NearbySearchHelpLine("cp:75001", AppStrings.nearbySearchHelpPostalDesc)
+                NearbySearchHelpLine("gps:48.8566,2.3522", AppStrings.nearbySearchHelpGpsDesc)
+                NearbySearchHelpLine("anfr:123456", AppStrings.nearbySearchHelpAnfrDesc)
+                NearbySearchHelpLine("support:123456", AppStrings.nearbySearchHelpSupportDesc)
+                NearbySearchHelpLine("op:Orange", AppStrings.nearbySearchHelpOperatorDesc)
+                NearbySearchHelpLine("tech:5G", AppStrings.nearbySearchHelpTechDesc)
+                NearbySearchHelpLine("type:pylone", AppStrings.nearbySearchHelpTypeDesc)
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(AppStrings.nearbySearchHelpOk)
+            }
+        }
+    )
+}
+
+@Composable
+private fun NearbySearchHelpLine(
+    code: String,
+    description: String
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = code,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
 fun EmitterCard(
     site: UiSite,
     useOneUi: Boolean,
@@ -838,6 +1042,397 @@ private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Do
     val res = FloatArray(1)
     Location.distanceBetween(lat1, lon1, lat2, lon2, res)
     return res[0]
+}
+
+private suspend fun mapAntennasToUiSites(
+    repository: AnfrRepository,
+    antennas: List<LocalisationEntity>,
+    referenceLocation: Location?
+): List<UiSite> {
+    val groupedSites = antennas.groupBy {
+        "${String.format(Locale.US, "%.4f", it.latitude)}_${String.format(Locale.US, "%.4f", it.longitude)}"
+    }
+
+    return groupedSites.values.map { list ->
+        val main = list.first()
+        val dist = referenceLocation?.let {
+            calculateDistance(it.latitude, it.longitude, main.latitude, main.longitude)
+        } ?: 0f
+
+        val operators = list.mapNotNull { it.operateur }
+            .flatMap { it.split(Regex("[/,\\-]")) }
+            .map { it.trim().uppercase(Locale.ROOT) }
+            .filter { it.isNotEmpty() }
+            .distinct()
+
+        val techniques = list.mapNotNull { repository.getTechniqueDetails(it.idAnfr) }
+        val physiques = list.flatMap { repository.getPhysiqueDetails(it.idAnfr) }
+        val allAddresses = techniques.mapNotNull { it.adresse?.takeIf(String::isNotBlank) }.distinct()
+        val fullAddress = allAddresses.firstOrNull()
+            ?: "Adresse inconnue"
+        val addressParts = splitNearbyAddress(fullAddress, main.idAnfr)
+        val anfrIds = list.map { it.idAnfr }.filter { it.isNotBlank() }.distinct()
+        val supportIds = physiques.map { it.idSupport }.filter { it.isNotBlank() }.distinct()
+        val supportTypes = physiques.mapNotNull { it.natureSupport?.takeIf(String::isNotBlank) }.distinct()
+        val supportText = physiques.flatMap {
+            listOfNotNull(it.idSupport, it.natureSupport, it.proprietaire, it.azimutsEtTypes)
+        }.joinToString(" ")
+        val technicalParts = list.flatMap {
+            listOfNotNull(it.filtres, it.frequences, it.azimuts, it.azimutsFh)
+        } + techniques.flatMap {
+            listOfNotNull(it.technologies, it.detailsFrequences, it.statut)
+        }
+        val technologies = extractNearbyTechnologies(technicalParts)
+        val technicalText = (technicalParts + technologies).joinToString(" ")
+        val postalCode = extractNearbyPostalCode(fullAddress)
+        val city = extractNearbyCity(fullAddress)
+        val searchText = listOf(
+            fullAddress,
+            allAddresses.joinToString(" "),
+            addressParts.title,
+            addressParts.subtitle,
+            postalCode,
+            city,
+            main.idAnfr,
+            main.latitude.toString(),
+            main.longitude.toString(),
+            operators.joinToString(" "),
+            anfrIds.joinToString(" "),
+            supportIds.joinToString(" "),
+            supportTypes.joinToString(" "),
+            supportText,
+            technicalText
+        ).filterNotNull().joinToString(" ")
+
+        UiSite(
+            id = main.idAnfr.toLongOrNull() ?: 0L,
+            idSupport = supportIds.firstOrNull(),
+            distance = dist.toInt(),
+            address = addressParts.title,
+            description = addressParts.subtitle,
+            operators = operators,
+            latitude = main.latitude,
+            longitude = main.longitude,
+            anfrIds = anfrIds,
+            supportIds = supportIds,
+            supportTypes = supportTypes,
+            technologies = technologies,
+            postalCode = postalCode,
+            city = city,
+            fullAddress = fullAddress,
+            allAddresses = allAddresses,
+            technicalText = technicalText,
+            supportText = supportText,
+            searchText = searchText
+        )
+    }
+}
+
+private data class NearbyAddressParts(
+    val title: String,
+    val subtitle: String
+)
+
+private fun splitNearbyAddress(fullAddress: String, idAnfr: String): NearbyAddressParts {
+    val lastCommaIndex = fullAddress.lastIndexOf(",")
+    val title = if (lastCommaIndex != -1) fullAddress.substring(0, lastCommaIndex).trim() else fullAddress
+    val subtitle = if (lastCommaIndex != -1) {
+        fullAddress.substring(lastCommaIndex + 1).trim()
+    } else {
+        "Site ANFR: $idAnfr"
+    }
+    return NearbyAddressParts(title = title, subtitle = subtitle)
+}
+
+private fun parseNearbySearchQuery(raw: String): NearbySearchSpec {
+    val trimmed = raw.trim()
+    val splitIndex = trimmed.indexOf(':')
+    val prefix = if (splitIndex > 0) normalizeNearbySearchCompact(trimmed.substring(0, splitIndex)) else ""
+    val value = if (splitIndex > 0) trimmed.substring(splitIndex + 1).trim() else trimmed
+
+    val explicitField = when (prefix) {
+        "op", "operateur", "operator", "o" -> NearbySearchField.Operator
+        "tech", "technologie", "technology", "reseau", "network", "t" -> NearbySearchField.Technology
+        "type", "nature" -> NearbySearchField.SupportType
+        "support", "idsupport", "s" -> NearbySearchField.SupportId
+        "anfr", "idanfr", "site", "id" -> NearbySearchField.AnfrId
+        "cp", "postal", "codepostal", "zip" -> NearbySearchField.PostalCode
+        "ville", "city", "commune" -> NearbySearchField.City
+        "adresse", "address", "addr" -> NearbySearchField.Address
+        "gps", "coord", "coords", "latlon", "latlng" -> NearbySearchField.Gps
+        else -> null
+    }
+
+    val coordinateMatch = nearbyCoordinateRegex.find(value)
+    val lat = coordinateMatch?.groupValues?.getOrNull(1)?.replace(',', '.')?.toDoubleOrNull()
+    val lon = coordinateMatch?.groupValues?.getOrNull(2)?.replace(',', '.')?.toDoubleOrNull()
+    if (lat != null && lon != null && lat in -90.0..90.0 && lon in -180.0..180.0) {
+        return NearbySearchSpec(NearbySearchField.Gps, value, lat, lon)
+    }
+
+    val inferredField = explicitField ?: inferNearbySearchField(value)
+    return NearbySearchSpec(inferredField, value)
+}
+
+private val nearbyCoordinateRegex =
+    Regex("""^\s*([-+]?\d{1,2}(?:[.,]\d+)?)\s*[,;\s]\s*([-+]?\d{1,3}(?:[.,]\d+)?)\s*$""")
+
+private fun inferNearbySearchField(value: String): NearbySearchField {
+    val normalized = normalizeNearbySearchCompact(value)
+    return when {
+        normalized in setOf("orange", "sfr", "bouygues", "free") -> NearbySearchField.Operator
+        normalized in setOf("2g", "3g", "4g", "5g", "gsm", "umts", "lte", "nr") -> NearbySearchField.Technology
+        else -> NearbySearchField.All
+    }
+}
+
+private fun siteMatchesSearch(site: UiSite, spec: NearbySearchSpec): Boolean {
+    val needle = normalizeNearbySearch(spec.value)
+    val compactNeedle = normalizeNearbySearchCompact(spec.value)
+    if (needle.isBlank()) return true
+
+    fun containsNeedle(values: Iterable<String?>): Boolean {
+        return values.any { value -> nearbyTextMatches(value.orEmpty(), needle, compactNeedle) }
+    }
+
+    return when (spec.field) {
+        NearbySearchField.All -> nearbyTextMatches(site.searchText, needle, compactNeedle)
+        NearbySearchField.Operator -> containsNeedle(site.operators)
+        NearbySearchField.Technology -> containsNeedle(site.technologies + site.technicalText)
+        NearbySearchField.SupportType -> containsNeedle(site.supportTypes + site.supportText)
+        NearbySearchField.SupportId -> containsNeedle(site.supportIds + site.idSupport)
+        NearbySearchField.AnfrId -> containsNeedle(site.anfrIds + site.id.toString())
+        NearbySearchField.Address -> containsNeedle(site.allAddresses + listOf(site.fullAddress, site.address, site.description))
+        NearbySearchField.City -> containsNeedle(site.allAddresses + listOf(site.city, site.description, site.fullAddress))
+        NearbySearchField.PostalCode -> containsNeedle(site.allAddresses + listOf(site.postalCode, site.description, site.fullAddress))
+        NearbySearchField.Gps -> containsNeedle(
+            listOf(
+                site.latitude.toString(),
+                site.longitude.toString(),
+                String.format(Locale.US, "%.6f,%.6f", site.latitude, site.longitude)
+            )
+        )
+    }
+}
+
+private fun shouldFilterOnWholeAddress(
+    spec: NearbySearchSpec,
+    value: String,
+    isPostalCode: Boolean
+): Boolean {
+    return when (spec.field) {
+        NearbySearchField.Address,
+        NearbySearchField.City,
+        NearbySearchField.PostalCode -> true
+        NearbySearchField.All -> !isPostalCode && value.any(Char::isLetter) && value.none(Char::isDigit)
+        else -> false
+    }
+}
+
+private fun siteAddressMatchesSearch(site: UiSite, value: String): Boolean {
+    val needle = normalizeNearbySearch(value)
+    val compactNeedle = normalizeNearbySearchCompact(value)
+    if (needle.isBlank()) return true
+
+    return nearbyTextMatches(
+        value = listOf(site.fullAddress, site.address, site.description, site.postalCode, site.city)
+            .plus(site.allAddresses)
+            .filterNotNull()
+            .joinToString(" "),
+        needle = needle,
+        compactNeedle = compactNeedle
+    )
+}
+
+private data class NearbyNominatimArea(
+    val latNorth: Double,
+    val lonEast: Double,
+    val latSouth: Double,
+    val lonWest: Double,
+    val polygons: List<List<NearbyGeoPoint>>
+)
+
+private data class NearbyGeoPoint(
+    val latitude: Double,
+    val longitude: Double
+)
+
+private fun shouldUseNearbyNominatimCitySearch(
+    spec: NearbySearchSpec,
+    value: String,
+    isPostalCode: Boolean
+): Boolean {
+    if (isPostalCode || value.isBlank()) return false
+    return when (spec.field) {
+        NearbySearchField.City -> true
+        NearbySearchField.All -> value.any(Char::isLetter) && value.none(Char::isDigit)
+        else -> false
+    }
+}
+
+private fun fetchNearbyNominatimArea(query: String): NearbyNominatimArea? {
+    return try {
+        val encodedQuery = java.net.URLEncoder.encode(query.trim(), "UTF-8")
+        val urlString = "https://nominatim.openstreetmap.org/search?q=$encodedQuery&format=json&polygon_geojson=1&limit=1"
+        val connection = java.net.URL(urlString).openConnection() as java.net.HttpURLConnection
+        connection.connectTimeout = 7000
+        connection.readTimeout = 7000
+        connection.setRequestProperty("User-Agent", "GeoTowerApp")
+
+        if (connection.responseCode != 200) return null
+
+        val response = connection.inputStream.bufferedReader().use { it.readText() }
+        val jsonArray = org.json.JSONArray(response)
+        if (jsonArray.length() == 0) return null
+
+        val firstResult = jsonArray.getJSONObject(0)
+        val bboxArray = firstResult.getJSONArray("boundingbox")
+        val latSouth = bboxArray.getDouble(0)
+        val latNorth = bboxArray.getDouble(1)
+        val lonWest = bboxArray.getDouble(2)
+        val lonEast = bboxArray.getDouble(3)
+        val polygons = firstResult.optJSONObject("geojson")
+            ?.let { extractNearbyGeoJsonPolygons(it) }
+            .orEmpty()
+
+        NearbyNominatimArea(
+            latNorth = latNorth,
+            lonEast = lonEast,
+            latSouth = latSouth,
+            lonWest = lonWest,
+            polygons = polygons
+        )
+    } catch (e: Exception) {
+        Log.e("GeoTower", "Erreur Nominatim NearEmitters : ${e.message}")
+        null
+    }
+}
+
+private fun extractNearbyGeoJsonPolygons(geoJson: org.json.JSONObject): List<List<NearbyGeoPoint>> {
+    return when (geoJson.optString("type")) {
+        "Polygon" -> extractNearbyPolygonRings(geoJson.getJSONArray("coordinates"))
+        "MultiPolygon" -> {
+            val polygons = mutableListOf<List<NearbyGeoPoint>>()
+            val coordinates = geoJson.getJSONArray("coordinates")
+            for (i in 0 until coordinates.length()) {
+                polygons += extractNearbyPolygonRings(coordinates.getJSONArray(i))
+            }
+            polygons
+        }
+        else -> emptyList()
+    }
+}
+
+private fun extractNearbyPolygonRings(coordinates: org.json.JSONArray): List<List<NearbyGeoPoint>> {
+    val rings = mutableListOf<List<NearbyGeoPoint>>()
+    for (ringIndex in 0 until coordinates.length()) {
+        val ring = coordinates.getJSONArray(ringIndex)
+        val points = mutableListOf<NearbyGeoPoint>()
+        for (pointIndex in 0 until ring.length()) {
+            val point = ring.getJSONArray(pointIndex)
+            points += NearbyGeoPoint(
+                latitude = point.getDouble(1),
+                longitude = point.getDouble(0)
+            )
+        }
+        if (points.size >= 3) rings += points
+    }
+    return rings
+}
+
+private fun isNearbyPointInPolygons(
+    lat: Double,
+    lon: Double,
+    polygons: List<List<NearbyGeoPoint>>
+): Boolean {
+    var isInside = false
+    for (polygon in polygons) {
+        var j = polygon.size - 1
+        var polyInside = false
+        for (i in polygon.indices) {
+            val pi = polygon[i]
+            val pj = polygon[j]
+            if (((pi.longitude > lon) != (pj.longitude > lon)) &&
+                (lat < (pj.latitude - pi.latitude) * (lon - pi.longitude) / (pj.longitude - pi.longitude) + pi.latitude)
+            ) {
+                polyInside = !polyInside
+            }
+            j = i
+        }
+        if (polyInside) isInside = true
+    }
+    return isInside
+}
+
+private fun nearbyDatabaseSearchVariants(value: String): List<String> {
+    val trimmed = value.trim()
+    if (trimmed.isBlank()) return emptyList()
+
+    val separatorFriendly = trimmed
+        .replace(Regex("""[-_'.’]+"""), " ")
+        .replace(Regex("""\s+"""), " ")
+        .trim()
+    val hyphenFriendly = separatorFriendly.replace(" ", "-")
+    val accentFriendly = trimmed
+        .replace("pylone", "pylône", ignoreCase = true)
+        .replace("chateau", "château", ignoreCase = true)
+        .replace("batiment", "bâtiment", ignoreCase = true)
+        .replace("eglise", "église", ignoreCase = true)
+        .replace("aerien", "aérien", ignoreCase = true)
+
+    return listOf(trimmed, separatorFriendly, hyphenFriendly, accentFriendly)
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .distinct()
+}
+
+private fun nearbyTextMatches(value: String, needle: String, compactNeedle: String): Boolean {
+    val normalized = normalizeNearbySearch(value)
+    if (normalized.contains(needle)) return true
+    return compactNeedle.isNotBlank() && normalizeNearbySearchCompact(value).contains(compactNeedle)
+}
+
+private fun normalizeNearbySearch(value: String): String {
+    val withoutAccents = Normalizer.normalize(value.lowercase(Locale.ROOT), Normalizer.Form.NFD)
+        .replace(Regex("\\p{Mn}+"), "")
+    return withoutAccents
+        .replace(Regex("[^a-z0-9\\s]"), " ")
+        .replace(Regex("\\s+"), " ")
+        .trim()
+}
+
+private fun normalizeNearbySearchCompact(value: String): String {
+    val withoutAccents = Normalizer.normalize(value.lowercase(Locale.ROOT), Normalizer.Form.NFD)
+        .replace(Regex("\\p{Mn}+"), "")
+    return withoutAccents.replace(Regex("[^a-z0-9]"), "")
+}
+
+private fun extractNearbyPostalCode(fullAddress: String): String? {
+    return Regex("""\b\d{5}\b""").find(fullAddress)?.value
+}
+
+private fun extractNearbyCity(fullAddress: String): String? {
+    val candidate = fullAddress.split(",")
+        .map { it.trim() }
+        .lastOrNull { it.any(Char::isLetter) }
+        ?: return null
+    return candidate
+        .replace(Regex("""\b\d{5}\b"""), "")
+        .trim(' ', ',', '-', ';')
+        .takeIf { it.isNotBlank() }
+}
+
+private fun extractNearbyTechnologies(values: List<String>): List<String> {
+    val text = values.joinToString(" ").uppercase(Locale.ROOT)
+    val technologies = mutableListOf<String>()
+    listOf("5G", "4G", "3G", "2G").forEach { generation ->
+        if (text.contains(generation)) technologies.add(generation)
+    }
+    if (Regex("""\bNR\b""").containsMatchIn(text) && "5G" !in technologies) technologies.add("5G")
+    if (Regex("""\bLTE\b""").containsMatchIn(text) && "4G" !in technologies) technologies.add("4G")
+    if (Regex("""\bUMTS\b""").containsMatchIn(text) && "3G" !in technologies) technologies.add("3G")
+    if (Regex("""\bGSM\b""").containsMatchIn(text) && "2G" !in technologies) technologies.add("2G")
+    return technologies
 }
 
 @SuppressLint("MissingPermission")

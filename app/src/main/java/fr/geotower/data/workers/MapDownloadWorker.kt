@@ -157,7 +157,7 @@ class MapDownloadWorker(
 
         val intent = Intent(applicationContext, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            data = android.net.Uri.parse("geotower://settings?section=database")
+            data = android.net.Uri.parse("geotower://settings?section=offline_maps")
         }
         val pendingIntent = PendingIntent.getActivity(
             applicationContext, 0, intent,

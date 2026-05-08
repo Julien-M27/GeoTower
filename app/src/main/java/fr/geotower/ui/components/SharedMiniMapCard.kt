@@ -1,6 +1,9 @@
 package fr.geotower.ui.components
 
 import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.Point
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -31,11 +34,15 @@ import org.osmdroid.events.ZoomEvent
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
+import org.osmdroid.views.Projection
 import org.osmdroid.views.overlay.Marker
+import org.osmdroid.views.overlay.Overlay
 import org.osmdroid.mapsforge.MapsForgeTileProvider
 import org.osmdroid.mapsforge.MapsForgeTileSource
 import org.mapsforge.map.rendertheme.InternalRenderTheme
 import org.osmdroid.tileprovider.MapTileProviderBasic
+import kotlin.math.abs
+import kotlin.math.cos
 
 @Composable
 fun SharedMiniMapCard(
@@ -47,7 +54,9 @@ fun SharedMiniMapCard(
     blockShape: Shape,
     cardBorder: BorderStroke?,
     onMapReady: (MapView) -> Unit,
-    focusOperator: String? = null
+    focusOperator: String? = null,
+    coneOverlay: MiniMapConeOverlayData? = null,
+    initialZoom: Double = 17.5
 ) {
     val context = LocalContext.current
     var mapRef by remember { mutableStateOf<MapView?>(null) }
@@ -74,7 +83,7 @@ fun SharedMiniMapCard(
 
     val ignStyle by AppConfig.ignStyle
     val shouldInvertColors = (mapProvider == 0 && ignStyle == 1)
-    var currentZoom by remember { mutableDoubleStateOf(17.5) }
+    var currentZoom by remember(initialZoom) { mutableDoubleStateOf(initialZoom) }
 
     // ✅ NOUVEAU : Récupération de la couleur du thème pour le marqueur par défaut
     val rawPrimaryColor = MaterialTheme.colorScheme.primary.toArgb()
@@ -92,7 +101,7 @@ fun SharedMiniMapCard(
                     setMultiTouchControls(false)
                     setOnTouchListener { _, _ -> true }
                     zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
-                    controller.setZoom(17.5)
+                    controller.setZoom(initialZoom)
                     controller.setCenter(GeoPoint(centerLat, centerLon))
                     setMinZoomLevel(14.0)
 
@@ -103,6 +112,8 @@ fun SharedMiniMapCard(
                             return true
                         }
                     })
+
+                    updateMiniMapConeOverlay(coneOverlay, safePrimaryColor)
 
                     // ✅ MODIFICATION : On utilise le nouveau marqueur personnalisé avec les azimuts
                     val marker = MiniMapAntennaMarker(this, mappedAntennas, safePrimaryColor, focusOperator).apply { // 👈 AJOUTEZ focusOperator
@@ -161,6 +172,7 @@ fun SharedMiniMapCard(
                 }
 
                 map.overlayManager.tilesOverlay.setColorFilter(if (shouldInvertColors) MapUtils.getInvertFilter() else null)
+                map.updateMiniMapConeOverlay(coneOverlay, safePrimaryColor)
 
                 // ✅ CORRECTION ICI : On cherche notre marqueur spécifique (MiniMapAntennaMarker)
                 val marker = map.overlays.filterIsInstance<MiniMapAntennaMarker>().firstOrNull()
@@ -233,6 +245,110 @@ fun SharedMiniMapCard(
 // =====================================================================
 // MARQUEUR MINI-CARTE (DESSINE LES AZIMUTS + L'ICÔNE)
 // =====================================================================
+data class MiniMapConeOverlayData(
+    val centerLat: Double,
+    val centerLon: Double,
+    val radiusMeters: Double,
+    val strongPoints: List<MiniMapStrongPoint>
+)
+
+data class MiniMapStrongPoint(
+    val latitude: Double,
+    val longitude: Double
+)
+
+private fun MapView.updateMiniMapConeOverlay(data: MiniMapConeOverlayData?, primaryColor: Int) {
+    val current = overlays.filterIsInstance<MiniMapConeOverlay>().firstOrNull()
+    if (data == null) {
+        if (current != null) overlays.remove(current)
+        return
+    }
+
+    if (current == null) {
+        overlays.add(0, MiniMapConeOverlay(data, primaryColor))
+    } else {
+        current.data = data
+        current.primaryColor = primaryColor
+        current.refreshPaints()
+    }
+}
+
+private class MiniMapConeOverlay(
+    var data: MiniMapConeOverlayData,
+    var primaryColor: Int
+) : Overlay() {
+    private val centerPoint = Point()
+    private val radiusPoint = Point()
+    private val strongPoint = Point()
+    private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val pointFillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val pointStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    init {
+        refreshPaints()
+    }
+
+    fun refreshPaints() {
+        fillPaint.apply {
+            style = Paint.Style.FILL
+            color = android.graphics.Color.argb(
+                32,
+                android.graphics.Color.red(primaryColor),
+                android.graphics.Color.green(primaryColor),
+                android.graphics.Color.blue(primaryColor)
+            )
+        }
+        strokePaint.apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+            color = android.graphics.Color.argb(
+                210,
+                android.graphics.Color.red(primaryColor),
+                android.graphics.Color.green(primaryColor),
+                android.graphics.Color.blue(primaryColor)
+            )
+        }
+        pointFillPaint.apply {
+            style = Paint.Style.FILL
+            color = android.graphics.Color.argb(
+                235,
+                android.graphics.Color.red(primaryColor),
+                android.graphics.Color.green(primaryColor),
+                android.graphics.Color.blue(primaryColor)
+            )
+        }
+        pointStrokePaint.apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 3f
+            color = android.graphics.Color.WHITE
+        }
+    }
+
+    override fun draw(canvas: Canvas, projection: Projection) {
+        if (data.radiusMeters <= 0.0) return
+
+        val center = GeoPoint(data.centerLat, data.centerLon)
+        projection.toPixels(center, centerPoint)
+        val radiusLonOffset = data.radiusMeters / metersPerDegreeLongitude(data.centerLat)
+        projection.toPixels(GeoPoint(data.centerLat, data.centerLon + radiusLonOffset), radiusPoint)
+        val radiusPx = abs(radiusPoint.x - centerPoint.x).toFloat().coerceAtLeast(8f)
+
+        canvas.drawCircle(centerPoint.x.toFloat(), centerPoint.y.toFloat(), radiusPx, fillPaint)
+        canvas.drawCircle(centerPoint.x.toFloat(), centerPoint.y.toFloat(), radiusPx, strokePaint)
+
+        data.strongPoints.forEach { point ->
+            projection.toPixels(GeoPoint(point.latitude, point.longitude), strongPoint)
+            canvas.drawCircle(strongPoint.x.toFloat(), strongPoint.y.toFloat(), 9f, pointStrokePaint)
+            canvas.drawCircle(strongPoint.x.toFloat(), strongPoint.y.toFloat(), 6f, pointFillPaint)
+        }
+    }
+
+    private fun metersPerDegreeLongitude(latitude: Double): Double {
+        return (111_320.0 * cos(Math.toRadians(latitude))).coerceAtLeast(1.0)
+    }
+}
+
 class MiniMapAntennaMarker(
     private val mapView: MapView,
     initialSiteAntennas: List<LocalisationEntity>,

@@ -73,6 +73,8 @@ fun SharePreferencesSheet(
     onStatusChange: (Boolean) -> Unit,
     speedtestEnabled: Boolean, // 🚨 NEW
     onSpeedtestChange: (Boolean) -> Unit, // 🚨 NEW
+    throughputEnabled: Boolean,
+    onThroughputChange: (Boolean) -> Unit,
     freqEnabled: Boolean,
     onFreqChange: (Boolean) -> Unit,
     splitImageEnabled: Boolean,
@@ -194,6 +196,7 @@ fun SharePreferencesSheet(
                             "dates" -> DraggableSwitchCard(AppStrings.shareDatesOption, datesEnabled, onDatesChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "address" -> DraggableSwitchCard(AppStrings.shareAddressOption, addressEnabled, onAddressChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "speedtest" -> DraggableSwitchCard(AppStrings.shareSpeedtestOption, speedtestEnabled, onSpeedtestChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "throughput" -> DraggableSwitchCard(AppStrings.shareThroughputOption, throughputEnabled, onThroughputChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "status" -> DraggableSwitchCard(AppStrings.shareStatusOption, statusEnabled, onStatusChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "freq" -> DraggableSwitchCard(AppStrings.shareFreqOption, freqEnabled, onFreqChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                         }
@@ -206,7 +209,7 @@ fun SharePreferencesSheet(
             // --- BOUTON RÉINITIALISER (TOUT PAR DÉFAUT) ---
             TextButton(
                 onClick = {
-                    onOrderChange(listOf("map", "elevation_profile", "support", "ids", "dates", "address", "speedtest", "status", "freq"))
+                    onOrderChange(listOf("map", "elevation_profile", "support", "ids", "dates", "address", "speedtest", "throughput", "status", "freq"))
                     onMapChange(true)
                     onElevationProfileChange(true)
                     onSplitImageChange(true) // Réinitialise aussi la scission
@@ -215,6 +218,7 @@ fun SharePreferencesSheet(
                     onDatesChange(true)
                     onAddressChange(true)
                     onSpeedtestChange(true)
+                    onThroughputChange(true)
                     onStatusChange(true)
                     onFreqChange(true)
                     // Note : On ne réinitialise volontairement pas le mode "Confidentiel" par sécurité
@@ -231,17 +235,19 @@ fun SharePreferencesSheet(
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
             // ✅ INTERRUPTEUR : SCINDER L'IMAGE (Juste au-dessus du QR Code)
-            SimpleSwitchCardWithDesc(
-                title = AppStrings.splitShareImage,
-                desc = AppStrings.splitShareImageDesc,
-                checked = splitImageEnabled,
-                onCheckedChange = onSplitImageChange,
-                shape = shape,
-                border = border,
-                bubbleColor = bubbleColor,
-                useOneUi = useOneUi
-            )
-            Spacer(modifier = Modifier.height(8.dp))
+            if (freqEnabled) {
+                SimpleSwitchCardWithDesc(
+                    title = AppStrings.splitShareImage,
+                    desc = AppStrings.splitShareImageDesc,
+                    checked = splitImageEnabled,
+                    onCheckedChange = onSplitImageChange,
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    useOneUi = useOneUi
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+            }
 
             // ✅ LE BOUTON QR CODE EST ICI !
             SimpleSwitchCard("QR Code", qrEnabled, onQrChange, shape, border, bubbleColor, useOneUi)

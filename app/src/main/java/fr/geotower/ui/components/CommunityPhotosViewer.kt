@@ -67,7 +67,6 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -577,25 +576,6 @@ fun CommunityPhotosSectionShared(
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
                         )
-
-                        if (operatorName != null && (operatorName.contains("SFR", true) || operatorName.contains("BOUYGUES", true)) && onAddPhotoClick != null) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.clip(pillButtonShape).background(overlayButtonBg).clickable { onAddPhotoClick() }.padding(horizontal = 16.dp, vertical = 8.dp),
-                                horizontalArrangement = Arrangement.Center,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Text(
-                                    text = AppStrings.signalQuestUploadPrompt,
-                                    color = viewerContentColor,
-                                    style = MaterialTheme.typography.bodyMedium,
-                                    textAlign = TextAlign.Center,
-                                    textDecoration = TextDecoration.Underline
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Icon(imageVector = Icons.Default.Outbox, contentDescription = null, tint = viewerContentColor, modifier = Modifier.size(20.dp))
-                            }
-                        }
                     }
 
                     IconButton(

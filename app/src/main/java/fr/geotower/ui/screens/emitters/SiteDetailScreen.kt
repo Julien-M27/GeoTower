@@ -46,6 +46,7 @@ import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material3.AlertDialog
@@ -112,6 +113,7 @@ import fr.geotower.utils.AppStrings
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.UUID
+import kotlin.math.roundToInt
 import fr.geotower.ui.components.SpeedtestCard
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -121,7 +123,9 @@ fun SiteDetailScreen(
     repository: AnfrRepository,
     antennaId: Long,
     isSplitScreen: Boolean = false,
-    onCloseSplitScreen: () -> Unit = {}
+    onCloseSplitScreen: () -> Unit = {},
+    onOpenElevationProfile: ((String) -> Unit)? = null,
+    onOpenThroughputCalculator: ((String) -> Unit)? = null
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var isReady by remember { mutableStateOf(false) } // ✅ NOUVEAU : État de chargement
@@ -288,22 +292,39 @@ fun SiteDetailScreen(
 
     fun normalizeSiteOrder(order: List<String>): List<String> {
         val mutableOrder = order.filter { it.isNotBlank() }.toMutableList()
-        if (!mutableOrder.contains("elevation_profile") && mutableOrder.contains("open_map") && mutableOrder.contains("support_details")) {
-            mutableOrder.remove("open_map")
-            val supportDetailsIndex = mutableOrder.indexOf("support_details")
-            mutableOrder.add(supportDetailsIndex + 1, "open_map")
-        }
         if (!mutableOrder.contains("speedtest")) {
             val photosIndex = mutableOrder.indexOf("photos")
             if (photosIndex >= 0) mutableOrder.add(photosIndex + 1, "speedtest") else mutableOrder.add("speedtest")
         }
         if (!mutableOrder.contains("open_map")) {
-            val supportDetailsIndex = mutableOrder.indexOf("support_details")
-            if (supportDetailsIndex >= 0) mutableOrder.add(supportDetailsIndex + 1, "open_map") else mutableOrder.add("open_map")
+            val elevationProfileIndex = mutableOrder.indexOf("elevation_profile")
+            if (elevationProfileIndex >= 0) {
+                mutableOrder.add(elevationProfileIndex + 1, "open_map")
+            } else {
+                val supportDetailsIndex = mutableOrder.indexOf("support_details")
+                if (supportDetailsIndex >= 0) mutableOrder.add(supportDetailsIndex + 1, "open_map") else mutableOrder.add("open_map")
+            }
         }
         if (!mutableOrder.contains("elevation_profile")) {
             val openMapIndex = mutableOrder.indexOf("open_map")
-            if (openMapIndex >= 0) mutableOrder.add(openMapIndex + 1, "elevation_profile") else mutableOrder.add("elevation_profile")
+            if (openMapIndex >= 0) mutableOrder.add(openMapIndex, "elevation_profile") else mutableOrder.add("elevation_profile")
+        }
+        if (!mutableOrder.contains("throughput_calculator")) {
+            val elevationProfileIndex = mutableOrder.indexOf("elevation_profile")
+            val openMapIndex = mutableOrder.indexOf("open_map")
+            when {
+                elevationProfileIndex >= 0 -> mutableOrder.add(elevationProfileIndex + 1, "throughput_calculator")
+                openMapIndex >= 0 -> mutableOrder.add(openMapIndex, "throughput_calculator")
+                else -> mutableOrder.add("throughput_calculator")
+            }
+        }
+        val openMapIndex = mutableOrder.indexOf("open_map")
+        val elevationProfileIndex = mutableOrder.indexOf("elevation_profile")
+        if (openMapIndex >= 0 && elevationProfileIndex >= 0 && openMapIndex < elevationProfileIndex) {
+            mutableOrder.remove("elevation_profile")
+            mutableOrder.remove("open_map")
+            mutableOrder.add(openMapIndex, "elevation_profile")
+            mutableOrder.add(openMapIndex + 1, "open_map")
         }
         return mutableOrder
     }
@@ -319,12 +340,18 @@ fun SiteDetailScreen(
         if (isSplitScreen) onCloseSplitScreen()
         navController.navigate("map")
     }
+    val openElevationProfile = onOpenElevationProfile ?: { id: String ->
+        navController.navigate("elevation_profile/$id")
+    }
+    val openThroughputCalculator = onOpenThroughputCalculator ?: { id: String ->
+        navController.navigate("throughput_calculator/$id")
+    }
 
     // 🚨 MODIFICATION : L'ordre par défaut (photos, speedtest, nav, share...)
     val pageSiteOrder by remember {
         mutableStateOf(
             normalizeSiteOrder(
-                (prefs.getString("page_site_order", "operator,bearing_height,map,support_details,open_map,elevation_profile,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links") ?: "operator,bearing_height,map,support_details,open_map,elevation_profile,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links")
+                (prefs.getString("page_site_order", "operator,bearing_height,map,support_details,elevation_profile,throughput_calculator,open_map,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links") ?: "operator,bearing_height,map,support_details,elevation_profile,throughput_calculator,open_map,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links")
                     .split(",")
             )
         )
@@ -338,6 +365,7 @@ fun SiteDetailScreen(
     val showIds by remember { mutableStateOf(prefs.getBoolean("page_site_ids", true)) }
     val showOpenMap by remember { mutableStateOf(prefs.getBoolean("page_site_open_map", true)) }
     val showElevationProfile by remember { mutableStateOf(prefs.getBoolean("page_site_elevation_profile", true)) }
+    val showThroughputCalculator by remember { mutableStateOf(prefs.getBoolean("page_site_throughput_calculator", true)) }
     val showNav by remember { mutableStateOf(prefs.getBoolean("page_site_nav", true)) }
     val showShare by remember { mutableStateOf(prefs.getBoolean("page_site_share", true)) }
     val showDates by remember { mutableStateOf(prefs.getBoolean("page_site_dates", true)) }
@@ -508,11 +536,12 @@ fun SiteDetailScreen(
         onDispose { locationManager.removeUpdates(locationListener) }
     }
 
-    val locationData = remember(userLocation, antenna) {
+    val distanceUnit = AppConfig.distanceUnit.intValue
+    val locationData = remember(userLocation, antenna, distanceUnit) {
         if (userLocation != null && antenna != null) {
             val res = FloatArray(2)
             Location.distanceBetween(userLocation!!.latitude, userLocation!!.longitude, antenna!!.latitude, antenna!!.longitude, res)
-            val distance = if (res[0] >= 1000) String.format(Locale.US, "%.3f km", res[0] / 1000f) else "${res[0].toInt()} m"
+            val distance = formatSiteDistanceMeters(res[0].toDouble(), distanceUnit)
             var bearing = res[1]
             if (bearing < 0) bearing += 360f
 
@@ -812,7 +841,7 @@ fun SiteDetailScreen(
                                             Spacer(Modifier.height(8.dp))
                                             Icon(Icons.Default.VerticalAlignTop, null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
                                             Spacer(Modifier.height(8.dp))
-                                            Text("${physique?.hauteur ?: "--"} m", fontWeight = FontWeight.Bold)
+                                            Text(formatSiteHeightMeters(physique?.hauteur), fontWeight = FontWeight.Bold)
                                         }
                                     }
                                 }
@@ -888,8 +917,8 @@ fun SiteDetailScreen(
                                     modifier = Modifier.fillMaxWidth().height(56.dp),
                                     shape = buttonShape,
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary,
-                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
                                 ) {
                                     Icon(Icons.Default.Map, null, modifier = Modifier.size(24.dp))
@@ -901,17 +930,34 @@ fun SiteDetailScreen(
                         "elevation_profile" -> {
                             if (showElevationProfile) {
                                 Button(
-                                    onClick = { safeClick { navController.navigate("elevation_profile/${info.idAnfr}") } },
+                                    onClick = { safeClick { openElevationProfile(info.idAnfr) } },
                                     modifier = Modifier.fillMaxWidth().height(56.dp),
                                     shape = buttonShape,
                                     colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
-                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
                                     )
                                 ) {
                                     Icon(Icons.Default.Terrain, null, modifier = Modifier.size(24.dp))
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Text(AppStrings.elevationProfileButton, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                        "throughput_calculator" -> {
+                            if (showThroughputCalculator) {
+                                Button(
+                                    onClick = { safeClick { openThroughputCalculator(info.idAnfr) } },
+                                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                                    shape = buttonShape,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onTertiaryContainer
+                                    )
+                                ) {
+                                    Icon(Icons.Default.Speed, null, modifier = Modifier.size(24.dp))
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(AppStrings.throughputCalculatorButton, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
@@ -1040,6 +1086,25 @@ private fun AppLauncherButton(isInstalled: Boolean, appName: String, txtOpen: St
 
 private fun isPackageInstalled(context: Context, pkg: String): Boolean = try { context.packageManager.getPackageInfo(pkg, 0); true } catch (e: Exception) { false }
 private fun launchApp(context: Context, pkg: String) { context.packageManager.getLaunchIntentForPackage(pkg)?.let { context.startActivity(it) } }
+
+private fun formatSiteDistanceMeters(distanceMeters: Double, distanceUnit: Int = AppConfig.distanceUnit.intValue): String {
+    return if (distanceUnit == 1) {
+        val feet = distanceMeters * 3.28084
+        val miles = distanceMeters / 1609.344
+        if (miles >= 0.1) String.format(Locale.US, "%.2f mi", miles) else "${feet.roundToInt()} ft"
+    } else {
+        if (distanceMeters >= 1000.0) String.format(Locale.US, "%.3f km", distanceMeters / 1000.0) else "${distanceMeters.toInt()} m"
+    }
+}
+
+private fun formatSiteHeightMeters(heightMeters: Double?): String {
+    if (heightMeters == null) return "--"
+    return if (AppConfig.distanceUnit.intValue == 1) {
+        "${(heightMeters * 3.28084).roundToInt()} ft"
+    } else {
+        if (heightMeters % 1.0 == 0.0) "${heightMeters.toInt()} m" else String.format(Locale.US, "%.1f m", heightMeters)
+    }
+}
 
 private fun Modifier.antennaFadingEdge(scrollState: androidx.compose.foundation.ScrollState): Modifier {
     if (!AppConfig.isBlurEnabled.value) return this

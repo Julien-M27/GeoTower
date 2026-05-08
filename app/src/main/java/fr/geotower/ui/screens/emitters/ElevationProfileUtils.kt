@@ -154,9 +154,7 @@ fun extractElevationProfileFrequencies(raw: String?): List<Int> {
         .lineSequence()
         .joinToString(" ") { line -> line.substringBefore("|") }
 
-    val frequencies = Regex("""\d{3,5}""")
-        .findAll(frequencyText)
-        .mapNotNull { match -> match.value.toIntOrNull()?.let(::normalizeElevationProfileFrequency) }
+    val frequencies = extractNormalizedElevationProfileFrequencies(frequencyText)
         .distinct()
         .sortedWith(
             compareBy<Int> { frequency ->
@@ -168,6 +166,30 @@ fun extractElevationProfileFrequencies(raw: String?): List<Int> {
     return frequencies.ifEmpty { listOf(DEFAULT_ELEVATION_PROFILE_FREQUENCY_MHZ) }
 }
 
+fun extractElevationProfileAntennaHeightsByFrequency(raw: String?): Map<Int, Double> {
+    if (raw.isNullOrBlank()) return emptyMap()
+
+    val heightsByFrequency = mutableMapOf<Int, Double>()
+    raw.lineSequence()
+        .map { line -> line.trim() }
+        .filter { line -> line.isNotBlank() }
+        .forEach { line ->
+            val parts = line.split("|").map { part -> part.trim() }
+            val rawFrequencies = parts.getOrNull(0).orEmpty()
+            val physicalDetails = parts.getOrNull(3).orEmpty()
+            val antennaHeight = extractElevationProfileAntennaHeightMeters(physicalDetails) ?: return@forEach
+
+            extractNormalizedElevationProfileFrequencies(rawFrequencies).forEach { frequency ->
+                val previousHeight = heightsByFrequency[frequency]
+                if (previousHeight == null || antennaHeight > previousHeight) {
+                    heightsByFrequency[frequency] = antennaHeight
+                }
+            }
+        }
+
+    return heightsByFrequency
+}
+
 fun formatElevationProfileDistance(distanceMeters: Float): String {
     return if (AppConfig.distanceUnit.intValue == 1) {
         val miles = distanceMeters / 1609.34f
@@ -175,6 +197,21 @@ fun formatElevationProfileDistance(distanceMeters: Float): String {
     } else {
         if (distanceMeters >= 1000f) String.format(Locale.US, "%.2f km", distanceMeters / 1000f) else "${distanceMeters.roundToInt()} m"
     }
+}
+
+private fun extractNormalizedElevationProfileFrequencies(text: String): List<Int> {
+    return Regex("""\d{3,5}""")
+        .findAll(text)
+        .mapNotNull { match -> match.value.toIntOrNull()?.let(::normalizeElevationProfileFrequency) }
+        .distinct()
+        .toList()
+}
+
+private fun extractElevationProfileAntennaHeightMeters(physicalDetails: String): Double? {
+    return Regex("""(?i)([0-9]+(?:[.,][0-9]+)?)\s*m\b""")
+        .findAll(physicalDetails)
+        .mapNotNull { match -> match.groupValues[1].replace(',', '.').toDoubleOrNull() }
+        .maxOrNull()
 }
 
 private fun parseElevationProfileData(json: String, fallbackDistanceMeters: Float): ElevationProfileDataResult {
