@@ -6,10 +6,14 @@ import android.os.Build
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 
 object AppConfig {
+    const val PREF_COLOR_PALETTE = "color_palette"
+    const val DEFAULT_COLOR_PALETTE = "dynamic"
+
     // --- Apparence ---
     var themeMode = mutableIntStateOf(0)
     var isOledMode = mutableStateOf(true)
     var isBlurEnabled = mutableStateOf(true)
+    var colorPalette = mutableStateOf(DEFAULT_COLOR_PALETTE)
     // 0 = Plein écran, 1 = Fractionné
     var displayStyle = mutableIntStateOf(0)
 
@@ -179,6 +183,7 @@ object AppConfig {
 
         //Notification de téléchargement
         enableUpdateNotifications.value = prefs.getBoolean("enable_update_notifications", true)
+        colorPalette.value = prefs.getString(PREF_COLOR_PALETTE, DEFAULT_COLOR_PALETTE) ?: DEFAULT_COLOR_PALETTE
         val model = android.os.Build.MODEL
         val device = android.os.Build.DEVICE
 

@@ -25,37 +25,11 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section("Global", "Global", "Global") {
+    section("Général", "General", "Geral") {
         item(
-            "Correction d'un bug sur le téléchargement de base de donnée",
-            "Fixed a bug in database download",
-            "Correção de um erro na transferência da base de dados"
-        )
-        item(
-            "Changement de couleur pour l'opérateur Bouygues Télécoms",
-            "Changed the color for the Bouygues Telecom operator",
-            "Alteração da cor da operadora Bouygues Telecom"
-        )
-    }
-
-    section("Écran de configuration", "Setup screen", "Ecrã de configuração") {
-        item(
-            "Ajout du bouton pour activer les notifications en direct",
-            "Added the button to enable live notifications",
-            "Adição do botão para ativar notificações em direto"
-        )
-        item(
-            "Modification du menu de choix de l'opérateur par défaut",
-            "Updated the default operator selection menu",
-            "Alteração do menu de escolha da operadora predefinida"
-        )
-    }
-
-    section("Paramètres", "Settings", "Definições") {
-        item(
-            "Modification du menu de choix de l'opérateur par défaut",
-            "Updated the default operator selection menu",
-            "Alteração do menu de escolha da operadora predefinida"
+            "Ajout des palettes de couleurs",
+            "Added color palettes",
+            "Adição de paletas de cores"
         )
     }
 }

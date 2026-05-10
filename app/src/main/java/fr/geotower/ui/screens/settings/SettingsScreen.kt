@@ -132,6 +132,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
+import fr.geotower.ui.components.colorPaletteFadingEdge
 import fr.geotower.services.LiveTrackingController
 import kotlin.math.roundToInt
 
@@ -170,6 +171,7 @@ fun SettingsScreen(
     val configuration = LocalConfiguration.current
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
+    val colorPaletteScrollState = rememberScrollState()
     val sectionBringIntoViewRequesters = remember { List(5) { BringIntoViewRequester() } }
     val sectionRootPositions = remember { mutableStateMapOf<Int, Float>() }
     var scrollViewportTop by remember { mutableFloatStateOf(0f) }
@@ -185,6 +187,7 @@ fun SettingsScreen(
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val showHomeLogo = remember { prefs.getBoolean("show_home_logo", true) }
     var showUnitSheet by remember { mutableStateOf(false) }
+    var showColorPalettePage by remember { mutableStateOf(false) }
 
 
     val isSystemDark = isSystemInDarkTheme()
@@ -222,7 +225,11 @@ fun SettingsScreen(
     }
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
 
-    BackHandler(enabled = !safeBackNavigation.isLocked) {
+    BackHandler(enabled = showColorPalettePage) {
+        showColorPalettePage = false
+    }
+
+    BackHandler(enabled = !showColorPalettePage && !safeBackNavigation.isLocked) {
         safeBackNavigation.navigateBack()
     }
 
@@ -550,11 +557,41 @@ fun SettingsScreen(
         topBar = {
             if (!isWideScreen) {
                 // On remet la vraie barre supérieure pour les téléphones !
-                SettingsTopBar(onBack = { safeBackNavigation.navigateBack() })
+                if (showColorPalettePage) {
+                    fr.geotower.ui.components.ColorPaletteTopBar(onBack = { showColorPalettePage = false })
+                } else {
+                    SettingsTopBar(onBack = { safeBackNavigation.navigateBack() })
+                }
             }
         }
     ) { innerPadding ->
         // 🚀 NOUVEL AFFICHAGE QUI UTILISE LE COMPOSANT COMMUN
+        if (showColorPalettePage) {
+            Column(
+                modifier = Modifier
+                    .padding(top = innerPadding.calculateTopPadding())
+                    .fillMaxSize()
+                    .background(mainBgColor)
+            ) {
+                if (isWideScreen) {
+                    fr.geotower.ui.components.ColorPaletteTopBar(onBack = { showColorPalettePage = false })
+                }
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .colorPaletteFadingEdge(colorPaletteScrollState)
+                        .verticalScroll(colorPaletteScrollState)
+                        .padding(horizontal = if (isWideScreen) 48.dp else 24.dp)
+                        .navigationBarsPadding()
+                ) {
+                    fr.geotower.ui.components.ColorPalettePickerContent(
+                        modifier = Modifier.padding(top = 16.dp, bottom = 48.dp),
+                        useOneUi = useOneUi,
+                        bubbleColor = bubbleBaseColor
+                    )
+                }
+            }
+        } else {
         fr.geotower.ui.components.ResponsiveDualPaneLayout(
             // 🚨 CORRECTION 1 : On utilise uniquement le padding du haut
             modifier = Modifier.padding(top = innerPadding.calculateTopPadding()),
@@ -660,10 +697,10 @@ fun SettingsScreen(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                             if (navMode == 0 || !isExpanded) {
-                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, forceOneUi, { forceOneUi = it; prefs.edit().putBoolean("force_one_ui", it).apply() }, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, { safeClick(it) }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> offlineMapsRootPosition = coordinates.positionInRoot().y })
+                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, forceOneUi, { forceOneUi = it; prefs.edit().putBoolean("force_one_ui", it).apply() }, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, { safeClick(it) }, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> offlineMapsRootPosition = coordinates.positionInRoot().y })
                             } else {
                                 when (activeSectionIndex) {
-                                    0 -> SectionApparence(themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, forceOneUi, { forceOneUi = it; prefs.edit().putBoolean("force_one_ui", it).apply() }, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, { safeClick(it) })
+                                    0 -> SectionApparence(themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, forceOneUi, { forceOneUi = it; prefs.edit().putBoolean("force_one_ui", it).apply() }, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, { safeClick(it) }, { showColorPalettePage = true })
                                     1 -> SectionCartographie(mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, cardShape, cardBorder, bubbleBaseColor, useOneUi, { safeClick(it) })
                                     2 -> SectionPreferences(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, { safeClick(it) })
                                     3 -> SectionSysteme(context, cardShape, border = cardBorder, bubbleColor = bubbleBaseColor, useOneUi = useOneUi, safeClick = { safeClick(it) })
@@ -676,6 +713,7 @@ fun SettingsScreen(
                 }
             }
         )
+        }
 
         if (showIconSheet) {
             IconSheet(
@@ -1383,6 +1421,7 @@ fun AllSettingsContent(
     bubbleColor: Color,
     useOneUi: Boolean,
     safeClick: (() -> Unit) -> Unit,
+    onColorPaletteClick: () -> Unit,
     repository: AnfrRepository,
     scope: kotlinx.coroutines.CoroutineScope,
     appearanceSectionModifier: Modifier = Modifier,
@@ -1393,7 +1432,7 @@ fun AllSettingsContent(
     offlineMapsSectionModifier: Modifier = Modifier
 ) {
     Column(modifier = appearanceSectionModifier.fillMaxWidth()) {
-        SectionApparence(theme, onTheme, oled, onOled, oneUi, onOneUi, blur, onBlur, logo, onIcon, shape, border, bubbleColor, useOneUi, safeClick)
+        SectionApparence(theme, onTheme, oled, onOled, oneUi, onOneUi, blur, onBlur, logo, onIcon, shape, border, bubbleColor, useOneUi, safeClick, onColorPaletteClick)
     }
     Spacer(Modifier.height(32.dp))
     Column(modifier = mappingSectionModifier.fillMaxWidth()) {
@@ -1416,7 +1455,8 @@ fun SectionApparence(
     theme: Int, onTheme: (Int) -> Unit, oled: Boolean, onOled: (Boolean) -> Unit,
     oneUi: Boolean, onOneUi: (Boolean) -> Unit, blur: Boolean, onBlur: (Boolean) -> Unit,
     logo: Int, onIcon: () -> Unit,
-    shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: (() -> Unit) -> Unit
+    shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: (() -> Unit) -> Unit,
+    onColorPaletteClick: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", android.content.Context.MODE_PRIVATE)
@@ -1438,6 +1478,16 @@ fun SectionApparence(
         appIconRes = logo,
         onAppIconClick = onIcon,
         shape = shape, border = border, bubbleColor = bubbleColor, safeClick = safeClick
+    )
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    fr.geotower.ui.components.ColorPaletteActionCard(
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi,
+        onClick = { safeClick { onColorPaletteClick() } }
     )
 
     // <-- NOUVEAU : AFFICHAGE DU SÉLECTEUR DE LOGO D'ACCUEIL

@@ -379,6 +379,69 @@ object AppStrings {
     val oledDesc @Composable get() = get("Noir pur", "Pure black", "Preto puro")
     val appIcon @Composable get() = get("Icône de l'application", "App Icon", "Ícone da aplicação")
     val restartToApply @Composable get() = get("L'app redémarrera pour appliquer le changement.", "The app will restart to apply the change.", "O aplicativo será reiniciado para appliquer a alteração.")
+    val colorPaletteTitle @Composable get() = get("Palette de couleur", "Color palette", "Paleta de cores")
+    val colorSourceTitle @Composable get() = get("Source des couleurs", "Color source", "Fonte das cores")
+    val colorSourceDesc @Composable get() = get(
+        "Le mode Dynamique (fond d'écran) est prioritaire. Sinon, choisissez une palette Material 3 native.",
+        "Dynamic mode (wallpaper) takes priority. Otherwise, choose a native Material 3 palette.",
+        "O modo Dinâmico (papel de parede) tem prioridade. Caso contrário, escolha uma paleta Material 3 nativa."
+    )
+    val colorPaletteDynamicTitle @Composable get() = get("Dynamique (fond d'écran)", "Dynamic (wallpaper)", "Dinâmico (papel de parede)")
+    val colorPaletteDynamicDesc @Composable get() = get(
+        "Utilise automatiquement les couleurs système du téléphone (Material You).",
+        "Automatically uses the phone system colors (Material You).",
+        "Usa automaticamente as cores do sistema do telemóvel (Material You)."
+    )
+    val colorPaletteBaselineTitle @Composable get() = get("Material Baseline", "Material Baseline", "Material Baseline")
+    val colorPaletteBaselineDesc @Composable get() = get("Palette Material 3 native de référence Android", "Native reference Android Material 3 palette", "Paleta Material 3 nativa de referência Android")
+    val colorPaletteRedTitle @Composable get() = get("Material Red", "Material Red", "Material Red")
+    val colorPaletteRedDesc @Composable get() = get("Palette système rouge Material 3", "Material 3 red system palette", "Paleta de sistema vermelha Material 3")
+    val colorPaletteGreenTitle @Composable get() = get("Material Green", "Material Green", "Material Green")
+    val colorPaletteGreenDesc @Composable get() = get("Palette système verte Material 3", "Material 3 green system palette", "Paleta de sistema verde Material 3")
+    val colorPaletteBlueTitle @Composable get() = get("Material Blue", "Material Blue", "Material Blue")
+    val colorPaletteBlueDesc @Composable get() = get("Palette système bleue Material 3", "Material 3 blue system palette", "Paleta de sistema azul Material 3")
+    val colorPaletteCyanTitle @Composable get() = get("Material Cyan", "Material Cyan", "Material Cyan")
+    val colorPaletteCyanDesc @Composable get() = get("Palette système cyan Material 3", "Material 3 cyan system palette", "Paleta de sistema ciano Material 3")
+    val colorPaletteTealTitle @Composable get() = get("Material Teal", "Material Teal", "Material Teal")
+    val colorPaletteTealDesc @Composable get() = get("Palette système teal Material 3", "Material 3 teal system palette", "Paleta de sistema teal Material 3")
+    val colorPaletteIndigoTitle @Composable get() = get("Material Indigo", "Material Indigo", "Material Indigo")
+    val colorPaletteIndigoDesc @Composable get() = get("Palette système indigo Material 3", "Material 3 indigo system palette", "Paleta de sistema indigo Material 3")
+    val colorPaletteRoseTitle @Composable get() = get("Material Rose", "Material Rose", "Material Rose")
+    val colorPaletteRoseDesc @Composable get() = get("Palette système rose expressive Material 3", "Expressive Material 3 rose system palette", "Paleta de sistema rosa expressiva Material 3")
+    val colorPaletteAmberTitle @Composable get() = get("Material Amber", "Material Amber", "Material Amber")
+    val colorPaletteAmberDesc @Composable get() = get("Palette système ambre Material 3", "Material 3 amber system palette", "Paleta de sistema âmbar Material 3")
+    val colorPaletteGraphiteTitle @Composable get() = get("Material Graphite", "Material Graphite", "Material Graphite")
+    val colorPaletteGraphiteDesc @Composable get() = get("Palette système graphite Material 3", "Material 3 graphite system palette", "Paleta de sistema grafite Material 3")
+    @Composable
+    fun colorPaletteName(key: String): String = when (key) {
+        "baseline" -> colorPaletteBaselineTitle
+        "red", "canada" -> colorPaletteRedTitle
+        "green" -> colorPaletteGreenTitle
+        "blue" -> colorPaletteBlueTitle
+        "cyan" -> colorPaletteCyanTitle
+        "teal" -> colorPaletteTealTitle
+        "indigo" -> colorPaletteIndigoTitle
+        "rose" -> colorPaletteRoseTitle
+        "amber" -> colorPaletteAmberTitle
+        "graphite" -> colorPaletteGraphiteTitle
+        else -> colorPaletteDynamicTitle
+    }
+
+    @Composable
+    fun colorPaletteDescription(key: String): String = when (key) {
+        "baseline" -> colorPaletteBaselineDesc
+        "red", "canada" -> colorPaletteRedDesc
+        "green" -> colorPaletteGreenDesc
+        "blue" -> colorPaletteBlueDesc
+        "cyan" -> colorPaletteCyanDesc
+        "teal" -> colorPaletteTealDesc
+        "indigo" -> colorPaletteIndigoDesc
+        "rose" -> colorPaletteRoseDesc
+        "amber" -> colorPaletteAmberDesc
+        "graphite" -> colorPaletteGraphiteDesc
+        else -> colorPaletteDynamicDesc
+    }
+
     val systemLanguage @Composable get() = get("Langage système", "System language", "Idioma do sistema")
 
     val mapIgn @Composable get() = get("IGN (Gouv)", "IGN (Gov)", "IGN (Gov)")

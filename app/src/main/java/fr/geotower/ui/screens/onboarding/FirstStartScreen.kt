@@ -79,6 +79,7 @@ import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.workers.DatabaseDownloadWorker
+import fr.geotower.ui.components.colorPaletteFadingEdge
 import fr.geotower.services.LiveTrackingController
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
@@ -241,10 +242,12 @@ fun FirstStartScreen(
                     userScrollEnabled = true,
                     verticalAlignment = Alignment.Top
                 ) { page ->
+                    val pageScrollState = rememberScrollState()
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .verticalScroll(rememberScrollState()),
+                            .then(if (page == 3) Modifier.colorPaletteFadingEdge(pageScrollState) else Modifier)
+                            .verticalScroll(pageScrollState),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         when (page) {
@@ -938,6 +941,13 @@ fun StepThemeDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStrok
             appIconRes = null, // Pas de sélecteur d'icône au 1er lancement
             onAppIconClick = null,
             shape = cardShape, border = cardBorder, bubbleColor = bubbleColor, safeClick = onSafeClick
+        )
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        fr.geotower.ui.components.ColorPalettePickerContent(
+            useOneUi = useOneUi,
+            bubbleColor = bubbleColor
         )
 
         Spacer(modifier = Modifier.height(16.dp))

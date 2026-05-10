@@ -63,6 +63,8 @@ import android.net.Uri
 import fr.geotower.ui.screens.map.MapScreen
 import fr.geotower.ui.screens.map.MapViewModel
 import fr.geotower.ui.screens.map.MapViewModelFactory
+import fr.geotower.ui.theme.AppColorPalette
+import fr.geotower.ui.theme.appStaticColorScheme
 import java.io.File
 import androidx.compose.runtime.collectAsState
 import androidx.navigation.navDeepLink
@@ -247,6 +249,7 @@ class MainActivity : ComponentActivity() {
         AppConfig.isOledMode.value = appPrefs.getBoolean("is_oled_mode", true)
         AppConfig.isBlurEnabled.value = appPrefs.getBoolean("is_blur_enabled", true)
         AppConfig.forceOneUiTheme.value = appPrefs.getBoolean("force_one_ui", false)
+        AppConfig.colorPalette.value = appPrefs.getString(AppConfig.PREF_COLOR_PALETTE, AppConfig.DEFAULT_COLOR_PALETTE) ?: AppConfig.DEFAULT_COLOR_PALETTE
         AppConfig.mapProvider.intValue = appPrefs.getInt("map_provider", 1)
         AppConfig.ignStyle.intValue = appPrefs.getInt("ign_style", 0)
         AppConfig.navMode.intValue = appPrefs.getInt("nav_mode", 0)
@@ -270,6 +273,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             val themeMode by AppConfig.themeMode
             val isOled by AppConfig.isOledMode
+            val selectedPaletteKey by AppConfig.colorPalette
             val context = LocalContext.current
             val txtPhotoPrepareError = AppStrings.photoPrepareError
 
@@ -290,21 +294,28 @@ class MainActivity : ComponentActivity() {
                 else -> isSystemInDarkTheme()
             }
 
-            val dynamicColors = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            val selectedPalette = AppColorPalette.fromKey(selectedPaletteKey)
+            val baseColorScheme = if (
+                selectedPalette == AppColorPalette.Dynamic &&
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+            ) {
                 if (isDark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
             } else {
-                if (isDark) darkColorScheme() else lightColorScheme()
+                appStaticColorScheme(selectedPalette, isDark)
             }
 
             val colorScheme = if (isDark && isOled) {
-                dynamicColors.copy(
+                // Le mode OLED reste une surcouche : il conserve l'accent choisi et force les fonds en noir pur.
+                baseColorScheme.copy(
                     background = Color.Black,
                     surface = Color.Black,
+                    surfaceContainer = Color.Black,
+                    surfaceContainerHigh = Color.Black,
                     onBackground = Color.White,
                     onSurface = Color.White
                 )
             } else {
-                dynamicColors
+                baseColorScheme
             }
 
             MaterialTheme(colorScheme = colorScheme) {
