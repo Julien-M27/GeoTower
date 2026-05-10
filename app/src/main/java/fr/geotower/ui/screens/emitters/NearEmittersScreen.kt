@@ -6,7 +6,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
-import android.util.Log
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -90,8 +89,11 @@ import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.api.NominatimApi
+import fr.geotower.data.api.NominatimGeoPoint
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -101,6 +103,8 @@ import fr.geotower.data.models.LocalisationEntity
 import androidx.compose.runtime.saveable.rememberSaveable
 import java.text.Normalizer
 import java.util.Locale
+
+private const val TAG_NEAR_EMITTERS = "GeoTower"
 
 data class UiSite(
     val id: Long,
@@ -228,7 +232,7 @@ fun NearEmittersScreen(
             try {
                 locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 5f, locationListener)
                 locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000L, 5f, locationListener)
-            } catch (e: Exception) { e.printStackTrace() }
+            } catch (e: Exception) { AppLogger.w(TAG_NEAR_EMITTERS, "Location updates could not start", e) }
         }
         onDispose { locationManager.removeUpdates(locationListener) }
     }
@@ -355,7 +359,7 @@ fun NearEmittersScreen(
                         targetLon = searchSpec.longitude
                     } else if (searchSpec.field in setOf(NearbySearchField.All, NearbySearchField.Address, NearbySearchField.City, NearbySearchField.PostalCode)) {
                         val nominatimArea = if (shouldUseNearbyNominatimCitySearch(searchSpec, searchValue, isPostalCode)) {
-                            fetchNearbyNominatimArea(searchValue)
+                            NominatimApi.searchArea(searchValue)
                         } else {
                             null
                         }
@@ -463,7 +467,7 @@ fun NearEmittersScreen(
                         }
                     }
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    AppLogger.w(TAG_NEAR_EMITTERS, "Remote nearby search failed", e)
                     withContext(Dispatchers.Main) {
                         filteredSites = localMatches.take(maxItemsToShow)
                         isSearchingRemote = false
@@ -505,7 +509,7 @@ fun NearEmittersScreen(
                     enabled = !safeBackNavigation.isLocked,
                     modifier = Modifier.padding(start = 4.dp)
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", tint = MaterialTheme.colorScheme.onSurface)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppStrings.back, tint = MaterialTheme.colorScheme.onSurface)
                 }
                 Text(
                     text = AppStrings.nearEmittersTitle,
@@ -554,7 +558,7 @@ fun NearEmittersScreen(
                                         if (isSearchingRemote) {
                                             LoadingIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.primary)
                                         } else if (searchQuery.isNotEmpty()) {
-                                            IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, "Effacer") }
+                                            IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, AppStrings.clear) }
                                         }
                                     },
                                     singleLine = true,
@@ -658,7 +662,7 @@ fun NearEmittersScreen(
                                                     ) {
                                                         Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
                                                         Spacer(modifier = Modifier.width(8.dp))
-                                                        Text(AppStrings.get("Afficher plus de sites", "Show more sites", "Mostrar mais"), fontWeight = FontWeight.Bold)
+                                                        Text(AppStrings.showMoreSites, fontWeight = FontWeight.Bold)
                                                     }
                                                 }
                                             }
@@ -694,11 +698,11 @@ fun NearEmittersScreen(
                                                     verticalAlignment = Alignment.CenterVertically
                                                 ) {
                                                     IconButton(onClick = {
-                                                        coroutineScope.launch { lazyListState.animateScrollToItem(0) }
+                                                        coroutineScope.launch { lazyListState.animateScrollToItemSmoothly(0) }
                                                     }) {
                                                         Icon(
                                                             imageVector = Icons.Default.KeyboardArrowUp,
-                                                            contentDescription = "Haut",
+                                                            contentDescription = AppStrings.top,
                                                             tint = iconColor
                                                         )
                                                     }
@@ -706,12 +710,12 @@ fun NearEmittersScreen(
                                                     IconButton(onClick = {
                                                         coroutineScope.launch {
                                                             val lastIndex = lazyListState.layoutInfo.totalItemsCount - 1
-                                                            if (lastIndex > 0) lazyListState.animateScrollToItem(lastIndex)
+                                                            if (lastIndex > 0) lazyListState.animateScrollToItemSmoothly(lastIndex)
                                                         }
                                                     }) {
                                                         Icon(
                                                             imageVector = Icons.Default.KeyboardArrowDown,
-                                                            contentDescription = "Bas",
+                                                            contentDescription = AppStrings.bottom,
                                                             tint = iconColor
                                                         )
                                                     }
@@ -727,6 +731,65 @@ fun NearEmittersScreen(
             }
         }
     }
+}
+
+private const val NEAR_EMITTERS_SCROLL_MIN_STEP_ITEMS = 12
+private const val NEAR_EMITTERS_SCROLL_MAX_STEP_ITEMS = 32
+
+private suspend fun LazyListState.animateScrollToItemSmoothly(targetIndex: Int) {
+    val lastIndex = layoutInfo.totalItemsCount - 1
+    if (lastIndex < 0) return
+
+    val boundedTargetIndex = targetIndex.coerceIn(0, lastIndex)
+    val scrollingDown = boundedTargetIndex > firstVisibleItemIndex
+
+    if (scrollingDown) {
+        while (canScrollForward && firstVisibleItemIndex < boundedTargetIndex) {
+            val startIndex = firstVisibleItemIndex
+            val startOffset = firstVisibleItemScrollOffset
+            val step = nearEmittersScrollStep(
+                remainingItems = boundedTargetIndex - firstVisibleItemIndex
+            )
+            val nextIndex = minOf(
+                firstVisibleItemIndex + step,
+                boundedTargetIndex
+            )
+
+            animateScrollToItem(nextIndex)
+
+            if (firstVisibleItemIndex == startIndex && firstVisibleItemScrollOffset == startOffset) break
+        }
+    } else {
+        while (
+            canScrollBackward &&
+            (firstVisibleItemIndex > boundedTargetIndex || firstVisibleItemScrollOffset > 0)
+        ) {
+            val startIndex = firstVisibleItemIndex
+            val startOffset = firstVisibleItemScrollOffset
+            val step = nearEmittersScrollStep(
+                remainingItems = firstVisibleItemIndex - boundedTargetIndex
+            )
+            val nextIndex = maxOf(
+                firstVisibleItemIndex - step,
+                boundedTargetIndex
+            )
+
+            animateScrollToItem(nextIndex)
+
+            if (firstVisibleItemIndex == startIndex && firstVisibleItemScrollOffset == startOffset) break
+        }
+    }
+
+    if (!scrollingDown || canScrollForward) {
+        animateScrollToItem(boundedTargetIndex)
+    }
+}
+
+private fun nearEmittersScrollStep(remainingItems: Int): Int {
+    return (remainingItems / 4).coerceIn(
+        NEAR_EMITTERS_SCROLL_MIN_STEP_ITEMS,
+        NEAR_EMITTERS_SCROLL_MAX_STEP_ITEMS
+    )
 }
 
 
@@ -1052,6 +1115,9 @@ private suspend fun mapAntennasToUiSites(
     val groupedSites = antennas.groupBy {
         "${String.format(Locale.US, "%.4f", it.latitude)}_${String.format(Locale.US, "%.4f", it.longitude)}"
     }
+    val idAnfrs = antennas.map { it.idAnfr }.filter { it.isNotBlank() }.distinct()
+    val techniquesById = repository.getTechniqueDetailsByIds(idAnfrs)
+    val physiquesById = repository.getPhysiqueDetailsByIds(idAnfrs)
 
     return groupedSites.values.map { list ->
         val main = list.first()
@@ -1065,8 +1131,8 @@ private suspend fun mapAntennasToUiSites(
             .filter { it.isNotEmpty() }
             .distinct()
 
-        val techniques = list.mapNotNull { repository.getTechniqueDetails(it.idAnfr) }
-        val physiques = list.flatMap { repository.getPhysiqueDetails(it.idAnfr) }
+        val techniques = list.mapNotNull { techniquesById[it.idAnfr] }
+        val physiques = list.flatMap { physiquesById[it.idAnfr].orEmpty() }
         val allAddresses = techniques.mapNotNull { it.adresse?.takeIf(String::isNotBlank) }.distinct()
         val fullAddress = allAddresses.firstOrNull()
             ?: "Adresse inconnue"
@@ -1244,19 +1310,6 @@ private fun siteAddressMatchesSearch(site: UiSite, value: String): Boolean {
     )
 }
 
-private data class NearbyNominatimArea(
-    val latNorth: Double,
-    val lonEast: Double,
-    val latSouth: Double,
-    val lonWest: Double,
-    val polygons: List<List<NearbyGeoPoint>>
-)
-
-private data class NearbyGeoPoint(
-    val latitude: Double,
-    val longitude: Double
-)
-
 private fun shouldUseNearbyNominatimCitySearch(
     spec: NearbySearchSpec,
     value: String,
@@ -1270,80 +1323,10 @@ private fun shouldUseNearbyNominatimCitySearch(
     }
 }
 
-private fun fetchNearbyNominatimArea(query: String): NearbyNominatimArea? {
-    return try {
-        val encodedQuery = java.net.URLEncoder.encode(query.trim(), "UTF-8")
-        val urlString = "https://nominatim.openstreetmap.org/search?q=$encodedQuery&format=json&polygon_geojson=1&limit=1"
-        val connection = java.net.URL(urlString).openConnection() as java.net.HttpURLConnection
-        connection.connectTimeout = 7000
-        connection.readTimeout = 7000
-        connection.setRequestProperty("User-Agent", "GeoTowerApp")
-
-        if (connection.responseCode != 200) return null
-
-        val response = connection.inputStream.bufferedReader().use { it.readText() }
-        val jsonArray = org.json.JSONArray(response)
-        if (jsonArray.length() == 0) return null
-
-        val firstResult = jsonArray.getJSONObject(0)
-        val bboxArray = firstResult.getJSONArray("boundingbox")
-        val latSouth = bboxArray.getDouble(0)
-        val latNorth = bboxArray.getDouble(1)
-        val lonWest = bboxArray.getDouble(2)
-        val lonEast = bboxArray.getDouble(3)
-        val polygons = firstResult.optJSONObject("geojson")
-            ?.let { extractNearbyGeoJsonPolygons(it) }
-            .orEmpty()
-
-        NearbyNominatimArea(
-            latNorth = latNorth,
-            lonEast = lonEast,
-            latSouth = latSouth,
-            lonWest = lonWest,
-            polygons = polygons
-        )
-    } catch (e: Exception) {
-        Log.e("GeoTower", "Erreur Nominatim NearEmitters : ${e.message}")
-        null
-    }
-}
-
-private fun extractNearbyGeoJsonPolygons(geoJson: org.json.JSONObject): List<List<NearbyGeoPoint>> {
-    return when (geoJson.optString("type")) {
-        "Polygon" -> extractNearbyPolygonRings(geoJson.getJSONArray("coordinates"))
-        "MultiPolygon" -> {
-            val polygons = mutableListOf<List<NearbyGeoPoint>>()
-            val coordinates = geoJson.getJSONArray("coordinates")
-            for (i in 0 until coordinates.length()) {
-                polygons += extractNearbyPolygonRings(coordinates.getJSONArray(i))
-            }
-            polygons
-        }
-        else -> emptyList()
-    }
-}
-
-private fun extractNearbyPolygonRings(coordinates: org.json.JSONArray): List<List<NearbyGeoPoint>> {
-    val rings = mutableListOf<List<NearbyGeoPoint>>()
-    for (ringIndex in 0 until coordinates.length()) {
-        val ring = coordinates.getJSONArray(ringIndex)
-        val points = mutableListOf<NearbyGeoPoint>()
-        for (pointIndex in 0 until ring.length()) {
-            val point = ring.getJSONArray(pointIndex)
-            points += NearbyGeoPoint(
-                latitude = point.getDouble(1),
-                longitude = point.getDouble(0)
-            )
-        }
-        if (points.size >= 3) rings += points
-    }
-    return rings
-}
-
 private fun isNearbyPointInPolygons(
     lat: Double,
     lon: Double,
-    polygons: List<List<NearbyGeoPoint>>
+    polygons: List<List<NominatimGeoPoint>>
 ): Boolean {
     var isInside = false
     for (polygon in polygons) {

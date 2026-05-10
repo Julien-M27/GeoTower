@@ -15,19 +15,30 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
 import androidx.work.*
+import fr.geotower.data.upload.SignalQuestUploadDraftStore
+import fr.geotower.data.upload.SignalQuestUploadQueue
+import fr.geotower.data.upload.SignalQuestUploadQueueException
+import fr.geotower.data.workers.DatabaseDownloadWorker
 import fr.geotower.data.workers.SignalQuestUploadWorker
+import fr.geotower.data.workers.UpdateCheckScheduler
 import fr.geotower.widget.AntennaWidgetWorker
 import android.content.Intent
+import android.widget.Toast
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 // --- DONNÉES ---
 import fr.geotower.data.AnfrRepository
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppStrings
 import fr.geotower.data.api.RetrofitClient
 import fr.geotower.services.LiveTrackingController
 
@@ -82,7 +93,6 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        checkDownloadIntent(intent)
 
         intent.data?.let { uri ->
             if (uri.scheme == "geotower") {
@@ -100,18 +110,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun checkDownloadIntent(intent: Intent?) {
-        if (intent?.action == "ACTION_DOWNLOAD_DB") {
-            // Lancer le téléchargement de la base de données via ton Worker !
-            val request = OneTimeWorkRequestBuilder<fr.geotower.data.workers.DatabaseDownloadWorker>().build()
-            WorkManager.getInstance(this).enqueueUniqueWork(
-                "manual_db_download",
-                ExistingWorkPolicy.REPLACE,
-                request
-            )
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -119,8 +117,6 @@ class MainActivity : ComponentActivity() {
         // 🏗️ INITIALISATION DU MOTEUR VECTORIEL (Mapsforge)
         // Indispensable pour que le téléphone sache "dessiner" les données du fichier .map
         AndroidGraphicFactory.createInstance(this.application)
-
-        checkDownloadIntent(intent)
 
         // ✅ ÉTAPE 2 : Vérifie si on a cliqué sur la notif quand l'app était fermée
         if (intent?.getBooleanExtra("SHOW_DB_SUCCESS_POPUP", false) == true) {
@@ -158,15 +154,14 @@ class MainActivity : ComponentActivity() {
         // =====================================================================
         // 🚀 NOUVEAU : BOOST DE PERFORMANCES (Spécial Cartes Vectorielles)
         // =====================================================================
-        // 1. Multi-threading : On force le moteur à utiliser tous les cœurs disponibles du téléphone
-        val cores = Runtime.getRuntime().availableProcessors().toShort()
-        osmdroidConfig.tileDownloadThreads = cores
-        osmdroidConfig.tileFileSystemThreads = cores
+        // 1. Multi-threading : on limite la concurrence pour laisser de l'air au thread UI.
+        val cores = Runtime.getRuntime().availableProcessors()
+        osmdroidConfig.tileDownloadThreads = cores.coerceIn(2, 4).toShort()
+        osmdroidConfig.tileFileSystemThreads = (cores / 2).coerceIn(1, 2).toShort()
 
-        // 2. Cache RAM : On augmente drastiquement la mémoire allouée (de 9 à 40)
-        // Cela évite les saccades (les "tuiles grises") quand on glisse la carte
-        osmdroidConfig.cacheMapTileCount = 40.toShort()
-        osmdroidConfig.cacheMapTileOvershoot = 40.toShort()
+        // 2. Cache RAM : on garde davantage de tuiles chaudes pendant les zooms/dezooms.
+        osmdroidConfig.cacheMapTileCount = 160.toShort()
+        osmdroidConfig.cacheMapTileOvershoot = 80.toShort()
         // =====================================================================
 
 
@@ -178,17 +173,8 @@ class MainActivity : ComponentActivity() {
         )
         val widgetDest = intent.getStringExtra("widget_dest")
 
-        // ========================================================
-        // NOUVEAU : VÉRIFICATION PÉRIODIQUE DES MISES À JOUR (TOUS LES 3 JOURS)
-        // ========================================================
-        val updateCheckRequest = androidx.work.PeriodicWorkRequestBuilder<fr.geotower.data.workers.UpdateCheckWorker>(
-            30, java.util.concurrent.TimeUnit.MINUTES
-        ).build()
-        WorkManager.getInstance(this).enqueueUniquePeriodicWork(
-            "PeriodicUpdateCheck",
-            ExistingPeriodicWorkPolicy.KEEP, // KEEP = Ne remet pas le compteur à 0 à chaque ouverture de l'app
-            updateCheckRequest
-        )
+        // Verification quotidienne de mise a jour de base autour de 20h.
+        UpdateCheckScheduler.reconcile(applicationContext)
 
         val widgetSiteId = intent.getStringExtra("widget_site_id")
 
@@ -239,11 +225,11 @@ class MainActivity : ComponentActivity() {
 
         if (!appPrefs.contains("app_language")) {
             // Premier lancement : On définit le choix sur "Système" par défaut
-            appPrefs.edit().putString("app_language", "Système").apply()
-            AppConfig.appLanguage.value = "Système"
+            appPrefs.edit().putString("app_language", AppStrings.LANGUAGE_SYSTEM).apply()
+            AppConfig.appLanguage.value = AppStrings.LANGUAGE_SYSTEM
         } else {
             // L'utilisateur a déjà une langue sauvegardée (ou "Système")
-            AppConfig.appLanguage.value = appPrefs.getString("app_language", "Système") ?: "Système"
+            AppConfig.appLanguage.value = appPrefs.getString("app_language", AppStrings.LANGUAGE_SYSTEM) ?: AppStrings.LANGUAGE_SYSTEM
         }
 
         // ========================================================
@@ -285,10 +271,11 @@ class MainActivity : ComponentActivity() {
             val themeMode by AppConfig.themeMode
             val isOled by AppConfig.isOledMode
             val context = LocalContext.current
+            val txtPhotoPrepareError = AppStrings.photoPrepareError
 
             // ✅ NOUVEAU : On écoute la fin du téléchargement globalement
             val workManager = remember { androidx.work.WorkManager.getInstance(context) }
-            val workInfos by workManager.getWorkInfosForUniqueWorkFlow("db_download").collectAsState(initial = emptyList())
+            val workInfos by workManager.getWorkInfosForUniqueWorkFlow(DatabaseDownloadWorker.UNIQUE_WORK_NAME).collectAsState(initial = emptyList())
             val currentWork = workInfos.firstOrNull()
 
             LaunchedEffect(currentWork?.state) {
@@ -489,11 +476,11 @@ class MainActivity : ComponentActivity() {
                             // --- 3. ÉCRAN D'ENVOI SIGNAL QUEST ---
                             composable(
                                 // ✅ AJOUT DE &azimuts={azimuts} À LA FIN
-                                route = "sq_upload/{siteId}/{operatorName}?uris={uris}&lat={lat}&lon={lon}&azimuts={azimuts}",
+                                route = "sq_upload/{siteId}/{operatorName}?draftId={draftId}&lat={lat}&lon={lon}&azimuts={azimuts}",
                                 arguments = listOf(
                                     navArgument("siteId") { type = NavType.StringType },
                                     navArgument("operatorName") { type = NavType.StringType },
-                                    navArgument("uris") { type = NavType.StringType; defaultValue = "" },
+                                    navArgument("draftId") { type = NavType.StringType; defaultValue = "" },
                                     navArgument("lat") { type = NavType.StringType; defaultValue = "0.0" },
                                     navArgument("lon") { type = NavType.StringType; defaultValue = "0.0" },
 
@@ -503,7 +490,7 @@ class MainActivity : ComponentActivity() {
                             ) { backStackEntry ->
                                 val siteId = backStackEntry.arguments?.getString("siteId") ?: ""
                                 val operatorName = backStackEntry.arguments?.getString("operatorName") ?: ""
-                                val urisStr = backStackEntry.arguments?.getString("uris") ?: ""
+                                val draftId = backStackEntry.arguments?.getString("draftId") ?: ""
                                 val lat = backStackEntry.arguments?.getString("lat")?.toDoubleOrNull() ?: 0.0
                                 val lon = backStackEntry.arguments?.getString("lon")?.toDoubleOrNull() ?: 0.0
 
@@ -511,7 +498,9 @@ class MainActivity : ComponentActivity() {
                                 val azimutsStr = backStackEntry.arguments?.getString("azimuts") ?: ""
                                 val decodedAzimuts = android.net.Uri.decode(azimutsStr)
 
-                                val uris = urisStr.split(",").map { Uri.decode(it) }.filter { it.isNotEmpty() }
+                                val uris = remember(draftId) {
+                                    if (draftId.isBlank()) emptyList() else SignalQuestUploadDraftStore.take(draftId)
+                                }
 
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     SignalQuestUploadScreen(
@@ -523,31 +512,48 @@ class MainActivity : ComponentActivity() {
                                         azimuts = decodedAzimuts,
                                         onNavigateBack = { navController.popBackStack() },
                                         onStartUpload = { finalUris, description ->
-                                            val uploadData = workDataOf(
-                                                "siteId" to siteId,
-                                                "operator" to operatorName,
-                                                "description" to description,
-                                                "uris" to finalUris.joinToString(",")
-                                            )
+                                            lifecycleScope.launch {
+                                                try {
+                                                    val manifest = withContext(Dispatchers.IO) {
+                                                        SignalQuestUploadQueue.createUpload(
+                                                            context = applicationContext,
+                                                            siteId = siteId,
+                                                            operator = operatorName,
+                                                            description = description,
+                                                            uriStrings = finalUris
+                                                        )
+                                                    }
 
-                                            val uploadRequest = OneTimeWorkRequestBuilder<SignalQuestUploadWorker>()
-                                                .setInputData(uploadData)
-                                                .addTag("sq_upload_${siteId}")
-                                                .addTag("sq_upload_global")
-                                                .setConstraints(
-                                                    Constraints.Builder()
-                                                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                                                    val uploadData = workDataOf(
+                                                        SignalQuestUploadQueue.INPUT_UPLOAD_ID to manifest.uploadId
+                                                    )
+
+                                                    val uploadRequest = OneTimeWorkRequestBuilder<SignalQuestUploadWorker>()
+                                                        .setInputData(uploadData)
+                                                        .addTag("sq_upload_${siteId}")
+                                                        .addTag("sq_upload_global")
+                                                        .setConstraints(
+                                                            Constraints.Builder()
+                                                                .setRequiredNetworkType(NetworkType.CONNECTED)
+                                                                .build()
+                                                        )
                                                         .build()
-                                                )
-                                                .build()
 
-                                            WorkManager.getInstance(context).enqueueUniqueWork(
-                                                "upload_sq_${System.currentTimeMillis()}",
-                                                ExistingWorkPolicy.APPEND_OR_REPLACE,
-                                                uploadRequest
-                                            )
+                                                    WorkManager.getInstance(applicationContext).enqueueUniqueWork(
+                                                        "upload_sq_${manifest.uploadId}",
+                                                        ExistingWorkPolicy.APPEND_OR_REPLACE,
+                                                        uploadRequest
+                                                    )
 
-                                            navController.popBackStack()
+                                                    navController.popBackStack()
+                                                } catch (e: SignalQuestUploadQueueException) {
+                                                    Toast.makeText(
+                                                        context,
+                                                        e.message ?: txtPhotoPrepareError,
+                                                        Toast.LENGTH_LONG
+                                                    ).show()
+                                                }
+                                            }
                                         }
                                     )
                                 }

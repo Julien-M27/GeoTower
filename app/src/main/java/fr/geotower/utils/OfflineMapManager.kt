@@ -23,8 +23,8 @@ class OfflineMapManager(private val context: Context) {
 
     fun downloadMap() {
         val request = DownloadManager.Request(Uri.parse(mapUrl))
-            .setTitle("Téléchargement Carte France")
-            .setDescription("Récupération des données cartographiques...")
+            .setTitle(AppStrings.offlineMapDownloadTitle(context))
+            .setDescription(AppStrings.offlineMapDownloadDesc(context))
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, mapFileName)
             .setAllowedOverMetered(true)

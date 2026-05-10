@@ -30,8 +30,8 @@ object RadioThroughputEngine {
         allocations: List<SpectrumAllocation> = SpectrumAllocationsFrMetro.allocations
     ): ThroughputEngineResult {
         val warnings = mutableListOf(
-            "La charge reseau, le backhaul et les capacites exactes du terminal ne sont pas connus.",
-            "MIMO et modulation ne sont pas publies au niveau du site : profil ${profile.label} applique."
+            "La charge du réseau, le backhaul et les capacités exactes du téléphone ne sont pas connus.",
+            "Le MIMO et la modulation ne sont pas publiés au niveau du site : le profil ${profile.label} est donc appliqué."
         )
         val assumptions = mutableListOf(profile.description)
         val excluded = mutableListOf<ExcludedCarrier>()
@@ -56,9 +56,9 @@ object RadioThroughputEngine {
                     sourceKey = system.sourceKey,
                     technology = system.technology,
                     bandLabel = system.bandLabel,
-                    reason = "Aucune allocation Arcep FR metropole compatible avec cette techno/bande."
+                    reason = "Aucune allocation Arcep France métropolitaine compatible avec cette technologie et cette bande."
                 )
-                warnings += "Bande ${system.bandLabel} ${system.technology.labelForUi()} exclue : allocation operateur non trouvee."
+                warnings += "Bande ${system.bandLabel} ${system.technology.labelForUi()} exclue : allocation opérateur introuvable."
                 return@mapNotNull null
             }
 
@@ -82,7 +82,7 @@ object RadioThroughputEngine {
             warnings = warnings.distinct(),
             assumptions = assumptions.distinct(),
             confidenceScore = confidence,
-            sourceSummary = "ANFR/data.gouv pour les frequences declarees, Arcep pour les allocations operateur, ETSI/3GPP TS 38.306 et TS 36.306/36.213 pour le modele radio."
+            sourceSummary = "ANFR/data.gouv pour les fréquences déclarées, Arcep pour les allocations opérateur, ETSI/3GPP TS 38.306 et TS 36.306/36.213 pour le modèle radio."
         )
     }
 
@@ -240,14 +240,14 @@ object RadioThroughputEngine {
             .forEach { dssGroup ->
                 val winner = dssGroup.maxBy { it.dlMbps }
                 dssGroup.filter { it.sourceKey != winner.sourceKey }.forEach { loser ->
-                    val reason = "Bande potentiellement partagee 4G/5G : non additionnee deux fois."
+                    val reason = "Bande potentiellement partagée entre la 4G et la 5G : elle n'est pas additionnée deux fois."
                     val index = mutableResults.indexOfFirst { it.sourceKey == loser.sourceKey }
                     if (index >= 0) {
                         mutableResults[index] = loser.copy(included = false, excludedReason = reason, warnings = loser.warnings + reason)
                     }
                     excluded += ExcludedCarrier(loser.sourceKey, loser.technology, loser.bandLabel, reason)
                 }
-                warnings += "Bande ${winner.bandLabel} potentiellement partagee 4G/5G : debit non additionne integralement."
+                warnings += "Bande ${winner.bandLabel} potentiellement partagée entre la 4G et la 5G : le débit n'est pas additionné intégralement."
             }
 
         return mutableResults
@@ -267,7 +267,7 @@ object ThroughputProfiles {
     val prudent = ThroughputProfile(
         id = "PRUDENT",
         label = "Prudent",
-        description = "Profil prudent : 4G 64-QAM DL, 16-QAM UL, 5G NR 64-QAM, CA limitee et DSS non double-compte.",
+        description = "Profil prudent : 4G 64-QAM en descendant, 16-QAM en montant, 5G NR 64-QAM, agrégation limitée et DSS non compté deux fois.",
         lte = RatAssumptions(dlModulationOrder = 6, ulModulationOrder = 4, dlMimoLayers = 2, ulMimoLayers = 1, maxCaComponents = 3),
         nr = RatAssumptions(dlModulationOrder = 6, ulModulationOrder = 6, dlMimoLayers = 4, ulMimoLayers = 1, maxCaComponents = 1, scsKHz = 30, tddDlRatio = 0.70, tddUlRatio = 0.20, overheadDl = 0.14, overheadUl = 0.08),
         defaultDeviceCategory = DeviceCategory.AVERAGE_PHONE
@@ -276,7 +276,7 @@ object ThroughputProfiles {
     val standard = ThroughputProfile(
         id = "STANDARD",
         label = "Standard",
-        description = "Profil standard : 4G 256-QAM DL MIMO 2x2, UL 64-QAM telephone, 5G n78 256-QAM DL MIMO 4x4, UL 64-QAM 2 couches, DSS non double-compte.",
+        description = "Profil standard : 4G 256-QAM en descendant avec MIMO 2x2, montant 64-QAM côté téléphone, 5G n78 256-QAM en descendant avec MIMO 4x4, montant 64-QAM sur 2 couches, DSS non compté deux fois.",
         lte = RatAssumptions(dlModulationOrder = 8, ulModulationOrder = 6, dlMimoLayers = 2, ulMimoLayers = 1, maxCaComponents = 5),
         nr = RatAssumptions(dlModulationOrder = 8, ulModulationOrder = 6, dlMimoLayers = 4, ulMimoLayers = 2, maxCaComponents = 1, scsKHz = 30, tddDlRatio = 0.70, tddUlRatio = 0.20, overheadDl = 0.14, overheadUl = 0.08),
         defaultDeviceCategory = DeviceCategory.RECENT_PHONE
@@ -284,8 +284,8 @@ object ThroughputProfiles {
 
     val ideal = ThroughputProfile(
         id = "IDEAL",
-        label = "Profil ideal",
-        description = "Profil ideal : meilleures conditions radio plausibles, 4G DL MIMO 4x4, 5G NR 256-QAM, CA plus ouverte, sans double comptage DSS.",
+        label = "Profil idéal",
+        description = "Profil idéal : très bonnes conditions radio plausibles, 4G en descendant avec MIMO 4x4, 5G NR 256-QAM, agrégation plus ouverte et sans double comptage DSS.",
         lte = RatAssumptions(dlModulationOrder = 8, ulModulationOrder = 6, dlMimoLayers = 4, ulMimoLayers = 1, maxCaComponents = 5),
         nr = RatAssumptions(dlModulationOrder = 8, ulModulationOrder = 8, dlMimoLayers = 4, ulMimoLayers = 2, maxCaComponents = 2, scsKHz = 30, tddDlRatio = 0.70, tddUlRatio = 0.20, overheadDl = 0.14, overheadUl = 0.08),
         defaultDeviceCategory = DeviceCategory.FLAGSHIP

@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.OperatorColors
 import android.content.SharedPreferences
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.MutableState
@@ -116,30 +117,30 @@ fun MapSettingsSheet(
                         "Orange",
                         showOrange,
                         Modifier.weight(1f),
-                        selectedColor = Color(0xFFFF7900)
+                        selectedColor = Color(OperatorColors.ORANGE_ARGB)
                     ) { showOrange = it }
                     // SFR reste en Rouge
                     SelectableButton(
                         "SFR",
                         showSfr,
                         Modifier.weight(1f),
-                        selectedColor = Color(0xFFE2001A)
+                        selectedColor = Color(OperatorColors.SFR_ARGB)
                     ) { showSfr = it }
                 }
                 Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // Bouygues reste en Bleu foncé
+                    // Bouygues utilise le bleu live notification centralisé
                     SelectableButton(
                         "Bouygues",
                         showBouygues,
                         Modifier.weight(1f),
-                        selectedColor = Color(0xFF00295F)
+                        selectedColor = Color(OperatorColors.BOUYGUES_ARGB)
                     ) { showBouygues = it }
                     // Free passe en Gris
                     SelectableButton(
                         "Free",
                         showFree,
                         Modifier.weight(1f),
-                        selectedColor = Color(0xFF757575)
+                        selectedColor = Color(OperatorColors.FREE_ARGB)
                     ) { showFree = it }
                 }
             }

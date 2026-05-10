@@ -83,10 +83,18 @@ class RadioThroughputEngineTest {
 
         val result = RadioThroughputEngine.estimate(systems, ThroughputProfiles.standard)
         val included = result.perCarrierResults.filter { it.included }
+        val excludedResult = result.perCarrierResults.single { !it.included }
+        val excludedCarrier = result.excludedCarriers.single()
 
         assertEquals(2, result.perCarrierResults.size)
         assertEquals(1, included.size)
-        assertFalse(result.excludedCarriers.isEmpty())
-        assertTrue(result.warnings.any { it.contains("partagee", ignoreCase = true) })
+        assertEquals("nr-2100", included.single().sourceKey)
+        assertEquals("lte-2100", excludedResult.sourceKey)
+        assertEquals(excludedResult.sourceKey, excludedCarrier.sourceKey)
+        assertEquals(RadioTechnology.LTE_4G, excludedCarrier.technology)
+        assertEquals("2100", excludedCarrier.bandLabel)
+        assertFalse(excludedResult.excludedReason.isNullOrBlank())
+        assertFalse(excludedCarrier.reason.isBlank())
+        assertFalse(result.warnings.isEmpty())
     }
 }

@@ -24,6 +24,7 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.OperatorColors
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -57,7 +58,7 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
             val counts4GMap = mutableMapOf<String, Int>()
             val counts5GMap = mutableMapOf<String, Int>() // ✅ NOUVEAU
 
-            val operatorsToFetch = listOf("ORANGE", "BOUYGUES", "SFR", "FREE")
+            val operatorsToFetch = OperatorColors.orderedKeys
 
             for (op in operatorsToFetch) {
                 totalMap[op] = repository.getUniqueSupportCountByOperator(op)
@@ -65,7 +66,7 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
                 counts5GMap[op] = repository.get5GSupportCountByOperator(op) // ✅ NOUVEAU
             }
 
-            val baseOrder = listOf("ORANGE", "BOUYGUES", "SFR", "FREE")
+            val baseOrder = OperatorColors.orderedKeys
             val displayOrder = mutableListOf<String>()
             if (defaultOp != "AUCUN" && baseOrder.any { defaultOp.contains(it, ignoreCase = true) }) {
                 displayOrder.add(baseOrder.first { defaultOp.contains(it, ignoreCase = true) })
@@ -219,13 +220,9 @@ fun SupportBarChart(data: List<Pair<String, Int>>) {
                 verticalAlignment = Alignment.Bottom
             ) {
                 data.forEach { (opName, count) ->
-                    val barColor = when(opName.uppercase()) {
-                        "ORANGE" -> Color(0xFFFF6600)
-                        "BOUYGUES" -> Color(0xFF00295F)
-                        "SFR" -> Color(0xFFE2001A)
-                        "FREE" -> Color(0xFF757575)
-                        else -> Color.Gray
-                    }
+                    val barColor = OperatorColors.keyFor(opName)
+                        ?.let { Color(OperatorColors.colorArgbForKey(it)) }
+                        ?: Color.Gray
 
                     val fraction = if (yMax > 0) count.toFloat() / yMax.toFloat() else 0f
 

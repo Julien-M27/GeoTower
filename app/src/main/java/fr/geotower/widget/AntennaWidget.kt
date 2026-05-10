@@ -67,8 +67,13 @@ import com.google.android.gms.tasks.CancellationTokenSource
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import fr.geotower.data.db.AppDatabase
+import fr.geotower.utils.AppLogger
+import fr.geotower.utils.AppStrings
+import fr.geotower.utils.OperatorColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+private const val TAG_WIDGET = "GeoTower"
 
 class AntennaWidget : GlanceAppWidget() {
 
@@ -81,9 +86,6 @@ class AntennaWidget : GlanceAppWidget() {
         val isOled = prefs.getBoolean("oled_mode", false)
         val isSamsungDevice = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
 
-        val lang = prefs.getString("app_language", "Système") ?: "Système"
-        val isFr = lang == "Français" || (lang == "Système" && java.util.Locale.getDefault().language == "fr")
-
         val jsonData = prefs.getString("widget_data_api", null)
         var realSites: List<WidgetSiteData> = emptyList()
 
@@ -92,7 +94,7 @@ class AntennaWidget : GlanceAppWidget() {
                 val type = object : TypeToken<List<WidgetSiteData>>() {}.type
                 realSites = Gson().fromJson(jsonData, type) ?: emptyList()
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLogger.w(TAG_WIDGET, "Widget cached data could not be read", e)
             }
         }
 
@@ -103,8 +105,8 @@ class AntennaWidget : GlanceAppWidget() {
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         }
 
-        val txtWarningTitle = fr.geotower.utils.AppStrings.widgetBgLocationWarning(context)
-        val txtWarningDesc = fr.geotower.utils.AppStrings.widgetBgLocationDesc(context)
+        val txtWarningTitle = AppStrings.widgetBgLocationWarning(context)
+        val txtWarningDesc = AppStrings.widgetBgLocationDesc(context)
 
         provideContent {
             val size = LocalSize.current
@@ -113,7 +115,7 @@ class AntennaWidget : GlanceAppWidget() {
             // Détection de la hauteur réduite (Format 2x1)
             val isShortWidget = size.height < 130.dp
 
-            val widgetTitleText = if (isFr) "📍 Antennes à proximité" else "📍 Nearby antennas"
+            val widgetTitleText = AppStrings.widgetTitle(context)
 
             // Si le widget est court, on n'affiche que LA première antenne de la liste !
             val displaySites = if (isShortWidget) realSites.take(1) else realSites
@@ -173,7 +175,7 @@ class AntennaWidget : GlanceAppWidget() {
                     // ✅ On cache l'heure de mise à jour si le widget est en format 2x1 pour gagner de la place
                     if (!isShortWidget) {
                         Text(
-                            text = if (isFr) "Mis à jour à $lastUpdate" else "Updated at $lastUpdate",
+                            text = AppStrings.widgetUpdatedAt(context, lastUpdate),
                             style = TextStyle(
                                 color = GlanceTheme.colors.onSurfaceVariant,
                                 fontSize = 11.sp,
@@ -216,7 +218,7 @@ class AntennaWidget : GlanceAppWidget() {
                     // ✅ SINON ON CONTINUE NORMALEMENT
                     else if (displaySites.isEmpty()) {
                         Text(
-                            text = if (isFr) "En attente du GPS..." else "Waiting for GPS...",
+                            text = AppStrings.widgetWaitingGps(context),
                             style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp, textAlign = TextAlign.Center),
                             modifier = GlanceModifier.padding(top = 8.dp).fillMaxWidth()
                         )
@@ -395,11 +397,8 @@ class RefreshWidgetAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         // 1. On affiche le message TOUT DE SUITE pour confirmer le clic
         val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-        val lang = prefs.getString("app_language", "Système") ?: "Système"
-        val isFr = lang == "Français" || (lang == "Système" && java.util.Locale.getDefault().language == "fr")
-
         Handler(Looper.getMainLooper()).post {
-            Toast.makeText(context, if (isFr) "Recherche immédiate..." else "Searching...", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, AppStrings.widgetImmediateSearch(context), Toast.LENGTH_SHORT).show()
         }
 
         val timeFormat = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
@@ -518,13 +517,7 @@ class RefreshWidgetAction : ActionCallback {
 
                     val operateurText = ops.joinToString(" • ")
                     val colorHex = if (ops.size == 1) {
-                        when {
-                            ops[0].contains("ORANGE") -> "#FF7900"
-                            ops[0].contains("FREE") -> "#757575"
-                            ops[0].contains("BOUYGUES") -> "#00295F"
-                            ops[0].contains("SFR") -> "#E2001A"
-                            else -> "#FFFFFF"
-                        }
+                        OperatorColors.colorHex(ops[0], fallback = "#FFFFFF")
                     } else "#MULTI"
 
                     val technique = dao.getTechniqueDetails(main.idAnfr.toString())
@@ -544,7 +537,7 @@ class RefreshWidgetAction : ActionCallback {
                 updateUi(true, json)
 
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLogger.w(TAG_WIDGET, "Widget refresh failed", e)
                 updateUi(false)
             }
         }

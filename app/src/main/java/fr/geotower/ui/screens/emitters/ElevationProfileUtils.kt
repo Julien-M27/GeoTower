@@ -6,15 +6,13 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
-import android.net.Uri
 import androidx.core.app.ActivityCompat
+import fr.geotower.data.api.ElevationProfileApi
 import fr.geotower.utils.AppConfig
-import java.net.URL
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
-import org.json.JSONObject
 
 data class ElevationProfileDataPoint(
     val latitude: Double,
@@ -52,34 +50,23 @@ fun fetchIgnElevationProfileData(
     toLatitude: Double,
     toLongitude: Double
 ): ElevationProfileDataResult {
-    val totalDistance = FloatArray(1)
-    Location.distanceBetween(fromLatitude, fromLongitude, toLatitude, toLongitude, totalDistance)
-    val sampling = elevationSamplingForDistance(totalDistance[0])
-    val url = Uri.parse("https://data.geopf.fr/altimetrie/1.0/calcul/alti/rest/elevationLine.json")
-        .buildUpon()
-        .appendQueryParameter("lon", "$fromLongitude|$toLongitude")
-        .appendQueryParameter("lat", "$fromLatitude|$toLatitude")
-        .appendQueryParameter("resource", "ign_rge_alti_wld")
-        .appendQueryParameter("delimiter", "|")
-        .appendQueryParameter("indent", "false")
-        .appendQueryParameter("measures", "false")
-        .appendQueryParameter("profile_mode", "simple")
-        .appendQueryParameter("sampling", sampling.toString())
-        .build()
-        .toString()
-
-    val connection = URL(url).openConnection() as java.net.HttpURLConnection
-    connection.requestMethod = "GET"
-    connection.connectTimeout = 8000
-    connection.readTimeout = 8000
-
-    return try {
-        if (connection.responseCode !in 200..299) error("HTTP ${connection.responseCode}")
-        val json = connection.inputStream.bufferedReader().use { reader -> reader.readText() }
-        parseElevationProfileData(json, totalDistance[0])
-    } finally {
-        connection.disconnect()
-    }
+    val profile = ElevationProfileApi.getProfile(
+        fromLatitude = fromLatitude,
+        fromLongitude = fromLongitude,
+        toLatitude = toLatitude,
+        toLongitude = toLongitude
+    )
+    return ElevationProfileDataResult(
+        points = profile.points.map { point ->
+            ElevationProfileDataPoint(
+                latitude = point.latitude,
+                longitude = point.longitude,
+                elevation = point.elevation,
+                distanceMeters = point.distanceMeters
+            )
+        },
+        distanceMeters = profile.distanceMeters
+    )
 }
 
 fun calculateElevationLineObstruction(
@@ -212,50 +199,6 @@ private fun extractElevationProfileAntennaHeightMeters(physicalDetails: String):
         .findAll(physicalDetails)
         .mapNotNull { match -> match.groupValues[1].replace(',', '.').toDoubleOrNull() }
         .maxOrNull()
-}
-
-private fun parseElevationProfileData(json: String, fallbackDistanceMeters: Float): ElevationProfileDataResult {
-    val array = JSONObject(json).getJSONArray("elevations")
-    val points = mutableListOf<ElevationProfileDataPoint>()
-    var cumulativeDistance = 0f
-    var previousLat: Double? = null
-    var previousLon: Double? = null
-
-    for (index in 0 until array.length()) {
-        val item = array.getJSONObject(index)
-        val latitude = item.getDouble("lat")
-        val longitude = item.getDouble("lon")
-        val elevation = item.getDouble("z")
-        if (elevation <= -99990.0) continue
-
-        if (previousLat != null && previousLon != null) {
-            val segment = FloatArray(1)
-            Location.distanceBetween(previousLat, previousLon, latitude, longitude, segment)
-            cumulativeDistance += segment[0]
-        }
-
-        points.add(
-            ElevationProfileDataPoint(
-                latitude = latitude,
-                longitude = longitude,
-                elevation = elevation,
-                distanceMeters = cumulativeDistance
-            )
-        )
-        previousLat = latitude
-        previousLon = longitude
-    }
-
-    if (points.size < 2) error("No profile data")
-    val distance = if (cumulativeDistance > 0f) cumulativeDistance else fallbackDistanceMeters
-    return ElevationProfileDataResult(points = points, distanceMeters = distance)
-}
-
-private fun elevationSamplingForDistance(distanceMeters: Float): Int = when {
-    distanceMeters < 1_000f -> 90
-    distanceMeters < 5_000f -> 140
-    distanceMeters < 20_000f -> 220
-    else -> 320
 }
 
 private fun normalizeElevationProfileFrequency(value: Int): Int? {

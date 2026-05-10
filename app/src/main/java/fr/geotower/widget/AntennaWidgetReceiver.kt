@@ -14,9 +14,9 @@ class AntennaWidgetReceiver : GlanceAppWidgetReceiver() {
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
 
-        // Récupère la fréquence sauvegardée (ou 30 min par défaut)
+        // Récupère la fréquence sauvegardée (ou 1 h par défaut)
         val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-        val freq = prefs.getInt("widget_sync_freq", 30).toLong()
+        val freq = prefs.getInt("widget_sync_freq", 60).toLong()
 
         val periodicWork = PeriodicWorkRequestBuilder<AntennaWidgetWorker>(
             freq, TimeUnit.MINUTES

@@ -5,6 +5,11 @@ import androidx.compose.ui.text.intl.Locale as ComposeLocale
 import java.util.Locale
 
 object AppStrings {
+    const val LANGUAGE_SYSTEM = "Système"
+    const val LANGUAGE_FRENCH = "Français"
+    const val LANGUAGE_ENGLISH = "English"
+    const val LANGUAGE_PORTUGUESE = "Português"
+
     // Lecture en temps réel de la langue choisie dans les paramètres
     private val language: String
         @Composable get() = AppConfig.appLanguage.value
@@ -15,15 +20,15 @@ object AppStrings {
         val currentLang = AppConfig.appLanguage.value
 
         // Si "Système" est sélectionné, on récupère le code langue du téléphone
-        val langToCheck = if (currentLang == "Système") {
+        val langToCheck = if (currentLang == LANGUAGE_SYSTEM) {
             currentSystemLanguage()
         } else {
             currentLang
         }
 
         return when {
-            langToCheck == "Français" || langToCheck == "fr" -> fr
-            langToCheck == "Português" || langToCheck == "pt" -> pt
+            langToCheck == LANGUAGE_FRENCH || langToCheck == "fr" -> fr
+            langToCheck == LANGUAGE_PORTUGUESE || langToCheck == "pt" -> pt
             // Anglais par défaut
             else -> en
         }
@@ -581,6 +586,454 @@ object AppStrings {
     val throughputNoSite @Composable get() = get("Site introuvable pour ce calcul.", "Site not found for this calculation.", "Site não encontrado para este cálculo.")
     val throughputNoBands @Composable get() = get("Aucune bande 4G ou 5G exploitable n'a été détectée pour ce site.", "No usable 4G or 5G band was detected for this site.", "Nenhuma banda 4G ou 5G utilizável foi detetada para este site.")
     val throughputDisclaimer @Composable get() = get("Le résultat est un débit radio théorique : il ne tient pas compte de la distance, du niveau de signal, du SINR, de la charge réseau, du backhaul, ni des limites du téléphone.", "The result is a theoretical radio throughput: it does not account for distance, signal level, SINR, network load, backhaul, or phone limits.", "O resultado é um débito rádio teórico: não considera distância, nível de sinal, SINR, carga da rede, backhaul ou limites do telemóvel.")
+    @Composable fun throughputHeaderSite(siteId: String, supportHeightLabel: String?) = get(
+        "Site $siteId${supportHeightLabel?.let { " - support $it" } ?: ""}",
+        "Site $siteId${supportHeightLabel?.let { " - support $it" } ?: ""}",
+        "Site $siteId${supportHeightLabel?.let { " - suporte $it" } ?: ""}"
+    )
+    val throughputEstimatedRadioTitle @Composable get() = get("Débit radio théorique estimé", "Estimated theoretical radio throughput", "Débito rádio teórico estimado")
+    val throughputDownloadLabel @Composable get() = get("Descendant", "Download", "Download")
+    val throughputPhoneUploadLabel @Composable get() = get("Montant (téléphone)", "Upload (phone)", "Upload (telemóvel)")
+    val throughputSummaryUploadNote @Composable get() = get(
+        "Le montant est pondéré côté terminal : puissance plus faible, moins de MIMO et modulation souvent plus basse qu'en descendant.",
+        "Upload is weighted for a handset: lower transmit power, less MIMO and usually lower modulation than download.",
+        "O upload é ponderado para o telemóvel: menor potência de emissão, menos MIMO e modulação geralmente inferior ao download."
+    )
+    @Composable fun throughputIncludedBandsCount(included: Int, total: Int) = get(
+        "$included bande(s) incluse(s) sur $total",
+        "$included band(s) included out of $total",
+        "$included banda(s) incluída(s) de $total"
+    )
+    val throughputEstimatedOptimalDistanceTitle @Composable get() = get("Distance optimale estimée", "Estimated optimal distance", "Distância ótima estimada")
+    val throughputConeHeightUnavailable @Composable get() = get(
+        "Hauteur de panneau/support indisponible : impossible d'estimer la zone principale du cône.",
+        "Panel/support height unavailable: unable to estimate the main cone zone.",
+        "Altura do painel/suporte indisponível: não é possível estimar a zona principal do cone."
+    )
+    @Composable fun throughputMainZoneEstimated(near: String, far: String) = get(
+        "Zone principale estimée : $near à $far",
+        "Estimated main zone: $near to $far",
+        "Zona principal estimada: $near a $far"
+    )
+    val throughputConeAssumption @Composable get() = get(
+        "Hypothèse : hauteur panneau/support, mobile à 1,5 m, tilt vertical typique 4°-8° avec un point nominal à 6°.",
+        "Assumption: panel/support height, handset at 1.5 m, typical vertical tilt 4°-8° with a 6° nominal point.",
+        "Hipótese: altura do painel/suporte, telemóvel a 1,5 m, tilt vertical típico 4°-8° com ponto nominal a 6°."
+    )
+    val throughputConeMapExplanation @Composable get() = get(
+        "Le cercle marque la distance optimale, les points indiquent les axes de panneau où le signal devrait être le plus fort.",
+        "The circle marks the optimal distance; dots show panel axes where signal should be strongest.",
+        "O círculo marca a distância ótima; os pontos mostram os eixos de painel onde o sinal deve ser mais forte."
+    )
+    val throughputRadioAssumption @Composable get() = get("Hypothèse radio", "Radio assumption", "Hipótese rádio")
+    val throughputIncludePlanned @Composable get() = get("Inclure les projets", "Include planned", "Incluir projetos")
+    val throughputIncludedBandsTitle @Composable get() = get("Bandes incluses", "Included bands", "Bandas incluídas")
+    val throughputCustomModulationTitle @Composable get() = get("Modulation personnalisée", "Custom modulation", "Modulação personalizada")
+    val throughput4gDownloadLabel @Composable get() = get("4G descendant", "4G download", "4G download")
+    val throughput4gUploadLabel @Composable get() = get("4G montant", "4G upload", "4G upload")
+    val throughput5gDownloadLabel @Composable get() = get("5G descendant", "5G download", "5G download")
+    val throughput5gUploadLabel @Composable get() = get("5G montant", "5G upload", "5G upload")
+    val throughputFrequenciesAndModulationTitle @Composable get() = get("Fréquences et modulation", "Frequencies and modulation", "Frequências e modulação")
+    val throughputEstimatedSuffix @Composable get() = get("(estimé)", "(estimated)", "(estimado)")
+    @Composable fun throughputEstimatedCone(center: String, near: String, far: String) = get(
+        "Cône estimé : $center ($near-$far)",
+        "Estimated cone: $center ($near-$far)",
+        "Cone estimado: $center ($near-$far)"
+    )
+    val throughputFrequenciesLabel @Composable get() = get("Fréquences", "Frequencies", "Frequências")
+    val throughputModulationAndAntennasLabel @Composable get() = get("Modulation et antennes", "Modulation and antennas", "Modulação e antenas")
+    val throughputReadAsEstimateTitle @Composable get() = get("À lire comme une estimation", "Read as an estimate", "Ler como uma estimativa")
+    @Composable
+    fun throughputPresetLabel(presetId: String): String = when (presetId.lowercase()) {
+        "conservative", "prudent" -> get("Prudent", "Conservative", "Prudente")
+        "ideal", "maximum" -> get("Idéal", "Ideal", "Ideal")
+        "custom" -> get("Personnalisé", "Custom", "Personalizado")
+        else -> get("Standard", "Standard", "Padrão")
+    }
+    @Composable
+    fun throughputPresetDescription(presetId: String): String = when (presetId.lowercase()) {
+        "conservative", "prudent" -> get(
+            "Profil prudent : modulation moyenne, UL fortement limité par la puissance du téléphone.",
+            "Conservative profile: average modulation, upload strongly limited by handset transmit power.",
+            "Perfil prudente: modulação média, upload fortemente limitado pela potência do telemóvel."
+        )
+        "ideal", "maximum" -> get(
+            "Profil idéal : très bonnes conditions radio plausibles, mais l'UL reste plafonné côté terminal.",
+            "Ideal profile: plausible very good radio conditions, but upload remains capped on the handset side.",
+            "Perfil ideal: condições rádio muito boas e plausíveis, mas o upload continua limitado pelo terminal."
+        )
+        "custom" -> get(
+            "Profil personnalisé : les modulations DL/UL sont réglées manuellement, avec un UL toujours limité comme un téléphone.",
+            "Custom profile: DL/UL modulations are manually tuned, with upload still limited like a handset.",
+            "Perfil personalizado: as modulações DL/UL são ajustadas manualmente, com upload ainda limitado como um telemóvel."
+        )
+        else -> get(
+            "Profil standard : 4G MIMO 2x2 et 5G MIMO 4x4 en descendant, montant calculé comme un téléphone réel.",
+            "Standard profile: 4G MIMO 2x2 and 5G MIMO 4x4 for download, upload calculated like a real handset.",
+            "Perfil padrão: 4G MIMO 2x2 e 5G MIMO 4x4 no download, upload calculado como um telemóvel real."
+        )
+    }
+    val shareThroughputTitle @Composable get() = get("Débit théorique", "Theoretical throughput", "Débito teórico")
+    val shareThroughputPhoneUploadLabel @Composable get() = get("Montant tél.", "Phone upload", "Upload tel.")
+    @Composable fun shareThroughputOptimalDistance(distance: String) = get("Distance optimale : $distance", "Optimal distance: $distance", "Distância ótima: $distance")
+    @Composable fun shareThroughputZone(near: String, far: String) = get("Zone : $near à $far", "Zone: $near to $far", "Zona: $near a $far")
+    @Composable fun shareThroughputBandsSummary(presetLabel: String, included: Int, total: Int) = get(
+        "$presetLabel · $included/$total bande(s)",
+        "$presetLabel · $included/$total band(s)",
+        "$presetLabel · $included/$total banda(s)"
+    )
+    val shareThroughputDisclaimer @Composable get() = get(
+        "Débit radio estimé : hors charge réseau, signal réel, backhaul et limites exactes du téléphone.",
+        "Estimated radio throughput: excludes network load, real signal, backhaul and exact phone limits.",
+        "Débito rádio estimado: exclui carga da rede, sinal real, backhaul e limites exatos do telefone."
+    )
+    @Composable
+    fun throughputBlockTitle(blockId: String): String = when (blockId) {
+        "header" -> get("En-tête du site", "Site header", "Cabeçalho do site")
+        "summary" -> get("Résumé des débits", "Throughput summary", "Resumo dos débitos")
+        "cone" -> get("Distance optimale", "Optimal distance", "Distância ideal")
+        "controls" -> get("Hypothèses et filtres", "Assumptions and filters", "Hipóteses e filtros")
+        "bands" -> throughputFrequenciesAndModulationTitle
+        "assumptions" -> get("Sources et avertissements", "Sources and warnings", "Fontes e avisos")
+        else -> blockId
+    }
+    val throughputCalculationSettingsTitle @Composable get() = get("Réglages de calcul", "Calculation settings", "Definições de cálculo")
+    val throughputDefaultModeTitle @Composable get() = get("Mode de calcul par défaut", "Default calculation mode", "Modo de cálculo predefinido")
+    val throughputInclude4g @Composable get() = get("Inclure la 4G", "Include 4G", "Incluir 4G")
+    val throughputInclude5g @Composable get() = get("Inclure la 5G", "Include 5G", "Incluir 5G")
+    val throughputDefaultFrequencyBandsTitle @Composable get() = get("Bandes de fréquences par défaut", "Default frequency bands", "Bandas de frequência predefinidas")
+    val throughputAttentionTitle @Composable get() = get("Points d'attention", "Important notes", "Pontos de atenção")
+    @Composable fun throughputCalculationAssumptions(assumptions: String) = get("Hypothèses de calcul : $assumptions", "Calculation assumptions: $assumptions", "Hipóteses de cálculo: $assumptions")
+    @Composable fun throughputSources(summary: String) = get("Sources : $summary", "Sources: $summary", "Fontes: $summary")
+    val throughputWarningNetworkUnknown @Composable get() = get(
+        "La charge du réseau, le backhaul et les capacités exactes du téléphone ne sont pas connus.",
+        "Network load, backhaul and the phone's exact capabilities are not known.",
+        "A carga da rede, o backhaul e as capacidades exatas do telemóvel não são conhecidos."
+    )
+    @Composable fun throughputWarningProfileApplied(profileLabel: String) = get(
+        "Le MIMO et la modulation ne sont pas publiés au niveau du site : le profil $profileLabel est donc appliqué.",
+        "MIMO and modulation are not published at site level, so the $profileLabel profile is applied.",
+        "O MIMO e a modulação não são publicados ao nível do site; por isso, é aplicado o perfil $profileLabel."
+    )
+    @Composable fun throughputWarningAllocationMissing(bandAndTech: String) = get(
+        "Bande $bandAndTech exclue : allocation opérateur introuvable.",
+        "Band $bandAndTech excluded: operator allocation not found.",
+        "Banda $bandAndTech excluída: alocação da operadora não encontrada."
+    )
+    @Composable fun throughputWarningDssShared(band: String) = get(
+        "Bande $band potentiellement partagée entre la 4G et la 5G : le débit n'est pas additionné intégralement.",
+        "Band $band may be shared between 4G and 5G, so its throughput is not fully added.",
+        "A banda $band pode ser partilhada entre 4G e 5G; por isso, o débito não é somado integralmente."
+    )
+    val throughputWarningUplinkAggregation @Composable get() = get(
+        "Le débit montant est limité aux deux meilleures fréquences agrégées, une hypothèse plus réaliste pour les réseaux mobiles en France.",
+        "Upload throughput is limited to the two best aggregated frequencies, which is a more realistic assumption for mobile networks in France.",
+        "O débito ascendente é limitado às duas melhores frequências agregadas, uma hipótese mais realista para redes móveis em França."
+    )
+    val throughputWarningLowBandAggregation @Composable get() = get(
+        "Agrégation 4G entre bandes basses 700/800/900 MHz limitée : beaucoup de téléphones ne cumulent pas ces porteuses.",
+        "4G aggregation between low bands 700/800/900 MHz is limited: many phones do not combine these carriers.",
+        "A agregação 4G entre bandas baixas 700/800/900 MHz é limitada: muitos telemóveis não combinam estas portadoras."
+    )
+    val throughputWarningLteAggregationLimit @Composable get() = get(
+        "Limite d'agrégation 4G choisie : seules les meilleures porteuses sont comptées.",
+        "Selected 4G aggregation limit: only the best carriers are counted.",
+        "Limite de agregação 4G escolhida: apenas as melhores portadoras são contabilizadas."
+    )
+    val throughputWarningNrAggregationLimit @Composable get() = get(
+        "Limite d'agrégation 5G du profil : seules les meilleures porteuses sont comptées.",
+        "Profile 5G aggregation limit: only the best carriers are counted.",
+        "Limite de agregação 5G do perfil: apenas as melhores portadoras são contabilizadas."
+    )
+    val throughputExcludedNoMetropolitanArcepAllocation @Composable get() = get(
+        "Aucune allocation Arcep France métropolitaine compatible avec cette technologie et cette bande.",
+        "No compatible Arcep allocation for metropolitan France was found for this technology and band.",
+        "Não foi encontrada nenhuma alocação Arcep da França metropolitana compatível com esta tecnologia e esta banda."
+    )
+    val throughputExcludedDssShared @Composable get() = get(
+        "Bande potentiellement partagée entre la 4G et la 5G : elle n'est pas additionnée deux fois.",
+        "Band potentially shared between 4G and 5G: it is not counted twice.",
+        "Banda potencialmente partilhada entre 4G e 5G: não é contabilizada duas vezes."
+    )
+    val throughputSourceSummaryEngine @Composable get() = get(
+        "ANFR/data.gouv pour les fréquences déclarées, Arcep pour les allocations opérateur, ETSI/3GPP TS 38.306 et TS 36.306/36.213 pour le modèle radio.",
+        "ANFR/data.gouv for declared frequencies, Arcep for operator allocations, ETSI/3GPP TS 38.306 and TS 36.306/36.213 for the radio model.",
+        "ANFR/data.gouv para as frequências declaradas, Arcep para as alocações das operadoras, ETSI/3GPP TS 38.306 e TS 36.306/36.213 para o modelo rádio."
+    )
+    val throughputSourceSummaryDefault @Composable get() = get(
+        "ANFR/data.gouv pour les fréquences déclarées, Arcep pour les allocations opérateur, 3GPP pour le modèle radio.",
+        "ANFR/data.gouv for declared frequencies, Arcep for operator allocations, 3GPP for the radio model.",
+        "ANFR/data.gouv para as frequências declaradas, Arcep para as alocações das operadoras, 3GPP para o modelo rádio."
+    )
+    val throughputProfilePrudentEngineDesc @Composable get() = get(
+        "Profil prudent : 4G 64-QAM en descendant, 16-QAM en montant, 5G NR 64-QAM, agrégation limitée et DSS non compté deux fois.",
+        "Conservative profile: 4G 64-QAM downlink, 16-QAM uplink, 5G NR 64-QAM, limited aggregation and DSS not counted twice.",
+        "Perfil prudente: 4G 64-QAM em download, 16-QAM em upload, 5G NR 64-QAM, agregação limitada e DSS sem dupla contagem."
+    )
+    val throughputProfileStandardEngineDesc @Composable get() = get(
+        "Profil standard : 4G 256-QAM en descendant avec MIMO 2x2, montant 64-QAM côté téléphone, 5G n78 256-QAM en descendant avec MIMO 4x4, montant 64-QAM sur 2 couches, DSS non compté deux fois.",
+        "Standard profile: 4G 256-QAM downlink with 2x2 MIMO, 64-QAM phone-side uplink, 5G n78 256-QAM downlink with 4x4 MIMO, 64-QAM uplink on 2 layers, DSS not counted twice.",
+        "Perfil padrão: 4G 256-QAM em download com MIMO 2x2, upload 64-QAM no telemóvel, 5G n78 256-QAM em download com MIMO 4x4, upload 64-QAM em 2 camadas, DSS sem dupla contagem."
+    )
+    val throughputProfileIdealEngineDesc @Composable get() = get(
+        "Profil idéal : très bonnes conditions radio plausibles, 4G en descendant avec MIMO 4x4, 5G NR 256-QAM, agrégation plus ouverte et sans double comptage DSS.",
+        "Ideal profile: plausible very good radio conditions, 4G downlink with 4x4 MIMO, 5G NR 256-QAM, more open aggregation and no DSS double counting.",
+        "Perfil ideal: condições rádio muito boas e plausíveis, 4G em download com MIMO 4x4, 5G NR 256-QAM, agregação mais aberta e sem dupla contagem DSS."
+    )
+    val throughputProfileCustomEngineDesc @Composable get() = get(
+        "Profil personnalisé : modulations descendantes et montantes choisies dans l'interface, débit montant traité comme celui d'un téléphone.",
+        "Custom profile: downlink and uplink modulations chosen in the interface, with upload treated like a phone.",
+        "Perfil personalizado: modulações de download e upload escolhidas na interface, com o upload tratado como o de um telemóvel."
+    )
+    val throughputCustomSignalTitle @Composable get() = get("Signal mesuré", "Measured signal", "Sinal medido")
+    val throughputCustomSignalDesc @Composable get() = get(
+        "Ces valeurs pondèrent le débit estimé : un bon SINR autorise une modulation plus efficace, alors qu'un RSRP faible dégrade la stabilité.",
+        "These values weight the estimate: good SINR allows more efficient modulation, while weak RSRP reduces stability.",
+        "Estes valores ponderam a estimativa: um bom SINR permite uma modulação mais eficiente, enquanto um RSRP fraco reduz a estabilidade."
+    )
+    val throughputCustomEnvironmentTitle @Composable get() = get("Environnement", "Environment", "Ambiente")
+    val throughputCustomPositionTitle @Composable get() = get("Position", "Position", "Posição")
+    val throughputUseCurrentPosition @Composable get() = get("Utiliser ma position actuelle", "Use my current position", "Usar a minha posição atual")
+    val throughputChooseMapPoint @Composable get() = get("Choisir un point sur la carte", "Choose a point on the map", "Escolher um ponto no mapa")
+    val throughputClearPosition @Composable get() = get("Retirer la localisation du calcul", "Remove location from calculation", "Remover a localização do cálculo")
+    val throughputTapMapToChoose @Composable get() = get(
+        "Déplacez/zoomez la mini-carte si besoin, puis touchez le point à analyser.",
+        "Move/zoom the mini map if needed, then tap the point to analyze.",
+        "Mova/aproxime o minimapa se necessário e toque no ponto a analisar."
+    )
+    val throughputPositionCurrentApplied @Composable get() = get(
+        "Position actuelle utilisée pour l'analyse.",
+        "Current position used for the analysis.",
+        "Posição atual usada para a análise."
+    )
+    val throughputPositionMapPointApplied @Composable get() = get(
+        "Point choisi sur la carte utilisé pour l'analyse.",
+        "Map point used for the analysis.",
+        "Ponto escolhido no mapa usado para a análise."
+    )
+    val throughputPositionCleared @Composable get() = get(
+        "Localisation retirée du calcul.",
+        "Location removed from the calculation.",
+        "Localização removida do cálculo."
+    )
+    val throughputPositionPermissionDenied @Composable get() = get(
+        "Autorisation de localisation refusée : choisis un point sur la carte ou réessaie après l'avoir activée.",
+        "Location permission denied: choose a point on the map or try again after enabling it.",
+        "Autorização de localização recusada: escolha um ponto no mapa ou tente novamente depois de a ativar."
+    )
+    val throughputPositionUnavailable @Composable get() = get(
+        "Position actuelle indisponible pour le moment.",
+        "Current position is unavailable for now.",
+        "A posição atual está indisponível neste momento."
+    )
+    val throughputPositionLocating @Composable get() = get("Recherche de la position...", "Locating...", "A localizar...")
+    val throughputPositionNoSelection @Composable get() = get(
+        "Aucune position choisie : le calcul garde un coefficient de position neutre.",
+        "No position selected: the calculation keeps a neutral position coefficient.",
+        "Nenhuma posição escolhida: o cálculo mantém um coeficiente de posição neutro."
+    )
+    val throughputCustomMapSelectionHint @Composable get() = get(
+        "Touchez la mini-carte pour choisir votre position : GeoTower déduira si vous êtes dans le cône, trop proche, trop loin ou hors azimut.",
+        "Tap the mini map to choose your position: GeoTower will infer whether you are in the beam, too close, too far, or outside the azimuth.",
+        "Toque no minimapa para escolher a sua posição: o GeoTower deduzirá se está no feixe, demasiado perto, demasiado longe ou fora do azimute."
+    )
+    @Composable fun throughputCustomSelectedPosition(label: String) = get(
+        "Position choisie : $label",
+        "Selected position: $label",
+        "Posição escolhida: $label"
+    )
+    @Composable fun throughputPositionDistance(distance: String) = get(
+        "Distance au site : $distance",
+        "Distance to site: $distance",
+        "Distância ao site: $distance"
+    )
+    @Composable fun throughputPositionAzimuthInside(azimuth: String, delta: Int) = get(
+        "Dans l'azimut d'un panneau ($azimuth, écart $delta°).",
+        "Inside a panel azimuth ($azimuth, $delta° offset).",
+        "Dentro do azimute de um painel ($azimuth, desvio $delta°)."
+    )
+    @Composable fun throughputPositionAzimuthOutside(azimuth: String, delta: Int) = get(
+        "Hors faisceau : panneau le plus proche $azimuth, écart $delta°.",
+        "Outside beam: closest panel $azimuth, $delta° offset.",
+        "Fora do feixe: painel mais próximo $azimuth, desvio $delta°."
+    )
+    val throughputPositionAzimuthUnknown @Composable get() = get(
+        "Azimut panneau indisponible : seul le cône de distance est exploitable.",
+        "Panel azimuth unavailable: only the distance cone can be used.",
+        "Azimute do painel indisponível: apenas o cone de distância pode ser usado."
+    )
+    @Composable fun throughputPositionCone(center: String, near: String, far: String) = get(
+        "Cône radio estimé : point nominal $center, zone utile $near-$far d'après la hauteur panneau/support.",
+        "Estimated radio cone: nominal point $center, useful zone $near-$far from panel/support height.",
+        "Cone rádio estimado: ponto nominal $center, zona útil $near-$far a partir da altura do painel/suporte."
+    )
+    val throughputPositionConeUnavailable @Composable get() = get(
+        "Cône radio indisponible : hauteur panneau/support manquante.",
+        "Radio cone unavailable: missing panel/support height.",
+        "Cone rádio indisponível: altura do painel/suporte em falta."
+    )
+    val throughputCustomTerminalTitle @Composable get() = get("Réseau et agrégation", "Network and aggregation", "Rede e agregação")
+    val throughputCustomTerminalDesc @Composable get() = get(
+        "Ces choix ajustent la charge cellule, la qualité du lien de collecte et le nombre de porteuses 4G comptées.",
+        "These choices adjust cell load, backhaul quality and the number of counted 4G carriers.",
+        "Estas opções ajustam a carga da célula, a qualidade do backhaul e o número de portadoras 4G contabilizadas."
+    )
+    val throughputCustomNetworkLoadTitle @Composable get() = get("Charge réseau", "Network load", "Carga da rede")
+    val throughputCustomBackhaulTitle @Composable get() = get("Backhaul", "Backhaul", "Backhaul")
+    val throughputCustomAggregationTitle @Composable get() = get("Agrégation 4G", "4G aggregation", "Agregação 4G")
+    @Composable fun throughputCustomImpact(ltePercent: Int, nrPercent: Int) = get(
+        "Impact estimé : 4G ${ltePercent}% / 5G ${nrPercent}%",
+        "Estimated impact: 4G ${ltePercent}% / 5G ${nrPercent}%",
+        "Impacto estimado: 4G ${ltePercent}% / 5G ${nrPercent}%"
+    )
+    @Composable
+    fun throughputEnvironmentLabel(id: String): String = when (id) {
+        "outdoor" -> get("Extérieur", "Outdoor", "Exterior")
+        "vehicle" -> get("Voiture", "Vehicle", "Carro")
+        "indoor" -> get("Intérieur", "Indoor", "Interior")
+        "deep_indoor" -> get("Intérieur profond", "Deep indoor", "Interior profundo")
+        else -> id
+    }
+    @Composable
+    fun throughputPositionScenarioLabel(id: String): String = when (id) {
+        "unknown" -> get("Non renseignée", "Unknown", "Desconhecida")
+        "in_cone" -> get("Dans le cône", "In the beam", "No feixe")
+        "too_close" -> get("Trop proche", "Too close", "Demasiado perto")
+        "too_far" -> get("Trop loin", "Too far", "Demasiado longe")
+        "outside_beam" -> get("Hors azimut", "Outside beam", "Fora do azimute")
+        else -> id
+    }
+    @Composable
+    fun throughputNetworkLoadLabel(id: String): String = when (id) {
+        "unknown" -> get("Non renseignée", "Unknown", "Desconhecida")
+        "light" -> get("Faible", "Light", "Baixa")
+        "medium" -> get("Moyenne", "Medium", "Média")
+        "heavy" -> get("Forte", "Heavy", "Alta")
+        "saturated" -> get("Saturée", "Saturated", "Saturada")
+        else -> id
+    }
+    @Composable
+    fun throughputBackhaulLabel(id: String): String = when (id) {
+        "unknown" -> get("Non renseigné", "Unknown", "Desconhecido")
+        "fiber" -> get("Fibre / très bon", "Fiber / very good", "Fibra / muito bom")
+        "radio" -> get("Faisceau hertzien", "Microwave link", "Feixe hertziano")
+        "limited" -> get("Limité", "Limited", "Limitado")
+        else -> id
+    }
+    @Composable
+    fun throughputLteAggregationLabel(id: String): String = when (id) {
+        "single" -> get("1 porteuse", "1 carrier", "1 portadora")
+        "realistic" -> get("Réaliste", "Realistic", "Realista")
+        "wide" -> get("Large", "Wide", "Ampla")
+        else -> id
+    }
+    val throughputCustomExplanationTitle @Composable get() = get("Impact sur le calcul", "Impact on the calculation", "Impacto no cálculo")
+    val throughputCustomExplanationModulationTitle @Composable get() = get("Modulation", "Modulation", "Modulação")
+    val throughputCustomExplanationModulationDesc @Composable get() = get(
+        "Le QAM choisi fixe le débit radio brut : plus la modulation est élevée, plus le débit théorique monte, mais elle suppose un meilleur signal.",
+        "The selected QAM sets the raw radio throughput: higher modulation increases theoretical speed but assumes a better signal.",
+        "O QAM escolhido define o débito rádio bruto: uma modulação mais alta aumenta o débito teórico, mas pressupõe melhor sinal."
+    )
+    @Composable fun throughputCustomExplanationSignalDesc(ltePercent: Int, nrPercent: Int) = get(
+        "Le RSRP compte pour 40 % du score radio et le SNR/SINR pour 60 %. Le coefficient actuel donne 4G $ltePercent % / 5G $nrPercent %.",
+        "RSRP accounts for 40% of the radio score and SNR/SINR for 60%. The current coefficient gives 4G $ltePercent% / 5G $nrPercent%.",
+        "O RSRP conta 40% da pontuação rádio e o SNR/SINR 60%. O coeficiente atual dá 4G $ltePercent% / 5G $nrPercent%."
+    )
+    val throughputCustomExplanationEnvironmentDesc @Composable get() = get(
+        "L'environnement multiplie le résultat : extérieur 100 %, voiture 85 %, intérieur 65 %, intérieur profond 45 %.",
+        "Environment multiplies the result: outdoor 100%, vehicle 85%, indoor 65%, deep indoor 45%.",
+        "O ambiente multiplica o resultado: exterior 100%, carro 85%, interior 65%, interior profundo 45%."
+    )
+    val throughputCustomExplanationPositionDesc @Composable get() = get(
+        "La position ajuste le débit selon la zone radio : dans le cône 106 %, trop proche 75 %, trop loin 68 %, hors azimut 45 %.",
+        "Position adjusts throughput by radio zone: in the beam 106%, too close 75%, too far 68%, outside azimuth 45%.",
+        "A posição ajusta o débito pela zona rádio: no feixe 106%, demasiado perto 75%, demasiado longe 68%, fora do azimute 45%."
+    )
+    val throughputCustomExplanationNetworkLoadDesc @Composable get() = get(
+        "La charge réseau réduit le débit disponible par utilisateur : inconnue 100 %, faible 90 %, moyenne 68 %, forte 46 %, saturée 28 % en descendant.",
+        "Network load reduces per-user throughput: unknown 100%, light 90%, medium 68%, heavy 46%, saturated 28% on download.",
+        "A carga da rede reduz o débito por utilizador: desconhecida 100%, baixa 90%, média 68%, alta 46%, saturada 28% em download."
+    )
+    val throughputCustomExplanationBackhaulDesc @Composable get() = get(
+        "Le backhaul représente le lien derrière l'antenne : fibre 100 %, faisceau hertzien 84 %, limité 55 % en descendant.",
+        "Backhaul represents the link behind the antenna: fiber 100%, microwave link 84%, limited 55% on download.",
+        "O backhaul representa a ligação por trás da antena: fibra 100%, feixe hertziano 84%, limitado 55% em download."
+    )
+    @Composable fun throughputCustomExplanationAggregationDesc(maxLteCarriers: Int) = get(
+        "Le total garde les $maxLteCarriers meilleure(s) porteuse(s) 4G selon le profil. Les bandes basses 700/800/900 MHz ne sont pas additionnées entre elles.",
+        "The total keeps the best $maxLteCarriers 4G carrier(s) for the profile. Low bands 700/800/900 MHz are not added together.",
+        "O total mantém as $maxLteCarriers melhor(es) portadora(s) 4G do perfil. As bandas baixas 700/800/900 MHz não são somadas entre si."
+    )
+
+    @Composable
+    fun translateThroughputWarning(warning: String): String {
+        val profilePrefix = "Le MIMO et la modulation ne sont pas publiés au niveau du site : le profil "
+        val allocationPrefix = "Bande "
+        val allocationSuffix = " exclue : allocation opérateur introuvable."
+        val dssPrefix = "Bande "
+        val dssSuffix = " potentiellement partagée entre la 4G et la 5G : le débit n'est pas additionné intégralement."
+
+        return when {
+            warning == "La charge du réseau, le backhaul et les capacités exactes du téléphone ne sont pas connus." -> throughputWarningNetworkUnknown
+            warning.startsWith(profilePrefix) && warning.endsWith(" est donc appliqué.") -> {
+                val rawLabel = warning.removePrefix(profilePrefix).removeSuffix(" est donc appliqué.")
+                throughputWarningProfileApplied(translateThroughputProfileLabel(rawLabel))
+            }
+            warning.startsWith(allocationPrefix) && warning.endsWith(allocationSuffix) -> {
+                throughputWarningAllocationMissing(warning.removePrefix(allocationPrefix).removeSuffix(allocationSuffix))
+            }
+            warning.startsWith(dssPrefix) && warning.endsWith(dssSuffix) -> {
+                throughputWarningDssShared(warning.removePrefix(dssPrefix).removeSuffix(dssSuffix))
+            }
+            warning == "Le débit montant est limité aux deux meilleures fréquences agrégées, une hypothèse plus réaliste pour les réseaux mobiles en France." -> throughputWarningUplinkAggregation
+            warning == "Agrégation 4G entre bandes basses 700/800/900 MHz limitée : beaucoup de téléphones ne cumulent pas ces porteuses." -> throughputWarningLowBandAggregation
+            warning == "Limite d'agrégation 4G choisie : seules les meilleures porteuses sont comptées." -> throughputWarningLteAggregationLimit
+            warning == "Limite d'agrégation 5G du profil : seules les meilleures porteuses sont comptées." -> throughputWarningNrAggregationLimit
+            else -> warning
+        }
+    }
+
+    @Composable
+    fun translateThroughputAssumption(assumption: String): String = when (assumption) {
+        "Profil prudent : 4G 64-QAM en descendant, 16-QAM en montant, 5G NR 64-QAM, agrégation limitée et DSS non compté deux fois." -> throughputProfilePrudentEngineDesc
+        "Profil standard : 4G 256-QAM en descendant avec MIMO 2x2, montant 64-QAM côté téléphone, 5G n78 256-QAM en descendant avec MIMO 4x4, montant 64-QAM sur 2 couches, DSS non compté deux fois." -> throughputProfileStandardEngineDesc
+        "Profil idéal : très bonnes conditions radio plausibles, 4G en descendant avec MIMO 4x4, 5G NR 256-QAM, agrégation plus ouverte et sans double comptage DSS." -> throughputProfileIdealEngineDesc
+        "Profil personnalisé : modulations descendantes et montantes choisies dans l'interface, débit montant traité comme celui d'un téléphone." -> throughputProfileCustomEngineDesc
+        "Profil personnalisé : modulations DL/UL choisies dans l'interface, UL traité comme un téléphone." -> throughputProfileCustomEngineDesc
+        else -> assumption
+    }
+
+    @Composable
+    fun translateThroughputExcludedReason(reason: String): String = when (reason) {
+        "5G désactivée" -> get("5G désactivée", "5G disabled", "5G desativado")
+        "4G désactivée" -> get("4G désactivée", "4G disabled", "4G desativado")
+        "Bande exclue" -> get("Bande exclue", "Band excluded", "Banda excluída")
+        "Opérateur non reconnu pour les allocations Arcep" -> get("Opérateur non reconnu pour les allocations Arcep", "Operator not recognized for Arcep allocations", "Operadora não reconhecida nas alocações Arcep")
+        "Allocation Arcep introuvable" -> get("Allocation Arcep introuvable", "Arcep allocation not found", "Alocação Arcep não encontrada")
+        "Bande en projet" -> get("Bande en projet", "Planned band", "Banda em projeto")
+        "Aucune allocation Arcep France métropolitaine compatible avec cette technologie et cette bande." -> throughputExcludedNoMetropolitanArcepAllocation
+        "Bande potentiellement partagée entre la 4G et la 5G : elle n'est pas additionnée deux fois." -> throughputExcludedDssShared
+        "Agrégation 4G entre bandes basses 700/800/900 MHz limitée : beaucoup de téléphones ne cumulent pas ces porteuses." -> throughputWarningLowBandAggregation
+        "Limite d'agrégation 4G choisie : seules les meilleures porteuses sont comptées." -> throughputWarningLteAggregationLimit
+        "Limite d'agrégation 5G du profil : seules les meilleures porteuses sont comptées." -> throughputWarningNrAggregationLimit
+        else -> reason
+    }
+
+    @Composable
+    fun translateThroughputSourceSummary(summary: String): String = when (summary) {
+        "ANFR/data.gouv pour les fréquences déclarées, Arcep pour les allocations opérateur, ETSI/3GPP TS 38.306 et TS 36.306/36.213 pour le modèle radio." -> throughputSourceSummaryEngine
+        "ANFR/data.gouv pour les fréquences déclarées, Arcep pour les allocations opérateur, 3GPP pour le modèle radio." -> throughputSourceSummaryDefault
+        else -> summary
+    }
+
+    @Composable
+    private fun translateThroughputProfileLabel(label: String): String = when (label) {
+        "Prudent" -> get("prudent", "conservative", "prudente")
+        "Standard" -> get("standard", "standard", "padrão")
+        "Profil idéal" -> get("idéal", "ideal", "ideal")
+        "Personnalisé" -> get("personnalisé", "custom", "personalizado")
+        else -> label
+    }
 
     val liveNotificationTitle @Composable get() = get("Notification Live", "Live Notification", "Notificação au vivo")
     val liveNotificationDesc @Composable get() = get("Activer les notifications en temps réel", "Enable real-time notifications", "Ativar notifications em tempo real")
@@ -596,6 +1049,11 @@ object AppStrings {
     val minOneTechnoWarning @Composable get() = get("Vous devez garder au moins une technologie mobile (2G, 3G, 4G ou 5G).", "You must keep at least one mobile technology (2G, 3G, 4G, or 5G).", "Deve manter pelo menos uma tecnologia móvel (2G, 3G, 4G ou 5G).")
     val minOneFreqWarning @Composable get() = get("Vous devez garder au moins une fréquence.", "You must keep at least one frequency.", "Deve manter pelo menos uma fréquence.")
     val anfrDatabaseFrom @Composable get() = get("Données hebdomadaires actuellement téléchargées :", "Weekly data currently downloaded:", "Dados semanais atualmente transferidos:")
+    val noDatabaseInstalled @Composable get() = get("Aucune base installée", "No database installed", "Nenhuma base instalada")
+    val invalidLocalDatabase @Composable get() = get("Base locale invalide", "Invalid local database", "Base local inválida")
+    val oldUndatedDatabase @Composable get() = get("Ancienne version (Non datée)", "Old version (Undated)", "Versão antiga (Sem data)")
+    val latestDatabaseAvailable @Composable get() = get("Dernière base disponible :", "Latest database:", "Última base disp.:")
+    val currentlyDownloadedDatabase @Composable get() = get("Base actuellement téléchargée :", "Currently downloaded:", "Base atualmente transferida:")
 
     val deleteData @Composable get() = get("Supprimer les données", "Delete data", "Eliminar dados")
     val deleteDbWarningTitle @Composable get() = get("Attention", "Warning", "Atenção")
@@ -655,20 +1113,21 @@ object AppStrings {
     val nearbySearchHelpContentDescription @Composable get() = get("Aide recherche", "Search help", "Ajuda da pesquisa")
     val nearbySearchHelpTitle @Composable get() = get("Codes de recherche", "Search codes", "Códigos de pesquisa")
     val nearbySearchHelpOk @Composable get() = get("Compris", "Got it", "Entendi")
-    val nearbySearchHelpCityDesc @Composable get() = get("cherche les sites dans la ville avec la zone Nominatim, comme la carte.", "searches for sites in the city using the Nominatim area, like the map.", "procura locais na cidade usando a área do Nominatim, como no mapa.")
-    val nearbySearchHelpAddressDesc @Composable get() = get("cherche dans toute l'adresse ANFR du site.", "searches the full ANFR address of the site.", "procura no endereço ANFR completo do local.")
-    val nearbySearchHelpPostalDesc @Composable get() = get("cherche par code postal.", "searches by postal code.", "procura por código postal.")
-    val nearbySearchHelpGpsDesc @Composable get() = get("cherche autour de coordonnées GPS.", "searches around GPS coordinates.", "procura à volta de coordenadas GPS.")
-    val nearbySearchHelpAnfrDesc @Composable get() = get("cherche un identifiant ANFR.", "searches for an ANFR identifier.", "procura um identificador ANFR.")
-    val nearbySearchHelpSupportDesc @Composable get() = get("cherche un identifiant de support.", "searches for a support identifier.", "procura um identificador de suporte.")
-    val nearbySearchHelpOperatorDesc @Composable get() = get("filtre par opérateur.", "filters by operator.", "filtra por operador.")
-    val nearbySearchHelpTechDesc @Composable get() = get("filtre par technologie.", "filters by technology.", "filtra por tecnologia.")
-    val nearbySearchHelpTypeDesc @Composable get() = get("filtre par type de support.", "filters by support type.", "filtra por tipo de suporte.")
+    val nearbySearchHelpCityDesc @Composable get() = get("Cherche les sites dans la ville avec la zone Nominatim, comme la carte.", "Searches for sites in the city using the Nominatim area, like the map.", "Procura locais na cidade usando a área do Nominatim, como no mapa.")
+    val nearbySearchHelpAddressDesc @Composable get() = get("Cherche dans toute l'adresse ANFR du site.", "Searches the full ANFR address of the site.", "Procura no endereço ANFR completo do local.")
+    val nearbySearchHelpPostalDesc @Composable get() = get("Cherche par code postal.", "Searches by postal code.", "Procura por código postal.")
+    val nearbySearchHelpGpsDesc @Composable get() = get("Cherche autour de coordonnées GPS.", "Searches around GPS coordinates.", "Procura à volta de coordenadas GPS.")
+    val nearbySearchHelpAnfrDesc @Composable get() = get("Cherche un identifiant ANFR.", "Searches for an ANFR identifier.", "Procura um identificador ANFR.")
+    val nearbySearchHelpSupportDesc @Composable get() = get("Cherche un identifiant de support.", "Searches for a support identifier.", "Procura um identificador de suporte.")
+    val nearbySearchHelpOperatorDesc @Composable get() = get("Filtre par opérateur.", "Filters by operator.", "Filtra por operador.")
+    val nearbySearchHelpTechDesc @Composable get() = get("Filtre par technologie.", "Filters by technology.", "Filtra por tecnologia.")
+    val nearbySearchHelpTypeDesc @Composable get() = get("Filtre par type de support.", "Filters by support type.", "Filtra por tipo de suporte.")
     val open @Composable get() = get("Ouvrir", "Open", "Abrir")
 
     val supportDetailsTitle @Composable get() = get("Détails du support", "Support details", "Detalhes do suporte")
     val supportNature @Composable get() = get("Nature du support", "Support nature", "Natureza do suporte")
     val owner @Composable get() = get("Propriétaire", "Owner", "Proprietário")
+    val likelyNetworkVendor @Composable get() = get("Équipementier réseau probable", "Likely network vendor", "Fornecedor provável da rede")
     val antennaType @Composable get() = get("Type d'antenne", "Antenna type", "Tipo de antena")
 
     // ==========================================
@@ -679,7 +1138,12 @@ object AppStrings {
         "You can send your photos directly from this app",
         "Pode enviar as suas fotos directement a partir desta application"
     )
+    val supportDiagram @Composable get() = get("Schéma du support", "Support diagram", "Esquema do suporte")
+    val addPhotos @Composable get() = get("Ajouter des photos", "Add photos", "Adicionar fotos")
+    val camera @Composable get() = get("Appareil photo", "Camera", "Câmara")
+    val gallery @Composable get() = get("Galerie", "Gallery", "Galeria")
     val uploadPhotosPrompt @Composable get() = get("Envoyer des photos", "Upload photos", "Enviar fotos")
+    val photoPrepareError @Composable get() = get("Impossible de préparer les photos.", "Could not prepare photos.", "Não foi possível preparar as fotos.")
     val unknownAuthor @Composable get() = get("Auteur inconnu", "Unknown author", "Autor desconhecido")
     val previous @Composable get() = get("Précédent", "Previous", "Anterior")
     val next @Composable get() = get("Suivant", "Next", "Próximo")
@@ -689,6 +1153,7 @@ object AppStrings {
     // ==========================================
     val searching @Composable get() = get("Recherche...", "Searching...", "A pesquisar...")
     val unknown @Composable get() = get("Inconnu", "Unknown", "Desconhecido")
+    val unknownFeminine @Composable get() = get("Inconnue", "Unknown", "Desconhecida")
 
     // --- NOUVEAUX AJOUTS ---
     val latShort @Composable get() = get("LAT", "LAT", "LAT")
@@ -699,11 +1164,92 @@ object AppStrings {
 
     val nearbyAntennasAzimuth @Composable get() = get("Antennes à proximité", "Nearby antennas", "Antenas nas proximidades")
     val supportPrefix @Composable get() = get("Support", "Support", "Suporte")
+    val height @Composable get() = get("Hauteur", "Height", "Altura")
     // ==========================================
     // 🆕 ONBOARDING
     // ==========================================
     val btnAuthorize @Composable get() = get("Autoriser", "Authorize", "Autorizar")
     val btnNext @Composable get() = get("Suivant", "Next", "Seguinte")
+    val btnStartConfiguration @Composable get() = get("Commencer la configuration ➜", "Start setup ➜", "Começar configuração ➜")
+    val onboardingWelcomeTitle @Composable get() = get("GeoTower", "GeoTower", "GeoTower")
+    val onboardingWelcomeDesc @Composable get() = get(
+        "Bienvenue sur GeoTower, l'application pour localiser les antennes relais proches de vous et obtenir des informations sur celles ci.",
+        "Welcome to GeoTower, the app for locating nearby cell towers and getting information about them.",
+        "Bem-vindo ao GeoTower, a aplicação para localizar antenas retransmissoras perto de si e obter informações sobre elas."
+    )
+    val onboardingWelcomeNearbyTitle @Composable get() = get("Trouver autour de vous", "Find what is nearby", "Encontrar por perto")
+    val onboardingWelcomeNearbyDesc @Composable get() = get(
+        "Listez rapidement les supports et sites radio les plus proches de votre position.",
+        "Quickly list the nearest radio supports and sites around your position.",
+        "Liste rapidamente os suportes e sites rádio mais próximos da sua posição."
+    )
+    val onboardingWelcomeMapTitle @Composable get() = get("Explorer sur la carte", "Explore on the map", "Explorar no mapa")
+    val onboardingWelcomeMapDesc @Composable get() = get(
+        "Parcourez les antennes, filtres, couches et informations techniques directement sur une carte.",
+        "Browse antennas, filters, layers and technical information directly on a map.",
+        "Explore antenas, filtros, camadas e informações técnicas diretamente no mapa."
+    )
+    val onboardingWelcomeToolsTitle @Composable get() = get("Comprendre le réseau", "Understand the network", "Compreender a rede")
+    val onboardingWelcomeToolsDesc @Composable get() = get(
+        "Accédez aux fréquences, azimuts, photos, profils et outils de mesure quand les données sont disponibles.",
+        "Access frequencies, azimuths, photos, profiles and measurement tools when data is available.",
+        "Aceda a frequências, azimutes, fotos, perfis e ferramentas de medição quando os dados estiverem disponíveis."
+    )
+    val onboardingLocationTitle @Composable get() = get("Localisation", "Location", "Localização")
+    val onboardingLocationDesc @Composable get() = get(
+        "Veuillez accepter l'autorisation de localisation pour pouvoir localiser rapidement les émetteurs proches de vous.",
+        "Please allow location permission so GeoTower can quickly locate nearby transmitters.",
+        "Aceite a autorização de localização para poder localizar rapidamente os emissores perto de si."
+    )
+    val onboardingLocationNearbyTitle @Composable get() = get("À proximité en un geste", "Nearby in one tap", "Por perto num toque")
+    val onboardingLocationNearbyDesc @Composable get() = get(
+        "Votre position sert à trier les antennes autour de vous et à ouvrir directement la bonne zone.",
+        "Your position is used to sort antennas around you and open the right area immediately.",
+        "A sua posição serve para ordenar as antenas à sua volta e abrir diretamente a zona certa."
+    )
+    val onboardingLocationMapTitle @Composable get() = get("Carte plus précise", "More precise map", "Mapa mais preciso")
+    val onboardingLocationMapDesc @Composable get() = get(
+        "Le bouton de localisation pourra centrer la carte, puis suivre vos déplacements si vous l'activez.",
+        "The location button can center the map, then follow your movement when you enable it.",
+        "O botão de localização poderá centrar o mapa e depois seguir os seus movimentos quando o ativar."
+    )
+    val onboardingLocationPrivacyTitle @Composable get() = get("Vous gardez le contrôle", "You stay in control", "Mantém o controlo")
+    val onboardingLocationPrivacyDesc @Composable get() = get(
+        "Vous pourrez continuer sans autorisation et la modifier plus tard depuis les réglages Android.",
+        "You can continue without permission and change it later from Android settings.",
+        "Pode continuar sem autorização e alterá-la mais tarde nas definições do Android."
+    )
+    val onboardingNotificationsTitle @Composable get() = get("Notifications", "Notifications", "Notificações")
+    val onboardingNotificationsDesc @Composable get() = get(
+        "Veuillez accepter l'autorisation pour les notifications afin d'afficher les notifications de téléchargement de base de données, de carte hors ligne, ou encore de la disponibilité de nouvelle base de données.",
+        "Please allow notification permission to show notifications for database downloads, offline map downloads, and new database availability.",
+        "Aceite a autorização de notificações para apresentar notificações de transferência da base de dados, de mapas offline ou da disponibilidade de uma nova base de dados."
+    )
+    val onboardingNotificationsDownloadTitle @Composable get() = get("Téléchargements visibles", "Visible downloads", "Transferências visíveis")
+    val onboardingNotificationsDownloadDesc @Composable get() = get(
+        "GeoTower pourra afficher l'avancement des bases de données et cartes hors ligne pendant leur téléchargement.",
+        "GeoTower can show progress for database and offline map downloads while they are running.",
+        "O GeoTower poderá mostrar o progresso das bases de dados e dos mapas offline durante a transferência."
+    )
+    val onboardingNotificationsUpdateTitle @Composable get() = get("Données à jour", "Up-to-date data", "Dados atualizados")
+    val onboardingNotificationsUpdateDesc @Composable get() = get(
+        "Vous pourrez être prévenu quand une nouvelle base est disponible, sans ouvrir l'application pour vérifier.",
+        "You can be notified when a new database is available without opening the app to check.",
+        "Poderá ser notificado quando uma nova base de dados estiver disponível sem abrir a aplicação para verificar."
+    )
+    val onboardingNotificationsControlTitle @Composable get() = get("Alertes utiles seulement", "Useful alerts only", "Apenas alertas úteis")
+    val onboardingNotificationsControlDesc @Composable get() = get(
+        "Aucune notification sociale ou publicité : uniquement les opérations longues et les données importantes.",
+        "No social notifications or ads: only long-running operations and important data updates.",
+        "Sem notificações sociais nem publicidade: apenas operações demoradas e dados importantes."
+    )
+    val onboardingLocationDisabledTitle @Composable get() = get("Localisation non activée", "Location not enabled", "Localização não ativada")
+    val onboardingLocationDisabledDesc @Composable get() = get(
+        "La localisation n'est pas activée. GeoTower ne pourra pas localiser rapidement les émetteurs proches de vous.",
+        "Location is not enabled. GeoTower will not be able to quickly locate nearby transmitters.",
+        "A localização não está ativada. O GeoTower não conseguirá localizar rapidamente os emissores perto de si."
+    )
+    val retry @Composable get() = get("Réessayer", "Try again", "Tentar novamente")
     val btnLetsGo @Composable get() = get("C'est parti !", "Let's go!", "Vamos lá!")
 
     val welcomeTitle @Composable get() = get("Bienvenue !", "Welcome!", "Bem-vindo!")
@@ -729,6 +1275,11 @@ object AppStrings {
 
     val warningNoOpTitle @Composable get() = get("Aucun opérateur sélectionné", "No operator selected", "Nenhuma operadora selecionada")
     val warningNoOpDesc @Composable get() = get("Vous n'avez pas choisi d'opérateur par défaut. Les outils de filtrage sur la carte seront désactivés.\n\nVoulez-vous vraiment continuer ?", "You have not chosen a default operator. The filtering tools on the map will be disabled.\n\nDo you really want to continue?", "Não escolheu uma operadora por defeito. As ferramentas de filtragem no mapa serão desativadas.\n\nTem a certeza de que pretende continuer?")
+    val warningNoOpLiveNotificationsLead @Composable get() = get("Les ", "The ", "As ")
+    val warningNoOpLiveNotificationsLabel @Composable get() = get("notifications live", "live notifications", "notificações live")
+    val warningNoOpLiveNotificationsMiddle @Composable get() = get(" que vous avez activées ", " you enabled ", " que ativou ")
+    val warningNoOpLiveNotificationsHighlight @Composable get() = get("vont être désactivées", "will be turned off", "serão desativadas")
+    val warningNoOpLiveNotificationsSuffix @Composable get() = get(", car elles nécessitent un opérateur par défaut.", " because they require a default operator.", ", porque exigem uma operadora padrão.")
     val warningContinue @Composable get() = get("Continuer quand même", "Continue anyway", "Continuer mesmo assim")
     val warningChooseOp @Composable get() = get("Choisir un opérateur", "Choose an operator", "Escolher uma operadora")
 
@@ -755,6 +1306,9 @@ object AppStrings {
     // ==========================================
     val aboutPresentation @Composable get() = get("Présentation", "Presentation", "Apresentação")
     val aboutNew @Composable get() = get("Nouveautés", "What's New", "Novidades")
+    @Composable fun aboutNewForVersion(appVersion: String) = get("Nouveautés ($appVersion)", "What's new ($appVersion)", "Novidades ($appVersion)")
+    val aboutDownloadNewDatabase @Composable get() = get("Téléchargez la nouvelle base", "Download the new database", "Transfira a nova base")
+    val aboutDatabaseNotInstalled @Composable get() = get("Non installée", "Not installed", "Não instalada")
     val aboutSources @Composable get() = get("Sources de données", "Data Sources", "Fontes de données")
     val aboutDev @Composable get() = get("Développement", "Development", "Desenvolvimento")
     val aboutIntro @Composable get() = get("GeoTower vous permet de localiser les antennes relais autour de vous et d'identifier les technologies disponibles.", "GeoTower allows you to locate cell towers around you and identify available technologies.", "A GeoTower permite-lhe localizar torres de celular à sua volta e identificar as tecnologias disponibles.")
@@ -961,6 +1515,8 @@ object AppStrings {
 
     val sitePhotoDesc @Composable get() = get("Photo du site", "Site photo", "Foto do local")
     val fullScreenPhotoDesc @Composable get() = get("Photo en plein écran", "Full screen photo", "Foto em tela cheia")
+    val supportImageDesc @Composable get() = get("Image du support", "Support image", "Imagem do suporte")
+    val supportImageFullScreenDesc @Composable get() = get("Image en plein écran", "Full screen image", "Imagem em ecrã inteiro")
     val close @Composable get() = get("Fermer", "Close", "Fechar")
 
     val defaultShareContentTitle @Composable get() = get("Contenu du partage par défaut", "Default share content", "Conteúdo de partilha predefinido")
@@ -987,6 +1543,36 @@ object AppStrings {
     val geoTowerApp @Composable get() = get("l'application GeoTower", "the GeoTower app", "aplicativo GeoTower")
 
     val back @Composable get() = get("Retour", "Back", "Voltar")
+    val openMenu @Composable get() = get("Ouvrir menu", "Open menu", "Abrir menu")
+    val closeMenu @Composable get() = get("Fermer menu", "Close menu", "Fechar menu")
+    val search @Composable get() = get("Rechercher", "Search", "Pesquisar")
+    val clear @Composable get() = get("Effacer", "Clear", "Limpar")
+    val download @Composable get() = get("Télécharger", "Download", "Transferir")
+    val delete @Composable get() = get("Supprimer", "Delete", "Eliminar")
+    val apply @Composable get() = get("Appliquer", "Apply", "Aplicar")
+    val mapFiltersTitle @Composable get() = get("Filtres carte", "Map filters", "Filtros do mapa")
+    val technicalDataUnavailable @Composable get() = get("Données techniques non disponibles", "Technical data unavailable", "Dados técnicos indisponíveis")
+    val ruler @Composable get() = get("Règle", "Ruler", "Régua")
+    val layers @Composable get() = get("Calques", "Layers", "Camadas")
+    val tools @Composable get() = get("Outils", "Tools", "Ferramentas")
+    val locate @Composable get() = get("Localiser", "Locate", "Localizar")
+    val top @Composable get() = get("Haut", "Top", "Topo")
+    val bottom @Composable get() = get("Bas", "Bottom", "Fundo")
+    val noOfflineMapsInstalled @Composable get() = get("(Aucune carte hors-ligne installée)", "(No offline map installed)", "(Nenhum mapa offline instalado)")
+    val latestChanges @Composable get() = get("Dernières modifications", "Latest changes", "Últimas alterações")
+    val showMoreSites @Composable get() = get("Afficher plus de sites", "Show more sites", "Mostrar mais")
+    val geoportailIgn @Composable get() = get("Géoportail (IGN)", "Geoportal (IGN)", "Geoportal (IGN)")
+    val languageFrenchName @Composable get() = get("Français", "French", "Francês")
+    val languageEnglishName @Composable get() = get("Anglais", "English", "Inglês")
+    val languagePortugueseName @Composable get() = get("Portugais", "Portuguese", "Português")
+    @Composable
+    fun languageDisplayName(languageValue: String): String = when (languageValue) {
+        LANGUAGE_SYSTEM -> systemLanguage
+        LANGUAGE_FRENCH -> languageFrenchName
+        LANGUAGE_ENGLISH -> languageEnglishName
+        LANGUAGE_PORTUGUESE -> languagePortugueseName
+        else -> languageValue
+    }
     val imageContent @Composable get() = get("Contenu de l'image", "Image content", "Conteúdo da imagem")
     val move @Composable get() = get("Déplacer", "Move", "Mover")
     val generateImage @Composable get() = get("Générer l'image", "Generate image", "Gerar imagem")
@@ -1077,8 +1663,10 @@ object AppStrings {
     val continueAnyway @Composable get() = get("Continuer", "Continue", "Continuar")
 
     val missingDbBannerTitle @Composable get() = get("Base de données manquante", "Missing database", "Base de données ausente")
+    val invalidDbBannerTitle @Composable get() = get("Base de données invalide", "Invalid database", "Base de données invalida")
     val updateDbBannerTitle @Composable get() = get("Mise à jour disponible", "Update available", "Atualização disponible")
     val missingDbBannerDesc @Composable get() = get("Téléchargez la base pour utiliser l'appli.", "Download the database to use the app.", "Baixe o banco de données para usar o app.")
+    val invalidDbBannerDesc @Composable get() = get("La base locale est incompatible. Téléchargez une base valide pour continuer.", "The local database is incompatible. Download a valid database to continue.", "A base local e incompativel. Baixe uma base valida para continuar.")
     val btnDownloadBanner @Composable get() = get("Télécharger", "Download", "Baixar")
 
     @Composable
@@ -1249,12 +1837,56 @@ object AppStrings {
     }
 
     fun newDbNotifTitle(ctx: android.content.Context) = getForService(ctx, "Nouvelle base de données", "New database", "Nova base de données")
-    fun newDbNotifDesc(ctx: android.content.Context) = getForService(ctx, "Une mise à jour des antennes est disponible ! Touchez pour l'installer.", "An antenna update is available! Tap to install.", "Uma atualização de antennes está disponible! Toque para instalar.")
+    fun newDbNotifDesc(ctx: android.content.Context) = getForService(ctx, "Une mise à jour des antennes est disponible. Touchez pour ouvrir la section de téléchargement.", "An antenna update is available. Tap to open the download section.", "Uma atualização das antenas está disponível. Toque para abrir a secção de transferência.")
     fun nearestAntennaTitle(ctx: android.content.Context) = getForService(ctx, "À proximité", "Nearby", "Nas proximidades")
     fun liveTrackingChannelDesc(ctx: android.content.Context) = getForService(ctx, "Suivi d'antennes en direct", "Live antenna tracking", "Rastreamento de antennes ao vivo")
     fun searchInProgress(ctx: android.content.Context) = getForService(ctx, "Recherche en cours...", "Searching...", "Buscando...")
     fun quitAction(ctx: android.content.Context) = getForService(ctx, "Quitter", "Stop", "Sair")
     fun noneOpService(ctx: android.content.Context) = getForService(ctx, "Aucun", "None", "Nenhum")
+    fun errorForService(ctx: android.content.Context) = getForService(ctx, "Erreur", "Error", "Erro")
+
+    fun dbDownloadChannelName(ctx: android.content.Context) = getForService(ctx, "Mise à jour Base de données", "Database Update", "Atualização da base de dados")
+    fun dbDownloadTitle(ctx: android.content.Context) = getForService(ctx, "Mise à jour de la base", "Database update", "Atualização da base")
+    fun dbDownloadProgress(ctx: android.content.Context, progress: Int) = getForService(ctx, "Téléchargement en cours... $progress%", "Downloading... $progress%", "A transferir... $progress%")
+    fun dbDownloadedTitle(ctx: android.content.Context) = getForService(ctx, "Base de données", "Database", "Base de dados")
+    fun dbDownloadedContent(ctx: android.content.Context) = getForService(ctx, "La base a été téléchargée. Appuyez pour ouvrir.", "Database downloaded. Tap to open.", "Base transferida. Toque para abrir.")
+    fun dbDownloadFailed(ctx: android.content.Context) = getForService(ctx, "Échec du téléchargement. Veuillez vérifier votre connexion.", "Download failed. Please check your connection.", "Falha na transferência. Verifique a sua ligação.")
+    fun newDbChannelName(ctx: android.content.Context) = getForService(ctx, "Mises à jour Base de données", "Database updates", "Atualizações da base de dados")
+
+    fun mapDownloadChannelName(ctx: android.content.Context) = getForService(ctx, "Téléchargement de cartes", "Maps download", "Transferência de mapas")
+    fun mapDownloadTitle(ctx: android.content.Context, mapName: String) = getForService(ctx, "Carte : $mapName", "Map: $mapName", "Mapa: $mapName")
+    fun mapDownloadProgress(ctx: android.content.Context, progress: Int) = getForService(ctx, "Téléchargement... $progress%", "Downloading... $progress%", "A transferir... $progress%")
+    fun offlineMapDownloadTitle(ctx: android.content.Context) = getForService(ctx, "Téléchargement Carte France", "France map download", "Transferência do mapa de França")
+    fun offlineMapDownloadDesc(ctx: android.content.Context) = getForService(ctx, "Récupération des données cartographiques...", "Retrieving map data...", "A obter dados cartográficos...")
+    fun mapSiteNotInArea(ctx: android.content.Context, siteId: String) = getForService(ctx, "Le site $siteId n'est pas dans la zone affichée. Déplacez la carte vers sa ville d'abord.", "Site $siteId is not in the displayed area. Move the map to its city first.", "O site $siteId não está na área apresentada. Mova primeiro o mapa para a sua cidade.")
+
+    fun signalQuestUploadChannelName(ctx: android.content.Context) = getForService(ctx, "Envoi Signal Quest", "Signal Quest upload", "Envio Signal Quest")
+    fun signalQuestUploadProgress(ctx: android.content.Context, current: Int, total: Int) = getForService(ctx, "Envoi en cours ($current/$total)...", "Uploading ($current/$total)...", "A enviar ($current/$total)...")
+    fun signalQuestUploadRetry(ctx: android.content.Context) = getForService(ctx, "Échec réseau, nouvel essai plus tard.", "Network error, retrying later.", "Erro de rede, nova tentativa mais tarde.")
+    fun signalQuestUploadSuccess(ctx: android.content.Context, success: Int, total: Int) = getForService(ctx, "$success/$total photos envoyées avec succès !", "$success/$total photos sent successfully!", "$success/$total fotos enviadas com sucesso!")
+    fun signalQuestUploadPartial(ctx: android.content.Context, success: Int, total: Int) = getForService(ctx, "$success/$total photos envoyées. Certaines ont échoué.", "$success/$total photos sent. Some failed.", "$success/$total fotos enviadas. Algumas falharam.")
+
+    fun widgetTitle(ctx: android.content.Context) = getForService(ctx, "📍 Antennes à proximité", "📍 Nearby antennas", "📍 Antenas próximas")
+    fun widgetUpdatedAt(ctx: android.content.Context, lastUpdate: String) = getForService(ctx, "Mis à jour à $lastUpdate", "Updated at $lastUpdate", "Atualizado às $lastUpdate")
+    fun widgetWaitingGps(ctx: android.content.Context) = getForService(ctx, "En attente du GPS...", "Waiting for GPS...", "À espera do GPS...")
+    fun widgetImmediateSearch(ctx: android.content.Context) = getForService(ctx, "Recherche immédiate...", "Searching...", "Pesquisa imediata...")
+
+    fun carConnected(ctx: android.content.Context) = getForService(ctx, "GeoTower est connecté à Android Auto.", "GeoTower is connected to Android Auto.", "GeoTower está ligado ao Android Auto.")
+    fun carNearbySites(ctx: android.content.Context) = getForService(ctx, "Sites proches", "Nearby sites", "Sites próximos")
+    fun carSitesAroundMe(ctx: android.content.Context) = getForService(ctx, "Sites autour de moi", "Sites around me", "Sites à minha volta")
+    fun carNoSitesNearby(ctx: android.content.Context) = getForService(ctx, "Aucun site trouvé autour de votre position.", "No site found around your position.", "Nenhum site encontrado à volta da sua posição.")
+    fun carRetry(ctx: android.content.Context) = getForService(ctx, "Réessayer", "Try again", "Tentar novamente")
+    fun carSearchNearby(ctx: android.content.Context) = getForService(ctx, "Recherche des sites proches...", "Searching nearby sites...", "A pesquisar sites próximos...")
+    fun carLocationUnavailable(ctx: android.content.Context) = getForService(ctx, "Position indisponible pour le moment.", "Position unavailable for now.", "Posição indisponível neste momento.")
+    fun carLocationPermissionMessage(ctx: android.content.Context) = getForService(ctx, "Autorisez la localisation dans GeoTower sur le téléphone.", "Allow location in GeoTower on the phone.", "Autorize a localização no GeoTower no telefone.")
+    fun carPermissionExplanation(ctx: android.content.Context) = getForService(ctx, "GeoTower a besoin de la localisation pour afficher les sites autour de vous.", "GeoTower needs location to show sites around you.", "O GeoTower precisa da localização para mostrar sites à sua volta.")
+    fun carLocationRequired(ctx: android.content.Context) = getForService(ctx, "Localisation requise", "Location required", "Localização necessária")
+    fun carOpenApp(ctx: android.content.Context) = getForService(ctx, "Ouvrir l'app", "Open app", "Abrir app")
+    fun carOperators(ctx: android.content.Context) = getForService(ctx, "Opérateurs", "Operators", "Operadoras")
+    fun carDistance(ctx: android.content.Context) = getForService(ctx, "Distance", "Distance", "Distância")
+    fun carAddress(ctx: android.content.Context) = getForService(ctx, "Adresse", "Address", "Endereço")
+    fun carCoordinates(ctx: android.content.Context) = getForService(ctx, "Coordonnées", "Coordinates", "Coordenadas")
+    fun carNavigate(ctx: android.content.Context) = getForService(ctx, "Naviguer", "Navigate", "Navegar")
 
     fun noAntennaFound(ctx: android.content.Context, op: String) = getForService(ctx, "Aucune antenne $op trouvée à proximité.", "No $op antenna found nearby.", "Nenhuma antenne $op encontrada nas proximidades.")
     fun antennaDistance(ctx: android.content.Context, op: String, dist: String) = getForService(ctx, "Antenne $op : $dist", "$op antenna : $dist", "Antenne $op : $dist")
@@ -1340,7 +1972,7 @@ object AppStrings {
 
     @Composable
     fun formatMonthlyVersion(rawName: String): String {
-        if (rawName.isBlank() || rawName == "-" || rawName == "Téléchargez la nouvelle base") return rawName
+        if (rawName.isBlank() || rawName == "-" || rawName == aboutDownloadNewDatabase) return rawName
         val regex = Regex("^(\\d{4})(\\d{2})\\d{2}.*")
         val match = regex.find(rawName)
         if (match != null) {

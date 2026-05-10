@@ -18,6 +18,8 @@ import java.util.Locale
 
 // ⚠️ Assure-toi que cet import correspond au nom exact de ta base de données locale
 import fr.geotower.data.db.AppDatabase
+import fr.geotower.utils.AppLogger
+import fr.geotower.utils.OperatorColors
 
 data class WidgetSiteData(val id: String, val operateur: String, val distance: String, val adresse: String, val colorHex: String)
 
@@ -158,13 +160,7 @@ class AntennaWidgetWorker(
                 val operateurText = ops.joinToString(" • ")
 
                 val colorHex = if (ops.size == 1) {
-                    when {
-                        ops[0].contains("ORANGE") -> "#FF7900"
-                        ops[0].contains("FREE") -> "#757575"
-                        ops[0].contains("BOUYGUES") -> "#00295F"
-                        ops[0].contains("SFR") -> "#E2001A"
-                        else -> "#FFFFFF"
-                    }
+                    OperatorColors.colorHex(ops[0], fallback = "#FFFFFF")
                 } else {
                     "#MULTI"
                 }
@@ -188,9 +184,13 @@ class AntennaWidgetWorker(
             return Result.success()
 
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.w(TAG, "Widget worker failed", e)
             updateUiAndFinish(false)
             return Result.retry()
         }
+    }
+
+    private companion object {
+        private const val TAG = "GeoTower"
     }
 }

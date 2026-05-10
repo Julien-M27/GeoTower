@@ -126,7 +126,7 @@ fun ShareThroughputCalculatorBlock(
                 Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = AppStrings.get("Débit théorique", "Theoretical throughput", "Débito teórico"),
+                    text = AppStrings.shareThroughputTitle,
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     color = MaterialTheme.colorScheme.onSurface
@@ -135,14 +135,14 @@ fun ShareThroughputCalculatorBlock(
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ShareThroughputMetric(
-                    label = AppStrings.get("Descendant", "Download", "Download"),
+                    label = AppStrings.throughputDownloadLabel,
                     value = formatShareThroughput(result.totalDownMbps),
                     iconColor = Color(0xFF4CAF50),
                     isDownload = true,
                     modifier = Modifier.weight(1f)
                 )
                 ShareThroughputMetric(
-                    label = AppStrings.get("Montant tél.", "Phone upload", "Upload tel."),
+                    label = AppStrings.shareThroughputPhoneUploadLabel,
                     value = formatShareThroughput(result.totalUpMbps),
                     iconColor = Color(0xFF2196F3),
                     isDownload = false,
@@ -158,19 +158,14 @@ fun ShareThroughputCalculatorBlock(
                     Spacer(Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = AppStrings.get(
-                                "Distance optimale : ${formatShareDistanceMeters(coneDistance.centerMeters)}",
-                                "Optimal distance: ${formatShareDistanceMeters(coneDistance.centerMeters)}",
-                                "Distância ótima: ${formatShareDistanceMeters(coneDistance.centerMeters)}"
-                            ),
+                            text = AppStrings.shareThroughputOptimalDistance(formatShareDistanceMeters(coneDistance.centerMeters)),
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = AppStrings.get(
-                                "Zone : ${formatShareDistanceMeters(coneDistance.nearMeters)} à ${formatShareDistanceMeters(coneDistance.farMeters)}",
-                                "Zone: ${formatShareDistanceMeters(coneDistance.nearMeters)} to ${formatShareDistanceMeters(coneDistance.farMeters)}",
-                                "Zona: ${formatShareDistanceMeters(coneDistance.nearMeters)} a ${formatShareDistanceMeters(coneDistance.farMeters)}"
+                            text = AppStrings.shareThroughputZone(
+                                formatShareDistanceMeters(coneDistance.nearMeters),
+                                formatShareDistanceMeters(coneDistance.farMeters)
                             ),
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -181,10 +176,10 @@ fun ShareThroughputCalculatorBlock(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
             Text(
-                text = AppStrings.get(
-                    "${shareThroughputPresetLabel(preset)} · ${result.includedBands.size}/${result.bands.size} bande(s)",
-                    "${shareThroughputPresetLabel(preset)} · ${result.includedBands.size}/${result.bands.size} band(s)",
-                    "${shareThroughputPresetLabel(preset)} · ${result.includedBands.size}/${result.bands.size} banda(s)"
+                text = AppStrings.shareThroughputBandsSummary(
+                    shareThroughputPresetLabel(preset),
+                    result.includedBands.size,
+                    result.bands.size
                 ),
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -206,11 +201,7 @@ fun ShareThroughputCalculatorBlock(
             }
 
             Text(
-                text = AppStrings.get(
-                    "Débit radio estimé : hors charge réseau, signal réel, backhaul et limites exactes du téléphone.",
-                    "Estimated radio throughput: excludes network load, real signal, backhaul and exact phone limits.",
-                    "Débito rádio estimado: exclui carga da rede, sinal real, backhaul e limites exatos do telefone."
-                ),
+                text = AppStrings.shareThroughputDisclaimer,
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -369,12 +360,13 @@ private fun shareThroughputPresetFromPreference(raw: String?): ShareThroughputPr
     }
 }
 
+@Composable
 private fun shareThroughputPresetLabel(preset: ShareThroughputPreset): String {
     return when (preset) {
-        ShareThroughputPreset.Conservative -> "Prudent"
-        ShareThroughputPreset.Standard -> "Standard"
-        ShareThroughputPreset.Maximum -> "Idéal"
-        ShareThroughputPreset.Custom -> "Personnalisé"
+        ShareThroughputPreset.Conservative -> AppStrings.throughputPresetLabel("conservative")
+        ShareThroughputPreset.Standard -> AppStrings.throughputPresetLabel("standard")
+        ShareThroughputPreset.Maximum -> AppStrings.throughputPresetLabel("ideal")
+        ShareThroughputPreset.Custom -> AppStrings.throughputPresetLabel("custom")
     }
 }
 

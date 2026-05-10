@@ -7,15 +7,24 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.work.BackoffPolicy
+import androidx.work.Constraints
 import androidx.work.CoroutineWorker
+import androidx.work.ExistingWorkPolicy
 import androidx.work.ForegroundInfo
+import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkerParameters
+import androidx.work.WorkManager
 import androidx.work.workDataOf
 import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.api.DatabaseDownloader
 import android.content.pm.ServiceInfo
-import java.util.Locale
+import fr.geotower.utils.AppLogger
+import fr.geotower.utils.AppStrings
+import kotlinx.coroutines.CancellationException
+import java.util.concurrent.TimeUnit
 
 class DatabaseDownloadWorker(
     private val context: Context,
@@ -24,42 +33,65 @@ class DatabaseDownloadWorker(
 
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     private val channelId = "db_download_channel"
-    private val notificationId = 1001
-
-    // ✅ NOUVEAU : Une petite fonction classique (Non-Composable) pour traduire en arrière-plan
-    private fun getLocalString(fr: String, en: String, es: String): String {
-        return when (Locale.getDefault().language) {
-            "fr" -> fr
-            "es" -> es
-            else -> en
-        }
-    }
+    private val notificationId = NOTIFICATION_ID_PROGRESS
 
     override suspend fun doWork(): Result {
         createChannel()
+        return try {
 
-        // 1. Démarrer en premier plan
-        setForeground(createForegroundInfo(0))
+            // 1. Démarrer en premier plan
+            setForeground(createForegroundInfo(0))
 
-        // 2. Lancer le téléchargement
-        val success = DatabaseDownloader.downloadUpdate(context) { progress ->
-            setProgressAsync(workDataOf("progress" to progress))
-            notificationManager.notify(notificationId, createNotification(progress))
+            // 2. Lancer le téléchargement
+            val success = DatabaseDownloader.downloadUpdate(context) { progress ->
+                setProgress(workDataOf(KEY_PROGRESS to progress))
+                notifySafely(notificationId, createNotification(progress))
+            }
+
+            // 3. Fin du téléchargement
+            if (success) {
+                setProgress(workDataOf(KEY_PROGRESS to 100))
+                showSuccessNotification()
+                Result.success()
+            } else {
+                retryOrFail()
+            }
+        } catch (e: CancellationException) {
+            cancelSafely(notificationId)
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "Database download worker failed", e)
+            retryOrFail()
         }
+    }
 
-        // 3. Fin du téléchargement
-        return if (success) {
-            showSuccessNotification()
-            Result.success()
+    private fun retryOrFail(): Result {
+        cancelSafely(notificationId)
+        return if (runAttemptCount < MAX_RETRY_ATTEMPTS) {
+            Result.retry()
         } else {
             showErrorNotification()
             Result.failure()
         }
     }
 
+    private fun notifySafely(id: Int, notification: android.app.Notification) {
+        runCatching {
+            notificationManager.notify(id, notification)
+        }.onFailure { error ->
+            AppLogger.w(TAG, "Database download notification update failed", error)
+        }
+    }
+
+    private fun cancelSafely(id: Int) {
+        runCatching {
+            notificationManager.cancel(id)
+        }
+    }
+
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channelName = getLocalString("Mise à jour Base de données", "Database Update", "Actualización de la base de datos")
+            val channelName = AppStrings.dbDownloadChannelName(context)
             val channel = NotificationChannel(
                 channelId,
                 channelName,
@@ -84,8 +116,8 @@ class DatabaseDownloadWorker(
     }
 
     private fun createNotification(progress: Int): android.app.Notification {
-        val title = getLocalString("Mise à jour de la base", "Database update", "Actualización de base de datos")
-        val content = getLocalString("Téléchargement en cours... $progress%", "Downloading... $progress%", "Descargando... $progress%")
+        val title = AppStrings.dbDownloadTitle(context)
+        val content = AppStrings.dbDownloadProgress(context, progress)
 
         // ✅ AJOUT : Intent pour ouvrir les paramètres DB au clic
         val intent = Intent(context, MainActivity::class.java).apply {
@@ -159,8 +191,8 @@ class DatabaseDownloadWorker(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = getLocalString("Base de données", "Database", "Base de datos")
-        val content = getLocalString("La base a été téléchargée. Appuyez pour ouvrir.", "Database downloaded. Tap to open.", "Base de datos descargada. Toca para abrir.")
+        val title = AppStrings.dbDownloadedTitle(context)
+        val content = AppStrings.dbDownloadedContent(context)
 
         val notification = NotificationCompat.Builder(context, channelId)
             .setContentTitle(title)
@@ -170,12 +202,12 @@ class DatabaseDownloadWorker(
             .setAutoCancel(true)
             .build()
 
-        notificationManager.notify(1002, notification)
+        notifySafely(NOTIFICATION_ID_RESULT, notification)
     }
 
     private fun showErrorNotification() {
-        val title = getLocalString("Erreur", "Error", "Error")
-        val content = getLocalString("Échec du téléchargement. Veuillez vérifier votre connexion.", "Download failed. Please check your connection.", "Error de descarga. Por favor comprueba tu conexión.")
+        val title = AppStrings.errorForService(context)
+        val content = AppStrings.dbDownloadFailed(context)
 
         val notification = NotificationCompat.Builder(context, channelId)
             .setContentTitle(title)
@@ -183,6 +215,33 @@ class DatabaseDownloadWorker(
             .setSmallIcon(R.mipmap.ic_launcher_geotower)
             .setAutoCancel(true)
             .build()
-        notificationManager.notify(1002, notification)
+        notifySafely(NOTIFICATION_ID_RESULT, notification)
+    }
+
+    companion object {
+        const val UNIQUE_WORK_NAME = "db_download"
+        const val KEY_PROGRESS = "progress"
+
+        private const val TAG = "GeoTowerDb"
+        private const val MAX_RETRY_ATTEMPTS = 3
+        private const val NOTIFICATION_ID_PROGRESS = 2101
+        private const val NOTIFICATION_ID_RESULT = 2102
+
+        fun buildRequest() = OneTimeWorkRequestBuilder<DatabaseDownloadWorker>()
+            .setConstraints(
+                Constraints.Builder()
+                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                    .build()
+            )
+            .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+            .build()
+
+        fun enqueue(workManager: WorkManager) {
+            workManager.enqueueUniqueWork(
+                UNIQUE_WORK_NAME,
+                ExistingWorkPolicy.KEEP,
+                buildRequest()
+            )
+        }
     }
 }

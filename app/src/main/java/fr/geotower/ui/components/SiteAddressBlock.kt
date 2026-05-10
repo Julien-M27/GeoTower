@@ -56,7 +56,7 @@ fun SiteAddressBlock(
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-            val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: "Adresse non spécifiée"
+            val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: AppStrings.notSpecified
             val gpsCoords = String.format(Locale.US, "%.5f, %.5f", info.latitude, info.longitude)
 
             InfoLine(

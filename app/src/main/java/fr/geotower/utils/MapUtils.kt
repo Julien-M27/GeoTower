@@ -80,7 +80,7 @@ object MapUtils {
         }
 
         val def = defaultOp.uppercase()
-        val baseOrder = listOf("ORANGE", "BOUYGUES", "SFR", "FREE")
+        val baseOrder = OperatorColors.orderedKeys
         val priorityList = mutableListOf<String>()
 
         if (def != "AUCUN" && baseOrder.any { def.contains(it) }) {
@@ -88,12 +88,7 @@ object MapUtils {
         }
         baseOrder.forEach { if (!priorityList.contains(it)) priorityList.add(it) }
 
-        val colorMap = mapOf(
-            "ORANGE" to android.graphics.Color.parseColor("#FF7900"),
-            "BOUYGUES" to android.graphics.Color.parseColor("#00295F"),
-            "SFR" to android.graphics.Color.parseColor("#E2001A"),
-            "FREE" to android.graphics.Color.parseColor("#757575")
-        )
+        val colorMap = OperatorColors.androidColorMap()
 
         val operatorsOnSite = siteAntennas.mapNotNull { it.operateur }
             .flatMap { it.split(Regex("[/,\\-]")) }
@@ -239,16 +234,11 @@ object MapUtils {
             style = Paint.Style.FILL
         }
 
-        val colorMap = mapOf(
-            "ORANGE" to android.graphics.Color.parseColor("#FF7900"),
-            "BOUYGUES" to android.graphics.Color.parseColor("#00295F"),
-            "SFR" to android.graphics.Color.parseColor("#E2001A"),
-            "FREE" to android.graphics.Color.parseColor("#757575")
-        )
+        val colorMap = OperatorColors.androidColorMap()
 
         // ✅ CORRECTION : Tri intelligent selon l'opérateur préféré
         val def = defaultOp.uppercase()
-        val baseOrder = listOf("ORANGE", "BOUYGUES", "SFR", "FREE")
+        val baseOrder = OperatorColors.orderedKeys
         val priorityList = mutableListOf<String>()
 
         if (def != "AUCUN" && baseOrder.any { def.contains(it) }) {

@@ -8,5 +8,6 @@ data class OfflineMapDto(
     @SerializedName("description") val description: String,
     @SerializedName("map_url") val mapUrl: String,
     @SerializedName("estimated_size_mb") val estimatedSizeMb: Int,
-    @SerializedName("map_filename") val mapFilename: String
+    @SerializedName("map_filename") val mapFilename: String,
+    @SerializedName("sha256") val sha256: String? = null
 )

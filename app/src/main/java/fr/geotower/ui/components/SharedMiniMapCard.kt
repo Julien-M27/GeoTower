@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Point
+import android.view.MotionEvent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -28,6 +29,7 @@ import androidx.core.graphics.ColorUtils
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.MapUtils
+import fr.geotower.utils.OperatorColors
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
 import org.osmdroid.events.ZoomEvent
@@ -43,6 +45,8 @@ import org.mapsforge.map.rendertheme.InternalRenderTheme
 import org.osmdroid.tileprovider.MapTileProviderBasic
 import kotlin.math.abs
 import kotlin.math.cos
+import kotlin.math.max
+import kotlin.math.sqrt
 
 @Composable
 fun SharedMiniMapCard(
@@ -56,9 +60,14 @@ fun SharedMiniMapCard(
     onMapReady: (MapView) -> Unit,
     focusOperator: String? = null,
     coneOverlay: MiniMapConeOverlayData? = null,
-    initialZoom: Double = 17.5
+    initialZoom: Double = 17.5,
+    onMapTap: ((Double, Double) -> Unit)? = null,
+    allowGestures: Boolean = false,
+    fitSelectedPointRequest: Int = 0
 ) {
     val context = LocalContext.current
+    val currentOnMapTap by rememberUpdatedState(onMapTap)
+    val currentAllowGestures by rememberUpdatedState(allowGestures)
     var mapRef by remember { mutableStateOf<MapView?>(null) }
     val mapProvider by AppConfig.mapProvider
 
@@ -72,7 +81,7 @@ fun SharedMiniMapCard(
 
     LaunchedEffect(Unit) {
         val offlineDir = java.io.File(context.getExternalFilesDir(null), "maps")
-        val files = offlineDir.listFiles { file -> file.extension == "map" } ?: emptyArray()
+        val files = offlineDir.listFiles { file -> file.extension == "map" && file.length() > 0L } ?: emptyArray()
         mapFiles = files
 
         // Si hors-ligne ET présence de fichiers : on bascule.
@@ -84,6 +93,7 @@ fun SharedMiniMapCard(
     val ignStyle by AppConfig.ignStyle
     val shouldInvertColors = (mapProvider == 0 && ignStyle == 1)
     var currentZoom by remember(initialZoom) { mutableDoubleStateOf(initialZoom) }
+    var lastFitSelectedPointRequest by remember { mutableIntStateOf(fitSelectedPointRequest) }
 
     // ✅ NOUVEAU : Récupération de la couleur du thème pour le marqueur par défaut
     val rawPrimaryColor = MaterialTheme.colorScheme.primary.toArgb()
@@ -98,8 +108,18 @@ fun SharedMiniMapCard(
             factory = { ctx ->
                 MapView(ctx).apply {
                     setLayerType(android.view.View.LAYER_TYPE_HARDWARE, null)
-                    setMultiTouchControls(false)
-                    setOnTouchListener { _, _ -> true }
+                    setMultiTouchControls(allowGestures)
+                    setOnTouchListener { view, event ->
+                        if (!currentAllowGestures) return@setOnTouchListener true
+                        when (event.actionMasked) {
+                            MotionEvent.ACTION_DOWN,
+                            MotionEvent.ACTION_POINTER_DOWN,
+                            MotionEvent.ACTION_MOVE -> view.requestAncestorTouchInterception(false)
+                            MotionEvent.ACTION_UP,
+                            MotionEvent.ACTION_CANCEL -> view.requestAncestorTouchInterception(true)
+                        }
+                        false
+                    }
                     zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
                     controller.setZoom(initialZoom)
                     controller.setCenter(GeoPoint(centerLat, centerLon))
@@ -114,6 +134,7 @@ fun SharedMiniMapCard(
                     })
 
                     updateMiniMapConeOverlay(coneOverlay, safePrimaryColor)
+                    overlays.add(MiniMapTapOverlay { currentOnMapTap })
 
                     // ✅ MODIFICATION : On utilise le nouveau marqueur personnalisé avec les azimuts
                     val marker = MiniMapAntennaMarker(this, mappedAntennas, safePrimaryColor, focusOperator).apply { // 👈 AJOUTEZ focusOperator
@@ -128,23 +149,50 @@ fun SharedMiniMapCard(
                 }
             },
             update = { map ->
-                map.controller.setCenter(GeoPoint(centerLat, centerLon))
+                map.setMultiTouchControls(allowGestures)
+                val selectedPoint = coneOverlay?.selectedPoint
+                if (fitSelectedPointRequest != lastFitSelectedPointRequest && selectedPoint != null) {
+                    val viewport = miniMapViewportForSelection(
+                        centerLat = centerLat,
+                        centerLon = centerLon,
+                        selectedLat = selectedPoint.latitude,
+                        selectedLon = selectedPoint.longitude,
+                        coneRadiusMeters = coneOverlay.radiusMeters,
+                        fallbackZoom = initialZoom
+                    )
+                    map.controller.setZoom(viewport.zoom)
+                    map.controller.setCenter(GeoPoint(viewport.centerLat, viewport.centerLon))
+                    currentZoom = viewport.zoom
+                    lastFitSelectedPointRequest = fitSelectedPointRequest
+                } else if (!allowGestures) {
+                    map.controller.setCenter(GeoPoint(centerLat, centerLon))
+                }
 
                 // 🗺️ LOGIQUE HORS-LIGNE
                 if (effectiveProvider == 4) {
                     if (mapFiles.isNotEmpty()) {
                         if (map.tileProvider !is MapsForgeTileProvider) {
-                            val forgeSource = MapsForgeTileSource.createFromFiles(
-                                mapFiles,
-                                InternalRenderTheme.OSMARENDER,
-                                "osmarender"
-                            )
-                            val forgeProvider = MapsForgeTileProvider(
-                                org.osmdroid.tileprovider.util.SimpleRegisterReceiver(context),
-                                forgeSource,
-                                null
-                            )
-                            map.tileProvider = forgeProvider
+                            runCatching {
+                                val forgeSource = MapsForgeTileSource.createFromFiles(
+                                    mapFiles,
+                                    InternalRenderTheme.OSMARENDER,
+                                    "osmarender"
+                                )
+                                val forgeProvider = MapsForgeTileProvider(
+                                    org.osmdroid.tileprovider.util.SimpleRegisterReceiver(context),
+                                    forgeSource,
+                                    null
+                                )
+                                map.tileProvider = forgeProvider
+                            }.onFailure {
+                                mapFiles = emptyArray()
+                                effectiveProvider = 1
+                                AppConfig.mapProvider.value = 1
+                                if (map.tileProvider is MapsForgeTileProvider) {
+                                    map.tileProvider = MapTileProviderBasic(context)
+                                }
+                                runCatching { map.setTileSource(MapUtils.OSM_Source) }
+                            }
                         }
                     } else {
                         AppConfig.mapProvider.value = 1
@@ -242,6 +290,77 @@ fun SharedMiniMapCard(
     }
 }
 
+private fun android.view.View.requestAncestorTouchInterception(allowInterception: Boolean) {
+    var currentParent = parent
+    while (currentParent != null) {
+        currentParent.requestDisallowInterceptTouchEvent(!allowInterception)
+        currentParent = currentParent.parent
+    }
+}
+
+private data class MiniMapViewport(
+    val centerLat: Double,
+    val centerLon: Double,
+    val zoom: Double
+)
+
+private fun miniMapViewportForSelection(
+    centerLat: Double,
+    centerLon: Double,
+    selectedLat: Double,
+    selectedLon: Double,
+    coneRadiusMeters: Double,
+    fallbackZoom: Double
+): MiniMapViewport {
+    val distanceMeters = roughDistanceMeters(centerLat, centerLon, selectedLat, selectedLon)
+    val usefulRadius = max(coneRadiusMeters, distanceMeters / 2.0)
+    val zoom = miniMapZoomForRadius(usefulRadius).coerceAtMost(fallbackZoom)
+    return MiniMapViewport(
+        centerLat = (centerLat + selectedLat) / 2.0,
+        centerLon = (centerLon + selectedLon) / 2.0,
+        zoom = zoom
+    )
+}
+
+private fun roughDistanceMeters(
+    firstLat: Double,
+    firstLon: Double,
+    secondLat: Double,
+    secondLon: Double
+): Double {
+    val middleLat = Math.toRadians((firstLat + secondLat) / 2.0)
+    val latMeters = (secondLat - firstLat) * 111_320.0
+    val lonMeters = (secondLon - firstLon) * 111_320.0 * cos(middleLat)
+    return sqrt(latMeters * latMeters + lonMeters * lonMeters)
+}
+
+private fun miniMapZoomForRadius(radiusMeters: Double): Double {
+    return when {
+        radiusMeters >= 40_000.0 -> 9.0
+        radiusMeters >= 20_000.0 -> 10.0
+        radiusMeters >= 10_000.0 -> 11.0
+        radiusMeters >= 5_000.0 -> 12.0
+        radiusMeters >= 2_500.0 -> 13.0
+        radiusMeters >= 1_200.0 -> 14.0
+        radiusMeters >= 650.0 -> 15.0
+        radiusMeters >= 300.0 -> 16.0
+        else -> 17.0
+    }
+}
+
+private class MiniMapTapOverlay(
+    private val onTapProvider: () -> ((Double, Double) -> Unit)?
+) : Overlay() {
+    override fun onSingleTapConfirmed(e: MotionEvent?, mapView: MapView?): Boolean {
+        val tap = onTapProvider() ?: return false
+        val safeEvent = e ?: return false
+        val safeMapView = mapView ?: return false
+        val point = safeMapView.projection.fromPixels(safeEvent.x.toInt(), safeEvent.y.toInt())
+        tap(point.latitude, point.longitude)
+        return true
+    }
+}
+
 // =====================================================================
 // MARQUEUR MINI-CARTE (DESSINE LES AZIMUTS + L'ICÔNE)
 // =====================================================================
@@ -249,7 +368,8 @@ data class MiniMapConeOverlayData(
     val centerLat: Double,
     val centerLon: Double,
     val radiusMeters: Double,
-    val strongPoints: List<MiniMapStrongPoint>
+    val strongPoints: List<MiniMapStrongPoint>,
+    val selectedPoint: MiniMapStrongPoint? = null
 )
 
 data class MiniMapStrongPoint(
@@ -284,6 +404,8 @@ private class MiniMapConeOverlay(
     private val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val pointFillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val pointStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val selectedFillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val selectedStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     init {
         refreshPaints()
@@ -323,6 +445,20 @@ private class MiniMapConeOverlay(
             strokeWidth = 3f
             color = android.graphics.Color.WHITE
         }
+        selectedFillPaint.apply {
+            style = Paint.Style.FILL
+            color = android.graphics.Color.argb(
+                245,
+                android.graphics.Color.red(primaryColor),
+                android.graphics.Color.green(primaryColor),
+                android.graphics.Color.blue(primaryColor)
+            )
+        }
+        selectedStrokePaint.apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 5f
+            color = android.graphics.Color.WHITE
+        }
     }
 
     override fun draw(canvas: Canvas, projection: Projection) {
@@ -341,6 +477,12 @@ private class MiniMapConeOverlay(
             projection.toPixels(GeoPoint(point.latitude, point.longitude), strongPoint)
             canvas.drawCircle(strongPoint.x.toFloat(), strongPoint.y.toFloat(), 9f, pointStrokePaint)
             canvas.drawCircle(strongPoint.x.toFloat(), strongPoint.y.toFloat(), 6f, pointFillPaint)
+        }
+
+        data.selectedPoint?.let { point ->
+            projection.toPixels(GeoPoint(point.latitude, point.longitude), strongPoint)
+            canvas.drawCircle(strongPoint.x.toFloat(), strongPoint.y.toFloat(), 14f, selectedStrokePaint)
+            canvas.drawCircle(strongPoint.x.toFloat(), strongPoint.y.toFloat(), 9f, selectedFillPaint)
         }
     }
 
@@ -464,14 +606,7 @@ class MiniMapAntennaMarker(
     }
 
     private fun getOpColorInt(name: String?): Int {
-        val opName = name?.uppercase() ?: ""
-        return when {
-            opName.contains("ORANGE") -> android.graphics.Color.parseColor("#FF7900")
-            opName.contains("SFR") -> android.graphics.Color.parseColor("#E2001A")
-            opName.contains("FREE") -> android.graphics.Color.parseColor("#757575")
-            opName.contains("BOUYGUES") -> android.graphics.Color.parseColor("#00295F")
-            else -> primaryColor
-        }
+        return OperatorColors.colorInt(name, fallback = primaryColor)
     }
 
     override fun draw(canvas: android.graphics.Canvas, projection: org.osmdroid.views.Projection) {

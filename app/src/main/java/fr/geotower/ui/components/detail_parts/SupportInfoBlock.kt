@@ -15,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fr.geotower.ui.components.OutlinedCard
+import fr.geotower.utils.AppStrings
 
 @Composable
 fun SupportInfoBlock(
@@ -35,7 +36,7 @@ fun SupportInfoBlock(
                 Spacer(modifier = Modifier.width(16.dp))
                 Column {
                     Text(
-                        text = "Adresse",
+                        text = AppStrings.addressLabel.replace(" : ", ""),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -63,7 +64,7 @@ fun SupportInfoBlock(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
-                        Text(text = "Hauteur", style = MaterialTheme.typography.labelSmall)
+                        Text(text = AppStrings.height, style = MaterialTheme.typography.labelSmall)
                         Text(text = "${height.toInt()} m", fontWeight = FontWeight.Bold)
                     }
                 }
@@ -77,7 +78,7 @@ fun SupportInfoBlock(
                     )
                     Spacer(modifier = Modifier.width(8.dp))
                     Column {
-                        Text(text = "Support", style = MaterialTheme.typography.labelSmall)
+                        Text(text = AppStrings.supportPrefix, style = MaterialTheme.typography.labelSmall)
                         Text(text = typeSupport, fontWeight = FontWeight.Bold)
                     }
                 }

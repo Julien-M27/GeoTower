@@ -1,26 +1,28 @@
 package fr.geotower.data.workers
 
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
+import android.os.Build
 import android.os.StatFs
+import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
+import androidx.work.ForegroundInfo
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import fr.geotower.MainActivity
+import fr.geotower.R
 import fr.geotower.data.api.RetrofitClient
+import fr.geotower.utils.AppLogger
+import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.os.Build
-import androidx.core.app.NotificationCompat
-import androidx.work.ForegroundInfo
-import android.app.PendingIntent
-import android.content.Intent
-import fr.geotower.MainActivity
-import fr.geotower.R
-import java.util.Locale
 
 class MapDownloadWorker(
     context: Context,
@@ -33,82 +35,99 @@ class MapDownloadWorker(
     private val channelId = "map_download_channel"
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
-        // ✅ CHANGÉ : On récupère map_url
         val mapUrl = inputData.getString("map_url") ?: return@withContext Result.failure()
         val mapFilename = inputData.getString("map_filename") ?: return@withContext Result.failure()
+        val expectedSha256 = inputData.getString("map_sha256")?.takeIf { it.isNotBlank() }
         val estimatedSizeMb = inputData.getInt("estimated_size_mb", 2000)
+
+        if (!OfflineMapDownloadValidator.isAllowedHttpsUrl(mapUrl) ||
+            !OfflineMapDownloadValidator.isSafeMapFilename(mapFilename)
+        ) {
+            setProgress(workDataOf("error" to "invalid_map_catalog"))
+            return@withContext Result.failure()
+        }
 
         val uniqueNotifId = mapFilename.hashCode()
 
         try {
             setForeground(createForegroundInfo(0, mapFilename, uniqueNotifId))
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.w(TAG, "Map download foreground setup failed", e)
         }
 
-        // 1️⃣ SÉCURITÉ : Vérification de l'espace libre
         if (!hasEnoughSpace(estimatedSizeMb)) {
             setProgress(workDataOf("error" to "not_enough_space"))
             return@withContext Result.failure()
         }
 
         val mapsDir = File(applicationContext.getExternalFilesDir(null), "maps")
-        if (!mapsDir.exists()) mapsDir.mkdirs()
+        if (!mapsDir.exists() && !mapsDir.mkdirs()) {
+            setProgress(workDataOf("error" to "maps_dir_unavailable"))
+            return@withContext Result.failure()
+        }
 
-        // ✅ NOUVEAU : On télécharge dans un fichier .tmp pour sécuriser le téléchargement
-        val tempMapFile = File(mapsDir, "temp_${mapFilename}.tmp")
-        val finalMapFile = File(mapsDir, mapFilename)
+        val finalMapFile = OfflineMapDownloadValidator.safeMapFile(mapsDir, mapFilename)
+            ?: return@withContext Result.failure()
+        val tempMapFile = File(mapsDir.canonicalFile, "${finalMapFile.name}.download")
+        val backupMapFile = File(mapsDir.canonicalFile, "${finalMapFile.name}.backup")
 
         try {
-            // 2️⃣ TÉLÉCHARGEMENT DIRECT DE LA CARTE (.map)
             setProgress(workDataOf("state" to "DOWNLOADING", "progress" to 0))
+            if (tempMapFile.exists()) tempMapFile.delete()
 
             val request = Request.Builder().url(mapUrl).build()
             val response = RetrofitClient.currentClient.newCall(request).execute()
 
-            if (!response.isSuccessful) return@withContext Result.failure()
+            response.use { safeResponse ->
+                if (!safeResponse.isSuccessful) return@withContext Result.failure()
 
-            val body = response.body ?: return@withContext Result.failure()
-            val fileLength = body.contentLength()
-            val inputStream = body.byteStream()
-            val outputStream = FileOutputStream(tempMapFile)
+                val body = safeResponse.body ?: return@withContext Result.failure()
+                val expectedContentLength = body.contentLength()
 
-            val buffer = ByteArray(16 * 1024)
-            var bytesCopied: Long = 0
-            var bytes = inputStream.read(buffer)
-            var lastProgress = 0
+                body.byteStream().use { inputStream ->
+                    FileOutputStream(tempMapFile).use { outputStream ->
+                        val buffer = ByteArray(16 * 1024)
+                        var bytesCopied = 0L
+                        var bytes = inputStream.read(buffer)
+                        var lastProgress = 0
 
-            while (bytes >= 0) {
-                if (isStopped) {
-                    outputStream.close()
-                    inputStream.close()
-                    tempMapFile.delete()
-                    return@withContext Result.failure()
-                }
+                        while (bytes >= 0) {
+                            if (isStopped) {
+                                tempMapFile.delete()
+                                return@withContext Result.failure()
+                            }
 
-                outputStream.write(buffer, 0, bytes)
-                bytesCopied += bytes
+                            outputStream.write(buffer, 0, bytes)
+                            bytesCopied += bytes
 
-                if (fileLength > 0) {
-                    val progress = ((bytesCopied * 100) / fileLength).toInt()
+                            if (expectedContentLength > 0) {
+                                val progress = ((bytesCopied * 100) / expectedContentLength).toInt()
+                                if (progress > lastProgress) {
+                                    lastProgress = progress
+                                    setProgress(workDataOf("state" to "DOWNLOADING", "progress" to progress))
+                                    notificationManager.notify(uniqueNotifId, createNotification(progress, mapFilename))
+                                }
+                            }
 
-                    if (progress > lastProgress) {
-                        lastProgress = progress
-                        setProgress(workDataOf("state" to "DOWNLOADING", "progress" to progress))
-                        notificationManager.notify(uniqueNotifId, createNotification(progress, mapFilename))
+                            bytes = inputStream.read(buffer)
+                        }
                     }
                 }
-                bytes = inputStream.read(buffer)
+
+                if (!OfflineMapDownloadValidator.isValidDownloadedMap(
+                        file = tempMapFile,
+                        expectedContentLength = expectedContentLength,
+                        expectedSha256 = expectedSha256
+                    )
+                ) {
+                    tempMapFile.delete()
+                    setProgress(workDataOf("error" to "invalid_map_file"))
+                    return@withContext Result.failure()
+                }
             }
 
-            outputStream.flush()
-            outputStream.close()
-            inputStream.close()
-
-            // 3️⃣ FINALISATION : On renomme le fichier .tmp en .map
             setProgress(workDataOf("state" to "DONE", "progress" to 100))
-            if (finalMapFile.exists()) finalMapFile.delete()
-            val success = tempMapFile.renameTo(finalMapFile)
+            val success = replaceMapAtomically(tempMapFile, finalMapFile, backupMapFile)
 
             return@withContext if (success) {
                 Result.success()
@@ -116,18 +135,34 @@ class MapDownloadWorker(
                 tempMapFile.delete()
                 Result.failure()
             }
-
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.w(TAG, "Map download failed", e)
             if (tempMapFile.exists()) tempMapFile.delete()
             return@withContext Result.failure()
         }
     }
 
-    /**
-     * Vérifie s'il y a assez de place.
-     * Comme on ne dézippe plus rien, on a juste besoin de 1.1x la taille du fichier (10% de marge de sécurité)
-     */
+    private fun replaceMapAtomically(tempMapFile: File, finalMapFile: File, backupMapFile: File): Boolean {
+        if (backupMapFile.exists() && !backupMapFile.delete()) return false
+
+        val hadExistingMap = finalMapFile.exists()
+        if (hadExistingMap && !finalMapFile.renameTo(backupMapFile)) {
+            tempMapFile.delete()
+            return false
+        }
+
+        if (!tempMapFile.renameTo(finalMapFile)) {
+            if (hadExistingMap && backupMapFile.exists()) {
+                backupMapFile.renameTo(finalMapFile)
+            }
+            tempMapFile.delete()
+            return false
+        }
+
+        if (backupMapFile.exists()) backupMapFile.delete()
+        return true
+    }
+
     private fun hasEnoughSpace(estimatedSizeMb: Int): Boolean {
         val requiredBytes = estimatedSizeMb * 1024L * 1024L * 1.1
         val stat = StatFs(applicationContext.getExternalFilesDir(null)?.path ?: return false)
@@ -145,11 +180,11 @@ class MapDownloadWorker(
         }
     }
 
-    private fun createNotification(progress: Int, mapName: String): android.app.Notification {
+    private fun createNotification(progress: Int, mapName: String): Notification {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
-                getLocalString("Téléchargement de cartes", "Maps download", "Descarga de mapas"),
+                AppStrings.mapDownloadChannelName(applicationContext),
                 NotificationManager.IMPORTANCE_LOW
             )
             notificationManager.createNotificationChannel(channel)
@@ -160,12 +195,14 @@ class MapDownloadWorker(
             data = android.net.Uri.parse("geotower://settings?section=offline_maps")
         }
         val pendingIntent = PendingIntent.getActivity(
-            applicationContext, 0, intent,
+            applicationContext,
+            0,
+            intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = getLocalString("Carte : $mapName", "Map: $mapName", "Mapa: $mapName")
-        val content = getLocalString("Téléchargement... $progress%", "Downloading... $progress%", "Descargando... $progress%")
+        val title = AppStrings.mapDownloadTitle(applicationContext, mapName)
+        val content = AppStrings.mapDownloadProgress(applicationContext, progress)
 
         val builder = NotificationCompat.Builder(applicationContext, channelId)
             .setContentTitle(title)
@@ -178,28 +215,27 @@ class MapDownloadWorker(
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-            val progressStyle = android.app.Notification.ProgressStyle()
+            val progressStyle = Notification.ProgressStyle()
                 .setProgress(progress)
-                .setProgressSegments(listOf(android.app.Notification.ProgressStyle.Segment(100)))
+                .setProgressSegments(listOf(Notification.ProgressStyle.Segment(100)))
 
-            val nativeBuilder = android.app.Notification.Builder(applicationContext, channelId)
+            val nativeBuilder = Notification.Builder(applicationContext, channelId)
                 .setContentTitle(title)
                 .setContentText(content)
                 .setSmallIcon(R.drawable.geotower_logo)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
-                .setCategory(android.app.Notification.CATEGORY_PROGRESS)
+                .setCategory(Notification.CATEGORY_PROGRESS)
                 .setStyle(progressStyle)
 
-            // ✅ Utilisation de la réflexion pour compatibilité A16
             runCatching {
-                android.app.Notification.Builder::class.java
+                Notification.Builder::class.java
                     .getMethod("setShortCriticalText", CharSequence::class.java)
                     .invoke(nativeBuilder, "$progress%")
             }
             runCatching {
-                android.app.Notification.Builder::class.java
+                Notification.Builder::class.java
                     .getMethod("setRequestPromotedOngoing", Boolean::class.javaPrimitiveType)
                     .invoke(nativeBuilder, true)
             }
@@ -213,11 +249,7 @@ class MapDownloadWorker(
         return builder.build()
     }
 
-    private fun getLocalString(fr: String, en: String, es: String): String {
-        return when (Locale.getDefault().language) {
-            "fr" -> fr
-            "es" -> es
-            else -> en
-        }
+    private companion object {
+        private const val TAG = "GeoTowerMap"
     }
 }

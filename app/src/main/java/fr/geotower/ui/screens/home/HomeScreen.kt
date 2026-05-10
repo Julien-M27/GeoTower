@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -61,6 +62,8 @@ import fr.geotower.utils.AppStrings
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.ui.zIndex
 import fr.geotower.R
+import fr.geotower.data.db.DatabaseVersionPolicy
+import fr.geotower.data.db.GeoTowerDatabaseValidator
 import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -73,7 +76,11 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import fr.geotower.data.workers.DatabaseDownloadWorker
+import fr.geotower.utils.AppLogger
 import kotlinx.coroutines.launch
+
+private const val TAG_HOME = "GeoTowerDb"
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @SuppressLint("UnusedBoxWithConstraintsScope")
@@ -140,41 +147,49 @@ fun HomeScreen(navController: NavController) {
     val workManager = remember { androidx.work.WorkManager.getInstance(context) }
 
     // ✅ NOUVEAU : On écoute si un téléchargement est déjà en cours
-    val workInfos by workManager.getWorkInfosForUniqueWorkFlow("db_download").collectAsState(initial = emptyList())
+    val workInfos by workManager.getWorkInfosForUniqueWorkFlow(DatabaseDownloadWorker.UNIQUE_WORK_NAME).collectAsState(initial = emptyList())
     val currentWork = workInfos.firstOrNull()
     val isSyncing = currentWork?.state == androidx.work.WorkInfo.State.RUNNING || currentWork?.state == androidx.work.WorkInfo.State.ENQUEUED
     // ✅ NOUVEAU : On récupère la progression de 0 à 100
-    val downloadProgress = currentWork?.progress?.getInt("progress", 0) ?: 0
+    val downloadProgress = currentWork?.progress?.getInt(DatabaseDownloadWorker.KEY_PROGRESS, 0) ?: 0
 
-    var isDbMissing by remember { mutableStateOf(false) }
+    val localDbState by AppConfig.localDatabaseState
+    var wasSyncing by remember { mutableStateOf(isSyncing) }
     var isUpdateAvailable by remember { mutableStateOf(false) }
+    val isDbChecked = localDbState != null
+    val isDbMissing = localDbState == GeoTowerDatabaseValidator.LocalDatabaseState.MISSING
+    val isDbInvalid = localDbState == GeoTowerDatabaseValidator.LocalDatabaseState.INVALID
 
     val lifecycleOwner = LocalLifecycleOwner.current // À ajouter avant les Effects
 
-    // ✅ BLOC 1 : Vérification physique (Fichier présent ?)
+    // ✅ BLOC 1 : On réutilise l'état validé au splash/onboarding et on ne rescane qu'en fallback ou après téléchargement.
     LaunchedEffect(isSyncing) {
-        if (!isSyncing) {
-            val dbFile = context.getDatabasePath("geotower.db")
-            isDbMissing = !dbFile.exists() || dbFile.length() < 100 * 1024
+        if (!isSyncing && (AppConfig.localDatabaseState.value == null || wasSyncing)) {
+            AppConfig.localDatabaseState.value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                GeoTowerDatabaseValidator.getInstalledDatabaseFileStatus(context).state
+            }
         }
+        wasSyncing = isSyncing
     }
 
     // ✅ BLOC 2 : Vérification réseau à CHAQUE retour sur l'écran (ON_RESUME)
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, isOnline, isSyncing, localDbState) {
         val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME && isOnline && !isSyncing && !isDbMissing) {
+            if (
+                event == Lifecycle.Event.ON_RESUME &&
+                isOnline &&
+                !isSyncing &&
+                localDbState == GeoTowerDatabaseValidator.LocalDatabaseState.VALID
+            ) {
                 scope.launch(kotlinx.coroutines.Dispatchers.IO) {
                     try {
-                        // On récupère la taille distante
-                        val remoteSize = fr.geotower.data.api.DatabaseDownloader.getDatabaseSize()
+                        val remoteVersion = fr.geotower.data.api.DatabaseDownloader.getLatestDatabaseVersion()
 
-                        // On calcule la taille locale
-                        val dbFile = context.getDatabasePath("geotower.db")
-                        val localSize = if (dbFile.exists()) dbFile.length() / (1024.0 * 1024.0) else 0.0
+                        val localVersion = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context)
+                        val hasRemoteUpdate = DatabaseVersionPolicy.isRemoteNewer(remoteVersion, localVersion)
 
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                            // Comparaison des tailles (marge d'erreur de 0.01 Mo)
-                            if (remoteSize > 0.0 && Math.abs(remoteSize - localSize) > 0.01) {
+                            if (hasRemoteUpdate) {
                                 isUpdateAvailable = true
                                 fr.geotower.utils.AppConfig.isDbUpdateAvailable.value = true
                             } else {
@@ -183,7 +198,7 @@ fun HomeScreen(navController: NavController) {
                             }
                         }
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        AppLogger.w(TAG_HOME, "Database update check failed", e)
                     }
                 }
             }
@@ -250,11 +265,15 @@ fun HomeScreen(navController: NavController) {
             }
 
             // ---> 2. LE BANDEAU DE BASE DE DONNÉES (S'affiche juste en dessous si besoin) <---
-            val isDbBannerVisible = isDbMissing || isUpdateAvailable || isSyncing
-            val isDbReady = !isDbMissing && !isSyncing // ✅ NOUVEAU : On vérifie si la base est prête et dispo
+            val isDbUnavailable = isDbChecked && localDbState != GeoTowerDatabaseValidator.LocalDatabaseState.VALID
+            val isDbBannerVisible = isDbUnavailable || isUpdateAvailable || isSyncing
+            val isDbReady = localDbState != GeoTowerDatabaseValidator.LocalDatabaseState.MISSING &&
+                localDbState != GeoTowerDatabaseValidator.LocalDatabaseState.INVALID &&
+                !isSyncing
 
             DatabaseWarningBanner(
                 isMissing = isDbMissing,
+                isInvalid = isDbInvalid,
                 isUpdateAvailable = isUpdateAvailable,
                 isDownloading = isSyncing,
                 downloadProgress = downloadProgress,
@@ -263,8 +282,7 @@ fun HomeScreen(navController: NavController) {
                     isUpdateAvailable = false
                     AppConfig.isDbUpdateAvailable.value = false
 
-                    val request = androidx.work.OneTimeWorkRequestBuilder<fr.geotower.data.workers.DatabaseDownloadWorker>().build()
-                    workManager.enqueueUniqueWork("db_download", androidx.work.ExistingWorkPolicy.REPLACE, request)
+                    DatabaseDownloadWorker.enqueue(workManager)
                 }
             )
 
@@ -280,6 +298,14 @@ fun HomeScreen(navController: NavController) {
                     "top_end" -> Alignment.TopEnd
                     "bottom_start" -> Alignment.BottomStart
                     else -> Alignment.BottomEnd
+                }
+                val isHelpButtonAtBottom = helpButtonPosition.startsWith("bottom")
+                val showBottomHelpButton = showHelpButton && isHelpButtonAtBottom
+                val isBottomHelpButtonStart = helpButtonPosition == "bottom_start"
+                val helpButtonPadding = if (isHelpButtonAtBottom) {
+                    PaddingValues(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 2.dp)
+                } else {
+                    PaddingValues(20.dp)
                 }
 
                 Box(modifier = Modifier.fillMaxSize()) {
@@ -336,7 +362,15 @@ fun HomeScreen(navController: NavController) {
                             Spacer(modifier = Modifier.weight(1f))
 
                             Spacer(modifier = Modifier.height(32.dp))
-                            AboutSection(navController, appVersion, paleColor)
+                            AboutSection(
+                                navController = navController,
+                                version = appVersion,
+                                paleColor = paleColor,
+                                showBottomHelpButton = showBottomHelpButton,
+                                alignHelpStart = isBottomHelpButtonStart,
+                                helpContentColor = onPaleColor,
+                                onHelpClick = { safeClick { navController.navigate("help") { launchSingleTop = true } } }
+                            )
                         }
                     } else {
                         // --- DISPOSITION SMARTPHONE ---
@@ -367,20 +401,28 @@ fun HomeScreen(navController: NavController) {
 
                             Spacer(modifier = Modifier.weight(1f))
 
-                            AboutSection(navController, appVersion, paleColor)
+                            AboutSection(
+                                navController = navController,
+                                version = appVersion,
+                                paleColor = paleColor,
+                                showBottomHelpButton = showBottomHelpButton,
+                                alignHelpStart = isBottomHelpButtonStart,
+                                helpContentColor = onPaleColor,
+                                onHelpClick = { safeClick { navController.navigate("help") { launchSingleTop = true } } }
+                            )
                             Spacer(modifier = Modifier.height(24.dp))
                         }
                     }
 
-                    if (showHelpButton) {
+                    if (showHelpButton && !isHelpButtonAtBottom) {
                         FloatingActionButton(
                             onClick = { safeClick { navController.navigate("help") { launchSingleTop = true } } },
                             containerColor = paleColor,
                             contentColor = onPaleColor,
                             modifier = Modifier
                                 .align(helpButtonAlignment)
-                                .padding(20.dp)
-                                .navigationBarsPadding()
+                                .padding(helpButtonPadding)
+                                .then(if (isHelpButtonAtBottom) Modifier else Modifier.navigationBarsPadding())
                                 .zIndex(2f)
                         ) {
                             Icon(Icons.AutoMirrored.Filled.Help, contentDescription = AppStrings.homeHelpSettings)
@@ -504,15 +546,46 @@ fun MenuButtonsList(
 }
 
 @Composable
-fun AboutSection(navController: NavController, version: String, paleColor: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        TextButton(onClick = { navController.navigate("about") }) {
-            // Utilise primary pour l'icône au lieu de paleColor
-            Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.width(8.dp))
-            Text(text = AppStrings.about, color = MaterialTheme.colorScheme.onSurface, fontSize = 18.sp)
+fun AboutSection(
+    navController: NavController,
+    version: String,
+    paleColor: Color,
+    showBottomHelpButton: Boolean = false,
+    alignHelpStart: Boolean = false,
+    helpContentColor: Color = Color.Unspecified,
+    onHelpClick: (() -> Unit)? = null
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 76.dp),
+        contentAlignment = Alignment.TopCenter
+    ) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            TextButton(onClick = { navController.navigate("about") }) {
+                // Utilise primary pour l'icône au lieu de paleColor
+                Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = AppStrings.about, color = MaterialTheme.colorScheme.onSurface, fontSize = 18.sp)
+            }
+            Text(text = version, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
         }
-        Text(text = version, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
+        if (showBottomHelpButton && onHelpClick != null) {
+            FloatingActionButton(
+                onClick = onHelpClick,
+                containerColor = paleColor,
+                contentColor = if (helpContentColor == Color.Unspecified) {
+                    MaterialTheme.colorScheme.onPrimaryContainer
+                } else {
+                    helpContentColor
+                },
+                modifier = Modifier
+                    .align(if (alignHelpStart) Alignment.TopStart else Alignment.TopEnd)
+                    .padding(top = 12.dp)
+            ) {
+                Icon(Icons.AutoMirrored.Filled.Help, contentDescription = AppStrings.homeHelpSettings)
+            }
+        }
     }
 }
 
@@ -579,29 +652,30 @@ fun DrawableImage(resId: Int, modifier: Modifier = Modifier) {
 @Composable
 fun DatabaseWarningBanner(
     isMissing: Boolean,
+    isInvalid: Boolean,
     isUpdateAvailable: Boolean,
     isDownloading: Boolean,
     downloadProgress: Int, // ✅ NOUVEAU PARAMÈTRE
     onDownloadClick: () -> Unit
 ) {
     androidx.compose.animation.AnimatedVisibility(
-        visible = isMissing || isUpdateAvailable || isDownloading,
+        visible = isMissing || isInvalid || isUpdateAvailable || isDownloading,
         enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
         exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
         // ✅ AJOUT DES MARGES (Comme pour le bandeau hors-ligne)
         modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
-        val containerColor = if (isMissing) {
+        val containerColor = if (isMissing || isInvalid) {
             androidx.compose.material3.MaterialTheme.colorScheme.errorContainer
         } else {
             androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer
         }
-        val contentColor = if (isMissing) {
+        val contentColor = if (isMissing || isInvalid) {
             androidx.compose.material3.MaterialTheme.colorScheme.onErrorContainer
         } else {
             androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer
         }
-        val icon = if (isMissing) Icons.Default.Error else Icons.Default.CloudDownload
+        val icon = if (isMissing || isInvalid) Icons.Default.Error else Icons.Default.CloudDownload
 
         androidx.compose.material3.Surface(
             color = containerColor,
@@ -623,14 +697,22 @@ fun DatabaseWarningBanner(
                 androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(12.dp))
                 androidx.compose.foundation.layout.Column(modifier = androidx.compose.ui.Modifier.weight(1f)) {
                     androidx.compose.material3.Text(
-                        text = if (isMissing) fr.geotower.utils.AppStrings.missingDbBannerTitle else fr.geotower.utils.AppStrings.updateDbBannerTitle,
+                        text = when {
+                            isInvalid -> fr.geotower.utils.AppStrings.invalidDbBannerTitle
+                            isMissing -> fr.geotower.utils.AppStrings.missingDbBannerTitle
+                            else -> fr.geotower.utils.AppStrings.updateDbBannerTitle
+                        },
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                         color = contentColor,
                         style = androidx.compose.material3.MaterialTheme.typography.titleSmall
                     )
-                    if (isMissing) {
+                    if (isMissing || isInvalid) {
                         androidx.compose.material3.Text(
-                            text = fr.geotower.utils.AppStrings.missingDbBannerDesc,
+                            text = if (isInvalid) {
+                                fr.geotower.utils.AppStrings.invalidDbBannerDesc
+                            } else {
+                                fr.geotower.utils.AppStrings.missingDbBannerDesc
+                            },
                             color = contentColor,
                             style = androidx.compose.material3.MaterialTheme.typography.bodySmall
                         )

@@ -72,6 +72,7 @@ import fr.geotower.ui.screens.emitters.formatTechnologies
 import fr.geotower.ui.screens.emitters.getElevationProfileLastKnownLocation
 import fr.geotower.ui.screens.emitters.getDetailLogoRes
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -82,6 +83,8 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import android.net.Uri
 import fr.geotower.ui.components.SiteStatusCard
+
+private const val TAG_SHARE_IMAGE = "GeoTower"
 
 private fun Int.dpToPx(context: Context): Int = (this * context.resources.displayMetrics.density).toInt()
 
@@ -334,7 +337,7 @@ fun shareFullAntennaCapture(
                                     Spacer(modifier = Modifier.width(16.dp))
                                     Column {
                                         Text(
-                                            info.operateur ?: "Inconnu",
+                                            info.operateur ?: AppStrings.unknown,
                                             fontWeight = FontWeight.Bold
                                         )
                                         val rawTechs =
@@ -466,7 +469,7 @@ fun shareFullAntennaCapture(
                                                             ?: txtNotSpecified
                                                     val proprietaire =
                                                         physique?.proprietaire?.takeIf { it.isNotBlank() }
-                                                            ?: "Inconnu"
+                                                            ?: AppStrings.unknown
                                                     Text(
                                                         "$txtSupportNature : $nature",
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -614,7 +617,7 @@ fun shareFullAntennaCapture(
                                                     )
                                                     val fullAddress =
                                                         technique?.adresse?.takeIf { it.isNotBlank() }
-                                                            ?: "Adresse non spécifiée"
+                                                            ?: AppStrings.notSpecified
                                                     Text(
                                                         fullAddress,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -1252,7 +1255,7 @@ fun shareFullAntennaCapture(
                                         Spacer(modifier = Modifier.width(16.dp))
                                         Column {
                                             Text(
-                                                info.operateur ?: "Inconnu",
+                                                info.operateur ?: AppStrings.unknown,
                                                 fontWeight = FontWeight.Bold
                                             )
                                             val rawTechs =
@@ -1611,7 +1614,7 @@ fun shareFullAntennaCapture(
         rootView.addView(composeView, ViewGroup.LayoutParams(expectedWidthDp.dpToPx(context), ViewGroup.LayoutParams.WRAP_CONTENT))
 
     } catch (e: Exception) {
-        e.printStackTrace()
+        AppLogger.w(TAG_SHARE_IMAGE, "Site share view setup failed", e)
         Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
         return
     }
@@ -1691,7 +1694,7 @@ fun shareFullAntennaCapture(
                 onComplete?.invoke()
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.w(TAG_SHARE_IMAGE, "Site share capture failed", e)
             if (composeView.parent != null) rootView.removeView(composeView)
             onComplete?.invoke()
         }
@@ -1778,9 +1781,9 @@ fun shareFullSiteCapture(
 
                                                     // ✅ ON UTILISE LES VRAIES DONNÉES DU PYLÔNE
                                                     val technique = techniquesMap[mainInfo.idAnfr]
-                                                    val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: "Adresse non spécifiée"
+                                                    val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: AppStrings.notSpecified
                                                     val nature = physique?.natureSupport?.takeIf { it.isNotBlank() } ?: txtNotSpecified
-                                                    val proprietaire = physique?.proprietaire?.takeIf { it.isNotBlank() } ?: "Inconnu"
+                                                    val proprietaire = physique?.proprietaire?.takeIf { it.isNotBlank() } ?: AppStrings.unknown
                                                     val hauteur = formatShareHeightMeters(physique?.hauteur)
                                                     val idSupportValue = physique?.idSupport?.takeIf { it.isNotBlank() } ?: txtNotSpecified
 
@@ -1896,14 +1899,14 @@ fun shareFullSiteCapture(
                 context.startActivity(Intent.createChooser(shareIntent, txtShareSiteVia))
                 onComplete?.invoke()
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLogger.w(TAG_SHARE_IMAGE, "Support share capture failed", e)
                 Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
                 if (composeView.parent != null) rootView.removeView(composeView)
                 onComplete?.invoke()
             }
         }
     } catch (e: Exception) {
-        e.printStackTrace()
+        AppLogger.w(TAG_SHARE_IMAGE, "Support share initialization failed", e)
         onComplete?.invoke()
     }
 }
@@ -2379,7 +2382,7 @@ fun AntennaShareMenu(
                                             )
                                         }
                                     } catch (e: Exception) {
-                                        e.printStackTrace()
+                                        AppLogger.w(TAG_SHARE_IMAGE, "Site share generation failed", e)
                                         isGeneratingShare = false
                                     }
                                 }, 300)
@@ -2643,7 +2646,7 @@ fun SupportShareMenu(
                                         onComplete = { isGeneratingShare = false }
                                     )
                                 } catch (e: Exception) {
-                                    e.printStackTrace()
+                                    AppLogger.w(TAG_SHARE_IMAGE, "Support share generation failed", e)
                                     isGeneratingShare = false
                                 }
                             }, 300)
@@ -2680,7 +2683,7 @@ fun generateQrCodeBitmap(text: String, size: Int): Bitmap? {
         bitmap.setPixels(pixels, 0, width, 0, 0, width, height)
         bitmap
     } catch (e: Exception) {
-        e.printStackTrace()
+        AppLogger.w(TAG_SHARE_IMAGE, "QR code generation failed", e)
         null
     }
 }

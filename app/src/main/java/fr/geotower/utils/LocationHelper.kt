@@ -19,8 +19,12 @@ class LocationHelper(private val context: Context) {
                 null
             ).await()
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.w(TAG, "Current location request failed", e)
             null
         }
+    }
+
+    private companion object {
+        private const val TAG = "GeoTowerLocation"
     }
 }

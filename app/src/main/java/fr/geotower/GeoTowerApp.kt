@@ -4,16 +4,15 @@ import android.app.Application
 import androidx.preference.PreferenceManager
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.RetrofitClient
+import fr.geotower.data.upload.SignalQuestUploadQueue
 import org.osmdroid.config.Configuration
 
-class GeoRadioApp : Application() {
-
-    // 🗑️ Plus besoin de déclarer la "database" ici, le Repository s'en occupe tout seul !
+class GeoTowerApp : Application() {
 
     val repository by lazy {
         AnfrRepository(
             api = RetrofitClient.apiService,
-            context = applicationContext // ✅ CORRECTION : on passe le context au lieu du dao
+            context = applicationContext
         )
     }
 
@@ -24,5 +23,6 @@ class GeoRadioApp : Application() {
             PreferenceManager.getDefaultSharedPreferences(applicationContext)
         )
         Configuration.getInstance().userAgentValue = packageName
+        SignalQuestUploadQueue.cleanupStaleFiles(applicationContext)
     }
 }

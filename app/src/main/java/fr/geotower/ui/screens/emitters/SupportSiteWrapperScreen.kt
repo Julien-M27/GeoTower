@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import fr.geotower.data.AnfrRepository
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppLogger
 
 private enum class SiteDetailSidePane {
     ElevationProfile,
@@ -101,7 +102,7 @@ fun SupportSiteWrapperScreen(
                         .apply()
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLogger.w(TAG_SUPPORT_WRAPPER, "Support selection restore failed", e)
             }
         }
         isReady = true
@@ -195,6 +196,8 @@ fun SupportSiteWrapperScreen(
         }
     }
 }
+
+private const val TAG_SUPPORT_WRAPPER = "GeoTower"
 
 @Composable
 fun NearEmittersSupportWrapperScreen(

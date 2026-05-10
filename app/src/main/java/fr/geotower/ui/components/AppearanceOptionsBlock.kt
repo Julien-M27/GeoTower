@@ -49,7 +49,7 @@ fun AppearanceOptionsBlock(
     // 1. Thème
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         if (showSystemTheme) {
-            SettingsOptionCard(AppStrings.get("Système", "System", "Sistema"), Icons.Default.SettingsSuggest, themeMode == 0, { safeClick { onThemeChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+            SettingsOptionCard(AppStrings.system, Icons.Default.SettingsSuggest, themeMode == 0, { safeClick { onThemeChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
         }
         SettingsOptionCard(AppStrings.themeLight, Icons.Default.LightMode, themeMode == 1 || (!showSystemTheme && themeMode == 0), { safeClick { onThemeChange(1) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
         SettingsOptionCard(AppStrings.themeDark, Icons.Default.DarkMode, themeMode == 2, { safeClick { onThemeChange(2) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)

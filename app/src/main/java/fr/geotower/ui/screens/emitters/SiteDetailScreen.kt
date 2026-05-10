@@ -104,17 +104,26 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.api.CellularFrApi
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
+import fr.geotower.data.upload.SignalQuestUploadDraftStore
+import fr.geotower.data.upload.SignalQuestUploadQueue
+import fr.geotower.data.upload.SignalQuestUploadRules
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.OperatorColors
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.roundToInt
 import fr.geotower.ui.components.SpeedtestCard
+
+private const val TAG_SITE_DETAIL = "GeoTower"
+private const val TAG_SPEEDTEST = "GeoTowerUpload"
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -165,7 +174,7 @@ fun SiteDetailScreen(
                         .putFloat("clicked_lon", site.longitude.toFloat())
                         .apply()
                 }
-            } catch (e: Exception) { e.printStackTrace() }
+            } catch (e: Exception) { AppLogger.w(TAG_SITE_DETAIL, "Site selection restore failed", e) }
         }
         isReady = true
     }
@@ -230,6 +239,7 @@ fun SiteDetailScreen(
     val completedWorkIds = remember { mutableSetOf<UUID>() }
 
     val currentSiteId = antenna?.idAnfr ?: ""
+    val unknownText = AppStrings.unknown
     val workInfos by remember(currentSiteId) {
         WorkManager.getInstance(context).getWorkInfosByTagFlow("sq_upload_$currentSiteId")
     }.collectAsState(initial = emptyList())
@@ -253,14 +263,14 @@ fun SiteDetailScreen(
     var showRncSheet by remember { mutableStateOf(false) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult<PickVisualMediaRequest, List<Uri>>(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 10),
+        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = SignalQuestUploadRules.MAX_PHOTOS),
         onResult = { uris ->
             if (uris.isNotEmpty() && antenna != null) {
-                val encodedUris = uris.joinToString(",") { Uri.encode(it.toString()) }
+                val draftId = SignalQuestUploadDraftStore.put(uris.map { it.toString() })
                 val uploadSiteId = physique?.idSupport ?: antenna!!.idAnfr
-                val safeOperator = Uri.encode(antenna!!.operateur ?: "Inconnu")
+                val safeOperator = Uri.encode(antenna!!.operateur ?: unknownText)
                 val safeAzimuts = Uri.encode(antenna!!.azimuts ?: "")
-                navController.navigate("sq_upload/${uploadSiteId}/${safeOperator}?uris=$encodedUris&lat=${antenna!!.latitude}&lon=${antenna!!.longitude}&azimuts=$safeAzimuts")
+                navController.navigate("sq_upload/${uploadSiteId}/${safeOperator}?draftId=$draftId&lat=${antenna!!.latitude}&lon=${antenna!!.longitude}&azimuts=$safeAzimuts")
             }
         }
     )
@@ -272,20 +282,16 @@ fun SiteDetailScreen(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
         if (success && currentCameraUri != null && antenna != null) {
-            val encodedUri = Uri.encode(currentCameraUri.toString())
+            val draftId = SignalQuestUploadDraftStore.put(listOf(currentCameraUri.toString()))
             val uploadSiteId = physique?.idSupport ?: antenna!!.idAnfr
-            val safeOperator = Uri.encode(antenna!!.operateur ?: "Inconnu")
+            val safeOperator = Uri.encode(antenna!!.operateur ?: unknownText)
             val safeAzimuts = Uri.encode(antenna!!.azimuts ?: "")
-            navController.navigate("sq_upload/${uploadSiteId}/${safeOperator}?uris=$encodedUri&lat=${antenna!!.latitude}&lon=${antenna!!.longitude}&azimuts=$safeAzimuts")
+            navController.navigate("sq_upload/${uploadSiteId}/${safeOperator}?draftId=$draftId&lat=${antenna!!.latitude}&lon=${antenna!!.longitude}&azimuts=$safeAzimuts")
         }
     }
 
     fun createCameraUri(): Uri {
-        val tempFile = java.io.File.createTempFile("sq_camera_${System.currentTimeMillis()}_", ".jpg", context.cacheDir).apply {
-            createNewFile()
-            deleteOnExit()
-        }
-        return androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tempFile)
+        return SignalQuestUploadQueue.createCameraUri(context)
     }
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
@@ -410,7 +416,7 @@ fun SiteDetailScreen(
                 }
                 if (hsData != null) tempOutageMap[localData.idAnfr] = hsData
                 hsDataMap = tempOutageMap
-            } catch (e: Exception) { e.printStackTrace() }
+            } catch (e: Exception) { AppLogger.w(TAG_SITE_DETAIL, "Outage data request failed", e) }
         }
 
         if (localData != null && localData.idAnfr.isNotBlank()) {
@@ -422,33 +428,9 @@ fun SiteDetailScreen(
 
             // ✅ Séparation en deux blocs `if` distincts (Plus de `else if`)
             if (opName.contains("ORANGE", true)) {
-                try {
-                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        val apiUrl = java.net.URL("https://cellularfr.fr/api/photos?siteId=$trueSupportId")
-                        val connection = apiUrl.openConnection() as java.net.HttpURLConnection
-                        connection.requestMethod = "GET"
-                        connection.connect()
-
-                        if (connection.responseCode == 200) {
-                            val jsonString = connection.inputStream.bufferedReader().use { it.readText() }
-                            val jsonObject = org.json.JSONObject(jsonString)
-                            val photosArray = jsonObject.optJSONArray("photos")
-
-                            if (photosArray != null) {
-                                for (i in 0 until photosArray.length()) {
-                                    val photoObj = photosArray.getJSONObject(i)
-                                    val relativeUrl = photoObj.optString("url", "")
-                                    val author = if (photoObj.isNull("nickname")) null else photoObj.optString("nickname")
-                                    val date = if (photoObj.isNull("uploadDate")) null else photoObj.optString("uploadDate")
-
-                                    if (relativeUrl.isNotEmpty()) {
-                                        photosTemp.add(CommunityPhoto("https://cellularfr.fr$relativeUrl", "CellularFR", author, date))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                } catch (e: Exception) { e.printStackTrace() }
+                CellularFrApi.getCellularFrPhotos(trueSupportId).forEach { photo ->
+                    photosTemp.add(CommunityPhoto(photo.url, "CellularFR", photo.author, photo.uploadedAt))
+                }
             }
 
             if (opName.contains("SFR", true) || opName.contains("BOUYGUES", true)) {
@@ -462,7 +444,7 @@ fun SiteDetailScreen(
                             photosTemp.add(CommunityPhoto(it.imageUrl, "Signal Quest", it.authorName, it.uploadedAt))
                         }
                     }
-                } catch (e: Exception) { e.printStackTrace() }
+                } catch (e: Exception) { AppLogger.w(TAG_SITE_DETAIL, "SignalQuest photos request failed", e) }
             }
 
             communityPhotos = photosTemp
@@ -488,7 +470,7 @@ fun SiteDetailScreen(
                     else -> null
                 }
 
-                android.util.Log.d("SpeedtestDebug", "👉 1. Envoi du Code ANFR : $anfrCodeToSend (Opérateur: $apiOperator)")
+                AppLogger.d(TAG_SPEEDTEST, "Speedtest request anfr=$anfrCodeToSend operator=$apiOperator")
 
                 val response = fr.geotower.data.api.SignalQuestClient.api.getSiteSpeedtests(
                     authHeader = "Bearer ${fr.geotower.BuildConfig.SQ_API_KEY}",
@@ -497,19 +479,19 @@ fun SiteDetailScreen(
                     bestOnly = true
                 )
 
-                android.util.Log.d("SpeedtestDebug", "👉 2. Code HTTP de réponse: ${response.code()}")
+                AppLogger.d(TAG_SPEEDTEST, "Speedtest response code=${response.code()}")
 
                 if (response.isSuccessful) {
                     val body = response.body()
                     speedtestData = body?.data?.firstOrNull()
-                    android.util.Log.d("SpeedtestDebug", "👉 3. Donnée finale : $speedtestData")
+                    AppLogger.d(TAG_SPEEDTEST, "Speedtest data=$speedtestData")
                 } else {
-                    val errorMsg = response.errorBody()?.string() ?: "Erreur inconnue"
-                    android.util.Log.e("SpeedtestDebug", "❌ Erreur API (${response.code()}): $errorMsg")
+                    response.errorBody()?.close()
+                    AppLogger.d(TAG_SPEEDTEST, "Speedtest API failure code=${response.code()}")
+                    AppLogger.w(TAG_SPEEDTEST, "SignalQuest speedtest API failure")
                 }
             } catch (e: Exception) {
-                android.util.Log.e("SpeedtestDebug", "💥 Exception lors de l'appel Speedtest", e)
-                e.printStackTrace()
+                AppLogger.w(TAG_SPEEDTEST, "SignalQuest speedtest request failed", e)
             } finally {
                 isSpeedtestLoading = false
             }
@@ -531,7 +513,7 @@ fun SiteDetailScreen(
             try {
                 locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 1f, locationListener)
                 locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000L, 1f, locationListener)
-            } catch (e: Exception) { e.printStackTrace() }
+            } catch (e: Exception) { AppLogger.w(TAG_SITE_DETAIL, "Location updates could not start", e) }
         }
         onDispose { locationManager.removeUpdates(locationListener) }
     }
@@ -805,7 +787,7 @@ fun SiteDetailScreen(
                             if (showOperator) {
                                 Card(modifier = Modifier.fillMaxWidth(), shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
                                     Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        val opNameDisplay = info.operateur ?: "Inconnu"
+                                        val opNameDisplay = info.operateur ?: AppStrings.unknown
                                         val logoRes = getDetailLogoRes(opNameDisplay)
 
                                         if (logoRes != null) { Image(painter = painterResource(id = logoRes), contentDescription = null, modifier = Modifier.size(72.dp).clip(RoundedCornerShape(8.dp))) }
@@ -883,6 +865,7 @@ fun SiteDetailScreen(
                                     photos = communityPhotos,
                                     operatorName = opName,
                                     supportNature = physique?.natureSupport, // ✅ LE BON NOM DE VARIABLE
+                                    supportOwner = physique?.proprietaire,
                                     bgColor = cardBgColor,
                                     shape = blockShape,
                                     onAddPhotoClick = { safeClick { showImageSourceDialog = true } }
@@ -1032,7 +1015,7 @@ fun SiteDetailScreen(
                     onDismissRequest = { showImageSourceDialog = false },
                     shape = blockShape,
                     containerColor = sheetBgColor,
-                    title = { Text(AppStrings.get("Ajouter des photos", "Add photos", "Añadir fotos"), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+                    title = { Text(AppStrings.addPhotos, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                     text = {
                         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             Button(
@@ -1050,7 +1033,7 @@ fun SiteDetailScreen(
                             ) {
                                 Icon(Icons.Default.PhotoCamera, null)
                                 Spacer(Modifier.width(8.dp))
-                                Text(AppStrings.get("Appareil photo", "Camera", "Cámara"), fontWeight = FontWeight.Bold)
+                                Text(AppStrings.camera, fontWeight = FontWeight.Bold)
                             }
                             OutlinedButton(
                                 onClick = {
@@ -1066,7 +1049,7 @@ fun SiteDetailScreen(
                             ) {
                                 Icon(Icons.Default.PhotoLibrary, null)
                                 Spacer(Modifier.width(8.dp))
-                                Text(AppStrings.get("Galerie", "Gallery", "Galería"), fontWeight = FontWeight.Bold)
+                                Text(AppStrings.gallery, fontWeight = FontWeight.Bold)
                             }
                         }
                     },
@@ -1129,12 +1112,10 @@ private fun CommunityCard(title: String, txtUnavailable: String, opColor: Color,
     }
 }
 
-private fun getOperatorColor(name: String?): Color = when {
-    name?.contains("ORANGE", true) == true -> Color(0xFFFF6600)
-    name?.contains("SFR", true) == true -> Color(0xFFE2001A)
-    name?.contains("FREE", true) == true -> Color(0xFF757575)
-    name?.contains("BOUYGUES", true) == true -> Color(0xFF00295F)
-    else -> Color.Gray
+private fun getOperatorColor(name: String?): Color {
+    return OperatorColors.keyFor(name)
+        ?.let { Color(OperatorColors.colorArgbForKey(it)) }
+        ?: Color.Gray
 }
 
 fun getDetailLogoRes(opName: String?): Int? = when {

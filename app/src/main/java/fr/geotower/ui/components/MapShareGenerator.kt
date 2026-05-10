@@ -44,11 +44,14 @@ import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppStrings
 import java.io.File
 import java.io.FileOutputStream
 import androidx.compose.foundation.Image
 import androidx.compose.ui.draw.rotate
+
+private const val TAG_MAP_SHARE = "GeoTowerMap"
 
 fun shareFullMapCapture(
     context: Context,
@@ -172,12 +175,12 @@ fun shareFullMapCapture(
                 }
                 context.startActivity(Intent.createChooser(shareIntent, txtShareSiteVia))
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLogger.w(TAG_MAP_SHARE, "Map share capture failed", e)
                 Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
                 rootView.removeView(composeView)
             }
         }
-    } catch (e: Exception) { e.printStackTrace() }
+    } catch (e: Exception) { AppLogger.w(TAG_MAP_SHARE, "Map share initialization failed", e) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

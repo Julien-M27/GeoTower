@@ -1,6 +1,7 @@
 package fr.geotower.ui.theme
 
 import androidx.compose.ui.graphics.Color
+import fr.geotower.utils.OperatorColors
 
 // --- Couleurs de base (Thème) ---
 val ColorBlue = Color(0xFF4285F4)
@@ -8,11 +9,11 @@ val ColorPurple = Color(0xFF6200EE)
 val ColorPink = Color(0xFFE91E63)
 
 // --- Couleurs des Opérateurs ---
-val ColorOrange = Color(0xFFFF6600)
-val ColorSfr = Color(0xFFE2001A)
-val ColorBouygues = Color(0xFF009FD8)
-val ColorFree = Color(0xFFCE0033)
-val ColorUnknown = Color(0xFF808080)
+val ColorOrange = Color(OperatorColors.ORANGE_ARGB)
+val ColorSfr = Color(OperatorColors.SFR_ARGB)
+val ColorBouygues = Color(OperatorColors.BOUYGUES_ARGB)
+val ColorFree = Color(OperatorColors.FREE_ARGB)
+val ColorUnknown = Color(OperatorColors.UNKNOWN_ARGB)
 
 // --- Couleurs des Technologies (C'est ce qui manquait !) ---
 val Color5G = Color(0xFF00C853) // Vert vif

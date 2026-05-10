@@ -89,6 +89,7 @@ import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.map.MapViewModel
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.OperatorColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -355,7 +356,7 @@ fun CompassScreen(
                         onClick = { safeBackNavigation.navigateBack() },
                         enabled = !safeBackNavigation.isLocked
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", tint = oncompassBg)
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppStrings.back, tint = oncompassBg)
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = compassBg),
@@ -931,7 +932,7 @@ fun MiniOperatorGrid(operateurs: List<String>) {
     }
 }
 fun getOperatorPriorityList(defaultOp: String): List<String> {
-    val baseOrder = listOf("ORANGE", "BOUYGUES", "SFR", "FREE")
+    val baseOrder = OperatorColors.orderedKeys
     val priorityList = mutableListOf<String>()
     val defOpUpper = defaultOp.uppercase()
 
@@ -943,12 +944,9 @@ fun getOperatorPriorityList(defaultOp: String): List<String> {
 }
 
 fun getOperatorColors(): Map<String, Color> {
-    return mapOf(
-        "ORANGE" to Color(0xFFFF7900),
-        "BOUYGUES" to Color(0xFF00295F),
-        "SFR" to Color(0xFFE2001A),
-        "FREE" to Color(0xFF757575)
-    )
+    return OperatorColors.orderedKeys.associateWith { key ->
+        Color(OperatorColors.colorArgbForKey(key))
+    }
 }
 
 fun formatCompassDistance(distanceMeters: Float, isMi: Boolean): String {

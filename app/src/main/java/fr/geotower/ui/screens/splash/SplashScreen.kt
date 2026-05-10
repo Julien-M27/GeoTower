@@ -15,10 +15,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
+import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.AppConfig
 import kotlinx.coroutines.*
+
+private const val TAG_SPLASH = "GeoTowerDb"
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -36,27 +39,24 @@ fun SplashScreen(
         // Vérification des mises à jour en tâche de fond (accès direct SQLite pour éviter Room au démarrage)
         launch(Dispatchers.IO) {
             try {
-                val latestVersion = fr.geotower.data.api.DatabaseDownloader.getLatestDatabaseVersion()
-                val dbPath = context.getDatabasePath("geotower.db")
-                var currentVersion: String? = null
-
-                if (dbPath.exists()) {
-                    val db = android.database.sqlite.SQLiteDatabase.openDatabase(
-                        dbPath.absolutePath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY
-                    )
-                    val cursor = db.rawQuery("SELECT version FROM metadata LIMIT 1", null)
-                    if (cursor.moveToFirst()) currentVersion = cursor.getString(0)
-                    cursor.close()
-                    db.close()
+                val localStatus = fr.geotower.data.db.GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context)
+                withContext(Dispatchers.Main) {
+                    AppConfig.localDatabaseState.value = localStatus.state
                 }
 
-                if (latestVersion != null && latestVersion != currentVersion) {
-                    withContext(Dispatchers.Main) {
-                        AppConfig.isDbUpdateAvailable.value = true
-                    }
+                val currentVersion = if (localStatus.state == fr.geotower.data.db.GeoTowerDatabaseValidator.LocalDatabaseState.VALID) {
+                    fr.geotower.data.db.GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context)
+                } else {
+                    null
+                }
+
+                val latestVersion = fr.geotower.data.api.DatabaseDownloader.getLatestDatabaseVersion()
+                val updateAvailable = fr.geotower.data.db.DatabaseVersionPolicy.isRemoteNewer(latestVersion, currentVersion)
+                withContext(Dispatchers.Main) {
+                    AppConfig.isDbUpdateAvailable.value = updateAvailable
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLogger.w(TAG_SPLASH, "Startup database update check failed", e)
             }
         }
 

@@ -19,9 +19,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -65,9 +68,11 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
@@ -79,6 +84,7 @@ import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.ui.res.painterResource // 🚨 Pour régler "painterResource"
 import fr.geotower.R // 🚨 Pour régler "R" (le lien vers vos dossiers res/)
 import androidx.compose.foundation.Image
+import java.text.Normalizer
 
 // Modèle de données unifié
 data class CommunityPhoto(
@@ -87,6 +93,71 @@ data class CommunityPhoto(
     val author: String? = null,
     val date: String? = null
 )
+
+private data class DisplayedPhotoFrame(
+    val left: Float,
+    val top: Float,
+    val width: Float,
+    val height: Float
+) {
+    val right: Float get() = left + width
+    val bottom: Float get() = top + height
+}
+
+private fun fittedPhotoFrame(containerSize: IntSize, sourceSize: IntSize?): DisplayedPhotoFrame {
+    val containerWidth = containerSize.width.toFloat()
+    val containerHeight = containerSize.height.toFloat()
+
+    if (
+        containerWidth <= 0f ||
+        containerHeight <= 0f ||
+        sourceSize == null ||
+        sourceSize.width <= 0 ||
+        sourceSize.height <= 0
+    ) {
+        return DisplayedPhotoFrame(0f, 0f, containerWidth, containerHeight)
+    }
+
+    val containerRatio = containerWidth / containerHeight
+    val sourceRatio = sourceSize.width.toFloat() / sourceSize.height.toFloat()
+    val fittedWidth: Float
+    val fittedHeight: Float
+
+    if (sourceRatio > containerRatio) {
+        fittedWidth = containerWidth
+        fittedHeight = containerWidth / sourceRatio
+    } else {
+        fittedHeight = containerHeight
+        fittedWidth = containerHeight * sourceRatio
+    }
+
+    return DisplayedPhotoFrame(
+        left = (containerWidth - fittedWidth) / 2f,
+        top = (containerHeight - fittedHeight) / 2f,
+        width = fittedWidth,
+        height = fittedHeight
+    )
+}
+
+private fun normalizedSupportText(value: String?): String {
+    if (value.isNullOrBlank()) return ""
+    return Normalizer.normalize(value, Normalizer.Form.NFD)
+        .replace("\\p{Mn}+".toRegex(), "")
+        .lowercase()
+}
+
+private fun isRteOwner(owner: String?): Boolean {
+    val ownerTokens = normalizedSupportText(owner)
+        .split(Regex("[^a-z0-9]+"))
+        .filter { it.isNotBlank() }
+
+    return "rte" in ownerTokens
+}
+
+private fun isTubularPylon(supportNature: String?): Boolean {
+    val normalizedNature = normalizedSupportText(supportNature)
+    return normalizedNature.contains("tubulaire")
+}
 
 fun formatPhotoDate(isoDate: String?): String {
     if (isoDate.isNullOrBlank() || isoDate == "null") return ""
@@ -105,6 +176,7 @@ fun CommunityPhotosSectionShared(
     photos: List<CommunityPhoto>,
     operatorName: String?,
     supportNature: String? = null, // 🚨 AJOUT DE LA NATURE DU SUPPORT
+    supportOwner: String? = null,
     bgColor: Color,
     shape: Shape,
     onAddPhotoClick: (() -> Unit)? = null
@@ -150,9 +222,12 @@ fun CommunityPhotosSectionShared(
     // ✅ NOUVEAU : On vérifie si on est en ligne en réutilisant ta fonction MapScreen
     val isOnline = fr.geotower.ui.screens.map.isNetworkAvailable(context)
 
+    val isRteTubularPylon = isTubularPylon(supportNature) && isRteOwner(supportOwner)
+
     // 🚨 NOUVEAU : On choisit la bonne image générique en fonction du mot-clé !
     val placeholderRes = if (AppConfig.siteShowSchemes.value) {
         when {
+            isRteTubularPylon -> R.drawable.pylone_electrique
             supportNature != null && (supportNature.contains("chateau", true) || supportNature.contains("château", true)) -> R.drawable.chateau_deau
             supportNature != null && supportNature.contains("autostable", true) -> R.drawable.pylone_autostable
             supportNature != null && supportNature.contains("tubulaire", true) -> R.drawable.pylone_tubulaire
@@ -191,8 +266,7 @@ fun CommunityPhotosSectionShared(
     val showSchemaTitle = (filteredPhotos.isEmpty() || isFree) && placeholderRes != null
 
     val sectionTitle = if (showSchemaTitle) {
-        // On utilise AppStrings.get() pour que ça marche dans les 3 langues de ton appli !
-        AppStrings.get("Schéma du support", "Support diagram", "Esquema do suporte")
+        AppStrings.supportDiagram
     } else {
         AppStrings.sitePhotosAndSchemesOption
     }
@@ -249,7 +323,7 @@ fun CommunityPhotosSectionShared(
                         item {
                             Image(
                                 painter = painterResource(id = placeholderRes),
-                                contentDescription = "Image du support",
+                                contentDescription = AppStrings.supportImageDesc,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
                                     .size(120.dp)
@@ -272,7 +346,7 @@ fun CommunityPhotosSectionShared(
                             item {
                                 Image(
                                     painter = painterResource(id = placeholderRes), // 🪄 L'image s'adapte toute seule !
-                                    contentDescription = "Image du support",
+                                    contentDescription = AppStrings.supportImageDesc,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
                                         .size(120.dp)
@@ -326,7 +400,7 @@ fun CommunityPhotosSectionShared(
                             item {
                                 Image(
                                     painter = painterResource(id = placeholderRes), // 🪄 L'image s'adapte toute seule !
-                                    contentDescription = "Image du support",
+                                    contentDescription = AppStrings.supportImageDesc,
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
                                         .size(120.dp)
@@ -391,7 +465,7 @@ fun CommunityPhotosSectionShared(
                     // L'image au centre
                     Image(
                         painter = painterResource(id = placeholderRes), // 🪄 L'image en plein écran s'adapte !
-                        contentDescription = "Image en plein écran",
+                        contentDescription = AppStrings.supportImageFullScreenDesc,
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxSize()
@@ -423,6 +497,8 @@ fun CommunityPhotosSectionShared(
 
         val dismissOffset = remember { Animatable(0f) }
         val coroutineScope = rememberCoroutineScope()
+        var viewerContainerSize by remember { mutableStateOf(IntSize.Zero) }
+        var photoSourceSizes by remember(filteredPhotos) { mutableStateOf<Map<Int, IntSize>>(emptyMap()) }
 
         Dialog(
             onDismissRequest = {
@@ -432,11 +508,21 @@ fun CommunityPhotosSectionShared(
             properties = DialogProperties(usePlatformDefaultWidth = false)
         ) {
             val bgAlpha = (1f - (abs(dismissOffset.value) / 800f)).coerceIn(0f, 1f)
+            val density = LocalDensity.current
+            val currentPhotoFrame = fittedPhotoFrame(viewerContainerSize, photoSourceSizes[pagerState.currentPage])
+            val photoStartPadding = with(density) { currentPhotoFrame.left.coerceAtLeast(0f).toDp() + 16.dp }
+            val photoEndPadding = with(density) { (viewerContainerSize.width - currentPhotoFrame.right).coerceAtLeast(0f).toDp() + 16.dp }
+            val navigationBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            val photoBottomPadding = maxOf(
+                with(density) { (viewerContainerSize.height - currentPhotoFrame.bottom).coerceAtLeast(0f).toDp() + 12.dp },
+                navigationBottomPadding + 12.dp
+            )
 
             Surface(modifier = Modifier.fillMaxSize(), color = viewerBgBaseColor.copy(alpha = bgAlpha)) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
+                        .onSizeChanged { viewerContainerSize = it }
                         .graphicsLayer { translationY = dismissOffset.value }
                 ) {
                     HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
@@ -532,6 +618,12 @@ fun CommunityPhotosSectionShared(
                                 model = filteredPhotos[page].url,
                                 contentDescription = AppStrings.fullScreenPhotoDesc,
                                 contentScale = ContentScale.Fit,
+                                onSuccess = { state ->
+                                    val drawable = state.result.drawable
+                                    if (drawable.intrinsicWidth > 0 && drawable.intrinsicHeight > 0) {
+                                        photoSourceSizes = photoSourceSizes + (page to IntSize(drawable.intrinsicWidth, drawable.intrinsicHeight))
+                                    }
+                                },
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .graphicsLayer(
@@ -548,7 +640,7 @@ fun CommunityPhotosSectionShared(
                     if (pagerState.currentPage > 0) {
                         IconButton(
                             onClick = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
-                            modifier = Modifier.align(Alignment.CenterStart).padding(start = 16.dp).size(28.dp).background(overlayButtonBg, CircleShape)
+                            modifier = Modifier.align(Alignment.CenterStart).padding(start = photoStartPadding).size(28.dp).background(overlayButtonBg, CircleShape)
                         ) {
                             Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = AppStrings.previous, tint = viewerContentColor, modifier = Modifier.size(20.dp))
                         }
@@ -558,7 +650,7 @@ fun CommunityPhotosSectionShared(
                     if (pagerState.currentPage < filteredPhotos.size - 1) {
                         IconButton(
                             onClick = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
-                            modifier = Modifier.align(Alignment.CenterEnd).padding(end = 16.dp).size(28.dp).background(overlayButtonBg, CircleShape)
+                            modifier = Modifier.align(Alignment.CenterEnd).padding(end = photoEndPadding).size(28.dp).background(overlayButtonBg, CircleShape)
                         ) {
                             Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = AppStrings.next, tint = viewerContentColor, modifier = Modifier.size(20.dp))
                         }
@@ -588,7 +680,7 @@ fun CommunityPhotosSectionShared(
                     // --- AUTEUR ET DATE ---
                     if (!currentPhoto.author.isNullOrBlank() || !currentPhoto.date.isNullOrBlank()) {
                         Column(
-                            modifier = Modifier.align(Alignment.BottomStart).padding(bottom = 84.dp, start = 16.dp).background(overlayButtonBg, badgeShape).padding(horizontal = 12.dp, vertical = 8.dp),
+                            modifier = Modifier.align(Alignment.BottomStart).padding(bottom = photoBottomPadding, start = photoStartPadding).background(overlayButtonBg, badgeShape).padding(horizontal = 12.dp, vertical = 8.dp),
                             horizontalAlignment = Alignment.Start
                         ) {
                             if (!currentPhoto.author.isNullOrBlank() && currentPhoto.author != "null") {
@@ -604,7 +696,7 @@ fun CommunityPhotosSectionShared(
                     // --- COMPTEUR (On utilise filteredPhotos.size) ---
                     if (filteredPhotos.size > 1) {
                         Column(
-                            modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = 84.dp, end = 16.dp).background(overlayButtonBg, pillButtonShape).padding(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = photoBottomPadding, end = photoEndPadding).background(overlayButtonBg, pillButtonShape).padding(horizontal = 12.dp, vertical = 6.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
@@ -621,7 +713,7 @@ fun CommunityPhotosSectionShared(
                         Box(
                             modifier = Modifier
                                 .align(Alignment.BottomCenter)
-                                .padding(bottom = 84.dp)
+                                .padding(bottom = photoBottomPadding)
                                 .onSizeChanged { containerWidth = it.width }
                                 .background(color = if (isDark) Color(0xFF2C2C2C) else Color(0xFFF0F0F0), shape = CircleShape)
                                 .padding(horizontal = 12.dp, vertical = 6.dp)

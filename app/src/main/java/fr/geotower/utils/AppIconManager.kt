@@ -51,7 +51,7 @@ object AppIconManager {
             }
 
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.w(TAG, "App icon update failed", e)
         }
     }
 
@@ -82,4 +82,6 @@ object AppIconManager {
         currentIconRes.intValue = resId
         return resId
     }
+
+    private const val TAG = "GeoTower"
 }

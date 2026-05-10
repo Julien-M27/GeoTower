@@ -82,6 +82,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppIconManager
+import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.NewReleases as FilledNewReleases
@@ -93,6 +94,8 @@ import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.navigationBarsPadding
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import kotlin.math.roundToInt
+
+private const val TAG_ABOUT = "GeoTower"
 
 @Composable
 fun AboutScreen(navController: NavController) {
@@ -148,14 +151,17 @@ fun AboutScreen(navController: NavController) {
     // --- LECTURE DU MODE DE NAVIGATION DEPUIS AppConfig ---
     val navMode = AppConfig.navMode.intValue
 
+    val txtVersion = AppStrings.version
+    val txtUnknown = AppStrings.unknown
+
     // --- RÉCUPÉRATION DE VERSION ---
-    val appVersion = remember {
+    val appVersion = remember(txtVersion, txtUnknown) {
         try {
             val packageManager = context.packageManager
             val packageInfo = packageManager.getPackageInfo(context.packageName, 0)
-            "Version ${packageInfo.versionName}"
+            "$txtVersion ${packageInfo.versionName}"
         } catch (e: Exception) {
-            "Version Inconnue"
+            "$txtVersion $txtUnknown"
         }
     }
 
@@ -297,11 +303,11 @@ fun AboutScreen(navController: NavController) {
                                 enabled = !safeBackNavigation.isLocked,
                                 modifier = Modifier.padding(start = 8.dp)
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Retour", tint = MaterialTheme.colorScheme.onSurface)
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppStrings.back, tint = MaterialTheme.colorScheme.onSurface)
                             }
                             // ✅ RETOUR DU BOUTON MENU
                             IconButton(onClick = onCloseSidebar, modifier = Modifier.padding(end = 8.dp)) {
-                                Icon(Icons.Default.Menu, contentDescription = "Fermer Menu", tint = MaterialTheme.colorScheme.onSurface)
+                                Icon(Icons.Default.Menu, contentDescription = AppStrings.closeMenu, tint = MaterialTheme.colorScheme.onSurface)
                             }
                         }
 
@@ -351,7 +357,7 @@ fun AboutScreen(navController: NavController) {
                                             }
                                         }
                                     } catch (e: IllegalArgumentException) {
-                                        e.printStackTrace()
+                                        AppLogger.w(TAG_ABOUT, "Settings navigation failed", e)
                                         safeBackNavigation.navigateBack()
                                     }
                                 }
@@ -389,7 +395,7 @@ fun AboutScreen(navController: NavController) {
                                     onClick = onToggleSidebar,
                                     modifier = Modifier.padding(start = 8.dp)
                                 ) {
-                                    Icon(Icons.Default.Menu, contentDescription = "Ouvrir Menu", tint = MaterialTheme.colorScheme.onSurface)
+                                    Icon(Icons.Default.Menu, contentDescription = AppStrings.openMenu, tint = MaterialTheme.colorScheme.onSurface)
                                 }
                             }
 
@@ -502,7 +508,7 @@ fun AboutTopBar(onBack: () -> Unit) {
         modifier = Modifier.fillMaxWidth().background(Color.Transparent).padding(vertical = 2.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Retour") }
+        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, AppStrings.back) }
         Text(AppStrings.about, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
         Spacer(Modifier.width(48.dp))
     }
@@ -589,39 +595,9 @@ fun SectionPresentation(appTitle: String, appVersion: String, logoResId: Int) {
 
 @Composable
 fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) {
-    val releaseNotes: Map<String, List<Any>> = mapOf(
-        "Interface & Design" to listOf(
-            "Global :" to listOf(
-                "Correction des notifications de téléchargement des bases de données et cartes",
-                "Correction de certains éléments pour les rendre compatibles avec le système de mesure impérial"
-            ),
-            "Page d'accueil :" to listOf(
-                "Ajout d'un nouvel écran nommé Aides"
-            ),
-            "Antennes à proximités :" to listOf(
-                "Ajout des filtres rapides",
-                "Correction de certaines recherches qui n'aboutissaient pas"
-            ),
-            "Détails du support :" to listOf(
-                "Ajout d'un bouton pour ouvrir la carte"
-            ),
-            "Détail des sites :" to listOf(
-                "Ajout du profil altimétrique",
-                "Ajout du calculateur de débit théoriques",
-                "Ajout d'un bouton pour ouvrir la carte",
-                "Ajout de l'écran coupé en deux pour le profil altimétrique ainsi que le calculateur de débits théoriques"
-            ),
-            "A propos :" to listOf(
-                "Correction de l'affichage pour les folds"
-            ),
-            "Paramètres :" to listOf(
-                "Ajout de la personnalisation de nouvelles pages comme celle des débits théoriques",
-                "Correction de l'affichage pour les folds"
-            )
-        )
-    )
+    val releaseNotes = currentReleaseNotes()
 
-    SectionTitle("Nouveautés ($appVersion)")
+    SectionTitle(AppStrings.aboutNewForVersion(appVersion))
     Card(
         colors = CardDefaults.cardColors(containerColor = if (bubbleColor == Color.Transparent) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else bubbleColor),
         shape = cardShape,
@@ -631,21 +607,21 @@ fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.FilledNewReleases, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("Dernières modifications", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(AppStrings.latestChanges, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             }
             Spacer(modifier = Modifier.height(12.dp))
 
-            releaseNotes.forEach { (category, notes) ->
-                Text(category, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
-                notes.forEach { note ->
-                    when (note) {
-                        is Pair<*, *> -> {
-                            Text(note.first.toString(), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 2.dp))
-                            (note.second as? List<*>)?.forEach { subItem ->
-                                Text("• $subItem", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 20.dp, top = 1.dp, bottom = 1.dp))
+            releaseNotes.sections.forEach { section ->
+                Text(section.title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+                section.entries.forEach { entry ->
+                    when (entry) {
+                        is ReleaseNoteGroup -> {
+                            Text(entry.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 2.dp))
+                            entry.items.forEach { item ->
+                                Text("• $item", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 20.dp, top = 1.dp, bottom = 1.dp))
                             }
                         }
-                        is String -> Text("• $note", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp, top = 2.dp, bottom = 2.dp))
+                        is ReleaseNoteItem -> Text("• ${entry.text}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp, top = 2.dp, bottom = 2.dp))
                     }
                 }
                 Spacer(modifier = Modifier.height(8.dp))
@@ -771,14 +747,17 @@ private fun AboutDrawableImage(resId: Int, modifier: Modifier = Modifier, conten
 
 @Composable
 fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     var appVersion by remember { mutableStateOf("-") }
     var dbVersion by remember { mutableStateOf("-") }
     var anfrDate by remember { mutableStateOf("-") }
     var rawMonthlyVersion by remember { mutableStateOf("-") } // ✅ Changé en "rawMonthlyVersion"
     var hsDate by remember { mutableStateOf("-") }
+    val txtDownloadNewBase = AppStrings.aboutDownloadNewDatabase
+    val txtInvalidLocalDatabase = AppStrings.invalidLocalDatabase
+    val txtNotInstalled = AppStrings.aboutDatabaseNotInstalled
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(txtDownloadNewBase, txtInvalidLocalDatabase, txtNotInstalled) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             // 1. Version de l'application
             try {
@@ -789,7 +768,8 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
             // 2. Base de données locale (Extraction Directe)
             try {
                 val dbPath = context.getDatabasePath("geotower.db")
-                if (dbPath.exists()) {
+                val localStatus = fr.geotower.data.db.GeoTowerDatabaseValidator.getInstalledDatabaseFileStatus(context)
+                if (localStatus.state == fr.geotower.data.db.GeoTowerDatabaseValidator.LocalDatabaseState.VALID) {
                     val db = android.database.sqlite.SQLiteDatabase.openDatabase(dbPath.absolutePath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY)
 
                     // 🚨 Requêtes en "cascade" pour ne pas planter avec l'ancienne BDD
@@ -833,16 +813,22 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
                         if (cursor.columnCount > 2 && !cursor.isNull(2)) {
                             rawMonthlyVersion = cursor.getString(2) ?: "-"
                         } else {
-                            rawMonthlyVersion = "Téléchargez la nouvelle base"
+                            rawMonthlyVersion = txtDownloadNewBase
                         }
                     }
                     cursor.close()
                     db.close()
                 } else {
-                    dbVersion = "Non installée"
+                    dbVersion = if (localStatus.state == fr.geotower.data.db.GeoTowerDatabaseValidator.LocalDatabaseState.INVALID) {
+                        txtInvalidLocalDatabase
+                    } else {
+                        txtNotInstalled
+                    }
+                    anfrDate = "-"
+                    rawMonthlyVersion = "-"
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLogger.w(TAG_ABOUT, "Database version info could not be read", e)
             }
 
             // 3. Données des sites HS (depuis les préférences)

@@ -59,12 +59,37 @@ interface GeoTowerDao {
     """)
     suspend fun getNearest100(lat: Double, lon: Double): List<LocalisationEntity>
 
+    @Query("""
+        SELECT * FROM localisation
+        WHERE latitude BETWEEN :minLat AND :maxLat
+        AND longitude BETWEEN :minLon AND :maxLon
+        AND ((latitude - :lat) * (latitude - :lat) + (longitude - :lon) * (longitude - :lon)) <= :maxDistanceSquared
+        ORDER BY ((latitude - :lat) * (latitude - :lat) + (longitude - :lon) * (longitude - :lon)) ASC
+        LIMIT :limit
+    """)
+    suspend fun getNearestWithinRadius(
+        lat: Double,
+        lon: Double,
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double,
+        maxDistanceSquared: Double,
+        limit: Int
+    ): List<LocalisationEntity>
+
     // 2. Pour le tiroir de détails quand on clique sur un point (rapide, sans jointure)
     @Query("SELECT * FROM technique WHERE id_anfr = :idAnfr")
     suspend fun getTechniqueDetails(idAnfr: String): TechniqueEntity?
 
     @Query("SELECT * FROM physique WHERE id_anfr = :idAnfr")
     suspend fun getPhysiqueDetails(idAnfr: String): List<PhysiqueEntity>
+
+    @Query("SELECT * FROM technique WHERE id_anfr IN (:idAnfrs)")
+    suspend fun getTechniqueDetailsByIds(idAnfrs: List<String>): List<TechniqueEntity>
+
+    @Query("SELECT * FROM physique WHERE id_anfr IN (:idAnfrs)")
+    suspend fun getPhysiqueDetailsByIds(idAnfrs: List<String>): List<PhysiqueEntity>
 
     @Query("SELECT * FROM faisceaux_hertziens WHERE id_anfr = :idAnfr")
     suspend fun getFaisceauxDetails(idAnfr: String): List<FaisceauxEntity>

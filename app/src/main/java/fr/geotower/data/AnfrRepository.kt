@@ -11,6 +11,7 @@ import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.models.SiteHsEntity
+import fr.geotower.utils.AppLogger
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -24,44 +25,68 @@ class AnfrRepository(
     private val dao: GeoTowerDao
         get() = AppDatabase.getDatabase(context).geoTowerDao()
 
+    private suspend fun <T> queryLocalDatabase(defaultValue: T, block: suspend GeoTowerDao.() -> T): T {
+        return try {
+            dao.block()
+        } catch (e: Exception) {
+            AppLogger.w(TAG_DB, "Local database query failed", e)
+            defaultValue
+        }
+    }
+
     // =================================================================
     // 1. POUR LA CARTE (Affichage ultra-rapide des points)
     // =================================================================
     suspend fun getAntennasInBox(latNorth: Double, lonEast: Double, latSouth: Double, lonWest: Double): List<LocalisationEntity> {
-        return try {
-            dao.getLocalisationsInBox(
+        return queryLocalDatabase(emptyList()) {
+            getLocalisationsInBox(
                 minLat = latSouth,
                 maxLat = latNorth,
                 minLon = lonWest,
                 maxLon = lonEast
             )
-        } catch (e: Exception) {
-            e.printStackTrace()
-            emptyList()
         }
     }
 
     suspend fun getNearest100(lat: Double, lon: Double): List<LocalisationEntity> {
-        return dao.getNearest100(lat, lon)
+        return queryLocalDatabase(emptyList()) {
+            val radii = listOf(0.03, 0.08, 0.18, 0.45, 1.0, 2.5, 5.0)
+            var bestResult = emptyList<LocalisationEntity>()
+
+            for (radius in radii) {
+                val nearest = getNearestWithinRadius(
+                    lat = lat,
+                    lon = lon,
+                    minLat = lat - radius,
+                    maxLat = lat + radius,
+                    minLon = lon - radius,
+                    maxLon = lon + radius,
+                    maxDistanceSquared = radius * radius,
+                    limit = 100
+                )
+
+                if (nearest.size > bestResult.size) bestResult = nearest
+                if (nearest.size >= 100) return@queryLocalDatabase nearest
+            }
+
+            bestResult.ifEmpty { getNearest100(lat, lon) }
+        }
     }
 
     // =================================================================
     // 1.5 POUR LA CARTE (Mode Macro : Clustering progressif à 5 niveaux)
     // =================================================================
     suspend fun getClusteredAntennas(zoom: Double, latNorth: Double, lonEast: Double, latSouth: Double, lonWest: Double): List<DbCluster> {
-        return try {
+        return queryLocalDatabase(emptyList()) {
             when {
-                zoom < 6.5 -> dao.getL1Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
-                zoom < 8.0 -> dao.getL2Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
-                zoom < 9.5 -> dao.getL3Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
-                zoom < 10.5 -> dao.getL4Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
-                zoom < 11.5 -> dao.getL5Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
-                zoom < 12.5 -> dao.getL6Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
-                else -> dao.getL7Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
+                zoom < 6.5 -> getL1Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
+                zoom < 8.0 -> getL2Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
+                zoom < 9.5 -> getL3Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
+                zoom < 10.5 -> getL4Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
+                zoom < 11.5 -> getL5Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
+                zoom < 12.5 -> getL6Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
+                else -> getL7Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
             }
-        } catch (e: Exception) {
-            e.printStackTrace()
-            emptyList()
         }
     }
 
@@ -69,72 +94,100 @@ class AnfrRepository(
     // 2. POUR LES DÉTAILS (Quand on clique sur une antenne)
     // =================================================================
     suspend fun getTechniqueDetails(idAnfr: String): TechniqueEntity? {
-        return dao.getTechniqueDetails(idAnfr)
+        return queryLocalDatabase(null) {
+            getTechniqueDetails(idAnfr)
+        }
     }
 
     suspend fun getPhysiqueDetails(idAnfr: String): List<PhysiqueEntity> {
-        return dao.getPhysiqueDetails(idAnfr)
+        return queryLocalDatabase(emptyList()) {
+            getPhysiqueDetails(idAnfr)
+        }
+    }
+
+    suspend fun getTechniqueDetailsByIds(idAnfrs: List<String>): Map<String, TechniqueEntity> {
+        val distinctIds = idAnfrs.filter { it.isNotBlank() }.distinct()
+        if (distinctIds.isEmpty()) return emptyMap()
+
+        return distinctIds.chunked(SQLITE_IN_CLAUSE_BATCH_SIZE)
+            .flatMap { chunk ->
+                queryLocalDatabase(emptyList<TechniqueEntity>()) {
+                    getTechniqueDetailsByIds(chunk)
+                }
+            }
+            .associateBy { it.idAnfr }
+    }
+
+    suspend fun getPhysiqueDetailsByIds(idAnfrs: List<String>): Map<String, List<PhysiqueEntity>> {
+        val distinctIds = idAnfrs.filter { it.isNotBlank() }.distinct()
+        if (distinctIds.isEmpty()) return emptyMap()
+
+        return distinctIds.chunked(SQLITE_IN_CLAUSE_BATCH_SIZE)
+            .flatMap { chunk ->
+                queryLocalDatabase(emptyList<PhysiqueEntity>()) {
+                    getPhysiqueDetailsByIds(chunk)
+                }
+            }
+            .groupBy { it.idAnfr }
     }
 
     suspend fun getFaisceauxDetails(idAnfr: String): List<FaisceauxEntity> {
-        return dao.getFaisceauxDetails(idAnfr)
+        return queryLocalDatabase(emptyList()) {
+            getFaisceauxDetails(idAnfr)
+        }
     }
 
     suspend fun getPhysiqueByAnfr(idAnfr: String): List<PhysiqueEntity> {
-        return dao.getPhysiqueByAnfr(idAnfr)
+        return queryLocalDatabase(emptyList()) {
+            getPhysiqueByAnfr(idAnfr)
+        }
     }
 
     suspend fun getTechniqueByAnfr(idAnfr: String): List<TechniqueEntity> {
-        return dao.getTechniqueByAnfr(idAnfr)
+        return queryLocalDatabase(emptyList()) {
+            getTechniqueByAnfr(idAnfr)
+        }
     }
 
     suspend fun searchAntennasById(query: String): List<LocalisationEntity> {
-        return dao.searchAntennasById(query)
+        return queryLocalDatabase(emptyList()) {
+            searchAntennasById(query)
+        }
     }
 
     suspend fun searchAntennasByText(query: String, limit: Int = 200): List<LocalisationEntity> {
-        return try {
-            dao.searchAntennasByText(query, limit)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            emptyList()
+        return queryLocalDatabase(emptyList()) {
+            searchAntennasByText(query, limit)
         }
     }
 
     suspend fun searchAntennasByAddress(query: String, limit: Int = 5000): List<LocalisationEntity> {
-        return try {
-            dao.searchAntennasByAddress(query, limit)
-        } catch (e: Exception) {
-            e.printStackTrace()
-            emptyList()
+        return queryLocalDatabase(emptyList()) {
+            searchAntennasByAddress(query, limit)
         }
     }
 
     suspend fun getAntennasByExactId(exactId: String): List<LocalisationEntity> {
-        return dao.getAntennasByExactId(exactId)
+        return queryLocalDatabase(emptyList()) {
+            getAntennasByExactId(exactId)
+        }
     }
 
     suspend fun getUniqueSupportCountByOperator(operatorName: String): Int {
-        return try {
-            dao.getUniqueSupportCountByOperator(operatorName)
-        } catch (e: Exception) {
-            0
+        return queryLocalDatabase(0) {
+            getUniqueSupportCountByOperator(operatorName)
         }
     }
 
     suspend fun get4GSupportCountByOperator(operatorName: String): Int {
-        return try {
-            dao.get4GSupportCountByOperator(operatorName)
-        } catch (e: Exception) {
-            0
+        return queryLocalDatabase(0) {
+            get4GSupportCountByOperator(operatorName)
         }
     }
 
     suspend fun get5GSupportCountByOperator(operatorName: String): Int {
-        return try {
-            dao.get5GSupportCountByOperator(operatorName)
-        } catch (e: Exception) {
-            0
+        return queryLocalDatabase(0) {
+            get5GSupportCountByOperator(operatorName)
         }
     }
 
@@ -234,12 +287,18 @@ class AnfrRepository(
 
             hsList
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.w(TAG_MAP, "Outage data request failed", e)
             emptyList()
         }
     }
 
     private fun org.json.JSONObject.optNullableString(name: String): String? {
         return if (isNull(name)) null else optString(name)
+    }
+
+    private companion object {
+        const val TAG_DB = "GeoTowerDb"
+        const val TAG_MAP = "GeoTowerMap"
+        const val SQLITE_IN_CLAUSE_BATCH_SIZE = 900
     }
 }

@@ -111,7 +111,7 @@ fun OperatorDetailItem(
 
     Column(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            val opName = antenna.operateur ?: "Inconnu"
+            val opName = antenna.operateur ?: AppStrings.unknown
             val logoRes = getLocalLogoRes(opName)
 
             if (logoRes != null) {

@@ -12,7 +12,7 @@ object ExternalLinksHelper {
             val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
             context.startActivity(intent)
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.w(TAG, "External link could not be opened", e)
         }
     }
 
@@ -30,4 +30,6 @@ object ExternalLinksHelper {
     fun openRncMobile(context: Context, siteId: String) {
         openUrl(context, "${Constants.RNC_MOBILE_BASE_URL}$siteId")
     }
+
+    private const val TAG = "GeoTower"
 }

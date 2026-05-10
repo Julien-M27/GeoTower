@@ -112,12 +112,15 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
+import fr.geotower.data.api.NominatimApi
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.AppLogger
 import fr.geotower.utils.MapUtils
+import fr.geotower.utils.OperatorColors
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -414,7 +417,7 @@ fun MapScreen(
     // Vérification réseau + fichiers au premier affichage
     LaunchedEffect(Unit) {
         val offlineDir = java.io.File(context.getExternalFilesDir(null), "maps")
-        val files = offlineDir.listFiles { file -> file.extension == "map" } ?: emptyArray()
+        val files = offlineDir.listFiles { file -> file.extension == "map" && file.length() > 0L } ?: emptyArray()
         mapFiles = files
 
         // Si on est hors ligne ET qu'on a bien téléchargé une carte
@@ -435,6 +438,7 @@ fun MapScreen(
     var showCityStatsPopup by remember { mutableStateOf(false) }
     var showCityStatsDetail by remember { mutableStateOf(false) }
     var isTrackingActive by remember { mutableStateOf(false) }
+    var hasCenteredOnLocation by remember { mutableStateOf(false) }
 
     val txtMapTitle = AppStrings.mapTitle
     val txtSearchCityOrId = AppStrings.searchCityOrId
@@ -465,6 +469,8 @@ fun MapScreen(
     var hideColorWarning by remember { mutableStateOf(prefs.getBoolean("hide_light_color_warning", false)) }
     var showColorWarningDialog by remember { mutableStateOf(false) }
     var dontShowAgainChecked by remember { mutableStateOf(false) }
+    val lastTilesColorFilterMap = remember { arrayOfNulls<MapView>(1) }
+    val lastTilesColorFilterInverted = remember { arrayOfNulls<Boolean>(1) }
 
     LaunchedEffect(Unit) {
         Configuration.getInstance().userAgentValue = context.packageName
@@ -1010,6 +1016,7 @@ fun MapScreen(
                             }
                         }
                     }
+                    locationOverlay.setEnableAutoStop(false)
                     locationOverlay.enableMyLocation()
 
                     locationOverlay.runOnFirstFix {
@@ -1046,11 +1053,7 @@ fun MapScreen(
                     var lastRadius = 250
                     addMapListener(object : MapListener {
                         override fun onScroll(event: ScrollEvent?): Boolean {
-                            // Si l'utilisateur fait défiler la carte, on désactive le suivi continu
-                            if (isTrackingActive) {
-                                isTrackingActive = false
-                                locationOverlayRef?.disableFollowLocation()
-                            }
+                            // La poursuite GPS garde le controle pendant les scrolls generes par le suivi.
                             updateInfo()
                             return true
                         }
@@ -1099,6 +1102,7 @@ fun MapScreen(
                 (locationOverlayRef as? CustomLocationOverlay)?.let { overlay ->
                     overlay.currentCompassAzimuth = azimuth
                 }
+                var shouldInvalidateMap = false
 
                 // 🗺️ LOGIQUE HORS-LIGNE
                 if (effectiveProvider == 4) {
@@ -1106,7 +1110,8 @@ fun MapScreen(
                         if (map.tileProvider !is MapsForgeTileProvider) {
 
                             // On tente de charger le magnifique thème Elevate
-                            val renderTheme = try {
+                            runCatching {
+                                val renderTheme = try {
                                 AssetsRenderTheme(context.assets, "themes/", "freizeitkarte-v5.xml")
                             } catch (e: Exception) {
                                 // S'il manque, on repasse sur le thème par défaut pour ne pas planter
@@ -1123,7 +1128,21 @@ fun MapScreen(
                                 forgeSource,
                                 null
                             )
-                            map.tileProvider = forgeProvider
+                                map.tileProvider = forgeProvider
+                                shouldInvalidateMap = true
+                            }.onFailure {
+                                mapFiles = emptyArray()
+                                effectiveProvider = 1
+                                AppConfig.mapProvider.value = 1
+                                if (map.tileProvider is MapsForgeTileProvider) {
+                                    map.tileProvider = MapTileProviderBasic(context)
+                                    shouldInvalidateMap = true
+                                }
+                                runCatching {
+                                    map.setTileSource(MapUtils.OSM_Source)
+                                    shouldInvalidateMap = true
+                                }
+                            }
                         }
                     } else {
                         AppConfig.mapProvider.value = 1
@@ -1132,6 +1151,7 @@ fun MapScreen(
                     // 🌐 LOGIQUE EN LIGNE
                     if (map.tileProvider is MapsForgeTileProvider) {
                         map.tileProvider = MapTileProviderBasic(context)
+                        shouldInvalidateMap = true
                     }
 
                     // ⚠️ ATTENTION : on utilise bien "effectiveProvider" ici !
@@ -1148,11 +1168,20 @@ fun MapScreen(
 
                     if (map.tileProvider.tileSource.name() != newSource.name()) {
                         map.setTileSource(newSource)
+                        shouldInvalidateMap = true
                     }
                 }
 
-                map.overlayManager.tilesOverlay.setColorFilter(if (shouldInvertColors) MapUtils.getInvertFilter() else null)
-                map.invalidate()
+                if (lastTilesColorFilterMap[0] !== map || lastTilesColorFilterInverted[0] != shouldInvertColors) {
+                    map.overlayManager.tilesOverlay.setColorFilter(if (shouldInvertColors) MapUtils.getInvertFilter() else null)
+                    lastTilesColorFilterMap[0] = map
+                    lastTilesColorFilterInverted[0] = shouldInvertColors
+                    shouldInvalidateMap = true
+                }
+
+                if (shouldInvalidateMap) {
+                    map.invalidate()
+                }
             }
         )
 
@@ -1186,148 +1215,121 @@ fun MapScreen(
                         // Si l'utilisateur n'a tapé QUE des chiffres et qu'on n'a rien trouvé en base,
                         // inutile d'aller chercher sur internet (Nominatim).
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                            Toast.makeText(context, "Le site $cleanQuery $txtSiteNotInArea", Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, AppStrings.mapSiteNotInArea(context, cleanQuery), Toast.LENGTH_LONG).show()
                         }
                         return@launch
                     }
                 }
 
                 // 3. Recherche de Ville / Adresse via internet (Nominatim)
-                try {
-                    val urlString = "https://nominatim.openstreetmap.org/search?q=${java.net.URLEncoder.encode(cleanQuery, "UTF-8")}&format=json&polygon_geojson=1&limit=1"
-                    val connection = java.net.URL(urlString).openConnection() as java.net.HttpURLConnection
-                    connection.setRequestProperty("User-Agent", "GeoTowerApp")
+                val nominatimArea = NominatimApi.searchArea(cleanQuery)
+                if (nominatimArea != null) {
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                        mapViewRef?.let { map ->
+                            searchBoundaryOverlay.items.clear()
 
-                    if (connection.responseCode == 200) {
-                        val response = connection.inputStream.bufferedReader().readText()
-                        val jsonArray = org.json.JSONArray(response)
+                            nominatimArea.geoJsonFeature?.let { geoJsonString ->
+                                val kmlDocument = org.osmdroid.bonuspack.kml.KmlDocument()
+                                kmlDocument.parseGeoJSON(geoJsonString)
+                                val featureOverlay = kmlDocument.mKmlRoot.buildOverlay(map, null, null, kmlDocument)
 
-                        if (jsonArray.length() > 0) {
-                            val firstResult = jsonArray.getJSONObject(0)
+                                val holesList = mutableListOf<List<GeoPoint>>()
+                                val outlinesOverlay = org.osmdroid.views.overlay.FolderOverlay()
 
-                            val bboxArray = firstResult.getJSONArray("boundingbox")
-                            val latMin = bboxArray.getDouble(0)
-                            val latMax = bboxArray.getDouble(1)
-                            val lonMin = bboxArray.getDouble(2)
-                            val lonMax = bboxArray.getDouble(3)
-
-                            var geoJsonString: String? = null
-                            if (firstResult.has("geojson")) {
-                                val geometryJson = firstResult.getJSONObject("geojson").toString()
-                                geoJsonString = """
-                                    {
-                                      "type": "Feature",
-                                      "properties": {},
-                                      "geometry": $geometryJson
-                                    }
-                                """.trimIndent()
-                            }
-
-                            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                mapViewRef?.let { map ->
-                                    searchBoundaryOverlay.items.clear()
-
-                                    if (geoJsonString != null) {
-                                        val kmlDocument = org.osmdroid.bonuspack.kml.KmlDocument()
-                                        kmlDocument.parseGeoJSON(geoJsonString)
-                                        val featureOverlay = kmlDocument.mKmlRoot.buildOverlay(map, null, null, kmlDocument)
-
-                                        val holesList = mutableListOf<List<GeoPoint>>()
-                                        val outlinesOverlay = org.osmdroid.views.overlay.FolderOverlay()
-
-                                        fun extractHolesAndOutlines(overlay: org.osmdroid.views.overlay.Overlay) {
-                                            when (overlay) {
-                                                is org.osmdroid.views.overlay.Polygon -> {
-                                                    @Suppress("DEPRECATION")
-                                                    val overlayPoints = overlay.points
-                                                    holesList.add(overlayPoints)
-                                                    val outline = org.osmdroid.views.overlay.Polyline(map).apply {
-                                                        setPoints(overlayPoints)
-                                                        outlinePaint.color = android.graphics.Color.RED
-                                                        outlinePaint.strokeWidth = 4f
-                                                        outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 15f), 0f)
-                                                    }
-                                                    outlinesOverlay.add(outline)
-                                                }
-                                                is org.osmdroid.views.overlay.Polyline -> {
-                                                    @Suppress("DEPRECATION")
-                                                    val overlayPoints = overlay.points
-                                                    val outline = org.osmdroid.views.overlay.Polyline(map).apply {
-                                                        setPoints(overlayPoints)
-                                                        outlinePaint.color = android.graphics.Color.RED
-                                                        outlinePaint.strokeWidth = 4f
-                                                        outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 15f), 0f)
-                                                    }
-                                                    outlinesOverlay.add(outline)
-                                                }
-                                                is org.osmdroid.views.overlay.FolderOverlay -> {
-                                                    overlay.items.forEach { extractHolesAndOutlines(it) }
-                                                }
+                                fun extractHolesAndOutlines(overlay: org.osmdroid.views.overlay.Overlay) {
+                                    when (overlay) {
+                                        is org.osmdroid.views.overlay.Polygon -> {
+                                            @Suppress("DEPRECATION")
+                                            val overlayPoints = overlay.points
+                                            holesList.add(overlayPoints)
+                                            val outline = org.osmdroid.views.overlay.Polyline(map).apply {
+                                                setPoints(overlayPoints)
+                                                outlinePaint.color = android.graphics.Color.RED
+                                                outlinePaint.strokeWidth = 4f
+                                                outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 15f), 0f)
                                             }
+                                            outlinesOverlay.add(outline)
                                         }
-
-                                        extractHolesAndOutlines(featureOverlay)
-
-                                        currentCityPolygons = holesList
-
-                                        viewModel.loadAntennasForCity(
-                                            latNorth = latMax,
-                                            lonEast = lonMax,
-                                            latSouth = latMin,
-                                            lonWest = lonMin,
-                                            polygons = holesList
-                                        )
-
-                                        showCityStatsPopup = true
-
-                                        val worldMask = object : org.osmdroid.views.overlay.Overlay() {
-                                            private val path = android.graphics.Path()
-
-                                            override fun draw(canvas: android.graphics.Canvas, projection: org.osmdroid.views.Projection) {
-                                                if (holesList.isEmpty()) return
-
-                                                path.reset()
-                                                holesList.forEach { geoPoints ->
-                                                    var first = true
-                                                    geoPoints.forEach { pt ->
-                                                        val px = projection.toPixels(pt, null)
-                                                        if (first) {
-                                                            path.moveTo(px.x.toFloat(), px.y.toFloat())
-                                                            first = false
-                                                        } else {
-                                                            path.lineTo(px.x.toFloat(), px.y.toFloat())
-                                                        }
-                                                    }
-                                                    path.close()
-                                                }
-
-                                                canvas.save()
-                                                if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                                                    canvas.clipOutPath(path)
-                                                } else {
-                                                    @Suppress("DEPRECATION")
-                                                    canvas.clipPath(path, android.graphics.Region.Op.DIFFERENCE)
-                                                }
-
-                                                canvas.drawColor(android.graphics.Color.parseColor("#66000000"))
-                                                canvas.restore()
+                                        is org.osmdroid.views.overlay.Polyline -> {
+                                            @Suppress("DEPRECATION")
+                                            val overlayPoints = overlay.points
+                                            val outline = org.osmdroid.views.overlay.Polyline(map).apply {
+                                                setPoints(overlayPoints)
+                                                outlinePaint.color = android.graphics.Color.RED
+                                                outlinePaint.strokeWidth = 4f
+                                                outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 15f), 0f)
                                             }
+                                            outlinesOverlay.add(outline)
                                         }
-
-                                        searchBoundaryOverlay.add(worldMask)
-                                        searchBoundaryOverlay.add(outlinesOverlay)
+                                        is org.osmdroid.views.overlay.FolderOverlay -> {
+                                            overlay.items.forEach { extractHolesAndOutlines(it) }
+                                        }
                                     }
-
-                                    val cityBounds = org.osmdroid.util.BoundingBox(latMax, lonMax, latMin, lonMin)
-                                    map.zoomToBoundingBox(cityBounds, true, 100)
-                                    map.invalidate()
                                 }
+
+                                extractHolesAndOutlines(featureOverlay)
+
+                                currentCityPolygons = holesList
+
+                                viewModel.loadAntennasForCity(
+                                    latNorth = nominatimArea.latNorth,
+                                    lonEast = nominatimArea.lonEast,
+                                    latSouth = nominatimArea.latSouth,
+                                    lonWest = nominatimArea.lonWest,
+                                    polygons = holesList
+                                )
+
+                                showCityStatsPopup = true
+
+                                val worldMask = object : org.osmdroid.views.overlay.Overlay() {
+                                    private val path = android.graphics.Path()
+
+                                    override fun draw(canvas: android.graphics.Canvas, projection: org.osmdroid.views.Projection) {
+                                        if (holesList.isEmpty()) return
+
+                                        path.reset()
+                                        holesList.forEach { geoPoints ->
+                                            var first = true
+                                            geoPoints.forEach { pt ->
+                                                val px = projection.toPixels(pt, null)
+                                                if (first) {
+                                                    path.moveTo(px.x.toFloat(), px.y.toFloat())
+                                                    first = false
+                                                } else {
+                                                    path.lineTo(px.x.toFloat(), px.y.toFloat())
+                                                }
+                                            }
+                                            path.close()
+                                        }
+
+                                        canvas.save()
+                                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                            canvas.clipOutPath(path)
+                                        } else {
+                                            @Suppress("DEPRECATION")
+                                            canvas.clipPath(path, android.graphics.Region.Op.DIFFERENCE)
+                                        }
+
+                                        canvas.drawColor(android.graphics.Color.parseColor("#66000000"))
+                                        canvas.restore()
+                                    }
+                                }
+
+                                searchBoundaryOverlay.add(worldMask)
+                                searchBoundaryOverlay.add(outlinesOverlay)
                             }
-                            return@launch
+
+                            val cityBounds = org.osmdroid.util.BoundingBox(
+                                nominatimArea.latNorth,
+                                nominatimArea.lonEast,
+                                nominatimArea.latSouth,
+                                nominatimArea.lonWest
+                            )
+                            map.zoomToBoundingBox(cityBounds, true, 100)
+                            map.invalidate()
                         }
                     }
-                } catch (e: Exception) {
-                    android.util.Log.e("GeoTower", "Erreur Nominatim : ${e.message}")
+                    return@launch
                 }
 
                 try {
@@ -1428,7 +1430,7 @@ fun MapScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Search,
-                            contentDescription = "Rechercher",
+                            contentDescription = AppStrings.search,
                             tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
@@ -1575,13 +1577,9 @@ fun MapScreen(
         val defaultOp by AppConfig.defaultOperator
 
         val darkMaterialColor = Color(0xFF37474F)
-        val opColor = when {
-            defaultOp.uppercase().contains("ORANGE") -> Color(0xFFFF7900)
-            defaultOp.uppercase().contains("SFR") -> Color(0xFFE2001A)
-            defaultOp.uppercase().contains("BOUYGUES") -> Color(0xFF00295F)
-            defaultOp.uppercase().contains("FREE") -> Color(0xFF757575)
-            else -> MaterialTheme.colorScheme.primary
-        }
+        val opColor = OperatorColors.keyFor(defaultOp)
+            ?.let { Color(OperatorColors.colorArgbForKey(it)) }
+            ?: MaterialTheme.colorScheme.primary
 
         // --- LES BOUTONS DE SUIVI (MODE MESURE) ---
         // --- LES BOUTONS DE SUIVI "A TIROIR" (MODE MESURE) ---
@@ -1687,7 +1685,7 @@ fun MapScreen(
             Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 SmallFloatingButton(
                     icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    desc = "Retour",
+                    desc = AppStrings.back,
                     modifier = Modifier.align(Alignment.CenterStart)
                 ) {
                     safeBackNavigation.navigateBack()
@@ -1827,17 +1825,49 @@ fun MapScreen(
                 FloatingActionButton(
                     onClick = {
                         safeClick {
-                            if (isTrackingActive) {
-                                // Si déjà actif, on désactive
-                                isTrackingActive = false
-                                locationOverlayRef?.disableFollowLocation()
-                            } else {
-                                // Sinon, on active le suivi continu
-                                isTrackingActive = true
-                                locationOverlayRef?.enableFollowLocation()
-                                locationOverlayRef?.myLocation?.let { loc ->
-                                    mapViewRef?.controller?.setZoom(16.0)
-                                    mapViewRef?.controller?.setCenter(loc)
+                            val map = mapViewRef
+                            val locationOverlay = locationOverlayRef
+
+                            if (map == null || locationOverlay == null) {
+                                Toast.makeText(context, txtLocationNotFound, Toast.LENGTH_SHORT).show()
+                                return@safeClick
+                            }
+
+                            fun centerOnLocation(location: GeoPoint) {
+                                map.controller.stopAnimation(false)
+                                map.controller.setZoom(16.0)
+                                map.controller.setCenter(location)
+                                currentZoom = 16.0
+                                currentLat = location.latitude
+                                hasCenteredOnLocation = true
+                            }
+
+                            when {
+                                isTrackingActive -> {
+                                    isTrackingActive = false
+                                    hasCenteredOnLocation = false
+                                    locationOverlay.disableFollowLocation()
+                                }
+                                !hasCenteredOnLocation -> {
+                                    locationOverlay.disableFollowLocation()
+                                    val location = locationOverlay.myLocation ?: myCurrentLoc
+                                    if (location != null) {
+                                        centerOnLocation(location)
+                                    } else {
+                                        locationOverlay.enableMyLocation()
+                                        locationOverlay.runOnFirstFix {
+                                            locationOverlay.myLocation?.let { firstLocation ->
+                                                map.post { centerOnLocation(firstLocation) }
+                                            }
+                                        }
+                                    }
+                                }
+                                else -> {
+                                    isTrackingActive = true
+                                    locationOverlay.setEnableAutoStop(false)
+                                    locationOverlay.enableMyLocation()
+                                    locationOverlay.enableFollowLocation()
+                                    (locationOverlay.myLocation ?: myCurrentLoc)?.let { centerOnLocation(it) }
                                 }
                             }
                         }
@@ -1865,7 +1895,7 @@ fun MapScreen(
                     ) {
                         Icon(
                             imageVector = if (isTrackingActive) Icons.Default.MyLocation else Icons.Outlined.MyLocation, // Change l'icône (plein/vide) pour plus de clarté si tu veux, ou garde Icons.Default.MyLocation
-                            contentDescription = "Localiser",
+                            contentDescription = AppStrings.locate,
                             tint = if (isTrackingActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
@@ -2020,7 +2050,7 @@ fun MapScreen(
                         } else if (!isOnline) {
                             // Optionnel : un petit message pour dire qu'aucune carte n'est dispo si on est hors ligne
                             Text(
-                                text = "(Aucune carte hors-ligne installée)",
+                                text = AppStrings.noOfflineMapsInstalled,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp,
                                 modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp)
@@ -2429,13 +2459,7 @@ class AntennaMarker(
     }
 
     private fun getOpColorInt(name: String?): Int {
-        return when {
-            name?.contains("ORANGE", true) == true -> android.graphics.Color.parseColor("#FF7900")
-            name?.contains("SFR", true) == true -> android.graphics.Color.parseColor("#E2001A")
-            name?.contains("FREE", true) == true -> android.graphics.Color.parseColor("#757575")
-            name?.contains("BOUYGUES", true) == true -> android.graphics.Color.parseColor("#00295F")
-            else -> primaryColor
-        }
+        return OperatorColors.colorInt(name, fallback = primaryColor)
     }
 
     override fun draw(canvas: android.graphics.Canvas, projection: org.osmdroid.views.Projection) {

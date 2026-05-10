@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">GeoTower</string>
+    <string name="antenna_widget_label">Antennes à proximité</string>
 </resources>

@@ -1,0 +1,228 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 1,
+    "identityHash": "76cdf074a291b9259af10df963f0b120",
+    "entities": [
+      {
+        "tableName": "localisation",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id_anfr` TEXT NOT NULL, `operateur` TEXT, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `azimuts` TEXT, `code_insee` TEXT, `azimuts_fh` TEXT, `filtres` TEXT, PRIMARY KEY(`id_anfr`))",
+        "fields": [
+          {
+            "fieldPath": "idAnfr",
+            "columnName": "id_anfr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operateur",
+            "columnName": "operateur",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "azimuts",
+            "columnName": "azimuts",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "codeInsee",
+            "columnName": "code_insee",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "azimutsFh",
+            "columnName": "azimuts_fh",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "filtres",
+            "columnName": "filtres",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id_anfr"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "technique",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id_anfr` TEXT NOT NULL, `technologies` TEXT, `statut` TEXT, `date_implantation` TEXT, `date_service` TEXT, `date_modif` TEXT, `details_frequences` TEXT, `adresse` TEXT, PRIMARY KEY(`id_anfr`))",
+        "fields": [
+          {
+            "fieldPath": "idAnfr",
+            "columnName": "id_anfr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "technologies",
+            "columnName": "technologies",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "statut",
+            "columnName": "statut",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dateImplantation",
+            "columnName": "date_implantation",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dateService",
+            "columnName": "date_service",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dateModif",
+            "columnName": "date_modif",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "detailsFrequences",
+            "columnName": "details_frequences",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "adresse",
+            "columnName": "adresse",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id_anfr"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "physique",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id_anfr` TEXT NOT NULL, `id_support` TEXT NOT NULL, `nature_support` TEXT, `proprietaire` TEXT, `hauteur` REAL, `azimuts_et_types` TEXT, PRIMARY KEY(`id_anfr`, `id_support`))",
+        "fields": [
+          {
+            "fieldPath": "idAnfr",
+            "columnName": "id_anfr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "idSupport",
+            "columnName": "id_support",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "natureSupport",
+            "columnName": "nature_support",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "proprietaire",
+            "columnName": "proprietaire",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "hauteur",
+            "columnName": "hauteur",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "azimutsEtTypes",
+            "columnName": "azimuts_et_types",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id_anfr",
+            "id_support"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "faisceaux_hertziens",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id_anfr` TEXT NOT NULL, `id_support` TEXT NOT NULL, `type_fh` TEXT, `azimuts_fh` TEXT, PRIMARY KEY(`id_anfr`, `id_support`))",
+        "fields": [
+          {
+            "fieldPath": "idAnfr",
+            "columnName": "id_anfr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "idSupport",
+            "columnName": "id_support",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "typeFh",
+            "columnName": "type_fh",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "azimutsFh",
+            "columnName": "azimuts_fh",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id_anfr",
+            "id_support"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '76cdf074a291b9259af10df963f0b120')"
+    ]
+  }
+}

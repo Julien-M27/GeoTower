@@ -30,6 +30,7 @@ import fr.geotower.R
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.OperatorColors
 
 // ✅ CLASSE DE DONNÉES COMPLÈTE
 data class OperatorStat(
@@ -70,10 +71,10 @@ fun CityStatsDetailSheet(
         val regexFiltre = Regex("^(2G|3G|4G|5G)(\\d{3,4})$")
 
         val rawList = listOf(
-            Triple("ORANGE", R.drawable.logo_orange, Color(0xFFFF6600)),
-            Triple("BOUYGUES", R.drawable.logo_bouygues, Color(0xFF00295F)),
-            Triple("SFR", R.drawable.logo_sfr, Color(0xFFE2001A)),
-            Triple("FREE", R.drawable.logo_free, Color(0xFF757575))
+            Triple(OperatorColors.ORANGE_KEY, R.drawable.logo_orange, Color(OperatorColors.ORANGE_ARGB)),
+            Triple(OperatorColors.BOUYGUES_KEY, R.drawable.logo_bouygues, Color(OperatorColors.BOUYGUES_ARGB)),
+            Triple(OperatorColors.SFR_KEY, R.drawable.logo_sfr, Color(OperatorColors.SFR_ARGB)),
+            Triple(OperatorColors.FREE_KEY, R.drawable.logo_free, Color(OperatorColors.FREE_ARGB))
         ).map { (opKey, logo, color) ->
 
             val opAnts = cityAntennas.filter { it.operateur?.contains(opKey, true) == true }
@@ -222,7 +223,7 @@ fun CartoradioGroupedTable(
 
     if (groupedData.isEmpty()) {
         Box(modifier = Modifier.fillMaxWidth().background(tableBgColor).padding(16.dp), contentAlignment = Alignment.Center) {
-            Text("Données techniques non disponibles", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(AppStrings.technicalDataUnavailable, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         return
     }

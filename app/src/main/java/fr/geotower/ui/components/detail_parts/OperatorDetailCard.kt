@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fr.geotower.data.models.OperatorDetails
 import fr.geotower.ui.components.OutlinedCard
+import fr.geotower.utils.AppStrings
 
 @Composable
 fun OperatorDetailCard(
@@ -61,13 +62,13 @@ fun OperatorDetailCard(
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Technologies
-                Text("Technologies :", fontWeight = FontWeight.Bold)
+                Text("${AppStrings.technologiesTitle} :", fontWeight = FontWeight.Bold)
                 Text(details.technologies.joinToString(", "))
 
                 Spacer(modifier = Modifier.height(8.dp))
 
                 // Fréquences
-                Text("Fréquences :", fontWeight = FontWeight.Bold)
+                Text("${AppStrings.frequenciesTitle} :", fontWeight = FontWeight.Bold)
                 Text(details.frequencies.joinToString("\n"))
 
                 Spacer(modifier = Modifier.height(16.dp))

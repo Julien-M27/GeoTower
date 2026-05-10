@@ -32,7 +32,9 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.data.db.AppDatabase
 import fr.geotower.data.db.GeoTowerDao
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.OperatorColors
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.cos
@@ -139,7 +141,7 @@ class LiveTrackingService : Service() {
         try {
             fusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, Looper.getMainLooper())
         } catch (e: SecurityException) {
-            android.util.Log.w("LiveTracking", "Location permission revoked before updates could start: ${e.message}")
+            AppLogger.w(TAG_LOCATION, "Location updates could not start", e)
             stopTrackingAndSelf()
         }
     }
@@ -238,7 +240,7 @@ class LiveTrackingService : Service() {
             } catch (_: CancellationException) {
                 // Newer GPS updates replace older calculations.
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLogger.w(TAG_LOCATION, "Live tracking update failed", e)
             }
         }
     }
@@ -592,7 +594,7 @@ class LiveTrackingService : Service() {
             }
             true
         } catch (e: SecurityException) {
-            android.util.Log.w("LiveNotif", "Impossible de demarrer le service de localisation: ${e.message}")
+            AppLogger.w(TAG_LOCATION, "Live tracking foreground service failed", e)
             stopTrackingAndSelf()
             false
         }
@@ -664,13 +666,7 @@ class LiveTrackingService : Service() {
     }
 
     private fun operatorColor(operator: String): Int {
-        return when {
-            operator.contains("ORANGE") -> android.graphics.Color.parseColor("#FF7900")
-            operator.contains("BOUYGUES") -> android.graphics.Color.parseColor("#009FE3")
-            operator.contains("SFR") -> android.graphics.Color.parseColor("#E2001A")
-            operator.contains("FREE") -> android.graphics.Color.parseColor("#55565A")
-            else -> android.graphics.Color.GRAY
-        }
+        return OperatorColors.colorInt(operator)
     }
 
     private fun operatorLogo(operator: String): Int? {
@@ -706,6 +702,7 @@ class LiveTrackingService : Service() {
         private const val MAX_SAMSUNG_NOW_BAR_TEXT_LENGTH = 80
         private const val MAX_SAMSUNG_CHIP_TEXT_LENGTH = 24
         private const val MAX_SAMSUNG_DRAWER_TITLE_LENGTH = 36
+        private const val TAG_LOCATION = "GeoTowerLocation"
         private val SEARCH_RADII_KM = doubleArrayOf(5.0, 10.0, 25.0, 50.0, 100.0)
     }
 }

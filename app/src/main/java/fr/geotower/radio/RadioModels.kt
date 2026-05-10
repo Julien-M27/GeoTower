@@ -1,5 +1,7 @@
 package fr.geotower.radio
 
+import fr.geotower.utils.OperatorColors
+
 const val THROUGHPUT_CALCULATION_VERSION = "FR_RADIO_THROUGHPUT_V1"
 
 enum class CountryScope {
@@ -12,10 +14,10 @@ enum class MobileOperator(
     val colorHex: String,
     val aliases: List<String>
 ) {
-    ORANGE("Orange", "#FF7900", listOf("ORANGE", "ORANGE FRANCE")),
-    SFR("SFR", "#E2001A", listOf("SFR", "SOCIETE FRANCAISE DU RADIOTELEPHONE")),
-    BOUYGUES("Bouygues Telecom", "#00295F", listOf("BOUYGUES", "BOUYGUES TELECOM")),
-    FREE("Free Mobile", "#757575", listOf("FREE", "FREE MOBILE"));
+    ORANGE("Orange", OperatorColors.ORANGE_HEX, listOf("ORANGE", "ORANGE FRANCE")),
+    SFR("SFR", OperatorColors.SFR_HEX, listOf("SFR", "SOCIETE FRANCAISE DU RADIOTELEPHONE")),
+    BOUYGUES("Bouygues Telecom", OperatorColors.BOUYGUES_HEX, listOf("BOUYGUES", "BOUYGUES TELECOM")),
+    FREE("Free Mobile", OperatorColors.FREE_HEX, listOf("FREE", "FREE MOBILE"));
 
     companion object {
         fun fromLabel(raw: String?): MobileOperator? {

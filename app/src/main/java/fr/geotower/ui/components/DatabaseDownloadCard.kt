@@ -25,6 +25,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.R
+import fr.geotower.data.db.DatabaseVersionPolicy
+import fr.geotower.data.db.GeoTowerDatabaseValidator
+import fr.geotower.data.workers.DatabaseDownloadWorker
+import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -41,24 +45,27 @@ fun DatabaseDownloadCard(
 ) {
     val context = LocalContext.current
     val workManager = remember { androidx.work.WorkManager.getInstance(context) }
-    val workInfos by workManager.getWorkInfosForUniqueWorkFlow("db_download").collectAsState(initial = emptyList())
+    val workInfos by workManager.getWorkInfosForUniqueWorkFlow(DatabaseDownloadWorker.UNIQUE_WORK_NAME).collectAsState(initial = emptyList())
     val currentWork = workInfos.firstOrNull()
 
     val isSyncing = currentWork?.state == androidx.work.WorkInfo.State.RUNNING || currentWork?.state == androidx.work.WorkInfo.State.ENQUEUED
-    val downloadProgress = currentWork?.progress?.getInt("progress", 0)?.div(100f) ?: 0f
+    val downloadProgress = currentWork?.progress?.getInt(DatabaseDownloadWorker.KEY_PROGRESS, 0)?.div(100f) ?: 0f
 
-    val txtSearching = AppStrings.get("Recherche...", "Searching...", "Buscando...")
-    val txtUnknown = AppStrings.get("Inconnue", "Unknown", "Desconocida")
-    val txtNoDb = AppStrings.get("Aucune base installée", "No database installed", "Ninguna base instalada")
-    val txtOldDb = AppStrings.get("Ancienne version (Non datée)", "Old version (Undated)", "Versión antigua (Sin fecha)")
-    val txtLatestDb = AppStrings.get("Dernière base disponible :", "Latest database:", "Última base disp.:")
-    val txtDownloadedDb = AppStrings.get("Base actuellement téléchargée :", "Currently downloaded:", "Base descargada atualmente:")
+    val txtSearching = AppStrings.searching
+    val txtUnknown = AppStrings.unknownFeminine
+    val txtNoDb = AppStrings.noDatabaseInstalled
+    val txtInvalidDb = AppStrings.invalidLocalDatabase
+    val txtOldDb = AppStrings.oldUndatedDatabase
+    val txtLatestDb = AppStrings.latestDatabaseAvailable
+    val txtDownloadedDb = AppStrings.currentlyDownloadedDatabase
 
     val txtAnfrDatabaseFrom = AppStrings.anfrDatabaseFrom
 
     var dbSizeMb by remember { mutableDoubleStateOf(-1.0) }
     var localDbVersion by remember { mutableStateOf(txtSearching) }
+    var localDbVersionRaw by remember { mutableStateOf<String?>(null) }
     var remoteDbVersion by remember { mutableStateOf(txtSearching) }
+    var remoteDbVersionRaw by remember { mutableStateOf<String?>(null) }
     var localAnfrDate by remember { mutableStateOf("") }
 
     // ✅ NOUVEAUX ÉTATS POUR LA SUPPRESSION
@@ -68,12 +75,6 @@ fun DatabaseDownloadCard(
     // ✅ ON AJOUTE dbRefreshTrigger AUX CLÉS DE L'EFFET
     LaunchedEffect(isSyncing, dbRefreshTrigger) {
         withContext(Dispatchers.IO) {
-            dbSizeMb = try {
-                fr.geotower.data.api.DatabaseDownloader.getDatabaseSize()
-            } catch (e: Exception) {
-                -1.0
-            }
-
             fun formatVersion(raw: String?): String {
                 if (raw != null && raw.length == 13) {
                     val year = raw.substring(0, 4)
@@ -86,69 +87,114 @@ fun DatabaseDownloadCard(
                 return raw ?: txtUnknown
             }
 
+            var nextLocalVersion = txtNoDb
+            var nextLocalRawVersion: String? = null
+            var nextLocalAnfrDate = ""
+            var nextLocalState = GeoTowerDatabaseValidator.LocalDatabaseState.MISSING
+            var shouldValidateLocalDb = false
+
+            withContext(Dispatchers.IO) {
+                val dbPath = context.getDatabasePath("geotower.db")
+                try {
+                    if (dbPath.exists()) {
+                        shouldValidateLocalDb = true
+                        nextLocalState = GeoTowerDatabaseValidator.LocalDatabaseState.VALID
+                        val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
+
+                        try {
+                            val cursor = try {
+                                db.rawQuery("SELECT version, date_maj_anfr FROM metadata LIMIT 1", null)
+                            } catch (e: Exception) {
+                                db.rawQuery("SELECT version FROM metadata LIMIT 1", null)
+                            }
+
+                            cursor.use {
+                                var versionFormatee = txtUnknown
+                                var anfrDateFormatee = ""
+
+                                if (it.moveToFirst()) {
+                                    val rawVersion = it.getString(0)
+                                    nextLocalRawVersion = rawVersion
+                                    versionFormatee = formatVersion(rawVersion)
+
+                                    if (it.columnCount > 1 && !it.isNull(1)) {
+                                        val raw = it.getString(1)
+                                        anfrDateFormatee = try {
+                                            if (raw.contains("T")) {
+                                                val datePart = raw.substringBefore("T")
+                                                val timePart = raw.substringAfter("T")
+
+                                                val dParts = datePart.split("-")
+                                                val tParts = timePart.split(":")
+
+                                                if (dParts.size >= 3 && tParts.size >= 2) {
+                                                    "${dParts[2]}/${dParts[1]}/${dParts[0]} - ${tParts[0]}:${tParts[1]}"
+                                                } else {
+                                                    raw
+                                                }
+                                            } else {
+                                                when (raw.length) {
+                                                    13 -> "${raw.substring(6, 8)}/${raw.substring(4, 6)}/${raw.substring(0, 4)} - ${raw.substring(9, 11)}:${raw.substring(11, 13)}"
+                                                    8 -> "${raw.substring(6, 8)}/${raw.substring(4, 6)}/${raw.substring(0, 4)}"
+                                                    else -> raw
+                                                }
+                                            }
+                                        } catch (e: Exception) {
+                                            raw
+                                        }
+                                    }
+                                }
+
+                                nextLocalAnfrDate = anfrDateFormatee
+                                nextLocalVersion = versionFormatee
+                            }
+                        } finally {
+                            db.close()
+                        }
+                    } else {
+                        nextLocalAnfrDate = ""
+                        nextLocalVersion = txtNoDb
+                    }
+                } catch (e: Exception) {
+                    shouldValidateLocalDb = false
+                    nextLocalState = GeoTowerDatabaseValidator.LocalDatabaseState.INVALID
+                    nextLocalAnfrDate = ""
+                    nextLocalVersion = txtOldDb
+                }
+            }
+            localAnfrDate = nextLocalAnfrDate
+            localDbVersion = nextLocalVersion
+            localDbVersionRaw = nextLocalRawVersion
+            AppConfig.localDatabaseState.value = nextLocalState
+
             remoteDbVersion = try {
                 val remote = fr.geotower.data.api.DatabaseDownloader.getLatestDatabaseVersion()
+                remoteDbVersionRaw = remote
                 if (remote != null) formatVersion(remote) else txtUnknown
             } catch (e: Exception) {
+                remoteDbVersionRaw = null
                 txtUnknown
             }
 
-            localDbVersion = try {
-                val dbPath = context.getDatabasePath("geotower.db")
-
-                if (dbPath.exists()) {
-                    val db = SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY)
-
-                    val cursor = try {
-                        db.rawQuery("SELECT version, date_maj_anfr FROM metadata LIMIT 1", null)
-                    } catch (e: Exception) {
-                        db.rawQuery("SELECT version FROM metadata LIMIT 1", null)
-                    }
-
-                    var versionFormatee = txtUnknown
-                    var anfrDateFormatee = ""
-
-                    if (cursor.moveToFirst()) {
-                        versionFormatee = formatVersion(cursor.getString(0))
-
-                        if (cursor.columnCount > 1 && !cursor.isNull(1)) {
-                            val raw = cursor.getString(1)
-                            anfrDateFormatee = try {
-                                if (raw.contains("T")) {
-                                    val datePart = raw.substringBefore("T")
-                                    val timePart = raw.substringAfter("T")
-
-                                    val dParts = datePart.split("-")
-                                    val tParts = timePart.split(":")
-
-                                    if (dParts.size >= 3 && tParts.size >= 2) {
-                                        "${dParts[2]}/${dParts[1]}/${dParts[0]} - ${tParts[0]}:${tParts[1]}"
-                                    } else {
-                                        raw
-                                    }
-                                } else {
-                                    when (raw.length) {
-                                        13 -> "${raw.substring(6, 8)}/${raw.substring(4, 6)}/${raw.substring(0, 4)} - ${raw.substring(9, 11)}:${raw.substring(11, 13)}"
-                                        8 -> "${raw.substring(6, 8)}/${raw.substring(4, 6)}/${raw.substring(0, 4)}"
-                                        else -> raw
-                                    }
-                                }
-                            } catch (e: Exception) {
-                                raw
-                            }
-                        }
-                    }
-                    cursor.close()
-                    db.close()
-
-                    localAnfrDate = anfrDateFormatee
-                    versionFormatee
-                } else {
-                    localAnfrDate = "" // On vide la date si on n'a plus de base
-                    txtNoDb
+            if (shouldValidateLocalDb) {
+                val validatedState = withContext(Dispatchers.IO) {
+                    GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context).state
                 }
+                AppConfig.localDatabaseState.value = validatedState
+                if (validatedState == GeoTowerDatabaseValidator.LocalDatabaseState.INVALID && nextLocalVersion == txtOldDb) {
+                    localDbVersionRaw = null
+                    localAnfrDate = ""
+                    localDbVersion = txtInvalidDb
+                }
+                if (validatedState == GeoTowerDatabaseValidator.LocalDatabaseState.INVALID) {
+                    localDbVersionRaw = null
+                }
+            }
+
+            dbSizeMb = try {
+                fr.geotower.data.api.DatabaseDownloader.getDatabaseSize()
             } catch (e: Exception) {
-                txtOldDb
+                -1.0
             }
         }
     }
@@ -270,7 +316,7 @@ fun DatabaseDownloadCard(
                     OutlinedButton(
                         onClick = {
                             onSafeClick {
-                                workManager.cancelUniqueWork("db_download")
+                                workManager.cancelUniqueWork(DatabaseDownloadWorker.UNIQUE_WORK_NAME)
                             }
                         },
                         modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 50.dp),
@@ -284,19 +330,19 @@ fun DatabaseDownloadCard(
                     }
                 }
             } else {
-                val isUpToDate = localDbVersion != txtSearching &&
-                                localDbVersion != txtNoDb &&
-                                localDbVersion != txtUnknown &&
-                                localDbVersion == remoteDbVersion
+                val isUpToDate = DatabaseVersionPolicy.isLocalCurrentOrNewer(
+                    remoteDbVersionRaw,
+                    localDbVersionRaw
+                )
+                val isSearchingDatabaseInfo = localDbVersion == txtSearching || remoteDbVersion == txtSearching
 
                 Button(
                     onClick = {
                         onSafeClick {
-                            val request = androidx.work.OneTimeWorkRequestBuilder<fr.geotower.data.workers.DatabaseDownloadWorker>().build()
-                            workManager.enqueueUniqueWork("db_download", androidx.work.ExistingWorkPolicy.REPLACE, request)
+                            DatabaseDownloadWorker.enqueue(workManager)
                         }
                     },
-                    enabled = !isUpToDate, // ✅ Grise le bouton si déjà à jour
+                    enabled = !isUpToDate && !isSearchingDatabaseInfo,
                     modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 56.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -318,7 +364,7 @@ fun DatabaseDownloadCard(
             }
 
             // ✅ AFFICHAGE CONDITIONNEL DE LA DATE DE L'ANFR
-            if (localAnfrDate.isNotEmpty() && localAnfrDate != "Inconnue") {
+            if (localAnfrDate.isNotEmpty() && localAnfrDate != txtUnknown) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = "$txtAnfrDatabaseFrom $localAnfrDate",
@@ -366,6 +412,7 @@ fun DatabaseDownloadCard(
 
                     // 2. Supprimer la base et ses fichiers temporaires
                     context.deleteDatabase("geotower.db")
+                    AppConfig.localDatabaseState.value = GeoTowerDatabaseValidator.LocalDatabaseState.MISSING
 
                     // 3. Déclencher le rafraîchissement visuel instantanément
                     dbRefreshTrigger++

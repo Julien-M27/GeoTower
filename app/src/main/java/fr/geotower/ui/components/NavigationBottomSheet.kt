@@ -198,7 +198,7 @@ fun NavigationBottomSheet(
                     // --- 5. GÉOPORTAIL IGN ---
                     NavOptionItem(
                         iconRes = R.drawable.logo_cartesign,
-                        label = "Géoportail (IGN)",
+                        label = AppStrings.geoportailIgn,
                         isSubItem = true,
                         useOneUi = useOneUi,
                         onClick = {

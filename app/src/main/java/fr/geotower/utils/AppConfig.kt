@@ -3,6 +3,7 @@ package fr.geotower.utils
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import android.os.Build
+import fr.geotower.data.db.GeoTowerDatabaseValidator
 
 object AppConfig {
     // --- Apparence ---
@@ -13,6 +14,9 @@ object AppConfig {
     var displayStyle = mutableIntStateOf(0)
 
     var menuSize = mutableStateOf("normal")
+
+    // État validé une fois au démarrage/onboarding, réutilisé par l'accueil pour éviter les faux bandeaux.
+    var localDatabaseState = mutableStateOf<GeoTowerDatabaseValidator.LocalDatabaseState?>(null)
 
     //Notification de téléchargement
     var enableUpdateNotifications = mutableStateOf(true) // Désactivé par défaut
@@ -178,8 +182,7 @@ object AppConfig {
         val model = android.os.Build.MODEL
         val device = android.os.Build.DEVICE
 
-        // 🛠️ ASTUCE DÉBOGAGE : Regarde dans le Logcat d'Android Studio pour voir ces valeurs !
-        android.util.Log.d("GeoTower_Fold", "Modèle (MODEL) : $model | Appareil (DEVICE) : $device")
+        AppLogger.d("GeoTower", "Fold device detection model=$model device=$device")
 
         //Statut
         shareSiteStatus.value = prefs.getBoolean("share_site_status", true)

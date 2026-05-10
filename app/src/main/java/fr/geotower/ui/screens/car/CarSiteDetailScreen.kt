@@ -9,6 +9,7 @@ import androidx.car.app.model.Pane
 import androidx.car.app.model.PaneTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import fr.geotower.utils.AppStrings
 import java.util.Locale
 
 class CarSiteDetailScreen(
@@ -18,13 +19,13 @@ class CarSiteDetailScreen(
 
     override fun onGetTemplate(): Template {
         val pane = Pane.Builder()
-            .addRow(Row.Builder().setTitle("Operateurs").addText(site.operators).build())
-            .addRow(Row.Builder().setTitle("Distance").addText(formatCarDistance(site.distanceMeters)).build())
-            .addRow(Row.Builder().setTitle("Adresse").addText(site.title).addText(site.subtitle).build())
-            .addRow(Row.Builder().setTitle("Coordonnees").addText(formatCoordinates()).build())
+            .addRow(Row.Builder().setTitle(AppStrings.carOperators(carContext)).addText(site.operators).build())
+            .addRow(Row.Builder().setTitle(AppStrings.carDistance(carContext)).addText(formatCarDistance(site.distanceMeters)).build())
+            .addRow(Row.Builder().setTitle(AppStrings.carAddress(carContext)).addText(site.title).addText(site.subtitle).build())
+            .addRow(Row.Builder().setTitle(AppStrings.carCoordinates(carContext)).addText(formatCoordinates()).build())
             .addAction(
                 Action.Builder()
-                    .setTitle("Naviguer")
+                    .setTitle(AppStrings.carNavigate(carContext))
                     .setOnClickListener { startNavigation() }
                     .build()
             )

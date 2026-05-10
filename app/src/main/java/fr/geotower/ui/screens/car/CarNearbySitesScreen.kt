@@ -20,6 +20,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.utils.AppStrings
 import fr.geotower.utils.LocationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -50,15 +51,15 @@ class CarNearbySitesScreen(
             NearbySitesState.Loading -> loadingTemplate()
             NearbySitesState.MissingLocationPermission -> missingPermissionTemplate()
             NearbySitesState.Empty -> messageTemplate(
-                title = "Sites proches",
-                message = "Aucun site trouve autour de votre position.",
-                actionTitle = "Reessayer",
+                title = AppStrings.carNearbySites(carContext),
+                message = AppStrings.carNoSitesNearby(carContext),
+                actionTitle = AppStrings.carRetry(carContext),
                 action = ::loadNearbySites
             )
             is NearbySitesState.Error -> messageTemplate(
-                title = "Sites proches",
+                title = AppStrings.carNearbySites(carContext),
                 message = currentState.message,
-                actionTitle = "Reessayer",
+                actionTitle = AppStrings.carRetry(carContext),
                 action = ::loadNearbySites
             )
             is NearbySitesState.Loaded -> loadedTemplate(currentState.sites)
@@ -78,7 +79,7 @@ class CarNearbySitesScreen(
 
             val location = getCarLocation()
             if (location == null) {
-                state = NearbySitesState.Error("Position indisponible pour le moment.")
+                state = NearbySitesState.Error(AppStrings.carLocationUnavailable(carContext))
                 invalidate()
                 return@launch
             }
@@ -112,27 +113,27 @@ class CarNearbySitesScreen(
 
         return ListTemplate.Builder()
             .setSingleList(itemListBuilder.build())
-            .setTitle("Sites autour de moi")
+            .setTitle(AppStrings.carSitesAroundMe(carContext))
             .setHeaderAction(Action.BACK)
             .build()
     }
 
     private fun loadingTemplate(): Template {
         return messageTemplate(
-            title = "Sites autour de moi",
-            message = "Recherche des sites proches...",
+            title = AppStrings.carSitesAroundMe(carContext),
+            message = AppStrings.carSearchNearby(carContext),
             actionTitle = null,
             action = null
         )
     }
 
     private fun missingPermissionTemplate(): Template {
-        return MessageTemplate.Builder("Autorisez la localisation dans GeoTower sur le telephone.")
-            .setTitle("Localisation requise")
+        return MessageTemplate.Builder(AppStrings.carLocationPermissionMessage(carContext))
+            .setTitle(AppStrings.carLocationRequired(carContext))
             .setHeaderAction(Action.BACK)
             .addAction(
                 Action.Builder()
-                    .setTitle("Ouvrir l'app")
+                    .setTitle(AppStrings.carOpenApp(carContext))
                     .setOnClickListener {
                         carContext.getCarService(ScreenManager::class.java)
                             .push(CarPermissionScreen(carContext))

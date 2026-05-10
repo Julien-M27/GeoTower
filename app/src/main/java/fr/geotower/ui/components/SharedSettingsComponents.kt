@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import fr.geotower.R
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.OperatorColors
 
 // ============================================================
 // 1. LOGIQUE MATHÉMATIQUE DES SWITCHS ET BOUTONS ONE UI
@@ -49,12 +50,24 @@ fun OneUiSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
 }
 
 @Composable
-fun OneUiRadioButton(selected: Boolean, onClick: () -> Unit) {
-    val themeMode by AppConfig.themeMode
-    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+fun OneUiRadioButton(
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    OneUiRadioButton(
+        selected = selected,
+        selectedColor = MaterialTheme.colorScheme.primary,
+        onClick = onClick
+    )
+}
 
-    // ✅ MODIFICATION : On utilise la couleur primaire vibrante partout
-    val activeColor = MaterialTheme.colorScheme.primary
+@Composable
+fun OneUiRadioButton(
+    selected: Boolean,
+    selectedColor: Color,
+    onClick: () -> Unit
+) {
+    val activeColor = selectedColor
     val color = if (selected) activeColor else MaterialTheme.colorScheme.outline
 
     Box(modifier = Modifier.size(24.dp).clip(CircleShape).border(2.dp, color, CircleShape).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onClick() }.padding(5.dp), contentAlignment = Alignment.Center) {
@@ -150,10 +163,10 @@ fun OperatorSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
             Text(AppStrings.defaultOperator, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 24.dp))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OperatorItem(AppStrings.none, null, Color.Gray, tempOp == "Aucun", useOneUi, bubbleColor) { tempOp = "Aucun" }
-                OperatorItem("Orange", R.drawable.logo_orange, Color(0xFFFF6600), tempOp == "Orange", useOneUi, bubbleColor) { tempOp = "Orange" }
-                OperatorItem("Bouygues Telecom", R.drawable.logo_bouygues, Color(0xFF00295F), tempOp == "Bouygues Telecom", useOneUi, bubbleColor) { tempOp = "Bouygues Telecom" }
-                OperatorItem("SFR", R.drawable.logo_sfr, Color(0xFFE2001A), tempOp == "SFR", useOneUi, bubbleColor) { tempOp = "SFR" }
-                OperatorItem("Free", R.drawable.logo_free, Color(0xFF757575), tempOp == "Free", useOneUi, bubbleColor) { tempOp = "Free" }
+                OperatorItem("Orange", R.drawable.logo_orange, Color(OperatorColors.ORANGE_ARGB), tempOp == "Orange", useOneUi, bubbleColor) { tempOp = "Orange" }
+                OperatorItem("Bouygues Telecom", R.drawable.logo_bouygues, Color(OperatorColors.BOUYGUES_ARGB), tempOp == "Bouygues Telecom", useOneUi, bubbleColor) { tempOp = "Bouygues Telecom" }
+                OperatorItem("SFR", R.drawable.logo_sfr, Color(OperatorColors.SFR_ARGB), tempOp == "SFR", useOneUi, bubbleColor) { tempOp = "SFR" }
+                OperatorItem("Free", R.drawable.logo_free, Color(OperatorColors.FREE_ARGB), tempOp == "Free", useOneUi, bubbleColor) { tempOp = "Free" }
 
                 Button(
                     onClick = { onSelect(tempOp); onDismiss() },
@@ -176,7 +189,7 @@ fun OperatorItem(name: String, logoRes: Int?, operatorColor: Color, isSelected: 
             else Box(modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Block, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
             Spacer(modifier = Modifier.width(16.dp))
             Text(text = name, style = MaterialTheme.typography.titleMedium, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1f))
-            if (useOneUi) OneUiRadioButton(isSelected, onClick) else RadioButton(selected = isSelected, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = operatorColor))
+            if (useOneUi) OneUiRadioButton(isSelected, selectedColor = operatorColor, onClick = onClick) else RadioButton(selected = isSelected, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = operatorColor))
         }
     }
 }
@@ -197,10 +210,10 @@ fun LanguageSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
         Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(AppStrings.appLanguageLabel, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 24.dp))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                LanguageItem(AppStrings.systemLanguage, "📱", tempLang == "Système", useOneUi, bubbleColor, activeColor) { tempLang = "Système" }
-                LanguageItem("Français", "🇫🇷", tempLang == "Français", useOneUi, bubbleColor, activeColor) { tempLang = "Français" }
-                LanguageItem("English", "🇬🇧", tempLang == "English", useOneUi, bubbleColor, activeColor) { tempLang = "English" }
-                LanguageItem("Português", "🇵🇹", tempLang == "Português", useOneUi, bubbleColor, activeColor) { tempLang = "Português" }
+                LanguageItem(AppStrings.systemLanguage, "📱", tempLang == AppStrings.LANGUAGE_SYSTEM, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_SYSTEM }
+                LanguageItem(AppStrings.languageFrenchName, "🇫🇷", tempLang == AppStrings.LANGUAGE_FRENCH, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_FRENCH }
+                LanguageItem(AppStrings.languageEnglishName, "🇬🇧", tempLang == AppStrings.LANGUAGE_ENGLISH, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_ENGLISH }
+                LanguageItem(AppStrings.languagePortugueseName, "🇵🇹", tempLang == AppStrings.LANGUAGE_PORTUGUESE, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_PORTUGUESE }
 
                 Button(
                     onClick = { onSelect(tempLang); onDismiss() }, modifier = Modifier.fillMaxWidth().height(50.dp).padding(top = 8.dp),

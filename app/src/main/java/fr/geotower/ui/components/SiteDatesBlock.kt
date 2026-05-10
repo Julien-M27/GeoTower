@@ -50,8 +50,8 @@ fun SiteDatesBlock(
             val dateSer = technique?.dateService?.takeIf { it.isNotBlank() }
             val dateMod = technique?.dateModif?.takeIf { it.isNotBlank() } // ✅ RÉCUPÉRATION DE LA MODIFICATION
 
-            val dateImpStr = dateImp?.let { formatDateToFrench(it) } ?: "Non spécifiée"
-            val dateSerStr = dateSer?.let { formatDateToFrench(it) } ?: "Non spécifiée"
+            val dateImpStr = dateImp?.let { formatDateToFrench(it) } ?: AppStrings.notSpecified
+            val dateSerStr = dateSer?.let { formatDateToFrench(it) } ?: AppStrings.notSpecified
             val dateModStr = dateMod?.let { formatDateToFrench(it) } ?: "-"
 
             // ✅ PLUS DE " : " EN TROP ICI NON PLUS !
@@ -60,7 +60,7 @@ fun SiteDatesBlock(
             Text(text = "$txtActivatedOn$dateSerStr", color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             // ✅ CONDITION : On affiche la dernière modification seulement si elle existe
-            if (dateModStr != "-" && dateModStr != "Non spécifiée") {
+            if (dateModStr != "-" && dateModStr != AppStrings.notSpecified) {
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(text = "$txtLastModification$dateModStr", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }

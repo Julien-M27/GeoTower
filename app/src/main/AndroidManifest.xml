@@ -23,7 +23,9 @@
 
     <application
         android:allowBackup="false"
-        android:usesCleartextTraffic="true"
+        android:name=".GeoTowerApp"
+        android:networkSecurityConfig="@xml/network_security_config"
+        android:usesCleartextTraffic="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher_geotower"
@@ -133,7 +135,7 @@
 
         <receiver
             android:name=".widget.AntennaWidgetReceiver"
-            android:label="Antennes à proximité"
+            android:label="@string/antenna_widget_label"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -144,7 +146,7 @@
         </receiver>
         <receiver
             android:name=".widget.AntennaWidgetMediumReceiver"
-            android:label="Antennes à proximité"
+            android:label="@string/antenna_widget_label"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
@@ -155,7 +157,7 @@
         </receiver>
         <receiver
             android:name=".widget.AntennaWidgetLargeReceiver"
-            android:label="Antennes à proximité"
+            android:label="@string/antenna_widget_label"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />

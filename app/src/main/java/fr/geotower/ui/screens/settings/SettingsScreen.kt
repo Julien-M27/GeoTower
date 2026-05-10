@@ -116,6 +116,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.workers.UpdateCheckScheduler
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.AppStrings
@@ -272,7 +273,7 @@ fun SettingsScreen(
         }
     }
 
-    var appLanguage by remember { mutableStateOf(prefs.getString("app_language", "Français") ?: "Français") }
+    var appLanguage by remember { mutableStateOf(prefs.getString("app_language", AppStrings.LANGUAGE_FRENCH) ?: AppStrings.LANGUAGE_FRENCH) }
     var showLanguageSheet by remember { mutableStateOf(false) }
     var showOperatorSheet by remember { mutableStateOf(false) }
     var showIconSheet by remember { mutableStateOf(false) }
@@ -1491,7 +1492,7 @@ fun SectionPreferences(
     )
 
     var widgetFrequency by remember {
-        mutableIntStateOf(prefs.getInt("widget_sync_freq", 30).let { if (it < 30) 30 else it })
+        mutableIntStateOf(prefs.getInt("widget_sync_freq", 60).let { if (it < 30) 30 else it })
     }
 
     // ✅ AJOUT POUR LE STYLE D'AFFICHAGE
@@ -1610,6 +1611,7 @@ fun SectionPreferences(
         onCheckedChange = { isChecked ->
             fr.geotower.utils.AppConfig.enableUpdateNotifications.value = isChecked
             prefs.edit().putBoolean("enable_update_notifications", isChecked).apply()
+            UpdateCheckScheduler.onNotificationsPreferenceChanged(context, isChecked)
 
             // Demande la permission sur Android 13+ si on active
             if (isChecked && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
@@ -2009,7 +2011,7 @@ fun PreferenceOperatorCard(title: String, operator: String, onClick: () -> Unit,
         Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(if (operator == "Aucun") "Sélectionner" else "Actuel : $operator", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(if (operator == "Aucun") AppStrings.select else AppStrings.current(operator), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (logoRes != null) {
@@ -2037,18 +2039,19 @@ fun PreferenceLanguageCard(title: String, language: String, onClick: () -> Unit,
 
     // Détermination de l'emoji en fonction de la langue
     val flag = when (language) {
-        "Français" -> "🇫🇷"
-        "English" -> "🇬🇧"
-        "Português" -> "🇵🇹"
-        "Système" -> "📱"
+        AppStrings.LANGUAGE_FRENCH -> "🇫🇷"
+        AppStrings.LANGUAGE_ENGLISH -> "🇬🇧"
+        AppStrings.LANGUAGE_PORTUGUESE -> "🇵🇹"
+        AppStrings.LANGUAGE_SYSTEM -> "📱"
         else -> "🌐"
     }
+    val displayLanguage = AppStrings.languageDisplayName(language)
 
     Surface(onClick = { safeClick { onClick() } }, shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(AppStrings.current(language), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(AppStrings.current(displayLanguage), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // L'EMOJI REMPLACE L'ICÔNE PLANÈTE

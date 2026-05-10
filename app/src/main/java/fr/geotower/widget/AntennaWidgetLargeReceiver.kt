@@ -15,7 +15,7 @@ class AntennaWidgetLargeReceiver : GlanceAppWidgetReceiver() {
     override fun onEnabled(context: Context) {
         super.onEnabled(context)
         val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-        val freq = prefs.getInt("widget_sync_freq", 30).toLong()
+        val freq = prefs.getInt("widget_sync_freq", 60).toLong()
 
         val periodicWork = PeriodicWorkRequestBuilder<AntennaWidgetWorker>(freq, TimeUnit.MINUTES).build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(

@@ -25,6 +25,7 @@ import androidx.work.WorkInfo
 import androidx.work.workDataOf
 import fr.geotower.data.api.RetrofitClient
 import fr.geotower.data.models.OfflineMapDto
+import fr.geotower.data.workers.OfflineMapDownloadValidator
 import fr.geotower.utils.AppStrings
 import java.io.File
 
@@ -54,6 +55,7 @@ fun MapDownloadCard(
     LaunchedEffect(Unit) {
         try {
             catalog = RetrofitClient.apiService.getMapsCatalog()
+                .filter { OfflineMapDownloadValidator.isValidCatalogEntry(it) }
         } catch (e: Exception) {
             isError = true
         } finally {
@@ -63,8 +65,7 @@ fun MapDownloadCard(
 
     // Vérifie s'il y a au moins une carte téléchargée pour afficher le bouton "Tout supprimer"
     val hasDownloadedMaps = remember(fileRefreshTrigger, workInfos) {
-        val files = mapsDir.listFiles { f -> f.extension == "map" }
-        !files.isNullOrEmpty()
+        OfflineMapDownloadValidator.listSafeMapFiles(mapsDir).isNotEmpty()
     }
 
     Surface(
@@ -92,15 +93,17 @@ fun MapDownloadCard(
                         onClick = {
                             onSafeClick {
                                 catalog.forEach { map ->
-                                    val isDownloaded = File(mapsDir, map.mapFilename).exists()
+                                    val mapFile = OfflineMapDownloadValidator.safeMapFile(mapsDir, map.mapFilename)
+                                    val isDownloaded = mapFile?.exists() == true
                                     val currentWork = workInfos.find { it.tags.contains("map_id_${map.id}") }
                                     val isSyncing = currentWork?.state == WorkInfo.State.RUNNING || currentWork?.state == WorkInfo.State.ENQUEUED
 
-                                    if (!isDownloaded && !isSyncing) {
+                                    if (mapFile != null && !isDownloaded && !isSyncing) {
                                         val data = workDataOf(
                                             "map_url" to map.mapUrl,
                                             "map_filename" to map.mapFilename,
-                                            "estimated_size_mb" to map.estimatedSizeMb
+                                            "estimated_size_mb" to map.estimatedSizeMb,
+                                            "map_sha256" to map.sha256.orEmpty()
                                         )
                                         val request = OneTimeWorkRequestBuilder<fr.geotower.data.workers.MapDownloadWorker>()
                                             .setInputData(data)
@@ -131,7 +134,7 @@ fun MapDownloadCard(
                     val isSyncing = currentWork?.state == WorkInfo.State.RUNNING || currentWork?.state == WorkInfo.State.ENQUEUED
                     val progressValue = currentWork?.progress?.getInt("progress", 0) ?: 0
                     val isDownloaded = remember(fileRefreshTrigger, currentWork?.state) {
-                        File(mapsDir, map.mapFilename).exists()
+                        OfflineMapDownloadValidator.safeMapFile(mapsDir, map.mapFilename)?.exists() == true
                     }
 
                     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
@@ -148,24 +151,29 @@ fun MapDownloadCard(
 
                             if (isSyncing) {
                                 IconButton(onClick = { onSafeClick { workManager.cancelUniqueWork("map_dl_${map.id}") } }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Annuler", tint = MaterialTheme.colorScheme.error)
+                                    Icon(Icons.Default.Close, contentDescription = AppStrings.cancel, tint = MaterialTheme.colorScheme.error)
                                 }
                             } else if (isDownloaded) {
                                 IconButton(onClick = { onSafeClick { mapToDelete = map } }) {
-                                    Icon(Icons.Default.Delete, contentDescription = "Supprimer", tint = MaterialTheme.colorScheme.error)
+                                    Icon(Icons.Default.Delete, contentDescription = AppStrings.delete, tint = MaterialTheme.colorScheme.error)
                                 }
                             } else {
                                 IconButton(
                                     onClick = {
                                         onSafeClick {
-                                            val data = workDataOf("map_url" to map.mapUrl, "map_filename" to map.mapFilename, "estimated_size_mb" to map.estimatedSizeMb)
+                                            val data = workDataOf(
+                                                "map_url" to map.mapUrl,
+                                                "map_filename" to map.mapFilename,
+                                                "estimated_size_mb" to map.estimatedSizeMb,
+                                                "map_sha256" to map.sha256.orEmpty()
+                                            )
                                             val request = OneTimeWorkRequestBuilder<fr.geotower.data.workers.MapDownloadWorker>()
                                                 .setInputData(data).addTag("map_download").addTag("map_id_${map.id}").build()
                                             workManager.enqueueUniqueWork("map_dl_${map.id}", ExistingWorkPolicy.REPLACE, request)
                                         }
                                     }
                                 ) {
-                                    Icon(Icons.Default.CloudDownload, contentDescription = "Télécharger", tint = MaterialTheme.colorScheme.primary)
+                                    Icon(Icons.Default.CloudDownload, contentDescription = AppStrings.download, tint = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
@@ -236,7 +244,7 @@ fun MapDownloadCard(
             containerColor = MaterialTheme.colorScheme.surface,
             dismissButton = {
                 TextButton(onClick = {
-                    File(mapsDir, mapToDelete!!.mapFilename).delete()
+                    OfflineMapDownloadValidator.safeMapFile(mapsDir, mapToDelete!!.mapFilename)?.delete()
                     fileRefreshTrigger++
                     mapToDelete = null
                 }) { Text(AppStrings.yes, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
@@ -255,7 +263,7 @@ fun MapDownloadCard(
             containerColor = MaterialTheme.colorScheme.surface,
             dismissButton = {
                 TextButton(onClick = {
-                    mapsDir.listFiles()?.forEach { it.delete() }
+                    OfflineMapDownloadValidator.deleteAllSafeMapFiles(mapsDir)
                     fileRefreshTrigger++
                     showDeleteAllDialog = false
                 }) { Text(AppStrings.yes, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }

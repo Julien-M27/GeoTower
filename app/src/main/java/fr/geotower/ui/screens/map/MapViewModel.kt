@@ -1,6 +1,5 @@
 package fr.geotower.ui.screens.map
 
-import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -14,6 +13,7 @@ import kotlinx.coroutines.launch
 import org.osmdroid.util.GeoPoint
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppLogger
 
 class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
 
@@ -39,9 +39,9 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
                 val filteredMarkers = apiMarkers.filter { isPointInPolygon(it.latitude, it.longitude, polygons) }
 
                 _antennas.value = filteredMarkers
-                Log.d("GeoTower", "✅ ${filteredMarkers.size} marqueurs conservés à l'intérieur des frontières sur ${apiMarkers.size} téléchargés.")
+                AppLogger.d(TAG, "City map markers filtered=${filteredMarkers.size} total=${apiMarkers.size}")
             } catch (e: Exception) {
-                Log.e("GeoTower", "❌ Erreur carte (City) : ${e.message}")
+                AppLogger.w(TAG, "City map request failed", e)
             } finally {
                 _isLoading.value = false
             }
@@ -109,9 +109,9 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
                 // On télécharge toutes les pannes de tous les opérateurs en une seule fois !
                 val allHs = repository.getSitesHs()
                 _sitesHs.value = allHs
-                Log.d("GeoTower", "✅ ${allHs.size} antennes en panne récupérées via le nouveau GeoJSON !")
+                AppLogger.d(TAG, "Outage markers loaded count=${allHs.size}")
             } catch (e: Exception) {
-                Log.e("GeoTower", "❌ Erreur lors de la récupération des pannes : ${e.message}")
+                AppLogger.w(TAG, "Outage markers request failed", e)
             }
         }
     }
@@ -174,3 +174,5 @@ class MapViewModelFactory(private val repository: AnfrRepository) : ViewModelPro
         throw IllegalArgumentException("Unknown ViewModel class")
     }
 }
+
+private const val TAG = "GeoTowerMap"

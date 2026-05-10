@@ -9,12 +9,15 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -237,7 +240,7 @@ fun HelpScreen(navController: NavController) {
                 onTopicClick = { topic -> selectedTopicId = topic.id },
                 safeClick = ::safeClick,
                 style = helpStyle,
-                modifier = Modifier.padding(padding)
+                modifier = Modifier.padding(top = padding.calculateTopPadding())
             )
         } else {
             HelpTopicDetail(
@@ -245,7 +248,7 @@ fun HelpScreen(navController: NavController) {
                 onBackToSummary = { safeClick { selectedTopicId = null } },
                 safeClick = ::safeClick,
                 style = helpStyle,
-                modifier = Modifier.padding(padding)
+                modifier = Modifier.padding(top = padding.calculateTopPadding())
             )
         }
     }
@@ -295,9 +298,13 @@ private fun HelpSummary(
         state = listState,
         modifier = modifier
             .fillMaxSize()
-            .navigationBarsPadding()
-            .helpFadingEdge(listState),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp),
+            .nearEmittersFadingEdge(listState),
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            top = 20.dp,
+            end = 20.dp,
+            bottom = 20.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        ),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         item {
@@ -450,9 +457,13 @@ private fun HelpTopicDetail(
         state = listState,
         modifier = modifier
             .fillMaxSize()
-            .navigationBarsPadding()
-            .helpFadingEdge(listState),
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(20.dp),
+            .nearEmittersFadingEdge(listState),
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            top = 20.dp,
+            end = 20.dp,
+            bottom = 20.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        ),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         item {
@@ -812,39 +823,48 @@ private fun helpVisualBlocks(visual: HelpVisual, compact: Boolean): List<HelpVis
     }
 }
 
-private fun Modifier.helpFadingEdge(listState: LazyListState): Modifier {
+private fun Modifier.nearEmittersFadingEdge(lazyListState: LazyListState): Modifier {
     if (!AppConfig.isBlurEnabled.value) return this
+
     val fadeHeight = 80.dp
-    return graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen).drawWithContent {
-        drawContent()
-        val heightPx = fadeHeight.toPx()
-        val topAlpha = if (listState.firstVisibleItemIndex > 0) {
-            1f
-        } else {
-            (listState.firstVisibleItemScrollOffset / heightPx).coerceIn(0f, 1f)
+
+    return this
+        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
+        .drawWithContent {
+            drawContent()
+            val heightPx = fadeHeight.toPx()
+
+            val isFirstItemVisible = lazyListState.firstVisibleItemIndex == 0
+            val topAlpha = if (!isFirstItemVisible) 1f
+            else (lazyListState.firstVisibleItemScrollOffset.toFloat() / heightPx).coerceIn(0f, 1f)
+
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Black.copy(alpha = 1f - topAlpha),
+                        Color.Black
+                    ),
+                    startY = 0f,
+                    endY = heightPx
+                ),
+                blendMode = BlendMode.DstIn
+            )
+
+            val canScrollForward = lazyListState.canScrollForward
+            val bottomAlpha = if (canScrollForward) 1f else 0f
+
+            drawRect(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.Black,
+                        Color.Black.copy(alpha = 1f - bottomAlpha)
+                    ),
+                    startY = size.height - heightPx,
+                    endY = size.height
+                ),
+                blendMode = BlendMode.DstIn
+            )
         }
-        drawRect(
-            Brush.verticalGradient(
-                listOf(Color.Black.copy(alpha = 1f - topAlpha), Color.Black),
-                0f,
-                heightPx
-            ),
-            blendMode = BlendMode.DstIn
-        )
-        val hasForwardContent = listState.layoutInfo.visibleItemsInfo.lastOrNull()?.let { lastVisibleItem ->
-            lastVisibleItem.index < listState.layoutInfo.totalItemsCount - 1 ||
-                lastVisibleItem.offset + lastVisibleItem.size > listState.layoutInfo.viewportEndOffset
-        } ?: false
-        val bottomAlpha = if (hasForwardContent) 1f else 0f
-        drawRect(
-            Brush.verticalGradient(
-                listOf(Color.Black, Color.Black.copy(alpha = 1f - bottomAlpha)),
-                size.height - heightPx,
-                size.height
-            ),
-            blendMode = BlendMode.DstIn
-        )
-    }
 }
 
 private fun HelpTopic.matches(query: String): Boolean {

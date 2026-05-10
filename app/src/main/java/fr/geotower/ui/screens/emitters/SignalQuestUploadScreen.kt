@@ -73,6 +73,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
+import fr.geotower.data.upload.SignalQuestUploadQueue
+import fr.geotower.data.upload.SignalQuestUploadRules
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.MapUtils
@@ -144,7 +146,7 @@ fun SignalQuestUploadScreen(
 
     androidx.compose.runtime.LaunchedEffect(Unit) {
         val offlineDir = java.io.File(context.getExternalFilesDir(null), "maps")
-        val files = offlineDir.listFiles { file -> file.extension == "map" } ?: emptyArray()
+        val files = offlineDir.listFiles { file -> file.extension == "map" && file.length() > 0L } ?: emptyArray()
         mapFiles = files
 
         // Si hors-ligne ET présence de fichiers : on bascule.
@@ -155,11 +157,11 @@ fun SignalQuestUploadScreen(
 
     // --- 1.5 LANCEURS GALERIE ET CAMERA ---
     val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = 10)
+        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = SignalQuestUploadRules.MAX_PHOTOS)
     ) { uris ->
         if (uris.isNotEmpty()) {
             val newUris = uris.map { it.toString() }.filter { !currentUris.contains(it) }
-            val availableSlots = 10 - currentUris.size
+            val availableSlots = SignalQuestUploadRules.MAX_PHOTOS - currentUris.size
             if (availableSlots > 0) {
                 currentUris.addAll(newUris.take(availableSlots))
             }
@@ -178,11 +180,7 @@ fun SignalQuestUploadScreen(
     }
 
     fun createCameraUri(): Uri {
-        val tempFile = java.io.File.createTempFile("sq_camera_${System.currentTimeMillis()}_", ".jpg", context.cacheDir).apply {
-            createNewFile()
-            deleteOnExit()
-        }
-        return androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tempFile)
+        return SignalQuestUploadQueue.createCameraUri(context)
     }
 
     // Thème et couleurs
@@ -263,7 +261,7 @@ fun SignalQuestUploadScreen(
                         Icon(Icons.Default.PhotoCamera, null, modifier = Modifier.size(48.dp), tint = activeColor)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = AppStrings.get("Ajouter des photos", "Add photos", "Adicionar fotos"),
+                            text = AppStrings.addPhotos,
                             color = textColor,
                             fontWeight = FontWeight.Bold
                         )
@@ -298,7 +296,7 @@ fun SignalQuestUploadScreen(
                         }
                     }
 
-                    if (currentUris.size < 10) {
+                    if (currentUris.size < SignalQuestUploadRules.MAX_PHOTOS) {
                         item {
                             Card(
                                 modifier = Modifier
@@ -378,7 +376,7 @@ fun SignalQuestUploadScreen(
                 onDismissRequest = { showImageSourceDialog = false },
                 shape = blockShape,
                 containerColor = surfaceColor,
-                title = { Text(AppStrings.get("Ajouter des photos", "Add photos", "Añadir fotos"), fontWeight = FontWeight.Bold, color = textColor) },
+                title = { Text(AppStrings.addPhotos, fontWeight = FontWeight.Bold, color = textColor) },
                 text = {
                     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         Button(
@@ -396,7 +394,7 @@ fun SignalQuestUploadScreen(
                         ) {
                             Icon(Icons.Default.PhotoCamera, null)
                             Spacer(Modifier.width(8.dp))
-                            Text(AppStrings.get("Appareil photo", "Camera", "Cámara"), fontWeight = FontWeight.Bold)
+                            Text(AppStrings.camera, fontWeight = FontWeight.Bold)
                         }
                         OutlinedButton(
                             onClick = {
@@ -412,7 +410,7 @@ fun SignalQuestUploadScreen(
                         ) {
                             Icon(Icons.Default.PhotoLibrary, null)
                             Spacer(Modifier.width(8.dp))
-                            Text(AppStrings.get("Galerie", "Gallery", "Galería"), fontWeight = FontWeight.Bold)
+                            Text(AppStrings.gallery, fontWeight = FontWeight.Bold)
                         }
                     }
                 },
@@ -491,17 +489,27 @@ fun SignalQuestUploadScreen(
                                     if (effectiveProvider == 4) {
                                         if (mapFiles.isNotEmpty()) {
                                             if (map.tileProvider !is MapsForgeTileProvider) {
-                                                val forgeSource = MapsForgeTileSource.createFromFiles(
-                                                    mapFiles,
-                                                    InternalRenderTheme.OSMARENDER,
-                                                    "osmarender"
-                                                )
-                                                val forgeProvider = MapsForgeTileProvider(
-                                                    org.osmdroid.tileprovider.util.SimpleRegisterReceiver(context),
-                                                    forgeSource,
-                                                    null
-                                                )
-                                                map.tileProvider = forgeProvider
+                                                runCatching {
+                                                    val forgeSource = MapsForgeTileSource.createFromFiles(
+                                                        mapFiles,
+                                                        InternalRenderTheme.OSMARENDER,
+                                                        "osmarender"
+                                                    )
+                                                    val forgeProvider = MapsForgeTileProvider(
+                                                        org.osmdroid.tileprovider.util.SimpleRegisterReceiver(context),
+                                                        forgeSource,
+                                                        null
+                                                    )
+                                                    map.tileProvider = forgeProvider
+                                                }.onFailure {
+                                                    mapFiles = emptyArray()
+                                                    effectiveProvider = 1
+                                                    AppConfig.mapProvider.value = 1
+                                                    if (map.tileProvider is MapsForgeTileProvider) {
+                                                        map.tileProvider = MapTileProviderBasic(context)
+                                                    }
+                                                    runCatching { map.setTileSource(MapUtils.OSM_Source) }
+                                                }
                                             }
                                         } else {
                                             AppConfig.mapProvider.value = 1

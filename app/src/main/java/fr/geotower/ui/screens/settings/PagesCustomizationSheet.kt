@@ -1,5 +1,6 @@
 package fr.geotower.ui.screens.settings
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -177,6 +178,7 @@ fun StartupPageSelectionSheet(
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        BackHandler(onBack = onBack)
         Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
@@ -279,6 +281,13 @@ fun HomeSettingsSheet(
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        BackHandler {
+            if (showHelpPositionSettings) {
+                showHelpPositionSettings = false
+            } else {
+                onBack()
+            }
+        }
         Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             if (showHelpPositionSettings) {
                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -478,7 +487,7 @@ fun DraggableSwitchCard(
                 IconButton(onClick = onSettingsClick) {
                     Icon(
                         imageVector = Icons.Default.Settings,
-                        contentDescription = "Paramètres",
+                        contentDescription = AppStrings.settingsTitle,
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -566,6 +575,7 @@ fun NearbySettingsSheet(
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        BackHandler(onBack = onBack)
         Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
@@ -758,6 +768,7 @@ fun CompassSettingsSheet(
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        BackHandler(onBack = onBack)
         Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
@@ -848,6 +859,7 @@ fun MapSettingsSheet(
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        BackHandler(onBack = onBack)
         Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
@@ -926,15 +938,7 @@ private fun normalizeThroughputBlockOrder(order: List<String>): List<String> {
 
 @Composable
 private fun throughputBlockTitle(blockId: String): String {
-    return when (blockId) {
-        "header" -> AppStrings.get("En-tête du site", "Site header", "Cabeçalho do site")
-        "summary" -> AppStrings.get("Résumé des débits", "Throughput summary", "Resumo dos débitos")
-        "cone" -> AppStrings.get("Distance optimale", "Optimal distance", "Distância ideal")
-        "controls" -> AppStrings.get("Hypothèses et filtres", "Assumptions and filters", "Hipóteses e filtros")
-        "bands" -> AppStrings.get("Fréquences et modulation", "Frequencies and modulation", "Frequências e modulação")
-        "assumptions" -> AppStrings.get("Sources et avertissements", "Sources and warnings", "Fontes e avisos")
-        else -> blockId
-    }
+    return AppStrings.throughputBlockTitle(blockId)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -972,6 +976,7 @@ fun ThroughputCalculatorSettingsSheet(
     val currentOrder by rememberUpdatedState(normalizeThroughputBlockOrder(throughputOrder))
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        BackHandler(onBack = onBack)
         val density = LocalDensity.current
         val cardHeight = 64.dp
         val spacing = 12.dp
@@ -1158,6 +1163,7 @@ fun ThroughputCalculationDefaultsSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        BackHandler(onBack = onBack)
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
@@ -1168,7 +1174,7 @@ fun ThroughputCalculationDefaultsSheet(
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(
-                    AppStrings.get("Réglages de calcul", "Calculation settings", "Definições de cálculo"),
+                    AppStrings.throughputCalculationSettingsTitle,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -1178,7 +1184,7 @@ fun ThroughputCalculationDefaultsSheet(
             }
 
             Text(
-                AppStrings.get("Mode de calcul par défaut", "Default calculation mode", "Modo de cálculo predefinido"),
+                AppStrings.throughputDefaultModeTitle,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
@@ -1202,20 +1208,20 @@ fun ThroughputCalculationDefaultsSheet(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        AppStrings.get("Modulation personnalisée", "Custom modulation", "Modulação personalizada"),
+                        AppStrings.throughputCustomModulationTitle,
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold
                     )
-                    ThroughputDefaultModulationSlider(AppStrings.get("4G descendant", "4G download", "4G download"), lteDownIndex, useOneUi) {
+                    ThroughputDefaultModulationSlider(AppStrings.throughput4gDownloadLabel, lteDownIndex, useOneUi) {
                         saveInt("throughput_custom_lte_down", it) { value -> lteDownIndex = value }
                     }
-                    ThroughputDefaultModulationSlider(AppStrings.get("4G montant", "4G upload", "4G upload"), lteUpIndex, useOneUi) {
+                    ThroughputDefaultModulationSlider(AppStrings.throughput4gUploadLabel, lteUpIndex, useOneUi) {
                         saveInt("throughput_custom_lte_up", it) { value -> lteUpIndex = value }
                     }
-                    ThroughputDefaultModulationSlider(AppStrings.get("5G descendant", "5G download", "5G download"), nrDownIndex, useOneUi) {
+                    ThroughputDefaultModulationSlider(AppStrings.throughput5gDownloadLabel, nrDownIndex, useOneUi) {
                         saveInt("throughput_custom_nr_down", it) { value -> nrDownIndex = value }
                     }
-                    ThroughputDefaultModulationSlider(AppStrings.get("5G montant", "5G upload", "5G upload"), nrUpIndex, useOneUi) {
+                    ThroughputDefaultModulationSlider(AppStrings.throughput5gUploadLabel, nrUpIndex, useOneUi) {
                         saveInt("throughput_custom_nr_up", it) { value -> nrUpIndex = value }
                     }
                 }
@@ -1225,15 +1231,15 @@ fun ThroughputCalculationDefaultsSheet(
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
             Spacer(Modifier.height(12.dp))
 
-            SimpleSwitchCard(AppStrings.get("Inclure la 4G", "Include 4G", "Incluir 4G"), include4G, { saveBool("throughput_include_4g", it) { value -> include4G = value } }, shape, border, bubbleColor, useOneUi)
+            SimpleSwitchCard(AppStrings.throughputInclude4g, include4G, { saveBool("throughput_include_4g", it) { value -> include4G = value } }, shape, border, bubbleColor, useOneUi)
             Spacer(Modifier.height(8.dp))
-            SimpleSwitchCard(AppStrings.get("Inclure la 5G", "Include 5G", "Incluir 5G"), include5G, { saveBool("throughput_include_5g", it) { value -> include5G = value } }, shape, border, bubbleColor, useOneUi)
+            SimpleSwitchCard(AppStrings.throughputInclude5g, include5G, { saveBool("throughput_include_5g", it) { value -> include5G = value } }, shape, border, bubbleColor, useOneUi)
             Spacer(Modifier.height(8.dp))
-            SimpleSwitchCard(AppStrings.get("Inclure les projets", "Include planned", "Incluir projetos"), includePlanned, { saveBool("throughput_include_planned", it) { value -> includePlanned = value } }, shape, border, bubbleColor, useOneUi)
+            SimpleSwitchCard(AppStrings.throughputIncludePlanned, includePlanned, { saveBool("throughput_include_planned", it) { value -> includePlanned = value } }, shape, border, bubbleColor, useOneUi)
 
             Spacer(Modifier.height(20.dp))
             Text(
-                AppStrings.get("Bandes de fréquences par défaut", "Default frequency bands", "Bandas de frequência predefinidas"),
+                AppStrings.throughputDefaultFrequencyBandsTitle,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
@@ -1375,10 +1381,10 @@ private data class ThroughputBandDefault(
 private val throughputModulationLabels = listOf("QPSK", "16-QAM", "64-QAM", "256-QAM")
 
 private val throughputPresetDefaults = listOf(
-    ThroughputPresetDefault("conservative") { AppStrings.get("Prudent", "Conservative", "Prudente") },
-    ThroughputPresetDefault("standard") { AppStrings.get("Standard", "Standard", "Padrão") },
-    ThroughputPresetDefault("ideal") { AppStrings.get("Idéal", "Ideal", "Ideal") },
-    ThroughputPresetDefault("custom") { AppStrings.get("Personnalisé", "Custom", "Personalizado") }
+    ThroughputPresetDefault("conservative") { AppStrings.throughputPresetLabel("conservative") },
+    ThroughputPresetDefault("standard") { AppStrings.throughputPresetLabel("standard") },
+    ThroughputPresetDefault("ideal") { AppStrings.throughputPresetLabel("ideal") },
+    ThroughputPresetDefault("custom") { AppStrings.throughputPresetLabel("custom") }
 )
 
 private val throughputBandDefaults = listOf(
@@ -1436,6 +1442,7 @@ fun SupportSettingsSheet(
             }
         }
     ) {
+        BackHandler(onBack = onBack)
         Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
@@ -1564,6 +1571,7 @@ fun SiteSettingsSheet(
             }
         }
     ) {
+        BackHandler(onBack = onBack)
         val scrollState = rememberScrollState()
 
         Column(
@@ -1721,6 +1729,7 @@ fun SiteFreqFiltersSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface) {
+        BackHandler(onBack = onBack)
         Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp, top = 8.dp),
@@ -2023,6 +2032,7 @@ fun SitePhotosSettingsSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface) {
+        BackHandler(onBack = onBack)
         Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp, top = 8.dp),

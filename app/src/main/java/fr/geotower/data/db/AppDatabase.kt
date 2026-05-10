@@ -19,7 +19,7 @@ import fr.geotower.data.models.TechniqueEntity
         // ✅ ON A SUPPRIMÉ METADATA ICI !
     ],
     version = 1,
-    exportSchema = false
+    exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
 
@@ -32,13 +32,32 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
+                val appContext = context.applicationContext
+                // Keep the hot path cheap: the full integrity check is done on download/splash/settings.
+                // Here we only prevent Room from creating an empty replacement when geotower.db is absent.
+                val fileStatus = GeoTowerDatabaseValidator.getInstalledDatabaseFileStatus(appContext)
+                if (fileStatus.state != GeoTowerDatabaseValidator.LocalDatabaseState.VALID) {
+                    closeDatabase()
+                    throw InvalidGeoTowerDatabaseException(fileStatus.reason ?: "Base GeoTower absente")
+                }
+
                 val instance = Room.databaseBuilder(
-                    context.applicationContext,
+                    appContext,
                     AppDatabase::class.java,
                     "geotower.db" // ⚠️ TRÈS IMPORTANT : C'est le nom exact du fichier téléchargé
                 )
-                    .fallbackToDestructiveMigration()
                     .build()
+                try {
+                    instance.openHelper.readableDatabase
+                    GeoTowerDatabaseValidator.clearInstalledDatabaseInvalid(appContext)
+                } catch (e: Exception) {
+                    instance.close()
+                    GeoTowerDatabaseValidator.markInstalledDatabaseInvalid(
+                        appContext,
+                        e.message ?: "Schema Room incompatible"
+                    )
+                    throw InvalidGeoTowerDatabaseException("Schema Room incompatible avec geotower.db", e)
+                }
                 INSTANCE = instance
                 instance
             }
@@ -51,3 +70,8 @@ abstract class AppDatabase : RoomDatabase() {
         }
     }
 }
+
+class InvalidGeoTowerDatabaseException(
+    message: String,
+    cause: Throwable? = null
+) : IllegalStateException(message, cause)

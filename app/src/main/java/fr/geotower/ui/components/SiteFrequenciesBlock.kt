@@ -147,16 +147,59 @@ fun SiteFrequenciesBlock(
                         modifier = Modifier.fillMaxWidth().padding(bottom = if (index == parsedBands.lastIndex) 0.dp else 12.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
-                            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                                 // ✅ NOUVEAU : Formatage propre "4G 700" ici aussi
-                                val technoName = displayFrequencyBandLabel(band)
+                                val bandCode = bandEquivalentLabel(band.gen, band.value)
+                                val mainBandLabel = if (band.gen in 2..5 && band.value > 0) {
+                                    "${band.gen}G ${band.value} MHz"
+                                } else {
+                                    band.rawFreq.substringBefore(":").trim().ifBlank { band.rawFreq }
+                                }
 
-                                Text(
-                                    text = "• $technoName",
-                                    fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface,
-                                    fontSize = 12.sp,
-                                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis, modifier = Modifier.weight(1f)
-                                )
+                                if (band.gen in 2..5 && band.value > 0) {
+                                Row(
+                                    verticalAlignment = Alignment.Top,
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = "• ",
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontSize = 12.sp,
+                                        maxLines = 1
+                                    )
+                                    Column {
+                                        Text(
+                                            text = mainBandLabel,
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = MaterialTheme.colorScheme.onSurface,
+                                            fontSize = 12.sp,
+                                            maxLines = 1,
+                                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                        )
+                                        if (bandCode != null) {
+                                            Text(
+                                                text = "($bandCode)",
+                                                fontWeight = FontWeight.SemiBold,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                fontSize = 12.sp,
+                                                lineHeight = 14.sp,
+                                                maxLines = 1
+                                            )
+                                        }
+                                    }
+                                }
+                                } else {
+                                    Text(
+                                        text = "• ${band.rawFreq.substringBefore(":").trim().ifBlank { band.rawFreq }}",
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        fontSize = 12.sp,
+                                        maxLines = 1,
+                                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                }
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(

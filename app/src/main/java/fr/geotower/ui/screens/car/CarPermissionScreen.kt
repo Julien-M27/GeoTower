@@ -7,17 +7,18 @@ import androidx.car.app.model.Action
 import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Template
 import fr.geotower.MainActivity
+import fr.geotower.utils.AppStrings
 
 class CarPermissionScreen(carContext: CarContext) : Screen(carContext) {
     override fun onGetTemplate(): Template {
         return MessageTemplate.Builder(
-            "GeoTower a besoin de la localisation pour afficher les sites autour de vous."
+            AppStrings.carPermissionExplanation(carContext)
         )
-            .setTitle("Localisation requise")
+            .setTitle(AppStrings.carLocationRequired(carContext))
             .setHeaderAction(Action.BACK)
             .addAction(
                 Action.Builder()
-                    .setTitle("Ouvrir l'app")
+                    .setTitle(AppStrings.carOpenApp(carContext))
                     .setOnClickListener { openPhoneApp() }
                     .build()
             )

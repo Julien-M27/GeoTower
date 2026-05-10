@@ -1,8 +1,15 @@
 package fr.geotower.ui.screens.emitters
 
+import android.Manifest
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
+import android.location.Location
+import android.location.LocationManager
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
@@ -29,9 +36,13 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.WifiTethering
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
@@ -43,6 +54,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -51,6 +63,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -69,7 +82,10 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
+import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.Priority
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
@@ -98,15 +114,21 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
+import kotlin.math.sqrt
 import kotlin.math.tan
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 
 private const val USER_DEVICE_HEIGHT_METERS = 1.5
 private const val NOMINAL_DOWNTILT_DEGREES = 6.0
 private const val MIN_DOWNTILT_DEGREES = 4.0
 private const val MAX_DOWNTILT_DEGREES = 8.0
+private const val PANEL_AZIMUTH_HALF_BEAM_DEGREES = 45.0
 private const val MAX_FR_UPLINK_AGGREGATED_CARRIERS = 2
+private val LTE_LOW_BAND_MHZ = setOf(700, 800, 900)
 private const val THROUGHPUT_BLOCK_ORDER_PREF = "page_throughput_order"
 private const val DEFAULT_THROUGHPUT_BLOCK_ORDER = "header,summary,cone,controls,bands,assumptions"
 
@@ -154,9 +176,48 @@ fun ThroughputCalculatorScreen(
                 lteDownIndex = prefs.getInt("throughput_custom_lte_down", 3).coerceIn(0, lteDownModulationOptions.lastIndex),
                 lteUpIndex = prefs.getInt("throughput_custom_lte_up", 2).coerceIn(0, lteUpModulationOptions.lastIndex),
                 nrDownIndex = prefs.getInt("throughput_custom_nr_down", 3).coerceIn(0, nrDownModulationOptions.lastIndex),
-                nrUpIndex = prefs.getInt("throughput_custom_nr_up", 2).coerceIn(0, nrUpModulationOptions.lastIndex)
+                nrUpIndex = prefs.getInt("throughput_custom_nr_up", 2).coerceIn(0, nrUpModulationOptions.lastIndex),
+                lteRsrpDbm = prefs.getFloat("throughput_custom_lte_rsrp", -95f),
+                lteSinrDb = prefs.getFloat("throughput_custom_lte_sinr", 15f),
+                nrRsrpDbm = prefs.getFloat("throughput_custom_nr_rsrp", -92f),
+                nrSinrDb = prefs.getFloat("throughput_custom_nr_sinr", 18f),
+                environment = radioEnvironmentFromPreference(prefs.getString("throughput_custom_environment", null)),
+                positionScenario = positionScenarioFromPreference(prefs.getString("throughput_custom_position", null)),
+                networkLoad = networkLoadFromPreference(prefs.getString("throughput_custom_network_load", null)),
+                backhaul = backhaulQualityFromPreference(prefs.getString("throughput_custom_backhaul", null)),
+                lteAggregation = lteAggregationModeFromPreference(prefs.getString("throughput_custom_lte_aggregation", null)),
+                selectedLatitude = prefs.getString("throughput_custom_selected_lat", null)?.toDoubleOrNull(),
+                selectedLongitude = prefs.getString("throughput_custom_selected_lon", null)?.toDoubleOrNull()
             )
         )
+    }
+    fun updateCustomSettings(newSettings: CustomModulationSettings) {
+        customSettings = newSettings
+        val editor = prefs.edit()
+            .putInt("throughput_custom_lte_down", newSettings.lteDownIndex)
+            .putInt("throughput_custom_lte_up", newSettings.lteUpIndex)
+            .putInt("throughput_custom_nr_down", newSettings.nrDownIndex)
+            .putInt("throughput_custom_nr_up", newSettings.nrUpIndex)
+            .putFloat("throughput_custom_lte_rsrp", newSettings.lteRsrpDbm)
+            .putFloat("throughput_custom_lte_sinr", newSettings.lteSinrDb)
+            .putFloat("throughput_custom_nr_rsrp", newSettings.nrRsrpDbm)
+            .putFloat("throughput_custom_nr_sinr", newSettings.nrSinrDb)
+            .putString("throughput_custom_environment", newSettings.environment.id)
+            .putString("throughput_custom_position", newSettings.positionScenario.id)
+            .putString("throughput_custom_network_load", newSettings.networkLoad.id)
+            .putString("throughput_custom_backhaul", newSettings.backhaul.id)
+            .putString("throughput_custom_lte_aggregation", newSettings.lteAggregation.id)
+            .remove("throughput_custom_device")
+        if (newSettings.selectedLatitude != null && newSettings.selectedLongitude != null) {
+            editor
+                .putString("throughput_custom_selected_lat", newSettings.selectedLatitude.toString())
+                .putString("throughput_custom_selected_lon", newSettings.selectedLongitude.toString())
+        } else {
+            editor
+                .remove("throughput_custom_selected_lat")
+                .remove("throughput_custom_selected_lon")
+        }
+        editor.apply()
     }
     var enabledBandKeys by remember(antennaId) { mutableStateOf<Set<String>>(emptySet()) }
     var bandKeysInitialized by remember(antennaId) { mutableStateOf(false) }
@@ -293,7 +354,7 @@ fun ThroughputCalculatorScreen(
                 selectedPreset = selectedPreset,
                 onPresetChange = { selectedPreset = it },
                 customSettings = customSettings,
-                onCustomSettingsChange = { customSettings = it },
+                onCustomSettingsChange = ::updateCustomSettings,
                 useOneUi = useOneUiDesign,
                 include4G = include4G,
                 onInclude4GChange = { include4G = it },
@@ -391,7 +452,14 @@ private fun ThroughputContent(
             when (block) {
                 ThroughputBlock.Header -> ThroughputHeaderCard(site, physique, cardBgColor, blockShape)
                 ThroughputBlock.Summary -> ThroughputSummaryCard(result, cardBgColor, blockShape)
-                ThroughputBlock.Cone -> ThroughputConeCard(site, result, cardBgColor, blockShape)
+                ThroughputBlock.Cone -> ThroughputConeCard(
+                    site = site,
+                    result = result,
+                    cardBgColor = cardBgColor,
+                    blockShape = blockShape,
+                    customSettings = customSettings,
+                    onCustomSettingsChange = onCustomSettingsChange
+                )
                 ThroughputBlock.Controls -> ThroughputControlsCard(
                     cardBgColor = cardBgColor,
                     blockShape = blockShape,
@@ -458,11 +526,7 @@ private fun ThroughputHeaderCard(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = AppStrings.get(
-                        "Site ${site.idAnfr}${supportHeightLabel?.let { " - support $it" } ?: ""}",
-                        "Site ${site.idAnfr}${supportHeightLabel?.let { " - support $it" } ?: ""}",
-                        "Site ${site.idAnfr}${supportHeightLabel?.let { " - suporte $it" } ?: ""}"
-                    ),
+                    text = AppStrings.throughputHeaderSite(site.idAnfr, supportHeightLabel),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -505,7 +569,7 @@ private fun ThroughputSummaryCard(result: ThroughputResult, cardBgColor: Color, 
                 Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = AppStrings.get("Débit radio théorique estimé", "Estimated theoretical radio throughput", "Débito rádio teórico estimado"),
+                    text = AppStrings.throughputEstimatedRadioTitle,
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -513,31 +577,23 @@ private fun ThroughputSummaryCard(result: ThroughputResult, cardBgColor: Color, 
             }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                 ThroughputMetric(
-                    label = AppStrings.get("Descendant", "Download", "Download"),
+                    label = AppStrings.throughputDownloadLabel,
                     value = formatThroughput(result.totalDownMbps),
                     modifier = Modifier.weight(1f)
                 )
                 ThroughputMetric(
-                    label = AppStrings.get("Montant (téléphone)", "Upload (phone)", "Upload (telemóvel)"),
+                    label = AppStrings.throughputPhoneUploadLabel,
                     value = formatThroughput(result.totalUpMbps),
                     modifier = Modifier.weight(1f)
                 )
             }
             Text(
-                text = AppStrings.get(
-                    "Le montant est pondéré côté terminal : puissance plus faible, moins de MIMO et modulation souvent plus basse qu'en descendant.",
-                    "Upload is weighted for a handset: lower transmit power, less MIMO and usually lower modulation than download.",
-                    "O upload é ponderado para o telemóvel: menor potência de emissão, menos MIMO e modulação geralmente inferior ao download."
-                ),
+                text = AppStrings.throughputSummaryUploadNote,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = AppStrings.get(
-                    "${result.includedBands.size} bande(s) incluse(s) sur ${result.bands.size}",
-                    "${result.includedBands.size} band(s) included out of ${result.bands.size}",
-                    "${result.includedBands.size} banda(s) incluída(s) de ${result.bands.size}"
-                ),
+                text = AppStrings.throughputIncludedBandsCount(result.includedBands.size, result.bands.size),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -558,26 +614,127 @@ private fun ThroughputConeCard(
     site: LocalisationEntity,
     result: ThroughputResult,
     cardBgColor: Color,
-    blockShape: Shape
+    blockShape: Shape,
+    customSettings: CustomModulationSettings? = null,
+    onCustomSettingsChange: ((CustomModulationSettings) -> Unit)? = null
 ) {
     val coneDistance = result.coneDistance
-    val coneMapOverlay = remember(site, result) { buildConeOverlayData(site, result) }
+    val selectedMapPoint = customSettings?.let { settings ->
+        val latitude = settings.selectedLatitude
+        val longitude = settings.selectedLongitude
+        if (latitude != null && longitude != null) MapPoint(latitude, longitude) else null
+    }
+    val hasPositionCorrection = customSettings?.let { settings ->
+        settings.positionScenario != PositionScenario.Unknown ||
+            (settings.selectedLatitude != null && settings.selectedLongitude != null)
+    } == true
+    val coneMapOverlay = remember(site, result, selectedMapPoint) {
+        buildConeOverlayData(site, result, selectedMapPoint)
+    }
+    val selectedPositionAnalysis = remember(site, result, selectedMapPoint) {
+        selectedMapPoint?.let { analyzePosition(site, result, it.latitude, it.longitude) }
+    }
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+    var isChoosingPoint by remember { mutableStateOf(false) }
+    var isResolvingPosition by remember { mutableStateOf(false) }
+    var positionStatusMessage by remember { mutableStateOf<String?>(null) }
+    var mapFitRequest by remember { mutableStateOf(0) }
+    val currentPositionAppliedText = AppStrings.throughputPositionCurrentApplied
+    val mapPointAppliedText = AppStrings.throughputPositionMapPointApplied
+    val permissionDeniedText = AppStrings.throughputPositionPermissionDenied
+    val unavailableText = AppStrings.throughputPositionUnavailable
+    val tapMapText = AppStrings.throughputTapMapToChoose
+    val locatingText = AppStrings.throughputPositionLocating
+    val pureTheoreticalText = AppStrings.throughputPositionCleared
+
+    fun applySelectedPosition(
+        latitude: Double,
+        longitude: Double,
+        statusMessage: String,
+        fitMapToSelection: Boolean
+    ) {
+        if (customSettings == null || onCustomSettingsChange == null) return
+        val analysis = analyzePosition(site, result, latitude, longitude)
+        onCustomSettingsChange(
+            customSettings.copy(
+                positionScenario = analysis.scenario,
+                selectedLatitude = latitude,
+                selectedLongitude = longitude
+            )
+        )
+        isChoosingPoint = false
+        positionStatusMessage = statusMessage
+        if (fitMapToSelection) {
+            mapFitRequest += 1
+        }
+    }
+
+    fun resolveCurrentPosition() {
+        coroutineScope.launch {
+            isResolvingPosition = true
+            val location = loadCurrentThroughputLocation(context)
+            if (location != null) {
+                applySelectedPosition(
+                    latitude = location.latitude,
+                    longitude = location.longitude,
+                    statusMessage = currentPositionAppliedText,
+                    fitMapToSelection = true
+                )
+            } else {
+                positionStatusMessage = unavailableText
+            }
+            isResolvingPosition = false
+        }
+    }
+
+    fun clearSelectedPosition() {
+        if (customSettings == null || onCustomSettingsChange == null) return
+        onCustomSettingsChange(
+            customSettings.copy(
+                positionScenario = PositionScenario.Unknown,
+                selectedLatitude = null,
+                selectedLongitude = null
+            )
+        )
+        isChoosingPoint = false
+        positionStatusMessage = pureTheoreticalText
+    }
+
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { grants ->
+        if (grants.values.any { it }) {
+            resolveCurrentPosition()
+        } else {
+            positionStatusMessage = permissionDeniedText
+        }
+    }
+
+    fun handleUseCurrentPosition() {
+        if (hasThroughputLocationPermission(context)) {
+            resolveCurrentPosition()
+        } else {
+            locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+        }
+    }
 
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text = AppStrings.get("Distance optimale estimée", "Estimated optimal distance", "Distância ótima estimada"),
+                text = AppStrings.throughputEstimatedOptimalDistanceTitle,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             if (coneDistance == null) {
                 Text(
-                    text = AppStrings.get(
-                        "Hauteur de panneau/support indisponible : impossible d'estimer la zone principale du cône.",
-                        "Panel/support height unavailable: unable to estimate the main cone zone.",
-                        "Altura do painel/suporte indisponível: não é possível estimar a zona principal do cone."
-                    ),
+                    text = AppStrings.throughputConeHeightUnavailable,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -589,25 +746,100 @@ private fun ThroughputConeCard(
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = AppStrings.get(
-                        "Zone principale estimée : ${formatDistanceMeters(coneDistance.nearMeters)} à ${formatDistanceMeters(coneDistance.farMeters)}",
-                        "Estimated main zone: ${formatDistanceMeters(coneDistance.nearMeters)} to ${formatDistanceMeters(coneDistance.farMeters)}",
-                        "Zona principal estimada: ${formatDistanceMeters(coneDistance.nearMeters)} a ${formatDistanceMeters(coneDistance.farMeters)}"
+                    text = AppStrings.throughputMainZoneEstimated(
+                        formatDistanceMeters(coneDistance.nearMeters),
+                        formatDistanceMeters(coneDistance.farMeters)
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = AppStrings.get(
-                        "Hypothèse : hauteur panneau/support, mobile à 1,5 m, tilt vertical typique 4°-8° avec un point nominal à 6°.",
-                        "Assumption: panel/support height, handset at 1.5 m, typical vertical tilt 4°-8° with a 6° nominal point.",
-                        "Hipótese: altura do painel/suporte, telemóvel a 1,5 m, tilt vertical típico 4°-8° com ponto nominal a 6°."
-                    ),
+                    text = AppStrings.throughputConeAssumption,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (coneMapOverlay != null) {
                     Spacer(Modifier.height(4.dp))
+                    if (customSettings != null && onCustomSettingsChange != null) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                        Text(
+                            text = AppStrings.throughputCustomPositionTitle,
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Button(
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !isResolvingPosition,
+                                onClick = { handleUseCurrentPosition() }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.MyLocation,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(if (isResolvingPosition) locatingText else AppStrings.throughputUseCurrentPosition)
+                            }
+                            OutlinedButton(
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = {
+                                    isChoosingPoint = true
+                                    positionStatusMessage = tapMapText
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Map,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(AppStrings.throughputChooseMapPoint)
+                            }
+                            if (hasPositionCorrection) {
+                                OutlinedButton(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    onClick = { clearSelectedPosition() }
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(AppStrings.throughputClearPosition)
+                                }
+                            }
+                        }
+                        positionStatusMessage?.let { message ->
+                            Text(
+                                text = message,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (isChoosingPoint) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                }
+                            )
+                        }
+                        PositionAnalysisSummary(
+                            analysis = selectedPositionAnalysis,
+                            scenario = customSettings.positionScenario
+                        )
+                    }
+                    val mapTapHandler = if (customSettings != null && onCustomSettingsChange != null && isChoosingPoint) {
+                        { latitude: Double, longitude: Double ->
+                            applySelectedPosition(
+                                latitude = latitude,
+                                longitude = longitude,
+                                statusMessage = mapPointAppliedText,
+                                fitMapToSelection = false
+                            )
+                        }
+                    } else {
+                        null
+                    }
                     SharedMiniMapCard(
                         modifier = Modifier.fillMaxWidth(),
                         centerLat = site.latitude,
@@ -618,20 +850,91 @@ private fun ThroughputConeCard(
                         onMapReady = {},
                         focusOperator = site.operateur,
                         coneOverlay = coneMapOverlay,
-                        initialZoom = mapZoomForCone(coneDistance.centerMeters)
+                        initialZoom = mapZoomForCone(coneDistance.centerMeters),
+                        onMapTap = mapTapHandler,
+                        allowGestures = customSettings != null,
+                        fitSelectedPointRequest = mapFitRequest
                     )
                     Text(
-                        text = AppStrings.get(
-                            "Le cercle marque la distance optimale, les points indiquent les axes de panneau où le signal devrait être le plus fort.",
-                            "The circle marks the optimal distance; dots show panel axes where signal should be strongest.",
-                            "O círculo marca a distância ótima; os pontos mostram os eixos de painel onde o sinal deve ser mais forte."
-                        ),
+                        text = AppStrings.throughputConeMapExplanation,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PositionAnalysisSummary(
+    analysis: PositionAnalysis?,
+    scenario: PositionScenario
+) {
+    if (analysis == null) {
+        Text(
+            text = AppStrings.throughputPositionNoSelection,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = AppStrings.throughputCustomSelectedPosition(
+                AppStrings.throughputPositionScenarioLabel(scenario.id)
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
+
+    val nearestAzimuth = analysis.nearestAzimuthDegrees?.let { formatDegrees(it) }
+    val deltaDegrees = analysis.azimuthDeltaDegrees?.roundToInt()
+    val azimuthText = when (analysis.isInsideAzimuth) {
+        true -> AppStrings.throughputPositionAzimuthInside(
+            nearestAzimuth.orEmpty(),
+            deltaDegrees ?: 0
+        )
+        false -> AppStrings.throughputPositionAzimuthOutside(
+            nearestAzimuth.orEmpty(),
+            deltaDegrees ?: 0
+        )
+        null -> AppStrings.throughputPositionAzimuthUnknown
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            text = AppStrings.throughputCustomSelectedPosition(
+                AppStrings.throughputPositionScenarioLabel(analysis.scenario.id)
+            ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold
+        )
+        Text(
+            text = AppStrings.throughputPositionDistance(formatDistanceMeters(analysis.distanceMeters)),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        Text(
+            text = azimuthText,
+            style = MaterialTheme.typography.bodySmall,
+            color = if (analysis.isInsideAzimuth == false) {
+                MaterialTheme.colorScheme.error
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        )
+        Text(
+            text = analysis.coneDistance?.let { cone ->
+                AppStrings.throughputPositionCone(
+                    center = formatDistanceMeters(cone.centerMeters),
+                    near = formatDistanceMeters(cone.nearMeters),
+                    far = formatDistanceMeters(cone.farMeters)
+                )
+            } ?: AppStrings.throughputPositionConeUnavailable,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -657,7 +960,7 @@ private fun ThroughputControlsCard(
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
-                text = AppStrings.get("Hypothèse radio", "Radio assumption", "Hipótese rádio"),
+                text = AppStrings.throughputRadioAssumption,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -694,13 +997,13 @@ private fun ThroughputControlsCard(
                 FilterChip(
                     selected = includePlanned,
                     onClick = { onIncludePlannedChange(!includePlanned) },
-                    label = { Text(AppStrings.get("Inclure les projets", "Include planned", "Incluir projetos")) }
+                    label = { Text(AppStrings.throughputIncludePlanned) }
                 )
             }
             if (bands.isNotEmpty()) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                 Text(
-                    text = AppStrings.get("Bandes incluses", "Included bands", "Bandas incluidas"),
+                    text = AppStrings.throughputIncludedBandsTitle,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -727,39 +1030,324 @@ private fun CustomModulationControls(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            text = AppStrings.get("Modulation personnalisée", "Custom modulation", "Modulação personalizada"),
+            text = AppStrings.throughputCustomModulationTitle,
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
         ModulationSlider(
-            label = AppStrings.get("4G descendant", "4G download", "4G download"),
+            label = AppStrings.throughput4gDownloadLabel,
             options = lteDownModulationOptions,
             selectedIndex = settings.lteDownIndex,
             onSelectedIndexChange = { onSettingsChange(settings.copy(lteDownIndex = it)) },
             useOneUi = useOneUi
         )
         ModulationSlider(
-            label = AppStrings.get("4G montant", "4G upload", "4G upload"),
+            label = AppStrings.throughput4gUploadLabel,
             options = lteUpModulationOptions,
             selectedIndex = settings.lteUpIndex,
             onSelectedIndexChange = { onSettingsChange(settings.copy(lteUpIndex = it)) },
             useOneUi = useOneUi
         )
         ModulationSlider(
-            label = AppStrings.get("5G descendant", "5G download", "5G download"),
+            label = AppStrings.throughput5gDownloadLabel,
             options = nrDownModulationOptions,
             selectedIndex = settings.nrDownIndex,
             onSelectedIndexChange = { onSettingsChange(settings.copy(nrDownIndex = it)) },
             useOneUi = useOneUi
         )
         ModulationSlider(
-            label = AppStrings.get("5G montant", "5G upload", "5G upload"),
+            label = AppStrings.throughput5gUploadLabel,
             options = nrUpModulationOptions,
             selectedIndex = settings.nrUpIndex,
             onSelectedIndexChange = { onSettingsChange(settings.copy(nrUpIndex = it)) },
             useOneUi = useOneUi
         )
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+
+        Text(
+            text = AppStrings.throughputCustomSignalTitle,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = AppStrings.throughputCustomSignalDesc,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        SignalSlider(
+            label = "RSRP 4G",
+            value = settings.lteRsrpDbm,
+            valueRange = -125f..-60f,
+            steps = 64,
+            unit = "dBm",
+            useOneUi = useOneUi,
+            onValueChange = { onSettingsChange(settings.copy(lteRsrpDbm = it)) }
+        )
+        SignalSlider(
+            label = "SNR/SINR 4G",
+            value = settings.lteSinrDb,
+            valueRange = -10f..35f,
+            steps = 44,
+            unit = "dB",
+            useOneUi = useOneUi,
+            onValueChange = { onSettingsChange(settings.copy(lteSinrDb = it)) }
+        )
+        SignalSlider(
+            label = "SS-RSRP 5G",
+            value = settings.nrRsrpDbm,
+            valueRange = -125f..-60f,
+            steps = 64,
+            unit = "dBm",
+            useOneUi = useOneUi,
+            onValueChange = { onSettingsChange(settings.copy(nrRsrpDbm = it)) }
+        )
+        SignalSlider(
+            label = "SS-SINR 5G",
+            value = settings.nrSinrDb,
+            valueRange = -10f..40f,
+            steps = 49,
+            unit = "dB",
+            useOneUi = useOneUi,
+            onValueChange = { onSettingsChange(settings.copy(nrSinrDb = it)) }
+        )
+
+        CustomChoiceRow(
+            title = AppStrings.throughputCustomEnvironmentTitle,
+            selectedId = settings.environment.id,
+            options = RadioEnvironment.entries.map { it.id },
+            optionLabel = { AppStrings.throughputEnvironmentLabel(it) },
+            onSelect = { onSettingsChange(settings.copy(environment = radioEnvironmentFromPreference(it))) }
+        )
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+
+        Text(
+            text = AppStrings.throughputCustomTerminalTitle,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = AppStrings.throughputCustomTerminalDesc,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        CustomChoiceRow(
+            title = AppStrings.throughputCustomNetworkLoadTitle,
+            selectedId = settings.networkLoad.id,
+            options = NetworkLoad.entries.map { it.id },
+            optionLabel = { AppStrings.throughputNetworkLoadLabel(it) },
+            onSelect = { onSettingsChange(settings.copy(networkLoad = networkLoadFromPreference(it))) }
+        )
+        CustomChoiceRow(
+            title = AppStrings.throughputCustomBackhaulTitle,
+            selectedId = settings.backhaul.id,
+            options = BackhaulQuality.entries.map { it.id },
+            optionLabel = { AppStrings.throughputBackhaulLabel(it) },
+            onSelect = { onSettingsChange(settings.copy(backhaul = backhaulQualityFromPreference(it))) }
+        )
+        CustomChoiceRow(
+            title = AppStrings.throughputCustomAggregationTitle,
+            selectedId = settings.lteAggregation.id,
+            options = LteAggregationMode.entries.map { it.id },
+            optionLabel = { AppStrings.throughputLteAggregationLabel(it) },
+            onSelect = { onSettingsChange(settings.copy(lteAggregation = lteAggregationModeFromPreference(it))) }
+        )
+
+        val lteImpact = (customThroughputMultipliers(4, settings).down * 100).roundToInt()
+        val nrImpact = (customThroughputMultipliers(5, settings).down * 100).roundToInt()
+        Text(
+            text = AppStrings.throughputCustomImpact(lteImpact, nrImpact),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold
+        )
+        CustomCalculationExplanation(
+            settings = settings,
+            lteImpactPercent = lteImpact,
+            nrImpactPercent = nrImpact
+        )
+    }
+}
+
+@Composable
+private fun CustomCalculationExplanation(
+    settings: CustomModulationSettings,
+    lteImpactPercent: Int,
+    nrImpactPercent: Int
+) {
+    val maxLteCarriers = settings.lteAggregation.maxLteCarriers
+
+    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(
+            text = AppStrings.throughputCustomExplanationTitle,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        CustomExplanationLine(
+            title = AppStrings.throughputCustomExplanationModulationTitle,
+            description = AppStrings.throughputCustomExplanationModulationDesc
+        )
+        CustomExplanationLine(
+            title = AppStrings.throughputCustomSignalTitle,
+            description = AppStrings.throughputCustomExplanationSignalDesc(lteImpactPercent, nrImpactPercent)
+        )
+        CustomExplanationLine(
+            title = AppStrings.throughputCustomEnvironmentTitle,
+            description = AppStrings.throughputCustomExplanationEnvironmentDesc
+        )
+        CustomExplanationLine(
+            title = AppStrings.throughputCustomPositionTitle,
+            description = AppStrings.throughputCustomExplanationPositionDesc
+        )
+        CustomExplanationLine(
+            title = AppStrings.throughputCustomNetworkLoadTitle,
+            description = AppStrings.throughputCustomExplanationNetworkLoadDesc
+        )
+        CustomExplanationLine(
+            title = AppStrings.throughputCustomBackhaulTitle,
+            description = AppStrings.throughputCustomExplanationBackhaulDesc
+        )
+        CustomExplanationLine(
+            title = AppStrings.throughputCustomAggregationTitle,
+            description = AppStrings.throughputCustomExplanationAggregationDesc(maxLteCarriers)
+        )
+    }
+}
+
+@Composable
+private fun CustomExplanationLine(
+    title: String,
+    description: String
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SignalSlider(
+    label: String,
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    unit: String,
+    useOneUi: Boolean,
+    onValueChange: (Float) -> Unit
+) {
+    val roundedValue = value.roundToInt().coerceIn(valueRange.start.roundToInt(), valueRange.endInclusive.roundToInt())
+    val valueSpan = (valueRange.endInclusive - valueRange.start).coerceAtLeast(1f)
+    val valueFraction = ((roundedValue - valueRange.start) / valueSpan).coerceIn(0f, 1f)
+    val tickCount = steps.coerceAtLeast(0) + 2
+    val inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
+    val activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f)
+    val dotColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f)
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(
+            text = "$label : $roundedValue $unit",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        if (useOneUi) {
+            Slider(
+                value = roundedValue.toFloat(),
+                onValueChange = { onValueChange(it.roundToInt().toFloat()) },
+                valueRange = valueRange,
+                steps = steps.coerceAtLeast(0),
+                thumb = {
+                    Box(
+                        modifier = Modifier
+                            .size(22.dp)
+                            .background(MaterialTheme.colorScheme.surface, CircleShape)
+                            .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
+                    )
+                },
+                track = { _ ->
+                    Canvas(modifier = Modifier.fillMaxWidth().height(12.dp)) {
+                        val centerY = size.height / 2
+                        drawLine(
+                            color = inactiveTrackColor,
+                            start = Offset(0f, centerY),
+                            end = Offset(size.width, centerY),
+                            strokeWidth = 10.dp.toPx(),
+                            cap = StrokeCap.Round
+                        )
+                        drawLine(
+                            color = activeTrackColor,
+                            start = Offset(0f, centerY),
+                            end = Offset(size.width * valueFraction, centerY),
+                            strokeWidth = 10.dp.toPx(),
+                            cap = StrokeCap.Round
+                        )
+                        val dotRadius = if (tickCount > 52) 0.85.dp.toPx() else 1.15.dp.toPx()
+                        val lastIndex = (tickCount - 1).coerceAtLeast(1)
+                        for (i in 0 until tickCount) {
+                            val x = size.width * (i.toFloat() / lastIndex.toFloat())
+                            drawCircle(
+                                color = dotColor,
+                                radius = dotRadius,
+                                center = Offset(x, centerY)
+                            )
+                        }
+                    }
+                }
+            )
+        } else {
+            Slider(
+                value = roundedValue.toFloat(),
+                onValueChange = { onValueChange(it.roundToInt().toFloat()) },
+                valueRange = valueRange,
+                steps = steps.coerceAtLeast(0)
+            )
+        }
+    }
+}
+
+@Composable
+private fun CustomChoiceRow(
+    title: String,
+    selectedId: String,
+    options: List<String>,
+    optionLabel: @Composable (String) -> String,
+    onSelect: (String) -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Text(
+            text = title,
+            style = MaterialTheme.typography.labelLarge,
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            options.forEach { option ->
+                FilterChip(
+                    selected = selectedId == option,
+                    onClick = { onSelect(option) },
+                    label = { Text(optionLabel(option)) }
+                )
+            }
+        }
     }
 }
 
@@ -862,7 +1450,7 @@ private fun ThroughputBandsCard(result: ThroughputResult, cardBgColor: Color, bl
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
-                text = AppStrings.get("Fréquences et modulation", "Frequencies and modulation", "Frequências e modulação"),
+                text = AppStrings.throughputFrequenciesAndModulationTitle,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -877,18 +1465,18 @@ private fun ThroughputBandsCard(result: ThroughputResult, cardBgColor: Color, bl
 @Composable
 private fun ThroughputBandRow(band: ThroughputBandResult) {
     val contentColor = if (band.isIncluded) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
-    val metricColor = if (band.isIncluded) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
-    val estimatedText = AppStrings.get("(estimé)", "(estimated)", "(estimado)")
+    val metricColor = if (band.isIncluded && band.downAggregationExcludedReason == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
+    val estimatedText = AppStrings.throughputEstimatedSuffix
     val bandDetail = buildString {
         append(formatBandwidth(band.bandwidthMHz))
         if (band.bandwidthIsEstimated) append(" ").append(estimatedText)
         if (band.status.isNotBlank()) append(" - ").append(band.status)
     }
     val coneLabel = band.coneDistance?.let {
-        AppStrings.get(
-            "Cône estimé : ${formatDistanceMeters(it.centerMeters)} (${formatDistanceMeters(it.nearMeters)}-${formatDistanceMeters(it.farMeters)})",
-            "Estimated cone: ${formatDistanceMeters(it.centerMeters)} (${formatDistanceMeters(it.nearMeters)}-${formatDistanceMeters(it.farMeters)})",
-            "Cone estimado: ${formatDistanceMeters(it.centerMeters)} (${formatDistanceMeters(it.nearMeters)}-${formatDistanceMeters(it.farMeters)})"
+        AppStrings.throughputEstimatedCone(
+            formatDistanceMeters(it.centerMeters),
+            formatDistanceMeters(it.nearMeters),
+            formatDistanceMeters(it.farMeters)
         )
     }
 
@@ -896,12 +1484,12 @@ private fun ThroughputBandRow(band: ThroughputBandResult) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(band.label, fontWeight = FontWeight.Bold, color = contentColor)
             ThroughputDetailLine(
-                label = AppStrings.get("Fréquences", "Frequencies", "Frequências"),
+                label = AppStrings.throughputFrequenciesLabel,
                 value = band.frequencyDetails,
                 color = contentColor
             )
             ThroughputDetailLine(
-                label = AppStrings.get("Modulation et antennes", "Modulation and antennas", "Modulação e antenas"),
+                label = AppStrings.throughputModulationAndAntennasLabel,
                 value = band.modulationLabel,
                 color = contentColor
             )
@@ -918,7 +1506,18 @@ private fun ThroughputBandRow(band: ThroughputBandResult) {
                 )
             }
             if (!band.isIncluded && band.excludedReason != null) {
-                Text(band.excludedReason, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                Text(
+                    text = AppStrings.translateThroughputExcludedReason(band.excludedReason),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
+            if (band.isIncluded && band.downAggregationExcludedReason != null) {
+                Text(
+                    text = AppStrings.translateThroughputExcludedReason(band.downAggregationExcludedReason),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
         }
         Column(horizontalAlignment = Alignment.End) {
@@ -947,7 +1546,7 @@ private fun ThroughputAssumptionsCard(
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text = AppStrings.get("À lire comme une estimation", "Read as an estimate", "Ler como uma estimativa"),
+                text = AppStrings.throughputReadAsEstimateTitle,
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -964,14 +1563,14 @@ private fun ThroughputAssumptionsCard(
             )
             if (result.warnings.isNotEmpty()) {
                 Text(
-                    text = AppStrings.get("Avertissements", "Warnings", "Avisos"),
+                    text = AppStrings.throughputAttentionTitle,
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 result.warnings.take(4).forEach { warning ->
                     Text(
-                        text = "- $warning",
+                        text = "- ${AppStrings.translateThroughputWarning(warning)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -979,13 +1578,13 @@ private fun ThroughputAssumptionsCard(
             }
             if (result.assumptions.isNotEmpty()) {
                 Text(
-                    text = AppStrings.get("Hypothèses moteur : ${result.assumptions.joinToString(" | ")}", "Engine assumptions: ${result.assumptions.joinToString(" | ")}", "Hipóteses do motor: ${result.assumptions.joinToString(" | ")}"),
+                    text = AppStrings.throughputCalculationAssumptions(localizedThroughputAssumptions(result.assumptions)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
-                text = AppStrings.get("Sources : ${result.sourceSummary}", "Sources: ${result.sourceSummary}", "Fontes: ${result.sourceSummary}"),
+                text = AppStrings.throughputSources(AppStrings.translateThroughputSourceSummary(result.sourceSummary)),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -994,38 +1593,31 @@ private fun ThroughputAssumptionsCard(
 }
 
 @Composable
+private fun localizedThroughputAssumptions(assumptions: List<String>): String {
+    val translated = mutableListOf<String>()
+    for (assumption in assumptions) {
+        translated += AppStrings.translateThroughputAssumption(assumption)
+    }
+    return translated.joinToString(" | ")
+}
+
+@Composable
 private fun presetLabel(preset: ThroughputPreset): String {
     return when (preset) {
-        ThroughputPreset.Conservative -> AppStrings.get("Prudent", "Conservative", "Prudente")
-        ThroughputPreset.Standard -> AppStrings.get("Standard", "Standard", "Padrão")
-        ThroughputPreset.Maximum -> AppStrings.get("Idéal", "Ideal", "Ideal")
-        ThroughputPreset.Custom -> AppStrings.get("Personnalisé", "Custom", "Personalizado")
+        ThroughputPreset.Conservative -> AppStrings.throughputPresetLabel("conservative")
+        ThroughputPreset.Standard -> AppStrings.throughputPresetLabel("standard")
+        ThroughputPreset.Maximum -> AppStrings.throughputPresetLabel("ideal")
+        ThroughputPreset.Custom -> AppStrings.throughputPresetLabel("custom")
     }
 }
 
 @Composable
 private fun presetDescription(preset: ThroughputPreset): String {
     return when (preset) {
-        ThroughputPreset.Conservative -> AppStrings.get(
-            "Profil prudent : modulation moyenne, UL fortement limité par la puissance du téléphone.",
-            "Conservative profile: average modulation, upload strongly limited by handset transmit power.",
-            "Perfil prudente: modulação média, upload fortemente limitado pela potência do telemóvel."
-        )
-        ThroughputPreset.Standard -> AppStrings.get(
-            "Profil standard : 4G MIMO 2x2 et 5G MIMO 4x4 en descendant, montant calculé comme un téléphone réel.",
-            "Standard profile: 4G MIMO 2x2 and 5G MIMO 4x4 for download, upload calculated like a real handset.",
-            "Perfil padrão: 4G MIMO 2x2 e 5G MIMO 4x4 no download, upload calculado como um telemóvel real."
-        )
-        ThroughputPreset.Maximum -> AppStrings.get(
-            "Profil idéal : très bonnes conditions radio plausibles, mais l'UL reste plafonné côté terminal.",
-            "Ideal profile: plausible very good radio conditions, but upload remains capped on the handset side.",
-            "Perfil ideal: condições rádio muito boas e plausíveis, mas o upload continua limitado pelo terminal."
-        )
-        ThroughputPreset.Custom -> AppStrings.get(
-            "Profil personnalisé : les modulations DL/UL sont réglées manuellement, avec un UL toujours limité comme un téléphone.",
-            "Custom profile: DL/UL modulations are manually tuned, with upload still limited like a handset.",
-            "Perfil personalizado: as modulações DL/UL são ajustadas manualmente, com upload ainda limitado como um telemóvel."
-        )
+        ThroughputPreset.Conservative -> AppStrings.throughputPresetDescription("conservative")
+        ThroughputPreset.Standard -> AppStrings.throughputPresetDescription("standard")
+        ThroughputPreset.Maximum -> AppStrings.throughputPresetDescription("ideal")
+        ThroughputPreset.Custom -> AppStrings.throughputPresetDescription("custom")
     }
 }
 
@@ -1115,6 +1707,7 @@ private fun calculateThroughput(
             val isIncluded = generationAllowed && bandAllowed && engineIncluded && (includePlanned || !isPlanned)
             val panelHeightMeters = extractPanelHeightMeters(band, supportHeightMeters)
             val azimuths = extractAzimuths(band)
+            val customMultipliers = throughputMultipliersFor(preset, band.gen, customSettings)
             val excludedReason = when {
                 !generationAllowed -> if (band.gen == 5) "5G désactivée" else "4G désactivée"
                 !bandAllowed -> "Bande exclue"
@@ -1129,6 +1722,7 @@ private fun calculateThroughput(
                 key = key,
                 label = bandLabel(band),
                 generation = band.gen,
+                frequencyMHz = band.value,
                 frequencyDetails = frequencyDetailsLabel(band),
                 modulationLabel = carrierResult?.let { modulationLabel(it.dlModulationOrder, it.ulModulationOrder, it.dlMimoLayers, it.ulMimoLayers) }
                     ?: modulationLabel(band.gen, engineProfile),
@@ -1137,26 +1731,30 @@ private fun calculateThroughput(
                 coneDistance = estimateConeDistance(panelHeightMeters),
                 azimuths = azimuths,
                 status = band.status,
-                downMbps = carrierResult?.dlMbps ?: 0.0,
-                upMbps = carrierResult?.ulMbps ?: 0.0,
+                downMbps = (carrierResult?.dlMbps ?: 0.0) * customMultipliers.down,
+                upMbps = (carrierResult?.ulMbps ?: 0.0) * customMultipliers.up,
                 isIncluded = isIncluded,
                 excludedReason = excludedReason
             )
         }
 
-    val uplinkAggregationWarning = if (calculatedBands.count { it.isIncluded && it.upMbps > 0.0 } > MAX_FR_UPLINK_AGGREGATED_CARRIERS) {
-        listOf("Upload limite aux 2 meilleures frequences agregees, contrainte retenue pour les reseaux mobiles en France.")
+    val aggregationAwareBands = applyCarrierAggregationPolicy(calculatedBands, engineProfile)
+    val aggregationWarnings = aggregationAwareBands
+        .mapNotNull { it.downAggregationExcludedReason }
+        .distinct()
+    val uplinkAggregationWarning = if (aggregationAwareBands.count { it.isIncluded && it.downAggregationExcludedReason == null && it.upMbps > 0.0 } > MAX_FR_UPLINK_AGGREGATED_CARRIERS) {
+        listOf("Le débit montant est limité aux deux meilleures fréquences agrégées, une hypothèse plus réaliste pour les réseaux mobiles en France.")
     } else {
         emptyList()
     }
 
     return ThroughputResult(
-        bands = calculatedBands,
-        warnings = (engineResult?.warnings.orEmpty() + uplinkAggregationWarning).distinct(),
+        bands = aggregationAwareBands,
+        warnings = (engineResult?.warnings.orEmpty() + aggregationWarnings + uplinkAggregationWarning).distinct(),
         assumptions = engineResult?.assumptions.orEmpty(),
         confidenceScore = engineResult?.confidenceScore ?: 35,
         calculationVersion = engineResult?.calculationVersion ?: fr.geotower.radio.THROUGHPUT_CALCULATION_VERSION,
-        sourceSummary = engineResult?.sourceSummary ?: "ANFR/data.gouv pour les frequences declarees, Arcep pour les allocations operateur, 3GPP pour le modele radio."
+        sourceSummary = engineResult?.sourceSummary ?: "ANFR/data.gouv pour les fréquences déclarées, Arcep pour les allocations opérateur, 3GPP pour le modèle radio."
     )
 }
 
@@ -1241,13 +1839,13 @@ private fun customProfile(customSettings: CustomModulationSettings): ThroughputP
     return ThroughputProfile(
         id = "CUSTOM",
         label = "Personnalisé",
-        description = "Profil personnalisé : modulations DL/UL choisies dans l'interface, UL traité comme un téléphone.",
+        description = "Profil personnalisé : modulations descendantes et montantes choisies dans l'interface, débit montant traité comme celui d'un téléphone.",
         lte = RatAssumptions(
             dlModulationOrder = lteDown.modulationOrder,
             ulModulationOrder = lteUp.modulationOrder,
             dlMimoLayers = 2,
             ulMimoLayers = 1,
-            maxCaComponents = 5
+            maxCaComponents = customSettings.lteAggregation.maxLteCarriers
         ),
         nr = RatAssumptions(
             dlModulationOrder = nrDown.modulationOrder,
@@ -1262,6 +1860,136 @@ private fun customProfile(customSettings: CustomModulationSettings): ThroughputP
             overheadUl = 0.08
         )
     )
+}
+
+private fun customThroughputMultipliers(
+    generation: Int,
+    settings: CustomModulationSettings
+): CustomThroughputMultipliers {
+    val rsrp = if (generation == 5) settings.nrRsrpDbm else settings.lteRsrpDbm
+    val sinr = if (generation == 5) settings.nrSinrDb else settings.lteSinrDb
+    val rsrpScore = ((rsrp + 120f) / 45f).coerceIn(0f, 1f).toDouble()
+    val sinrScore = ((sinr + 5f) / 35f).coerceIn(0f, 1f).toDouble()
+    val radioScore = (rsrpScore * 0.4) + (sinrScore * 0.6)
+    val radioMultiplier = (0.55 + radioScore * 0.75).coerceIn(0.25, 1.20)
+    val down = (
+        radioMultiplier *
+            settings.environment.multiplier *
+            settings.positionScenario.multiplier *
+            settings.networkLoad.downMultiplier *
+            settings.backhaul.downMultiplier
+        )
+        .coerceIn(0.10, 1.20)
+    val upPositionMultiplier = (settings.positionScenario.multiplier * 0.9) + 0.1
+    val up = (
+        radioMultiplier *
+            settings.environment.multiplier *
+            upPositionMultiplier *
+            settings.networkLoad.upMultiplier *
+            settings.backhaul.upMultiplier
+        )
+        .coerceIn(0.10, 1.15)
+    return CustomThroughputMultipliers(down = down, up = up)
+}
+
+private fun throughputMultipliersFor(
+    preset: ThroughputPreset,
+    generation: Int,
+    settings: CustomModulationSettings
+): CustomThroughputMultipliers {
+    return if (preset == ThroughputPreset.Custom) {
+        customThroughputMultipliers(generation, settings)
+    } else {
+        positionThroughputMultipliers(settings.positionScenario)
+    }
+}
+
+private fun positionThroughputMultipliers(
+    scenario: PositionScenario
+): CustomThroughputMultipliers {
+    val upPositionMultiplier = (scenario.multiplier * 0.9) + 0.1
+    return CustomThroughputMultipliers(
+        down = scenario.multiplier.coerceIn(0.10, 1.20),
+        up = upPositionMultiplier.coerceIn(0.10, 1.15)
+    )
+}
+
+private fun applyLteLowBandAggregationPolicy(
+    bands: List<ThroughputBandResult>
+): List<ThroughputBandResult> {
+    val includedLowBands = bands
+        .filter { it.isIncluded && it.generation == 4 && it.frequencyMHz in LTE_LOW_BAND_MHZ }
+    if (includedLowBands.size <= 1) return bands
+
+    val keptBand = includedLowBands.maxWith(
+        compareBy<ThroughputBandResult> { it.downMbps }
+            .thenBy { it.bandwidthMHz }
+    )
+    val excludedKeys = includedLowBands
+        .filterNot { it.key == keptBand.key }
+        .map { it.key }
+        .toSet()
+    val reason = "Agrégation 4G entre bandes basses 700/800/900 MHz limitée : beaucoup de téléphones ne cumulent pas ces porteuses."
+
+    return bands.map { band ->
+        if (band.key in excludedKeys) {
+            band.copy(downAggregationExcludedReason = reason)
+        } else {
+            band
+        }
+    }
+}
+
+private fun applyCarrierAggregationPolicy(
+    bands: List<ThroughputBandResult>,
+    profile: ThroughputProfile
+): List<ThroughputBandResult> {
+    val lowBandAwareBands = applyLteLowBandAggregationPolicy(bands)
+    val maxLteCarriers = profile.lte.maxCaComponents
+    val maxNrCarriers = profile.nr.maxCaComponents
+
+    return lowBandAwareBands
+        .limitAggregatedCarriers(
+            generation = 4,
+            maxCarriers = maxLteCarriers,
+            reason = "Limite d'agrégation 4G choisie : seules les meilleures porteuses sont comptées."
+        )
+        .limitAggregatedCarriers(
+            generation = 5,
+            maxCarriers = maxNrCarriers,
+            reason = "Limite d'agrégation 5G du profil : seules les meilleures porteuses sont comptées."
+        )
+}
+
+private fun List<ThroughputBandResult>.limitAggregatedCarriers(
+    generation: Int,
+    maxCarriers: Int,
+    reason: String
+): List<ThroughputBandResult> {
+    val safeMaxCarriers = maxCarriers.coerceAtLeast(1)
+    val eligibleBands = filter {
+        it.isIncluded &&
+            it.generation == generation &&
+            it.downAggregationExcludedReason == null
+    }
+    if (eligibleBands.size <= safeMaxCarriers) return this
+
+    val keptKeys = eligibleBands
+        .sortedWith(
+            compareByDescending<ThroughputBandResult> { it.downMbps }
+                .thenByDescending { it.bandwidthMHz }
+        )
+        .take(safeMaxCarriers)
+        .map { it.key }
+        .toSet()
+
+    return map { band ->
+        if (band in eligibleBands && band.key !in keptKeys) {
+            band.copy(downAggregationExcludedReason = reason)
+        } else {
+            band
+        }
+    }
 }
 
 private fun siteStatusFromBandStatus(status: String): SiteRadioStatus {
@@ -1452,6 +2180,8 @@ private fun formatHeightMeters(valueMeters: Double): String {
     }
 }
 
+private fun formatDegrees(value: Double): String = "${value.roundToInt()}\u00B0"
+
 private fun formatNumber(value: Double): String {
     return if (value % 1.0 == 0.0) value.toInt().toString() else String.format(Locale.US, "%.1f", value)
 }
@@ -1460,15 +2190,13 @@ private fun bandKey(band: FreqBand): String {
     return "${band.gen}:${band.value}:${band.rawFreq.substringBefore(":").trim()}"
 }
 
-private fun buildConeOverlayData(site: LocalisationEntity, result: ThroughputResult): MiniMapConeOverlayData? {
+private fun buildConeOverlayData(
+    site: LocalisationEntity,
+    result: ThroughputResult,
+    selectedPoint: MapPoint? = null
+): MiniMapConeOverlayData? {
     val coneDistance = result.coneDistance ?: return null
-    val azimuths = result.strongAzimuths.ifEmpty {
-        site.azimuts
-            ?.split(",")
-            ?.mapNotNull { it.trim().replace(',', '.').toDoubleOrNull() }
-            ?.filter { it in 0.0..360.0 }
-            .orEmpty()
-    }.distinctBy { it.roundToInt() }
+    val azimuths = strongAzimuthsForSite(site, result)
 
     val strongPoints = azimuths.take(12).map { azimuth ->
         val point = destinationPoint(site.latitude, site.longitude, coneDistance.centerMeters, azimuth)
@@ -1479,8 +2207,95 @@ private fun buildConeOverlayData(site: LocalisationEntity, result: ThroughputRes
         centerLat = site.latitude,
         centerLon = site.longitude,
         radiusMeters = coneDistance.centerMeters,
-        strongPoints = strongPoints
+        strongPoints = strongPoints,
+        selectedPoint = selectedPoint?.let { MiniMapStrongPoint(latitude = it.latitude, longitude = it.longitude) }
     )
+}
+
+private fun classifyPositionScenario(
+    site: LocalisationEntity,
+    result: ThroughputResult,
+    latitude: Double,
+    longitude: Double
+): PositionScenario = analyzePosition(site, result, latitude, longitude).scenario
+
+private fun analyzePosition(
+    site: LocalisationEntity,
+    result: ThroughputResult,
+    latitude: Double,
+    longitude: Double
+): PositionAnalysis {
+    val coneDistance = result.coneDistance
+    val distance = distanceMetersBetween(site.latitude, site.longitude, latitude, longitude)
+    val azimuths = strongAzimuthsForSite(site, result)
+    val bearing = bearingDegreesBetween(site.latitude, site.longitude, latitude, longitude)
+    val nearestAzimuth = azimuths.minByOrNull { angularDistanceDegrees(it, bearing) }
+    val azimuthDelta = nearestAzimuth?.let { angularDistanceDegrees(it, bearing) }
+    val isInsideAzimuth = azimuthDelta?.let { it <= PANEL_AZIMUTH_HALF_BEAM_DEGREES }
+    val scenario = when {
+        coneDistance == null -> PositionScenario.Unknown
+        isInsideAzimuth == false -> PositionScenario.OutsideBeam
+        distance < coneDistance.nearMeters -> PositionScenario.TooClose
+        distance > coneDistance.farMeters -> PositionScenario.TooFar
+        else -> PositionScenario.InCone
+    }
+
+    return PositionAnalysis(
+        distanceMeters = distance,
+        bearingDegrees = bearing,
+        scenario = scenario,
+        nearestAzimuthDegrees = nearestAzimuth,
+        azimuthDeltaDegrees = azimuthDelta,
+        isInsideAzimuth = isInsideAzimuth,
+        coneDistance = coneDistance
+    )
+}
+
+private fun strongAzimuthsForSite(site: LocalisationEntity, result: ThroughputResult): List<Double> {
+    return result.strongAzimuths.ifEmpty {
+        site.azimuts
+            ?.split(",")
+            ?.mapNotNull { it.trim().replace(',', '.').toDoubleOrNull() }
+            ?.filter { it in 0.0..360.0 }
+            .orEmpty()
+    }.distinctBy { it.roundToInt() }
+}
+
+private fun distanceMetersBetween(
+    fromLatitude: Double,
+    fromLongitude: Double,
+    toLatitude: Double,
+    toLongitude: Double
+): Double {
+    val earthRadiusMeters = 6_371_000.0
+    val fromLatRad = Math.toRadians(fromLatitude)
+    val toLatRad = Math.toRadians(toLatitude)
+    val deltaLat = Math.toRadians(toLatitude - fromLatitude)
+    val deltaLon = Math.toRadians(toLongitude - fromLongitude)
+    val sinHalfLat = sin(deltaLat / 2.0)
+    val sinHalfLon = sin(deltaLon / 2.0)
+    val a = sinHalfLat * sinHalfLat + cos(fromLatRad) * cos(toLatRad) * sinHalfLon * sinHalfLon
+    val normalizedA = a.coerceIn(0.0, 1.0)
+    val c = 2.0 * atan2(sqrt(normalizedA), sqrt(1.0 - normalizedA))
+    return earthRadiusMeters * c
+}
+
+private fun bearingDegreesBetween(
+    fromLatitude: Double,
+    fromLongitude: Double,
+    toLatitude: Double,
+    toLongitude: Double
+): Double {
+    val fromLatRad = Math.toRadians(fromLatitude)
+    val toLatRad = Math.toRadians(toLatitude)
+    val deltaLon = Math.toRadians(toLongitude - fromLongitude)
+    val y = sin(deltaLon) * cos(toLatRad)
+    val x = cos(fromLatRad) * sin(toLatRad) - sin(fromLatRad) * cos(toLatRad) * cos(deltaLon)
+    return (Math.toDegrees(atan2(y, x)) + 360.0) % 360.0
+}
+
+private fun angularDistanceDegrees(first: Double, second: Double): Double {
+    return abs(((first - second + 540.0) % 360.0) - 180.0)
 }
 
 private fun destinationPoint(
@@ -1516,6 +2331,46 @@ private fun mapZoomForCone(radiusMeters: Double): Double {
         radiusMeters >= 250.0 -> 16.0
         else -> 17.0
     }
+}
+
+private fun hasThroughputLocationPermission(context: Context): Boolean {
+    return ActivityCompat.checkSelfPermission(
+        context,
+        Manifest.permission.ACCESS_FINE_LOCATION
+    ) == PackageManager.PERMISSION_GRANTED ||
+        ActivityCompat.checkSelfPermission(
+            context,
+            Manifest.permission.ACCESS_COARSE_LOCATION
+        ) == PackageManager.PERMISSION_GRANTED
+}
+
+@SuppressLint("MissingPermission")
+private suspend fun loadCurrentThroughputLocation(context: Context): Location? {
+    if (!hasThroughputLocationPermission(context)) return null
+
+    return try {
+        val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
+        withTimeoutOrNull(8_000L) {
+            fusedLocationClient.getCurrentLocation(
+                Priority.PRIORITY_HIGH_ACCURACY,
+                null
+            ).await()
+        } ?: fusedLocationClient.lastLocation.await()
+            ?: withContext(Dispatchers.IO) { bestLastKnownThroughputLocation(context) }
+    } catch (_: Exception) {
+        withContext(Dispatchers.IO) { bestLastKnownThroughputLocation(context) }
+    }
+}
+
+@SuppressLint("MissingPermission")
+private fun bestLastKnownThroughputLocation(context: Context): Location? {
+    if (!hasThroughputLocationPermission(context)) return null
+    val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null
+    return locationManager.getProviders(true)
+        .mapNotNull { provider ->
+            runCatching { locationManager.getLastKnownLocation(provider) }.getOrNull()
+        }
+        .maxByOrNull { it.time }
 }
 
 private fun Modifier.throughputFadingEdge(scrollState: ScrollState): Modifier {
@@ -1575,12 +2430,79 @@ private enum class ThroughputPreset {
     Custom
 }
 
+private enum class RadioEnvironment(val id: String, val multiplier: Double) {
+    Outdoor("outdoor", 1.0),
+    Vehicle("vehicle", 0.85),
+    Indoor("indoor", 0.65),
+    DeepIndoor("deep_indoor", 0.45)
+}
+
+private enum class PositionScenario(val id: String, val multiplier: Double) {
+    Unknown("unknown", 1.0),
+    InCone("in_cone", 1.06),
+    TooClose("too_close", 0.75),
+    TooFar("too_far", 0.68),
+    OutsideBeam("outside_beam", 0.45)
+}
+
+private enum class NetworkLoad(val id: String, val downMultiplier: Double, val upMultiplier: Double) {
+    Unknown("unknown", 1.0, 1.0),
+    Light("light", 0.90, 0.88),
+    Medium("medium", 0.68, 0.62),
+    Heavy("heavy", 0.46, 0.40),
+    Saturated("saturated", 0.28, 0.24)
+}
+
+private enum class BackhaulQuality(val id: String, val downMultiplier: Double, val upMultiplier: Double) {
+    Unknown("unknown", 1.0, 1.0),
+    Fiber("fiber", 1.0, 1.0),
+    Radio("radio", 0.84, 0.78),
+    Limited("limited", 0.55, 0.48)
+}
+
+private enum class LteAggregationMode(val id: String, val maxLteCarriers: Int) {
+    Single("single", 1),
+    Realistic("realistic", 3),
+    Wide("wide", 4)
+}
+
 private data class CustomModulationSettings(
     val lteDownIndex: Int = 3,
     val lteUpIndex: Int = 2,
     val nrDownIndex: Int = 3,
-    val nrUpIndex: Int = 2
+    val nrUpIndex: Int = 2,
+    val lteRsrpDbm: Float = -95f,
+    val lteSinrDb: Float = 15f,
+    val nrRsrpDbm: Float = -92f,
+    val nrSinrDb: Float = 18f,
+    val environment: RadioEnvironment = RadioEnvironment.Outdoor,
+    val positionScenario: PositionScenario = PositionScenario.Unknown,
+    val networkLoad: NetworkLoad = NetworkLoad.Unknown,
+    val backhaul: BackhaulQuality = BackhaulQuality.Unknown,
+    val lteAggregation: LteAggregationMode = LteAggregationMode.Realistic,
+    val selectedLatitude: Double? = null,
+    val selectedLongitude: Double? = null
 )
+
+private data class CustomThroughputMultipliers(
+    val down: Double = 1.0,
+    val up: Double = 1.0
+)
+
+private fun radioEnvironmentFromPreference(raw: String?): RadioEnvironment =
+    RadioEnvironment.entries.firstOrNull { it.id == raw } ?: RadioEnvironment.Outdoor
+
+private fun positionScenarioFromPreference(raw: String?): PositionScenario =
+    PositionScenario.entries.firstOrNull { it.id == raw } ?: PositionScenario.Unknown
+
+private fun networkLoadFromPreference(raw: String?): NetworkLoad =
+    NetworkLoad.entries.firstOrNull { it.id == raw } ?: NetworkLoad.Unknown
+
+private fun backhaulQualityFromPreference(raw: String?): BackhaulQuality =
+    BackhaulQuality.entries.firstOrNull { it.id == raw } ?: BackhaulQuality.Unknown
+
+private fun lteAggregationModeFromPreference(raw: String?): LteAggregationMode =
+    LteAggregationMode.entries.firstOrNull { it.id == raw } ?: LteAggregationMode.Realistic
 
 private data class ModulationOption(
     val label: String,
@@ -1631,6 +2553,16 @@ private data class MapPoint(
     val longitude: Double
 )
 
+private data class PositionAnalysis(
+    val distanceMeters: Double,
+    val bearingDegrees: Double,
+    val scenario: PositionScenario,
+    val nearestAzimuthDegrees: Double?,
+    val azimuthDeltaDegrees: Double?,
+    val isInsideAzimuth: Boolean?,
+    val coneDistance: ConeDistance?
+)
+
 private data class ThroughputResult(
     val bands: List<ThroughputBandResult>,
     val warnings: List<String> = emptyList(),
@@ -1641,10 +2573,12 @@ private data class ThroughputResult(
 ) {
     val includedBands: List<ThroughputBandResult>
         get() = bands.filter { it.isIncluded }
+    val downAggregatedBands: List<ThroughputBandResult>
+        get() = includedBands.filter { it.downAggregationExcludedReason == null }
     val totalDownMbps: Double
-        get() = includedBands.sumOf { it.downMbps }
+        get() = downAggregatedBands.sumOf { it.downMbps }
     val totalUpMbps: Double
-        get() = includedBands
+        get() = downAggregatedBands
             .sortedByDescending { it.upMbps }
             .take(MAX_FR_UPLINK_AGGREGATED_CARRIERS)
             .sumOf { it.upMbps }
@@ -1666,6 +2600,7 @@ private data class ThroughputBandResult(
     val key: String,
     val label: String,
     val generation: Int,
+    val frequencyMHz: Int,
     val frequencyDetails: String,
     val modulationLabel: String,
     val bandwidthMHz: Double,
@@ -1676,7 +2611,8 @@ private data class ThroughputBandResult(
     val downMbps: Double,
     val upMbps: Double,
     val isIncluded: Boolean,
-    val excludedReason: String?
+    val excludedReason: String?,
+    val downAggregationExcludedReason: String? = null
 )
 
 private data class ConeDistance(

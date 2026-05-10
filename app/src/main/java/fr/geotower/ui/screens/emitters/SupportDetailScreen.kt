@@ -68,17 +68,21 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.api.CellularFrApi
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.ui.components.SupportShareMenu
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppStrings
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+
+private const val TAG_SUPPORT_DETAIL = "GeoTower"
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -240,11 +244,11 @@ fun SupportDetailScreen(
                     }
                     hsDataMap = tempOutageMap
                 } catch (e: Exception) {
-                    e.printStackTrace()
+                    AppLogger.w(TAG_SUPPORT_DETAIL, "Outage data request failed", e)
                 }
             } // Fin du bloc IO Base de données
         } catch (e: Exception) {
-            e.printStackTrace()
+            AppLogger.w(TAG_SUPPORT_DETAIL, "Support details request failed", e)
         } finally {
             isLoading = false // 🚨 L'ÉCRAN S'AFFICHE IMMÉDIATEMENT ICI !
         }
@@ -259,29 +263,9 @@ fun SupportDetailScreen(
 
                 if (!trueSupportId.isNullOrBlank()) {
                     if (hasOrange) {
-                        try {
-                            val apiUrl = java.net.URL("https://cellularfr.fr/api/photos?siteId=$trueSupportId")
-                            val connection = apiUrl.openConnection() as java.net.HttpURLConnection
-                            connection.requestMethod = "GET"
-                            connection.connectTimeout = 5000 // 🚨 TIMEOUT POUR ÉVITER LE BLOCAGE INFINI
-                            connection.readTimeout = 5000
-                            connection.connect()
-
-                            if (connection.responseCode == 200) {
-                                val jsonString = connection.inputStream.bufferedReader().use { it.readText() }
-                                val jsonObject = org.json.JSONObject(jsonString)
-                                val photosArray = jsonObject.optJSONArray("photos")
-                                if (photosArray != null) {
-                                    for (i in 0 until photosArray.length()) {
-                                        val photoObj = photosArray.getJSONObject(i)
-                                        val relativeUrl = photoObj.optString("url", "")
-                                        val author = if (photoObj.isNull("nickname")) null else photoObj.optString("nickname")
-                                        val date = if (photoObj.isNull("uploadDate")) null else photoObj.optString("uploadDate")
-                                        if (relativeUrl.isNotEmpty()) photosTemp.add(CommunityPhoto("https://cellularfr.fr$relativeUrl", "CellularFR", author, date))
-                                    }
-                                }
-                            }
-                        } catch (e: Exception) { e.printStackTrace() }
+                        CellularFrApi.getCellularFrPhotos(trueSupportId).forEach { photo ->
+                            photosTemp.add(CommunityPhoto(photo.url, "CellularFR", photo.author, photo.uploadedAt))
+                        }
                     }
 
                     if (hasSfrOrBouygues) {
@@ -295,12 +279,12 @@ fun SupportDetailScreen(
                                     photosTemp.add(CommunityPhoto(photo.imageUrl, "Signal Quest", photo.authorName, photo.uploadedAt))
                                 }
                             }
-                        } catch (e: Exception) { e.printStackTrace() }
+                        } catch (e: Exception) { AppLogger.w(TAG_SUPPORT_DETAIL, "SignalQuest photos request failed", e) }
                     }
                 }
                 communityPhotos = photosTemp
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLogger.w(TAG_SUPPORT_DETAIL, "Support photos refresh failed", e)
             }
         }
     }
@@ -324,7 +308,7 @@ fun SupportDetailScreen(
                 locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 1f, locationListener)
                 locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000L, 1f, locationListener)
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppLogger.w(TAG_SUPPORT_DETAIL, "Location updates could not start", e)
             }
         }
         onDispose {
@@ -529,6 +513,7 @@ fun SupportDetailScreen(
                                             photos = communityPhotos,
                                             operatorName = null,
                                             supportNature = physique?.natureSupport, // ✅ LE BON NOM DE VARIABLE
+                                            supportOwner = physique?.proprietaire,
                                             bgColor = cardBgColor,
                                             shape = blockShape,
                                             onAddPhotoClick = null

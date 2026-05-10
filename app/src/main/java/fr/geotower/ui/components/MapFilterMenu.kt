@@ -17,6 +17,7 @@ import fr.geotower.ui.theme.ColorBouygues
 import fr.geotower.ui.theme.ColorFree
 import fr.geotower.ui.theme.ColorOrange
 import fr.geotower.ui.theme.ColorSfr
+import fr.geotower.utils.AppStrings
 import fr.geotower.utils.Constants
 import fr.geotower.utils.FilterState
 
@@ -41,11 +42,11 @@ fun MapFilterMenu(onDismiss: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Filtres Carte",
+                        text = AppStrings.mapFiltersTitle,
                         style = MaterialTheme.typography.titleLarge
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Fermer")
+                        Icon(Icons.Default.Close, contentDescription = AppStrings.close)
                     }
                 }
 
@@ -53,7 +54,7 @@ fun MapFilterMenu(onDismiss: () -> Unit) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Section Opérateurs
-                Text("Opérateurs", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                Text(AppStrings.operatorsTitle, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(8.dp))
 
                 FilterCheckbox(label = "Orange", color = ColorOrange, key = Constants.OP_ORANGE)
@@ -64,7 +65,7 @@ fun MapFilterMenu(onDismiss: () -> Unit) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Section Technologies
-                Text("Technologies", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                Text(AppStrings.technologiesTitle, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.height(8.dp))
 
                 TechCheckbox("5G")
@@ -75,7 +76,7 @@ fun MapFilterMenu(onDismiss: () -> Unit) {
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) {
-                    Text("Appliquer")
+                    Text(AppStrings.apply)
                 }
             }
         }
