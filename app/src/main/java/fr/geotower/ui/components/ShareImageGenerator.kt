@@ -1039,7 +1039,7 @@ fun shareFullAntennaCapture(
                                                                     val regex =
                                                                         Regex("""([0-9]+(?:[.,][0-9]+)?)\s*-\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]*Hz)?""")
                                                                     val detailedFreqs =
-                                                                        regex.replace(preciseFreqs) { match ->
+                                                                        regex.findAll(preciseFreqs).joinToString("\n") { match ->
                                                                             val n1 =
                                                                                 match.groupValues[1].replace(
                                                                                     ',',
@@ -1067,13 +1067,14 @@ fun shareFullAntennaCapture(
                                                                                     diff
                                                                                 )
                                                                             "${match.groupValues[1]}-${match.groupValues[2]} $unit [$diffStr $unit]".trim()
-                                                                        }
+                                                                        }.ifBlank { preciseFreqs }
                                                                     if (AppConfig.siteShowSpectrumBand.value) {
                                                                         Text(
-                                                                            text = "${AppStrings.spectrumByBand} : $detailedFreqs",
+                                                                            text = "${AppStrings.spectrumByBand} :\n\n$detailedFreqs",
                                                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                             fontSize = 12.sp,
-                                                                            fontWeight = FontWeight.Normal
+                                                                            fontWeight = FontWeight.Normal,
+                                                                            lineHeight = 16.sp
                                                                         )
                                                                     }
                                                                     if (AppConfig.siteShowSpectrumTotal.value && totalBandwidth > 0) {
@@ -1435,7 +1436,7 @@ fun shareFullAntennaCapture(
                                                             val regex =
                                                                 Regex("""([0-9]+(?:[.,][0-9]+)?)\s*-\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]*Hz)?""")
                                                             val detailedFreqs =
-                                                                regex.replace(preciseFreqs) { match ->
+                                                                regex.findAll(preciseFreqs).joinToString("\n") { match ->
                                                                     val n1 =
                                                                         match.groupValues[1].replace(
                                                                             ',',
@@ -1461,13 +1462,14 @@ fun shareFullAntennaCapture(
                                                                             diff
                                                                         )
                                                                     "${match.groupValues[1]}-${match.groupValues[2]} $unit [$diffStr $unit]".trim()
-                                                                }
+                                                                }.ifBlank { preciseFreqs }
                                                             if (AppConfig.siteShowSpectrumBand.value) {
                                                                 Text(
-                                                                    text = "${AppStrings.spectrumByBand} : $detailedFreqs",
+                                                                    text = "${AppStrings.spectrumByBand} :\n\n$detailedFreqs",
                                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                     fontSize = 12.sp,
-                                                                    fontWeight = FontWeight.Normal
+                                                                    fontWeight = FontWeight.Normal,
+                                                                    lineHeight = 16.sp
                                                                 )
                                                             }
                                                             if (AppConfig.siteShowSpectrumTotal.value && totalBandwidth > 0) {

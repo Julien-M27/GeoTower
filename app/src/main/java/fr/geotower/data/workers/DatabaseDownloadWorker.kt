@@ -54,7 +54,8 @@ class DatabaseDownloadWorker(
                 showSuccessNotification()
                 Result.success()
             } else {
-                retryOrFail()
+                showErrorNotification()
+                Result.failure()
             }
         } catch (e: CancellationException) {
             cancelSafely(notificationId)

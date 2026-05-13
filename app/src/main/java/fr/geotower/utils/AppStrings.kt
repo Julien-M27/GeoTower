@@ -1434,6 +1434,11 @@ object AppStrings {
     val initError @Composable get() = get("Erreur d'initialisation", "Initialization error", "Erro de inicialização")
 
     val totalspectrum @Composable get() = get("Spectre total", "Total spectrum", "Espectro total")
+    val totalSpectrumWarning @Composable get() = get(
+        "Le spectre total peut être erroné en raison de probables erreurs de déclaration.",
+        "The total spectrum may be inaccurate due to likely declaration errors.",
+        "O espectro total pode estar incorreto devido a prováveis erros de declaração."
+    )
     val spectrumTitle @Composable get() = get("Spectre", "Spectrum", "Espectro")
     val spectrumByBand @Composable get() = get("Spectre par plage de fréquence", "Spectrum by frequency band", "Espectro por faixa de fréquence")
 

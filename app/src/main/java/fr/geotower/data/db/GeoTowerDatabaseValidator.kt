@@ -6,10 +6,14 @@ import java.io.File
 import java.util.Locale
 
 object GeoTowerDatabaseValidator {
-    const val DB_NAME = "geotower.db"
+    const val DB_NAME = "geotower_fr.db"
+    const val EXPECTED_COUNTRY_CODE = "FR"
+    const val EXPECTED_SCHEMA_VERSION = 4
 
+    private const val LEGACY_DB_NAME = "geotower.db"
     private const val PREFS_NAME = "GeoTowerPrefs"
     private const val PREF_INVALID_REASON = "geotower_db_invalid_reason"
+    private val obsoleteDatabaseNames = listOf(LEGACY_DB_NAME)
 
     enum class LocalDatabaseState {
         VALID,
@@ -28,6 +32,7 @@ object GeoTowerDatabaseValidator {
     )
 
     fun getInstalledDatabaseFileStatus(context: Context): LocalDatabaseStatus {
+        deleteObsoleteDatabases(context)
         val dbFile = context.getDatabasePath(DB_NAME)
         if (!dbFile.isFile || dbFile.length() <= 0L) {
             clearInstalledDatabaseInvalid(context)
@@ -38,6 +43,7 @@ object GeoTowerDatabaseValidator {
     }
 
     fun getInstalledDatabaseVersion(context: Context): String? {
+        deleteObsoleteDatabases(context)
         val dbFile = context.getDatabasePath(DB_NAME)
         if (!dbFile.isFile || dbFile.length() <= 0L) return null
         return readDatabaseVersion(dbFile)
@@ -80,86 +86,139 @@ object GeoTowerDatabaseValidator {
     private val requiredColumns = mapOf(
         "localisation" to setOf(
             "id_anfr",
-            "operateur",
+            "operateur_id",
             "latitude",
             "longitude",
             "azimuts",
             "code_insee",
             "azimuts_fh",
-            "filtres"
+            "tech_mask",
+            "band_mask"
         ),
         "technique" to setOf(
             "id_anfr",
-            "technologies",
-            "statut",
+            "statut_id",
             "date_implantation",
             "date_service",
             "date_modif",
             "details_frequences",
-            "adresse"
+            "adresse",
+            "has_active"
         ),
-        "physique" to setOf(
+        "support" to setOf(
             "id_anfr",
             "id_support",
-            "nature_support",
-            "proprietaire",
-            "hauteur",
-            "azimuts_et_types"
+            "nat_id",
+            "tpo_id",
+            "hauteur"
         ),
-        "faisceaux_hertziens" to setOf(
+        "antenne" to setOf(
+            "aer_id",
             "id_anfr",
             "id_support",
-            "type_fh",
-            "azimuts_fh"
+            "tae_id",
+            "azimut",
+            "hauteur_bas",
+            "is_fh"
         ),
+        "ref_operateur" to setOf("id", "libelle"),
+        "ref_nature" to setOf("nat_id", "libelle"),
+        "ref_proprietaire" to setOf("tpo_id", "libelle"),
+        "ref_type_antenne" to setOf("tae_id", "libelle"),
+        "ref_systeme" to setOf("id", "libelle"),
+        "ref_statut" to setOf("id", "libelle"),
+        "ref_commune" to setOf("code_insee", "nom"),
         "metadata" to setOf(
             "version",
-            "date_maj_anfr"
+            "schema_version",
+            "country_code",
+            "country_name",
+            "source",
+            "date_maj_anfr",
+            "zip_version"
         )
     )
 
     private val criticalNonEmptyTables = listOf(
         "localisation",
         "technique",
-        "physique",
-        "metadata"
+        "support",
+        "metadata",
+        "ref_operateur",
+        "ref_systeme",
+        "ref_statut"
     )
 
     private val expectedAffinities = mapOf(
         "localisation" to mapOf(
             "id_anfr" to SQLiteAffinity.TEXT,
+            "operateur_id" to SQLiteAffinity.INTEGER,
             "latitude" to SQLiteAffinity.REAL,
-            "longitude" to SQLiteAffinity.REAL
+            "longitude" to SQLiteAffinity.REAL,
+            "tech_mask" to SQLiteAffinity.INTEGER,
+            "band_mask" to SQLiteAffinity.INTEGER
         ),
         "technique" to mapOf(
-            "id_anfr" to SQLiteAffinity.TEXT
+            "id_anfr" to SQLiteAffinity.TEXT,
+            "statut_id" to SQLiteAffinity.INTEGER,
+            "has_active" to SQLiteAffinity.INTEGER
         ),
-        "physique" to mapOf(
+        "support" to mapOf(
             "id_anfr" to SQLiteAffinity.TEXT,
             "id_support" to SQLiteAffinity.TEXT,
+            "nat_id" to SQLiteAffinity.INTEGER,
+            "tpo_id" to SQLiteAffinity.INTEGER,
             "hauteur" to SQLiteAffinity.REAL
         ),
-        "faisceaux_hertziens" to mapOf(
+        "antenne" to mapOf(
+            "aer_id" to SQLiteAffinity.TEXT,
             "id_anfr" to SQLiteAffinity.TEXT,
-            "id_support" to SQLiteAffinity.TEXT
+            "id_support" to SQLiteAffinity.TEXT,
+            "tae_id" to SQLiteAffinity.INTEGER,
+            "azimut" to SQLiteAffinity.INTEGER,
+            "hauteur_bas" to SQLiteAffinity.REAL,
+            "is_fh" to SQLiteAffinity.INTEGER
+        ),
+        "metadata" to mapOf(
+            "version" to SQLiteAffinity.TEXT,
+            "schema_version" to SQLiteAffinity.INTEGER,
+            "country_code" to SQLiteAffinity.TEXT,
+            "source" to SQLiteAffinity.TEXT
         )
     )
 
     private val requiredPrimaryKeys = mapOf(
         "localisation" to listOf("id_anfr"),
         "technique" to listOf("id_anfr"),
-        "physique" to listOf("id_anfr", "id_support"),
-        "faisceaux_hertziens" to listOf("id_anfr", "id_support")
+        "support" to listOf("id_anfr", "id_support"),
+        "antenne" to listOf("aer_id"),
+        "ref_operateur" to listOf("id"),
+        "ref_nature" to listOf("nat_id"),
+        "ref_proprietaire" to listOf("tpo_id"),
+        "ref_type_antenne" to listOf("tae_id"),
+        "ref_systeme" to listOf("id"),
+        "ref_statut" to listOf("id"),
+        "ref_commune" to listOf("code_insee"),
+        "metadata" to listOf("version")
     )
 
     private val requiredNotNullColumns = mapOf(
-        "localisation" to listOf("id_anfr", "latitude", "longitude"),
-        "technique" to listOf("id_anfr"),
-        "physique" to listOf("id_anfr", "id_support"),
-        "faisceaux_hertziens" to listOf("id_anfr", "id_support")
+        "localisation" to listOf("id_anfr", "latitude", "longitude", "tech_mask", "band_mask"),
+        "technique" to listOf("id_anfr", "has_active"),
+        "support" to listOf("id_anfr", "id_support"),
+        "antenne" to listOf("aer_id", "id_anfr", "is_fh"),
+        "ref_operateur" to listOf("id", "libelle"),
+        "ref_nature" to listOf("nat_id", "libelle"),
+        "ref_proprietaire" to listOf("tpo_id", "libelle"),
+        "ref_type_antenne" to listOf("tae_id", "libelle"),
+        "ref_systeme" to listOf("id", "libelle"),
+        "ref_statut" to listOf("id", "libelle"),
+        "ref_commune" to listOf("code_insee", "nom"),
+        "metadata" to listOf("version", "schema_version", "country_code", "source")
     )
 
     fun getInstalledDatabaseStatus(context: Context): LocalDatabaseStatus {
+        deleteObsoleteDatabases(context)
         val dbFile = context.getDatabasePath(DB_NAME)
         if (!dbFile.isFile || dbFile.length() <= 0L) {
             clearInstalledDatabaseInvalid(context)
@@ -175,6 +234,12 @@ object GeoTowerDatabaseValidator {
             markInstalledDatabaseInvalid(context, reason)
             LocalDatabaseStatus(LocalDatabaseState.INVALID, reason)
         }
+    }
+
+    fun deleteObsoleteDatabases(context: Context) {
+        obsoleteDatabaseNames
+            .filterNot { it == DB_NAME }
+            .forEach { dbName -> deleteDatabaseArtifacts(context, dbName) }
     }
 
     fun validateDatabaseFile(file: File): ValidationResult {
@@ -267,7 +332,33 @@ object GeoTowerDatabaseValidator {
             }
         }
 
+        validateMetadata(db)?.let { return it }
+
         return ValidationResult(true)
+    }
+
+    private fun validateMetadata(db: SQLiteDatabase): ValidationResult? {
+        val cursor = db.rawQuery(
+            "SELECT schema_version, country_code FROM metadata LIMIT 1",
+            null
+        )
+        return cursor.use {
+            if (!it.moveToFirst()) {
+                ValidationResult(false, "Metadata absente")
+            } else {
+                val schemaVersion = it.getInt(0)
+                val countryCode = it.getString(1)?.uppercase(Locale.US)
+                when {
+                    schemaVersion != EXPECTED_SCHEMA_VERSION -> {
+                        ValidationResult(false, "Schema DB incompatible: $schemaVersion")
+                    }
+                    countryCode != EXPECTED_COUNTRY_CODE -> {
+                        ValidationResult(false, "Pays DB incompatible: $countryCode")
+                    }
+                    else -> null
+                }
+            }
+        }
     }
 
     private fun runIntegrityCheck(db: SQLiteDatabase): Boolean {
@@ -326,5 +417,20 @@ object GeoTowerDatabaseValidator {
 
     private fun quoteIdentifier(identifier: String): String {
         return "\"" + identifier.replace("\"", "\"\"") + "\""
+    }
+
+    private fun deleteDatabaseArtifacts(context: Context, dbName: String) {
+        val relatedNames = listOf(dbName, "$dbName.download", "$dbName.backup")
+        relatedNames.forEach { name ->
+            val dbFile = context.getDatabasePath(name)
+            if (dbFile.exists()) {
+                context.deleteDatabase(name)
+                dbFile.delete()
+            }
+
+            listOf("-wal", "-shm", "-journal").forEach { suffix ->
+                File(dbFile.path + suffix).delete()
+            }
+        }
     }
 }

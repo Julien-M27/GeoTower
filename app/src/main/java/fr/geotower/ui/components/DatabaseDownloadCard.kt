@@ -95,7 +95,7 @@ fun DatabaseDownloadCard(
             var shouldValidateLocalDb = false
 
             withContext(Dispatchers.IO) {
-                val dbPath = context.getDatabasePath("geotower.db")
+                val dbPath = context.getDatabasePath(GeoTowerDatabaseValidator.DB_NAME)
                 try {
                     if (dbPath.exists()) {
                         shouldValidateLocalDb = true
@@ -336,6 +336,7 @@ fun DatabaseDownloadCard(
                     localDbVersionRaw
                 )
                 val isSearchingDatabaseInfo = localDbVersion == txtSearching || remoteDbVersion == txtSearching
+                val canDownloadRemoteDatabase = remoteDbVersionRaw != null
 
                 Button(
                     onClick = {
@@ -343,7 +344,7 @@ fun DatabaseDownloadCard(
                             DatabaseDownloadWorker.enqueue(workManager)
                         }
                     },
-                    enabled = !isUpToDate && !isSearchingDatabaseInfo,
+                    enabled = canDownloadRemoteDatabase && !isUpToDate && !isSearchingDatabaseInfo,
                     modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 56.dp),
                     shape = RoundedCornerShape(12.dp),
                     colors = ButtonDefaults.buttonColors(
@@ -412,7 +413,7 @@ fun DatabaseDownloadCard(
                     fr.geotower.data.db.AppDatabase.closeDatabase()
 
                     // 2. Supprimer la base et ses fichiers temporaires
-                    context.deleteDatabase("geotower.db")
+                    context.deleteDatabase(GeoTowerDatabaseValidator.DB_NAME)
                     AppConfig.localDatabaseState.value = GeoTowerDatabaseValidator.LocalDatabaseState.MISSING
 
                     // 3. Déclencher le rafraîchissement visuel instantanément

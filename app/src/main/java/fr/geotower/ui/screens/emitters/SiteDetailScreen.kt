@@ -630,7 +630,11 @@ fun SiteDetailScreen(
                                 showEnbSheet = false
                                 uriHandler.openUri("https://enb-analytics.fr/analytics_${opNameUrl}.html")
                             }
-                            val has5G = info.frequences?.contains("5G", ignoreCase = true) == true
+                            val has5G = listOfNotNull(
+                                technique?.technologies,
+                                info.filtres,
+                                info.frequences
+                            ).any { it.contains("5G", ignoreCase = true) }
                             CommunityCard(title = txtMap5G, txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_enbanalytics, isEnabled = has5G, modifier = Modifier.weight(1f)) {
                                 if (has5G) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); showEnbSheet = false; uriHandler.openUri("https://enb-analytics.fr/analytics_nr_${opNameUrl}.html") }
                             }

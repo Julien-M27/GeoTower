@@ -20,6 +20,8 @@ import java.util.concurrent.TimeUnit
 object DatabaseDownloader {
 
     private const val DB_URL = "https://api.cajejuma.fr/api/v2/download/db"
+    private const val DB_INFO_URL = "https://api.cajejuma.fr/api/v2/db/info"
+    private const val DB_VERSION_URL = "https://api.cajejuma.fr/api/v2/download/version"
     private const val DB_NAME = GeoTowerDatabaseValidator.DB_NAME
     private val downloadClient: OkHttpClient by lazy {
         RetrofitClient.currentClient.newBuilder()
@@ -30,16 +32,8 @@ object DatabaseDownloader {
 
     fun getDatabaseSize(): Double {
         return try {
-            val request = Request.Builder()
-                .url(DB_URL)
-                .header("Accept-Encoding", "identity")
-                .build()
-
-            val response = RetrofitClient.currentClient.newCall(request).execute()
-            response.use {
-                val length = it.body?.contentLength() ?: 0L
-                if (length > 0) length / (1024.0 * 1024.0) else 0.0
-            }
+            val sizeBytes = readRemoteDatabaseInfo()?.optLong("size_bytes", 0L) ?: 0L
+            if (sizeBytes > 0L) sizeBytes / (1024.0 * 1024.0) else 0.0
         } catch (e: Exception) {
             0.0
         }
@@ -49,14 +43,30 @@ object DatabaseDownloader {
         return withContext(Dispatchers.IO) {
             try {
                 val request = Request.Builder()
-                    .url("https://api.cajejuma.fr/api/v2/download/version")
+                    .url(DB_VERSION_URL)
                     .build()
 
                 val response = RetrofitClient.currentClient.newCall(request).execute()
                 response.use {
                     if (!it.isSuccessful) return@withContext null
+                    val remoteInfo = readRemoteDatabaseInfo() ?: return@withContext null
                     val bodyString = it.body?.string() ?: return@withContext null
                     val json = org.json.JSONObject(bodyString)
+                    if (!json.has("schema_version") || !json.has("country_code")) {
+                        return@withContext null
+                    }
+                    val schemaVersion = json.optInt("schema_version")
+                    if (schemaVersion != GeoTowerDatabaseValidator.EXPECTED_SCHEMA_VERSION) {
+                        return@withContext null
+                    }
+                    val countryCode = json.optString("country_code")
+                    if (!countryCode.equals(GeoTowerDatabaseValidator.EXPECTED_COUNTRY_CODE, ignoreCase = true)) {
+                        return@withContext null
+                    }
+                    val dbName = json.optString("db_name", remoteInfo.optString("filename"))
+                    if (dbName != DB_NAME) {
+                        return@withContext null
+                    }
                     if (json.isNull("version")) null else json.optString("version")
                 }
             } catch (e: Exception) {
@@ -67,6 +77,12 @@ object DatabaseDownloader {
 
     suspend fun downloadUpdate(context: Context, onProgress: suspend (Int) -> Unit): Boolean {
         return withContext(Dispatchers.IO) {
+            if (readRemoteDatabaseInfo() == null) {
+                AppLogger.w(TAG, "Remote database is unavailable or incompatible")
+                return@withContext false
+            }
+
+            GeoTowerDatabaseValidator.deleteObsoleteDatabases(context)
             val dbFile = context.getDatabasePath(DB_NAME)
             dbFile.parentFile?.mkdirs()
 
@@ -83,7 +99,10 @@ object DatabaseDownloader {
                 val response = downloadClient.newCall(request).execute()
 
                 response.use { safeResponse ->
-                    if (!safeResponse.isSuccessful) return@withContext false
+                    if (!safeResponse.isSuccessful) {
+                        AppLogger.w(TAG, "Database download HTTP ${safeResponse.code}")
+                        return@withContext false
+                    }
 
                     val body = safeResponse.body ?: return@withContext false
                     val expectedContentLength = body.contentLength()
@@ -115,12 +134,15 @@ object DatabaseDownloader {
                     }
 
                     if (!hasExpectedDownloadSize(tempFile, expectedContentLength)) {
+                        AppLogger.w(TAG, "Downloaded database size mismatch")
                         tempFile.delete()
                         return@withContext false
                     }
                 }
 
-                if (!GeoTowerDatabaseValidator.validateDatabaseFile(tempFile).isValid) {
+                val validation = GeoTowerDatabaseValidator.validateDatabaseFile(tempFile)
+                if (!validation.isValid) {
+                    AppLogger.w(TAG, "Downloaded database validation failed: ${validation.reason}")
                     tempFile.delete()
                     return@withContext false
                 }
@@ -144,6 +166,45 @@ object DatabaseDownloader {
                 if (tempFile.exists()) tempFile.delete()
                 false
             }
+        }
+    }
+
+    private fun readRemoteDatabaseInfo(): org.json.JSONObject? {
+        val request = Request.Builder()
+            .url(DB_INFO_URL)
+            .header("Accept-Encoding", "identity")
+            .build()
+
+        return try {
+            RetrofitClient.currentClient.newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return null
+                val body = response.body?.string() ?: return null
+                val json = org.json.JSONObject(body)
+
+                val filename = json.optString("filename")
+                if (filename != DB_NAME) return null
+
+                if (
+                    json.has("schema_version") &&
+                    json.optInt("schema_version") != GeoTowerDatabaseValidator.EXPECTED_SCHEMA_VERSION
+                ) {
+                    return null
+                }
+
+                if (
+                    json.has("country_code") &&
+                    !json.optString("country_code").equals(
+                        GeoTowerDatabaseValidator.EXPECTED_COUNTRY_CODE,
+                        ignoreCase = true
+                    )
+                ) {
+                    return null
+                }
+
+                json
+            }
+        } catch (e: Exception) {
+            null
         }
     }
 

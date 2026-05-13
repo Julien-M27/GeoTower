@@ -4,20 +4,35 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import fr.geotower.data.models.FaisceauxEntity
-import fr.geotower.data.models.LocalisationEntity
-import fr.geotower.data.models.PhysiqueEntity
-import fr.geotower.data.models.TechniqueEntity
+import fr.geotower.data.models.AntenneDbEntity
+import fr.geotower.data.models.LocalisationDbEntity
+import fr.geotower.data.models.MetadataDbEntity
+import fr.geotower.data.models.RefCommuneDbEntity
+import fr.geotower.data.models.RefNatureDbEntity
+import fr.geotower.data.models.RefOperateurDbEntity
+import fr.geotower.data.models.RefProprietaireDbEntity
+import fr.geotower.data.models.RefStatutDbEntity
+import fr.geotower.data.models.RefSystemeDbEntity
+import fr.geotower.data.models.RefTypeAntenneDbEntity
+import fr.geotower.data.models.SupportDbEntity
+import fr.geotower.data.models.TechniqueDbEntity
 
 @Database(
     entities = [
-        LocalisationEntity::class,
-        TechniqueEntity::class,
-        PhysiqueEntity::class,
-        FaisceauxEntity::class
-        // ✅ ON A SUPPRIMÉ METADATA ICI !
+        LocalisationDbEntity::class,
+        TechniqueDbEntity::class,
+        SupportDbEntity::class,
+        AntenneDbEntity::class,
+        RefOperateurDbEntity::class,
+        RefNatureDbEntity::class,
+        RefProprietaireDbEntity::class,
+        RefTypeAntenneDbEntity::class,
+        RefSystemeDbEntity::class,
+        RefStatutDbEntity::class,
+        RefCommuneDbEntity::class,
+        MetadataDbEntity::class
     ],
-    version = 1,
+    version = GeoTowerDatabaseValidator.EXPECTED_SCHEMA_VERSION,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -31,8 +46,6 @@ abstract class AppDatabase : RoomDatabase() {
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 val appContext = context.applicationContext
-                // Keep the hot path cheap: the full integrity check is done on download/splash/settings.
-                // Here we only prevent Room from creating an empty replacement when geotower.db is absent.
                 val fileStatus = GeoTowerDatabaseValidator.getInstalledDatabaseFileStatus(appContext)
                 if (fileStatus.state != GeoTowerDatabaseValidator.LocalDatabaseState.VALID) {
                     closeDatabase()
@@ -42,7 +55,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     appContext,
                     AppDatabase::class.java,
-                    "geotower.db" // ⚠️ TRÈS IMPORTANT : C'est le nom exact du fichier téléchargé
+                    GeoTowerDatabaseValidator.DB_NAME
                 )
                     .build()
                 try {
@@ -54,14 +67,16 @@ abstract class AppDatabase : RoomDatabase() {
                         appContext,
                         e.message ?: "Schema Room incompatible"
                     )
-                    throw InvalidGeoTowerDatabaseException("Schema Room incompatible avec geotower.db", e)
+                    throw InvalidGeoTowerDatabaseException(
+                        "Schema Room incompatible avec ${GeoTowerDatabaseValidator.DB_NAME}",
+                        e
+                    )
                 }
                 INSTANCE = instance
                 instance
             }
         }
 
-        // 🎯 Voici la fameuse fonction qui manquait pour ton bouton !
         fun closeDatabase() {
             INSTANCE?.close()
             INSTANCE = null

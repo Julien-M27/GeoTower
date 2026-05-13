@@ -757,7 +757,7 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
 
             // 2. Base de données locale (Extraction Directe)
             try {
-                val dbPath = context.getDatabasePath("geotower.db")
+                val dbPath = context.getDatabasePath(fr.geotower.data.db.GeoTowerDatabaseValidator.DB_NAME)
                 val localStatus = fr.geotower.data.db.GeoTowerDatabaseValidator.getInstalledDatabaseFileStatus(context)
                 if (localStatus.state == fr.geotower.data.db.GeoTowerDatabaseValidator.LocalDatabaseState.VALID) {
                     val db = android.database.sqlite.SQLiteDatabase.openDatabase(dbPath.absolutePath, null, android.database.sqlite.SQLiteDatabase.OPEN_READONLY)

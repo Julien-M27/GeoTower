@@ -41,6 +41,19 @@ internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
             "Added app update checks",
             "Adição da verificação de atualizações da aplicação"
         )
+        item(
+            "Correction liée à la nouvelle architecture de base de données",
+            "Fixed an issue related to the new database architecture",
+            "Correção relacionada com a nova arquitetura da base de dados"
+        )
+    }
+
+    section("Détail des sites", "Site details", "Detalhe dos sites") {
+        item(
+            "Correction de l'affichage du spectre des FH",
+            "Fixed microwave link spectrum display",
+            "Correção da apresentação do espectro FH"
+        )
     }
 
     section("Paramètres", "Settings", "Definições") {

@@ -11,7 +11,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -106,6 +105,7 @@ import java.text.Normalizer
 import java.util.Locale
 
 private const val TAG_NEAR_EMITTERS = "GeoTower"
+private const val NEARBY_RELOAD_DISTANCE_METERS = 100f
 
 data class UiSite(
     val id: Long,
@@ -190,6 +190,7 @@ fun NearEmittersScreen(
     }
 
     var userLocation by remember { mutableStateOf<Location?>(null) }
+    var searchCenter by remember { mutableStateOf<Location?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var sites by remember { mutableStateOf<List<UiSite>>(emptyList()) }
     var filteredSites by remember { mutableStateOf<List<UiSite>>(emptyList()) }
@@ -230,11 +231,15 @@ fun NearEmittersScreen(
     }
 
     // --- 1 & 2. CHARGEMENT ET TRAITEMENT (Fusionnés pour un chargement fluide) ---
-    LaunchedEffect(userLocation, searchRadiusMultiplier) {
-        val currentLoc = userLocation ?: Location("").apply {
-            latitude = 48.8566
-            longitude = 2.3522
+    LaunchedEffect(userLocation) {
+        val location = userLocation ?: return@LaunchedEffect
+        if (shouldRefreshNearbySearchCenter(searchCenter, location)) {
+            searchCenter = Location(location)
         }
+    }
+
+    LaunchedEffect(searchCenter, searchRadiusMultiplier) {
+        val currentLoc = searchCenter ?: return@LaunchedEffect
 
         isLoading = true
 
@@ -255,16 +260,18 @@ fun NearEmittersScreen(
             }
 
             // B. TRAITEMENT ET FORMATAGE
-            if (newAntennas.isNotEmpty()) {
-                val finalSites = mapAntennasToUiSites(
+            val finalSites = if (newAntennas.isNotEmpty()) {
+                mapAntennasToUiSites(
                     repository = repository,
                     antennas = newAntennas,
                     referenceLocation = currentLoc
                 ).sortedBy { it.distance }
+            } else {
+                emptyList()
+            }
 
-                withContext(Dispatchers.Main) {
-                    sites = finalSites
-                }
+            withContext(Dispatchers.Main) {
+                sites = finalSites
             }
 
             // C. ON ARRÊTE LE CHARGEMENT (Garanti de s'exécuter à 100%)
@@ -303,7 +310,7 @@ fun NearEmittersScreen(
             delay(800) // Petit délai pour ne pas spammer la recherche pendant la frappe
             isSearchingRemote = true
 
-            val referenceLocation = userLocation
+            val referenceLocation = searchCenter ?: userLocation
             withContext(Dispatchers.IO) {
                 try {
                     val globalAntennas = mutableListOf<LocalisationEntity>()
@@ -588,7 +595,7 @@ fun NearEmittersScreen(
                         if (showNearbySites) {
                             Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
                                 when {
-                                    userLocation == null -> {
+                                    searchCenter == null -> {
                                         Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                                             LoadingIndicator()
                                             Spacer(modifier = Modifier.height(8.dp))
@@ -640,7 +647,7 @@ fun NearEmittersScreen(
                                                     ) {
                                                         Text(AppStrings.loadMoreSites, fontWeight = FontWeight.Bold)
                                                     }
-                                                } else if (userLocation != null && searchQuery.isEmpty()) {
+                                                } else if (searchCenter != null && searchQuery.isEmpty()) {
                                                     OutlinedButton(
                                                         onClick = {
                                                             safeClick {
@@ -977,7 +984,8 @@ fun EmitterCard(
     }
 
     Card(
-        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        onClick = onClick,
+        modifier = Modifier.fillMaxWidth(),
         shape = cardShape,
         colors = CardDefaults.cardColors(containerColor = cardColor),
         elevation = CardDefaults.cardElevation(if (useOneUi) 0.dp else 2.dp)
@@ -1092,6 +1100,16 @@ private fun calculateDistance(lat1: Double, lon1: Double, lat2: Double, lon2: Do
     return res[0]
 }
 
+private fun shouldRefreshNearbySearchCenter(current: Location?, next: Location): Boolean {
+    if (current == null) return true
+    return calculateDistance(
+        current.latitude,
+        current.longitude,
+        next.latitude,
+        next.longitude
+    ) >= NEARBY_RELOAD_DISTANCE_METERS
+}
+
 private suspend fun mapAntennasToUiSites(
     repository: AnfrRepository,
     antennas: List<LocalisationEntity>,
@@ -1101,8 +1119,8 @@ private suspend fun mapAntennasToUiSites(
         "${String.format(Locale.US, "%.4f", it.latitude)}_${String.format(Locale.US, "%.4f", it.longitude)}"
     }
     val idAnfrs = antennas.map { it.idAnfr }.filter { it.isNotBlank() }.distinct()
-    val techniquesById = repository.getTechniqueDetailsByIds(idAnfrs)
-    val physiquesById = repository.getPhysiqueDetailsByIds(idAnfrs)
+    val techniquesById = repository.getTechniqueSummariesByIds(idAnfrs)
+    val physiquesById = repository.getPhysiqueSummariesByIds(idAnfrs)
 
     return groupedSites.values.map { list ->
         val main = list.first()
@@ -1131,7 +1149,7 @@ private suspend fun mapAntennasToUiSites(
         val technicalParts = list.flatMap {
             listOfNotNull(it.filtres, it.frequences, it.azimuts, it.azimutsFh)
         } + techniques.flatMap {
-            listOfNotNull(it.technologies, it.detailsFrequences, it.statut)
+            listOfNotNull(it.technologies, it.statut)
         }
         val technologies = extractNearbyTechnologies(technicalParts)
         val technicalText = (technicalParts + technologies).joinToString(" ")

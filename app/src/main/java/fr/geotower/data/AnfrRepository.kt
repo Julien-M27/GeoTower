@@ -118,6 +118,19 @@ class AnfrRepository(
             .associateBy { it.idAnfr }
     }
 
+    suspend fun getTechniqueSummariesByIds(idAnfrs: List<String>): Map<String, TechniqueEntity> {
+        val distinctIds = idAnfrs.filter { it.isNotBlank() }.distinct()
+        if (distinctIds.isEmpty()) return emptyMap()
+
+        return distinctIds.chunked(SQLITE_IN_CLAUSE_BATCH_SIZE)
+            .flatMap { chunk ->
+                queryLocalDatabase(emptyList<TechniqueEntity>()) {
+                    getTechniqueSummariesByIds(chunk)
+                }
+            }
+            .associateBy { it.idAnfr }
+    }
+
     suspend fun getPhysiqueDetailsByIds(idAnfrs: List<String>): Map<String, List<PhysiqueEntity>> {
         val distinctIds = idAnfrs.filter { it.isNotBlank() }.distinct()
         if (distinctIds.isEmpty()) return emptyMap()
@@ -126,6 +139,19 @@ class AnfrRepository(
             .flatMap { chunk ->
                 queryLocalDatabase(emptyList<PhysiqueEntity>()) {
                     getPhysiqueDetailsByIds(chunk)
+                }
+            }
+            .groupBy { it.idAnfr }
+    }
+
+    suspend fun getPhysiqueSummariesByIds(idAnfrs: List<String>): Map<String, List<PhysiqueEntity>> {
+        val distinctIds = idAnfrs.filter { it.isNotBlank() }.distinct()
+        if (distinctIds.isEmpty()) return emptyMap()
+
+        return distinctIds.chunked(SQLITE_IN_CLAUSE_BATCH_SIZE)
+            .flatMap { chunk ->
+                queryLocalDatabase(emptyList<PhysiqueEntity>()) {
+                    getPhysiqueSummariesByIds(chunk)
                 }
             }
             .groupBy { it.idAnfr }

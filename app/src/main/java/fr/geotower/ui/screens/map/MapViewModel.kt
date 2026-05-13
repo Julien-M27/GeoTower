@@ -70,7 +70,8 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
                             latitude = cluster.centerLat,
                             longitude = cluster.centerLon,
                             azimuts = null, codeInsee = null, azimutsFh = null,
-                            filtres = null
+                            techMask = 0,
+                            bandMask = 0
                         )
                     }
                     _antennas.value = fakeAntennas

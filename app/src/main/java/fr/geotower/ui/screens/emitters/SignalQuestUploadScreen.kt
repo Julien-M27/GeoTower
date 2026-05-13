@@ -445,7 +445,8 @@ fun SignalQuestUploadScreen(
                                     azimuts = azimuts,
                                     codeInsee = null,
                                     azimutsFh = null,
-                                    filtres = null
+                                    techMask = 0,
+                                    bandMask = 0
                                 ))
                             }
 

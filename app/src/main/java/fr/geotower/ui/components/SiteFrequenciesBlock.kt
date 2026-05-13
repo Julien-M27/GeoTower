@@ -41,6 +41,7 @@ fun SiteFrequenciesBlock(
     val txtTechnically = AppStrings.technically
     val txtUnknownStatus = AppStrings.unknownStatus
     val txtProjectApproved = AppStrings.projectApproved
+    val txtMicrowaveLinks = AppStrings.throughputBackhaulLabel("radio")
 
     // ✅ NOUVELLES TRADUCTIONS RÉCUPÉRÉES
     val txtUnknown = AppStrings.unknown
@@ -92,6 +93,9 @@ fun SiteFrequenciesBlock(
         }
     }
 
+    val mobileBands = remember(parsedBands) { parsedBands.filter { it.gen in 2..5 } }
+    val fhBands = remember(parsedBands) { parsedBands.filter { it.gen !in 2..5 } }
+
     Card(
         shape = blockShape,
         colors = CardDefaults.cardColors(containerColor = cardBgColor),
@@ -124,7 +128,20 @@ fun SiteFrequenciesBlock(
                     )
                 } else {
                     // 👇 TON CODE ACTUEL COMMENCE ICI 👇
-                    parsedBands.forEachIndexed { index, band ->
+                    val sectionedBands = mobileBands + fhBands
+                    sectionedBands.forEachIndexed { index, band ->
+                        if (index == mobileBands.size && fhBands.isNotEmpty()) {
+                            if (mobileBands.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                            }
+                            Text(
+                                text = txtMicrowaveLinks,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.primary,
+                                fontSize = 14.sp,
+                                modifier = Modifier.padding(bottom = 10.dp)
+                            )
+                        }
                         val (statusColor, statusText) = when {
                         band.status.contains("En service", true) -> Pair(Color(0xFF4CAF50), txtInService)
                         band.status.contains("Techniquement", true) -> Pair(Color(0xFF4CAF50), txtTechnically)
@@ -144,7 +161,7 @@ fun SiteFrequenciesBlock(
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                        modifier = Modifier.fillMaxWidth().padding(bottom = if (index == parsedBands.lastIndex) 0.dp else 12.dp)
+                        modifier = Modifier.fillMaxWidth().padding(bottom = if (index == sectionedBands.lastIndex) 0.dp else 12.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -214,7 +231,10 @@ fun SiteFrequenciesBlock(
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
-                                val preciseFreqs = band.rawFreq.substringAfter(":", "").trim()
+                                val preciseFreqs = band.spectrumLines
+                                    .ifEmpty { listOf(band.rawFreq.substringAfter(":", "").trim()) }
+                                    .filter { it.isNotBlank() }
+                                    .joinToString("\n")
 
                                 // ✅ ÉTAPE 1 : On vérifie si le switch maître du spectre est activé
                                 if (AppConfig.siteShowSpectrum.value && preciseFreqs.isNotBlank() && preciseFreqs != band.rawFreq.trim()) {
@@ -224,7 +244,7 @@ fun SiteFrequenciesBlock(
 
                                     val regex = Regex("""([0-9]+(?:[.,][0-9]+)?)\s*-\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]*Hz)?""")
 
-                                    val detailedFreqs = regex.replace(preciseFreqs) { match ->
+                                    val detailedFreqs = regex.findAll(preciseFreqs).joinToString("\n") { match ->
                                         val n1 = match.groupValues[1].replace(',', '.').toDoubleOrNull() ?: 0.0
                                         val n2 = match.groupValues[2].replace(',', '.').toDoubleOrNull() ?: 0.0
                                         val unit = match.groupValues[3].takeIf { it.isNotBlank() } ?: "MHz"
@@ -237,11 +257,17 @@ fun SiteFrequenciesBlock(
                                         val diffStr = if (diff % 1.0 == 0.0) diff.toInt().toString() else String.format(java.util.Locale.US, "%.1f", diff)
 
                                         "${match.groupValues[1]}-${match.groupValues[2]} $unit [$diffStr $unit]".trim()
-                                    }
+                                    }.ifBlank { preciseFreqs }
 
                                     // ✅ ÉTAPE 2 : On affiche le détail par bande uniquement si son switch est actif
                                     if (AppConfig.siteShowSpectrumBand.value) {
-                                        Text(text = "${AppStrings.spectrumByBand} : $detailedFreqs", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                        Text(
+                                            text = "${AppStrings.spectrumByBand} :\n\n$detailedFreqs",
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            lineHeight = 16.sp
+                                        )
                                     }
 
                                     // ✅ ÉTAPE 3 : On affiche le spectre total uniquement si son switch est actif et qu'il y a une valeur
@@ -254,6 +280,13 @@ fun SiteFrequenciesBlock(
                                         }
 
                                         Text(text = "${AppStrings.totalspectrum} : $totalStr $detectedUnit", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(
+                                            text = AppStrings.totalSpectrumWarning,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+                                            fontSize = 11.sp,
+                                            lineHeight = 13.sp
+                                        )
                                     }
 
                                     // Espacement final uniquement si l'un des deux éléments a été affiché
@@ -324,7 +357,14 @@ data class FreqBand(
     val date: String,
     val physDetails: List<String>,
     val gen: Int,
-    val value: Int
+    val value: Int,
+    val spectrumLines: List<String> = emptyList()
+)
+
+private data class FrequencyAccumulator(
+    val band: FreqBand,
+    val physDetails: MutableSet<String> = mutableSetOf(),
+    val spectrumLines: MutableSet<String> = mutableSetOf()
 )
 
 // ✅ NOUVEAU : On passe les traductions en paramètres pour plus de sécurité
@@ -333,7 +373,7 @@ fun parseAndSortFrequencies(freqStr: String?, txtUnknown: String, txtAzimuthNotS
     if (freqStr.isNullOrBlank()) return emptyList()
 
     val parsedLines = freqStr.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
-    val tempMap = mutableMapOf<String, Pair<FreqBand, MutableSet<String>>>()
+    val tempMap = mutableMapOf<String, FrequencyAccumulator>()
 
     for (line in parsedLines) {
         val parts = line.split("|").map { it.trim() }
@@ -343,31 +383,45 @@ fun parseAndSortFrequencies(freqStr: String?, txtUnknown: String, txtAzimuthNotS
         val phys = parts.getOrNull(3) ?: ""
 
         val systemName = rawFrequencies.substringBefore(":").trim().uppercase()
+        val isFh = isMicrowaveSystem(systemName)
+        val g = when {
+            isFh -> 0
+            systemName.contains("5G", true) || systemName.contains("NR", true) -> 5
+            systemName.contains("4G", true) || systemName.contains("LTE", true) -> 4
+            systemName.contains("3G", true) || systemName.contains("UMTS", true) -> 3
+            systemName.contains("2G", true) || systemName.contains("GSM", true) -> 2
+            else -> 0
+        }
+        val groupingKey = frequencyGroupingKey(systemName, rawFrequencies, status, dateStr, g, isFh)
+        val preciseFrequencies = rawFrequencies.substringAfter(":", "").trim()
 
-        if (!tempMap.containsKey(systemName)) {
-            val g = when {
-                systemName.contains("5G", true) || systemName.contains("NR", true) -> 5
-                systemName.contains("4G", true) || systemName.contains("LTE", true) -> 4
-                systemName.contains("3G", true) || systemName.contains("UMTS", true) -> 3
-                systemName.contains("2G", true) || systemName.contains("GSM", true) -> 2
-                else -> 0
-            }
-            val freqValue = Regex("\\d+").findAll(systemName).map { it.value.toInt() }.maxOrNull() ?: 0
+        val accumulator = tempMap.getOrPut(groupingKey) {
+            val freqValue = frequencySortValue(systemName, rawFrequencies, isFh)
 
             val band = FreqBand(rawFrequencies, status, dateStr, emptyList(), g, freqValue)
-            tempMap[systemName] = Pair(band, mutableSetOf())
+            FrequencyAccumulator(band)
+        }
+
+        if (preciseFrequencies.isNotBlank() && preciseFrequencies != rawFrequencies.trim()) {
+            accumulator.spectrumLines.add(preciseFrequencies)
         }
 
         // ✅ TRADUIT
         if (phys.isNotBlank() && phys != "Azimut non spécifié" && phys != txtAzimuthNotSpecified) {
-            tempMap[systemName]!!.second.add(phys)
+            accumulator.physDetails.add(phys)
         }
     }
 
     // ✅ TRI SELON L'ORDRE PERSONNALISÉ
     // ✅ APPLICATION DE L'ORDRE PERSONNALISÉ
-    return tempMap.values.map { (band, physSet) ->
-        band.copy(physDetails = physSet.toList().sorted())
+    return tempMap.values.map { accumulator ->
+        accumulator.band.copy(
+            physDetails = accumulator.physDetails.toList().sorted(),
+            spectrumLines = accumulator.spectrumLines.toList().sortedWith(compareBy(
+                { frequencySortValue("", it, isFh = true) },
+                { it }
+            ))
+        )
     }.sortedWith(compareBy(
         // 1. On trie par Technologie (selon ton ordre personnalisé)
         { AppConfig.siteTechnoOrder.value.indexOf(if(it.gen == 5) "5G" else if(it.gen == 4) "4G" else if(it.gen == 3) "3G" else if(it.gen == 2) "2G" else "FH") },
@@ -382,8 +436,45 @@ fun parseAndSortFrequencies(freqStr: String?, txtUnknown: String, txtAzimuthNotS
             }
             val idx = orderList.indexOf(band.value.toString())
             if (idx == -1) 999 else idx // Si fréquence inconnue, on la met à la fin
-        }
+        },
+        { band -> if (band.gen == 0) band.value else 0 },
+        { band -> band.rawFreq }
     ))
+}
+
+private fun isMicrowaveSystem(systemName: String): Boolean {
+    return systemName.contains("FH", ignoreCase = true) ||
+        systemName.contains("FAISCEAU", ignoreCase = true) ||
+        systemName.contains("HERTZIEN", ignoreCase = true)
+}
+
+private fun frequencyGroupingKey(
+    systemName: String,
+    rawFrequencies: String,
+    status: String,
+    dateStr: String,
+    gen: Int,
+    isFh: Boolean
+): String {
+    if (!isFh && gen in 2..5) return systemName
+
+    val preciseFrequencies = rawFrequencies.substringAfter(":", rawFrequencies).trim()
+    return listOf(
+        systemName,
+        preciseFrequencies.uppercase(),
+        status.trim().uppercase(),
+        dateStr.trim()
+    ).joinToString("|")
+}
+
+private fun frequencySortValue(systemName: String, rawFrequencies: String, isFh: Boolean): Int {
+    val source = if (isFh) {
+        rawFrequencies.substringAfter(":", rawFrequencies)
+    } else {
+        systemName
+    }
+    val values = Regex("\\d+").findAll(source).mapNotNull { it.value.toIntOrNull() }.toList()
+    return if (isFh) values.firstOrNull() ?: 0 else values.maxOrNull() ?: 0
 }
 
 private fun bandEquivalentLabel(gen: Int, value: Int): String? {
@@ -599,7 +690,10 @@ fun FrequenciesGridView(
         val technoName = displayFrequencyBandLabel(band)
         val bandEquivalent = null
 
-        val freqs = band.rawFreq.substringAfter(":", "").trim()
+        val freqs = band.spectrumLines
+            .ifEmpty { listOf(band.rawFreq.substringAfter(":", "").trim()) }
+            .filter { it.isNotBlank() }
+            .joinToString("\n")
 
         // Remplacement élégant des tirets par des "à" comme sur l'image modèle
         val displayFreqs = if (freqs.isNotBlank()) {
@@ -614,7 +708,7 @@ fun FrequenciesGridView(
                     }
                 }
                 .replace(Regex("""\s*,\s*"""), ", ")
-                .replace(Regex("""\s+"""), " ")
+                .replace(Regex("""[ \t]+"""), " ")
                 .trim()
         } else {
             "-"
