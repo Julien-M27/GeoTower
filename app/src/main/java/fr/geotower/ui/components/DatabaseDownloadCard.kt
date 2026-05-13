@@ -41,10 +41,11 @@ fun DatabaseDownloadCard(
     border: BorderStroke?,
     bubbleColor: Color,
     title: String? = null,
-    onSafeClick: (() -> Unit) -> Unit = { it() }
+    onSafeClick: SafeClick? = null
 ) {
     val context = LocalContext.current
     val workManager = remember { androidx.work.WorkManager.getInstance(context) }
+    val safeClick = onSafeClick ?: rememberSafeClick()
     val workInfos by workManager.getWorkInfosForUniqueWorkFlow(DatabaseDownloadWorker.UNIQUE_WORK_NAME).collectAsState(initial = emptyList())
     val currentWork = workInfos.firstOrNull()
 
@@ -315,7 +316,7 @@ fun DatabaseDownloadCard(
                     // ✅ NOUVEAU : Le bouton pour annuler le téléchargement via WorkManager
                     OutlinedButton(
                         onClick = {
-                            onSafeClick {
+                            safeClick("database_cancel_download") {
                                 workManager.cancelUniqueWork(DatabaseDownloadWorker.UNIQUE_WORK_NAME)
                             }
                         },
@@ -338,7 +339,7 @@ fun DatabaseDownloadCard(
 
                 Button(
                     onClick = {
-                        onSafeClick {
+                        safeClick("database_start_download") {
                             DatabaseDownloadWorker.enqueue(workManager)
                         }
                     },

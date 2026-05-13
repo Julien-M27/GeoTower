@@ -415,13 +415,20 @@ class MainActivity : ComponentActivity() {
 
                             // Paramètres
                             composable(
-                                route = "settings?section={section}",
-                                arguments = listOf(navArgument("section") { type = NavType.StringType; nullable = true; defaultValue = null }),
-                                deepLinks = listOf(navDeepLink { uriPattern = "geotower://settings?section={section}" })
+                                route = "settings?section={section}&target_map={targetMapFilename}",
+                                arguments = listOf(
+                                    navArgument("section") { type = NavType.StringType; nullable = true; defaultValue = null },
+                                    navArgument("targetMapFilename") { type = NavType.StringType; nullable = true; defaultValue = null }
+                                ),
+                                deepLinks = listOf(
+                                    navDeepLink { uriPattern = "geotower://settings?section={section}&target_map={targetMapFilename}" },
+                                    navDeepLink { uriPattern = "geotower://settings?section={section}" }
+                                )
                             ) { backStackEntry ->
                                 val section = backStackEntry.arguments?.getString("section")
+                                val targetMapFilename = backStackEntry.arguments?.getString("targetMapFilename")
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    SettingsScreen(navController, repository, section)
+                                    SettingsScreen(navController, repository, section, targetMapFilename)
                                 }
                             }
 

@@ -139,9 +139,6 @@ object AppConfig {
     var shareMapAttribution = mutableStateOf(true)
     var shareMapConfidential = mutableStateOf(false)
 
-    // Autres
-    var useOfflineMap = mutableStateOf(false)
-
     // Variable globale pour l'opérateur par défaut
     val defaultOperator = mutableStateOf("Aucun")
 
@@ -292,10 +289,6 @@ object AppConfig {
         siteShowCellularFrPhotos.value = prefs.getBoolean("site_show_cellularfr_photos", true)
         siteShowSignalQuestPhotos.value = prefs.getBoolean("site_show_signalquest_photos", true)
         siteShowSchemes.value = prefs.getBoolean("site_show_schemes", true)
-
-        // Chargement de l'ordre des blocs (incluant 'status' par défaut)
-        val pageOrder = prefs.getString("page_support_order", "map,status,details,photos,nav,share,operators")
-        // Note : Si vous utilisez une variable globale pour stocker cet ordre, assurez-vous de la mettre à jour ici.
 
         // --- CHARGEMENT DE L'ORDRE DES TECHNOLOGIES ET FRÉQUENCES ---
         val tOrder = prefs.getString("site_techno_order", "5G,4G,3G,2G,FH")

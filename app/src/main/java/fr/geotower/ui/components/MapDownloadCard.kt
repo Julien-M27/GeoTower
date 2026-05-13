@@ -15,6 +15,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -25,9 +27,48 @@ import androidx.work.WorkInfo
 import androidx.work.workDataOf
 import fr.geotower.data.api.RetrofitClient
 import fr.geotower.data.models.OfflineMapDto
+import fr.geotower.data.workers.DownloadNotificationCenter
 import fr.geotower.data.workers.OfflineMapDownloadValidator
 import fr.geotower.utils.AppStrings
 import java.io.File
+import kotlin.math.abs
+
+private data class MapRowViewportBounds(
+    val top: Float = Float.NaN,
+    val height: Int = 0
+) {
+    val bottom: Float
+        get() = top + height
+}
+
+private fun isMapRowAtBestViewportPosition(
+    bounds: MapRowViewportBounds,
+    viewportTop: Float,
+    viewportBottom: Float,
+    scrollValue: Int,
+    scrollMaxValue: Int
+): Boolean {
+    if (bounds.top.isNaN() || bounds.height <= 0 || viewportTop.isNaN() || viewportBottom.isNaN()) return false
+
+    val viewportHeight = viewportBottom - viewportTop
+    if (viewportHeight <= 0f) return false
+
+    val visibleTop = maxOf(bounds.top, viewportTop)
+    val visibleBottom = minOf(bounds.bottom, viewportBottom)
+    val visibleHeight = (visibleBottom - visibleTop).coerceAtLeast(0f)
+    val maxVisibleHeight = minOf(bounds.height.toFloat(), viewportHeight)
+    if (visibleHeight < maxVisibleHeight - 2f) return false
+
+    val idealScroll = (scrollValue + bounds.top - viewportTop)
+        .coerceIn(0f, scrollMaxValue.toFloat())
+    val topTolerance = maxOf(12f, bounds.height * 0.1f)
+
+    return abs(scrollValue - idealScroll) <= topTolerance
+}
+
+private fun mapDisplayName(map: OfflineMapDto): String {
+    return map.name.takeIf { it.isNotBlank() } ?: AppStrings.formatMapName(map.mapFilename)
+}
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -36,10 +77,17 @@ fun MapDownloadCard(
     shape: Shape,
     border: BorderStroke?,
     bubbleColor: Color,
-    onSafeClick: (() -> Unit) -> Unit = { it() }
+    viewportTop: Float = Float.NaN,
+    viewportBottom: Float = Float.NaN,
+    scrollValue: Int = 0,
+    scrollMaxValue: Int = 0,
+    targetMapFilename: String? = null,
+    onTargetMapPositioned: (Float, Int) -> Unit = { _, _ -> },
+    onSafeClick: SafeClick? = null
 ) {
     val context = LocalContext.current
     val workManager = remember { androidx.work.WorkManager.getInstance(context) }
+    val safeClick = onSafeClick ?: rememberSafeClick()
 
     val workInfos by workManager.getWorkInfosByTagFlow("map_download").collectAsState(initial = emptyList())
 
@@ -91,8 +139,9 @@ fun MapDownloadCard(
                 if (!isLoading && !isError && catalog.isNotEmpty()) {
                     IconButton(
                         onClick = {
-                            onSafeClick {
+                            safeClick("map_download_all") {
                                 catalog.forEach { map ->
+                                    val displayName = mapDisplayName(map)
                                     val mapFile = OfflineMapDownloadValidator.safeMapFile(mapsDir, map.mapFilename)
                                     val isDownloaded = mapFile?.exists() == true
                                     val currentWork = workInfos.find { it.tags.contains("map_id_${map.id}") }
@@ -101,6 +150,7 @@ fun MapDownloadCard(
                                     if (mapFile != null && !isDownloaded && !isSyncing) {
                                         val data = workDataOf(
                                             "map_url" to map.mapUrl,
+                                            "map_name" to displayName,
                                             "map_filename" to map.mapFilename,
                                             "estimated_size_mb" to map.estimatedSizeMb,
                                             "map_sha256" to map.sha256.orEmpty()
@@ -130,19 +180,41 @@ fun MapDownloadCard(
                 Text(AppStrings.networkErrorSearch, color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.CenterHorizontally))
             } else {
                 catalog.forEachIndexed { index, map ->
+                    val displayName = mapDisplayName(map)
                     val currentWork = workInfos.find { it.tags.contains("map_id_${map.id}") }
                     val isSyncing = currentWork?.state == WorkInfo.State.RUNNING || currentWork?.state == WorkInfo.State.ENQUEUED
                     val progressValue = currentWork?.progress?.getInt("progress", 0) ?: 0
+                    var rowBounds by remember(map.mapFilename) { mutableStateOf(MapRowViewportBounds()) }
+                    val isTargetMap = targetMapFilename == map.mapFilename
                     val isDownloaded = remember(fileRefreshTrigger, currentWork?.state) {
                         OfflineMapDownloadValidator.safeMapFile(mapsDir, map.mapFilename)?.exists() == true
                     }
 
-                    Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+                    LaunchedEffect(map.mapFilename, rowBounds, viewportTop, viewportBottom, scrollValue, scrollMaxValue) {
+                        if (isMapRowAtBestViewportPosition(rowBounds, viewportTop, viewportBottom, scrollValue, scrollMaxValue)) {
+                            DownloadNotificationCenter.clearOfflineMapResultNotification(context, map.mapFilename)
+                        }
+                    }
+
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp)
+                            .onGloballyPositioned { coordinates ->
+                                rowBounds = MapRowViewportBounds(
+                                    top = coordinates.positionInRoot().y,
+                                    height = coordinates.size.height
+                                )
+                                if (isTargetMap) {
+                                    onTargetMapPositioned(rowBounds.top, rowBounds.height)
+                                }
+                            }
+                    ) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.weight(1f)) {
                                 // On utilise notre nouvelle fonction de formatage pour un affichage propre
                                 Text(
-                                    text = AppStrings.formatMapName(map.mapFilename),
+                                    text = displayName,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp
                                 )
@@ -150,19 +222,20 @@ fun MapDownloadCard(
                             }
 
                             if (isSyncing) {
-                                IconButton(onClick = { onSafeClick { workManager.cancelUniqueWork("map_dl_${map.id}") } }) {
+                                IconButton(onClick = { safeClick("map_cancel_${map.id}") { workManager.cancelUniqueWork("map_dl_${map.id}") } }) {
                                     Icon(Icons.Default.Close, contentDescription = AppStrings.cancel, tint = MaterialTheme.colorScheme.error)
                                 }
                             } else if (isDownloaded) {
-                                IconButton(onClick = { onSafeClick { mapToDelete = map } }) {
+                                IconButton(onClick = { safeClick("map_delete_${map.id}") { mapToDelete = map } }) {
                                     Icon(Icons.Default.Delete, contentDescription = AppStrings.delete, tint = MaterialTheme.colorScheme.error)
                                 }
                             } else {
                                 IconButton(
                                     onClick = {
-                                        onSafeClick {
+                                        safeClick("map_download_${map.id}") {
                                             val data = workDataOf(
                                                 "map_url" to map.mapUrl,
+                                                "map_name" to displayName,
                                                 "map_filename" to map.mapFilename,
                                                 "estimated_size_mb" to map.estimatedSizeMb,
                                                 "map_sha256" to map.sha256.orEmpty()
@@ -200,7 +273,7 @@ fun MapDownloadCard(
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedButton(
                         onClick = {
-                            onSafeClick {
+                            safeClick("map_cancel_all") {
                                 workManager.cancelAllWorkByTag("map_download")
                             }
                         },

@@ -53,7 +53,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -79,10 +78,13 @@ import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.workers.DatabaseDownloadWorker
+import fr.geotower.ui.components.SafeClick
 import fr.geotower.ui.components.colorPaletteFadingEdge
+import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.services.LiveTrackingController
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.OperatorLogos
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -93,18 +95,9 @@ fun FirstStartScreen(
     repository: AnfrRepository,
     onFinished: () -> Unit
 ) {
-    var lastClickTime by remember { mutableLongStateOf(0L) }
-    val debounceTime = 700L
+    val safeClick = rememberSafeClick()
 
-    fun safeClick(action: () -> Unit) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastClickTime > debounceTime) {
-            lastClickTime = currentTime
-            action()
-        }
-    }
-
-    val totalSteps = 7
+    val totalSteps = 8
 
     // 1. La mémoire : Quelle est la page maximale atteinte ?
     var maxUnlockedStep by remember { mutableIntStateOf(0) }
@@ -114,14 +107,32 @@ fun FirstStartScreen(
 
     // 3. Un CoroutineScope pour animer le Pager lors du clic sur le bouton
     val coroutineScope = rememberCoroutineScope()
+    var pendingStep by remember { mutableStateOf<Int?>(null) }
+
+    LaunchedEffect(maxUnlockedStep, pendingStep) {
+        val targetStep = pendingStep
+        if (targetStep != null && maxUnlockedStep >= targetStep) {
+            pagerState.animateScrollToPage(targetStep)
+            pendingStep = null
+        }
+    }
 
     // 4. On garde une variable "currentStep" dérivée du pager pour le reste de ton code (Boutons, Indicateurs)
     val currentStep = pagerState.currentPage
 
+    fun goToStep(step: Int) {
+        val targetStep = step.coerceIn(0, totalSteps - 1)
+        if (maxUnlockedStep < targetStep) {
+            maxUnlockedStep = targetStep
+            pendingStep = targetStep
+        } else {
+            coroutineScope.launch { pagerState.animateScrollToPage(targetStep) }
+        }
+    }
+
     fun goToNextStep() {
         if (currentStep < totalSteps - 1) {
-            if (maxUnlockedStep < currentStep + 1) maxUnlockedStep = currentStep + 1
-            coroutineScope.launch { pagerState.animateScrollToPage(currentStep + 1) }
+            goToStep(currentStep + 1)
         } else {
             onFinished()
         }
@@ -253,17 +264,12 @@ fun FirstStartScreen(
                         when (page) {
                             0 -> StepWelcomeDesign()
                             1 -> StepLocationPermissionDesign()
-                            2 -> StepNotificationsPermissionDesign(
-                                shape = cardShape,
-                                border = cardBorder,
-                                bubbleColor = bubbleColor,
-                                useOneUi = useOneUi
-                            )
+                            2 -> StepNotificationsPermissionDesign()
                             // ✅ NOUVELLE PAGE INSÉRÉE ICI :
-                            3 -> StepThemeDesign(useOneUi, cardShape, cardBorder, bubbleColor, onSafeClick = { action -> safeClick(action) })
+                            3 -> StepThemeDesign(useOneUi, cardShape, cardBorder, bubbleColor, onSafeClick = safeClick)
                             // L'ancienne page 3 devient la 4 :
-                            4 -> StepMapDesign(useOneUi, bubbleColor, onSafeClick = { action -> safeClick(action) })
-                            5 -> StepDatabaseDesign(useOneUi, cardShape, cardBorder, bubbleColor, onSafeClick = { action -> safeClick(action) })
+                            4 -> StepMapDesign(useOneUi, bubbleColor, onSafeClick = safeClick)
+                            5 -> StepDatabaseDesign(useOneUi, cardShape, cardBorder, bubbleColor, onSafeClick = safeClick)
                             6 -> StepPreferencesDesign(
                                 useOneUi = useOneUi,
                                 cardShape = cardShape,
@@ -272,7 +278,15 @@ fun FirstStartScreen(
                                 onOpenOperatorSheet = { showOperatorSheet = true },
                                 onOpenLanguageSheet = { showLanguageSheet = true },
                                 onOpenUnitSheet = { showUnitSheet = true },
-                                onSafeClick = { action -> safeClick(action) }
+                                onSafeClick = safeClick
+                            )
+                            7 -> StepLiveNotificationsDesign(
+                                shape = cardShape,
+                                border = cardBorder,
+                                bubbleColor = bubbleColor,
+                                useOneUi = useOneUi,
+                                defaultOperator = defaultOperator,
+                                onOpenOperatorSheet = { showOperatorSheet = true }
                             )
                         }
                     }
@@ -299,7 +313,7 @@ fun FirstStartScreen(
             }
             Button(
                 onClick = {
-                    safeClick {
+                    safeClick("onboarding_primary_$currentStep") {
                         when(currentStep) {
                             0 -> {
                                 goToNextStep()
@@ -360,12 +374,7 @@ fun FirstStartScreen(
                                     showDbWarning = true
                                 } else {
                                     // ➡️ Passe à la page suivante normalement
-                                    if (maxUnlockedStep < currentStep + 1) {
-                                        maxUnlockedStep = currentStep + 1
-                                    }
-                                    coroutineScope.launch {
-                                        pagerState.animateScrollToPage(currentStep + 1)
-                                    }
+                                    goToNextStep()
                                 }
                             }
                         }
@@ -380,7 +389,7 @@ fun FirstStartScreen(
                 ),
                 shape = RoundedCornerShape(28.dp)
             ) {
-                Text(text = buttonText, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                Text(text = buttonText, fontSize = 18.sp)
                 Spacer(modifier = Modifier.width(8.dp))
                 if (currentStep == totalSteps - 1) {
                     Icon(Icons.Default.Check, contentDescription = null)
@@ -518,12 +527,7 @@ fun FirstStartScreen(
                     onClick = {
                         showDbWarning = false
                         // On force le passage à la page suivante !
-                        if (maxUnlockedStep < currentStep + 1) {
-                            maxUnlockedStep = currentStep + 1
-                        }
-                        coroutineScope.launch {
-                            pagerState.animateScrollToPage(currentStep + 1)
-                        }
+                        goToNextStep()
                     }
                 ) {
                     Text(AppStrings.continueAnyway, color = MaterialTheme.colorScheme.error)
@@ -559,12 +563,7 @@ fun FirstStartScreen(
                         fr.geotower.AppGlobalState.showDbSuccessPopup.value = false
 
                         // On débloque et on fait glisser la page automatiquement vers l'étape suivante !
-                        if (maxUnlockedStep < currentStep + 1) {
-                            maxUnlockedStep = currentStep + 1
-                        }
-                        coroutineScope.launch {
-                            pagerState.animateScrollToPage(currentStep + 1)
-                        }
+                        goToNextStep()
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
@@ -634,7 +633,7 @@ fun StepPreferencesDesign(
     onOpenOperatorSheet: () -> Unit,
     onOpenLanguageSheet: () -> Unit,
     onOpenUnitSheet: () -> Unit,
-    onSafeClick: (() -> Unit) -> Unit
+    onSafeClick: SafeClick
 ) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
@@ -654,13 +653,13 @@ fun StepPreferencesDesign(
         Spacer(modifier = Modifier.height(32.dp))
 
         // --- CARTE OPÉRATEUR ---
-        Surface(onClick = { onOpenOperatorSheet() }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
+        Surface(onClick = { onSafeClick("onboarding_operator") { onOpenOperatorSheet() } }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(AppStrings.defaultOperator, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(if (defaultOperator == "Aucun") AppStrings.selectOperator else AppStrings.current(defaultOperator), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
-                val operatorLogoRes = when (defaultOperator) { "Orange" -> R.drawable.logo_orange; "Bouygues", "Bouygues Telecom" -> R.drawable.logo_bouygues; "SFR" -> R.drawable.logo_sfr; "Free" -> R.drawable.logo_free; else -> null }
+                val operatorLogoRes = OperatorLogos.drawableRes(defaultOperator)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (operatorLogoRes != null) { Image(painter = painterResource(id = operatorLogoRes), contentDescription = null, modifier = Modifier.size(32.dp).clip(RoundedCornerShape(6.dp))); Spacer(modifier = Modifier.width(12.dp)) }
                     Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = AppStrings.select, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -680,7 +679,7 @@ fun StepPreferencesDesign(
         }
         val displayLanguage = AppStrings.languageDisplayName(appLanguage)
 
-        Surface(onClick = { onOpenLanguageSheet() }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
+        Surface(onClick = { onSafeClick("onboarding_language") { onOpenLanguageSheet() } }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(AppStrings.appLanguageLabel, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -695,7 +694,7 @@ fun StepPreferencesDesign(
         }
         Spacer(modifier = Modifier.height(16.dp))
         // --- CARTE UNITÉS ---
-        Surface(onClick = { onOpenUnitSheet() }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
+        Surface(onClick = { onSafeClick("onboarding_unit") { onOpenUnitSheet() } }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(AppStrings.unitSettingsTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -803,15 +802,7 @@ fun StepLocationPermissionDesign() {
 }
 
 @Composable
-fun StepNotificationsPermissionDesign(
-    shape: Shape,
-    border: BorderStroke?,
-    bubbleColor: Color,
-    useOneUi: Boolean
-) {
-    val context = LocalContext.current
-    val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-
+fun StepNotificationsPermissionDesign() {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         Spacer(modifier = Modifier.height(16.dp))
         Icon(Icons.Default.Notifications, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
@@ -848,47 +839,112 @@ fun StepNotificationsPermissionDesign(
                 description = AppStrings.onboardingNotificationsControlDesc
             )
         }
+    }
+}
 
-        Spacer(Modifier.height(12.dp))
+@Composable
+fun StepLiveNotificationsDesign(
+    shape: Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
+    useOneUi: Boolean,
+    defaultOperator: String,
+    onOpenOperatorSheet: () -> Unit
+) {
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val liveNotifsEnabled by AppConfig.enableLiveNotifications
+    val hasOperator = defaultOperator != "Aucun"
 
-        // --- NOUVEAU : NOTIFICATION LIVE ---
-        val liveNotifsEnabled by AppConfig.enableLiveNotifications
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        Spacer(modifier = Modifier.height(16.dp))
+        Icon(Icons.Default.Notifications, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(24.dp))
+
+        Text(AppStrings.onboardingLiveNotificationsTitle, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = AppStrings.onboardingLiveNotificationsDesc,
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        if (!hasOperator) {
+            Spacer(Modifier.height(12.dp))
+            Text(
+                text = AppStrings.liveNotificationRequiresOp,
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error
+            )
+        }
+
+        Spacer(Modifier.height(24.dp))
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            PermissionDetailItem(
+                icon = Icons.Default.Notifications,
+                title = AppStrings.onboardingLiveNotificationsOperatorTitle,
+                description = AppStrings.onboardingLiveNotificationsOperatorDesc
+            )
+            PermissionDetailItem(
+                icon = Icons.Default.LocationOn,
+                title = AppStrings.onboardingLiveNotificationsNearestTitle,
+                description = AppStrings.onboardingLiveNotificationsNearestDesc
+            )
+            PermissionDetailItem(
+                icon = Icons.Default.Check,
+                title = AppStrings.onboardingLiveNotificationsControlTitle,
+                description = AppStrings.onboardingLiveNotificationsControlDesc
+            )
+        }
+
+        Spacer(Modifier.height(16.dp))
 
         fr.geotower.ui.components.LiveNotificationCard(
-            title = AppStrings.liveNotificationTitle,
-            desc = AppStrings.liveNotificationDesc,
+            title = AppStrings.onboardingLiveNotificationsTitle,
+            desc = if (hasOperator) {
+                "${AppStrings.onboardingLiveNotificationsSelectedOperator} : $defaultOperator"
+            } else {
+                AppStrings.liveNotificationRequiresOp
+            },
             checked = liveNotifsEnabled,
             onCheckedChange = { isChecked ->
                 if (isChecked) {
                     val eligibility = LiveTrackingController.eligibility(context)
-                    if (
-                        eligibility == LiveTrackingController.StartResult.MissingNotifications &&
-                        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
-                    ) {
-                        (context as? android.app.Activity)?.requestPermissions(
-                            arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
-                            1004
-                        )
-                    }
 
-                    if (
-                        eligibility == LiveTrackingController.StartResult.Started ||
-                        eligibility == LiveTrackingController.StartResult.MissingOperator
-                    ) {
+                    if (eligibility == LiveTrackingController.StartResult.MissingOperator) {
                         AppConfig.enableLiveNotifications.value = true
                         prefs.edit().putBoolean("enable_live_notifications", true).apply()
+                        LiveTrackingController.stop(context)
+                        onOpenOperatorSheet()
+                    } else {
+                        if (
+                            eligibility == LiveTrackingController.StartResult.MissingNotifications &&
+                            android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
+                        ) {
+                            (context as? android.app.Activity)?.requestPermissions(
+                                arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                                1004
+                            )
+                        }
+
                         if (eligibility == LiveTrackingController.StartResult.Started) {
+                            AppConfig.enableLiveNotifications.value = true
+                            prefs.edit().putBoolean("enable_live_notifications", true).apply()
                             if (LiveTrackingController.shouldOpenPromotedNotificationSettings(context)) {
                                 LiveTrackingController.openPromotedNotificationSettings(context)
                             }
                             LiveTrackingController.startIfEligible(context)
                         } else {
+                            AppConfig.enableLiveNotifications.value = false
+                            prefs.edit().putBoolean("enable_live_notifications", false).apply()
                             LiveTrackingController.stop(context)
                         }
-                    } else {
-                        AppConfig.enableLiveNotifications.value = false
-                        prefs.edit().putBoolean("enable_live_notifications", false).apply()
-                        LiveTrackingController.stop(context)
                     }
                 } else {
                     AppConfig.enableLiveNotifications.value = false
@@ -906,7 +962,7 @@ fun StepNotificationsPermissionDesign(
 }
 
 @Composable
-fun StepThemeDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStroke?, bubbleColor: Color, onSafeClick: (() -> Unit) -> Unit) {
+fun StepThemeDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStroke?, bubbleColor: Color, onSafeClick: SafeClick) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
@@ -955,7 +1011,7 @@ fun StepThemeDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStrok
 }
 
 @Composable
-fun StepMapDesign(useOneUi: Boolean, bubbleColor: Color, onSafeClick: (() -> Unit) -> Unit) {
+fun StepMapDesign(useOneUi: Boolean, bubbleColor: Color, onSafeClick: SafeClick) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
@@ -994,7 +1050,7 @@ fun StepMapDesign(useOneUi: Boolean, bubbleColor: Color, onSafeClick: (() -> Uni
 // --- NOUVELLE ÉTAPE : BASE DE DONNÉES ---
 // ==========================================
 @Composable
-fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStroke?, bubbleColor: Color, onSafeClick: (() -> Unit) -> Unit) {
+fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStroke?, bubbleColor: Color, onSafeClick: SafeClick) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         Spacer(modifier = Modifier.height(16.dp))
         Icon(

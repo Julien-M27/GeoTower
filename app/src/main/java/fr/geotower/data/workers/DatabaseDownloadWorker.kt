@@ -33,7 +33,7 @@ class DatabaseDownloadWorker(
 
     private val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     private val channelId = "db_download_channel"
-    private val notificationId = NOTIFICATION_ID_PROGRESS
+    private val notificationId = DownloadNotificationCenter.DB_DOWNLOAD_PROGRESS_NOTIFICATION_ID
 
     override suspend fun doWork(): Result {
         createChannel()
@@ -202,7 +202,7 @@ class DatabaseDownloadWorker(
             .setAutoCancel(true)
             .build()
 
-        notifySafely(NOTIFICATION_ID_RESULT, notification)
+        notifySafely(DownloadNotificationCenter.DB_DOWNLOAD_RESULT_NOTIFICATION_ID, notification)
     }
 
     private fun showErrorNotification() {
@@ -215,7 +215,7 @@ class DatabaseDownloadWorker(
             .setSmallIcon(R.mipmap.ic_launcher_geotower)
             .setAutoCancel(true)
             .build()
-        notifySafely(NOTIFICATION_ID_RESULT, notification)
+        notifySafely(DownloadNotificationCenter.DB_DOWNLOAD_RESULT_NOTIFICATION_ID, notification)
     }
 
     companion object {
@@ -224,9 +224,6 @@ class DatabaseDownloadWorker(
 
         private const val TAG = "GeoTowerDb"
         private const val MAX_RETRY_ATTEMPTS = 3
-        private const val NOTIFICATION_ID_PROGRESS = 2101
-        private const val NOTIFICATION_ID_RESULT = 2102
-
         fun buildRequest() = OneTimeWorkRequestBuilder<DatabaseDownloadWorker>()
             .setConstraints(
                 Constraints.Builder()

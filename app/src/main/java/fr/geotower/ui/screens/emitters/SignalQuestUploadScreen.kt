@@ -55,7 +55,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -73,11 +72,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
+import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadRules
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.MapUtils
+import fr.geotower.utils.isNetworkAvailable
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.Marker
@@ -101,17 +102,7 @@ fun SignalQuestUploadScreen(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
 
-    // --- 0. ANTI-SPAM CLIC (Debounce) ---
-    var lastClickTime by remember { mutableStateOf(0L) }
-    val debounceTime = 700L
-
-    fun safeClick(action: () -> Unit) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastClickTime > debounceTime) {
-            lastClickTime = currentTime
-            action()
-        }
-    }
+    val safeClick = rememberSafeClick()
     var isBackNavigationLocked by remember { mutableStateOf(false) }
 
     fun handleBackNavigation() {
@@ -150,7 +141,7 @@ fun SignalQuestUploadScreen(
         mapFiles = files
 
         // Si hors-ligne ET présence de fichiers : on bascule.
-        if (!fr.geotower.ui.screens.map.isNetworkAvailable(context) && files.isNotEmpty()) {
+        if (!isNetworkAvailable(context) && files.isNotEmpty()) {
             effectiveProvider = 4
         }
     }

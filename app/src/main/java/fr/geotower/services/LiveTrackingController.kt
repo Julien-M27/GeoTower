@@ -36,16 +36,6 @@ object LiveTrackingController {
         return StartResult.Started
     }
 
-    fun sync(context: Context): StartResult {
-        val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-        return if (prefs.getBoolean("enable_live_notifications", false)) {
-            startIfEligible(context)
-        } else {
-            stop(context)
-            StartResult.Stopped
-        }
-    }
-
     fun startOnAppLaunchIfEnabled(context: Context): StartResult {
         val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("enable_live_notifications", false)) return StartResult.Stopped

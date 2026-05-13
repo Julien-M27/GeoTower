@@ -6,27 +6,34 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.State
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 
 @Composable
 fun rememberNetworkConnectivityState(): State<Boolean> {
-    val context = LocalContext.current
+    return rememberNetworkConnectivityState(LocalContext.current)
+}
+
+@Composable
+fun rememberNetworkConnectivityState(context: Context): State<Boolean> {
     val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    val isOnlineState = remember(context) { mutableStateOf(isNetworkAvailable(context)) }
 
-    return produceState(initialValue = true) {
-        // 1. Vérification de l'état initial au lancement
-        val activeNetwork = connectivityManager.activeNetwork
-        val capabilities = connectivityManager.getNetworkCapabilities(activeNetwork)
-        value = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) == true
-
-        // 2. Création de l'écouteur en temps réel
+    DisposableEffect(connectivityManager, context) {
         val callback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) { value = true }
-            override fun onLost(network: Network) { value = false }
+            override fun onAvailable(network: Network) {
+                isOnlineState.value = isNetworkAvailable(context)
+            }
+
+            override fun onLost(network: Network) {
+                isOnlineState.value = isNetworkAvailable(context)
+            }
+
             override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-                value = networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                isOnlineState.value = hasInternetTransport(networkCapabilities)
             }
         }
 
@@ -36,9 +43,36 @@ fun rememberNetworkConnectivityState(): State<Boolean> {
 
         connectivityManager.registerNetworkCallback(request, callback)
 
-        // 3. Nettoyage automatique quand on quitte l'application
-        awaitDispose {
+        onDispose {
             connectivityManager.unregisterNetworkCallback(callback)
         }
     }
+
+    return isOnlineState
+}
+
+@Composable
+fun rememberNetworkAvailableState(): Boolean {
+    return rememberNetworkAvailableState(LocalContext.current)
+}
+
+@Composable
+fun rememberNetworkAvailableState(context: Context): Boolean {
+    return rememberNetworkConnectivityState(context).value
+}
+
+fun isNetworkAvailable(context: Context): Boolean {
+    val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    val network = connectivityManager.activeNetwork ?: return false
+    val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
+    return hasInternetTransport(capabilities)
+}
+
+private fun hasInternetTransport(capabilities: NetworkCapabilities): Boolean {
+    return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+        (
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||
+                capabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+            )
 }

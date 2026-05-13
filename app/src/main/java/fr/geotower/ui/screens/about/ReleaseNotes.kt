@@ -27,9 +27,32 @@ internal data class ReleaseNoteItem(
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
     section("Général", "General", "Geral") {
         item(
-            "Ajout des palettes de couleurs",
-            "Added color palettes",
-            "Adição de paletas de cores"
+            "Suppression du code inutilisé",
+            "Removed unused code",
+            "Remoção de código não utilizado"
+        )
+        item(
+            "Suppression du code dupliqué",
+            "Removed duplicated code",
+            "Remoção de código duplicado"
+        )
+        item(
+            "Ajout de la vérification des mises à jour de l'application",
+            "Added app update checks",
+            "Adição da verificação de atualizações da aplicação"
+        )
+    }
+
+    section("Paramètres", "Settings", "Definições") {
+        item(
+            "Suppression des notifications de fin de téléchargement si l'élément est affiché à l'écran",
+            "Removed download-complete notifications when the item is displayed on screen",
+            "Remoção das notificações de fim de transferência quando o elemento está visível no ecrã"
+        )
+        item(
+            "Ajout d'une notification de fin de téléchargement d'une carte",
+            "Added a download-complete notification for maps",
+            "Adição de uma notificação de fim de transferência de mapa"
         )
     }
 }

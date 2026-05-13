@@ -94,7 +94,6 @@ import fr.geotower.radio.MobileOperator
 import fr.geotower.radio.RadioTechnology
 import fr.geotower.radio.RadioThroughputEngine
 import fr.geotower.radio.RatAssumptions
-import fr.geotower.radio.SiteRadioStatus
 import fr.geotower.radio.SiteRadioSystem
 import fr.geotower.radio.ThroughputProfile
 import fr.geotower.radio.ThroughputProfiles
@@ -102,7 +101,18 @@ import fr.geotower.ui.components.FreqBand
 import fr.geotower.ui.components.MiniMapConeOverlayData
 import fr.geotower.ui.components.MiniMapStrongPoint
 import fr.geotower.ui.components.SharedMiniMapCard
+import fr.geotower.ui.components.ThroughputBandwidth
+import fr.geotower.ui.components.estimateThroughputConeDistance
+import fr.geotower.ui.components.extractThroughputAzimuths
+import fr.geotower.ui.components.extractThroughputPanelHeightMeters
+import fr.geotower.ui.components.formatThroughputDistanceMeters
+import fr.geotower.ui.components.formatThroughputMbps
 import fr.geotower.ui.components.parseAndSortFrequencies
+import fr.geotower.ui.components.resolveThroughputBandwidth
+import fr.geotower.ui.components.siteRadioStatusFromBandStatus
+import fr.geotower.ui.components.throughputBandKey
+import fr.geotower.ui.components.throughputBandLabel
+import fr.geotower.ui.components.ThroughputConeDistance as ConeDistance
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
@@ -115,17 +125,12 @@ import kotlin.math.cos
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
-import kotlin.math.tan
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 
-private const val USER_DEVICE_HEIGHT_METERS = 1.5
-private const val NOMINAL_DOWNTILT_DEGREES = 6.0
-private const val MIN_DOWNTILT_DEGREES = 4.0
-private const val MAX_DOWNTILT_DEGREES = 8.0
 private const val PANEL_AZIMUTH_HALF_BEAM_DEGREES = 45.0
 private const val MAX_FR_UPLINK_AGGREGATED_CARRIERS = 2
 private val LTE_LOW_BAND_MHZ = setOf(700, 800, 900)
@@ -264,7 +269,7 @@ fun ThroughputCalculatorScreen(
         parsedBands
             .filter { it.gen == 4 || it.gen == 5 }
             .filterNot { isHiddenThroughputBand(it) }
-            .map { bandKey(it) }
+            .map { throughputBandKey(it) }
             .toSet()
     }
     val defaultEnabledBandKeys = remember(parsedBands, prefs) {
@@ -272,7 +277,7 @@ fun ThroughputCalculatorScreen(
             .filter { it.gen == 4 || it.gen == 5 }
             .filterNot { isHiddenThroughputBand(it) }
             .filter { isThroughputBandEnabledByDefault(it, prefs) }
-            .map { bandKey(it) }
+            .map { throughputBandKey(it) }
             .toSet()
     }
     LaunchedEffect(availableBandKeys, defaultEnabledBandKeys) {
@@ -578,12 +583,12 @@ private fun ThroughputSummaryCard(result: ThroughputResult, cardBgColor: Color, 
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                 ThroughputMetric(
                     label = AppStrings.throughputDownloadLabel,
-                    value = formatThroughput(result.totalDownMbps),
+                    value = formatThroughputMbps(result.totalDownMbps),
                     modifier = Modifier.weight(1f)
                 )
                 ThroughputMetric(
                     label = AppStrings.throughputPhoneUploadLabel,
-                    value = formatThroughput(result.totalUpMbps),
+                    value = formatThroughputMbps(result.totalUpMbps),
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -740,15 +745,15 @@ private fun ThroughputConeCard(
                 )
             } else {
                 Text(
-                    text = formatDistanceMeters(coneDistance.centerMeters),
+                    text = formatThroughputDistanceMeters(coneDistance.centerMeters),
                     style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
                     text = AppStrings.throughputMainZoneEstimated(
-                        formatDistanceMeters(coneDistance.nearMeters),
-                        formatDistanceMeters(coneDistance.farMeters)
+                        formatThroughputDistanceMeters(coneDistance.nearMeters),
+                        formatThroughputDistanceMeters(coneDistance.farMeters)
                     ),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -911,7 +916,7 @@ private fun PositionAnalysisSummary(
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = AppStrings.throughputPositionDistance(formatDistanceMeters(analysis.distanceMeters)),
+            text = AppStrings.throughputPositionDistance(formatThroughputDistanceMeters(analysis.distanceMeters)),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -927,9 +932,9 @@ private fun PositionAnalysisSummary(
         Text(
             text = analysis.coneDistance?.let { cone ->
                 AppStrings.throughputPositionCone(
-                    center = formatDistanceMeters(cone.centerMeters),
-                    near = formatDistanceMeters(cone.nearMeters),
-                    far = formatDistanceMeters(cone.farMeters)
+                    center = formatThroughputDistanceMeters(cone.centerMeters),
+                    near = formatThroughputDistanceMeters(cone.nearMeters),
+                    far = formatThroughputDistanceMeters(cone.farMeters)
                 )
             } ?: AppStrings.throughputPositionConeUnavailable,
             style = MaterialTheme.typography.bodySmall,
@@ -1474,9 +1479,9 @@ private fun ThroughputBandRow(band: ThroughputBandResult) {
     }
     val coneLabel = band.coneDistance?.let {
         AppStrings.throughputEstimatedCone(
-            formatDistanceMeters(it.centerMeters),
-            formatDistanceMeters(it.nearMeters),
-            formatDistanceMeters(it.farMeters)
+            formatThroughputDistanceMeters(it.centerMeters),
+            formatThroughputDistanceMeters(it.nearMeters),
+            formatThroughputDistanceMeters(it.farMeters)
         )
     }
 
@@ -1521,8 +1526,8 @@ private fun ThroughputBandRow(band: ThroughputBandResult) {
             }
         }
         Column(horizontalAlignment = Alignment.End) {
-            Text(formatThroughput(band.downMbps), fontWeight = FontWeight.Bold, color = metricColor)
-            Text(formatThroughput(band.upMbps), style = MaterialTheme.typography.bodySmall, color = metricColor)
+            Text(formatThroughputMbps(band.downMbps), fontWeight = FontWeight.Bold, color = metricColor)
+            Text(formatThroughputMbps(band.upMbps), style = MaterialTheme.typography.bodySmall, color = metricColor)
         }
     }
 }
@@ -1670,15 +1675,15 @@ private fun calculateThroughput(
             .filterNot { isHiddenThroughputBand(it) }
             .map { band ->
                 SiteRadioSystem(
-                    sourceKey = bandKey(band),
+                    sourceKey = throughputBandKey(band),
                     supportId = "unknown",
                     operator = operator,
                     technology = if (band.gen == 5) RadioTechnology.NR_5G else RadioTechnology.LTE_4G,
                     bandLabel = band.value.toString(),
-                    status = siteStatusFromBandStatus(band.status),
-                    azimuthDeg = extractAzimuths(band).firstOrNull(),
+                    status = siteRadioStatusFromBandStatus(band.status),
+                    azimuthDeg = extractThroughputAzimuths(band).firstOrNull(),
                     supportHeightM = supportHeightMeters,
-                    antennaHeightM = extractPanelHeightMeters(band, supportHeightMeters),
+                    antennaHeightM = extractThroughputPanelHeightMeters(band, supportHeightMeters),
                     lastSeenAt = band.date.takeIf { it.isNotBlank() }
                 )
             }
@@ -1693,11 +1698,11 @@ private fun calculateThroughput(
         .filter { it.gen == 4 || it.gen == 5 }
         .filterNot { isHiddenThroughputBand(it) }
         .map { band ->
-            val key = bandKey(band)
+            val key = throughputBandKey(band)
             val carrierResult = carrierByKey[key]
             val bandwidth = carrierResult?.let {
                 ThroughputBandwidth(valueMHz = it.bandwidthMHz, isEstimated = false)
-            } ?: resolveBandwidthMHz(band)
+            } ?: resolveThroughputBandwidth(band)
             val isPlanned = band.status.contains("Projet", ignoreCase = true) ||
                 band.status.contains("Approuv", ignoreCase = true) ||
                 band.status.contains("Planned", ignoreCase = true)
@@ -1705,8 +1710,8 @@ private fun calculateThroughput(
             val bandAllowed = enabledBandKeys.contains(key)
             val engineIncluded = carrierResult?.included == true
             val isIncluded = generationAllowed && bandAllowed && engineIncluded && (includePlanned || !isPlanned)
-            val panelHeightMeters = extractPanelHeightMeters(band, supportHeightMeters)
-            val azimuths = extractAzimuths(band)
+            val panelHeightMeters = extractThroughputPanelHeightMeters(band, supportHeightMeters)
+            val azimuths = extractThroughputAzimuths(band)
             val customMultipliers = throughputMultipliersFor(preset, band.gen, customSettings)
             val excludedReason = when {
                 !generationAllowed -> if (band.gen == 5) "5G désactivée" else "4G désactivée"
@@ -1720,7 +1725,7 @@ private fun calculateThroughput(
 
             ThroughputBandResult(
                 key = key,
-                label = bandLabel(band),
+                label = throughputBandLabel(band),
                 generation = band.gen,
                 frequencyMHz = band.value,
                 frequencyDetails = frequencyDetailsLabel(band),
@@ -1728,7 +1733,7 @@ private fun calculateThroughput(
                     ?: modulationLabel(band.gen, engineProfile),
                 bandwidthMHz = bandwidth.valueMHz,
                 bandwidthIsEstimated = bandwidth.isEstimated,
-                coneDistance = estimateConeDistance(panelHeightMeters),
+                coneDistance = estimateThroughputConeDistance(panelHeightMeters),
                 azimuths = azimuths,
                 status = band.status,
                 downMbps = (carrierResult?.dlMbps ?: 0.0) * customMultipliers.down,
@@ -1992,183 +1997,11 @@ private fun List<ThroughputBandResult>.limitAggregatedCarriers(
     }
 }
 
-private fun siteStatusFromBandStatus(status: String): SiteRadioStatus {
-    val normalized = status.lowercase(Locale.ROOT)
-    return when {
-        normalized.contains("commercial") || normalized.contains("ouvert") -> SiteRadioStatus.COMMERCIAL_OPEN
-        normalized.contains("en service") || normalized.contains("service") -> SiteRadioStatus.IN_SERVICE
-        normalized.contains("techniquement") || normalized.contains("operationnel") || normalized.contains("opérationnel") -> SiteRadioStatus.TECHNICALLY_OPERATIONAL
-        normalized.contains("autor") || normalized.contains("approuv") || normalized.contains("projet") -> SiteRadioStatus.AUTHORIZED
-        else -> SiteRadioStatus.UNKNOWN
-    }
-}
-
-private fun resolveBandwidthMHz(band: FreqBand): ThroughputBandwidth {
-    val ranges = frequencyRangeRegex.findAll(band.rawFreq)
-        .mapNotNull { match ->
-            val start = match.groupValues[1].replace(',', '.').toDoubleOrNull()
-            val end = match.groupValues[2].replace(',', '.').toDoubleOrNull()
-            if (start == null || end == null) {
-                null
-            } else {
-                val unit = match.groupValues.getOrNull(3).orEmpty()
-                normalizeRangeWidthToMHz(abs(end - start), unit)
-            }
-        }
-        .filter { it > 0.0 }
-        .toList()
-
-    if (ranges.isNotEmpty()) {
-        val value = if (ranges.size > 1 && isLikelyFddBand(band)) {
-            ranges.maxOrNull() ?: ranges.sum()
-        } else {
-            ranges.sum()
-        }
-        return ThroughputBandwidth(valueMHz = value.coerceAtLeast(1.0), isEstimated = false)
-    }
-
-    return ThroughputBandwidth(valueMHz = defaultBandwidthMHz(band.gen, band.value), isEstimated = true)
-}
-
-private fun normalizeRangeWidthToMHz(width: Double, unit: String): Double {
-    val lowerUnit = unit.lowercase(Locale.ROOT)
-    return when {
-        lowerUnit.contains("ghz") -> width * 1000.0
-        lowerUnit.contains("khz") -> width / 1000.0
-        else -> width
-    }
-}
-
-private fun isLikelyFddBand(band: FreqBand): Boolean {
-    return band.value !in setOf(3500, 26000)
-}
-
-private fun defaultBandwidthMHz(gen: Int, value: Int): Double {
-    return when (gen) {
-        4 -> when (value) {
-            700, 800, 900, 2100 -> 10.0
-            1800 -> 15.0
-            2600 -> 20.0
-            else -> 10.0
-        }
-        5 -> when (value) {
-            700 -> 10.0
-            1800 -> 10.0
-            2100 -> 15.0
-            3500 -> 70.0
-            26000 -> 200.0
-            else -> 20.0
-        }
-        else -> 10.0
-    }
-}
-
-private fun extractPanelHeightMeters(band: FreqBand, fallbackSupportHeightMeters: Double?): Double? {
-    val panelHeights = band.physDetails.flatMap { detail ->
-        panelHeightRegex.findAll(detail).mapNotNull { match ->
-            match.groupValues.getOrNull(1)?.replace(',', '.')?.toDoubleOrNull()
-        }.toList()
-    }
-
-    return panelHeights.maxOrNull() ?: fallbackSupportHeightMeters?.takeIf { it > USER_DEVICE_HEIGHT_METERS }
-}
-
-private fun extractAzimuths(band: FreqBand): List<Double> {
-    return band.physDetails
-        .flatMap { detail ->
-            azimuthRegex.findAll(detail).mapNotNull { match ->
-                match.groupValues.getOrNull(1)?.replace(',', '.')?.toDoubleOrNull()
-            }.toList()
-        }
-        .filter { it in 0.0..360.0 }
-        .distinctBy { it.roundToInt() }
-}
-
-private fun estimateConeDistance(heightMeters: Double?): ConeDistance? {
-    val antennaHeight = heightMeters ?: return null
-    val verticalDelta = (antennaHeight - USER_DEVICE_HEIGHT_METERS).coerceAtLeast(1.0)
-    val center = verticalDelta / tan(Math.toRadians(NOMINAL_DOWNTILT_DEGREES))
-    val near = verticalDelta / tan(Math.toRadians(MAX_DOWNTILT_DEGREES))
-    val far = verticalDelta / tan(Math.toRadians(MIN_DOWNTILT_DEGREES))
-    return ConeDistance(centerMeters = center, nearMeters = near, farMeters = far)
-}
-
-private fun bandLabel(band: FreqBand): String {
-    return if (band.value > 0) {
-        val base = "${band.gen}G ${band.value} MHz"
-        radioBandCode(band.gen, band.value)?.let { "$base ($it)" } ?: base
-    } else {
-        band.rawFreq.substringBefore(":").ifBlank { "${band.gen}G" }
-    }
-}
-
-private fun radioBandCode(gen: Int, value: Int): String? {
-    return when (gen) {
-        5 -> when (value) {
-            700 -> "N28"
-            800 -> "N20"
-            900 -> "N8"
-            1800 -> "N3"
-            2100 -> "N1"
-            2600 -> "N7"
-            3500 -> "N78"
-            26000 -> "N258"
-            else -> null
-        }
-        4 -> when (value) {
-            700 -> "B28"
-            800 -> "B20"
-            900 -> "B8"
-            1800 -> "B3"
-            2100 -> "B1"
-            2600 -> "B7"
-            3500 -> "B42"
-            else -> null
-        }
-        3 -> when (value) {
-            900 -> "B8"
-            2100 -> "B1"
-            else -> null
-        }
-        2 -> when (value) {
-            900 -> "GSM 900"
-            1800 -> "DCS 1800"
-            else -> null
-        }
-        else -> null
-    }
-}
-
-private fun formatThroughput(valueMbps: Double): String {
-    return if (valueMbps >= 1000.0) {
-        String.format(Locale.US, "%.2f Gbit/s", valueMbps / 1000.0)
-    } else {
-        String.format(Locale.US, "%.0f Mbit/s", valueMbps)
-    }
-}
-
 private fun formatBandwidth(valueMHz: Double): String {
     return if (valueMHz % 1.0 == 0.0) {
         "${valueMHz.toInt()} MHz"
     } else {
         String.format(Locale.US, "%.1f MHz", valueMHz)
-    }
-}
-
-private fun formatDistanceMeters(valueMeters: Double): String {
-    if (AppConfig.distanceUnit.intValue == 1) {
-        val miles = valueMeters / 1609.34
-        return if (miles < 0.1) {
-            "${(valueMeters * 3.28084).roundToInt()} ft"
-        } else {
-            String.format(Locale.US, "%.2f mi", miles)
-        }
-    }
-
-    return if (valueMeters >= 1000.0) {
-        String.format(Locale.US, "%.2f km", valueMeters / 1000.0)
-    } else {
-        "${valueMeters.toInt()} m"
     }
 }
 
@@ -2184,10 +2017,6 @@ private fun formatDegrees(value: Double): String = "${value.roundToInt()}\u00B0"
 
 private fun formatNumber(value: Double): String {
     return if (value % 1.0 == 0.0) value.toInt().toString() else String.format(Locale.US, "%.1f", value)
-}
-
-private fun bandKey(band: FreqBand): String {
-    return "${band.gen}:${band.value}:${band.rawFreq.substringBefore(":").trim()}"
 }
 
 private fun buildConeOverlayData(
@@ -2211,13 +2040,6 @@ private fun buildConeOverlayData(
         selectedPoint = selectedPoint?.let { MiniMapStrongPoint(latitude = it.latitude, longitude = it.longitude) }
     )
 }
-
-private fun classifyPositionScenario(
-    site: LocalisationEntity,
-    result: ThroughputResult,
-    latitude: Double,
-    longitude: Double
-): PositionScenario = analyzePosition(site, result, latitude, longitude).scenario
 
 private fun analyzePosition(
     site: LocalisationEntity,
@@ -2401,10 +2223,6 @@ private fun Modifier.throughputFadingEdge(scrollState: ScrollState): Modifier {
     }
 }
 
-private val frequencyRangeRegex = Regex("""([0-9]+(?:[.,][0-9]+)?)\s*-\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]*Hz)?""")
-private val panelHeightRegex = Regex("""\(([0-9]+(?:[.,][0-9]+)?)\s*m\)""", RegexOption.IGNORE_CASE)
-private val azimuthRegex = Regex("""([0-9]{1,3}(?:[.,][0-9]+)?)\s*(?:\u00B0|\u00C2\u00B0)""")
-
 private enum class ThroughputBlock(val id: String, val prefKey: String) {
     Header("header", "page_throughput_header"),
     Summary("summary", "page_throughput_summary"),
@@ -2543,11 +2361,6 @@ private data class ThroughputSiteData(
     val technique: TechniqueEntity?
 )
 
-private data class ThroughputBandwidth(
-    val valueMHz: Double,
-    val isEstimated: Boolean
-)
-
 private data class MapPoint(
     val latitude: Double,
     val longitude: Double
@@ -2615,8 +2428,3 @@ private data class ThroughputBandResult(
     val downAggregationExcludedReason: String? = null
 )
 
-private data class ConeDistance(
-    val centerMeters: Double,
-    val nearMeters: Double,
-    val farMeters: Double
-)

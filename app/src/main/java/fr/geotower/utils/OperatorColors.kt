@@ -47,16 +47,8 @@ object OperatorColors {
         }?.key
     }
 
-    fun labelFor(raw: String?, fallback: String = raw.orEmpty()): String {
-        return keyFor(raw)?.let { specsByKey[it]?.label } ?: fallback
-    }
-
     fun colorHex(raw: String?, fallback: String = UNKNOWN_HEX): String {
         return keyFor(raw)?.let { specsByKey[it]?.colorHex } ?: fallback
-    }
-
-    fun colorArgb(raw: String?, fallback: Long = UNKNOWN_ARGB): Long {
-        return keyFor(raw)?.let { specsByKey[it]?.colorArgb } ?: fallback
     }
 
     fun colorInt(raw: String?, fallback: Int = AndroidColor.GRAY): Int {

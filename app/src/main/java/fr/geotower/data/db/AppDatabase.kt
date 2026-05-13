@@ -8,7 +8,6 @@ import fr.geotower.data.models.FaisceauxEntity
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
-// (Tu peux aussi supprimer l'import de MetadataEntity en haut)
 
 @Database(
     entities = [
@@ -23,7 +22,6 @@ import fr.geotower.data.models.TechniqueEntity
 )
 abstract class AppDatabase : RoomDatabase() {
 
-    // On branche notre nouveau DAO (adieu l'ancien AntennaDao !)
     abstract fun geoTowerDao(): GeoTowerDao
 
     companion object {

@@ -73,7 +73,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -111,11 +110,13 @@ import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.upload.SignalQuestUploadDraftStore
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadRules
+import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.OperatorLogos
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.UUID
@@ -213,15 +214,7 @@ fun SiteDetailScreen(
     var globalMapRef by remember { mutableStateOf<org.osmdroid.views.MapView?>(null) }
     val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
 
-    var lastClickTime by remember { mutableLongStateOf(0L) }
-    val debounceTime = 700L
-    fun safeClick(action: () -> Unit) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastClickTime > debounceTime) {
-            lastClickTime = currentTime
-            action()
-        }
-    }
+    val safeClick = rememberSafeClick()
 
     var antenna by remember { mutableStateOf<LocalisationEntity?>(null) }
     var physique by remember { mutableStateOf<PhysiqueEntity?>(null) }
@@ -1118,13 +1111,7 @@ private fun getOperatorColor(name: String?): Color {
         ?: Color.Gray
 }
 
-fun getDetailLogoRes(opName: String?): Int? = when {
-    opName?.contains("ORANGE", true) == true -> R.drawable.logo_orange
-    opName?.contains("SFR", true) == true -> R.drawable.logo_sfr
-    opName?.contains("BOUYGUES", true) == true -> R.drawable.logo_bouygues
-    opName?.contains("FREE", true) == true -> R.drawable.logo_free
-    else -> null
-}
+fun getDetailLogoRes(opName: String?): Int? = OperatorLogos.drawableRes(opName)
 
 fun formatTechnologies(tech: String?, txtUnknown: String): String = tech?.split(Regex("[/,\\-]"))?.map { it.trim().uppercase() }?.filter { it.isNotEmpty() }?.sortedDescending()?.joinToString(" - ") ?: txtUnknown
 

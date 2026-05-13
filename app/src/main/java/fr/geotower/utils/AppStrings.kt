@@ -372,11 +372,8 @@ object AppStrings {
     val system @Composable get() = get("Système", "System", "Sistema")
     val database @Composable get() = get("Base de données", "Database", "Base de dados")
 
-    val themeAuto @Composable get() = get("Auto", "Auto", "Auto")
     val themeLight @Composable get() = get("Clair", "Light", "Claro")
     val themeDark @Composable get() = get("Sombre", "Dark", "Escuro")
-    val oledMode @Composable get() = get("Mode OLED", "OLED Mode", "Modo OLED")
-    val oledDesc @Composable get() = get("Noir pur", "Pure black", "Preto puro")
     val appIcon @Composable get() = get("Icône de l'application", "App Icon", "Ícone da aplicação")
     val restartToApply @Composable get() = get("L'app redémarrera pour appliquer le changement.", "The app will restart to apply the change.", "O aplicativo será reiniciado para appliquer a alteração.")
     val colorPaletteTitle @Composable get() = get("Palette de couleur", "Color palette", "Paleta de cores")
@@ -458,9 +455,6 @@ object AppStrings {
     val navPagesDesc @Composable get() = get("Afficher une catégorie à la fois", "Show one category at a time", "Mostrar uma catégorie de cada vez")
 
     val oneUiInterface @Composable get() = get("Interface One UI", "One UI Interface", "Interface One UI")
-    val oneUiDesc @Composable get() = get("Activer le design Samsung", "Enable Samsung design", "Ativar o design Samsung")
-    val scrollBlur @Composable get() = get("Flou de défilement", "Scroll Blur", "Desfoque de rolagem")
-    val scrollBlurDesc @Composable get() = get("Activer ou désactiver l'effet de flou", "Enable or disable blur effect", "Ativar ou desativar o effect de desfoque")
 
     val defaultOperator @Composable get() = get("Opérateur par défaut", "Default Operator", "Operadora padrão")
     val appLanguageLabel @Composable get() = get("Langue de l'application", "App Language", "Idioma da aplicação")
@@ -475,23 +469,11 @@ object AppStrings {
     val managePermissions @Composable get() = get("Gérer les permissions", "Manage Permissions", "Gerir permissões")
     val permissionsDesc @Composable get() = get("Localisation et Notifications", "Location and Notifications", "Localização e Notificações")
 
-    val offlineMode @Composable get() = get("Mode hors-ligne", "Offline Mode", "Modo offline")
     val offlineDesc @Composable get() = get("Télécharge toute la base pour utiliser la liste sans réseau. Attention : fichier volumineux.", "Download the entire database to use the list offline. Warning : large file.", "Transfere toute a base de données para utiliser a liste offline. Aviso : ficheiro grande.")
     val downloadAntennas @Composable get() = get("Télécharger les antennes", "Download antennas", "Transferir antenas")
     val cancelDownload @Composable get() = get("Annuler le téléchargement", "Cancel download", "Cancelar transferência")
-    val downloadSuccess @Composable get() = get("Base de données téléchargée !", "Database downloaded!", "Base de données transferida!")
-    val downloadError @Composable get() = get("Erreur de téléchargement", "Download error", "Erro de transferência")
-
-    val pagesVisibilityTitle @Composable get() = get("Choix des pages à afficher", "Choice of pages to display", "Escolha das páginas a présenter")
-    val pagesVisibilityDesc @Composable get() = get("Personnaliser l'écran d'accueil", "Customize home screen", "Personalizar ecrã inicial")
-    val pagesVisibilitySheetTitle @Composable get() = get("Choisissez quels écrans vous souhaitez afficher", "Choose which screens you want to display", "Escolha quais ecrãs deseja exibir")
-
-    val pageNearby @Composable get() = get("Antennes à proximité", "Nearby antennas", "Antenas próximas")
-    val pageMap @Composable get() = get("Carte des Antennes", "Antenna map", "Mapa de antenas")
     val pageCompass @Composable get() = get("Boussole", "Compass", "Bússola")
-    val pageStats @Composable get() = get("Statistiques", "Statistics", "Estatísticas")
     val dragToReorderHint @Composable get() = get("(Appui long et glissé pour déplacer)", "(Long press and drag to reorder)", "(Pressione e segure para arrastar)")
-    val resetOrder @Composable get() = get("Réinitialiser l'ordre", "Reset order", "Redefinir ordem")
     @Composable
     fun downloadProgress(progress: Int) = get("Téléchargement : $progress %", "Downloading : $progress %", "A transferir : $progress %")
 
@@ -505,13 +487,10 @@ object AppStrings {
     val shareSupportDetailsTitle @Composable get() = get("Détails du pylône (Support)", "Pylon details (Support)", "Detalhes do pilão (Suporte)")
     val shareSiteDetailsTitle @Composable get() = get("Détails de l'antenne (Site)", "Antenna details (Site)", "Detalhes da antena (Site)")
     val supportShareTitle @Composable get() = get("Partage du pylône", "Pylon share", "Partilha do pilão")
-    val moveUp @Composable get() = get("Monter", "Move up", "Subir")
-    val moveDown @Composable get() = get("Descendre", "Move down", "Descer")
 
     val mapMapLibre @Composable get() = get("MapLibre", "MapLibre", "MapLibre")
     val mapTopo @Composable get() = get("OpenTopoMap", "OpenTopoMap", "OpenTopoMap")
     val mapOfflineLayer @Composable get() = get("Hors-ligne", "Offline", "Offline")
-    val noMapFileNotFound @Composable get() = get("Aucun fichier .map trouvé", "No .map file found", "Nenhum arquivo .map encontrado")
     // --- PERSONNALISATION DES PAGES ---
     val pagesCustomizationTitle @Composable get() = get("Personnalisation des pages", "Pages customization", "Personalização das páginas")
     val pagesCustomizationDesc @Composable get() = get("Personnalisez l'affichage des différentes pages de l'application", "Customize the display of the different pages of the application", "Personalize a exibição das differentes páginas do aplicativo")
@@ -560,8 +539,6 @@ object AppStrings {
     val siteBearingHeightOption @Composable get() = get("Cap et Hauteur", "Bearing and Height", "Rumo e Altura")
     val siteMapOption @Composable get() = get("Mini-carte", "Mini-map", "Mini-mapa")
     val siteSupportDetailsOption @Composable get() = get("Détails du pylône", "Support details", "Detalhes do suporte")
-    val sitePhotosOption @Composable get() = get("Photos communautaires", "Community photos", "Fotos da comunidade")
-    val sitePanelHeightsOption @Composable get() = get("Hauteurs des panneaux", "Panel heights", "Alturas dos painéis")
     val siteIdsOption @Composable get() = get("Identifiants", "Identifiers", "Identificadores")
     val siteOpenMapOption @Composable get() = get("Bouton Ouvrir la carte", "Open map button", "Botao Abrir o mapa")
     val siteElevationProfileOption @Composable get() = get("Bouton Profil altimétrique", "Elevation profile button", "Botão Perfil altimétrico")
@@ -579,7 +556,6 @@ object AppStrings {
     val resetWarningDesc @Composable get() = get("Êtes-vous sûr de vouloir rétablir les paramètres par défaut ? Cela supprimera tous les réglages que vous avez faits dans l'application.", "Are you sure you want to restore default settings? This will delete all settings you have made in the app.", "Tem certeza de que deseja restaurar as configurações padrão? Isso excluirá toutes as configurações que vous avez fez no aplicativo.")
     val yes @Composable get() = get("Oui", "Yes", "Sim")
     val no @Composable get() = get("Non", "No", "Não")
-    val siteAnfrOption @Composable get() = get("Bouton data.gouv.fr", "data.gouv.fr Button", "Botão data.gouv.fr")
     val offlineMessage @Composable get() = get("Vous êtes hors ligne", "You are offline", "Você está offline")
     val pageHomeLogoSettings @Composable get() = get("Logo de l'application", "App logo", "Logótipo da aplicação")
     val homeLogoSettingTitle @Composable get() = get("Logo de la page d'accueil", "Home page logo", "Logótipo da page inicial")
@@ -592,7 +568,6 @@ object AppStrings {
     val unknownSize @Composable get() = get("Taille inconnue", "Unknown size", "Tamanho desconhecido")
 
     val showSpeedometer @Composable get() = get("Compteur de vitesse", "Speedometer", "Velocímetro")
-    val showSpeedometerDesc @Composable get() = get("Afficher la vitesse sur la carte", "Show speed on the map", "Mostrar a vitesse no mapa")
     val siteFreqFiltersTitle @Composable get() = get("Filtres des fréquences de l'antenne", "Antenna frequency filters", "Filtros de fréquence da antena")
     val freqGridDisplayOption @Composable get() = get("Afficher les fréquences en grille", "Display frequencies in a grid", "Exibir frequências em grade")
 
@@ -895,11 +870,6 @@ object AppStrings {
         "No position selected: the calculation keeps a neutral position coefficient.",
         "Nenhuma posição escolhida: o cálculo mantém um coeficiente de posição neutro."
     )
-    val throughputCustomMapSelectionHint @Composable get() = get(
-        "Touchez la mini-carte pour choisir votre position : GeoTower déduira si vous êtes dans le cône, trop proche, trop loin ou hors azimut.",
-        "Tap the mini map to choose your position: GeoTower will infer whether you are in the beam, too close, too far, or outside the azimuth.",
-        "Toque no minimapa para escolher a sua posição: o GeoTower deduzirá se está no feixe, demasiado perto, demasiado longe ou fora do azimute."
-    )
     @Composable fun throughputCustomSelectedPosition(label: String) = get(
         "Position choisie : $label",
         "Selected position: $label",
@@ -1099,14 +1069,10 @@ object AppStrings {
     }
 
     val liveNotificationTitle @Composable get() = get("Notification Live", "Live Notification", "Notificação au vivo")
-    val liveNotificationDesc @Composable get() = get("Activer les notifications en temps réel", "Enable real-time notifications", "Ativar notifications em tempo real")
+    val liveNotificationDesc @Composable get() = get("Activez les notifications en temps réel pour être informé de l'antenne de votre opérateur par défaut la plus proche de vous", "Enable real-time notifications", "Ativar notifications em tempo real")
     val updateNotifSettingTitle @Composable get() = get("Notifications de mise à jour", "Update notifications", "Notificações de atualização")
-    val updateNotifSettingDesc @Composable get() = get("Être alerté quand une nouvelle base est disponible", "Get alerted when a new database is available", "Ser alertado quand uma nova base de données estiver disponible")
+    val updateNotifSettingDesc @Composable get() = get("Etre alerte quand une nouvelle base de donnees ou une nouvelle APK est disponible", "Get alerted when a new database or APK is available", "Ser alertado quando uma nova base de dados ou APK estiver disponivel")
     val liveNotificationRequiresOp @Composable get() = get("Nécessite de choisir un opérateur par défaut", "Requires choosing a default operator", "Requer a escolha de uma operadora padrão")
-
-    val liveTrackingTitle @Composable get() = get("Recherche d'antennes en direct", "Live antenna tracking", "Rastreamento de antennes ao vivo")
-    val stopLiveTracking @Composable get() = get("Quitter", "Stop", "Sair")
-    val searchingAntenna @Composable get() = get("Recherche de l'antenne la plus proche...", "Searching for nearest antenna...", "Buscando a antena mais próxima...")
 
     // ✅ NOUVEAU : Messages d'avertissement pour les filtres
     val minOneTechnoWarning @Composable get() = get("Vous devez garder au moins une technologie mobile (2G, 3G, 4G ou 5G).", "You must keep at least one mobile technology (2G, 3G, 4G, or 5G).", "Deve manter pelo menos uma tecnologia móvel (2G, 3G, 4G ou 5G).")
@@ -1124,7 +1090,6 @@ object AppStrings {
 
     val offlineMapsTitle @Composable get() = get("Cartes Hors-Ligne", "Offline Maps", "Mapas Offline")
     val offlineMapsDesc @Composable get() = get("Téléchargez des cartes de la France pour naviguer sans réseau.", "Download maps of France to navigate without an internet connection.", "Descarregue mapas de França para navegar sem rede.")
-    val mapExtracting @Composable get() = get("Extraction en cours...", "Extraction en cours...", "A extrair...")
     val mapDeleteWarningTitle @Composable get() = get("Supprimer la carte ?", "Delete map?", "Eliminar mapa?")
     val mapDeleteWarningDesc @Composable get() = get("Voulez-vous vraiment supprimer cette carte de votre appareil ?", "Do you really want to delete this map from your device?", "Tem a certeza de que pretende eliminar este mapa do seu dispositivo?")
     val downloadAll @Composable get() = get("Tout télécharger", "Download All", "Descarregar tudo")
@@ -1155,20 +1120,15 @@ object AppStrings {
         )
     }
 
-    val downloadFailed @Composable get() = get("Échec du téléchargement ❌", "Download failed ❌", "Falha na transferência ❌")
-
     // ==========================================
     // 📡 ANTENNES À PROXIMITÉ
     // ==========================================
     val nearEmittersTitle @Composable get() = get("Émetteurs à proximité", "Nearby Emitters", "Emissores próximos")
-    val searchPlaceholder @Composable get() = get("Filtrer (ex: Orange, 75001...)", "Filter (e.g., Orange, 75001...)", "Filtrar (ex: Orange, 75001...)")
     @Composable
     fun sitesFound(count: Int) = get("$count sites trouvés", "$count sites found", "$count locais encontrados")
     val searchGps @Composable get() = get("Recherche position GPS...", "Searching for GPS position...", "À procura de posição GPS...")
     val noSitesFound @Composable get() = get("Aucun site trouvé.", "No sites found.", "Nenhum local encontrado.")
     val loadMoreSites @Composable get() = get("Afficher plus de sites", "Load more sites", "Carregar mais sites")
-    val expandSearchArea @Composable get() = get("Élargir la zone de recherche", "Expand search area", "Expandir a área de pesquisa")
-    val searchingNewSites @Composable get() = get("Recherche de nouveaux sites...", "Searching for new sites...", "Procurando nouveaux sites...")
     val nearbySearchSuggestionCity @Composable get() = get("Ville", "City", "Cidade")
     val nearbySearchSuggestionPylon @Composable get() = get("Pylône", "Pylon", "Poste")
     val nearbySearchSuggestionRoof @Composable get() = get("Toit", "Roof", "Telhado")
@@ -1196,18 +1156,12 @@ object AppStrings {
     // ==========================================
     // 📸 PHOTOS COMMUNAUTAIRES (SIGNAL QUEST)
     // ==========================================
-    val signalQuestUploadPrompt @Composable get() = get(
-        "Vous pouvez envoyer vos photos directement depuis cette application",
-        "You can send your photos directly from this app",
-        "Pode enviar as suas fotos directement a partir desta application"
-    )
     val supportDiagram @Composable get() = get("Schéma du support", "Support diagram", "Esquema do suporte")
     val addPhotos @Composable get() = get("Ajouter des photos", "Add photos", "Adicionar fotos")
     val camera @Composable get() = get("Appareil photo", "Camera", "Câmara")
     val gallery @Composable get() = get("Galerie", "Gallery", "Galeria")
     val uploadPhotosPrompt @Composable get() = get("Envoyer des photos", "Upload photos", "Enviar fotos")
     val photoPrepareError @Composable get() = get("Impossible de préparer les photos.", "Could not prepare photos.", "Não foi possível preparar as fotos.")
-    val unknownAuthor @Composable get() = get("Auteur inconnu", "Unknown author", "Autor desconhecido")
     val previous @Composable get() = get("Précédent", "Previous", "Anterior")
     val next @Composable get() = get("Suivant", "Next", "Próximo")
 
@@ -1222,9 +1176,6 @@ object AppStrings {
     val latShort @Composable get() = get("LAT", "LAT", "LAT")
     val lonShort @Composable get() = get("LONG", "LONG", "LONG")
     val accuracy @Composable get() = get("PRÉCISION", "ACCURACY", "PRECISÃO")
-    @Composable
-    fun pylonsInDirection(count: Int) = get("$count pylônes dans cette direction", "$count pylons in this direction", "$count pilões nesta direção")
-
     val nearbyAntennasAzimuth @Composable get() = get("Antennes à proximité", "Nearby antennas", "Antenas nas proximidades")
     val supportPrefix @Composable get() = get("Support", "Support", "Suporte")
     val height @Composable get() = get("Hauteur", "Height", "Altura")
@@ -1306,6 +1257,31 @@ object AppStrings {
         "No social notifications or ads: only long-running operations and important data updates.",
         "Sem notificações sociais nem publicidade: apenas operações demoradas e dados importantes."
     )
+    val onboardingLiveNotificationsTitle @Composable get() = get("Notifications live", "Live notifications", "Notificações live")
+    val onboardingLiveNotificationsDesc @Composable get() = get(
+        "Activez un suivi discret pour garder l'antenne la plus proche de votre opérateur visible en notification.",
+        "Enable a discreet live tracker to keep the nearest antenna for your operator visible in a notification.",
+        "Ative um acompanhamento discreto para manter a antena mais próxima da sua operadora visível numa notificação."
+    )
+    val onboardingLiveNotificationsOperatorTitle @Composable get() = get("Lié à votre opérateur", "Linked to your operator", "Ligado à sua operadora")
+    val onboardingLiveNotificationsOperatorDesc @Composable get() = get(
+        "Le suivi live utilise l'opérateur par défaut choisi juste avant pour afficher une information pertinente.",
+        "Live tracking uses the default operator you just chose to show relevant information.",
+        "O acompanhamento live usa a operadora padrão escolhida antes para mostrar informação relevante."
+    )
+    val onboardingLiveNotificationsNearestTitle @Composable get() = get("Antenne proche en direct", "Nearest antenna live", "Antena próxima em direto")
+    val onboardingLiveNotificationsNearestDesc @Composable get() = get(
+        "La notification peut se mettre à jour pendant vos déplacements pour indiquer le site le plus proche.",
+        "The notification can update while you move to show the nearest site.",
+        "A notificação pode atualizar-se durante as suas deslocações para indicar o local mais próximo."
+    )
+    val onboardingLiveNotificationsControlTitle @Composable get() = get("Toujours désactivable", "Always optional", "Sempre opcional")
+    val onboardingLiveNotificationsControlDesc @Composable get() = get(
+        "Vous pourrez couper les notifications live à tout moment depuis les paramètres de GeoTower.",
+        "You can turn live notifications off at any time from GeoTower settings.",
+        "Pode desativar as notificações live a qualquer momento nas definições do GeoTower."
+    )
+    val onboardingLiveNotificationsSelectedOperator @Composable get() = get("Opérateur sélectionné", "Selected operator", "Operadora selecionada")
     val onboardingLocationDisabledTitle @Composable get() = get("Localisation non activée", "Location not enabled", "Localização não ativada")
     val onboardingLocationDisabledDesc @Composable get() = get(
         "La localisation n'est pas activée. GeoTower ne pourra pas localiser rapidement les émetteurs proches de vous.",
@@ -1315,26 +1291,17 @@ object AppStrings {
     val retry @Composable get() = get("Réessayer", "Try again", "Tentar novamente")
     val btnLetsGo @Composable get() = get("C'est parti !", "Let's go!", "Vamos lá!")
 
-    val welcomeTitle @Composable get() = get("Bienvenue !", "Welcome!", "Bem-vindo!")
-    val welcomeDesc @Composable get() = get("Pour fonctionner correctement, GeoTower a besoin de quelques autorisations :", "To work properly, GeoTower needs a few permissions :", "Para funcionar corretamente, a GeoTower precisa de algumas permissões :")
-    val permLocation @Composable get() = get("Localisation", "Location", "Localização")
-    val permLocationDesc @Composable get() = get("Nécessaire pour afficher votre position sur la carte et trouver les antennes autour de vous.", "Necessary to display your position on the map and find antennas around you.", "Necessário para apresentar a sua posição no mapa e encontrar antennes à sua volta.")
-    val permNotifications @Composable get() = get("Notifications", "Notifications", "Notificações")
-    val permNotificationsDesc @Composable get() = get("Pour vous prévenir lors de mises à jour importantes des données ou d'alertes.", "To notify you of important data updates or alerts.", "Para o notificar de atualizações de dados importantes ou alertas.")
-
     val themeDesc @Composable get() = get("Choisissez le style qui vous convient.", "Choose the style that suits you.", "Escolha o estilo que mais lhe convém.")
     val oledTitle @Composable get() = get("Mode OLED (Noir Pur)", "OLED Mode (Pure Black)", "Modo OLED (Preto Puro)")
-    val oledSubtitle @Composable get() = get("Économise la batterie", "Saves battery", "Poupa batterie")
+    val oledSubtitle @Composable get() = get("Économise de la batterie", "Saves battery", "Poupa batterie")
     val blurTitle @Composable get() = get("Flou de défilement", "Scroll Blur", "Desfoque de rolagem")
     val blurSubtitle @Composable get() = get("Activer ou désactiver le flou (plus énergivore)", "Enable or disable blur (consumes more battery)", "Ativar ou desativar o desfoque (consome mais bateria)")
 
     val mapDesc @Composable get() = get("Quel fournisseur de carte préférez-vous ?", "Which map provider do you prefer?", "Qual fornecedor de mapas prefere?")
-    val osmFree @Composable get() = get("OSM (Libre)", "OSM (Free)", "OSM (Livre)")
 
     val prefDesc @Composable get() = get("Configurez votre opérateur principal pour faciliter l'utilisation des outils de mesure sur la carte.", "Configure your main operator to make it easier to use the measurement tools on the map.", "Configure a sua operadora principal para facilitar a utilização das ferramentas de medição no mapa.")
     val selectOperator @Composable get() = get("Sélection de votre opérateur principal", "Select your main operator", "Selecione a sua operadora principal")
     val oneUiSubtitle @Composable get() = get("Activer le design Samsung (bulles arrondies)", "Enable Samsung design (rounded bubbles)", "Ativar o design Samsung (bolhas arredondadas)")
-    val chooseLanguage @Composable get() = get("Choisissez la langue de l'application.", "Choose the application language.", "Escolha o idioma do aplicativo.")
 
     val warningNoOpTitle @Composable get() = get("Aucun opérateur sélectionné", "No operator selected", "Nenhuma operadora selecionada")
     val warningNoOpDesc @Composable get() = get("Vous n'avez pas choisi d'opérateur par défaut. Les outils de filtrage sur la carte seront désactivés.\n\nVoulez-vous vraiment continuer ?", "You have not chosen a default operator. The filtering tools on the map will be disabled.\n\nDo you really want to continue?", "Não escolheu uma operadora por defeito. As ferramentas de filtragem no mapa serão desativadas.\n\nTem a certeza de que pretende continuer?")
@@ -1441,7 +1408,6 @@ object AppStrings {
     val onInternet @Composable get() = get("Sur internet", "On the internet", "Na internet")
     val onInternetDesc @Composable get() = get("Ouvrir dans le navigateur web", "Open in web browser", "Abrir no navegador web")
     val noGpsApp @Composable get() = get("Aucune application GPS trouvée.", "No GPS application found.", "Nenhuma aplicação de GPS encontrada.")
-    val navWith @Composable get() = get("Naviguer avec...", "Navigate with...", "Navegar com...")
     val shareSiteVia @Composable get() = get("Partager le site via...", "Share site via...", "Partilhar o local via...")
     val implementation @Composable get() = get("Implémentation : ", "Implementation : ", "Implementação : ")
     val lastModification @Composable get() = get("Dernière modification : ", "Last modification : ", "Última modificação : ")
@@ -1472,15 +1438,11 @@ object AppStrings {
     val spectrumByBand @Composable get() = get("Spectre par plage de fréquence", "Spectrum by frequency band", "Espectro por faixa de fréquence")
 
     val searchCityOrId @Composable get() = get("Ville, adresse, ID de site...", "City, address, site ID...", "Cidade, endereço, ID do local...")
-    val siteNotInArea @Composable get() = get("n'est pas dans la zone affichée. Déplacez la carte vers sa ville d'abord.", "is not in the displayed area. Move the map to its city first.", "não está na área apresentada. Mova o mapa para a sua cidade primeiro.")
     val locationNotFound @Composable get() = get("Lieu introuvable", "Location not found", "Localização não encontrada")
     val networkErrorSearch @Composable get() = get("Erreur réseau lors de la recherche", "Network error during search", "Erro de rede durante a pesquisa")
     val deleteTraces @Composable get() = get("Supprimer les tracés", "Delete traces", "Eliminar traços")
     val closestSite @Composable get() = get("Site le plus proche", "Closest site", "Local mais prochain")
-    val noSiteNearby @Composable get() = get("Aucun site", "No site", "Nenhum local")
-    val nearby @Composable get() = get("à proximité", "nearby", "nas proximidades")
     val filter @Composable get() = get("Filtres", "Filters", "Filtros")
-    val mapLayerTitle @Composable get() = get("Fond de carte", "Map layer", "Camada do mapa")
     val mapIgnLayer @Composable get() = get("IGN (Gouv)", "IGN (Gov)", "IGN (Gov)")
     val mapOsmLayer @Composable get() = get("OpenStreetMap", "OpenStreetMap", "OpenStreetMap")
     val mapLight @Composable get() = get("Clair", "Light", "Claro")
@@ -1499,7 +1461,6 @@ object AppStrings {
 
     val azimuthsLabel @Composable get() = get("Azimuts", "Azimuths", "Azimutes")
 
-    val orientationsTitle @Composable get() = get("Orientations (Azimuts)", "Orientations (Azimuths)", "Orientações (Azimutes)")
     val panelHeightsTitle @Composable get() = get("Hauteur des panneaux", "Panel heights", "Altura dos painéis")
     val idSupportLabel @Composable get() = get("ID Support : ", "Support ID : ", "ID do Suporte : ")
 
@@ -1534,7 +1495,6 @@ object AppStrings {
     fun sitesCount(count: Int) = get("$count sites", "$count sites", "$count locais")
     val frequenciesAndTechs @Composable get() = get("Technologies / Fréquences", "Technologies / Frequencies", "Tecnologias / Frequências")
     val sitesLabel @Composable get() = get("Sites", "Sites", "Locais")
-    val others @Composable get() = get("Autres", "Others", "Outros")
 
     val statsSupportsTitle @Composable get() = get("Supports (Pylônes)", "Supports (Pylons)", "Suportes (Pilões)")
     val statsSupportsDesc @Composable get() = get("Nombre de sites physiques par opérateur", "Number of physical sites per operator", "Número de locais físicos por operadora")
@@ -1613,7 +1573,6 @@ object AppStrings {
     val download @Composable get() = get("Télécharger", "Download", "Transferir")
     val delete @Composable get() = get("Supprimer", "Delete", "Eliminar")
     val apply @Composable get() = get("Appliquer", "Apply", "Aplicar")
-    val mapFiltersTitle @Composable get() = get("Filtres carte", "Map filters", "Filtros do mapa")
     val technicalDataUnavailable @Composable get() = get("Données techniques non disponibles", "Technical data unavailable", "Dados técnicos indisponíveis")
     val ruler @Composable get() = get("Règle", "Ruler", "Régua")
     val layers @Composable get() = get("Calques", "Layers", "Camadas")
@@ -1714,8 +1673,6 @@ object AppStrings {
     )
 
     val awesome @Composable get() = get("Super !", "Awesome!", "¡Genial!")
-    val notifDbDownloadTitle @Composable get() = get("Mise à jour de la base", "Database update", "Atualização da base de données")
-    val notifDbDownloadInProgress @Composable get() = get("Téléchargement en cours...", "Downloading...", "A transferir...")
     val notifDbDownloadSuccess @Composable get() = get("Téléchargement terminé", "Download finished", "Transferência concluída")
     val dbDownloadSuccessDesc @Composable get() = get("La base de données a été téléchargée avec succès !", "The database was successfully downloaded!", "A base de données foi transferida com sucesso!")
     val dbDownloadTermine @Composable get() = get("Terminer", "Finish", "Terminar")
@@ -1901,11 +1858,13 @@ object AppStrings {
 
     fun newDbNotifTitle(ctx: android.content.Context) = getForService(ctx, "Nouvelle base de données", "New database", "Nova base de données")
     fun newDbNotifDesc(ctx: android.content.Context) = getForService(ctx, "Une mise à jour des antennes est disponible. Touchez pour ouvrir la section de téléchargement.", "An antenna update is available. Tap to open the download section.", "Uma atualização das antenas está disponível. Toque para abrir a secção de transferência.")
+    fun newAppNotifTitle(ctx: android.content.Context) = getForService(ctx, "Nouvelle version GeoTower", "New GeoTower version", "Nova versao GeoTower")
+    fun newAppNotifDesc(ctx: android.content.Context, versionName: String) = getForService(ctx, "GeoTower $versionName est disponible. Touchez pour ouvrir le telechargement.", "GeoTower $versionName is available. Tap to open the download.", "GeoTower $versionName esta disponivel. Toque para abrir a transferencia.")
+    fun newAppChannelName(ctx: android.content.Context) = getForService(ctx, "Mises a jour GeoTower", "GeoTower updates", "Atualizacoes GeoTower")
     fun nearestAntennaTitle(ctx: android.content.Context) = getForService(ctx, "À proximité", "Nearby", "Nas proximidades")
     fun liveTrackingChannelDesc(ctx: android.content.Context) = getForService(ctx, "Suivi d'antennes en direct", "Live antenna tracking", "Rastreamento de antennes ao vivo")
     fun searchInProgress(ctx: android.content.Context) = getForService(ctx, "Recherche en cours...", "Searching...", "Buscando...")
     fun quitAction(ctx: android.content.Context) = getForService(ctx, "Quitter", "Stop", "Sair")
-    fun noneOpService(ctx: android.content.Context) = getForService(ctx, "Aucun", "None", "Nenhum")
     fun errorForService(ctx: android.content.Context) = getForService(ctx, "Erreur", "Error", "Erro")
 
     fun dbDownloadChannelName(ctx: android.content.Context) = getForService(ctx, "Mise à jour Base de données", "Database Update", "Atualização da base de dados")
@@ -1919,8 +1878,8 @@ object AppStrings {
     fun mapDownloadChannelName(ctx: android.content.Context) = getForService(ctx, "Téléchargement de cartes", "Maps download", "Transferência de mapas")
     fun mapDownloadTitle(ctx: android.content.Context, mapName: String) = getForService(ctx, "Carte : $mapName", "Map: $mapName", "Mapa: $mapName")
     fun mapDownloadProgress(ctx: android.content.Context, progress: Int) = getForService(ctx, "Téléchargement... $progress%", "Downloading... $progress%", "A transferir... $progress%")
-    fun offlineMapDownloadTitle(ctx: android.content.Context) = getForService(ctx, "Téléchargement Carte France", "France map download", "Transferência do mapa de França")
-    fun offlineMapDownloadDesc(ctx: android.content.Context) = getForService(ctx, "Récupération des données cartographiques...", "Retrieving map data...", "A obter dados cartográficos...")
+    fun mapDownloadedTitle(ctx: android.content.Context) = getForService(ctx, "Carte téléchargée", "Map downloaded", "Mapa transferido")
+    fun mapDownloadedContent(ctx: android.content.Context, mapName: String) = getForService(ctx, "La carte $mapName est prête hors ligne. Appuyez pour ouvrir.", "Map $mapName is ready offline. Tap to open.", "O mapa $mapName está pronto offline. Toque para abrir.")
     fun mapSiteNotInArea(ctx: android.content.Context, siteId: String) = getForService(ctx, "Le site $siteId n'est pas dans la zone affichée. Déplacez la carte vers sa ville d'abord.", "Site $siteId is not in the displayed area. Move the map to its city first.", "O site $siteId não está na área apresentada. Mova primeiro o mapa para a sua cidade.")
 
     fun signalQuestUploadChannelName(ctx: android.content.Context) = getForService(ctx, "Envoi Signal Quest", "Signal Quest upload", "Envio Signal Quest")
@@ -1972,9 +1931,6 @@ object AppStrings {
     val outageData @Composable get() = get("Data", "Data", "Dados")
     val outageStatusDegraded @Composable get() = get("Dégradé", "Degraded", "Degradado")
     val outageStatusHs @Composable get() = get("Hors Service", "Out of Service", "Fora de Serviço")
-    val outageStatusOk @Composable get() = get("OK", "OK", "OK")
-    val outageStatusNe @Composable get() = get("Non Équipé", "Not Equipped", "Não Equipado")
-    val outageEndExpected @Composable get() = get("Fin prévue le", "Expected end on", "Fim previsto em")
 
     val statusTitle @Composable get() = get("Statut du site", "Site Status", "Status do site")
     val statusFunctional @Composable get() = get("Fonctionnel", "Functional", "Funcional")
@@ -1990,7 +1946,6 @@ object AppStrings {
 
     val apiDetailIncident @Composable get() = get("Incident en cours", "Ongoing incident", "Incidente em curso")
     val apiDetailMaintenance @Composable get() = get("Travaux de maintenance", "Maintenance work", "Trabalhos de manutenção")
-    val outageStart @Composable get() = get("Depuis le", "Since", "Desde")
 
     val aboutVersionsTitle @Composable get() = get("Versions", "Versions", "Versões")
     val versionAppLabel @Composable get() = get("Version de l'application", "App version", "Versão do app")

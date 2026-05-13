@@ -141,10 +141,6 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
         }
     }
 
-    fun clearAntennas() {
-        _antennas.value = emptyList()
-    }
-
     private fun isPointInPolygon(lat: Double, lon: Double, polygons: List<List<GeoPoint>>): Boolean {
         var isInside = false
         for (polygon in polygons) {

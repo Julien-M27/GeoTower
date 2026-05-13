@@ -47,7 +47,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -73,6 +72,7 @@ import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.ui.components.SupportShareMenu
+import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
@@ -114,16 +114,7 @@ fun SupportDetailScreen(
     val buttonShape = if (useOneUi) CircleShape else RoundedCornerShape(12.dp)
     val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
 
-    var lastClickTime by remember { mutableLongStateOf(0L) }
-    val debounceTime = 700L
-
-    fun safeClick(action: () -> Unit) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastClickTime > debounceTime) {
-            lastClickTime = currentTime
-            action()
-        }
-    }
+    val safeClick = rememberSafeClick()
 
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "emitters")
 
@@ -377,7 +368,6 @@ fun SupportDetailScreen(
     val txtShareConfidentialOption = AppStrings.shareConfidentialOption
     val txtShareConfidentialDesc = AppStrings.shareConfidentialDesc
     val txtGenerateImage = AppStrings.generateImage
-    val txtNavWith = AppStrings.navWith
     val txtUnknown = AppStrings.unknown
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)

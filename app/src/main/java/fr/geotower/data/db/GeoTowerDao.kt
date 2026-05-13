@@ -12,9 +12,6 @@ import fr.geotower.data.models.DbCluster // ✅ NOUVEL IMPORT
 interface GeoTowerDao {
 
     // 1. Pour la carte : on charge tout super vite (ou juste une zone)
-    @Query("SELECT * FROM localisation")
-    suspend fun getAllLocalisations(): List<LocalisationEntity>
-
     // TRÈS UTILE pour ta fonction "getAntennasInBox" de ton Repository :
     @Query("""
         SELECT * FROM localisation 
@@ -101,18 +98,6 @@ interface GeoTowerDao {
     suspend fun getTechniqueByAnfr(idAnfr: String): List<TechniqueEntity>
 
     // 🚀 La requête magique qui regroupe les points (pour le dézoom)
-    @Query("""
-        SELECT 
-            ROUND(latitude, 1) as centerLat, 
-            ROUND(longitude, 1) as centerLon, 
-            COUNT(*) as count 
-        FROM localisation 
-        WHERE latitude BETWEEN :minLat AND :maxLat 
-        AND longitude BETWEEN :minLon AND :maxLon
-        GROUP BY ROUND(latitude, 1), ROUND(longitude, 1)
-    """)
-    suspend fun getClusteredLocalisations(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
-
     // 🌍 NIVEAU 1 : National (Zoom < 6.5) -> Blocs de ~250km
     @Query("""
         SELECT AVG(latitude) as centerLat, AVG(longitude) as centerLon, COUNT(*) as count 

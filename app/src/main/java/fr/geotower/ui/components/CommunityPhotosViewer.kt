@@ -78,6 +78,8 @@ import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.isNetworkAvailable
+import fr.geotower.ui.components.readSiteExternalLinkOrder
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import androidx.compose.material.icons.filled.CloudOff
@@ -184,7 +186,7 @@ fun CommunityPhotosSectionShared(
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
-    val linksOrder = prefs.getString("external_links_order", "cartoradio,cellularfr,signalquest,rncmobile,enbanalytics")!!.split(",")
+    val linksOrder = readSiteExternalLinkOrder(prefs)
     val showCellularFr = AppConfig.siteShowCellularFrPhotos.value
     val showSignalQuest = AppConfig.siteShowSignalQuestPhotos.value
     val showRncMobile = prefs.getBoolean("link_rncmobile", true) // Fallback to link pref if no specific site pref
@@ -220,7 +222,7 @@ fun CommunityPhotosSectionShared(
     val canUpload = operatorName != null && (operatorName.contains("SFR", true) || operatorName.contains("BOUYGUES", true))
 
     // ✅ NOUVEAU : On vérifie si on est en ligne en réutilisant ta fonction MapScreen
-    val isOnline = fr.geotower.ui.screens.map.isNetworkAvailable(context)
+    val isOnline = isNetworkAvailable(context)
 
     val isRteTubularPylon = isTubularPylon(supportNature) && isRteOwner(supportOwner)
 

@@ -73,11 +73,13 @@ import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import fr.geotower.data.workers.AppUpdateNotifier
 import fr.geotower.data.workers.DatabaseDownloadWorker
+import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.OperatorLogos
 import kotlinx.coroutines.launch
 
 private const val TAG_HOME = "GeoTowerDb"
@@ -89,28 +91,14 @@ fun HomeScreen(navController: NavController) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope() // ✅ AJOUT CRUCIAL ICI
     val logoResId by AppIconManager.currentIconRes
-    var lastClickTime by remember { mutableLongStateOf(0L) }
-
-    fun safeClick(action: () -> Unit) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastClickTime > 700L) {
-            lastClickTime = currentTime
-            action()
-        }
-    }
+    val safeClick = rememberSafeClick()
 
     // ---> 1. LECTURE DU CHOIX DU LOGO D'ACCUEIL <---
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val homeLogoChoice = prefs.getString("home_logo_choice", "app") ?: "app"
 
     // On associe le choix à la bonne image
-    val displayLogoResId = when (homeLogoChoice) {
-        "orange" -> R.drawable.logo_orange
-        "sfr" -> R.drawable.logo_sfr
-        "bouygues" -> R.drawable.logo_bouygues
-        "free" -> R.drawable.logo_free
-        else -> logoResId // Si "app", on garde le logo actuel de l'application
-    }
+    val displayLogoResId = OperatorLogos.homeLogoChoiceRes(homeLogoChoice, logoResId)
 
     // --- 1. LECTURE RÉACTIVE DU THÈME ET DESIGN ---
     val themeMode by AppConfig.themeMode
@@ -163,6 +151,26 @@ fun HomeScreen(navController: NavController) {
     val lifecycleOwner = LocalLifecycleOwner.current // À ajouter avant les Effects
 
     // ✅ BLOC 1 : On réutilise l'état validé au splash/onboarding et on ne rescane qu'en fallback ou après téléchargement.
+    LaunchedEffect(isOnline) {
+        if (isOnline) {
+            AppUpdateNotifier.checkAndNotify(context.applicationContext)
+        }
+    }
+
+    DisposableEffect(lifecycleOwner, isOnline) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME && isOnline) {
+                scope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                    AppUpdateNotifier.checkAndNotify(context.applicationContext)
+                }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
+    }
+
     LaunchedEffect(isSyncing) {
         if (!isSyncing && (AppConfig.localDatabaseState.value == null || wasSyncing)) {
             AppConfig.localDatabaseState.value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {

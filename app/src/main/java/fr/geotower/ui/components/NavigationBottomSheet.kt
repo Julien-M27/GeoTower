@@ -29,7 +29,6 @@ import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -71,15 +70,7 @@ fun NavigationBottomSheet(
     val txtOpenRouteWith = AppStrings.openRouteWith
     val txtNoGpsApp = AppStrings.noGpsApp
 
-    // Sécurité anti-spam
-    var lastClickTime by remember { mutableLongStateOf(0L) }
-    fun safeClick(action: () -> Unit) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastClickTime > 700L) {
-            lastClickTime = currentTime
-            action()
-        }
-    }
+    val safeClick = rememberSafeClick()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,

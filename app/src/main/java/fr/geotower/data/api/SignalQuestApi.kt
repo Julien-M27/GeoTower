@@ -19,7 +19,6 @@ data class SqPhotosResponse(
 
 data class SqPhotoData(
     val imageUrl: String,
-    val thumbnailUrl: String,
     val authorName: String?,
     val uploadedAt: String?
 )

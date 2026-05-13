@@ -70,6 +70,7 @@ import fr.geotower.data.db.AppDatabase
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.OperatorLogos
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -354,14 +355,7 @@ fun GlanceOperatorGrid(opsList: List<String>, gridSize: Dp) {
 
 @Composable
 fun GlanceGridCell(opName: String?, modifier: GlanceModifier) {
-    val iconRes = when {
-        opName == null -> null
-        opName.contains("ORANGE", true) -> R.drawable.logo_orange
-        opName.contains("BOUYGUES", true) -> R.drawable.logo_bouygues
-        opName.contains("SFR", true) -> R.drawable.logo_sfr
-        opName.contains("FREE", true) -> R.drawable.logo_free
-        else -> null
-    }
+    val iconRes = OperatorLogos.drawableRes(opName)
 
     val cellColor = if (iconRes == null) {
         ColorProvider(day = Color.Gray.copy(alpha = 0.1f), night = Color.Gray.copy(alpha = 0.1f))

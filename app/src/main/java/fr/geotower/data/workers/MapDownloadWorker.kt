@@ -32,11 +32,14 @@ class MapDownloadWorker(
     private val notificationManager by lazy {
         applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
     }
-    private val channelId = "map_download_channel"
+    private val channelId = DownloadNotificationCenter.MAP_DOWNLOAD_CHANNEL_ID
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         val mapUrl = inputData.getString("map_url") ?: return@withContext Result.failure()
         val mapFilename = inputData.getString("map_filename") ?: return@withContext Result.failure()
+        val mapDisplayName = inputData.getString("map_name")
+            ?.takeIf { it.isNotBlank() }
+            ?: AppStrings.formatMapName(mapFilename)
         val expectedSha256 = inputData.getString("map_sha256")?.takeIf { it.isNotBlank() }
         val estimatedSizeMb = inputData.getInt("estimated_size_mb", 2000)
 
@@ -47,10 +50,12 @@ class MapDownloadWorker(
             return@withContext Result.failure()
         }
 
-        val uniqueNotifId = mapFilename.hashCode()
+        val progressNotifId = DownloadNotificationCenter.mapDownloadNotificationId(mapFilename)
+        val resultNotifId = DownloadNotificationCenter.mapDownloadResultNotificationId(mapFilename)
+        DownloadNotificationCenter.rememberMapDownloadNotification(applicationContext, mapFilename)
 
         try {
-            setForeground(createForegroundInfo(0, mapFilename, uniqueNotifId))
+            setForeground(createForegroundInfo(0, mapDisplayName, progressNotifId))
         } catch (e: Exception) {
             AppLogger.w(TAG, "Map download foreground setup failed", e)
         }
@@ -105,7 +110,7 @@ class MapDownloadWorker(
                                 if (progress > lastProgress) {
                                     lastProgress = progress
                                     setProgress(workDataOf("state" to "DOWNLOADING", "progress" to progress))
-                                    notificationManager.notify(uniqueNotifId, createNotification(progress, mapFilename))
+                                    notificationManager.notify(progressNotifId, createNotification(progress, mapDisplayName, progressNotifId))
                                 }
                             }
 
@@ -130,6 +135,7 @@ class MapDownloadWorker(
             val success = replaceMapAtomically(tempMapFile, finalMapFile, backupMapFile)
 
             return@withContext if (success) {
+                showSuccessNotification(mapFilename, mapDisplayName, progressNotifId, resultNotifId)
                 Result.success()
             } else {
                 tempMapFile.delete()
@@ -171,7 +177,7 @@ class MapDownloadWorker(
     }
 
     private fun createForegroundInfo(progress: Int, mapName: String, notifId: Int): ForegroundInfo {
-        val notification = createNotification(progress, mapName)
+        val notification = createNotification(progress, mapName, notifId)
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ForegroundInfo(notifId, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
@@ -180,27 +186,12 @@ class MapDownloadWorker(
         }
     }
 
-    private fun createNotification(progress: Int, mapName: String): Notification {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                AppStrings.mapDownloadChannelName(applicationContext),
-                NotificationManager.IMPORTANCE_LOW
-            )
-            notificationManager.createNotificationChannel(channel)
-        }
+    private fun createNotification(progress: Int, mapName: String, notifId: Int): Notification {
+        DownloadNotificationCenter.rememberMapDownloadNotification(applicationContext, notifId)
 
-        val intent = Intent(applicationContext, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            data = android.net.Uri.parse("geotower://settings?section=offline_maps")
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            applicationContext,
-            0,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        ensureNotificationChannel()
 
+        val pendingIntent = createOfflineMapsPendingIntent(notifId)
         val title = AppStrings.mapDownloadTitle(applicationContext, mapName)
         val content = AppStrings.mapDownloadProgress(applicationContext, progress)
 
@@ -247,6 +238,56 @@ class MapDownloadWorker(
         }
 
         return builder.build()
+    }
+
+    private fun showSuccessNotification(mapFilename: String, mapDisplayName: String, progressNotifId: Int, resultNotifId: Int) {
+        DownloadNotificationCenter.rememberMapDownloadNotification(applicationContext, mapFilename)
+        ensureNotificationChannel()
+        notificationManager.cancel(progressNotifId)
+
+        val notification = NotificationCompat.Builder(applicationContext, channelId)
+            .setContentTitle(AppStrings.mapDownloadedTitle(applicationContext))
+            .setContentText(AppStrings.mapDownloadedContent(applicationContext, mapDisplayName))
+            .setSmallIcon(R.mipmap.ic_launcher_geotower)
+            .setContentIntent(createOfflineMapsPendingIntent(resultNotifId, mapFilename))
+            .setAutoCancel(true)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .build()
+
+        notificationManager.notify(resultNotifId, notification)
+    }
+
+    private fun ensureNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                AppStrings.mapDownloadChannelName(applicationContext),
+                NotificationManager.IMPORTANCE_LOW
+            )
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun createOfflineMapsPendingIntent(requestCode: Int, targetMapFilename: String? = null): PendingIntent {
+        val intent = Intent(applicationContext, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            data = android.net.Uri.Builder()
+                .scheme("geotower")
+                .authority("settings")
+                .appendQueryParameter("section", "offline_maps")
+                .apply {
+                    if (!targetMapFilename.isNullOrBlank()) {
+                        appendQueryParameter("target_map", targetMapFilename)
+                    }
+                }
+                .build()
+        }
+        return PendingIntent.getActivity(
+            applicationContext,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 
     private companion object {

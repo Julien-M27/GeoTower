@@ -41,7 +41,8 @@ fun AppearanceOptionsBlock(
     isBlur: Boolean, onBlurChange: (Boolean) -> Unit,
     menuSize: String, onMenuSizeChange: (String) -> Unit,
     appIconRes: Int? = null, onAppIconClick: (() -> Unit)? = null,
-    shape: Shape, border: BorderStroke?, bubbleColor: Color, safeClick: (() -> Unit) -> Unit
+    onColorPaletteClick: (() -> Unit)? = null,
+    shape: Shape, border: BorderStroke?, bubbleColor: Color, safeClick: SafeClick
 ) {
     // --- NOUVEAU : On cache le mode "Système" sur Android < 10 ---
     val showSystemTheme = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
@@ -49,12 +50,23 @@ fun AppearanceOptionsBlock(
     // 1. Thème
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         if (showSystemTheme) {
-            SettingsOptionCard(AppStrings.system, Icons.Default.SettingsSuggest, themeMode == 0, { safeClick { onThemeChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+            SettingsOptionCard(AppStrings.system, Icons.Default.SettingsSuggest, themeMode == 0, { safeClick("appearance_theme_system") { onThemeChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
         }
-        SettingsOptionCard(AppStrings.themeLight, Icons.Default.LightMode, themeMode == 1 || (!showSystemTheme && themeMode == 0), { safeClick { onThemeChange(1) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
-        SettingsOptionCard(AppStrings.themeDark, Icons.Default.DarkMode, themeMode == 2, { safeClick { onThemeChange(2) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+        SettingsOptionCard(AppStrings.themeLight, Icons.Default.LightMode, themeMode == 1 || (!showSystemTheme && themeMode == 0), { safeClick("appearance_theme_light") { onThemeChange(1) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+        SettingsOptionCard(AppStrings.themeDark, Icons.Default.DarkMode, themeMode == 2, { safeClick("appearance_theme_dark") { onThemeChange(2) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
     }
     Spacer(modifier = Modifier.height(12.dp))
+
+    if (onColorPaletteClick != null) {
+        ColorPaletteActionCard(
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            onClick = { safeClick("appearance_color_palette") { onColorPaletteClick() } }
+        )
+        Spacer(modifier = Modifier.height(12.dp))
+    }
 
     // 2. Mode OLED
     AnimatedVisibility(visible = themeMode == 2 || (themeMode == 0 && isSystemInDarkTheme())) {
@@ -74,7 +86,7 @@ fun AppearanceOptionsBlock(
 
     // 5. Icône de l'application
     if (onAppIconClick != null && appIconRes != null) {
-        Surface(onClick = { safeClick { onAppIconClick() } }, shape = shape, border = border, color = if (useOneUi) bubbleColor else Color.Transparent, modifier = Modifier.fillMaxWidth()) {
+        Surface(onClick = { safeClick("appearance_app_icon") { onAppIconClick() } }, shape = shape, border = border, color = if (useOneUi) bubbleColor else Color.Transparent, modifier = Modifier.fillMaxWidth()) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
 
                 // Le texte prend tout l'espace, plus d'icône ni de sous-titre !

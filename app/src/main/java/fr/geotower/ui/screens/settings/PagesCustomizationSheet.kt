@@ -5,7 +5,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,8 +67,6 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -92,6 +89,8 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
+import fr.geotower.ui.components.rememberSafeClick
+import fr.geotower.ui.components.rememberReorderableDragState
 import kotlin.math.roundToInt
 
 
@@ -266,7 +265,10 @@ fun HomeSettingsSheet(
     var showLogo by remember { mutableStateOf(prefs.getBoolean("show_home_logo", true)) }
     var showHelpButton by remember { mutableStateOf(prefs.getBoolean("show_home_help", true)) }
     var helpButtonPosition by remember { mutableStateOf(prefs.getString("home_help_position", "bottom_end") ?: "bottom_end") }
+    var showLogoSettings by remember { mutableStateOf(false) }
+    var logoSelectorResetKey by remember { mutableStateOf(0) }
     var showHelpPositionSettings by remember { mutableStateOf(false) }
+    val safeClick = rememberSafeClick()
 
     // ---> 2. SÉCURITÉ ET RÉACTIVITÉ : Assure que le logo est dans la liste <---
     val safeOrder = remember(pagesOrder) {
@@ -282,14 +284,40 @@ fun HomeSettingsSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         BackHandler {
-            if (showHelpPositionSettings) {
-                showHelpPositionSettings = false
-            } else {
-                onBack()
+            when {
+                showLogoSettings -> showLogoSettings = false
+                showHelpPositionSettings -> showHelpPositionSettings = false
+                else -> onBack()
             }
         }
         Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            if (showHelpPositionSettings) {
+            if (showLogoSettings) {
+                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { showLogoSettings = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                    Text(AppStrings.pageHomeLogoSettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                    Spacer(Modifier.width(48.dp))
+                }
+
+                key(logoSelectorResetKey) {
+                    fr.geotower.ui.components.HomeLogoSelectorBlock(
+                        safeClick = safeClick
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+                TextButton(
+                    onClick = {
+                        prefs.edit().putString("home_logo_choice", "app").apply()
+                        logoSelectorResetKey++
+                    }
+                ) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(8.dp))
+                    Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+
+                Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
+            } else if (showHelpPositionSettings) {
                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { showHelpPositionSettings = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                     Text(AppStrings.homeHelpPositionSettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
@@ -317,13 +345,9 @@ fun HomeSettingsSheet(
                 }
                 Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
 
-                val density = LocalDensity.current
                 val cardHeight = 64.dp
                 val spacing = 12.dp
-                val stepPx = with(density) { (cardHeight + spacing).toPx() }
-
-                var draggedItem by remember { mutableStateOf<String?>(null) }
-                var dragOffset by remember { mutableFloatStateOf(0f) }
+                val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
 
                 val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
                 val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
@@ -332,45 +356,17 @@ fun HomeSettingsSheet(
                 // --- MODIFICATION : On utilise 'currentOrder' au lieu de 'pagesOrder' partout ici ---
                 currentOrder.forEach { pageId ->
                     key(pageId) {
-                        val isDragged = draggedItem == pageId
-                        val dragModifier = Modifier.pointerInput(pageId) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = { draggedItem = pageId; dragOffset = 0f },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    dragOffset += dragAmount.y
-
-                                    val currentIndex = currentOrder.indexOf(pageId) // Utilise currentOrder
-                                    if (currentIndex < 0) return@detectDragGesturesAfterLongPress
-
-                                    var newIndex = currentIndex
-                                    while (dragOffset > stepPx * 0.5f && newIndex < currentOrder.size - 1) { // Utilise currentOrder
-                                        dragOffset -= stepPx
-                                        newIndex++
-                                    }
-                                    while (dragOffset < -stepPx * 0.5f && newIndex > 0) {
-                                        dragOffset += stepPx
-                                        newIndex--
-                                    }
-
-                                    if (newIndex != currentIndex) {
-                                        val newList = currentOrder.toMutableList() // Utilise currentOrder
-                                        val item = newList.removeAt(currentIndex)
-                                        newList.add(newIndex, item)
-                                        onOrderChange(newList)
-                                    }
-                                },
-                                onDragEnd = { draggedItem = null; dragOffset = 0f },
-                                onDragCancel = { draggedItem = null; dragOffset = 0f }
-                            )
-                        }
+                        val isDragged = reorderState.isDragged(pageId)
+                        val dragModifier = reorderState.dragModifier(pageId)
+                        val dragOffset = reorderState.offsetFor(pageId)
 
                         when (pageId) {
                             // ---> 3. AJOUT DU BLOC LOGO <---
                             "logo" -> DraggableSwitchCard(
                                 AppStrings.pageHomeLogoSettings, showLogo,
                                 { showLogo = it; prefs.edit().putBoolean("show_home_logo", it).apply() },
-                                shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
+                                shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight,
+                                onSettingsClick = { showLogoSettings = true }
                             )
                             "nearby" -> DraggableSwitchCard(AppStrings.pageNearbySettings, showNearby, onNearbyChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "map" -> DraggableSwitchCard(AppStrings.pageMapSettings, showMap, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
@@ -427,6 +423,7 @@ fun HomeSettingsSheet(
                     .putBoolean("show_home_logo", true)
                     .putBoolean("show_home_help", true)
                     .putString("home_help_position", "bottom_end")
+                    .putString("home_logo_choice", "app")
                     .apply()
             }) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -584,13 +581,9 @@ fun NearbySettingsSheet(
             }
             Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
 
-            val density = LocalDensity.current
             val cardHeight = 64.dp
             val spacing = 12.dp
-            val stepPx = with(density) { (cardHeight + spacing).toPx() }
-
-            var draggedItem by remember { mutableStateOf<String?>(null) }
-            var dragOffset by remember { mutableFloatStateOf(0f) }
+            val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
 
             val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
@@ -599,29 +592,9 @@ fun NearbySettingsSheet(
             Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
                 currentOrder.forEach { blockId ->
                     key(blockId) {
-                        val isDragged = draggedItem == blockId
-                        val dragModifier = Modifier.pointerInput(blockId) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = { draggedItem = blockId; dragOffset = 0f },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    dragOffset += dragAmount.y
-                                    val currentIndex = currentOrder.indexOf(blockId)
-                                    if (currentIndex < 0) return@detectDragGesturesAfterLongPress
-                                    var newIndex = currentIndex
-                                    while (dragOffset > stepPx * 0.5f && newIndex < currentOrder.size - 1) { dragOffset -= stepPx; newIndex++ }
-                                    while (dragOffset < -stepPx * 0.5f && newIndex > 0) { dragOffset += stepPx; newIndex-- }
-                                    if (newIndex != currentIndex) {
-                                        val newList = currentOrder.toMutableList()
-                                        val item = newList.removeAt(currentIndex)
-                                        newList.add(newIndex, item)
-                                        onOrderChange(newList)
-                                    }
-                                },
-                                onDragEnd = { draggedItem = null; dragOffset = 0f },
-                                onDragCancel = { draggedItem = null; dragOffset = 0f }
-                            )
-                        }
+                        val isDragged = reorderState.isDragged(blockId)
+                        val dragModifier = reorderState.dragModifier(blockId)
+                        val dragOffset = reorderState.offsetFor(blockId)
 
                         when (blockId) {
                             "search" -> DraggableSwitchCard(AppStrings.nearbySearchOption, showSearch, onSearchChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
@@ -777,13 +750,9 @@ fun CompassSettingsSheet(
             }
             Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
 
-            val density = LocalDensity.current
             val cardHeight = 64.dp
             val spacing = 12.dp
-            val stepPx = with(density) { (cardHeight + spacing).toPx() }
-
-            var draggedItem by remember { mutableStateOf<String?>(null) }
-            var dragOffset by remember { mutableFloatStateOf(0f) }
+            val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
 
             val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
@@ -791,29 +760,9 @@ fun CompassSettingsSheet(
             Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
                 currentOrder.forEach { blockId ->
                     key(blockId) {
-                        val isDragged = draggedItem == blockId
-                        val dragModifier = Modifier.pointerInput(blockId) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = { draggedItem = blockId; dragOffset = 0f },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    dragOffset += dragAmount.y
-                                    val currentIndex = currentOrder.indexOf(blockId)
-                                    if (currentIndex < 0) return@detectDragGesturesAfterLongPress
-                                    var newIndex = currentIndex
-                                    while (dragOffset > stepPx * 0.5f && newIndex < currentOrder.size - 1) { dragOffset -= stepPx; newIndex++ }
-                                    while (dragOffset < -stepPx * 0.5f && newIndex > 0) { dragOffset += stepPx; newIndex-- }
-                                    if (newIndex != currentIndex) {
-                                        val newList = currentOrder.toMutableList()
-                                        val item = newList.removeAt(currentIndex)
-                                        newList.add(newIndex, item)
-                                        onOrderChange(newList)
-                                    }
-                                },
-                                onDragEnd = { draggedItem = null; dragOffset = 0f },
-                                onDragCancel = { draggedItem = null; dragOffset = 0f }
-                            )
-                        }
+                        val isDragged = reorderState.isDragged(blockId)
+                        val dragModifier = reorderState.dragModifier(blockId)
+                        val dragOffset = reorderState.offsetFor(blockId)
 
                         when (blockId) {
                             "location" -> DraggableSwitchCard(AppStrings.compassLocationOption, showLocation, onLocationChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
@@ -977,12 +926,9 @@ fun ThroughputCalculatorSettingsSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         BackHandler(onBack = onBack)
-        val density = LocalDensity.current
         val cardHeight = 64.dp
         val spacing = 12.dp
-        val stepPx = with(density) { (cardHeight + spacing).toPx() }
-        var draggedItem by remember { mutableStateOf<String?>(null) }
-        var dragOffset by remember { mutableFloatStateOf(0f) }
+        val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onThroughputOrderChange)
 
         Column(
             modifier = Modifier
@@ -1015,35 +961,9 @@ fun ThroughputCalculatorSettingsSheet(
             Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
                 currentOrder.forEach { blockId ->
                     key(blockId) {
-                        val isDragged = draggedItem == blockId
-                        val dragModifier = Modifier.pointerInput(blockId) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = { draggedItem = blockId; dragOffset = 0f },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    dragOffset += dragAmount.y
-                                    val currentIndex = currentOrder.indexOf(blockId)
-                                    if (currentIndex < 0) return@detectDragGesturesAfterLongPress
-                                    var newIndex = currentIndex
-                                    while (dragOffset > stepPx * 0.5f && newIndex < currentOrder.size - 1) {
-                                        dragOffset -= stepPx
-                                        newIndex++
-                                    }
-                                    while (dragOffset < -stepPx * 0.5f && newIndex > 0) {
-                                        dragOffset += stepPx
-                                        newIndex--
-                                    }
-                                    if (newIndex != currentIndex) {
-                                        val newList = currentOrder.toMutableList()
-                                        val item = newList.removeAt(currentIndex)
-                                        newList.add(newIndex, item)
-                                        onThroughputOrderChange(newList)
-                                    }
-                                },
-                                onDragEnd = { draggedItem = null; dragOffset = 0f },
-                                onDragCancel = { draggedItem = null; dragOffset = 0f }
-                            )
-                        }
+                        val isDragged = reorderState.isDragged(blockId)
+                        val dragModifier = reorderState.dragModifier(blockId)
+                        val dragOffset = reorderState.offsetFor(blockId)
                         val checked = when (blockId) {
                             "header" -> showHeader
                             "summary" -> showSummary
@@ -1451,13 +1371,9 @@ fun SupportSettingsSheet(
             }
             Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
 
-            val density = LocalDensity.current
             val cardHeight = 64.dp
             val spacing = 12.dp
-            val stepPx = with(density) { (cardHeight + spacing).toPx() }
-
-            var draggedItem by remember { mutableStateOf<String?>(null) }
-            var dragOffset by remember { mutableFloatStateOf(0f) }
+            val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
 
             val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
@@ -1465,29 +1381,9 @@ fun SupportSettingsSheet(
             Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
                 currentOrder.forEach { blockId ->
                     key(blockId) {
-                        val isDragged = draggedItem == blockId
-                        val dragModifier = Modifier.pointerInput(blockId) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = { draggedItem = blockId; dragOffset = 0f },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    dragOffset += dragAmount.y
-                                    val currentIndex = currentOrder.indexOf(blockId)
-                                    if (currentIndex < 0) return@detectDragGesturesAfterLongPress
-                                    var newIndex = currentIndex
-                                    while (dragOffset > stepPx * 0.5f && newIndex < currentOrder.size - 1) { dragOffset -= stepPx; newIndex++ }
-                                    while (dragOffset < -stepPx * 0.5f && newIndex > 0) { dragOffset += stepPx; newIndex-- }
-                                    if (newIndex != currentIndex) {
-                                        val newList = currentOrder.toMutableList()
-                                        val item = newList.removeAt(currentIndex)
-                                        newList.add(newIndex, item)
-                                        onOrderChange(newList)
-                                    }
-                                },
-                                onDragEnd = { draggedItem = null; dragOffset = 0f },
-                                onDragCancel = { draggedItem = null; dragOffset = 0f }
-                            )
-                        }
+                        val isDragged = reorderState.isDragged(blockId)
+                        val dragModifier = reorderState.dragModifier(blockId)
+                        val dragOffset = reorderState.offsetFor(blockId)
 
                         when (blockId) {
                             "map" -> DraggableSwitchCard(AppStrings.supportMapOption, showMap, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
@@ -1588,13 +1484,9 @@ fun SiteSettingsSheet(
             }
             Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
 
-            val density = LocalDensity.current
             val cardHeight = 64.dp
             val spacing = 12.dp
-            val stepPx = with(density) { (cardHeight + spacing).toPx() }
-
-            var draggedItem by remember { mutableStateOf<String?>(null) }
-            var dragOffset by remember { mutableFloatStateOf(0f) }
+            val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
 
             val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
@@ -1602,29 +1494,9 @@ fun SiteSettingsSheet(
             Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
                 currentOrder.forEach { blockId ->
                     key(blockId) {
-                        val isDragged = draggedItem == blockId
-                        val dragModifier = Modifier.pointerInput(blockId) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = { draggedItem = blockId; dragOffset = 0f },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    dragOffset += dragAmount.y
-                                    val currentIndex = currentOrder.indexOf(blockId)
-                                    if (currentIndex < 0) return@detectDragGesturesAfterLongPress
-                                    var newIndex = currentIndex
-                                    while (dragOffset > stepPx * 0.5f && newIndex < currentOrder.size - 1) { dragOffset -= stepPx; newIndex++ }
-                                    while (dragOffset < -stepPx * 0.5f && newIndex > 0) { dragOffset += stepPx; newIndex-- }
-                                    if (newIndex != currentIndex) {
-                                        val newList = currentOrder.toMutableList()
-                                        val item = newList.removeAt(currentIndex)
-                                        newList.add(newIndex, item)
-                                        onOrderChange(newList)
-                                    }
-                                },
-                                onDragEnd = { draggedItem = null; dragOffset = 0f },
-                                onDragCancel = { draggedItem = null; dragOffset = 0f }
-                            )
-                        }
+                        val isDragged = reorderState.isDragged(blockId)
+                        val dragModifier = reorderState.dragModifier(blockId)
+                        val dragOffset = reorderState.offsetFor(blockId)
 
                         when (blockId) {
                             "operator" -> DraggableSwitchCard(AppStrings.siteOperatorOption, showOperator, onOperatorChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
@@ -1695,11 +1567,15 @@ fun SiteFreqFiltersSheet(
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val switchColor = MaterialTheme.colorScheme.primary
-    val density = LocalDensity.current
     val useOneUi = AppConfig.useOneUiDesign
-
-    var draggedTechno by remember { mutableStateOf<String?>(null) }
-    var technoDragOffset by remember { mutableFloatStateOf(0f) }
+    val technoDragState = rememberReorderableDragState(
+        items = AppConfig.siteTechnoOrder.value,
+        itemHeight = 80.dp,
+        onOrderChange = { newOrder ->
+            AppConfig.siteTechnoOrder.value = newOrder
+            prefs.edit().putString("site_techno_order", newOrder.joinToString(",")).apply()
+        }
+    )
     val emptyFreqOrderState = remember { mutableStateOf(emptyList<String>()) }
 
     val txtMinOneTechno = AppStrings.minOneTechnoWarning
@@ -1784,7 +1660,8 @@ fun SiteFreqFiltersSheet(
 
             AppConfig.siteTechnoOrder.value.forEach { technoId ->
                 key(technoId) {
-                    val isTechnoDragged = draggedTechno == technoId
+                    val isTechnoDragged = technoDragState.isDragged(technoId)
+                    val technoDragOffset = technoDragState.offsetFor(technoId)
                     val technoData = when(technoId) {
                         "5G" -> Triple("5G (NR)", AppConfig.siteShowTechno5G, "site_show_techno_5g") to (listOf("3500" to AppConfig.siteF5G_3500, "2100" to AppConfig.siteF5G_2100, "700" to AppConfig.siteF5G_700) to AppConfig.siteFreqOrder5G)
                         "4G" -> Triple("4G (LTE)", AppConfig.siteShowTechno4G, "site_show_techno_4g") to (listOf("2600" to AppConfig.siteF4G_2600, "2100" to AppConfig.siteF4G_2100, "1800" to AppConfig.siteF4G_1800, "900" to AppConfig.siteF4G_900, "800" to AppConfig.siteF4G_800, "700" to AppConfig.siteF4G_700) to AppConfig.siteFreqOrder4G)
@@ -1808,30 +1685,7 @@ fun SiteFreqFiltersSheet(
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                             .zIndex(if (isTechnoDragged) 1f else 0f)
                             .graphicsLayer { translationY = if (isTechnoDragged) technoDragOffset else 0f }
-                            .pointerInput(technoId) {
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = { draggedTechno = technoId; technoDragOffset = 0f },
-                                    onDrag = { change, dragAmount ->
-                                        change.consume()
-                                        technoDragOffset += dragAmount.y
-                                        val currentList = AppConfig.siteTechnoOrder.value
-                                        val currentIndex = currentList.indexOf(technoId)
-                                        val stepPx = with(density) { 80.dp.toPx() }
-                                        var newIndex = currentIndex
-                                        while (technoDragOffset > stepPx * 0.5f && newIndex < currentList.size - 1) { technoDragOffset -= stepPx; newIndex++ }
-                                        while (technoDragOffset < -stepPx * 0.5f && newIndex > 0) { technoDragOffset += stepPx; newIndex-- }
-                                        if (newIndex != currentIndex) {
-                                            val newList = currentList.toMutableList()
-                                            val item = newList.removeAt(currentIndex)
-                                            newList.add(newIndex, item)
-                                            AppConfig.siteTechnoOrder.value = newList
-                                            prefs.edit().putString("site_techno_order", newList.joinToString(",")).apply()
-                                        }
-                                    },
-                                    onDragEnd = { draggedTechno = null; technoDragOffset = 0f },
-                                    onDragCancel = { draggedTechno = null; technoDragOffset = 0f }
-                                )
-                            },
+                            .then(technoDragState.dragModifier(technoId)),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     ) {
                         Column(modifier = Modifier.padding(16.dp)) {
@@ -1861,44 +1715,29 @@ fun SiteFreqFiltersSheet(
                             AnimatedVisibility(visible = technoState.value && freqList.isNotEmpty()) {
                                 Column(modifier = Modifier.padding(top = 8.dp)) {
                                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                                    var draggedFreq by remember { mutableStateOf<String?>(null) }
-                                    var freqDragOffset by remember { mutableFloatStateOf(0f) }
+                                    val freqDragState = rememberReorderableDragState(
+                                        items = freqOrder.value,
+                                        itemHeight = 48.dp,
+                                        onOrderChange = { newOrder ->
+                                            freqOrder.value = newOrder
+                                            prefs.edit().putString("site_freq_${technoId.lowercase()}_order", newOrder.joinToString(",")).apply()
+                                        }
+                                    )
                                     freqOrder.value.forEach { freqLabel ->
                                         key(freqLabel) {
                                             val freqStatePair = freqList.find { it.first == freqLabel }
                                             if (freqStatePair != null) {
                                                 val freqState = freqStatePair.second
-                                                val isFreqDragged = draggedFreq == freqLabel
+                                                val isFreqDragged = freqDragState.isDragged(freqLabel)
+                                                val freqDragOffset = freqDragState.offsetFor(freqLabel)
                                                 val freqPrefKey = "site_f${technoId.lowercase()}_${freqLabel}"
                                                 Row(
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     modifier = Modifier.fillMaxWidth().zIndex(if (isFreqDragged) 1f else 0f)
                                                         .graphicsLayer { translationY = if (isFreqDragged) freqDragOffset else 0f; scaleX = if (isFreqDragged) 1.02f else 1f; scaleY = if (isFreqDragged) 1.02f else 1f }
                                                         .background(if (isFreqDragged) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent, RoundedCornerShape(8.dp))
-                                                        .pointerInput(freqLabel) {
-                                                            detectDragGesturesAfterLongPress(
-                                                                onDragStart = { draggedFreq = freqLabel; freqDragOffset = 0f },
-                                                                onDrag = { change, dragAmount ->
-                                                                    change.consume()
-                                                                    freqDragOffset += dragAmount.y
-                                                                    val currentList = freqOrder.value
-                                                                    val currentIndex = currentList.indexOf(freqLabel)
-                                                                    val stepPx = with(density) { 48.dp.toPx() }
-                                                                    var newIndex = currentIndex
-                                                                    while (freqDragOffset > stepPx * 0.5f && newIndex < currentList.size - 1) { freqDragOffset -= stepPx; newIndex++ }
-                                                                    while (freqDragOffset < -stepPx * 0.5f && newIndex > 0) { freqDragOffset += stepPx; newIndex-- }
-                                                                    if (newIndex != currentIndex) {
-                                                                        val newList = currentList.toMutableList()
-                                                                        val item = newList.removeAt(currentIndex)
-                                                                        newList.add(newIndex, item)
-                                                                        freqOrder.value = newList
-                                                                        prefs.edit().putString("site_freq_${technoId.lowercase()}_order", newList.joinToString(",")).apply()
-                                                                    }
-                                                                },
-                                                                onDragEnd = { draggedFreq = null; freqDragOffset = 0f },
-                                                                onDragCancel = { draggedFreq = null; freqDragOffset = 0f }
-                                                            )
-                                                        }.padding(vertical = 4.dp, horizontal = 4.dp)
+                                                        .then(freqDragState.dragModifier(freqLabel))
+                                                        .padding(vertical = 4.dp, horizontal = 4.dp)
                                                 ) {
                                                     Icon(Icons.Default.DragHandle, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f))
                                                     Text("$freqLabel MHz", modifier = Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.bodyMedium, fontWeight = if(isFreqDragged) FontWeight.Bold else FontWeight.Normal)

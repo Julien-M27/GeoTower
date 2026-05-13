@@ -28,6 +28,7 @@ import fr.geotower.data.models.TechniqueEntity // ✅ NOUVEL IMPORT
 import fr.geotower.ui.screens.emitters.formatDateToFrench // ✅ IMPORT DU FORMATAGE DES DATES
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.OperatorLogos
 
 @Composable
 fun OperatorsListSection(
@@ -222,13 +223,7 @@ private fun formatSiteTechnologies(
 }
 
 private fun getLocalLogoRes(opName: String): Int? {
-    return when {
-        opName.contains("ORANGE", true) -> R.drawable.logo_orange
-        opName.contains("SFR", true) -> R.drawable.logo_sfr
-        opName.contains("BOUYGUES", true) -> R.drawable.logo_bouygues
-        opName.contains("FREE", true) -> R.drawable.logo_free
-        else -> null
-    }
+    return OperatorLogos.drawableRes(opName)
 }
 
 @Composable

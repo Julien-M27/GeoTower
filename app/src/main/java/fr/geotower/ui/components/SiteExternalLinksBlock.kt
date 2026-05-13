@@ -41,18 +41,9 @@ fun SiteExternalLinksBlock(
     val txtOpenApp = AppStrings.open
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
-    var lastClickTime by remember { mutableLongStateOf(0L) }
-    val debounceTime = 700L
+    val safeClick = rememberSafeClick()
 
-    fun safeClick(action: () -> Unit) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastClickTime > debounceTime) {
-            lastClickTime = currentTime
-            action()
-        }
-    }
-
-    val externalLinksOrder by remember { mutableStateOf(prefs.getString("external_links_order", "cartoradio,cellularfr,signalquest,rncmobile,enbanalytics,anfr")!!.split(",")) }
+    val externalLinksOrder by remember { mutableStateOf(readSiteExternalLinkOrder(prefs)) }
 
     val showCartoradio by remember { mutableStateOf(prefs.getBoolean("link_cartoradio", true)) }
     val showAnfr by remember { mutableStateOf(prefs.getBoolean("show_anfr", true)) }
@@ -75,7 +66,7 @@ fun SiteExternalLinksBlock(
                     when (block) {
                         "cartoradio" -> {
                             if (showCartoradio) {
-                                CommunityLinkRow("Cartoradio", txtOpenApp, R.drawable.logo_cartoradio, buttonShape) {
+                                CommunityLinkRow(siteExternalLinkById(block)?.label ?: "Cartoradio", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_cartoradio, buttonShape) {
                                     safeClick {
                                         // ✅ Lien Cartoradio avec les coordonnées (Longitude d'abord, puis Latitude)
                                         uriHandler.openUri("https://cartoradio.fr/index.html#/cartographie/lonlat/${info.longitude}/${info.latitude}")
@@ -85,17 +76,17 @@ fun SiteExternalLinksBlock(
                         }
                         "cellularfr" -> {
                             if (showCellularFr && info.operateur?.contains("ORANGE", true) == true) {
-                                CommunityLinkRow("CellularFR", txtOpenApp, R.drawable.logo_cellularfr, buttonShape) { safeClick { onShowCellularFr() } }
+                                CommunityLinkRow(siteExternalLinkById(block)?.label ?: "CellularFR", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_cellularfr, buttonShape) { safeClick { onShowCellularFr() } }
                             }
                         }
                         "rncmobile" -> {
                             if (showRncMobile && info.operateur?.contains("FREE", true) == true) {
-                                CommunityLinkRow("RNC Mobile", txtOpenApp, R.drawable.logo_rncmobile, buttonShape) { safeClick { onShowRnc() } }
+                                CommunityLinkRow(siteExternalLinkById(block)?.label ?: "RNC Mobile", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_rncmobile, buttonShape) { safeClick { onShowRnc() } }
                             }
                         }
                         "signalquest" -> {
                             if (showSignalQuest && (info.operateur?.contains("SFR", true) == true || info.operateur?.contains("BOUYGUES", true) == true)) {
-                                CommunityLinkRow("Signal Quest", txtOpenApp, R.drawable.logo_signalquest, buttonShape) {
+                                CommunityLinkRow(siteExternalLinkById(block)?.label ?: "Signal Quest", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_signalquest, buttonShape) {
                                     safeClick {
                                         // 1. Formatage de l'opérateur pour l'URL
                                         val operator = when {
@@ -128,12 +119,12 @@ fun SiteExternalLinksBlock(
                         }
                         "enbanalytics" -> {
                             if (showEnbAnalytics) {
-                                CommunityLinkRow("eNB-Analytics", txtOpenApp, R.drawable.logo_enbanalytics, buttonShape) { safeClick { onShowEnb() } }
+                                CommunityLinkRow(siteExternalLinkById(block)?.label ?: "eNB-Analytics", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_enbanalytics, buttonShape) { safeClick { onShowEnb() } }
                             }
                         }
                         "anfr" -> {
                             if (showAnfr) {
-                                CommunityLinkRow("data.gouv.fr", txtOpenApp, R.drawable.logo_anfr, buttonShape) {
+                                CommunityLinkRow(siteExternalLinkById(block)?.label ?: "data.gouv.fr", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_anfr, buttonShape) {
                                     safeClick {
                                         // ✅ Lien data.gouv.fr (ANFR) avec zoom 17, Latitude puis Longitude
                                         uriHandler.openUri("https://data.anfr.fr/visualisation/map/?id=observatoire_2g_3g_4g&location=17,${info.latitude},${info.longitude}")

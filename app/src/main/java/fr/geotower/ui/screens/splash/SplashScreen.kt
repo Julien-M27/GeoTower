@@ -44,7 +44,7 @@ fun SplashScreen(
                     AppConfig.localDatabaseState.value = localStatus.state
                 }
 
-                val currentVersion = if (localStatus.state == fr.geotower.data.db.GeoTowerDatabaseValidator.LocalDatabaseState.VALID) {
+                val currentVersion = if (localStatus.state != fr.geotower.data.db.GeoTowerDatabaseValidator.LocalDatabaseState.MISSING) {
                     fr.geotower.data.db.GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context)
                 } else {
                     null

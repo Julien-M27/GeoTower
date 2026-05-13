@@ -80,7 +80,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -115,12 +114,14 @@ import androidx.navigation.NavController
 import fr.geotower.data.api.NominatimApi
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.SiteHsEntity
+import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.MapUtils
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.isNetworkAvailable
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -282,17 +283,7 @@ fun MapScreen(
         AppConfig.showSpeedometer.value = prefs.getBoolean("show_speedometer", true)
     }
 
-    var lastClickTime by remember { mutableLongStateOf(0L) }
-    var pauseMapUpdatesUntil by remember { mutableLongStateOf(0L) }
-    fun safeClick(action: () -> Unit) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastClickTime > 700L) { lastClickTime = currentTime; action() }
-    }
-
-    // --TAILLE DE L'APP--
-
-    val screenWidth = configuration.screenWidthDp
-    val screenHeight = configuration.screenHeightDp
+    val safeClick = rememberSafeClick()
 
     var showSettingsSheet by remember { mutableStateOf(false) }
     var showLayerSheet by remember { mutableStateOf(false) }
@@ -442,15 +433,11 @@ fun MapScreen(
 
     val txtMapTitle = AppStrings.mapTitle
     val txtSearchCityOrId = AppStrings.searchCityOrId
-    val txtSiteNotInArea = AppStrings.siteNotInArea
     val txtLocationNotFound = AppStrings.locationNotFound
     val txtNetworkErrorSearch = AppStrings.networkErrorSearch
     val txtDeleteTraces = AppStrings.deleteTraces
     val txtClosestSite = AppStrings.closestSite
-    val txtNoSiteNearby = AppStrings.noSiteNearby
-    val txtNearby = AppStrings.nearby
     val txtFilter = AppStrings.filter
-    val txtMapLayerTitle = AppStrings.mapLayerTitle
     val txtMapIgnLayer = AppStrings.mapIgnLayer
     val txtMapOsmLayer = AppStrings.mapOsmLayer
     val txtMapLight = AppStrings.mapLight
@@ -459,7 +446,6 @@ fun MapScreen(
     val txtMapMapLibre = AppStrings.mapMapLibre
     val txtMapTopo = AppStrings.mapTopo
     val txtMapOfflineLayer = AppStrings.mapOfflineLayer
-    val txtNoMapFileNotFound = AppStrings.noMapFileNotFound
 
     val txtWarningTitle = AppStrings.warningTitle
     val txtLightColorWarning = AppStrings.lightColorWarning
@@ -2280,7 +2266,6 @@ open class CustomLocationOverlay(
 ) : MyLocationNewOverlay(provider, mapView) {
 
     var currentCompassAzimuth = 0f
-    private val pulseStartTime = System.currentTimeMillis()
 
     // --- On prépare les objets de dessin une seule fois pour éviter les allocations dans draw() ---
     private val pt = android.graphics.Point()
@@ -2292,7 +2277,6 @@ open class CustomLocationOverlay(
     private val themeStrokePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { style = android.graphics.Paint.Style.STROKE; color = primaryColor; strokeCap = android.graphics.Paint.Cap.ROUND }
     private val whiteFillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { style = android.graphics.Paint.Style.FILL; color = android.graphics.Color.WHITE }
     private val pulsePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { style = android.graphics.Paint.Style.STROKE; color = primaryColor; strokeWidth = 3f }
-    private val beamPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { style = android.graphics.Paint.Style.FILL }
 
     override fun drawMyLocation(
         canvas: android.graphics.Canvas,
@@ -2566,53 +2550,7 @@ private fun isPointInPolygon(lat: Double, lon: Double, polygon: List<GeoPoint>):
     return isInside
 }
 
-@Composable
-fun MapDistanceIndicator(distanceMeters: Float?, label: String) {
-    if (distanceMeters == null) return
-
-    // On lit le choix de l'utilisateur (0 = km, 1 = miles)
-    val isMi = fr.geotower.utils.AppConfig.distanceUnit.intValue == 1
-
-    val displayDistance: String = if (isMi) {
-        val distMiles = distanceMeters / 1609.34f
-        if (distMiles < 0.1f) {
-            "${(distanceMeters * 3.28084f).toInt()} ft"
-        } else {
-            String.format(java.util.Locale.US, "%.2f mi", distMiles)
-        }
-    } else {
-        if (distanceMeters < 1000f) {
-            "${distanceMeters.toInt()} m"
-        } else {
-            String.format(java.util.Locale.US, "%.2f km", distanceMeters / 1000f)
-        }
-    }
-
-    Surface(
-        modifier = Modifier.padding(bottom = 4.dp, start = 6.dp),
-        color = Color.White.copy(alpha = 0.8f),
-        shape = RoundedCornerShape(4.dp)
-    ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(text = "$label : ", fontSize = 10.sp, color = Color.DarkGray)
-            Text(text = displayDistance, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-        }
-    }
-}
-
 // ✅ NOUVEAU : Fonction pour vérifier si internet est disponible
-fun isNetworkAvailable(context: Context): Boolean {
-    val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as android.net.ConnectivityManager
-    val network = connectivityManager.activeNetwork ?: return false
-    val activeNetwork = connectivityManager.getNetworkCapabilities(network) ?: return false
-    return activeNetwork.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) ||
-            activeNetwork.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) ||
-            activeNetwork.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET)
-}
-
 // 🚨 DESSINE LE POINT D'EXCLAMATION DE PANNE AVEC UN CACHE
 fun createHsBadge(context: Context): android.graphics.drawable.BitmapDrawable {
     val density = context.resources.displayMetrics.density

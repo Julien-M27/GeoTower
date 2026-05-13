@@ -8,12 +8,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
-import android.net.ConnectivityManager
-import android.net.Network
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
-import android.os.Handler
-import android.os.Looper
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
@@ -92,6 +86,8 @@ import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.isNetworkAvailable
+import fr.geotower.utils.rememberNetworkAvailableState
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -298,7 +294,7 @@ fun ElevationProfileScreen(
                 pendingProfilePoint = null
             }
         }.onFailure {
-            profileError = if (fr.geotower.ui.screens.map.isNetworkAvailable(context)) it.message ?: "" else PROFILE_ERROR_OFFLINE
+            profileError = if (isNetworkAvailable(context)) it.message ?: "" else PROFILE_ERROR_OFFLINE
         }
         isProfileLoading = false
     }
@@ -437,7 +433,7 @@ fun ElevationProfileScreen(
                                 Icon(Icons.Default.Terrain, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                                 Spacer(Modifier.width(12.dp))
                                 Text(
-                                    text = "${AppStrings.elevationProfileDistance} ${formatProfileDistance(profile!!.distanceMeters)}",
+                                    text = "${AppStrings.elevationProfileDistance} ${formatElevationProfileDistance(profile!!.distanceMeters)}",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -645,45 +641,6 @@ private fun Modifier.elevationProfileFadingEdge(scrollState: ScrollState): Modif
             blendMode = BlendMode.DstIn
         )
     }
-}
-
-@Composable
-private fun rememberNetworkAvailableState(context: Context): Boolean {
-    var isAvailable by remember { mutableStateOf(fr.geotower.ui.screens.map.isNetworkAvailable(context)) }
-    val mainHandler = remember { Handler(Looper.getMainLooper()) }
-
-    DisposableEffect(context) {
-        val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
-        val callback = object : ConnectivityManager.NetworkCallback() {
-            private fun refresh() {
-                val available = fr.geotower.ui.screens.map.isNetworkAvailable(context)
-                mainHandler.post { isAvailable = available }
-            }
-
-            override fun onAvailable(network: Network) {
-                refresh()
-            }
-
-            override fun onLost(network: Network) {
-                refresh()
-            }
-
-            override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-                refresh()
-            }
-        }
-        val request = NetworkRequest.Builder()
-            .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-            .build()
-
-        runCatching { connectivityManager.registerNetworkCallback(request, callback) }
-
-        onDispose {
-            runCatching { connectivityManager.unregisterNetworkCallback(callback) }
-        }
-    }
-
-    return isAvailable
 }
 
 @Composable
@@ -987,7 +944,7 @@ private fun ElevationProfileChart(
         textPaint.textAlign = android.graphics.Paint.Align.LEFT
         drawContext.canvas.nativeCanvas.drawText("0", left, size.height - 8.dp.toPx(), textPaint)
         textPaint.textAlign = android.graphics.Paint.Align.RIGHT
-        drawContext.canvas.nativeCanvas.drawText(formatProfileDistance(totalDistance), left + chartWidth, size.height - 8.dp.toPx(), textPaint)
+        drawContext.canvas.nativeCanvas.drawText(formatElevationProfileDistance(totalDistance), left + chartWidth, size.height - 8.dp.toPx(), textPaint)
     }
 }
 
@@ -1100,15 +1057,6 @@ private fun formatFrequencyLabel(frequencyMHz: Int): String {
         "${frequencyMHz / 1000} GHz"
     } else {
         "$frequencyMHz MHz"
-    }
-}
-
-private fun formatProfileDistance(distanceMeters: Float): String {
-    return if (AppConfig.distanceUnit.intValue == 1) {
-        val miles = distanceMeters / 1609.34f
-        if (miles < 0.1f) "${(distanceMeters * 3.28084f).roundToInt()} ft" else String.format(Locale.US, "%.2f mi", miles)
-    } else {
-        if (distanceMeters >= 1000f) String.format(Locale.US, "%.2f km", distanceMeters / 1000f) else "${distanceMeters.roundToInt()} m"
     }
 }
 

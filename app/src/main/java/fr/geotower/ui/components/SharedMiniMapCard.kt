@@ -27,9 +27,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.ColorUtils
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.MapUtils
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.isNetworkAvailable
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
 import org.osmdroid.events.ZoomEvent
@@ -48,13 +50,16 @@ import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sqrt
 
+private const val MINI_MAP_HS_OPERATOR_WILDCARD = "*"
+private val MINI_MAP_OPERATOR_KEYS = listOf("ORANGE", "SFR", "BOUYGUES", "FREE")
+
 @Composable
 fun SharedMiniMapCard(
     modifier: Modifier = Modifier,
     centerLat: Double,
     centerLon: Double,
     mappedAntennas: List<LocalisationEntity>,
-    sitesHs: List<fr.geotower.data.models.SiteHsEntity> = emptyList(),
+    sitesHs: List<SiteHsEntity> = emptyList(),
     blockShape: Shape,
     cardBorder: BorderStroke?,
     onMapReady: (MapView) -> Unit,
@@ -85,7 +90,7 @@ fun SharedMiniMapCard(
         mapFiles = files
 
         // Si hors-ligne ET présence de fichiers : on bascule.
-        if (!fr.geotower.ui.screens.map.isNetworkAvailable(context) && files.isNotEmpty()) {
+        if (!isNetworkAvailable(context) && files.isNotEmpty()) {
             effectiveProvider = 4
         }
     }
@@ -238,16 +243,10 @@ fun SharedMiniMapCard(
                     )
 
                     // 🚨 LE MÊME CODE QUE MAPSCREEN : LOGIQUE DE FUSION SITES HS
-                    val validHsSites = sitesHs.filter { it.latitude != 0.0 && it.longitude != 0.0 }
-                    val mainAntenna = mappedAntennas.firstOrNull()
-
-                    val isHs = if (mainAntenna != null) {
-                        validHsSites.any { hs ->
-                            val hsId = hs.idAnfr.toLongOrNull()
-                            val antId = mainAntenna.idAnfr.toLongOrNull()
-                            hsId != null && hsId == antId
-                        }
-                    } else false
+                    val hsOperatorMap = buildMiniMapHsOperatorMap(sitesHs)
+                    val isHs = mappedAntennas.any { antenna ->
+                        hasMiniMapHsOperator(antenna, hsOperatorMap)
+                    }
 
                     val finalIcon = if (isHs) {
                         val badgeIcon = createHsBadge(context)
@@ -345,6 +344,45 @@ private fun miniMapZoomForRadius(radiusMeters: Double): Double {
         radiusMeters >= 650.0 -> 15.0
         radiusMeters >= 300.0 -> 16.0
         else -> 17.0
+    }
+}
+
+private fun normalizedMiniMapAnfrId(value: String): String {
+    val trimmed = value.trim()
+    return trimmed.toLongOrNull()?.toString() ?: trimmed
+}
+
+private fun extractMiniMapOperatorKeys(value: String?): List<String> {
+    val upper = value?.uppercase() ?: return emptyList()
+    return MINI_MAP_OPERATOR_KEYS.filter { upper.contains(it) }
+}
+
+private fun buildMiniMapHsOperatorMap(sitesHs: List<SiteHsEntity>): Map<String, Set<String>> {
+    val result = mutableMapOf<String, MutableSet<String>>()
+
+    sitesHs.forEach { hs ->
+        val id = normalizedMiniMapAnfrId(hs.idAnfr)
+        if (id.isBlank()) return@forEach
+
+        val parsedOperators = extractMiniMapOperatorKeys(hs.operateur)
+        val operators = if (parsedOperators.isEmpty()) {
+            listOf(MINI_MAP_HS_OPERATOR_WILDCARD)
+        } else {
+            parsedOperators
+        }
+        result.getOrPut(id) { mutableSetOf() }.addAll(operators)
+    }
+
+    return result
+}
+
+private fun hasMiniMapHsOperator(
+    antenna: LocalisationEntity,
+    hsOperatorMap: Map<String, Set<String>>
+): Boolean {
+    val hsOperators = hsOperatorMap[normalizedMiniMapAnfrId(antenna.idAnfr)] ?: return false
+    return extractMiniMapOperatorKeys(antenna.operateur).any { operatorKey ->
+        MINI_MAP_HS_OPERATOR_WILDCARD in hsOperators || operatorKey in hsOperators
     }
 }
 

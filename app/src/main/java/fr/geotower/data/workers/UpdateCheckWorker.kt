@@ -17,6 +17,9 @@ import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.utils.AppStrings
 
 class UpdateCheckWorker(private val context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
+    private companion object {
+        const val UPDATE_ALERTS_CHANNEL_ID = "update_alerts_channel"
+    }
 
     override suspend fun doWork(): Result {
         val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
@@ -26,6 +29,8 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
             return Result.success()
         }
 
+        AppUpdateNotifier.checkAndNotify(context)
+
         // 2. On interroge discrètement ton serveur
         val remoteVersion = DatabaseDownloader.getLatestDatabaseVersion() ?: return Result.retry()
         if (remoteVersion.isBlank()) {
@@ -33,11 +38,14 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
             return Result.success()
         }
 
-        val localStatus = GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context)
-        val localVersion = if (localStatus.state == GeoTowerDatabaseValidator.LocalDatabaseState.VALID) {
+        val localFileStatus = GeoTowerDatabaseValidator.getInstalledDatabaseFileStatus(context)
+        val localVersion = if (localFileStatus.state != GeoTowerDatabaseValidator.LocalDatabaseState.MISSING) {
             GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context)
         } else {
             null
+        }
+        if (localFileStatus.state != GeoTowerDatabaseValidator.LocalDatabaseState.MISSING) {
+            GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context)
         }
 
         if (!DatabaseVersionPolicy.isRemoteNewer(remoteVersion, localVersion)) {
@@ -62,10 +70,9 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
 
     private fun showNotification() {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channelId = "update_alerts_channel"
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(channelId, AppStrings.newDbChannelName(context), NotificationManager.IMPORTANCE_DEFAULT)
+            val channel = NotificationChannel(UPDATE_ALERTS_CHANNEL_ID, AppStrings.newDbChannelName(context), NotificationManager.IMPORTANCE_DEFAULT)
             notificationManager.createNotificationChannel(channel)
         }
 
@@ -73,9 +80,14 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
             setPackage(context.packageName)
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
-        val pendingIntent = PendingIntent.getActivity(context, 2001, intent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+        val pendingIntent = PendingIntent.getActivity(
+            context,
+            DownloadNotificationCenter.DB_UPDATE_AVAILABLE_NOTIFICATION_ID,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
-        val notification = NotificationCompat.Builder(context, channelId)
+        val notification = NotificationCompat.Builder(context, UPDATE_ALERTS_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher_geotower)
             .setContentTitle(AppStrings.newDbNotifTitle(context))
             .setContentText(AppStrings.newDbNotifDesc(context))
@@ -83,6 +95,7 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
             .setAutoCancel(true)
             .build()
 
-        notificationManager.notify(2001, notification)
+        notificationManager.notify(DownloadNotificationCenter.DB_UPDATE_AVAILABLE_NOTIFICATION_ID, notification)
     }
+
 }

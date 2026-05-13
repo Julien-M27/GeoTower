@@ -13,7 +13,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -37,11 +36,9 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
@@ -1997,14 +1994,7 @@ fun AntennaShareMenu(
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
 
-    var lastClickTime by remember { mutableLongStateOf(0L) }
-    fun safeClick(action: () -> Unit) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastClickTime > 700L) {
-            lastClickTime = currentTime
-            action()
-        }
-    }
+    val safeClick = rememberSafeClick()
 
     var showShareSheet by remember { mutableStateOf(false) }
     var showSelectionSheet by remember { mutableStateOf(false) }
@@ -2159,38 +2149,22 @@ fun AntennaShareMenu(
                     Spacer(modifier = Modifier.width(48.dp))
                 }
 
-                val density = LocalDensity.current
                 val itemHeight = 48.dp
-                val stepPx = with(density) { itemHeight.toPx() }
-                var draggedItem by remember { mutableStateOf<String?>(null) }
-                var dragOffset by remember { mutableFloatStateOf(0f) }
+                val reorderState = rememberReorderableDragState(
+                    items = shareOrder,
+                    itemHeight = itemHeight,
+                    onOrderChange = { newOrder ->
+                        shareOrder = newOrder
+                        prefs.edit().putString("share_order", newOrder.joinToString(",")).apply()
+                    }
+                )
 
                 Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
                     shareOrder.forEach { blockId ->
                         key(blockId) {
-                            val isDragged = draggedItem == blockId
-                            val dragModifier = Modifier.pointerInput(blockId) {
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = { draggedItem = blockId; dragOffset = 0f },
-                                    onDrag = { change, dragAmount ->
-                                        change.consume(); dragOffset += dragAmount.y
-                                        val currentIndex = shareOrder.indexOf(blockId)
-                                        if (currentIndex < 0) return@detectDragGesturesAfterLongPress
-                                        var newIndex = currentIndex
-                                        while (dragOffset > stepPx * 0.5f && newIndex < shareOrder.size - 1) { dragOffset -= stepPx; newIndex++ }
-                                        while (dragOffset < -stepPx * 0.5f && newIndex > 0) { dragOffset += stepPx; newIndex-- }
-                                        if (newIndex != currentIndex) {
-                                            val newList = shareOrder.toMutableList()
-                                            val item = newList.removeAt(currentIndex)
-                                            newList.add(newIndex, item)
-                                            shareOrder = newList
-                                            prefs.edit().putString("share_order", newList.joinToString(",")).apply()
-                                        }
-                                    },
-                                    onDragEnd = { draggedItem = null; dragOffset = 0f },
-                                    onDragCancel = { draggedItem = null; dragOffset = 0f }
-                                )
-                            }
+                            val isDragged = reorderState.isDragged(blockId)
+                            val dragModifier = reorderState.dragModifier(blockId)
+                            val dragOffset = reorderState.offsetFor(blockId)
 
                             // Dans AntennaShareMenu -> showSelectionSheet -> shareOrder.forEach
                             val (label, checked, onChecked) = when (blockId) {
@@ -2422,14 +2396,7 @@ fun SupportShareMenu(
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
 
-    var lastClickTime by remember { mutableLongStateOf(0L) }
-    fun safeClick(action: () -> Unit) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastClickTime > 700L) {
-            lastClickTime = currentTime
-            action()
-        }
-    }
+    val safeClick = rememberSafeClick()
 
     var showShareSheet by remember { mutableStateOf(false) }
     var showSelectionSheet by remember { mutableStateOf(false) }
@@ -2528,38 +2495,22 @@ fun SupportShareMenu(
                     Spacer(modifier = Modifier.width(48.dp))
                 }
 
-                val density = LocalDensity.current
                 val itemHeight = 48.dp
-                val stepPx = with(density) { itemHeight.toPx() }
-                var draggedItem by remember { mutableStateOf<String?>(null) }
-                var dragOffset by remember { mutableFloatStateOf(0f) }
+                val reorderState = rememberReorderableDragState(
+                    items = shareOrder,
+                    itemHeight = itemHeight,
+                    onOrderChange = { newOrder ->
+                        shareOrder = newOrder
+                        prefs.edit().putString("share_sup_order", newOrder.joinToString(",")).apply()
+                    }
+                )
 
                 Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
                     shareOrder.forEach { blockId ->
                         key(blockId) {
-                            val isDragged = draggedItem == blockId
-                            val dragModifier = Modifier.pointerInput(blockId) {
-                                detectDragGesturesAfterLongPress(
-                                    onDragStart = { draggedItem = blockId; dragOffset = 0f },
-                                    onDrag = { change, dragAmount ->
-                                        change.consume(); dragOffset += dragAmount.y
-                                        val currentIndex = shareOrder.indexOf(blockId)
-                                        if (currentIndex < 0) return@detectDragGesturesAfterLongPress
-                                        var newIndex = currentIndex
-                                        while (dragOffset > stepPx * 0.5f && newIndex < shareOrder.size - 1) { dragOffset -= stepPx; newIndex++ }
-                                        while (dragOffset < -stepPx * 0.5f && newIndex > 0) { dragOffset += stepPx; newIndex-- }
-                                        if (newIndex != currentIndex) {
-                                            val newList = shareOrder.toMutableList()
-                                            val item = newList.removeAt(currentIndex)
-                                            newList.add(newIndex, item)
-                                            shareOrder = newList
-                                            prefs.edit().putString("share_sup_order", newList.joinToString(",")).apply()
-                                        }
-                                    },
-                                    onDragEnd = { draggedItem = null; dragOffset = 0f },
-                                    onDragCancel = { draggedItem = null; dragOffset = 0f }
-                                )
-                            }
+                            val isDragged = reorderState.isDragged(blockId)
+                            val dragModifier = reorderState.dragModifier(blockId)
+                            val dragOffset = reorderState.offsetFor(blockId)
 
                             // Dans SupportShareMenu -> showSelectionSheet -> shareOrder.forEach
                             val (label, checked, onChecked) = when (blockId) {

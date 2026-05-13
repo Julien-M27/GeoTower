@@ -204,14 +204,7 @@ fun MapShareMenu(
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
 
-    var lastClickTime by remember { mutableLongStateOf(0L) }
-    fun safeClick(action: () -> Unit) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastClickTime > 700L) {
-            lastClickTime = currentTime
-            action()
-        }
-    }
+    val safeClick = rememberSafeClick()
 
     var showShareSheet by remember { mutableStateOf(false) }
     var showSelectionSheet by remember { mutableStateOf(false) }

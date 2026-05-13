@@ -49,7 +49,6 @@ fun CityStatsDetailSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val defaultOp = AppConfig.defaultOperator.value
-    val txtOthers = AppStrings.others
 
     // LECTURE DIRECTE DEPUIS LA COLONNE "FILTRES"
     val stats = remember<List<OperatorStat>>(antennas, defaultOp) {

@@ -21,18 +21,18 @@ import fr.geotower.ui.screens.settings.SettingsOptionCard
 fun MappingOptionsBlock(
     mapProvider: Int, onMapProviderChange: (Int) -> Unit,
     ignStyle: Int, onIgnStyleChange: (Int) -> Unit,
-    shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: (() -> Unit) -> Unit
+    shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick
 ) {
     // 1. Les 4 fournisseurs répartis sur 2 lignes pour ne pas écraser l'interface
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             // Si on passe sur OSM et qu'on était en Satellite (2), on repasse en Clair (0) automatiquement
-            SettingsOptionCard(AppStrings.mapOsm, Icons.Default.Public, mapProvider == 1, { safeClick { onMapProviderChange(1); if (ignStyle == 2) onIgnStyleChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
-            SettingsOptionCard(AppStrings.mapIgn, Icons.Default.Layers, mapProvider == 0, { safeClick { onMapProviderChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+            SettingsOptionCard(AppStrings.mapOsm, Icons.Default.Public, mapProvider == 1, { safeClick("mapping_provider_osm") { onMapProviderChange(1); if (ignStyle == 2) onIgnStyleChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+            SettingsOptionCard(AppStrings.mapIgn, Icons.Default.Layers, mapProvider == 0, { safeClick("mapping_provider_ign") { onMapProviderChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            SettingsOptionCard(AppStrings.mapMapLibre, Icons.Default.Explore, mapProvider == 2, { safeClick { onMapProviderChange(2) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
-            SettingsOptionCard(AppStrings.mapTopo, Icons.Default.Terrain, mapProvider == 3, { safeClick { onMapProviderChange(3) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+            SettingsOptionCard(AppStrings.mapMapLibre, Icons.Default.Explore, mapProvider == 2, { safeClick("mapping_provider_maplibre") { onMapProviderChange(2) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+            SettingsOptionCard(AppStrings.mapTopo, Icons.Default.Terrain, mapProvider == 3, { safeClick("mapping_provider_topo") { onMapProviderChange(3) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
         }
     }
 
@@ -49,12 +49,12 @@ fun MappingOptionsBlock(
             Spacer(Modifier.height(8.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-                SettingsOptionCard(AppStrings.themeLight, Icons.Default.WbSunny, ignStyle == 0, { safeClick { onIgnStyleChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
-                SettingsOptionCard(AppStrings.themeDark, Icons.Default.NightsStay, ignStyle == 1, { safeClick { onIgnStyleChange(1) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+                SettingsOptionCard(AppStrings.themeLight, Icons.Default.WbSunny, ignStyle == 0, { safeClick("mapping_style_light") { onIgnStyleChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+                SettingsOptionCard(AppStrings.themeDark, Icons.Default.NightsStay, ignStyle == 1, { safeClick("mapping_style_dark") { onIgnStyleChange(1) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
 
                 // Le Satellite ne s'affiche QUE si on est sur l'IGN (mapProvider == 0)
                 if (mapProvider == 0) {
-                    SettingsOptionCard(AppStrings.mapSat, Icons.Default.Image, ignStyle == 2, { safeClick { onIgnStyleChange(2) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+                    SettingsOptionCard(AppStrings.mapSat, Icons.Default.Image, ignStyle == 2, { safeClick("mapping_style_satellite") { onIgnStyleChange(2) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
                 }
             }
         }

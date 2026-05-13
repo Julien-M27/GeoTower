@@ -39,16 +39,11 @@ import fr.geotower.radio.MobileOperator
 import fr.geotower.radio.RadioTechnology
 import fr.geotower.radio.RadioThroughputEngine
 import fr.geotower.radio.RatAssumptions
-import fr.geotower.radio.SiteRadioStatus
 import fr.geotower.radio.SiteRadioSystem
 import fr.geotower.radio.ThroughputProfile
 import fr.geotower.radio.ThroughputProfiles
-import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import java.util.Locale
-import kotlin.math.abs
-import kotlin.math.roundToInt
-import kotlin.math.tan
 
 private const val MAX_SHARE_FR_UPLINK_AGGREGATED_CARRIERS = 2
 
@@ -86,7 +81,7 @@ fun ShareThroughputCalculatorBlock(
             .filter { it.gen == 4 || it.gen == 5 }
             .filterNot { isShareHiddenThroughputBand(it) }
             .filter { isShareThroughputBandEnabledByDefault(it, prefs) }
-            .map { shareBandKey(it) }
+            .map { throughputBandKey(it) }
             .toSet()
     }
     val result = remember(
@@ -136,14 +131,14 @@ fun ShareThroughputCalculatorBlock(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ShareThroughputMetric(
                     label = AppStrings.throughputDownloadLabel,
-                    value = formatShareThroughput(result.totalDownMbps),
+                    value = formatThroughputMbps(result.totalDownMbps),
                     iconColor = Color(0xFF4CAF50),
                     isDownload = true,
                     modifier = Modifier.weight(1f)
                 )
                 ShareThroughputMetric(
                     label = AppStrings.shareThroughputPhoneUploadLabel,
-                    value = formatShareThroughput(result.totalUpMbps),
+                    value = formatThroughputMbps(result.totalUpMbps),
                     iconColor = Color(0xFF2196F3),
                     isDownload = false,
                     modifier = Modifier.weight(1f)
@@ -158,14 +153,14 @@ fun ShareThroughputCalculatorBlock(
                     Spacer(Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = AppStrings.shareThroughputOptimalDistance(formatShareDistanceMeters(coneDistance.centerMeters)),
+                            text = AppStrings.shareThroughputOptimalDistance(formatThroughputDistanceMeters(coneDistance.centerMeters)),
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
                             text = AppStrings.shareThroughputZone(
-                                formatShareDistanceMeters(coneDistance.nearMeters),
-                                formatShareDistanceMeters(coneDistance.farMeters)
+                                formatThroughputDistanceMeters(coneDistance.nearMeters),
+                                formatThroughputDistanceMeters(coneDistance.farMeters)
                             ),
                             fontSize = 12.sp,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -251,7 +246,7 @@ private fun ShareThroughputBandLine(band: ShareThroughputBandResult) {
                 modifier = Modifier.weight(1f)
             )
             Text(
-                text = "${formatShareThroughput(band.downMbps)} / ${formatShareThroughput(band.upMbps)}",
+                text = "${formatThroughputMbps(band.downMbps)} / ${formatThroughputMbps(band.upMbps)}",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary
@@ -285,15 +280,15 @@ private fun calculateShareThroughput(
             .filterNot { isShareHiddenThroughputBand(it) }
             .map { band ->
                 SiteRadioSystem(
-                    sourceKey = shareBandKey(band),
+                    sourceKey = throughputBandKey(band),
                     supportId = "unknown",
                     operator = operator,
                     technology = if (band.gen == 5) RadioTechnology.NR_5G else RadioTechnology.LTE_4G,
                     bandLabel = band.value.toString(),
-                    status = shareSiteStatusFromBandStatus(band.status),
-                    azimuthDeg = shareExtractAzimuths(band).firstOrNull(),
+                    status = siteRadioStatusFromBandStatus(band.status),
+                    azimuthDeg = extractThroughputAzimuths(band).firstOrNull(),
                     supportHeightM = supportHeightMeters,
-                    antennaHeightM = shareExtractPanelHeightMeters(band, supportHeightMeters),
+                    antennaHeightM = extractThroughputPanelHeightMeters(band, supportHeightMeters),
                     lastSeenAt = band.date.takeIf { it.isNotBlank() }
                 )
             }
@@ -308,11 +303,11 @@ private fun calculateShareThroughput(
         .filter { it.gen == 4 || it.gen == 5 }
         .filterNot { isShareHiddenThroughputBand(it) }
         .map { band ->
-            val key = shareBandKey(band)
+            val key = throughputBandKey(band)
             val carrierResult = carrierByKey[key]
             val bandwidth = carrierResult?.let {
-                ShareThroughputBandwidth(valueMHz = it.bandwidthMHz, isEstimated = false)
-            } ?: shareResolveBandwidthMHz(band)
+                ThroughputBandwidth(valueMHz = it.bandwidthMHz, isEstimated = false)
+            } ?: resolveThroughputBandwidth(band)
             val isPlanned = band.status.contains("Projet", ignoreCase = true) ||
                 band.status.contains("Approuv", ignoreCase = true) ||
                 band.status.contains("Planned", ignoreCase = true)
@@ -320,7 +315,7 @@ private fun calculateShareThroughput(
             val bandAllowed = enabledBandKeys.contains(key)
             val engineIncluded = carrierResult?.included == true
             val isIncluded = generationAllowed && bandAllowed && engineIncluded && (includePlanned || !isPlanned)
-            val panelHeightMeters = shareExtractPanelHeightMeters(band, supportHeightMeters)
+            val panelHeightMeters = extractThroughputPanelHeightMeters(band, supportHeightMeters)
             val excludedReason = when {
                 !generationAllowed -> if (band.gen == 5) "5G désactivée" else "4G désactivée"
                 !bandAllowed -> "Bande exclue"
@@ -333,14 +328,14 @@ private fun calculateShareThroughput(
 
             ShareThroughputBandResult(
                 key = key,
-                label = shareBandLabel(band),
+                label = throughputBandLabel(band),
                 generation = band.gen,
                 modulationLabel = carrierResult?.let {
                     shareModulationLabel(it.dlModulationOrder, it.ulModulationOrder, it.dlMimoLayers, it.ulMimoLayers)
                 } ?: shareModulationLabel(band.gen, engineProfile),
                 bandwidthMHz = bandwidth.valueMHz,
-                coneDistance = shareEstimateConeDistance(panelHeightMeters),
-                azimuths = shareExtractAzimuths(band),
+                coneDistance = estimateThroughputConeDistance(panelHeightMeters),
+                azimuths = extractThroughputAzimuths(band),
                 downMbps = carrierResult?.dlMbps ?: 0.0,
                 upMbps = carrierResult?.ulMbps ?: 0.0,
                 isIncluded = isIncluded,
@@ -462,168 +457,6 @@ private fun shareCustomProfile(customSettings: ShareCustomModulationSettings): T
     )
 }
 
-private fun shareSiteStatusFromBandStatus(status: String): SiteRadioStatus {
-    val normalized = status.lowercase(Locale.ROOT)
-    return when {
-        normalized.contains("commercial") || normalized.contains("ouvert") -> SiteRadioStatus.COMMERCIAL_OPEN
-        normalized.contains("en service") || normalized.contains("service") -> SiteRadioStatus.IN_SERVICE
-        normalized.contains("techniquement") || normalized.contains("operationnel") || normalized.contains("opérationnel") -> SiteRadioStatus.TECHNICALLY_OPERATIONAL
-        normalized.contains("autor") || normalized.contains("approuv") || normalized.contains("projet") -> SiteRadioStatus.AUTHORIZED
-        else -> SiteRadioStatus.UNKNOWN
-    }
-}
-
-private fun shareResolveBandwidthMHz(band: FreqBand): ShareThroughputBandwidth {
-    val ranges = shareFrequencyRangeRegex.findAll(band.rawFreq)
-        .mapNotNull { match ->
-            val start = match.groupValues[1].replace(',', '.').toDoubleOrNull()
-            val end = match.groupValues[2].replace(',', '.').toDoubleOrNull()
-            if (start == null || end == null) null else shareNormalizeRangeWidthToMHz(abs(end - start), match.groupValues.getOrNull(3).orEmpty())
-        }
-        .filter { it > 0.0 }
-        .toList()
-
-    if (ranges.isNotEmpty()) {
-        val value = if (ranges.size > 1 && shareIsLikelyFddBand(band)) ranges.maxOrNull() ?: ranges.sum() else ranges.sum()
-        return ShareThroughputBandwidth(valueMHz = value.coerceAtLeast(1.0), isEstimated = false)
-    }
-
-    return ShareThroughputBandwidth(valueMHz = shareDefaultBandwidthMHz(band.gen, band.value), isEstimated = true)
-}
-
-private fun shareNormalizeRangeWidthToMHz(width: Double, unit: String): Double {
-    val lowerUnit = unit.lowercase(Locale.ROOT)
-    return when {
-        lowerUnit.contains("ghz") -> width * 1000.0
-        lowerUnit.contains("khz") -> width / 1000.0
-        else -> width
-    }
-}
-
-private fun shareIsLikelyFddBand(band: FreqBand): Boolean {
-    return band.value !in setOf(3500, 26000)
-}
-
-private fun shareDefaultBandwidthMHz(gen: Int, value: Int): Double {
-    return when (gen) {
-        4 -> when (value) {
-            700, 800, 900, 2100 -> 10.0
-            1800 -> 15.0
-            2600 -> 20.0
-            else -> 10.0
-        }
-        5 -> when (value) {
-            700 -> 10.0
-            1800 -> 10.0
-            2100 -> 15.0
-            3500 -> 70.0
-            26000 -> 200.0
-            else -> 20.0
-        }
-        else -> 10.0
-    }
-}
-
-private fun shareExtractPanelHeightMeters(band: FreqBand, fallbackSupportHeightMeters: Double?): Double? {
-    val panelHeights = band.physDetails.flatMap { detail ->
-        sharePanelHeightRegex.findAll(detail).mapNotNull { match ->
-            match.groupValues.getOrNull(1)?.replace(',', '.')?.toDoubleOrNull()
-        }.toList()
-    }
-
-    return panelHeights.maxOrNull() ?: fallbackSupportHeightMeters?.takeIf { it > SHARE_USER_DEVICE_HEIGHT_METERS }
-}
-
-private fun shareExtractAzimuths(band: FreqBand): List<Double> {
-    return band.physDetails
-        .flatMap { detail ->
-            shareAzimuthRegex.findAll(detail).mapNotNull { match ->
-                match.groupValues.getOrNull(1)?.replace(',', '.')?.toDoubleOrNull()
-            }.toList()
-        }
-        .filter { it in 0.0..360.0 }
-        .distinctBy { it.roundToInt() }
-}
-
-private fun shareEstimateConeDistance(heightMeters: Double?): ShareConeDistance? {
-    val antennaHeight = heightMeters ?: return null
-    val verticalDelta = (antennaHeight - SHARE_USER_DEVICE_HEIGHT_METERS).coerceAtLeast(1.0)
-    val center = verticalDelta / tan(Math.toRadians(SHARE_NOMINAL_DOWNTILT_DEGREES))
-    val near = verticalDelta / tan(Math.toRadians(SHARE_MAX_DOWNTILT_DEGREES))
-    val far = verticalDelta / tan(Math.toRadians(SHARE_MIN_DOWNTILT_DEGREES))
-    return ShareConeDistance(centerMeters = center, nearMeters = near, farMeters = far)
-}
-
-private fun shareBandLabel(band: FreqBand): String {
-    return if (band.value > 0) {
-        val base = "${band.gen}G ${band.value} MHz"
-        shareRadioBandCode(band.gen, band.value)?.let { "$base ($it)" } ?: base
-    } else {
-        band.rawFreq.substringBefore(":").ifBlank { "${band.gen}G" }
-    }
-}
-
-private fun shareRadioBandCode(gen: Int, value: Int): String? {
-    return when (gen) {
-        5 -> when (value) {
-            700 -> "N28"
-            800 -> "N20"
-            900 -> "N8"
-            1800 -> "N3"
-            2100 -> "N1"
-            2600 -> "N7"
-            3500 -> "N78"
-            26000 -> "N258"
-            else -> null
-        }
-        4 -> when (value) {
-            700 -> "B28"
-            800 -> "B20"
-            900 -> "B8"
-            1800 -> "B3"
-            2100 -> "B1"
-            2600 -> "B7"
-            3500 -> "B42"
-            else -> null
-        }
-        else -> null
-    }
-}
-
-private fun formatShareThroughput(valueMbps: Double): String {
-    return if (valueMbps >= 1000.0) {
-        String.format(Locale.US, "%.2f Gbit/s", valueMbps / 1000.0)
-    } else {
-        String.format(Locale.US, "%.0f Mbit/s", valueMbps)
-    }
-}
-
-private fun formatShareDistanceMeters(valueMeters: Double): String {
-    if (AppConfig.distanceUnit.intValue == 1) {
-        val miles = valueMeters / 1609.34
-        return if (miles < 0.1) "${(valueMeters * 3.28084).roundToInt()} ft" else String.format(Locale.US, "%.2f mi", miles)
-    }
-
-    return if (valueMeters >= 1000.0) {
-        String.format(Locale.US, "%.2f km", valueMeters / 1000.0)
-    } else {
-        "${valueMeters.toInt()} m"
-    }
-}
-
-private fun shareBandKey(band: FreqBand): String {
-    return "${band.gen}:${band.value}:${band.rawFreq.substringBefore(":").trim()}"
-}
-
-private const val SHARE_USER_DEVICE_HEIGHT_METERS = 1.5
-private const val SHARE_NOMINAL_DOWNTILT_DEGREES = 6.0
-private const val SHARE_MIN_DOWNTILT_DEGREES = 4.0
-private const val SHARE_MAX_DOWNTILT_DEGREES = 8.0
-
-private val shareFrequencyRangeRegex = Regex("""([0-9]+(?:[.,][0-9]+)?)\s*-\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]*Hz)?""")
-private val sharePanelHeightRegex = Regex("""\(([0-9]+(?:[.,][0-9]+)?)\s*m\)""", RegexOption.IGNORE_CASE)
-private val shareAzimuthRegex = Regex("""([0-9]{1,3}(?:[.,][0-9]+)?)\s*(?:\u00B0|\u00C2\u00B0)""")
-
 private enum class ShareThroughputPreset {
     Conservative,
     Standard,
@@ -654,11 +487,6 @@ private val shareLteUpModulationOptions = shareLteDownModulationOptions
 private val shareNrDownModulationOptions = shareLteDownModulationOptions
 private val shareNrUpModulationOptions = shareLteDownModulationOptions
 
-private data class ShareThroughputBandwidth(
-    val valueMHz: Double,
-    val isEstimated: Boolean
-)
-
 private data class ShareThroughputResult(
     val bands: List<ShareThroughputBandResult>
 ) {
@@ -671,11 +499,11 @@ private data class ShareThroughputResult(
             .sortedByDescending { it.upMbps }
             .take(MAX_SHARE_FR_UPLINK_AGGREGATED_CARRIERS)
             .sumOf { it.upMbps }
-    val coneDistance: ShareConeDistance?
+    val coneDistance: ThroughputConeDistance?
         get() {
             val distances = includedBands.mapNotNull { it.coneDistance }
             if (distances.isEmpty()) return null
-            return ShareConeDistance(
+            return ThroughputConeDistance(
                 centerMeters = distances.map { it.centerMeters }.average(),
                 nearMeters = distances.minOf { it.nearMeters },
                 farMeters = distances.maxOf { it.farMeters }
@@ -689,16 +517,10 @@ private data class ShareThroughputBandResult(
     val generation: Int,
     val modulationLabel: String,
     val bandwidthMHz: Double,
-    val coneDistance: ShareConeDistance?,
+    val coneDistance: ThroughputConeDistance?,
     val azimuths: List<Double>,
     val downMbps: Double,
     val upMbps: Double,
     val isIncluded: Boolean,
     val excludedReason: String?
-)
-
-private data class ShareConeDistance(
-    val centerMeters: Double,
-    val nearMeters: Double,
-    val farMeters: Double
 )

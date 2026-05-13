@@ -1,7 +1,6 @@
 package fr.geotower.ui.screens.settings
 
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -35,7 +34,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -44,11 +42,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.components.rememberReorderableDragState
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 
@@ -136,13 +133,9 @@ fun SharePreferencesSheet(
             }
             Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
 
-            val density = LocalDensity.current
             val cardHeight = 64.dp
             val spacing = 12.dp
-            val stepPx = with(density) { (cardHeight + spacing).toPx() }
-
-            var draggedItem by remember { mutableStateOf<String?>(null) }
-            var dragOffset by remember { mutableFloatStateOf(0f) }
+            val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
 
             Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
                 val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
@@ -150,43 +143,9 @@ fun SharePreferencesSheet(
 
                 currentOrder.forEach { pageId ->
                     key(pageId) {
-                        val isDragged = draggedItem == pageId
-
-                        val dragModifier = Modifier.pointerInput(pageId) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = {
-                                    draggedItem = pageId
-                                    dragOffset = 0f
-                                },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    dragOffset += dragAmount.y
-
-                                    val currentIndex = currentOrder.indexOf(pageId)
-                                    if (currentIndex < 0) return@detectDragGesturesAfterLongPress
-
-                                    var newIndex = currentIndex
-
-                                    while (dragOffset > stepPx * 0.5f && newIndex < currentOrder.size - 1) {
-                                        dragOffset -= stepPx
-                                        newIndex++
-                                    }
-                                    while (dragOffset < -stepPx * 0.5f && newIndex > 0) {
-                                        dragOffset += stepPx
-                                        newIndex--
-                                    }
-
-                                    if (newIndex != currentIndex) {
-                                        val newList = currentOrder.toMutableList()
-                                        val item = newList.removeAt(currentIndex)
-                                        newList.add(newIndex, item)
-                                        onOrderChange(newList)
-                                    }
-                                },
-                                onDragEnd = { draggedItem = null; dragOffset = 0f },
-                                onDragCancel = { draggedItem = null; dragOffset = 0f }
-                            )
-                        }
+                        val isDragged = reorderState.isDragged(pageId)
+                        val dragModifier = reorderState.dragModifier(pageId)
+                        val dragOffset = reorderState.offsetFor(pageId)
 
                         when (pageId) {
                             "map" -> DraggableSwitchCard(AppStrings.shareMapOption, mapEnabled, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
@@ -321,13 +280,9 @@ fun SupportSharePreferencesSheet(
             }
             Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
 
-            val density = LocalDensity.current
             val cardHeight = 64.dp
             val spacing = 12.dp
-            val stepPx = with(density) { (cardHeight + spacing).toPx() }
-
-            var draggedItem by remember { mutableStateOf<String?>(null) }
-            var dragOffset by remember { mutableFloatStateOf(0f) }
+            val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
 
             Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
                 val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
@@ -335,29 +290,9 @@ fun SupportSharePreferencesSheet(
 
                 currentOrder.forEach { pageId ->
                     key(pageId) {
-                        val isDragged = draggedItem == pageId
-                        val dragModifier = Modifier.pointerInput(pageId) {
-                            detectDragGesturesAfterLongPress(
-                                onDragStart = { draggedItem = pageId; dragOffset = 0f },
-                                onDrag = { change, dragAmount ->
-                                    change.consume()
-                                    dragOffset += dragAmount.y
-                                    val currentIndex = currentOrder.indexOf(pageId)
-                                    if (currentIndex < 0) return@detectDragGesturesAfterLongPress
-                                    var newIndex = currentIndex
-                                    while (dragOffset > stepPx * 0.5f && newIndex < currentOrder.size - 1) { dragOffset -= stepPx; newIndex++ }
-                                    while (dragOffset < -stepPx * 0.5f && newIndex > 0) { dragOffset += stepPx; newIndex-- }
-                                    if (newIndex != currentIndex) {
-                                        val newList = currentOrder.toMutableList()
-                                        val item = newList.removeAt(currentIndex)
-                                        newList.add(newIndex, item)
-                                        onOrderChange(newList)
-                                    }
-                                },
-                                onDragEnd = { draggedItem = null; dragOffset = 0f },
-                                onDragCancel = { draggedItem = null; dragOffset = 0f }
-                            )
-                        }
+                        val isDragged = reorderState.isDragged(pageId)
+                        val dragModifier = reorderState.dragModifier(pageId)
+                        val dragOffset = reorderState.offsetFor(pageId)
 
                         when (pageId) {
                             "map" -> DraggableSwitchCard(AppStrings.shareMapOption, mapEnabled, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)

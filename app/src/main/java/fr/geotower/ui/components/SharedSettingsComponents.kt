@@ -159,7 +159,7 @@ fun OperatorSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
-        Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(AppStrings.defaultOperator, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 24.dp))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OperatorItem(AppStrings.none, null, Color.Gray, tempOp == "Aucun", useOneUi, bubbleColor) { tempOp = "Aucun" }
@@ -170,7 +170,8 @@ fun OperatorSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
 
                 Button(
                     onClick = { onSelect(tempOp); onDismiss() },
-                    modifier = Modifier.fillMaxWidth().height(50.dp).padding(top = 8.dp), shape = RoundedCornerShape(25.dp)
+                    modifier = Modifier.padding(top = 4.dp).fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(28.dp)
                 ) { Text(AppStrings.validate, fontWeight = FontWeight.Bold) }
             }
         }
@@ -207,7 +208,7 @@ fun LanguageSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
-        Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(AppStrings.appLanguageLabel, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 24.dp))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 LanguageItem(AppStrings.systemLanguage, "📱", tempLang == AppStrings.LANGUAGE_SYSTEM, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_SYSTEM }
@@ -216,8 +217,9 @@ fun LanguageSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
                 LanguageItem(AppStrings.languagePortugueseName, "🇵🇹", tempLang == AppStrings.LANGUAGE_PORTUGUESE, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_PORTUGUESE }
 
                 Button(
-                    onClick = { onSelect(tempLang); onDismiss() }, modifier = Modifier.fillMaxWidth().height(50.dp).padding(top = 8.dp),
-                    shape = RoundedCornerShape(25.dp),
+                    onClick = { onSelect(tempLang); onDismiss() },
+                    modifier = Modifier.padding(top = 4.dp).fillMaxWidth().height(56.dp),
+                    shape = RoundedCornerShape(28.dp),
                     // ✅ MODIFICATION : On s'assure que le texte du bouton utilise "onPrimary" (généralement blanc) pour contraster avec la couleur vive
                     colors = ButtonDefaults.buttonColors(containerColor = activeColor, contentColor = MaterialTheme.colorScheme.onPrimary)
                 ) { Text(AppStrings.validate, fontWeight = FontWeight.Bold) }

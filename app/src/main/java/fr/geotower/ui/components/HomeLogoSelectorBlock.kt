@@ -29,7 +29,7 @@ data class HomeLogoOption(val id: String, val name: String, val resId: Int?)
 
 @Composable
 fun HomeLogoSelectorBlock(
-    safeClick: (() -> Unit) -> Unit
+    safeClick: SafeClick
 ) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
@@ -95,7 +95,7 @@ fun HomeLogoSelectorBlock(
                     modifier = Modifier
                         .width(80.dp)
                         .clickable {
-                            safeClick {
+                            safeClick("home_logo_${option.id}") {
                                 currentSelection = option.id
                                 // Sauvegarde immédiate du choix
                                 prefs.edit().putString("home_logo_choice", option.id).apply()

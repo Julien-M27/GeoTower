@@ -35,6 +35,7 @@ import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.OperatorLogos
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.cos
@@ -670,13 +671,7 @@ class LiveTrackingService : Service() {
     }
 
     private fun operatorLogo(operator: String): Int? {
-        return when {
-            operator.contains("ORANGE") -> R.drawable.logo_orange
-            operator.contains("BOUYGUES") -> R.drawable.logo_bouygues
-            operator.contains("SFR") -> R.drawable.logo_sfr
-            operator.contains("FREE") -> R.drawable.logo_free
-            else -> null
-        }
+        return OperatorLogos.drawableRes(operator)
     }
 
     override fun onDestroy() {

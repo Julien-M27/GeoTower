@@ -65,7 +65,6 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -91,10 +90,12 @@ import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.NominatimApi
 import fr.geotower.data.api.NominatimGeoPoint
+import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.OperatorLogos
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -180,16 +181,7 @@ fun NearEmittersScreen(
         MaterialTheme.colorScheme.surfaceContainer
     }
 
-    var lastClickTime by remember { mutableLongStateOf(0L) }
-    val debounceTime = 700L
-
-    fun safeClick(action: () -> Unit) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastClickTime > debounceTime) {
-            lastClickTime = currentTime
-            action()
-        }
-    }
+    val safeClick = rememberSafeClick()
 
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
 
@@ -1070,14 +1062,7 @@ fun OperatorGrid(operators: List<String>) {
 
 @Composable
 fun GridCell(opName: String?, modifier: Modifier = Modifier) {
-    val iconRes = when {
-        opName == null -> null
-        opName.contains("ORANGE", true) -> R.drawable.logo_orange
-        opName.contains("BOUYGUES", true) -> R.drawable.logo_bouygues
-        opName.contains("SFR", true) -> R.drawable.logo_sfr
-        opName.contains("FREE", true) -> R.drawable.logo_free
-        else -> null
-    }
+    val iconRes = OperatorLogos.drawableRes(opName)
 
     val isPresent = iconRes != null
     val cornerShape = RoundedCornerShape(6.dp)

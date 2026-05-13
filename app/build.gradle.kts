@@ -24,7 +24,7 @@ android {
         minSdk = 24
         targetSdk = 36
         versionCode = 1
-        versionName = "1.9.9.2.2"
+        versionName = "1.9.9.2.5"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -49,10 +49,6 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
-    }
-    buildFeatures {
-        compose = true
-        buildConfig = true
     }
 }
 
@@ -82,9 +78,6 @@ dependencies {
     implementation(libs.androidx.car.app)
     implementation(libs.androidx.car.app.projected)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    // implementation(libs.androidx.material.icons.extended) // Doublon retiré
-
-    implementation("com.google.accompanist:accompanist-systemuicontroller:0.34.0")
     implementation("androidx.preference:preference-ktx:1.2.1")
 
     // Carte OSM
@@ -97,16 +90,10 @@ dependencies {
     // --- AJOUT POUR LE VECTORIEL (Mapsforge) ---
     // Le pont entre Osmdroid et Mapsforge
     implementation("org.osmdroid:osmdroid-mapsforge:6.1.18")
-    // 2. Le moteur de rendu vectoriel
-    implementation("org.mapsforge:mapsforge-map-android:0.19.0")
-    // 3. Les thèmes de base pour colorier la carte
-    implementation("org.mapsforge:mapsforge-themes:0.19.0")
-
     // Le moteur Mapsforge
     implementation("org.mapsforge:mapsforge-map-android:0.20.0")
     implementation("org.mapsforge:mapsforge-map-reader:0.20.0")
     implementation("org.mapsforge:mapsforge-themes:0.20.0")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // --- ROOM (BASE DE DONNÉES) ---
     val room_version = "2.6.1"
     implementation("androidx.room:room-runtime:$room_version")
@@ -116,9 +103,6 @@ dependencies {
     // Pour parler à l'API (Retrofit)
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    // Moshi (Pour comprendre le JSON)
-    implementation("com.squareup.moshi:moshi-kotlin:1.14.0")
-    implementation("com.squareup.retrofit2:converter-moshi:2.9.0")
     // --- AJOUT COIL POUR LES IMAGES ---
     implementation("io.coil-kt:coil-compose:2.6.0")
     // ✅ NOUVEAU : Librairie ZXing pour générer le QR Code
@@ -128,11 +112,8 @@ dependencies {
 
     // INDISPENSABLE pour .await()
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
-    implementation("com.google.guava:guava:33.2.1-android")
-
-    // CSV & Net
+    // Net
     implementation(libs.okhttp)
-    implementation(libs.commons.csv)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

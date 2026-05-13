@@ -57,7 +57,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -92,6 +91,7 @@ import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.navigationBarsPadding
+import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import kotlin.math.roundToInt
 
@@ -100,17 +100,7 @@ private const val TAG_ABOUT = "GeoTower"
 @Composable
 fun AboutScreen(navController: NavController) {
 
-    // --- SÉCURITÉ ANTI-SPAM ---
-    var lastClickTime by remember { mutableLongStateOf(0L) }
-    val debounceTime = 700L
-
-    fun safeClick(action: () -> Unit) {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - lastClickTime > debounceTime) {
-            lastClickTime = currentTime
-            action()
-        }
-    }
+    val safeClick = rememberSafeClick()
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
 
     BackHandler(enabled = !safeBackNavigation.isLocked) {

@@ -4,7 +4,6 @@ import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
-import fr.geotower.utils.OperatorColors
 
 // --- Palettes Material 3 de l'application ---
 // Ces couleurs pilotent uniquement le thème global de l'interface.
@@ -595,31 +594,3 @@ private val GraphiteDarkColorScheme = darkColorScheme(
     inverseOnSurface = Color(0xFF303034),
     inversePrimary = Color(0xFF5E6068)
 )
-
-// --- Couleurs de base historiques ---
-val ColorBlue = Color(0xFF4285F4)
-val ColorPurple = Color(0xFF6200EE)
-val ColorPink = Color(0xFFE91E63)
-
-// --- Couleurs des operateurs ---
-// A garder separe des palettes Material : ces couleurs representent les marques.
-val ColorOrange = Color(OperatorColors.ORANGE_ARGB)
-val ColorSfr = Color(OperatorColors.SFR_ARGB)
-val ColorBouygues = Color(OperatorColors.BOUYGUES_ARGB)
-val ColorFree = Color(OperatorColors.FREE_ARGB)
-val ColorUnknown = Color(OperatorColors.UNKNOWN_ARGB)
-
-// --- Couleurs des technologies radio ---
-val Color5G = Color(0xFF00C853)
-val Color4G = Color(0xFFFFD600)
-val Color3G = Color(0xFF2962FF)
-val Color2G = Color(0xFF455A64)
-
-// --- Couleurs Material Baseline conservees pour compatibilite ---
-val Purple80 = Color(0xFFD0BCFF)
-val PurpleGrey80 = Color(0xFFCCC2DC)
-val Pink80 = Color(0xFFEFB8C8)
-
-val Purple40 = Color(0xFF6650A4)
-val PurpleGrey40 = Color(0xFF625B71)
-val Pink40 = Color(0xFF7D5260)
