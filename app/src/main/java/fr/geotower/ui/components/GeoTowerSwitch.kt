@@ -6,6 +6,7 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -15,10 +16,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -50,33 +50,91 @@ fun GeoTowerSwitch(
             activeTrackColor = checkedColor
         )
     } else {
-        val checkedTrackAlpha = if (isSystemInDarkTheme()) 0.32f else 0.18f
-        val outlineColor = MaterialTheme.colorScheme.outline
-        val onSurfaceColor = MaterialTheme.colorScheme.onSurface
-
-        Switch(
+        GeoTowerMaterialSwitch(
             checked = checked,
             onCheckedChange = onCheckedChange,
             modifier = modifier,
-            thumbContent = {},
             enabled = enabled,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = checkedColor,
-                checkedTrackColor = checkedColor.copy(alpha = checkedTrackAlpha),
-                checkedBorderColor = checkedColor.copy(alpha = 0.58f),
-                checkedIconColor = Color.Transparent,
-                uncheckedThumbColor = outlineColor,
-                uncheckedTrackColor = Color.Transparent,
-                uncheckedBorderColor = outlineColor.copy(alpha = 0.7f),
-                uncheckedIconColor = Color.Transparent,
-                disabledCheckedThumbColor = checkedColor.copy(alpha = 0.38f),
-                disabledCheckedTrackColor = checkedColor.copy(alpha = checkedTrackAlpha * 0.6f),
-                disabledCheckedBorderColor = checkedColor.copy(alpha = 0.24f),
-                disabledUncheckedThumbColor = onSurfaceColor.copy(alpha = 0.38f),
-                disabledUncheckedTrackColor = Color.Transparent,
-                disabledUncheckedBorderColor = outlineColor.copy(alpha = 0.24f),
-                disabledUncheckedIconColor = Color.Transparent
+            activeTrackColor = checkedColor
+        )
+    }
+}
+
+@Composable
+private fun GeoTowerMaterialSwitch(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    activeTrackColor: Color = MaterialTheme.colorScheme.primary
+) {
+    val checkedTrackAlpha = if (isSystemInDarkTheme()) 0.32f else 0.18f
+    val outlineColor = MaterialTheme.colorScheme.outline
+    val onSurfaceColor = MaterialTheme.colorScheme.onSurface
+
+    val trackColor by animateColorAsState(
+        targetValue = when {
+            checked && enabled -> activeTrackColor.copy(alpha = checkedTrackAlpha)
+            checked -> activeTrackColor.copy(alpha = checkedTrackAlpha * 0.6f)
+            else -> Color.Transparent
+        },
+        animationSpec = tween(durationMillis = 180, easing = LinearOutSlowInEasing),
+        label = "materialTrackColor"
+    )
+    val borderColor by animateColorAsState(
+        targetValue = when {
+            checked && enabled -> activeTrackColor.copy(alpha = 0.58f)
+            checked -> activeTrackColor.copy(alpha = 0.24f)
+            enabled -> outlineColor.copy(alpha = 0.7f)
+            else -> outlineColor.copy(alpha = 0.24f)
+        },
+        animationSpec = tween(durationMillis = 180, easing = LinearOutSlowInEasing),
+        label = "materialBorderColor"
+    )
+    val thumbColor by animateColorAsState(
+        targetValue = when {
+            checked && enabled -> activeTrackColor
+            checked -> activeTrackColor.copy(alpha = 0.38f)
+            enabled -> outlineColor
+            else -> onSurfaceColor.copy(alpha = 0.38f)
+        },
+        animationSpec = tween(durationMillis = 180, easing = LinearOutSlowInEasing),
+        label = "materialThumbColor"
+    )
+
+    val trackWidth = 52.dp
+    val trackHeight = 32.dp
+    val thumbSize = 16.dp
+    val padding = (trackHeight - thumbSize) / 2
+    val thumbOffset by animateDpAsState(
+        targetValue = if (checked) trackWidth - thumbSize - padding else padding,
+        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
+        label = "materialThumbOffset"
+    )
+
+    Box(
+        modifier = modifier
+            .width(trackWidth)
+            .height(trackHeight)
+            .toggleable(
+                value = checked,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                enabled = enabled,
+                role = Role.Switch,
+                onValueChange = onCheckedChange
             )
+            .clip(CircleShape)
+            .background(trackColor)
+            .border(2.dp, borderColor, CircleShape),
+        contentAlignment = Alignment.CenterStart
+    ) {
+        Box(
+            modifier = Modifier
+                .offset(x = thumbOffset)
+                .size(thumbSize)
+                .clip(CircleShape)
+                .background(thumbColor)
         )
     }
 }

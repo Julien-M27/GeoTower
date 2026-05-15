@@ -27,68 +27,9 @@ internal data class ReleaseNoteItem(
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
     section("Général", "General", "Geral") {
         item(
-            "Suppression du code inutilisé",
-            "Removed unused code",
-            "Remoção de código não utilizado"
-        )
-        item(
-            "Suppression du code dupliqué",
-            "Removed duplicated code",
-            "Remoção de código duplicado"
-        )
-        item(
-            "Ajout de la vérification des mises à jour de l'application",
-            "Added app update checks",
-            "Adição da verificação de atualizações da aplicação"
-        )
-        item(
-            "Correction liée à la nouvelle architecture de base de données",
-            "Fixed an issue related to the new database architecture",
-            "Correção relacionada com a nova arquitetura da base de dados"
-        )
-        item(
-            "Ajout des opérateurs d'outre-mer",
-            "Added overseas operators",
-            "Adição das operadoras ultramarinas"
-        )
-        item(
-            "Migrations internes du code",
-            "Internal code migrations",
-            "Migrações internas do código"
-        )
-        item(
-            "Correction de certaines incohérences entre les différents menus",
-            "Fixed some inconsistencies between the different menus",
-            "Correção de algumas incoerências entre os diferentes menus"
-        )
-    }
-
-    section("Antennes à proximité et détail du support", "Nearby antennas and support detail", "Antenas próximas e detalhe do suporte") {
-        item(
-            "Mise en avant des opérateurs recherchés",
-            "Highlighted searched operators",
-            "Destaque das operadoras pesquisadas"
-        )
-    }
-
-    section("Détail des sites", "Site details", "Detalhe dos sites") {
-        item(
-            "Correction de l'affichage du spectre des FH",
-            "Fixed microwave link spectrum display",
-            "Correção da apresentação do espectro FH"
-        )
-    }
-
-    section("Paramètres", "Settings", "Definições") {
-        item(
-            "Suppression des notifications de fin de téléchargement si l'élément est affiché à l'écran",
-            "Removed download-complete notifications when the item is displayed on screen",
-            "Remoção das notificações de fim de transferência quando o elemento está visível no ecrã"
-        )
-        item(
-            "Ajout d'une notification de fin de téléchargement d'une carte",
-            "Added a download-complete notification for maps",
-            "Adição de uma notificação de fim de transferência de mapa"
+            "Modification des sélecteurs en mode normal",
+            "Updated selectors in normal mode",
+            "Alteração dos seletores no modo normal"
         )
     }
 }
