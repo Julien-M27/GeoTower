@@ -17,9 +17,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -27,20 +31,26 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.OperatorColorSpec
 import fr.geotower.utils.OperatorColors
 import android.content.SharedPreferences
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.MutableState
+
+private val OperatorFilterButtonHeight = 76.dp
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -53,13 +63,11 @@ fun MapSettingsSheet(
     val prefs = context.getSharedPreferences("GeoTowerPrefs", android.content.Context.MODE_PRIVATE)
 
     // Variables Opérateurs
-    var showOrange by AppConfig.showOrange
-    var showSfr by AppConfig.showSfr
-    var showBouygues by AppConfig.showBouygues
-    var showFree by AppConfig.showFree
+    var selectedOperatorKeys by AppConfig.selectedOperatorKeys
 
     // Variables Azimuts
     var showAzimuths by AppConfig.showAzimuths
+    var showMapLocationMarker by AppConfig.showMapLocationMarker
 
     // Variables Affichage des sites
     var showSitesInService by AppConfig.showSitesInService
@@ -110,39 +118,39 @@ fun MapSettingsSheet(
 
             // 1. OPÉRATEURS
             SectionTitle(AppStrings.operatorsTitle)
+            fun saveOperatorSelection(next: Set<String>) {
+                selectedOperatorKeys = next
+                prefs.edit().putStringSet(AppConfig.PREF_SELECTED_OPERATORS, next).apply()
+            }
+            val metroOperators = listOfNotNull(
+                OperatorColors.specForKey(OperatorColors.ORANGE_KEY),
+                OperatorColors.specForKey(OperatorColors.SFR_KEY),
+                OperatorColors.specForKey(OperatorColors.BOUYGUES_KEY)?.copy(label = "Bouygues"),
+                OperatorColors.specForKey(OperatorColors.FREE_KEY)?.copy(label = "Free")
+            )
+            val defaultOperatorKey = OperatorColors.keyFor(AppConfig.defaultOperator.value)
+            val defaultOperatorIsMetro = metroOperators.any { it.key == defaultOperatorKey }
+            val defaultOperatorIsOverseas = OperatorColors.overseas.any { it.key == defaultOperatorKey }
+            var isMetroExpanded by remember(defaultOperatorKey) { mutableStateOf(defaultOperatorIsMetro) }
+            var isOverseasExpanded by remember(defaultOperatorKey) { mutableStateOf(defaultOperatorIsOverseas) }
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // Orange reste en Orange
-                    SelectableButton(
-                        "Orange",
-                        showOrange,
-                        Modifier.weight(1f),
-                        selectedColor = Color(OperatorColors.ORANGE_ARGB)
-                    ) { showOrange = it }
-                    // SFR reste en Rouge
-                    SelectableButton(
-                        "SFR",
-                        showSfr,
-                        Modifier.weight(1f),
-                        selectedColor = Color(OperatorColors.SFR_ARGB)
-                    ) { showSfr = it }
-                }
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    // Bouygues utilise le bleu live notification centralisé
-                    SelectableButton(
-                        "Bouygues",
-                        showBouygues,
-                        Modifier.weight(1f),
-                        selectedColor = Color(OperatorColors.BOUYGUES_ARGB)
-                    ) { showBouygues = it }
-                    // Free passe en Gris
-                    SelectableButton(
-                        "Free",
-                        showFree,
-                        Modifier.weight(1f),
-                        selectedColor = Color(OperatorColors.FREE_ARGB)
-                    ) { showFree = it }
-                }
+                OperatorFilterGroup(
+                    title = AppStrings.operatorRegionMetro,
+                    operators = metroOperators,
+                    selectedKeys = selectedOperatorKeys,
+                    isExpanded = isMetroExpanded,
+                    onExpandedChange = { isMetroExpanded = it },
+                    onSelectionChange = ::saveOperatorSelection
+                )
+
+                OperatorFilterGroup(
+                    title = AppStrings.operatorRegionOverseas,
+                    operators = OperatorColors.overseas,
+                    selectedKeys = selectedOperatorKeys,
+                    isExpanded = isOverseasExpanded,
+                    onExpandedChange = { isOverseasExpanded = it },
+                    onSelectionChange = ::saveOperatorSelection
+                )
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -159,19 +167,23 @@ fun MapSettingsSheet(
                 SelectableButton(
                     label = AppStrings.showAzimuthsLabel.replace(" (", "\n("),
                     isSelected = showAzimuths,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    minHeight = 116.dp,
+                    maxLines = 4
                 ) {
                     showAzimuths = it
-                    prefs.edit().putBoolean("show_azimuths", it).apply()
+                    prefs.edit().putBoolean(AppConfig.PREF_SHOW_AZIMUTH_LINES, it).apply()
                 }
 
                 SelectableButton(
                     label = AppStrings.showAzimuthsConeLabel.replace(" (", "\n("),
                     isSelected = showAzimuthsCone,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
+                    minHeight = 116.dp,
+                    maxLines = 4
                 ) {
                     showAzimuthsCone = it
-                    prefs.edit().putBoolean("show_azimuths_cone", it).apply()
+                    prefs.edit().putBoolean(AppConfig.PREF_SHOW_AZIMUTH_CONES, it).apply()
                 }
             }
 
@@ -253,6 +265,18 @@ fun MapSettingsSheet(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            SectionTitle(AppStrings.mapLocationSectionTitle)
+            SelectableButton(
+                label = AppStrings.mapLocationMarkerOption,
+                isSelected = showMapLocationMarker,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                showMapLocationMarker = it
+                prefs.edit().putBoolean(AppConfig.PREF_SHOW_MAP_LOCATION_MARKER, it).apply()
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
             SectionTitle(AppStrings.siteDisplayTitle)
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 SelectableButton(
@@ -291,12 +315,96 @@ fun SectionTitle(text: String) {
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun OperatorFilterGroup(
+    title: String,
+    operators: List<OperatorColorSpec>,
+    selectedKeys: Set<String>,
+    isExpanded: Boolean,
+    onExpandedChange: (Boolean) -> Unit,
+    onSelectionChange: (Set<String>) -> Unit
+) {
+    val selectedCount = operators.count { it.key in selectedKeys }
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Surface(
+            onClick = { onExpandedChange(!isExpanded) },
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = title,
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "$selectedCount/${operators.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Icon(
+                    imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+
+        AnimatedVisibility(visible = isExpanded) {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 12.dp)
+            ) {
+                operators.chunked(2).forEach { rowOperators ->
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        rowOperators.forEach { operator ->
+                            SelectableButton(
+                                label = operator.label,
+                                isSelected = operator.key in selectedKeys,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(OperatorFilterButtonHeight),
+                                selectedColor = Color(operator.colorArgb)
+                            ) { selected ->
+                                val next = if (selected) selectedKeys + operator.key else selectedKeys - operator.key
+                                onSelectionChange(next)
+                            }
+                        }
+                        if (rowOperators.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun SelectableButton(
     label: String,
     isSelected: Boolean,
     modifier: Modifier = Modifier,
     selectedColor: Color? = null,
+    minHeight: Dp = 56.dp,
+    maxLines: Int = 3,
     onClick: (Boolean) -> Unit
 ) {
     val activeColor = selectedColor ?: MaterialTheme.colorScheme.primary
@@ -309,7 +417,7 @@ fun SelectableButton(
     Surface(
         onClick = { onClick(!isSelected) },
         // ✅ CORRECTION : heightIn(min = 56.dp) permet au bouton de s'agrandir s'il y a 2 lignes
-        modifier = modifier.heightIn(min = 56.dp),
+        modifier = modifier.heightIn(min = minHeight),
         shape = RoundedCornerShape(12.dp),
         color = containerColor,
         contentColor = contentColor,
@@ -317,12 +425,17 @@ fun SelectableButton(
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.padding(vertical = 8.dp) // Un peu d'espace en haut et en bas
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 8.dp)
         ) {
+            val compactText = label.length >= 18
             Text(
                 text = label,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = 16.sp,
+                fontSize = if (compactText) 15.sp else 16.sp,
+                maxLines = maxLines,
+                modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center, // ✅ CORRECTION : Centre le texte
                 lineHeight = 20.sp // Rapproche joliment les deux lignes
             )

@@ -34,6 +34,7 @@ import fr.geotower.data.db.GeoTowerDao
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.DeviceProfile
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
 import java.util.Locale
@@ -264,8 +265,9 @@ class LiveTrackingService : Service() {
             val radiusMeters = (radiusKm * 1000.0).toFloat()
             val offsetLat = radiusKm / KM_PER_LATITUDE_DEGREE
             val offsetLon = offsetLat / safeCos
+            val operatorQueryName = OperatorColors.specForKey(operator)?.aliases?.firstOrNull() ?: operator
             val candidates = dao.getActiveLocalisationsInBoxByOperator(
-                operatorName = operator,
+                operatorName = operatorQueryName,
                 minLat = location.latitude - offsetLat,
                 maxLat = location.latitude + offsetLat,
                 minLon = location.longitude - offsetLon,
@@ -503,7 +505,7 @@ class LiveTrackingService : Service() {
         secondaryInfo: String,
         shortCriticalText: String?
     ): Bundle {
-        if (!isSamsungDevice()) return Bundle.EMPTY
+        if (!DeviceProfile.supportsSamsungOngoingActivity) return Bundle.EMPTY
 
         val chipText = samsungChipText(shortCriticalText, primaryInfo)
         val drawerPrimaryInfo = samsungDrawerPrimaryInfo(chipText)
@@ -546,10 +548,6 @@ class LiveTrackingService : Service() {
 
     private fun supportsProgressStyle(): Boolean {
         return Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA
-    }
-
-    private fun isSamsungDevice(): Boolean {
-        return Build.MANUFACTURER.equals("samsung", ignoreCase = true)
     }
 
     private fun samsungChipText(shortCriticalText: String?, fallback: String): String {
@@ -638,14 +636,8 @@ class LiveTrackingService : Service() {
     private val currentOperator: String
         get() {
             val prefs = getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-            val rawOp = prefs.getString("default_operator", "Aucun")?.uppercase() ?: "AUCUN"
-            return when {
-                rawOp.contains("ORANGE") -> "ORANGE"
-                rawOp.contains("BOUYGUES") -> "BOUYGUES"
-                rawOp.contains("SFR") -> "SFR"
-                rawOp.contains("FREE") -> "FREE"
-                else -> rawOp
-            }
+            val rawOp = prefs.getString("default_operator", "Aucun") ?: "Aucun"
+            return OperatorColors.keyFor(rawOp) ?: "AUCUN"
         }
 
     private fun formatDistance(distanceMeters: Float): String {

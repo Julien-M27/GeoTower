@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.ContextCompat
+import fr.geotower.utils.OperatorColors
 
 object LiveTrackingController {
 
@@ -100,13 +101,7 @@ object LiveTrackingController {
 
     private fun currentOperator(context: Context): String {
         val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-        val rawOp = prefs.getString("default_operator", "Aucun")?.uppercase() ?: "AUCUN"
-        return when {
-            rawOp.contains("ORANGE") -> "ORANGE"
-            rawOp.contains("BOUYGUES") -> "BOUYGUES"
-            rawOp.contains("SFR") -> "SFR"
-            rawOp.contains("FREE") -> "FREE"
-            else -> rawOp
-        }
+        val rawOp = prefs.getString("default_operator", "Aucun") ?: "Aucun"
+        return OperatorColors.keyFor(rawOp) ?: "AUCUN"
     }
 }

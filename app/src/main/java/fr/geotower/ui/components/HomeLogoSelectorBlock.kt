@@ -2,7 +2,6 @@ package fr.geotower.ui.components
 
 import android.content.Context
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,14 +15,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import fr.geotower.R
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.OperatorLogos
 
 data class HomeLogoOption(val id: String, val name: String, val resId: Int?)
 
@@ -44,26 +44,23 @@ fun HomeLogoSelectorBlock(
     val defaultOp by AppConfig.defaultOperator
 
     // On détermine son ID pour la liste
-    val defaultId = when {
-        defaultOp.contains("Orange", ignoreCase = true) -> "orange"
-        defaultOp.contains("Bouygues", ignoreCase = true) -> "bouygues"
-        defaultOp.contains("SFR", ignoreCase = true) -> "sfr"
-        defaultOp.contains("Free", ignoreCase = true) -> "free"
-        else -> ""
-    }
+    val defaultId = OperatorColors.keyFor(defaultOp)?.lowercase().orEmpty()
 
     // ---> 2. L'ORDRE DE BASE DEMANDÉ (Orange > Bouygues > SFR > Free) <---
-    val baseOperators = listOf(
-        HomeLogoOption("orange", AppStrings.logoOrange, R.drawable.logo_orange),
-        HomeLogoOption("bouygues", AppStrings.logoBouygues, R.drawable.logo_bouygues),
-        HomeLogoOption("sfr", AppStrings.logoSfr, R.drawable.logo_sfr),
-        HomeLogoOption("free", AppStrings.logoFree, R.drawable.logo_free)
-    )
+    val baseOperators = OperatorColors.all.mapNotNull { operator ->
+        OperatorLogos.drawableRes(operator.key)?.let { logoRes ->
+            HomeLogoOption(
+                id = operator.key.lowercase(),
+                name = operator.label,
+                resId = logoRes
+            )
+        }
+    }
 
     // ---> 3. ON PLACE L'OPÉRATEUR FAVORIS EN TÊTE S'IL EXISTE <---
     val sortedOperators = if (defaultId.isNotEmpty()) {
-        val favOpt = baseOperators.find { it.id == defaultId }!!
-        listOf(favOpt) + baseOperators.filter { it.id != defaultId }
+        val favOpt = baseOperators.firstOrNull { it.id == defaultId }
+        if (favOpt != null) listOf(favOpt) + baseOperators.filter { it.id != defaultId } else baseOperators
     } else {
         baseOperators
     }
@@ -132,7 +129,8 @@ fun HomeLogoSelectorBlock(
                         fontSize = 12.sp,
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                         color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

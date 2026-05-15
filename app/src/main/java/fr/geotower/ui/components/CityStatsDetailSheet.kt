@@ -26,17 +26,17 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import fr.geotower.R
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.OperatorLogos
 
 // ✅ CLASSE DE DONNÉES COMPLÈTE
 data class OperatorStat(
     val name: String,
     val count: Int,
-    val logoRes: Int,
+    val logoRes: Int?,
     val color: Color,
     val groupedFreqs: Map<String, List<Pair<String, Int>>>
 )
@@ -69,14 +69,12 @@ fun CityStatsDetailSheet(
 
         val regexFiltre = Regex("^(2G|3G|4G|5G)(\\d{3,4})$")
 
-        val rawList = listOf(
-            Triple(OperatorColors.ORANGE_KEY, R.drawable.logo_orange, Color(OperatorColors.ORANGE_ARGB)),
-            Triple(OperatorColors.BOUYGUES_KEY, R.drawable.logo_bouygues, Color(OperatorColors.BOUYGUES_ARGB)),
-            Triple(OperatorColors.SFR_KEY, R.drawable.logo_sfr, Color(OperatorColors.SFR_ARGB)),
-            Triple(OperatorColors.FREE_KEY, R.drawable.logo_free, Color(OperatorColors.FREE_ARGB))
-        ).map { (opKey, logo, color) ->
+        val rawList = OperatorColors.all.map { operator ->
+            val opKey = operator.key
+            val logo = OperatorLogos.drawableRes(opKey)
+            val color = Color(operator.colorArgb)
 
-            val opAnts = cityAntennas.filter { it.operateur?.contains(opKey, true) == true }
+            val opAnts = cityAntennas.filter { OperatorColors.keysFor(it.operateur).contains(opKey) }
 
             val opAntennasGrouped = opAnts.groupBy { "${Math.round(it.latitude * 10000.0)}_${Math.round(it.longitude * 10000.0)}" }
             val siteCount = opAntennasGrouped.size
@@ -112,21 +110,14 @@ fun CityStatsDetailSheet(
                 if (idx == -1) 99 else idx
             })
 
-            val displayOpName = when(opKey) {
-                "ORANGE" -> "Orange"
-                "BOUYGUES" -> "Bouygues"
-                "SFR" -> "SFR"
-                "FREE" -> "Free"
-                else -> opKey
-            }
-
-            OperatorStat(displayOpName, siteCount, logo, color, groupedByTech)
+            OperatorStat(operator.label, siteCount, logo, color, groupedByTech)
         }
 
-        rawList.sortedWith { a, b ->
+        val defaultOpKey = OperatorColors.keyFor(defaultOp)
+        rawList.filter { it.count > 0 }.ifEmpty { rawList }.sortedWith { a, b ->
             if (a.name == b.name) 0
-            else if (a.name.equals(defaultOp, ignoreCase = true)) -1
-            else if (b.name.equals(defaultOp, ignoreCase = true)) 1
+            else if (OperatorColors.keyFor(a.name) == defaultOpKey) -1
+            else if (OperatorColors.keyFor(b.name) == defaultOpKey) 1
             else b.count.compareTo(a.count)
         }
     }
@@ -179,11 +170,28 @@ fun CityStatsDetailSheet(
                                 modifier = Modifier.fillMaxWidth().padding(16.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Image(
-                                    painter = painterResource(id = stat.logoRes),
-                                    contentDescription = stat.name,
-                                    modifier = Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)).background(Color.White)
-                                )
+                                if (stat.logoRes != null) {
+                                    Image(
+                                        painter = painterResource(id = stat.logoRes),
+                                        contentDescription = stat.name,
+                                        modifier = Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)).background(Color.White)
+                                    )
+                                } else {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(60.dp)
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(stat.color.copy(alpha = 0.14f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Text(
+                                            text = stat.name.take(1).uppercase(),
+                                            color = stat.color,
+                                            fontWeight = FontWeight.Black,
+                                            fontSize = 24.sp
+                                        )
+                                    }
+                                }
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(text = stat.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)

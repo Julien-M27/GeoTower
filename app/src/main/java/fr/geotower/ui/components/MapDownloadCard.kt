@@ -316,13 +316,13 @@ fun MapDownloadCard(
             shape = shape,
             containerColor = MaterialTheme.colorScheme.surface,
             dismissButton = {
-                TextButton(onClick = {
+                DialogDestructiveButton(text = AppStrings.yes, onClick = {
                     OfflineMapDownloadValidator.safeMapFile(mapsDir, mapToDelete!!.mapFilename)?.delete()
                     fileRefreshTrigger++
                     mapToDelete = null
-                }) { Text(AppStrings.yes, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
+                })
             },
-            confirmButton = { Button(onClick = { mapToDelete = null }, shape = RoundedCornerShape(8.dp)) { Text(AppStrings.no, fontWeight = FontWeight.Bold) } }
+            confirmButton = { DialogNeutralButton(text = AppStrings.no, onClick = { mapToDelete = null }) }
         )
     }
 
@@ -335,13 +335,13 @@ fun MapDownloadCard(
             shape = shape,
             containerColor = MaterialTheme.colorScheme.surface,
             dismissButton = {
-                TextButton(onClick = {
+                DialogDestructiveButton(text = AppStrings.yes, onClick = {
                     OfflineMapDownloadValidator.deleteAllSafeMapFiles(mapsDir)
                     fileRefreshTrigger++
                     showDeleteAllDialog = false
-                }) { Text(AppStrings.yes, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
+                })
             },
-            confirmButton = { Button(onClick = { showDeleteAllDialog = false }, shape = RoundedCornerShape(8.dp)) { Text(AppStrings.no, fontWeight = FontWeight.Bold) } }
+            confirmButton = { DialogNeutralButton(text = AppStrings.no, onClick = { showDeleteAllDialog = false }) }
         )
     }
 }

@@ -457,6 +457,10 @@ object AppStrings {
     val oneUiInterface @Composable get() = get("Interface One UI", "One UI Interface", "Interface One UI")
 
     val defaultOperator @Composable get() = get("Opérateur par défaut", "Default Operator", "Operadora padrão")
+    val operatorRegionMetro @Composable get() = get("Métropole", "Mainland France", "Metrópole")
+    val operatorRegionOverseas @Composable get() = get("Outre-mer", "Overseas", "Ultramar")
+    val selectAll @Composable get() = get("Tout sélectionner", "Select all", "Selecionar tudo")
+    val clearAll @Composable get() = get("Tout désélectionner", "Clear all", "Limpar tudo")
     val appLanguageLabel @Composable get() = get("Langue de l'application", "App Language", "Idioma da aplicação")
     val none @Composable get() = get("Aucun", "None", "Nenhum")
     val select @Composable get() = get("Sélectionner", "Select", "Selecionar")
@@ -514,7 +518,12 @@ object AppStrings {
     val compassLocationOption @Composable get() = get("Lieu", "Location", "Local")
     val compassGpsOption @Composable get() = get("Localisation", "Coordinates", "Coordenadas")
     val compassAccuracyOption @Composable get() = get("Précision", "Accuracy", "Precisão")
+    val mapLocationSectionTitle @Composable get() = get("Localisation", "Location", "Localização")
     val mapLocationOption @Composable get() = get("Bouton de localisation", "Location button", "Botão de localisation")
+    val mapLocationMarkerOption @Composable get() = get("Point GPS", "GPS dot", "Ponto GPS")
+    val mapAzimuthsOption @Composable get() = get("Azimuts", "Azimuths", "Azimutes")
+    val mapAzimuthLinesOption @Composable get() = get("Traits d'azimut", "Azimuth lines", "Linhas de azimute")
+    val mapAzimuthConesOption @Composable get() = get("Cônes d'azimut", "Azimuth cones", "Cones de azimute")
     val mapZoomOption @Composable get() = get("Boutons de zoom", "Zoom buttons", "Botões de zoom")
     val mapToolboxOption @Composable get() = get("Toolbox (Outils)", "Toolbox", "Ferramentas")
     val mapCompassOption @Composable get() = get("Boussole de la carte", "Map compass", "Bússola do mapa")
@@ -1301,7 +1310,7 @@ object AppStrings {
 
     val prefDesc @Composable get() = get("Configurez votre opérateur principal pour faciliter l'utilisation des outils de mesure sur la carte.", "Configure your main operator to make it easier to use the measurement tools on the map.", "Configure a sua operadora principal para facilitar a utilização das ferramentas de medição no mapa.")
     val selectOperator @Composable get() = get("Sélection de votre opérateur principal", "Select your main operator", "Selecione a sua operadora principal")
-    val oneUiSubtitle @Composable get() = get("Activer le design Samsung (bulles arrondies)", "Enable Samsung design (rounded bubbles)", "Ativar o design Samsung (bolhas arredondadas)")
+    val oneUiSubtitle @Composable get() = get("Utiliser l'affichage One UI (bulles arrondies)", "Use One UI display (rounded bubbles)", "Usar o visual One UI (bolhas arredondadas)")
 
     val warningNoOpTitle @Composable get() = get("Aucun opérateur sélectionné", "No operator selected", "Nenhuma operadora selecionada")
     val warningNoOpDesc @Composable get() = get("Vous n'avez pas choisi d'opérateur par défaut. Les outils de filtrage sur la carte seront désactivés.\n\nVoulez-vous vraiment continuer ?", "You have not chosen a default operator. The filtering tools on the map will be disabled.\n\nDo you really want to continue?", "Não escolheu uma operadora por defeito. As ferramentas de filtragem no mapa serão desativadas.\n\nTem a certeza de que pretende continuer?")
@@ -1342,7 +1351,7 @@ object AppStrings {
     val aboutSources @Composable get() = get("Sources de données", "Data Sources", "Fontes de données")
     val aboutDev @Composable get() = get("Développement", "Development", "Desenvolvimento")
     val aboutIntro @Composable get() = get("GeoTower vous permet de localiser les antennes relais autour de vous et d'identifier les technologies disponibles.", "GeoTower allows you to locate cell towers around you and identify available technologies.", "A GeoTower permite-lhe localizar torres de celular à sua volta e identificar as tecnologias disponibles.")
-    val devCredit @Composable get() = get("Développé par Julien, Gemini et les contributeurs de GitHub 😉", "Developed by Julien, Gemini, and GitHub contributors 😉", "Desenvolvido por Julien, Gemini e os collaborateurs do GitHub 😉")
+    val devCredit @Composable get() = get("Développé par Julien et les contributeurs de GitHub 😉", "Developed by Julien and GitHub contributors 😉", "Desenvolvido por Julien e os collaborateurs do GitHub 😉")
     val srcAntennas @Composable get() = get("Données Antennes", "Antenna Data", "Dados de Antenas")
     val srcAntennasDesc @Composable get() = get("Agence Nationale des Fréquences (ANFR).\nDonnées issues de Cartoradio (Open Data).", "National Frequency Agency (ANFR).\nData from Cartoradio (Open Data).", "Agência Nacional de Frequências (ANFR).\nDados do Cartoradio (Open Data).")
     val srcIgn @Composable get() = get("Fond de carte IGN", "IGN Basemap", "Mapa base IGN")
@@ -1398,7 +1407,7 @@ object AppStrings {
     val navToSite @Composable get() = get("Naviguer vers ce site", "Navigate to this site", "Navegar para este local")
     val shareSite @Composable get() = get("Partager ce site", "Share this site", "Partilhar este local")
     @Composable
-    fun operatorCount(count: Int) = get("↓ Nombre d'opérateurs : ( $count / 4 )", "↓ Number of operators : ( $count / 4 )", "↓ Número de operadoras : ( $count / 4 )")
+    fun operatorCount(count: Int) = get("↓ Nombre d'opérateurs : $count", "↓ Number of operators : $count", "↓ Número de operadoras : $count")
     val shareAs @Composable get() = get("Partager en...", "Share as...", "Partilhar comme...")
     val lightModeDesc @Composable get() = get("Idéal pour les emails ou messages", "Ideal for emails or messages", "Ideal para e-mails ou mensagens")
     val darkModeDesc @Composable get() = get("Idéal pour les réseaux sociaux (Twitter, Discord)", "Ideal for social media (Twitter, Discord)", "Ideal para redes sociais (Twitter, Discord)")
@@ -1461,7 +1470,7 @@ object AppStrings {
     val website @Composable get() = get("Site Web", "Website", "Site")
 
     val activatedOn @Composable get() = get("Activé le : ", "Activated on : ", "Ativado em : ")
-    val dateNotSpecifiedAnfr @Composable get() = get("Date non spécifiée par l'ANFR", "Date not specified by ANFR", "Data não especificada pela ANFR")
+    val dateNotSpecifiedAnfr @Composable get() = get("Date d'activation non spécifiée par l'ANFR", "Activation date not specified by ANFR", "Data de ativação não especificada pela ANFR")
     val azimuthNotSpecified @Composable get() = get("Azimut non spécifié", "Azimuth not specified", "Azimute não especificado")
 
     val azimuthsLabel @Composable get() = get("Azimuts", "Azimuths", "Azimutes")
@@ -1953,11 +1962,12 @@ object AppStrings {
     val apiDetailMaintenance @Composable get() = get("Travaux de maintenance", "Maintenance work", "Trabalhos de manutenção")
 
     val aboutVersionsTitle @Composable get() = get("Versions", "Versions", "Versões")
-    val versionAppLabel @Composable get() = get("Version de l'application", "App version", "Versão do app")
-    val versionDbLabel @Composable get() = get("Version de la base de données", "Database version", "Versão da base de données")
-    val versionWeeklyLabel @Composable get() = get("Données hebdomadaires", "Weekly data", "Dados semanais")
-    val versionMonthlyLabel @Composable get() = get("Données mensuelles", "Monthly data", "Dados mensais")
-    val versionHsLabel @Composable get() = get("Données des sites HS", "HS sites data", "Dados dos sites HS")
+    val versionAppLabel @Composable get() = get("Version de\nl'application", "App\nversion", "Versão do\napp")
+    val versionDbLabel @Composable get() = get("Version de la base\nde données", "Database\nversion", "Versão da base\nde dados")
+    val versionWeeklyLabel @Composable get() = get("Données\nhebdomadaires", "Weekly\ndata", "Dados\nsemanais")
+    val versionMonthlyLabel @Composable get() = get("Données\nmensuelles", "Monthly\ndata", "Dados\nmensais")
+    val versionHsLabel @Composable get() = get("Données des\nsites HS", "HS sites\ndata", "Dados dos\nsites HS")
+    val versionTimeAt @Composable get() = get("à", "at", "às")
 
     fun formatMapName(rawName: String): String {
         val cleanName = rawName.replace(".map", "", ignoreCase = true)
@@ -2039,7 +2049,7 @@ object AppStrings {
                 cal.minimalDaysInFirstWeek = 4
                 cal.time = date
                 val weekNumber = cal.get(java.util.Calendar.WEEK_OF_YEAR)
-                "$weekWord $weekNumber  -  $dateStr"
+                "$weekWord $weekNumber\n$dateStr"
             } else dateStr
         } catch (e: Exception) { dateStr }
     }

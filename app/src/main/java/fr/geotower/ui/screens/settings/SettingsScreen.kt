@@ -38,7 +38,6 @@ import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -60,7 +59,6 @@ import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Tune
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -73,8 +71,6 @@ import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.VerticalDivider
@@ -119,6 +115,7 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.data.workers.DownloadNotificationCenter
 import fr.geotower.data.workers.UpdateCheckScheduler
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppUiMode
 import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.launch
@@ -135,7 +132,10 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.components.SafeClick
 import fr.geotower.ui.components.colorPaletteFadingEdge
+import fr.geotower.ui.components.DialogDestructiveButton
+import fr.geotower.ui.components.DialogNeutralButton
 import fr.geotower.ui.components.rememberSafeClick
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.services.LiveTrackingController
 import fr.geotower.utils.OperatorLogos
 import kotlin.math.roundToInt
@@ -234,34 +234,25 @@ fun SettingsScreen(
     var shouldBringDatabaseIntoView by remember(initialSection) { mutableStateOf(initialSection == "database") }
     var shouldBringOfflineMapsIntoView by remember(initialSection) { mutableStateOf(initialSection == "offline_maps") }
 
-    var forceOneUi by AppConfig.forceOneUiTheme
     var themeMode by AppConfig.themeMode
     var isOledMode by AppConfig.isOledMode
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val uiStyle = LocalGeoTowerUiStyle.current
     var showUnitSheet by remember { mutableStateOf(false) }
     var showColorPalettePage by remember { mutableStateOf(false) }
 
-
-    val isSystemDark = isSystemInDarkTheme()
-    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemDark)
-
-    val useOneUi = forceOneUi
-    val isOled = isOledMode
-
-    val cardShape = if (useOneUi) RoundedCornerShape(28.dp) else RoundedCornerShape(12.dp)
-    val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-
-    val bubbleBaseColor = if (useOneUi) {
-        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
-    } else {
-        Color.Transparent
+    fun updateOneUi(enabled: Boolean) {
+        val mode = AppUiMode.fromOneUiEnabled(enabled)
+        AppConfig.uiMode.value = mode
+        prefs.edit().putString(AppConfig.PREF_UI_MODE, mode.storageKey).apply()
     }
 
-    val mainBgColor = if (isDark) {
-        if (isOled) Color.Black else MaterialTheme.colorScheme.background
-    } else {
-        MaterialTheme.colorScheme.background
-    }
+    val useOneUi = uiStyle.useOneUi
+    val isDark = uiStyle.isDark
+    val cardShape = uiStyle.cardShape
+    val cardBorder = uiStyle.cardBorder
+    val bubbleBaseColor = uiStyle.bubbleColor
+    val mainBgColor = uiStyle.backgroundColor
 
     val packageInfo = remember { try { context.packageManager.getPackageInfo(context.packageName, 0) } catch (e: Exception) { null } }
     val versionName = packageInfo?.versionName ?: "1.0.0"
@@ -420,6 +411,9 @@ fun SettingsScreen(
     var showMapSpeedometer by remember { mutableStateOf(prefs.getBoolean("show_speedometer", true)) }
     var showMapSettingsSheet by remember { mutableStateOf(false) }
     var showMapLocation by remember { mutableStateOf(prefs.getBoolean("show_map_location", true)) }
+    var showMapLocationMarker by AppConfig.showMapLocationMarker
+    var showMapAzimuths by AppConfig.showAzimuths
+    var showMapAzimuthsCone by AppConfig.showAzimuthsCone
     var showMapZoom by remember { mutableStateOf(prefs.getBoolean("show_map_zoom", true)) }
     var showMapToolbox by remember { mutableStateOf(prefs.getBoolean("show_map_toolbox", true)) }
     var showMapCompass by remember { mutableStateOf(prefs.getBoolean("show_map_compass", true)) }
@@ -583,7 +577,7 @@ fun SettingsScreen(
 
     LaunchedEffect(initialSection) {
         when (initialSection) {
-            "nearby", "support", "site", "throughput" -> {
+            "nearby", "map", "compass", "support", "site", "throughput" -> {
                 kotlinx.coroutines.delay(300)
                 activeSectionIndex = 2
                 if (navMode == 0 || !isWideScreen) {
@@ -593,6 +587,8 @@ fun SettingsScreen(
                 }
                 when (initialSection) {
                     "nearby" -> showNearbySettingsSheet = true
+                    "map" -> showMapSettingsSheet = true
+                    "compass" -> showCompassSettingsSheet = true
                     "support" -> showSupportSettingsSheet = true
                     "site" -> showSiteSettingsSheet = true
                     "throughput" -> showThroughputCalculatorSettingsSheet = true
@@ -797,10 +793,10 @@ fun SettingsScreen(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                             if (navMode == 0 || !isExpanded) {
-                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, forceOneUi, { forceOneUi = it; prefs.edit().putBoolean("force_one_ui", it).apply() }, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; offlineMapsBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) }, scrollViewportTop, scrollViewportBottom, scrollState.value, scrollState.maxValue, targetMapFilename = offlineMapsTargetFilename, onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) })
+                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; offlineMapsBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) }, scrollViewportTop, scrollViewportBottom, scrollState.value, scrollState.maxValue, targetMapFilename = offlineMapsTargetFilename, onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) })
                             } else {
                                 when (activeSectionIndex) {
-                                    0 -> SectionApparence(themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, forceOneUi, { forceOneUi = it; prefs.edit().putBoolean("force_one_ui", it).apply() }, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true })
+                                    0 -> SectionApparence(themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true })
                                     1 -> SectionCartographie(mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick)
                                     2 -> SectionPreferences(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick)
                                     3 -> SectionSysteme(context, cardShape, border = cardBorder, bubbleColor = bubbleBaseColor, useOneUi = useOneUi, safeClick = safeClick)
@@ -1103,6 +1099,18 @@ fun SettingsScreen(
                 showLocation = showMapLocation,
                 onLocationChange = {
                     showMapLocation = it; prefs.edit().putBoolean("show_map_location", it).apply()
+                },
+                showLocationMarker = showMapLocationMarker,
+                onLocationMarkerChange = {
+                    showMapLocationMarker = it; prefs.edit().putBoolean(AppConfig.PREF_SHOW_MAP_LOCATION_MARKER, it).apply()
+                },
+                showAzimuths = showMapAzimuths,
+                onAzimuthsChange = {
+                    showMapAzimuths = it; prefs.edit().putBoolean(AppConfig.PREF_SHOW_AZIMUTH_LINES, it).apply()
+                },
+                showAzimuthsCone = showMapAzimuthsCone,
+                onAzimuthsConeChange = {
+                    showMapAzimuthsCone = it; prefs.edit().putBoolean(AppConfig.PREF_SHOW_AZIMUTH_CONES, it).apply()
                 },
                 showZoom = showMapZoom,
                 onZoomChange = {
@@ -1469,27 +1477,17 @@ fun SettingsScreen(
             shape = cardShape,
             containerColor = MaterialTheme.colorScheme.surface,
             dismissButton = {
-                TextButton(
+                DialogDestructiveButton(
+                    text = AppStrings.yes,
                     onClick = {
                         showGlobalResetDialog = false
 
                         resetSettingsToDefaultsAndRestart(context, prefs)
                     }
-                ) {
-                    Text(AppStrings.yes, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
-                }
+                )
             },
             confirmButton = {
-                Button(
-                    onClick = { showGlobalResetDialog = false },
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF4CAF50), // Vert
-                        contentColor = Color.White
-                    )
-                ) {
-                    Text(AppStrings.no, fontWeight = FontWeight.Bold)
-                }
+                DialogNeutralButton(text = AppStrings.no, onClick = { showGlobalResetDialog = false })
             }
         )
     }
@@ -2077,15 +2075,13 @@ fun SectionDatabase(
             shape = shape,
             containerColor = MaterialTheme.colorScheme.surface,
             dismissButton = {
-                TextButton(onClick = {
+                DialogDestructiveButton(text = AppStrings.yes, onClick = {
                     showResetDialog = false
                     resetSettingsToDefaultsAndRestart(context, prefs)
-                }) { Text(AppStrings.yes, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold) }
+                })
             },
             confirmButton = {
-                Button(onClick = { showResetDialog = false }, shape = CircleShape, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50), contentColor = Color.White)) {
-                    Text(AppStrings.no, fontWeight = FontWeight.Bold)
-                }
+                DialogNeutralButton(text = AppStrings.no, onClick = { showResetDialog = false })
             }
         )
     }
@@ -2117,11 +2113,12 @@ fun PreferenceSwitchCard(title: String, desc: String, checked: Boolean, onChecke
     Surface(shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) { Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold); Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            if (useOneUi) {
-                fr.geotower.ui.components.OneUiSwitch(checked, onCheckedChange)
-            } else {
-                Switch(checked = checked, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(checkedTrackColor = accentColor))
-            }
+            fr.geotower.ui.components.GeoTowerSwitch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                useOneUi = useOneUi,
+                checkedColor = accentColor
+            )
         }
     }
 }

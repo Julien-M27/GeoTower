@@ -32,10 +32,10 @@ fun GlobalUploadOverlay() {
     // Thème dynamique
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
-    val forceOneUi by AppConfig.forceOneUiTheme
+    val useOneUi = AppConfig.useOneUiDesign
     val isDark = (themeMode == 2) || (themeMode == 0 && androidx.compose.foundation.isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
-    val blockShape = if (forceOneUi) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
+    val blockShape = if (useOneUi) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
 
     // Écoute TOUS les envois ayant le tag "sq_upload_global"
     val workInfos by remember {

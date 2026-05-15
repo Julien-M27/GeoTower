@@ -39,6 +39,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.LocationOn
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -313,14 +314,10 @@ fun CompassScreen(
                         // --- 2. FUSION ET TRI DES OPÉRATEURS ---
                         val ops = siteAntennas.asSequence()
                             .mapNotNull { it.operateur }
-                            .flatMap { it.split(Regex("[/,\\-]")) }
-                            .map { it.trim().uppercase() }
-                            .filter { it.isNotEmpty() }
+                            .flatMap { OperatorColors.keysFor(it).asSequence() }
                             .distinct()
-                            .sortedBy { op ->
-                                val match = priorityList.firstOrNull { op.contains(it) }
-                                if (match != null) priorityList.indexOf(match) else 99
-                            }.toList()
+                            .sortedBy { op -> priorityList.indexOf(op).takeIf { it >= 0 } ?: 99 }
+                            .toList()
 
                         RadarSite(
                             id = mainAntenna.idAnfr.toLongOrNull() ?: 0L,
@@ -357,6 +354,15 @@ fun CompassScreen(
                         enabled = !safeBackNavigation.isLocked
                     ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppStrings.back, tint = oncompassBg)
+                    }
+                },
+                actions = {
+                    IconButton(onClick = { navController.navigate("settings?section=compass") }) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = AppStrings.settingsTitle,
+                            tint = oncompassBg
+                        )
                     }
                 },
                 colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = compassBg),
@@ -448,7 +454,8 @@ fun CompassScreen(
                                     Column(modifier = Modifier.weight(1f)) {
                                         // --- AFFICHAGE DES OPÉRATEURS DU SUPPORT ---
                                         val opsText = site.operateurs.joinToString(", ") { op ->
-                                            op.lowercase().replaceFirstChar { it.titlecase() }
+                                            OperatorColors.specForKey(op)?.label
+                                                ?: op.lowercase().replaceFirstChar { it.titlecase() }
                                         }
                                         Text(
                                             text = "${AppStrings.supportPrefix} $opsText",
@@ -840,31 +847,14 @@ fun RadarSitesOverlay(
                 val rect = androidx.compose.ui.geometry.Rect(x - dotRadius, y - dotRadius, x + dotRadius, y + dotRadius)
 
                 val validOps = site.operateurs
-                    .filter { op -> colorMap.keys.any { op.contains(it) } }
-                    .map { op -> colorMap.keys.first { op.contains(it) } }
+                    .flatMap { OperatorColors.keysFor(it) }
                     .distinct()
-                    .sortedBy { priorityList.indexOf(it) }
+                    .sortedBy { priorityList.indexOf(it).takeIf { index -> index >= 0 } ?: 99 }
 
                 rotate(degrees = -currentRotation, pivot = Offset(x, y)) {
                     if (validOps.isEmpty()) drawCircle(color = Color.Gray, radius = dotRadius, center = Offset(x, y))
                     else {
-                        when (validOps.size) {
-                            1 -> drawCircle(color = colorMap[validOps[0]]!!, radius = dotRadius, center = Offset(x, y))
-                            2 -> {
-                                drawArc(colorMap[validOps[0]]!!, 180f, 180f, true, rect.topLeft, rect.size)
-                                drawArc(colorMap[validOps[1]]!!, 0f, 180f, true, rect.topLeft, rect.size)
-                            }
-                            3 -> {
-                                drawArc(colorMap[validOps[0]]!!, 210f, 120f, true, rect.topLeft, rect.size)
-                                drawArc(colorMap[validOps[1]]!!, 330f, 120f, true, rect.topLeft, rect.size)
-                                drawArc(colorMap[validOps[2]]!!, 90f, 120f, true, rect.topLeft, rect.size)
-                            }
-                            4 -> {
-                                val angles = listOf(180f, 270f, 0f, 90f)
-                                validOps.forEachIndexed { index, op -> drawArc(colorMap[op]!!, angles[index], 90f, true, rect.topLeft, rect.size) }
-                            }
-                            else -> drawCircle(color = Color.Gray, radius = dotRadius, center = Offset(x, y))
-                        }
+                        drawOperatorSlices(rect, validOps, colorMap)
                     }
                     drawCircle(color = compassBg, radius = dotRadius, center = Offset(x, y), style = Stroke(width = 1.5.dp.toPx()))
                 }
@@ -918,12 +908,15 @@ fun MiniOperatorGrid(operateurs: List<String>) {
             Offset(cellSize + spacing, cellSize + spacing) // 4. Bas Droite
         )
 
-        // On dessine les cases dans l'ordre de priorité !
-        priorityList.forEachIndexed { index, op ->
-            val hasOp = operateurs.any { it.uppercase().contains(op) }
+        val displayOps = priorityList
+            .filter { op -> operateurs.flatMap { OperatorColors.keysFor(it) }.contains(op) }
+            .take(4)
+
+        (0 until 4).forEach { index ->
+            val op = displayOps.getOrNull(index)
 
             drawRoundRect(
-                color = if (hasOp) colorMap[op]!! else emptyColor,
+                color = op?.let { colorMap[it] } ?: emptyColor,
                 topLeft = positions[index],
                 size = androidx.compose.ui.geometry.Size(cellSize, cellSize),
                 cornerRadius = cornerRadius
@@ -936,9 +929,7 @@ fun getOperatorPriorityList(defaultOp: String): List<String> {
     val priorityList = mutableListOf<String>()
     val defOpUpper = defaultOp.uppercase()
 
-    if (defOpUpper != "AUCUN" && baseOrder.any { defOpUpper.contains(it) }) {
-        priorityList.add(baseOrder.first { defOpUpper.contains(it) })
-    }
+    OperatorColors.keyFor(defOpUpper)?.let { priorityList.add(it) }
     baseOrder.forEach { if (!priorityList.contains(it)) priorityList.add(it) }
     return priorityList
 }
@@ -946,6 +937,24 @@ fun getOperatorPriorityList(defaultOp: String): List<String> {
 fun getOperatorColors(): Map<String, Color> {
     return OperatorColors.orderedKeys.associateWith { key ->
         Color(OperatorColors.colorArgbForKey(key))
+    }
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawOperatorSlices(
+    rect: androidx.compose.ui.geometry.Rect,
+    operators: List<String>,
+    colorMap: Map<String, Color>
+) {
+    val sweep = 360f / operators.size.coerceAtLeast(1)
+    operators.forEachIndexed { index, op ->
+        drawArc(
+            color = colorMap[op] ?: Color.Gray,
+            startAngle = -90f + index * sweep,
+            sweepAngle = sweep,
+            useCenter = true,
+            topLeft = rect.topLeft,
+            size = rect.size
+        )
     }
 }
 

@@ -14,6 +14,7 @@ import org.osmdroid.util.GeoPoint
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.OperatorColors
 
 class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
 
@@ -66,7 +67,7 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
                     val fakeAntennas = clusters.map { cluster ->
                         LocalisationEntity(
                             idAnfr = "CLUSTER_${cluster.count}",
-                            operateur = "ORANGE, SFR, BOUYGUES, FREE",
+                            operateur = OperatorColors.keysFor(cluster.operators).joinToString(", "),
                             latitude = cluster.centerLat,
                             longitude = cluster.centerLon,
                             azimuts = null, codeInsee = null, azimutsFh = null,

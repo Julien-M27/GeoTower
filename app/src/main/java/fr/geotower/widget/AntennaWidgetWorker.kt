@@ -136,26 +136,10 @@ class AntennaWidgetWorker(
                     }
                 }
 
-                val baseOrder = listOf("ORANGE", "BOUYGUES", "SFR", "FREE")
-
                 val ops = siteAntennas.mapNotNull { it.operateur }
-                    .flatMap { it.split(Regex("[/,\\-]")) }
-                    .map { it.trim().uppercase() }
-                    .filter { it.isNotEmpty() }
-                    .sortedBy { op ->
-                        val match = baseOrder.firstOrNull { op.contains(it) }
-                        if (match != null) baseOrder.indexOf(match) else 99
-                    }
-                    .map { op ->
-                        when {
-                            op.contains("ORANGE") -> "ORANGE"
-                            op.contains("BOUYGUES") -> "BOUYGUES"
-                            op.contains("FREE") -> "FREE"
-                            op.contains("SFR") -> "SFR"
-                            else -> op
-                        }
-                    }
+                    .flatMap { OperatorColors.keysFor(it) }
                     .distinct()
+                    .sortedBy { op -> OperatorColors.orderedKeys.indexOf(op).takeIf { it >= 0 } ?: 99 }
 
                 val operateurText = ops.joinToString(" • ")
 

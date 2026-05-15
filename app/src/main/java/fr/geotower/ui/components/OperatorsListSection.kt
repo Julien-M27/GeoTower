@@ -28,6 +28,7 @@ import fr.geotower.data.models.TechniqueEntity // ✅ NOUVEL IMPORT
 import fr.geotower.ui.screens.emitters.formatDateToFrench // ✅ IMPORT DU FORMATAGE DES DATES
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
 
 @Composable
@@ -38,6 +39,7 @@ fun OperatorsListSection(
     cardBgColor: Color,
     blockShape: Shape,
     useOneUi: Boolean,
+    priorityOperatorKey: String? = null,
     onAntennaClick: (String) -> Unit
 ) {
     // ✅ 1. LECTURE DES PARAMÈTRES SPÉCIFIQUES AU DÉTAIL DU SITE
@@ -70,6 +72,16 @@ fun OperatorsListSection(
     // Si on a tout masqué, on ne dessine rien du tout
     if (filteredAntennas.isEmpty()) return
 
+    val defaultOperatorKey = OperatorColors.keyFor(AppConfig.defaultOperator.value)
+    val sortedAntennas = filteredAntennas.sortedBy { antenna ->
+        val operatorKeys = OperatorColors.keysFor(antenna.operateur)
+        when {
+            priorityOperatorKey != null && priorityOperatorKey in operatorKeys -> 0
+            defaultOperatorKey != null && defaultOperatorKey in operatorKeys -> 1
+            else -> 2
+        }
+    }
+
     Column(modifier = Modifier.padding(top = 8.dp)) {
         Text(
             text = AppStrings.operatorCount(filteredAntennas.size), // ✅ Utilise la taille filtrée
@@ -77,7 +89,10 @@ fun OperatorsListSection(
             fontSize = 13.sp,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
-        filteredAntennas.forEach { antenna ->
+        if (!useOneUi) {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
+        }
+        sortedAntennas.forEach { antenna ->
             OperatorDetailItem(
                 antenna = antenna,
                 technique = techniques[antenna.idAnfr],

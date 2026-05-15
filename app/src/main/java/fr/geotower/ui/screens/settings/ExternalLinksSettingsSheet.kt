@@ -28,7 +28,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -171,8 +170,12 @@ fun ExternalLinksSettingsSheet(
 
                                     Text(link.label, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
 
-                                    if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { fr.geotower.ui.components.OneUiSwitch(checked, onChecked) }
-                                    else Switch(checked = checked, onCheckedChange = onChecked, modifier = Modifier.scale(0.8f))
+                                    fr.geotower.ui.components.GeoTowerSwitch(
+                                        checked = checked,
+                                        onCheckedChange = onChecked,
+                                        modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                                        useOneUi = useOneUi
+                                    )
                                 }
                             }
                         }

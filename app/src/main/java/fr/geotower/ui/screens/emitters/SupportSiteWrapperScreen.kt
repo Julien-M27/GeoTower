@@ -42,6 +42,7 @@ fun SupportSiteWrapperScreen(
     navController: NavController,
     repository: AnfrRepository,
     supportId: Long,
+    highlightedOperatorKey: String? = null,
     isSplitScreen: Boolean = false,
     onCloseSplitScreen: () -> Unit = {},
     onOpenAntennaInHost: ((Long) -> Unit)? = null
@@ -145,6 +146,7 @@ fun SupportSiteWrapperScreen(
                     navController = navController,
                     repository = repository,
                     siteId = supportId,
+                    highlightedOperatorKey = highlightedOperatorKey,
                     isSplitScreen = isSplitScreen,
                     onCloseSplitScreen = onCloseSplitScreen,
                     onAntennaClick = { id ->
@@ -206,6 +208,7 @@ fun NearEmittersSupportWrapperScreen(
 ) {
     val displayStyle by AppConfig.displayStyle
     var selectedSupportId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var selectedSupportOperatorKey by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSiteId by rememberSaveable { mutableStateOf<Long?>(null) }
     var selectedSidePane by remember { mutableStateOf<SiteDetailSidePane?>(null) }
     val isSplitActive = displayStyle == 1 && selectedSupportId != null
@@ -230,6 +233,7 @@ fun NearEmittersSupportWrapperScreen(
                     navController = navController,
                     repository = repository,
                     supportId = selectedSupportId!!,
+                    highlightedOperatorKey = selectedSupportOperatorKey,
                     isSplitScreen = true,
                     onCloseSplitScreen = {
                         selectedSiteId = null
@@ -243,17 +247,20 @@ fun NearEmittersSupportWrapperScreen(
                 else -> NearEmittersScreen(
                     navController = navController,
                     repository = repository,
-                    onSupportClick = { site ->
+                    onSupportClick = { site, searchedOperatorKey ->
                         if (displayStyle == 1) {
                             if (selectedSupportId == site.id && selectedSiteId == null) {
                                 selectedSupportId = null
+                                selectedSupportOperatorKey = null
                             } else {
                                 selectedSupportId = site.id
+                                selectedSupportOperatorKey = searchedOperatorKey
                             }
                             selectedSiteId = null
                             selectedSidePane = null
                         } else {
-                            navController.navigate("support_detail/${site.id}")
+                            val highlightedOperatorParam = searchedOperatorKey?.let { "?operator=$it" }.orEmpty()
+                            navController.navigate("support_detail/${site.id}$highlightedOperatorParam")
                         }
                     }
                 )
@@ -268,8 +275,12 @@ fun NearEmittersSupportWrapperScreen(
                     navController = navController,
                     repository = repository,
                     supportId = supportId,
+                    highlightedOperatorKey = selectedSupportOperatorKey,
                     isSplitScreen = true,
-                    onCloseSplitScreen = { selectedSupportId = null },
+                    onCloseSplitScreen = {
+                        selectedSupportId = null
+                        selectedSupportOperatorKey = null
+                    },
                     onOpenAntennaInHost = { antennaId ->
                         selectedSiteId = antennaId
                         selectedSidePane = null

@@ -10,6 +10,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.view.MotionEvent
 import android.view.View
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
@@ -145,11 +146,14 @@ import org.osmdroid.tileprovider.MapTileProviderBasic
 import org.mapsforge.map.android.rendertheme.AssetsRenderTheme
 import java.io.File
 import android.os.Environment
+import kotlin.math.log2
+import kotlin.math.roundToInt
 
 private const val HS_OPERATOR_WILDCARD = "*"
 private const val INITIAL_LOCATION_ZOOM = 16.0
-private val MAP_OPERATOR_KEYS = listOf("ORANGE", "SFR", "BOUYGUES", "FREE")
-
+private const val MOUSE_WHEEL_ZOOM_STEP = 1.0
+private const val MOUSE_WHEEL_ZOOM_ANIMATION_MS = 80L
+private const val WEB_MERCATOR_WORLD_TILE_SIZE_PX = 256.0
 private fun hasSavedMapPosition(prefs: SharedPreferences): Boolean {
     if (!prefs.contains("last_map_lat") || !prefs.contains("last_map_lon") || !prefs.contains("last_map_zoom")) {
         return false
@@ -164,14 +168,74 @@ private fun hasSavedMapPosition(prefs: SharedPreferences): Boolean {
         zoom in 0.0..25.0
 }
 
+private fun MapView.enableMouseWheelZoom() {
+    setOnGenericMotionListener { _, event ->
+        if (event.action != MotionEvent.ACTION_SCROLL) return@setOnGenericMotionListener false
+
+        val scrollY = event.getAxisValue(MotionEvent.AXIS_VSCROLL)
+        if (scrollY == 0f) return@setOnGenericMotionListener false
+
+        val zoomDirection = if (scrollY > 0f) 1.0 else -1.0
+        val targetZoom = (zoomLevelDouble + zoomDirection * MOUSE_WHEEL_ZOOM_STEP)
+            .coerceIn(minZoomLevel, maxZoomLevel)
+
+        controller.stopAnimation(false)
+        controller.zoomToFixing(
+            targetZoom,
+            event.x.roundToInt(),
+            event.y.roundToInt(),
+            MOUSE_WHEEL_ZOOM_ANIMATION_MS
+        )
+        true
+    }
+}
+
+private fun MapView.applyWorldMapBounds() {
+    if (isHorizontalMapRepetitionEnabled()) setHorizontalMapRepetitionEnabled(false)
+    if (isVerticalMapRepetitionEnabled()) setVerticalMapRepetitionEnabled(false)
+
+    val tileSystem = MapView.getTileSystem()
+    setScrollableAreaLimitLatitude(tileSystem.maxLatitude, tileSystem.minLatitude, 0)
+    setScrollableAreaLimitLongitude(tileSystem.minLongitude, tileSystem.maxLongitude, 0)
+
+    val mapWidthPx = width.takeIf { it > 0 } ?: resources.displayMetrics.widthPixels
+    val mapHeightPx = height.takeIf { it > 0 } ?: resources.displayMetrics.heightPixels
+    val minZoom = log2((maxOf(mapWidthPx, mapHeightPx).toDouble() / WEB_MERCATOR_WORLD_TILE_SIZE_PX).coerceAtLeast(1.0))
+    setMinZoomLevel(minZoom)
+    if (zoomLevelDouble < minZoom) {
+        controller.stopAnimation(false)
+        controller.setZoom(minZoom)
+    }
+}
+
+private fun MapView.visibleLongitudeBounds(): Pair<Double, Double> {
+    val worldWidthPx = WEB_MERCATOR_WORLD_TILE_SIZE_PX * Math.pow(2.0, zoomLevelDouble)
+    return if (width > 0 && width.toDouble() >= worldWidthPx) {
+        -180.0 to 180.0
+    } else {
+        boundingBox.lonWest to boundingBox.lonEast
+    }
+}
+
+private fun MapView.loadVisibleAntennas(viewModel: MapViewModel) {
+    val box = boundingBox
+    val (lonWest, lonEast) = visibleLongitudeBounds()
+    viewModel.loadAntennasInBox(zoomLevelDouble, box.latNorth, lonEast, box.latSouth, lonWest)
+}
+
+private fun MapView.clearCityFilterAndReloadVisible(viewModel: MapViewModel) {
+    val box = boundingBox
+    val (lonWest, lonEast) = visibleLongitudeBounds()
+    viewModel.clearCityFilterAndReload(zoomLevelDouble, box.latNorth, lonEast, box.latSouth, lonWest)
+}
+
 private fun normalizedAnfrId(value: String): String {
     val trimmed = value.trim()
     return trimmed.toLongOrNull()?.toString() ?: trimmed
 }
 
 private fun extractOperatorKeys(value: String?): List<String> {
-    val upper = value?.uppercase() ?: return emptyList()
-    return MAP_OPERATOR_KEYS.filter { upper.contains(it) }
+    return OperatorColors.keysFor(value)
 }
 
 private fun buildHsOperatorMap(sitesHs: List<SiteHsEntity>): Map<String, Set<String>> {
@@ -191,18 +255,9 @@ private fun buildHsOperatorMap(sitesHs: List<SiteHsEntity>): Map<String, Set<Str
 
 private fun isOperatorSelected(
     operatorKey: String,
-    showOrange: Boolean,
-    showSfr: Boolean,
-    showBouygues: Boolean,
-    showFree: Boolean
+    selectedOperatorKeys: Set<String>
 ): Boolean {
-    return when (operatorKey) {
-        "ORANGE" -> showOrange
-        "SFR" -> showSfr
-        "BOUYGUES" -> showBouygues
-        "FREE" -> showFree
-        else -> false
-    }
+    return operatorKey in selectedOperatorKeys
 }
 
 private fun isOperatorDeclaredHs(
@@ -219,13 +274,10 @@ private fun visibleOperatorKeysForAntenna(
     hsOperatorMap: Map<String, Set<String>>,
     showSitesInService: Boolean,
     showSitesOutOfService: Boolean,
-    showOrange: Boolean,
-    showSfr: Boolean,
-    showBouygues: Boolean,
-    showFree: Boolean
+    selectedOperatorKeys: Set<String>
 ): List<String> {
     return extractOperatorKeys(antenna.operateur).filter { operatorKey ->
-        if (!isOperatorSelected(operatorKey, showOrange, showSfr, showBouygues, showFree)) {
+        if (!isOperatorSelected(operatorKey, selectedOperatorKeys)) {
             false
         } else if (isOperatorDeclaredHs(antenna, operatorKey, hsOperatorMap)) {
             showSitesOutOfService
@@ -275,12 +327,20 @@ fun MapScreen(
     LaunchedEffect(Unit) {
         AppConfig.defaultOperator.value = prefs.getString("default_operator", "Aucun") ?: "Aucun"
         // ✅ AJOUT : On lit la préférence, mais le défaut est 'true' si la clé n'existe pas
-        AppConfig.showAzimuths.value = prefs.getBoolean("show_azimuths", true)
+        AppConfig.showAzimuths.value = prefs.getBoolean(
+            AppConfig.PREF_SHOW_AZIMUTH_LINES,
+            AppConfig.DEFAULT_SHOW_AZIMUTH_LINES
+        )
+        AppConfig.showAzimuthsCone.value = prefs.getBoolean(
+            AppConfig.PREF_SHOW_AZIMUTH_CONES,
+            AppConfig.DEFAULT_SHOW_AZIMUTH_CONES
+        )
         AppConfig.showSitesInService.value = prefs.getBoolean("show_sites_in_service", true)
         AppConfig.showSitesOutOfService.value = prefs.getBoolean("show_sites_out_of_service", true)
 
         // ✅ LA LIGNE MANQUANTE EST ICI : On charge la préférence du compteur
         AppConfig.showSpeedometer.value = prefs.getBoolean("show_speedometer", true)
+        AppConfig.showMapLocationMarker.value = prefs.getBoolean(AppConfig.PREF_SHOW_MAP_LOCATION_MARKER, true)
     }
 
     val safeClick = rememberSafeClick()
@@ -289,7 +349,6 @@ fun MapScreen(
     var showLayerSheet by remember { mutableStateOf(false) }
     var mapViewRef by remember { mutableStateOf<MapView?>(null) }
     var locationOverlayRef by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
-    var showZoomMessage by remember { mutableStateOf(false) }
 
     var currentZoom by remember { mutableDoubleStateOf(15.0) }
     var currentLat by remember { mutableDoubleStateOf(48.8584) }
@@ -320,6 +379,7 @@ fun MapScreen(
     val showCompass by remember { mutableStateOf(prefs.getBoolean("show_map_compass", true)) }
     val showScale by remember { mutableStateOf(prefs.getBoolean("show_map_scale", true)) }
     val showAttribution by remember { mutableStateOf(prefs.getBoolean("show_map_attribution", true)) }
+    val showLocationMarker by AppConfig.showMapLocationMarker
 
     var myCurrentLoc by remember { mutableStateOf<GeoPoint?>(null) }
     var currentSpeedKmH by remember { mutableIntStateOf(0) }
@@ -534,7 +594,7 @@ fun MapScreen(
 
     // ✅ 2. LaunchedEffect pour calculer en arrière-plan
     LaunchedEffect(
-        antennas, AppConfig.showOrange.value, AppConfig.showSfr.value, AppConfig.showBouygues.value, AppConfig.showFree.value,
+        antennas, AppConfig.selectedOperatorKeys.value,
         AppConfig.showTechnoFH.value, AppConfig.showTechno2G.value, AppConfig.showTechno3G.value, AppConfig.showTechno4G.value, AppConfig.showTechno5G.value,
         AppConfig.f2G_900.value, AppConfig.f2G_1800.value, AppConfig.f3G_900.value, AppConfig.f3G_2100.value,
         AppConfig.f4G_700.value, AppConfig.f4G_800.value, AppConfig.f4G_900.value, AppConfig.f4G_1800.value, AppConfig.f4G_2100.value, AppConfig.f4G_2600.value,
@@ -542,8 +602,7 @@ fun MapScreen(
         AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, sitesHs, currentCityPolygons
     ) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
-            val sOrange = AppConfig.showOrange.value; val sSfr = AppConfig.showSfr.value
-            val sBouygues = AppConfig.showBouygues.value; val sFree = AppConfig.showFree.value
+            val selectedOperators = AppConfig.selectedOperatorKeys.value
             val showSitesInService = AppConfig.showSitesInService.value
             val showSitesOutOfService = AppConfig.showSitesOutOfService.value
             val sFh = AppConfig.showTechnoFH.value
@@ -562,10 +621,7 @@ fun MapScreen(
                     hsOperatorMap = hsOperatorMap,
                     showSitesInService = showSitesInService,
                     showSitesOutOfService = showSitesOutOfService,
-                    showOrange = sOrange,
-                    showSfr = sSfr,
-                    showBouygues = sBouygues,
-                    showFree = sFree
+                    selectedOperatorKeys = selectedOperators
                 )
 
                 // ✅ 1. ON VÉRIFIE LES OPÉRATEURS TOUT DE SUITE
@@ -673,10 +729,7 @@ fun MapScreen(
 
     // ✅ AJOUT DU PARAMÈTRE sitesHsList
     suspend fun updateMarkers(map: MapView, antennasList: List<LocalisationEntity>, sitesHsList: List<SiteHsEntity> = emptyList()) {
-        val sOrange = AppConfig.showOrange.value
-        val sSfr = AppConfig.showSfr.value
-        val sBouygues = AppConfig.showBouygues.value
-        val sFree = AppConfig.showFree.value
+        val selectedOperators = AppConfig.selectedOperatorKeys.value
         val showSitesInService = AppConfig.showSitesInService.value
         val showSitesOutOfService = AppConfig.showSitesOutOfService.value
 
@@ -709,10 +762,7 @@ fun MapScreen(
                             hsOperatorMap = hsOperatorMap,
                             showSitesInService = showSitesInService,
                             showSitesOutOfService = showSitesOutOfService,
-                            showOrange = sOrange,
-                            showSfr = sSfr,
-                            showBouygues = sBouygues,
-                            showFree = sFree
+                            selectedOperatorKeys = selectedOperators
                         )
                         icon = MapUtils.createClusterIcon(context, activeOps, count, AppConfig.defaultOperator.value)
                         setOnMarkerClickListener { clickedMarker, m ->
@@ -737,10 +787,7 @@ fun MapScreen(
                             hsOperatorMap = hsOperatorMap,
                             showSitesInService = showSitesInService,
                             showSitesOutOfService = showSitesOutOfService,
-                            showOrange = sOrange,
-                            showSfr = sSfr,
-                            showBouygues = sBouygues,
-                            showFree = sFree
+                            selectedOperatorKeys = selectedOperators
                         )
 
                         if (activeOps.isEmpty()) null else antenna.copy(operateur = activeOps.joinToString(", "))
@@ -756,7 +803,9 @@ fun MapScreen(
 
                         infoWindow = null // Pas de bulle grise par défaut
 
-                        val operatorsOnSite = filteredSiteAntennas.mapNotNull { it.operateur }.flatMap { it.split(",") }.map { it.trim() }.filter { it.isNotEmpty() }.distinct()
+                        val operatorsOnSite = filteredSiteAntennas.mapNotNull { it.operateur }
+                            .flatMap { OperatorColors.keysFor(it) }
+                            .distinct()
                         relatedObject = operatorsOnSite
 
                         // 1. On génère l'icône de base (avec la bordure de couleur de l'opérateur)
@@ -831,10 +880,8 @@ fun MapScreen(
         isMeasuringMode,
         safePrimaryColor,
         AppConfig.showAzimuths.value,
-        AppConfig.showOrange.value,
-        AppConfig.showSfr.value,
-        AppConfig.showBouygues.value,
-        AppConfig.showFree.value,
+        AppConfig.showAzimuthsCone.value,
+        AppConfig.selectedOperatorKeys.value,
         AppConfig.showSitesInService.value,
         AppConfig.showSitesOutOfService.value
     ) {
@@ -845,8 +892,7 @@ fun MapScreen(
 
     LaunchedEffect(AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value) {
         mapViewRef?.let { map ->
-            val box = map.boundingBox
-            viewModel.loadAntennasInBox(map.zoomLevelDouble, box.latNorth, box.lonEast, box.latSouth, box.lonWest)
+            map.loadVisibleAntennas(viewModel)
         }
     }
 
@@ -905,9 +951,9 @@ fun MapScreen(
 
                     // --- SUIVI 2 : LE PLUS PROCHE OPÉRATEUR PRÉFÉRÉ ---
                     if (isFavActive) {
-                        val opQuery = AppConfig.defaultOperator.value.uppercase()
+                        val opQuery = OperatorColors.keyFor(AppConfig.defaultOperator.value)
                         val nearestFav = currentFilteredAntennas
-                            .filter { (it.operateur ?: "").uppercase().contains(opQuery) }
+                            .filter { opQuery != null && OperatorColors.keysFor(it.operateur).contains(opQuery) }
                             .minByOrNull { myLoc.distanceToAsDouble(GeoPoint(it.latitude, it.longitude)) }
 
                         val targetId = nearestFav?.idAnfr
@@ -977,6 +1023,13 @@ fun MapScreen(
                     }
 
                     setMultiTouchControls(true)
+                    enableMouseWheelZoom()
+                    applyWorldMapBounds()
+                    addOnLayoutChangeListener { view, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom ->
+                        if (right - left != oldRight - oldLeft || bottom - top != oldBottom - oldTop) {
+                            (view as? MapView)?.applyWorldMapBounds()
+                        }
+                    }
                     zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
                     val prefs = ctx.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
                     val hasSavedPosition = hasSavedMapPosition(prefs)
@@ -987,7 +1040,6 @@ fun MapScreen(
                     ))
 
                     controller.setZoom(prefs.getFloat("last_map_zoom", 6.0f).toDouble())
-                    setMinZoomLevel(6.0)
 
                     val locationOverlay = object : CustomLocationOverlay(GpsMyLocationProvider(ctx), this, safePrimaryColor) {
                         override fun onLocationChanged(location: android.location.Location?, source: org.osmdroid.views.overlay.mylocation.IMyLocationProvider?) {
@@ -1003,6 +1055,7 @@ fun MapScreen(
                         }
                     }
                     locationOverlay.setEnableAutoStop(false)
+                    locationOverlay.showLocationMarker = AppConfig.showMapLocationMarker.value
                     locationOverlay.enableMyLocation()
 
                     locationOverlay.runOnFirstFix {
@@ -1070,25 +1123,25 @@ fun MapScreen(
                                     mapViewRef?.invalidate()
                                 }
 
-                                if (z >= 6.0) {
-                                    showZoomMessage = false
-                                    val box = boundingBox
-                                    viewModel.loadAntennasInBox(z, box.latNorth, box.lonEast, box.latSouth, box.lonWest)
-                                } else {
-                                    showZoomMessage = true
-                                }
+                                this@apply.loadVisibleAntennas(viewModel)
                             }
                         }
                     })
+                    post { this@apply.loadVisibleAntennas(viewModel) }
                     mapViewRef = this
                 }
             },
             update = { map ->
+                var shouldInvalidateMap = false
+
                 // Mise à jour de la boussole (ton code actuel)
                 (locationOverlayRef as? CustomLocationOverlay)?.let { overlay ->
                     overlay.currentCompassAzimuth = azimuth
+                    if (overlay.showLocationMarker != showLocationMarker) {
+                        overlay.showLocationMarker = showLocationMarker
+                        shouldInvalidateMap = true
+                    }
                 }
-                var shouldInvalidateMap = false
 
                 // 🗺️ LOGIQUE HORS-LIGNE
                 if (effectiveProvider == 4) {
@@ -1443,7 +1496,7 @@ fun MapScreen(
             val speedText = if (isMi) "${(currentSpeedKmH / 1.60934).toInt()} mph" else "$currentSpeedKmH km/h"
 
             fr.geotower.ui.components.MapShareMenu(
-                useOneUi = fr.geotower.utils.AppConfig.forceOneUiTheme.value,
+                useOneUi = fr.geotower.utils.AppConfig.useOneUiDesign,
                 globalMapRef = mapViewRef,
                 currentSpeed = speedText,
                 currentZoom = currentZoom,
@@ -1736,7 +1789,7 @@ fun MapScreen(
 
                             // ✅ CORRECTION DU NOM ET APPEL AVEC LE ZOOM
                             mapViewRef?.let { map ->
-                                viewModel.clearCityFilterAndReload(map.zoomLevelDouble, map.boundingBox.latNorth, map.boundingBox.lonEast, map.boundingBox.latSouth, map.boundingBox.lonWest)
+                                map.clearCityFilterAndReloadVisible(viewModel)
                             }
 
                             trackNearestAll = false
@@ -1756,7 +1809,7 @@ fun MapScreen(
 
                             // ✅ CORRECTION DU NOM ET APPEL AVEC LE ZOOM
                             mapViewRef?.let { map ->
-                                viewModel.clearCityFilterAndReload(map.zoomLevelDouble, map.boundingBox.latNorth, map.boundingBox.lonEast, map.boundingBox.latSouth, map.boundingBox.lonWest)
+                                map.clearCityFilterAndReloadVisible(viewModel)
                             }
 
                             mapViewRef?.invalidate()
@@ -1773,7 +1826,7 @@ fun MapScreen(
                         }
                     },
                     onOpenLayers = { safeClick { showLayerSheet = true } },
-                    onOpenSettings = { safeClick { navController.navigate("settings") } }
+                    onOpenSettings = { safeClick { navController.navigate("settings?section=map") } }
                 )
             }
 
@@ -2266,6 +2319,7 @@ open class CustomLocationOverlay(
 ) : MyLocationNewOverlay(provider, mapView) {
 
     var currentCompassAzimuth = 0f
+    var showLocationMarker = true
 
     // --- On prépare les objets de dessin une seule fois pour éviter les allocations dans draw() ---
     private val pt = android.graphics.Point()
@@ -2285,6 +2339,7 @@ open class CustomLocationOverlay(
     ) {
         // On réutilise le point existant !
         projection.toPixels(org.osmdroid.util.GeoPoint(lastFix.latitude, lastFix.longitude), pt)
+        if (!showLocationMarker) return
 
         val density = mapView.context.resources.displayMetrics.density
         val radius = 18f * density
@@ -2353,6 +2408,7 @@ class AntennaMarker(
         val sin: Float,
         val linePaint: android.graphics.Paint,
         val conePaint: android.graphics.Paint?, // 🚨 NOUVEAU : Le pinceau translucide
+        val coneEdgePaint: android.graphics.Paint?,
         val dotColors: List<Int>
     )
 
@@ -2417,7 +2473,14 @@ class AntennaMarker(
                 color = androidx.core.graphics.ColorUtils.setAlphaComponent(mainColor, 50)
             }
 
-            precalculatedMobileAzimuths.add(GroupedAzimuthData(az, cos, sin, linePaint, conePaint, sortedColors))
+            val coneEdgePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                style = android.graphics.Paint.Style.STROKE
+                color = androidx.core.graphics.ColorUtils.setAlphaComponent(mainColor, 170)
+                strokeWidth = 2.2f * density
+                strokeCap = android.graphics.Paint.Cap.ROUND
+            }
+
+            precalculatedMobileAzimuths.add(GroupedAzimuthData(az, cos, sin, linePaint, conePaint, coneEdgePaint, sortedColors))
         }
 
         // Pareil pour les faisceaux hertziens (FH)
@@ -2438,7 +2501,7 @@ class AntennaMarker(
             }
 
             // On passe bien "az" et "null" (Pas de cône pour les FH)
-            precalculatedFhAzimuths.add(GroupedAzimuthData(az, cos, sin, dashedPaint, null, sortedColors))
+            precalculatedFhAzimuths.add(GroupedAzimuthData(az, cos, sin, dashedPaint, null, null, sortedColors))
         }
     }
 
@@ -2491,6 +2554,9 @@ class AntennaMarker(
                     // Pour un cône de 70°, on doit reculer de 35° pour que le centre du cône pointe sur l'azimut exact.
                     val startAngle = data.azimuth - 90f - 35f
                     canvas.drawArc(rectF, startAngle, 70f, true, data.conePaint)
+                    data.coneEdgePaint?.let { edgePaint ->
+                        drawConeEdgeLines(canvas, data.azimuth, circleOffsetPx, totalRadiusPx, edgePaint)
+                    }
                 }
 
                 // 2. DESSIN DE LA LIGNE ET DES PASTILLES D'OPÉRATEURS
@@ -2533,6 +2599,27 @@ class AntennaMarker(
             }
         }
         super.draw(canvas, projection)
+    }
+
+    private fun drawConeEdgeLines(
+        canvas: android.graphics.Canvas,
+        azimuth: Float,
+        startRadiusPx: Float,
+        endRadiusPx: Float,
+        paint: android.graphics.Paint
+    ) {
+        listOf(azimuth - 35f, azimuth + 35f).forEach { edgeAzimuth ->
+            val edgeRad = Math.toRadians(edgeAzimuth - 90.0)
+            val edgeCos = Math.cos(edgeRad).toFloat()
+            val edgeSin = Math.sin(edgeRad).toFloat()
+            canvas.drawLine(
+                ptCenter.x + startRadiusPx * edgeCos,
+                ptCenter.y + startRadiusPx * edgeSin,
+                ptCenter.x + endRadiusPx * edgeCos,
+                ptCenter.y + endRadiusPx * edgeSin,
+                paint
+            )
+        }
     }
 }
 private fun isPointInPolygon(lat: Double, lon: Double, polygon: List<GeoPoint>): Boolean {

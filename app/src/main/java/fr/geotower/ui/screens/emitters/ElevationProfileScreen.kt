@@ -114,16 +114,16 @@ fun ElevationProfileScreen(
     val context = LocalContext.current
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
-    val forceOneUi by AppConfig.forceOneUiTheme
+    val useOneUi = AppConfig.useOneUiDesign
     val isSystemDark = isSystemInDarkTheme()
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemDark)
     val mainBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.background
-    val cardBgColor = if (forceOneUi) {
+    val cardBgColor = if (useOneUi) {
         if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
     } else {
         MaterialTheme.colorScheme.surfaceContainerLow
     }
-    val blockShape = if (forceOneUi) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
+    val blockShape = if (useOneUi) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
 
     var site by remember { mutableStateOf<LocalisationEntity?>(null) }
     var physique by remember { mutableStateOf<PhysiqueEntity?>(null) }

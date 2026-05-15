@@ -49,8 +49,6 @@ import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -89,6 +87,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
+import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.rememberReorderableDragState
 import kotlin.math.roundToInt
@@ -214,7 +213,7 @@ fun StartupPageSelectionSheet(
                 Button(
                     onClick = { onPageSelected(tempPage); onDismiss() },
                     modifier = Modifier.fillMaxWidth().height(50.dp).padding(top = 8.dp),
-                    shape = RoundedCornerShape(25.dp)
+                    shape = oneUiActionButtonShape(useOneUi, RoundedCornerShape(25.dp))
                 ) {
                     Text(AppStrings.validate, fontWeight = FontWeight.Bold)
                 }
@@ -231,7 +230,7 @@ fun SettingsRadioItem(name: String, isSelected: Boolean, useOneUi: Boolean, bubb
     val inactiveBg = if (useOneUi) bubbleColor else Color.Transparent
     val bgColor = if (isSelected) activeBg else inactiveBg
     val border = if (useOneUi) { if (isSelected) BorderStroke(2.dp, accentColor) else null } else { BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) accentColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) }
-    val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
+    val shape = oneUiActionButtonShape(useOneUi)
 
     Surface(onClick = onClick, modifier = Modifier.fillMaxWidth().height(60.dp), color = bgColor, border = border, shape = shape) {
         Row(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -349,7 +348,7 @@ fun HomeSettingsSheet(
                 val spacing = 12.dp
                 val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
 
-                val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
+                val shape = oneUiActionButtonShape(useOneUi)
                 val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
                 Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
@@ -464,6 +463,8 @@ fun DraggableSwitchCard(
                 scaleX = if (isDragged) 1.05f else 1f
                 scaleY = if (isDragged) 1.05f else 1f
                 shadowElevation = if (isDragged) 8.dp.toPx() else 0f
+                this.shape = shape
+                clip = true
             }
             .then(dragModifier)
     ) {
@@ -499,12 +500,12 @@ fun DraggableSwitchCard(
                     modifier = Modifier.size(20.dp)
                 )
             } else {
-                if (useOneUi) {
-                    fr.geotower.ui.components.OneUiSwitch(checked, onCheckedChange)
-                } else {
-                    // ✅ MODIFICATION : On utilise switchColor
-                    Switch(checked = checked, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
-                }
+                fr.geotower.ui.components.GeoTowerSwitch(
+                    checked = checked,
+                    onCheckedChange = onCheckedChange,
+                    useOneUi = useOneUi,
+                    checkedColor = switchColor
+                )
             }
         }
     }
@@ -544,11 +545,12 @@ fun ConfigurableSwitchCard(
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
-            if (useOneUi) {
-                fr.geotower.ui.components.OneUiSwitch(checked, onCheckedChange)
-            } else {
-                Switch(checked = checked, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
-            }
+            fr.geotower.ui.components.GeoTowerSwitch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                useOneUi = useOneUi,
+                checkedColor = switchColor
+            )
         }
     }
 }
@@ -585,7 +587,7 @@ fun NearbySettingsSheet(
             val spacing = 12.dp
             val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
 
-            val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
+            val shape = oneUiActionButtonShape(useOneUi)
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
             // --- 1. LES BLOCS GLISSER/DÉPOSER ---
@@ -754,7 +756,7 @@ fun CompassSettingsSheet(
             val spacing = 12.dp
             val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
 
-            val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
+            val shape = oneUiActionButtonShape(useOneUi)
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
             Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
@@ -793,6 +795,9 @@ fun CompassSettingsSheet(
 @Composable
 fun MapSettingsSheet(
     showLocation: Boolean, onLocationChange: (Boolean) -> Unit,
+    showLocationMarker: Boolean, onLocationMarkerChange: (Boolean) -> Unit,
+    showAzimuths: Boolean, onAzimuthsChange: (Boolean) -> Unit,
+    showAzimuthsCone: Boolean, onAzimuthsConeChange: (Boolean) -> Unit,
     showZoom: Boolean, onZoomChange: (Boolean) -> Unit,
     showToolbox: Boolean, onToolboxChange: (Boolean) -> Unit,
     showCompass: Boolean, onCompassChange: (Boolean) -> Unit,
@@ -806,40 +811,84 @@ fun MapSettingsSheet(
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val showAnyAzimuths = showAzimuths || showAzimuthsCone
+    var showAzimuthSettings by remember { mutableStateOf(false) }
+
+    fun setAzimuthsVisible(visible: Boolean) {
+        if (visible) {
+            if (!showAzimuths && !showAzimuthsCone) onAzimuthsChange(true)
+        } else {
+            onAzimuthsChange(false)
+            onAzimuthsConeChange(false)
+        }
+    }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
-        BackHandler(onBack = onBack)
-        Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        BackHandler {
+            if (showAzimuthSettings) showAzimuthSettings = false else onBack()
+        }
+        Column(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text(AppStrings.pageMapSettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                IconButton(onClick = { if (showAzimuthSettings) showAzimuthSettings = false else onBack() }) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
+                }
+                Text(
+                    if (showAzimuthSettings) AppStrings.mapAzimuthsOption else AppStrings.pageMapSettings,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
                 Spacer(Modifier.width(48.dp))
             }
 
-            val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
+            val shape = oneUiActionButtonShape(useOneUi)
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SimpleSwitchCard(AppStrings.mapLocationOption, showMapLocation = showLocation, onLocationChange = onLocationChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
-                SimpleSwitchCard(AppStrings.mapZoomOption, showMapLocation = showZoom, onLocationChange = onZoomChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
-                SimpleSwitchCard(AppStrings.mapToolboxOption, showMapLocation = showToolbox, onLocationChange = onToolboxChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
-                if (AppConfig.hasCompass.value) {
-                    SimpleSwitchCard(AppStrings.mapCompassOption, showMapLocation = showCompass, onLocationChange = onCompassChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+            if (showAzimuthSettings) {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SimpleSwitchCard(AppStrings.mapAzimuthLinesOption, showMapLocation = showAzimuths, onLocationChange = onAzimuthsChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    SimpleSwitchCard(AppStrings.mapAzimuthConesOption, showMapLocation = showAzimuthsCone, onLocationChange = onAzimuthsConeChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                 }
-                SimpleSwitchCard(AppStrings.showSpeedometer, showMapLocation = showSpeedometer, onLocationChange = onSpeedometerChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
-                SimpleSwitchCard(AppStrings.mapScaleOption, showMapLocation = showScale, onLocationChange = onScaleChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
-                SimpleSwitchCard(AppStrings.mapAttributionOption, showMapLocation = showAttribution, onLocationChange = onAttributionChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SimpleSwitchCard(AppStrings.mapLocationOption, showMapLocation = showLocation, onLocationChange = onLocationChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    SimpleSwitchCard(AppStrings.mapLocationMarkerOption, showMapLocation = showLocationMarker, onLocationChange = onLocationMarkerChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    ConfigurableSwitchCard(AppStrings.mapAzimuthsOption, showAnyAzimuths, ::setAzimuthsVisible, { showAzimuthSettings = true }, shape, border, bubbleColor, useOneUi)
+                    SimpleSwitchCard(AppStrings.mapZoomOption, showMapLocation = showZoom, onLocationChange = onZoomChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    SimpleSwitchCard(AppStrings.mapToolboxOption, showMapLocation = showToolbox, onLocationChange = onToolboxChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    if (AppConfig.hasCompass.value) {
+                        SimpleSwitchCard(AppStrings.mapCompassOption, showMapLocation = showCompass, onLocationChange = onCompassChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    }
+                    SimpleSwitchCard(AppStrings.showSpeedometer, showMapLocation = showSpeedometer, onLocationChange = onSpeedometerChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    SimpleSwitchCard(AppStrings.mapScaleOption, showMapLocation = showScale, onLocationChange = onScaleChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    SimpleSwitchCard(AppStrings.mapAttributionOption, showMapLocation = showAttribution, onLocationChange = onAttributionChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
             TextButton(onClick = {
-                onLocationChange(true)
-                onZoomChange(true)
-                onToolboxChange(true)
-                onCompassChange(true)
-                onSpeedometerChange(true)
-                onScaleChange(true)
-                onAttributionChange(true)
+                if (showAzimuthSettings) {
+                    onAzimuthsChange(AppConfig.DEFAULT_SHOW_AZIMUTH_LINES)
+                    onAzimuthsConeChange(AppConfig.DEFAULT_SHOW_AZIMUTH_CONES)
+                } else {
+                    onLocationChange(true)
+                    onLocationMarkerChange(true)
+                    onAzimuthsChange(AppConfig.DEFAULT_SHOW_AZIMUTH_LINES)
+                    onAzimuthsConeChange(AppConfig.DEFAULT_SHOW_AZIMUTH_CONES)
+                    onZoomChange(true)
+                    onToolboxChange(true)
+                    onCompassChange(true)
+                    onSpeedometerChange(true)
+                    onScaleChange(true)
+                    onAttributionChange(true)
+                }
             }) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
@@ -865,11 +914,12 @@ fun SimpleSwitchCard(title: String, showMapLocation: Boolean, onLocationChange: 
                 maxLines = 2,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
-            if (useOneUi) {
-                fr.geotower.ui.components.OneUiSwitch(showMapLocation, onLocationChange)
-            } else {
-                Switch(checked = showMapLocation, onCheckedChange = onLocationChange, colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
-            }
+            fr.geotower.ui.components.GeoTowerSwitch(
+                checked = showMapLocation,
+                onCheckedChange = onLocationChange,
+                useOneUi = useOneUi,
+                checkedColor = switchColor
+            )
         }
     }
 }
@@ -920,7 +970,7 @@ fun ThroughputCalculatorSettingsSheet(
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
-    val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
+    val shape = oneUiActionButtonShape(useOneUi)
     val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
     val currentOrder by rememberUpdatedState(normalizeThroughputBlockOrder(throughputOrder))
 
@@ -1042,7 +1092,7 @@ fun ThroughputCalculationDefaultsSheet(
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
-    val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
+    val shape = oneUiActionButtonShape(useOneUi)
     val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
     var preset by remember { mutableStateOf(prefs.getString("throughput_default_preset", "conservative") ?: "conservative") }
@@ -1375,7 +1425,7 @@ fun SupportSettingsSheet(
             val spacing = 12.dp
             val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
 
-            val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
+            val shape = oneUiActionButtonShape(useOneUi)
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
             Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
@@ -1488,7 +1538,7 @@ fun SiteSettingsSheet(
             val spacing = 12.dp
             val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
 
-            val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
+            val shape = oneUiActionButtonShape(useOneUi)
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
             Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
@@ -1646,15 +1696,12 @@ fun SiteFreqFiltersSheet(
                         saveBool("site_freq_grid_display", AppConfig.siteFreqGridDisplay, newValue)
                     }
 
-                    if (useOneUi) {
-                        fr.geotower.ui.components.OneUiSwitch(AppConfig.siteFreqGridDisplay.value, onGridChange)
-                    } else {
-                        Switch(
-                            checked = AppConfig.siteFreqGridDisplay.value,
-                            onCheckedChange = onGridChange,
-                            colors = SwitchDefaults.colors(checkedTrackColor = switchColor)
-                        )
-                    }
+                    fr.geotower.ui.components.GeoTowerSwitch(
+                        checked = AppConfig.siteFreqGridDisplay.value,
+                        onCheckedChange = onGridChange,
+                        useOneUi = useOneUi,
+                        checkedColor = switchColor
+                    )
                 }
             }
 
@@ -1709,8 +1756,12 @@ fun SiteFreqFiltersSheet(
                                         freqList.forEach { saveBool("site_f${technoId.lowercase()}_${it.first}", it.second, true) }
                                     }
                                 }
-                                if (useOneUi) fr.geotower.ui.components.OneUiSwitch(technoState.value, onTechnoChange)
-                                else Switch(checked = technoState.value, onCheckedChange = onTechnoChange, colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
+                                fr.geotower.ui.components.GeoTowerSwitch(
+                                    checked = technoState.value,
+                                    onCheckedChange = onTechnoChange,
+                                    useOneUi = useOneUi,
+                                    checkedColor = switchColor
+                                )
                             }
                             AnimatedVisibility(visible = technoState.value && freqList.isNotEmpty()) {
                                 Column(modifier = Modifier.padding(top = 8.dp)) {
@@ -1750,8 +1801,13 @@ fun SiteFreqFiltersSheet(
                                                             else if (newValue && !technoState.value) saveBool(technoKey, technoState, true)
                                                         }
                                                     }
-                                                    if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { fr.geotower.ui.components.OneUiSwitch(freqState.value, onFreqChange) }
-                                                    else Switch(checked = freqState.value, onCheckedChange = onFreqChange, modifier = Modifier.scale(0.8f), colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
+                                                    fr.geotower.ui.components.GeoTowerSwitch(
+                                                        checked = freqState.value,
+                                                        onCheckedChange = onFreqChange,
+                                                        modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                                                        useOneUi = useOneUi,
+                                                        checkedColor = switchColor
+                                                    )
                                                 }
                                             }
                                         }
@@ -1775,8 +1831,12 @@ fun SiteFreqFiltersSheet(
                             saveBool("site_show_spectrum_band", AppConfig.siteShowSpectrumBand, newValue)
                             saveBool("site_show_spectrum_total", AppConfig.siteShowSpectrumTotal, newValue)
                         }
-                        if (useOneUi) fr.geotower.ui.components.OneUiSwitch(AppConfig.siteShowSpectrum.value, onSpectrumChange)
-                        else Switch(checked = AppConfig.siteShowSpectrum.value, onCheckedChange = onSpectrumChange, colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
+                        fr.geotower.ui.components.GeoTowerSwitch(
+                            checked = AppConfig.siteShowSpectrum.value,
+                            onCheckedChange = onSpectrumChange,
+                            useOneUi = useOneUi,
+                            checkedColor = switchColor
+                        )
                     }
                     AnimatedVisibility(visible = AppConfig.siteShowSpectrum.value) {
                         Column {
@@ -1788,8 +1848,13 @@ fun SiteFreqFiltersSheet(
                                     if (!newValue && !AppConfig.siteShowSpectrumTotal.value) saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, false)
                                     else if (newValue && !AppConfig.siteShowSpectrum.value) saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, true)
                                 }
-                                if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { fr.geotower.ui.components.OneUiSwitch(AppConfig.siteShowSpectrumBand.value, onBandChange) }
-                                else Switch(checked = AppConfig.siteShowSpectrumBand.value, onCheckedChange = onBandChange, modifier = Modifier.scale(0.8f), colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
+                                fr.geotower.ui.components.GeoTowerSwitch(
+                                    checked = AppConfig.siteShowSpectrumBand.value,
+                                    onCheckedChange = onBandChange,
+                                    modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                                    useOneUi = useOneUi,
+                                    checkedColor = switchColor
+                                )
                             }
                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(AppStrings.totalspectrum, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
@@ -1798,8 +1863,13 @@ fun SiteFreqFiltersSheet(
                                     if (!newValue && !AppConfig.siteShowSpectrumBand.value) saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, false)
                                     else if (newValue && !AppConfig.siteShowSpectrum.value) saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, true)
                                 }
-                                if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { fr.geotower.ui.components.OneUiSwitch(AppConfig.siteShowSpectrumTotal.value, onTotalChange) }
-                                else Switch(checked = AppConfig.siteShowSpectrumTotal.value, onCheckedChange = onTotalChange, modifier = Modifier.scale(0.8f), colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
+                                fr.geotower.ui.components.GeoTowerSwitch(
+                                    checked = AppConfig.siteShowSpectrumTotal.value,
+                                    onCheckedChange = onTotalChange,
+                                    modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                                    useOneUi = useOneUi,
+                                    checkedColor = switchColor
+                                )
                             }
                         }
                     }
@@ -1900,8 +1970,12 @@ fun SitePhotosSettingsSheet(
                         val onMasterChange = { newValue: Boolean ->
                             saveBool("page_site_photos", AppConfig.siteShowPhotos, newValue)
                         }
-                        if (useOneUi) fr.geotower.ui.components.OneUiSwitch(AppConfig.siteShowPhotos.value, onMasterChange)
-                        else Switch(checked = AppConfig.siteShowPhotos.value, onCheckedChange = onMasterChange, colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
+                        fr.geotower.ui.components.GeoTowerSwitch(
+                            checked = AppConfig.siteShowPhotos.value,
+                            onCheckedChange = onMasterChange,
+                            useOneUi = useOneUi,
+                            checkedColor = switchColor
+                        )
                     }
                     
                     androidx.compose.animation.AnimatedVisibility(visible = AppConfig.siteShowPhotos.value) {
@@ -1911,22 +1985,37 @@ fun SitePhotosSettingsSheet(
                             // CellularFR
                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(AppStrings.showCellularFrPhotosLabel, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                                if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { fr.geotower.ui.components.OneUiSwitch(AppConfig.siteShowCellularFrPhotos.value) { saveBool("site_show_cellularfr_photos", AppConfig.siteShowCellularFrPhotos, it) } }
-                                else Switch(checked = AppConfig.siteShowCellularFrPhotos.value, onCheckedChange = { saveBool("site_show_cellularfr_photos", AppConfig.siteShowCellularFrPhotos, it) }, modifier = Modifier.scale(0.8f), colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
+                                fr.geotower.ui.components.GeoTowerSwitch(
+                                    checked = AppConfig.siteShowCellularFrPhotos.value,
+                                    onCheckedChange = { saveBool("site_show_cellularfr_photos", AppConfig.siteShowCellularFrPhotos, it) },
+                                    modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                                    useOneUi = useOneUi,
+                                    checkedColor = switchColor
+                                )
                             }
                             
                             // SignalQuest
                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(AppStrings.showSignalQuestPhotosLabel, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                                if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { fr.geotower.ui.components.OneUiSwitch(AppConfig.siteShowSignalQuestPhotos.value) { saveBool("site_show_signalquest_photos", AppConfig.siteShowSignalQuestPhotos, it) } }
-                                else Switch(checked = AppConfig.siteShowSignalQuestPhotos.value, onCheckedChange = { saveBool("site_show_signalquest_photos", AppConfig.siteShowSignalQuestPhotos, it) }, modifier = Modifier.scale(0.8f), colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
+                                fr.geotower.ui.components.GeoTowerSwitch(
+                                    checked = AppConfig.siteShowSignalQuestPhotos.value,
+                                    onCheckedChange = { saveBool("site_show_signalquest_photos", AppConfig.siteShowSignalQuestPhotos, it) },
+                                    modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                                    useOneUi = useOneUi,
+                                    checkedColor = switchColor
+                                )
                             }
                             
                             // Schematics
                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(AppStrings.showSchemesLabel, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                                if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { fr.geotower.ui.components.OneUiSwitch(AppConfig.siteShowSchemes.value) { saveBool("site_show_schemes", AppConfig.siteShowSchemes, it) } }
-                                else Switch(checked = AppConfig.siteShowSchemes.value, onCheckedChange = { saveBool("site_show_schemes", AppConfig.siteShowSchemes, it) }, modifier = Modifier.scale(0.8f), colors = SwitchDefaults.colors(checkedTrackColor = switchColor))
+                                fr.geotower.ui.components.GeoTowerSwitch(
+                                    checked = AppConfig.siteShowSchemes.value,
+                                    onCheckedChange = { saveBool("site_show_schemes", AppConfig.siteShowSchemes, it) },
+                                    modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                                    useOneUi = useOneUi,
+                                    checkedColor = switchColor
+                                )
                             }
                         }
                     }

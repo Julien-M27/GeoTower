@@ -245,7 +245,7 @@ fun CommunityPhotosSectionShared(
         }
     } else null
     val themeMode by AppConfig.themeMode
-    val useOneUi by AppConfig.forceOneUiTheme
+    val useOneUi = AppConfig.useOneUiDesign
     val isSystemDark = isSystemInDarkTheme()
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemDark)
 

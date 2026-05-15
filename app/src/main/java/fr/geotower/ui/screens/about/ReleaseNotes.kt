@@ -46,6 +46,29 @@ internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
             "Fixed an issue related to the new database architecture",
             "Correção relacionada com a nova arquitetura da base de dados"
         )
+        item(
+            "Ajout des opérateurs d'outre-mer",
+            "Added overseas operators",
+            "Adição das operadoras ultramarinas"
+        )
+        item(
+            "Migrations internes du code",
+            "Internal code migrations",
+            "Migrações internas do código"
+        )
+        item(
+            "Correction de certaines incohérences entre les différents menus",
+            "Fixed some inconsistencies between the different menus",
+            "Correção de algumas incoerências entre os diferentes menus"
+        )
+    }
+
+    section("Antennes à proximité et détail du support", "Nearby antennas and support detail", "Antenas próximas e detalhe do suporte") {
+        item(
+            "Mise en avant des opérateurs recherchés",
+            "Highlighted searched operators",
+            "Destaque das operadoras pesquisadas"
+        )
     }
 
     section("Détail des sites", "Site details", "Detalhe dos sites") {

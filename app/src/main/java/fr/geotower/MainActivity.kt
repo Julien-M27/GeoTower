@@ -38,6 +38,7 @@ import kotlinx.coroutines.withContext
 // --- DONNÉES ---
 import fr.geotower.data.AnfrRepository
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppUiMode
 import fr.geotower.utils.AppStrings
 import fr.geotower.data.api.RetrofitClient
 import fr.geotower.services.LiveTrackingController
@@ -64,6 +65,7 @@ import fr.geotower.ui.screens.map.MapScreen
 import fr.geotower.ui.screens.map.MapViewModel
 import fr.geotower.ui.screens.map.MapViewModelFactory
 import fr.geotower.ui.theme.AppColorPalette
+import fr.geotower.ui.theme.GeoTowerUiStyleProvider
 import fr.geotower.ui.theme.appStaticColorScheme
 import java.io.File
 import androidx.compose.runtime.collectAsState
@@ -248,7 +250,9 @@ class MainActivity : ComponentActivity() {
         }
         AppConfig.isOledMode.value = appPrefs.getBoolean("is_oled_mode", true)
         AppConfig.isBlurEnabled.value = appPrefs.getBoolean("is_blur_enabled", true)
-        AppConfig.forceOneUiTheme.value = appPrefs.getBoolean("force_one_ui", false)
+        AppConfig.uiMode.value = AppUiMode.fromStorageKey(
+            appPrefs.getString(AppConfig.PREF_UI_MODE, AppUiMode.Auto.storageKey)
+        )
         AppConfig.colorPalette.value = appPrefs.getString(AppConfig.PREF_COLOR_PALETTE, AppConfig.DEFAULT_COLOR_PALETTE) ?: AppConfig.DEFAULT_COLOR_PALETTE
         AppConfig.mapProvider.intValue = appPrefs.getInt("map_provider", 1)
         AppConfig.ignStyle.intValue = appPrefs.getInt("ign_style", 0)
@@ -319,6 +323,7 @@ class MainActivity : ComponentActivity() {
             }
 
             MaterialTheme(colorScheme = colorScheme) {
+                GeoTowerUiStyleProvider {
                 val navController = rememberNavController()
 
                 // 🌟 4. ÉCOUTEUR : Naviguer instantanément (QR Code, Notif, Widget)
@@ -448,15 +453,23 @@ class MainActivity : ComponentActivity() {
 
                             // --- 1. DÉTAIL DU SUPPORT (Le Pylône) ---
                             composable(
-                                route = "support_detail/{id}",
-                                arguments = listOf(navArgument("id") { type = NavType.StringType }), // ✅ String
+                                route = "support_detail/{id}?operator={operator}",
+                                arguments = listOf(
+                                    navArgument("id") { type = NavType.StringType },
+                                    navArgument("operator") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    }
+                                ),
                                 deepLinks = listOf(navDeepLink { uriPattern = "geotower://support/{id}" })
                             ) { backStackEntry ->
                                 val id = backStackEntry.arguments?.getString("id") ?: ""
+                                val highlightedOperatorKey = backStackEntry.arguments?.getString("operator")
                                 // Convertir en Long si ta BDD utilise un Long, ou adapter la query
                                 val idLong = id.toLongOrNull() ?: 0L
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    fr.geotower.ui.screens.emitters.SupportSiteWrapperScreen(navController, repository, idLong)
+                                    fr.geotower.ui.screens.emitters.SupportSiteWrapperScreen(navController, repository, idLong, highlightedOperatorKey = highlightedOperatorKey)
                                 }
                             }
 
@@ -608,6 +621,7 @@ class MainActivity : ComponentActivity() {
                             )
                         }
                     }
+                }
                 }
             }
         }

@@ -641,7 +641,7 @@ fun shareFullAntennaCapture(
                                                         )
                                                     } else {
                                                         Text(
-                                                            "$txtDistanceLabel $distanceStr$txtFromMyPosition",
+                                                            "$txtDistanceLabel $distanceStr $txtFromMyPosition",
                                                             fontSize = 12.sp,
                                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                                         )
@@ -1803,7 +1803,7 @@ fun shareFullSiteCapture(
                                                         Text(AppStrings.distanceHidden, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                                                     } else {
                                                         Spacer(modifier = Modifier.height(4.dp))
-                                                        Text(buildAnnotatedString { withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) { append("$txtDistanceLabel ") }; withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append("$distanceStr$txtFromMyPosition") } }, fontSize = 14.sp)
+                                                        Text(buildAnnotatedString { withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) { append("$txtDistanceLabel ") }; withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append("$distanceStr $txtFromMyPosition") } }, fontSize = 14.sp)
                                                         Spacer(modifier = Modifier.height(4.dp))
                                                         Text(buildAnnotatedString { withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) { append("$txtBearingLabel ") }; withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(bearingStr) } }, fontSize = 14.sp)
                                                     }
@@ -2200,8 +2200,12 @@ fun AntennaShareMenu(
                                     Icon(Icons.Default.DragHandle, contentDescription = txtMove, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Text(label.toString(), modifier = Modifier.weight(1f))
-                                    if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { OneUiSwitch(checked as Boolean, safeOnChecked) }
-                                    else Switch(checked = checked as Boolean, onCheckedChange = safeOnChecked, modifier = Modifier.scale(0.8f))
+                                    GeoTowerSwitch(
+                                        checked = checked as Boolean,
+                                        onCheckedChange = safeOnChecked,
+                                        modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                                        useOneUi = useOneUi
+                                    )
                                 }
                             }
                         }
@@ -2231,16 +2235,24 @@ fun AntennaShareMenu(
                                 Text(AppStrings.splitShareImage, fontWeight = FontWeight.Bold, color = if(incSplitImage) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                                 Text(AppStrings.splitShareImageDesc, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
-                            if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { OneUiSwitch(checked = incSplitImage, onCheckedChange = { incSplitImage = it; prefs.edit().putBoolean("share_split_image_enabled", it).apply() }) }
-                            else Switch(checked = incSplitImage, onCheckedChange = { incSplitImage = it; prefs.edit().putBoolean("share_split_image_enabled", it).apply() }, modifier = Modifier.scale(0.8f))
+                            GeoTowerSwitch(
+                                checked = incSplitImage,
+                                onCheckedChange = { incSplitImage = it; prefs.edit().putBoolean("share_split_image_enabled", it).apply() },
+                                modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                                useOneUi = useOneUi
+                            )
                         }
                     }
 
                     // ✅ INTERRUPTEUR : QR CODE
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                         Text("QR Code", modifier = Modifier.weight(1f))
-                        if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { OneUiSwitch(checked = incQrCode, onCheckedChange = { incQrCode = it }) }
-                        else Switch(checked = incQrCode, onCheckedChange = { incQrCode = it }, modifier = Modifier.scale(0.8f))
+                        GeoTowerSwitch(
+                            checked = incQrCode,
+                            onCheckedChange = { incQrCode = it },
+                            modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                            useOneUi = useOneUi
+                        )
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -2248,8 +2260,12 @@ fun AntennaShareMenu(
                             Text(txtShareConfidentialOption, fontWeight = FontWeight.Bold, color = if(incConfidential) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                             Text(txtShareConfidentialDesc, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { OneUiSwitch(checked = incConfidential, onCheckedChange = { incConfidential = it }) }
-                        else Switch(checked = incConfidential, onCheckedChange = { incConfidential = it }, modifier = Modifier.scale(0.8f))
+                        GeoTowerSwitch(
+                            checked = incConfidential,
+                            onCheckedChange = { incConfidential = it },
+                            modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                            useOneUi = useOneUi
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -2538,8 +2554,12 @@ fun SupportShareMenu(
                                     Icon(Icons.Default.DragHandle, contentDescription = txtMove, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Text(label.toString(), modifier = Modifier.weight(1f))
-                                    if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { OneUiSwitch(checked as Boolean, safeOnChecked) }
-                                    else Switch(checked = checked as Boolean, onCheckedChange = safeOnChecked, modifier = Modifier.scale(0.8f))
+                                    GeoTowerSwitch(
+                                        checked = checked as Boolean,
+                                        onCheckedChange = safeOnChecked,
+                                        modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                                        useOneUi = useOneUi
+                                    )
                                 }
                             }
                         }
@@ -2564,8 +2584,12 @@ fun SupportShareMenu(
                     // ✅ NOUVEAU BOUTON : INTERRUPTEUR QR CODE
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                         Text("QR Code", modifier = Modifier.weight(1f))
-                        if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { OneUiSwitch(checked = incQrCode, onCheckedChange = { incQrCode = it }) }
-                        else Switch(checked = incQrCode, onCheckedChange = { incQrCode = it }, modifier = Modifier.scale(0.8f))
+                        GeoTowerSwitch(
+                            checked = incQrCode,
+                            onCheckedChange = { incQrCode = it },
+                            modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                            useOneUi = useOneUi
+                        )
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
@@ -2573,8 +2597,12 @@ fun SupportShareMenu(
                             Text(txtShareConfidentialOption, fontWeight = FontWeight.Bold, color = if(incConfidential) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                             Text(txtShareConfidentialDesc, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        if (useOneUi) Box(modifier = Modifier.scale(0.85f)) { OneUiSwitch(checked = incConfidential, onCheckedChange = { incConfidential = it }) }
-                        else Switch(checked = incConfidential, onCheckedChange = { incConfidential = it }, modifier = Modifier.scale(0.8f))
+                        GeoTowerSwitch(
+                            checked = incConfidential,
+                            onCheckedChange = { incConfidential = it },
+                            modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                            useOneUi = useOneUi
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))

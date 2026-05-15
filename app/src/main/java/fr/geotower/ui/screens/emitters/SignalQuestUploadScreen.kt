@@ -73,6 +73,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import coil.compose.AsyncImage
 import fr.geotower.ui.components.rememberSafeClick
+import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadRules
 import fr.geotower.utils.AppConfig
@@ -177,13 +178,13 @@ fun SignalQuestUploadScreen(
     // Thème et couleurs
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
-    val useOneUi by AppConfig.forceOneUiTheme // <-- NOUVEAU : Lecture du paramètre One UI
+    val useOneUi = AppConfig.useOneUiDesign
     val isDark = (themeMode == 2) || (themeMode == 0 && androidx.compose.foundation.isSystemInDarkTheme())
 
     // --- NOUVEAU : FORMES DYNAMIQUES SELON LE MODE ---
     val photoShape = if (useOneUi) RoundedCornerShape(32.dp) else RoundedCornerShape(24.dp)
     val blockShape = if (useOneUi) RoundedCornerShape(24.dp) else RoundedCornerShape(16.dp)
-    val buttonShape = if (useOneUi) CircleShape else RoundedCornerShape(16.dp)
+    val buttonShape = oneUiActionButtonShape(useOneUi, RoundedCornerShape(16.dp))
     val mapShape = if (useOneUi) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
 
     val effectiveOled = isOledMode && isDark

@@ -22,6 +22,14 @@ class AnfrRepository(
 ) {
 
     // ✅ NOUVEAU : On récupère toujours le DAO depuis l'instance active (qui se recréera si elle a été fermée)
+    private data class LongitudeRange(val min: Double, val max: Double)
+
+    private data class MapQueryBounds(
+        val minLat: Double,
+        val maxLat: Double,
+        val longitudeRanges: List<LongitudeRange>
+    )
+
     private val dao: GeoTowerDao
         get() = AppDatabase.getDatabase(context).geoTowerDao()
 
@@ -34,17 +42,78 @@ class AnfrRepository(
         }
     }
 
+    private fun sanitizeLatitude(value: Double, fallback: Double): Double {
+        return if (value.isNaN() || value.isInfinite()) fallback else value.coerceIn(-90.0, 90.0)
+    }
+
+    private fun sanitizeLongitude(value: Double, fallback: Double): Double {
+        return if (value.isNaN() || value.isInfinite()) fallback else value
+    }
+
+    private fun normalizeLongitude(value: Double): Double {
+        val normalized = ((value + 180.0) % 360.0 + 360.0) % 360.0 - 180.0
+        return if (normalized == -180.0 && value > 0.0) 180.0 else normalized
+    }
+
+    private fun mapQueryBounds(latNorth: Double, lonEast: Double, latSouth: Double, lonWest: Double): MapQueryBounds {
+        val south = sanitizeLatitude(latSouth, -90.0)
+        val north = sanitizeLatitude(latNorth, 90.0)
+        val minLat = minOf(south, north)
+        val maxLat = maxOf(south, north)
+
+        val rawWest = sanitizeLongitude(lonWest, -180.0)
+        val rawEast = sanitizeLongitude(lonEast, 180.0)
+        val rawSpan = rawEast - rawWest
+
+        val longitudeRanges = if (rawSpan >= 360.0 || rawSpan <= -360.0 || (rawWest <= -180.0 && rawEast >= 180.0)) {
+            listOf(LongitudeRange(-180.0, 180.0))
+        } else {
+            val west = normalizeLongitude(rawWest)
+            val east = normalizeLongitude(rawEast)
+            if (rawSpan < 0.0 || west > east) {
+                listOf(LongitudeRange(west, 180.0), LongitudeRange(-180.0, east))
+            } else {
+                listOf(LongitudeRange(west, east))
+            }
+        }
+
+        return MapQueryBounds(minLat = minLat, maxLat = maxLat, longitudeRanges = longitudeRanges)
+    }
+
+    private suspend fun GeoTowerDao.getClustersForZoom(
+        zoom: Double,
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double
+    ): List<DbCluster> {
+        return when {
+            zoom < 6.5 -> getL1Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
+            zoom < 8.0 -> getL2Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
+            zoom < 9.5 -> getL3Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
+            zoom < 10.5 -> getL4Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
+            zoom < 11.5 -> getL5Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
+            zoom < 12.5 -> getL6Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
+            else -> getL7Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
+        }
+    }
+
     // =================================================================
     // 1. POUR LA CARTE (Affichage ultra-rapide des points)
     // =================================================================
     suspend fun getAntennasInBox(latNorth: Double, lonEast: Double, latSouth: Double, lonWest: Double): List<LocalisationEntity> {
+        val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
         return queryLocalDatabase(emptyList()) {
-            getLocalisationsInBox(
-                minLat = latSouth,
-                maxLat = latNorth,
-                minLon = lonWest,
-                maxLon = lonEast
-            )
+            bounds.longitudeRanges
+                .flatMap { range ->
+                    getLocalisationsInBox(
+                        minLat = bounds.minLat,
+                        maxLat = bounds.maxLat,
+                        minLon = range.min,
+                        maxLon = range.max
+                    )
+                }
+                .distinctBy { it.idAnfr }
         }
     }
 
@@ -77,16 +146,18 @@ class AnfrRepository(
     // 1.5 POUR LA CARTE (Mode Macro : Clustering progressif à 5 niveaux)
     // =================================================================
     suspend fun getClusteredAntennas(zoom: Double, latNorth: Double, lonEast: Double, latSouth: Double, lonWest: Double): List<DbCluster> {
+        val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
         return queryLocalDatabase(emptyList()) {
-            when {
-                zoom < 6.5 -> getL1Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
-                zoom < 8.0 -> getL2Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
-                zoom < 9.5 -> getL3Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
-                zoom < 10.5 -> getL4Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
-                zoom < 11.5 -> getL5Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
-                zoom < 12.5 -> getL6Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
-                else -> getL7Clusters(minLat = latSouth, maxLat = latNorth, minLon = lonWest, maxLon = lonEast)
+            val clusters = bounds.longitudeRanges.flatMap { range ->
+                getClustersForZoom(
+                    zoom = zoom,
+                    minLat = bounds.minLat,
+                    maxLat = bounds.maxLat,
+                    minLon = range.min,
+                    maxLon = range.max
+                )
             }
+            MacroClusterGrouper.mergeTargetedTerritories(clusters, zoom)
         }
     }
 

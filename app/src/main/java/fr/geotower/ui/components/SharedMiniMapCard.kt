@@ -51,7 +51,6 @@ import kotlin.math.max
 import kotlin.math.sqrt
 
 private const val MINI_MAP_HS_OPERATOR_WILDCARD = "*"
-private val MINI_MAP_OPERATOR_KEYS = listOf("ORANGE", "SFR", "BOUYGUES", "FREE")
 
 @Composable
 fun SharedMiniMapCard(
@@ -96,6 +95,8 @@ fun SharedMiniMapCard(
     }
 
     val ignStyle by AppConfig.ignStyle
+    val showAzimuthLines by AppConfig.showAzimuths
+    val showAzimuthCones by AppConfig.showAzimuthsCone
     val shouldInvertColors = (mapProvider == 0 && ignStyle == 1)
     var currentZoom by remember(initialZoom) { mutableDoubleStateOf(initialZoom) }
     var lastFitSelectedPointRequest by remember { mutableIntStateOf(fitSelectedPointRequest) }
@@ -233,12 +234,14 @@ fun SharedMiniMapCard(
                 if (marker != null) {
                     marker.siteAntennas = mappedAntennas
                     marker.focusOperator = focusOperator
+                    marker.showAzimuthLines = showAzimuthLines
+                    marker.showAzimuthCones = showAzimuthCones
 
                     // 1. On génère l'icône de base
                     val baseIcon = MapUtils.createAdaptiveMarker(
                         context,
                         mappedAntennas,
-                        currentZoom >= 14.0 && AppConfig.showAzimuths.value,
+                        currentZoom >= 14.0 && showAzimuthLines,
                         focusOperator ?: AppConfig.defaultOperator.value
                     )
 
@@ -353,8 +356,7 @@ private fun normalizedMiniMapAnfrId(value: String): String {
 }
 
 private fun extractMiniMapOperatorKeys(value: String?): List<String> {
-    val upper = value?.uppercase() ?: return emptyList()
-    return MINI_MAP_OPERATOR_KEYS.filter { upper.contains(it) }
+    return OperatorColors.keysFor(value)
 }
 
 private fun buildMiniMapHsOperatorMap(sitesHs: List<SiteHsEntity>): Map<String, Set<String>> {
@@ -551,9 +553,12 @@ class MiniMapAntennaMarker(
     }
 
     private class GroupedAzimuthData(
+        val azimuth: Float,
         val cos: Float,
         val sin: Float,
         val linePaint: android.graphics.Paint,
+        val conePaint: android.graphics.Paint?,
+        val coneEdgePaint: android.graphics.Paint?,
         val dotColors: List<Int>
     )
 
@@ -572,6 +577,9 @@ class MiniMapAntennaMarker(
             field = value
             recalculateAzimuths()
         }
+
+    var showAzimuthLines: Boolean = AppConfig.showAzimuths.value
+    var showAzimuthCones: Boolean = AppConfig.showAzimuthsCone.value
 
     init {
         recalculateAzimuths()
@@ -620,7 +628,19 @@ class MiniMapAntennaMarker(
                 strokeCap = android.graphics.Paint.Cap.ROUND
             }
 
-            precalculatedMobileAzimuths.add(GroupedAzimuthData(cos, sin, linePaint, sortedColors))
+            val conePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                style = android.graphics.Paint.Style.FILL
+                color = ColorUtils.setAlphaComponent(mainColor, 50)
+            }
+
+            val coneEdgePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+                style = android.graphics.Paint.Style.STROKE
+                color = ColorUtils.setAlphaComponent(mainColor, 170)
+                strokeWidth = 2.2f * density
+                strokeCap = android.graphics.Paint.Cap.ROUND
+            }
+
+            precalculatedMobileAzimuths.add(GroupedAzimuthData(az, cos, sin, linePaint, conePaint, coneEdgePaint, sortedColors))
         }
 
         angleToColorsFh.forEach { (az, colorsSet) ->
@@ -639,7 +659,7 @@ class MiniMapAntennaMarker(
                 pathEffect = android.graphics.DashPathEffect(floatArrayOf(5f * density, 5f * density), 0f)
             }
 
-            precalculatedFhAzimuths.add(GroupedAzimuthData(cos, sin, dashedPaint, sortedColors))
+            precalculatedFhAzimuths.add(GroupedAzimuthData(az, cos, sin, dashedPaint, null, null, sortedColors))
         }
     }
 
@@ -649,8 +669,10 @@ class MiniMapAntennaMarker(
 
     override fun draw(canvas: android.graphics.Canvas, projection: org.osmdroid.views.Projection) {
         val zoom = mapView.zoomLevelDouble
+        val showLines = showAzimuthLines
+        val showCones = showAzimuthCones
 
-        if (zoom >= 13.0 && AppConfig.showAzimuths.value) {
+        if (zoom >= 13.0 && (showLines || showCones)) {
             projection.toPixels(mPosition, ptCenter)
 
             val scale = ((zoom - 11.0) / 6.5).coerceIn(0.5, 1.0).toFloat()
@@ -671,28 +693,44 @@ class MiniMapAntennaMarker(
             // ✅ NOUVEAU : Gap parfait pour que les points se collent
             val gapMobile = pointRadius * 2.0f
             val gapFh = fhRadius * 2.0f
+            val rectF = android.graphics.RectF(
+                ptCenter.x - totalRadiusPx,
+                ptCenter.y - totalRadiusPx,
+                ptCenter.x + totalRadiusPx,
+                ptCenter.y + totalRadiusPx
+            )
 
             // --- DESSIN DES MOBILES ---
             precalculatedMobileAzimuths.forEach { data ->
-                val startX = ptCenter.x + circleOffsetPx * data.cos
-                val startY = ptCenter.y + circleOffsetPx * data.sin
-                val endX = ptCenter.x + totalRadiusPx * data.cos
-                val endY = ptCenter.y + totalRadiusPx * data.sin
+                if (showCones && data.conePaint != null) {
+                    val startAngle = data.azimuth - 90f - 35f
+                    canvas.drawArc(rectF, startAngle, 70f, true, data.conePaint)
+                    data.coneEdgePaint?.let { edgePaint ->
+                        drawConeEdgeLines(canvas, data.azimuth, circleOffsetPx, totalRadiusPx, edgePaint)
+                    }
+                }
 
-                canvas.drawLine(startX, startY, endX, endY, data.linePaint)
+                if (showLines) {
+                    val startX = ptCenter.x + circleOffsetPx * data.cos
+                    val startY = ptCenter.y + circleOffsetPx * data.sin
+                    val endX = ptCenter.x + totalRadiusPx * data.cos
+                    val endY = ptCenter.y + totalRadiusPx * data.sin
 
-                // Alignement des points dans le prolongement
-                data.dotColors.forEachIndexed { index, colorInt ->
-                    val offsetMag = index * gapMobile
-                    val dotX = endX + (data.cos * offsetMag)
-                    val dotY = endY + (data.sin * offsetMag)
+                    canvas.drawLine(startX, startY, endX, endY, data.linePaint)
 
-                    canvas.drawCircle(dotX, dotY, pointRadius, getDotPaint(colorInt))
+                    // Alignement des points dans le prolongement
+                    data.dotColors.forEachIndexed { index, colorInt ->
+                        val offsetMag = index * gapMobile
+                        val dotX = endX + (data.cos * offsetMag)
+                        val dotY = endY + (data.sin * offsetMag)
+
+                        canvas.drawCircle(dotX, dotY, pointRadius, getDotPaint(colorInt))
+                    }
                 }
             }
 
             // --- DESSIN DES FAISCEAUX HERTZIENS ---
-            if (AppConfig.showTechnoFH.value) {
+            if (AppConfig.showTechnoFH.value && showLines) {
                 precalculatedFhAzimuths.forEach { data ->
                     val startX = ptCenter.x + circleOffsetPx * data.cos
                     val startY = ptCenter.y + circleOffsetPx * data.sin
@@ -712,6 +750,27 @@ class MiniMapAntennaMarker(
             }
         }
         super.draw(canvas, projection)
+    }
+
+    private fun drawConeEdgeLines(
+        canvas: android.graphics.Canvas,
+        azimuth: Float,
+        startRadiusPx: Float,
+        endRadiusPx: Float,
+        paint: android.graphics.Paint
+    ) {
+        listOf(azimuth - 35f, azimuth + 35f).forEach { edgeAzimuth ->
+            val edgeRad = Math.toRadians(edgeAzimuth - 90.0)
+            val edgeCos = Math.cos(edgeRad).toFloat()
+            val edgeSin = Math.sin(edgeRad).toFloat()
+            canvas.drawLine(
+                ptCenter.x + startRadiusPx * edgeCos,
+                ptCenter.y + startRadiusPx * edgeSin,
+                ptCenter.x + endRadiusPx * edgeCos,
+                ptCenter.y + endRadiusPx * edgeSin,
+                paint
+            )
+        }
     }
 }
 

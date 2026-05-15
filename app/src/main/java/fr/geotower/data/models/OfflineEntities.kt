@@ -275,5 +275,6 @@ data class FaisceauxEntity(
 data class DbCluster(
     @ColumnInfo(name = "centerLat") val centerLat: Double,
     @ColumnInfo(name = "centerLon") val centerLon: Double,
-    @ColumnInfo(name = "count") val count: Int
+    @ColumnInfo(name = "count") val count: Int,
+    @ColumnInfo(name = "operators") val operators: String?
 )

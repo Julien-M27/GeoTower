@@ -83,18 +83,13 @@ object MapUtils {
         val baseOrder = OperatorColors.orderedKeys
         val priorityList = mutableListOf<String>()
 
-        if (def != "AUCUN" && baseOrder.any { def.contains(it) }) {
-            priorityList.add(baseOrder.first { def.contains(it) })
-        }
+        OperatorColors.keyFor(def)?.let { priorityList.add(it) }
         baseOrder.forEach { if (!priorityList.contains(it)) priorityList.add(it) }
 
         val colorMap = OperatorColors.androidColorMap()
 
         val operatorsOnSite = siteAntennas.mapNotNull { it.operateur }
-            .flatMap { it.split(Regex("[/,\\-]")) }
-            .map { it.trim().uppercase() }
-            .filter { op -> colorMap.keys.any { op.contains(it) } }
-            .map { op -> colorMap.keys.first { op.contains(it) } }
+            .flatMap { OperatorColors.keysFor(it) }
             .distinct()
             .sortedBy { op -> priorityList.indexOf(op) }
 
@@ -102,8 +97,7 @@ object MapUtils {
             val azimutMap = mutableMapOf<Int, MutableList<String>>()
 
             siteAntennas.forEach { antenna ->
-                val opRaw = antenna.operateur?.uppercase() ?: return@forEach
-                val opClean = colorMap.keys.firstOrNull { opRaw.contains(it) } ?: return@forEach
+                val opClean = OperatorColors.keysFor(antenna.operateur).firstOrNull() ?: return@forEach
 
                 val azStr = antenna.azimuts
                 if (!azStr.isNullOrBlank() && azStr != "null") {
@@ -161,12 +155,7 @@ object MapUtils {
             paint.color = android.graphics.Color.GRAY
             canvas.drawCircle(center, center, pieRadius, paint)
         } else {
-            when (operatorsOnSite.size) {
-                1 -> { paint.color = colorMap[operatorsOnSite[0]]!!; canvas.drawArc(rect, 0f, 360f, true, paint) }
-                2 -> { paint.color = colorMap[operatorsOnSite[0]]!!; canvas.drawArc(rect, 180f, 180f, true, paint); paint.color = colorMap[operatorsOnSite[1]]!!; canvas.drawArc(rect, 0f, 180f, true, paint) }
-                3 -> { paint.color = colorMap[operatorsOnSite[0]]!!; canvas.drawArc(rect, 210f, 120f, true, paint); paint.color = colorMap[operatorsOnSite[1]]!!; canvas.drawArc(rect, 330f, 120f, true, paint); paint.color = colorMap[operatorsOnSite[2]]!!; canvas.drawArc(rect, 90f, 120f, true, paint) }
-                4 -> { val angles = listOf(180f, 270f, 0f, 90f); operatorsOnSite.forEachIndexed { index, op -> paint.color = colorMap[op]!!; canvas.drawArc(rect, angles[index], 90f, true, paint) } }
-            }
+            drawOperatorSlices(canvas, rect, operatorsOnSite, colorMap, paint)
         }
 
         paint.color = android.graphics.Color.WHITE
@@ -241,29 +230,19 @@ object MapUtils {
         val baseOrder = OperatorColors.orderedKeys
         val priorityList = mutableListOf<String>()
 
-        if (def != "AUCUN" && baseOrder.any { def.contains(it) }) {
-            priorityList.add(baseOrder.first { def.contains(it) })
-        }
+        OperatorColors.keyFor(def)?.let { priorityList.add(it) }
         baseOrder.forEach { if (!priorityList.contains(it)) priorityList.add(it) }
 
         val sortedOps = operators
-            .filter { op -> colorMap.keys.any { op.contains(it) } }
-            .map { op -> colorMap.keys.first { op.contains(it) } }
+            .flatMap { OperatorColors.keysFor(it) }
             .distinct()
             .sortedBy { op -> priorityList.indexOf(op) }
-
-        val rect = android.graphics.RectF(0f, 0f, size.toFloat(), size.toFloat())
 
         if (sortedOps.isEmpty()) {
             paint.color = android.graphics.Color.GRAY
             canvas.drawCircle(size / 2f, size / 2f, size / 2f, paint)
         } else {
-            when (sortedOps.size) {
-                1 -> { paint.color = colorMap[sortedOps[0]]!!; canvas.drawArc(rect, 0f, 360f, true, paint) }
-                2 -> { paint.color = colorMap[sortedOps[0]]!!; canvas.drawArc(rect, 180f, 180f, true, paint); paint.color = colorMap[sortedOps[1]]!!; canvas.drawArc(rect, 0f, 180f, true, paint) }
-                3 -> { paint.color = colorMap[sortedOps[0]]!!; canvas.drawArc(rect, 210f, 120f, true, paint); paint.color = colorMap[sortedOps[1]]!!; canvas.drawArc(rect, 330f, 120f, true, paint); paint.color = colorMap[sortedOps[2]]!!; canvas.drawArc(rect, 90f, 120f, true, paint) }
-                4 -> { val angles = listOf(180f, 270f, 0f, 90f); sortedOps.forEachIndexed { index, op -> paint.color = colorMap[op]!!; canvas.drawArc(rect, angles[index], 90f, true, paint) } }
-            }
+            drawOperatorRing(canvas, size.toFloat(), sortedOps, colorMap, paint)
         }
 
         val centerPoint = size / 2f
@@ -290,5 +269,50 @@ object MapUtils {
         clusterIconCache.put(cacheKey, finalDrawable)
 
         return finalDrawable
+    }
+
+    private fun drawOperatorSlices(
+        canvas: Canvas,
+        rect: android.graphics.RectF,
+        operators: List<String>,
+        colorMap: Map<String, Int>,
+        paint: Paint
+    ) {
+        val sweep = 360f / operators.size.coerceAtLeast(1)
+        operators.forEachIndexed { index, op ->
+            paint.color = colorMap[op] ?: android.graphics.Color.GRAY
+            canvas.drawArc(rect, -90f + index * sweep, sweep, true, paint)
+        }
+    }
+
+    private fun drawOperatorRing(
+        canvas: Canvas,
+        size: Float,
+        operators: List<String>,
+        colorMap: Map<String, Int>,
+        paint: Paint
+    ) {
+        val center = size / 2f
+        val strokeWidth = size * 0.22f
+        val radius = center - strokeWidth / 2f
+        val ringRect = android.graphics.RectF(
+            center - radius,
+            center - radius,
+            center + radius,
+            center + radius
+        )
+        val sweep = 360f / operators.size.coerceAtLeast(1)
+        val overlap = if (operators.size > 1) 0.8f else 0f
+
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = strokeWidth
+        paint.strokeCap = Paint.Cap.BUTT
+
+        operators.forEachIndexed { index, op ->
+            paint.color = colorMap[op] ?: android.graphics.Color.GRAY
+            canvas.drawArc(ringRect, -90f + index * sweep, sweep + overlap, false, paint)
+        }
+
+        paint.style = Paint.Style.FILL
     }
 }

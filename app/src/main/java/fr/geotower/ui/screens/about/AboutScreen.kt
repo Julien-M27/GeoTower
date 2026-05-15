@@ -746,8 +746,9 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
     val txtDownloadNewBase = AppStrings.aboutDownloadNewDatabase
     val txtInvalidLocalDatabase = AppStrings.invalidLocalDatabase
     val txtNotInstalled = AppStrings.aboutDatabaseNotInstalled
+    val txtVersionTimeAt = AppStrings.versionTimeAt
 
-    LaunchedEffect(txtDownloadNewBase, txtInvalidLocalDatabase, txtNotInstalled) {
+    LaunchedEffect(txtDownloadNewBase, txtInvalidLocalDatabase, txtNotInstalled, txtVersionTimeAt) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
             // 1. Version de l'application
             try {
@@ -777,7 +778,9 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
                         // A. Version interne
                         val rawVersion = cursor.getString(0)
                         if (rawVersion != null && rawVersion.length == 13) {
-                            dbVersion = "${rawVersion.substring(9, 11)}:${rawVersion.substring(11, 13)} - ${rawVersion.substring(6, 8)}/${rawVersion.substring(4, 6)}/${rawVersion.substring(0, 4)}"
+                            val dbDate = "${rawVersion.substring(6, 8)}/${rawVersion.substring(4, 6)}/${rawVersion.substring(0, 4)}"
+                            val dbTime = "${rawVersion.substring(9, 11)}:${rawVersion.substring(11, 13)}"
+                            dbVersion = "$dbDate\n$txtVersionTimeAt $dbTime"
                         } else {
                             dbVersion = rawVersion ?: "-"
                         }
@@ -835,12 +838,24 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
         shape = cardShape,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            VersionLine(AppStrings.versionAppLabel, appVersion)
-            VersionLine(AppStrings.versionDbLabel, dbVersion)
-            VersionLine(AppStrings.versionWeeklyLabel, AppStrings.formatWeeklyVersionWithWeekNumber(anfrDate))
-            VersionLine(AppStrings.versionMonthlyLabel, AppStrings.formatMonthlyVersion(rawMonthlyVersion))
-            VersionLine(AppStrings.versionHsLabel, hsDate)
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+            val versionRows = listOf(
+                AppStrings.versionAppLabel to appVersion,
+                AppStrings.versionDbLabel to dbVersion,
+                AppStrings.versionWeeklyLabel to AppStrings.formatWeeklyVersionWithWeekNumber(anfrDate),
+                AppStrings.versionMonthlyLabel to AppStrings.formatMonthlyVersion(rawMonthlyVersion),
+                AppStrings.versionHsLabel to hsDate
+            )
+
+            versionRows.forEachIndexed { index, row ->
+                VersionLine(row.first, row.second)
+                if (index < versionRows.lastIndex) {
+                    HorizontalDivider(
+                        modifier = Modifier.padding(vertical = 2.dp),
+                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+                    )
+                }
+            }
         }
     }
 }
@@ -848,22 +863,26 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
 @Composable
 private fun VersionLine(label: String, value: String) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically // 🚨 Centre le texte verticalement si la gauche passe sur 2 lignes
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 7.dp),
+        verticalAlignment = Alignment.Top
     ) {
         Text(
             text = label,
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.weight(1f).padding(end = 8.dp) // 🚨 Force le texte à la ligne s'il est trop long
+            modifier = Modifier
+                .weight(0.52f)
+                .padding(end = 12.dp)
         )
         Text(
             text = value,
             style = MaterialTheme.typography.bodyMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
-            textAlign = androidx.compose.ui.text.style.TextAlign.End // 🚨 Assure que la valeur reste alignée à droite
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(0.48f)
         )
     }
 }

@@ -49,19 +49,12 @@ fun LiveNotificationCard(
                 Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
-            if (useOneUi) {
-                fr.geotower.ui.components.OneUiSwitch(
-                    checked = checked,
-                    onCheckedChange = handleToggle // ✅ MODIFIÉ : On utilise notre nouvelle fonction
-                )
-            } else {
-                Switch(
-                    checked = checked,
-                    onCheckedChange = handleToggle, // ✅ MODIFIÉ : On utilise notre nouvelle fonction
-                    enabled = enabled,
-                    colors = SwitchDefaults.colors(checkedTrackColor = MaterialTheme.colorScheme.primary)
-                )
-            }
+            GeoTowerSwitch(
+                checked = checked,
+                onCheckedChange = handleToggle,
+                enabled = enabled,
+                useOneUi = useOneUi
+            )
         }
     }
 }

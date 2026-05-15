@@ -2,12 +2,18 @@ package fr.geotower.utils
 
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
-import android.os.Build
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 
 object AppConfig {
     const val PREF_COLOR_PALETTE = "color_palette"
     const val DEFAULT_COLOR_PALETTE = "dynamic"
+    const val PREF_SELECTED_OPERATORS = "selected_operator_keys"
+    const val PREF_UI_MODE = "ui_mode"
+    const val PREF_SHOW_MAP_LOCATION_MARKER = "show_map_location_marker"
+    const val PREF_SHOW_AZIMUTH_LINES = "show_azimuths"
+    const val PREF_SHOW_AZIMUTH_CONES = "show_azimuths_cone"
+    const val DEFAULT_SHOW_AZIMUTH_LINES = true
+    const val DEFAULT_SHOW_AZIMUTH_CONES = false
 
     // --- Apparence ---
     var themeMode = mutableIntStateOf(0)
@@ -48,17 +54,19 @@ object AppConfig {
     var ignStyle = mutableIntStateOf(0)
 
     var showSpeedometer = mutableStateOf(true)
+    var showMapLocationMarker = mutableStateOf(true)
 
     // --- FILTRES : OPÉRATEURS ---
     var showOrange = mutableStateOf(true)
     var showSfr = mutableStateOf(true)
     var showBouygues = mutableStateOf(true)
     var showFree = mutableStateOf(true)
+    var selectedOperatorKeys = mutableStateOf(OperatorColors.defaultVisibleKeys)
 
     // --- FILTRES : AZIMUTS ---
-    var showAzimuths = mutableStateOf(true)
+    var showAzimuths = mutableStateOf(DEFAULT_SHOW_AZIMUTH_LINES)
 
-    var showAzimuthsCone = mutableStateOf(false)
+    var showAzimuthsCone = mutableStateOf(DEFAULT_SHOW_AZIMUTH_CONES)
 
     // --- FILTRES : AFFICHAGE DES SITES ---
     var showSitesInService = mutableStateOf(true)
@@ -145,17 +153,10 @@ object AppConfig {
     // Mode de navigation (0 = Défilant, 1 = Pages)
     var navMode = mutableIntStateOf(0)
 
-    // --- DÉTECTION ET THÈME ONE UI ---
-
-    // Détecte si le téléphone est un Samsung
-    val isSamsungDevice = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
-
-    // État pour le bouton manuel dans les paramètres
-    var forceOneUiTheme = mutableStateOf(false)
-
-    // Propriété dynamique : Vrai si c'est un Samsung OU si l'utilisateur l'a forcé
+    // --- MODE D'AFFICHAGE ---
+    var uiMode = mutableStateOf(AppUiMode.Auto)
     val useOneUiDesign: Boolean
-        get() = isSamsungDevice || forceOneUiTheme.value
+        get() = uiMode.value.usesOneUi()
 
     //Masquer les boutons sur l'écran d'accueil
 
@@ -181,8 +182,8 @@ object AppConfig {
         //Notification de téléchargement
         enableUpdateNotifications.value = prefs.getBoolean("enable_update_notifications", true)
         colorPalette.value = prefs.getString(PREF_COLOR_PALETTE, DEFAULT_COLOR_PALETTE) ?: DEFAULT_COLOR_PALETTE
-        val model = android.os.Build.MODEL
-        val device = android.os.Build.DEVICE
+        val model = DeviceProfile.model
+        val device = DeviceProfile.device
 
         AppLogger.d("GeoTower", "Fold device detection model=$model device=$device")
 
@@ -190,19 +191,8 @@ object AppConfig {
         shareSiteStatus.value = prefs.getBoolean("share_site_status", true)
         shareSiteSpeedtest.value = prefs.getBoolean("share_site_speedtest", true) // 🚨 NEW
 
-        // ✅ DÉTECTION GALAXY Z FOLD (Samsung)
-        val isGalaxyZFold = model.startsWith("SM-F9", ignoreCase = true)
-
-        // ✅ DÉTECTION PIXEL FOLD (Google)
-        val pixelFoldModels = listOf("GQK96", "GGH2X", "G9FNL")
-        val pixelFoldDevices = listOf("felix", "comet") // Noms de code internes : Fold 1 = felix, Fold 9 Pro = comet
-
-        val isGoogleFold = model.contains("Fold", ignoreCase = true) ||
-                pixelFoldModels.contains(model.uppercase()) ||
-                pixelFoldDevices.contains(device.lowercase())
-
         // Si c'est un Z Fold OU un Pixel Fold, la valeur par défaut est 1 (Fractionné), sinon 0 (Plein écran)
-        val defaultDisplayStyle = if (isGalaxyZFold || isGoogleFold) 1 else 0
+        val defaultDisplayStyle = if (DeviceProfile.prefersSplitDisplay) 1 else 0
 
         //Notifications live
         enableLiveNotifications.value = prefs.getBoolean("enable_live_notifications", false)
@@ -218,9 +208,11 @@ object AppConfig {
         showSfr.value = prefs.getBoolean("show_sfr", true)
         showBouygues.value = prefs.getBoolean("show_bouygues", true)
         showFree.value = prefs.getBoolean("show_free", true)
+        selectedOperatorKeys.value = loadSelectedOperatorKeys(prefs)
 
-        showAzimuths.value = prefs.getBoolean("show_azimuths", true)
-        showAzimuthsCone.value = prefs.getBoolean("show_azimuths_cone", false)
+        showAzimuths.value = prefs.getBoolean(PREF_SHOW_AZIMUTH_LINES, DEFAULT_SHOW_AZIMUTH_LINES)
+        showAzimuthsCone.value = prefs.getBoolean(PREF_SHOW_AZIMUTH_CONES, DEFAULT_SHOW_AZIMUTH_CONES)
+        showMapLocationMarker.value = prefs.getBoolean(PREF_SHOW_MAP_LOCATION_MARKER, true)
 
         showSitesInService.value = prefs.getBoolean("show_sites_in_service", true)
         showSitesOutOfService.value = prefs.getBoolean("show_sites_out_of_service", true)
@@ -316,4 +308,19 @@ object AppConfig {
 
     // --- MISE À JOUR BASE DE DONNÉES ---
     var isDbUpdateAvailable = mutableStateOf(false)
+
+    private fun loadSelectedOperatorKeys(prefs: android.content.SharedPreferences): Set<String> {
+        val savedKeys = prefs.getStringSet(PREF_SELECTED_OPERATORS, null)
+            ?.mapNotNull { OperatorColors.specForKey(it)?.key }
+            ?.toSet()
+        if (!savedKeys.isNullOrEmpty()) return savedKeys
+
+        return buildSet {
+            if (showOrange.value) add(OperatorColors.ORANGE_KEY)
+            if (showSfr.value) add(OperatorColors.SFR_KEY)
+            if (showBouygues.value) add(OperatorColors.BOUYGUES_KEY)
+            if (showFree.value) add(OperatorColors.FREE_KEY)
+            addAll(OperatorColors.overseas.map { it.key })
+        }
+    }
 }

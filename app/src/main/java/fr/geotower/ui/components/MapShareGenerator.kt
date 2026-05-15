@@ -255,7 +255,7 @@ fun MapShareMenu(
 
     Surface(
         onClick = { safeClick { showShareSheet = true } },
-        shape = CircleShape,
+        shape = oneUiActionButtonShape(useOneUi, CircleShape),
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 4.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
@@ -290,26 +290,22 @@ fun MapShareMenu(
                     // Azimuts
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                         Text(txtAzimuths, modifier = Modifier.weight(1f))
-                        if (useOneUi) fr.geotower.ui.components.OneUiSwitch(checked = incAzimuths, onCheckedChange = { incAzimuths = it })
-                        else Switch(checked = incAzimuths, onCheckedChange = { incAzimuths = it })
+                        GeoTowerSwitch(checked = incAzimuths, onCheckedChange = { incAzimuths = it }, useOneUi = useOneUi)
                     }
                     // Compteur de vitesse
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                         Text(txtSpeedometer, modifier = Modifier.weight(1f))
-                        if (useOneUi) fr.geotower.ui.components.OneUiSwitch(checked = incSpeedometer, onCheckedChange = { incSpeedometer = it })
-                        else Switch(checked = incSpeedometer, onCheckedChange = { incSpeedometer = it })
+                        GeoTowerSwitch(checked = incSpeedometer, onCheckedChange = { incSpeedometer = it }, useOneUi = useOneUi)
                     }
                     // Échelle
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                         Text(txtScale, modifier = Modifier.weight(1f))
-                        if (useOneUi) fr.geotower.ui.components.OneUiSwitch(checked = incScale, onCheckedChange = { incScale = it })
-                        else Switch(checked = incScale, onCheckedChange = { incScale = it })
+                        GeoTowerSwitch(checked = incScale, onCheckedChange = { incScale = it }, useOneUi = useOneUi)
                     }
                     // Crédits (Attribution)
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                         Text(txtAttributionOption, modifier = Modifier.weight(1f))
-                        if (useOneUi) fr.geotower.ui.components.OneUiSwitch(checked = incAttribution, onCheckedChange = { incAttribution = it })
-                        else Switch(checked = incAttribution, onCheckedChange = { incAttribution = it })
+                        GeoTowerSwitch(checked = incAttribution, onCheckedChange = { incAttribution = it }, useOneUi = useOneUi)
                     }
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
@@ -320,8 +316,7 @@ fun MapShareMenu(
                             Text(txtShareConfidentialOption, fontWeight = FontWeight.Bold, color = if(incConfidential) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
                             Text(txtShareConfidentialDesc, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        if (useOneUi) fr.geotower.ui.components.OneUiSwitch(checked = incConfidential, onCheckedChange = { incConfidential = it })
-                        else Switch(checked = incConfidential, onCheckedChange = { incConfidential = it })
+                        GeoTowerSwitch(checked = incConfidential, onCheckedChange = { incConfidential = it }, useOneUi = useOneUi)
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -389,7 +384,7 @@ fun MapShareMenu(
                             }, 300)
                         },
                         modifier = Modifier.fillMaxWidth().height(56.dp),
-                        shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
+                        shape = oneUiActionButtonShape(useOneUi)
                     ) {
                         Text(txtGenerateImage, fontWeight = FontWeight.Bold)
                     }

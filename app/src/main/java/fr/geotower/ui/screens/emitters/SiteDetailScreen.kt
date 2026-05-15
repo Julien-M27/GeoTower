@@ -111,6 +111,7 @@ import fr.geotower.data.upload.SignalQuestUploadDraftStore
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadRules
 import fr.geotower.ui.components.rememberSafeClick
+import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
@@ -193,11 +194,10 @@ fun SiteDetailScreen(
 
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
-    val forceOneUi by AppConfig.forceOneUiTheme
+    val useOneUi = AppConfig.useOneUiDesign
 
     val isSystemDark = isSystemInDarkTheme()
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemDark)
-    val useOneUi = forceOneUi
     val isOled = isOledMode
 
     val mainBgColor = if (isDark && isOled) Color.Black else MaterialTheme.colorScheme.background
@@ -209,7 +209,7 @@ fun SiteDetailScreen(
     val sheetBgColor = if (isDark && isOled) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
 
     val blockShape = if (useOneUi) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
-    val buttonShape = if (useOneUi) CircleShape else RoundedCornerShape(12.dp)
+    val buttonShape = oneUiActionButtonShape(useOneUi)
 
     var globalMapRef by remember { mutableStateOf<org.osmdroid.views.MapView?>(null) }
     val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
@@ -901,9 +901,11 @@ fun SiteDetailScreen(
                                         contentColor = MaterialTheme.colorScheme.onSecondaryContainer
                                     )
                                 ) {
-                                    Icon(Icons.Default.Map, null, modifier = Modifier.size(24.dp))
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(AppStrings.openMap, fontWeight = FontWeight.Bold)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(24.dp))
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(AppStrings.openMap, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    }
                                 }
                             }
                         }
@@ -918,9 +920,11 @@ fun SiteDetailScreen(
                                         contentColor = MaterialTheme.colorScheme.onPrimary
                                     )
                                 ) {
-                                    Icon(Icons.Default.Terrain, null, modifier = Modifier.size(24.dp))
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(AppStrings.elevationProfileButton, fontWeight = FontWeight.Bold)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Terrain, contentDescription = null, modifier = Modifier.size(24.dp))
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(AppStrings.elevationProfileButton, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    }
                                 }
                             }
                         }
@@ -935,16 +939,22 @@ fun SiteDetailScreen(
                                         contentColor = MaterialTheme.colorScheme.onTertiaryContainer
                                     )
                                 ) {
-                                    Icon(Icons.Default.Speed, null, modifier = Modifier.size(24.dp))
-                                    Spacer(modifier = Modifier.width(12.dp))
-                                    Text(AppStrings.throughputCalculatorButton, fontWeight = FontWeight.Bold)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(24.dp))
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(AppStrings.throughputCalculatorButton, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    }
                                 }
                             }
                         }
                         "nav" -> {
                             if (showNav) {
                                 Button(onClick = { safeClick { showNavigationSheet = true } }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = buttonShape, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) {
-                                    Icon(Icons.Default.Navigation, null, modifier = Modifier.size(24.dp)); Spacer(modifier = Modifier.width(12.dp)); Text(txtNavToSite, fontWeight = FontWeight.Bold)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(24.dp))
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(txtNavToSite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    }
                                 }
                             }
                         }
@@ -1059,8 +1069,8 @@ fun SiteDetailScreen(
 
 @Composable
 private fun AppLauncherButton(isInstalled: Boolean, appName: String, txtOpen: String, txtInstall: String, useOneUi: Boolean, onClick: () -> Unit) {
-    Button(onClick = onClick, modifier = Modifier.fillMaxWidth().height(56.dp), shape = if (useOneUi) CircleShape else RoundedCornerShape(12.dp), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
-        Row(verticalAlignment = Alignment.CenterVertically) { Icon(if (isInstalled) Icons.AutoMirrored.Filled.Launch else Icons.Default.Download, null, modifier = Modifier.size(20.dp)); Spacer(modifier = Modifier.width(8.dp)); Text(if (isInstalled) "$txtOpen $appName" else "$txtInstall $appName", fontWeight = FontWeight.Bold) }
+    Button(onClick = onClick, modifier = Modifier.fillMaxWidth().height(56.dp), shape = oneUiActionButtonShape(useOneUi), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
+        Row(verticalAlignment = Alignment.CenterVertically) { Icon(if (isInstalled) Icons.AutoMirrored.Filled.Launch else Icons.Default.Download, null, modifier = Modifier.size(20.dp)); Spacer(modifier = Modifier.width(8.dp)); Text(if (isInstalled) "$txtOpen $appName" else "$txtInstall $appName", fontWeight = FontWeight.Bold, fontSize = 16.sp) }
     }
 }
 

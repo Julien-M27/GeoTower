@@ -3,7 +3,6 @@ package fr.geotower.ui.screens.home
 import android.annotation.SuppressLint
 import android.content.Context
 import android.widget.ImageView
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -78,6 +77,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import fr.geotower.data.workers.AppUpdateNotifier
 import fr.geotower.data.workers.DatabaseDownloadWorker
 import fr.geotower.ui.components.rememberSafeClick
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.OperatorLogos
 import kotlinx.coroutines.launch
@@ -101,29 +101,21 @@ fun HomeScreen(navController: NavController) {
     val displayLogoResId = OperatorLogos.homeLogoChoiceRes(homeLogoChoice, logoResId)
 
     // --- 1. LECTURE RÉACTIVE DU THÈME ET DESIGN ---
-    val themeMode by AppConfig.themeMode
-    val isOledMode by AppConfig.isOledMode
-    val forceOneUi by AppConfig.forceOneUiTheme
+    val uiStyle = LocalGeoTowerUiStyle.current
 
-    val isSystemDark = isSystemInDarkTheme()
-    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemDark)
+    val isDark = uiStyle.isDark
 
-    val useOneUi = forceOneUi
-    val isOled = isOledMode
+    val useOneUi = uiStyle.useOneUi
 
     // On force la couleur "Pâle" peu importe le thème
     val paleColor = if (isDark) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer
     val onPaleColor = if (isDark) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onPrimaryContainer
 
     // Couleur de fond de l'écran
-    val mainBgColor = if (isDark && isOled) Color.Black else MaterialTheme.colorScheme.background
+    val mainBgColor = uiStyle.backgroundColor
 
     // Couleur des boutons inactifs (Gris One UI ou Classique)
-    val buttonBgColor = if (useOneUi) {
-        if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
-    } else {
-        MaterialTheme.colorScheme.surfaceVariant
-    }
+    val buttonBgColor = if (useOneUi) uiStyle.bubbleColor else MaterialTheme.colorScheme.surfaceVariant
 
     // ---> 1. AJOUT : ON ÉCOUTE LE RÉSEAU ICI <---
     val isOnline by fr.geotower.utils.rememberNetworkConnectivityState()

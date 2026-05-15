@@ -68,6 +68,8 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withTimeoutOrNull
 import fr.geotower.data.db.AppDatabase
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppUiMode
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
@@ -85,7 +87,9 @@ class AntennaWidget : GlanceAppWidget() {
         val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
         val lastUpdate = prefs.getString("widget_last_update", "--:--") ?: "--:--"
         val isOled = prefs.getBoolean("oled_mode", false)
-        val isSamsungDevice = Build.MANUFACTURER.equals("samsung", ignoreCase = true)
+        val useOneUi = AppUiMode.fromStorageKey(
+            prefs.getString(AppConfig.PREF_UI_MODE, AppUiMode.Auto.storageKey)
+        ).usesOneUi()
 
         val jsonData = prefs.getString("widget_data_api", null)
         var realSites: List<WidgetSiteData> = emptyList()
@@ -196,7 +200,7 @@ class AntennaWidget : GlanceAppWidget() {
                             modifier = GlanceModifier
                                 .fillMaxWidth()
                                 .background(cardBgColor)
-                                .cornerRadius(if (isSamsungDevice) 24.dp else 12.dp)
+                                .cornerRadius(if (useOneUi) 24.dp else 12.dp)
                                 .padding(8.dp)
                                 .clickable(actionRunCallback<CheckPermissionAndRefreshAction>()), // ✅ On appelle notre nouvelle action ici !
                             verticalAlignment = Alignment.CenterVertically,
@@ -235,14 +239,14 @@ class AntennaWidget : GlanceAppWidget() {
                                     flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
                                 }
 
-                                val opsList = site.operateur?.split(" • ") ?: emptyList()
+                                val opsList = OperatorColors.keysFor(site.operateur)
 
                                 Column(
                                     modifier = GlanceModifier
                                         .fillMaxWidth()
                                         .padding(bottom = if (isShortWidget) 0.dp else 8.dp)
                                         .background(cardBgColor)
-                                        .cornerRadius(if (isSamsungDevice) 24.dp else 12.dp)
+                                        .cornerRadius(if (useOneUi) 24.dp else 12.dp)
                                         .padding(
                                             horizontal = if (isShortWidget) 6.dp else if (isSmallWidget) 8.dp else 12.dp,
                                             vertical = if (isShortWidget) 2.dp else if (isSmallWidget) 8.dp else 12.dp
@@ -356,9 +360,15 @@ fun GlanceOperatorGrid(opsList: List<String>, gridSize: Dp) {
 @Composable
 fun GlanceGridCell(opName: String?, modifier: GlanceModifier) {
     val iconRes = OperatorLogos.drawableRes(opName)
+    val spec = OperatorColors.specForKey(opName)
+    val fallbackColor = spec?.let { Color(it.colorArgb) }
 
     val cellColor = if (iconRes == null) {
-        ColorProvider(day = Color.Gray.copy(alpha = 0.1f), night = Color.Gray.copy(alpha = 0.1f))
+        if (fallbackColor != null) {
+            ColorProvider(day = fallbackColor.copy(alpha = 0.14f), night = fallbackColor.copy(alpha = 0.18f))
+        } else {
+            ColorProvider(day = Color.Gray.copy(alpha = 0.1f), night = Color.Gray.copy(alpha = 0.1f))
+        }
     } else {
         ColorProvider(day = Color.Transparent, night = Color.Transparent)
     }
@@ -378,6 +388,16 @@ fun GlanceGridCell(opName: String?, modifier: GlanceModifier) {
                 contentDescription = null,
                 modifier = GlanceModifier.fillMaxSize().cornerRadius(6.dp),
                 contentScale = ContentScale.Crop
+            )
+        } else if (spec != null && fallbackColor != null) {
+            Text(
+                text = spec.label.take(1).uppercase(),
+                style = TextStyle(
+                    color = ColorProvider(day = fallbackColor, night = fallbackColor),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    textAlign = TextAlign.Center
+                )
             )
         }
     }
@@ -488,26 +508,10 @@ class RefreshWidgetAction : ActionCallback {
                         }
                     }
 
-                    val baseOrder = listOf("ORANGE", "BOUYGUES", "SFR", "FREE")
-
                     val ops = siteAntennas.mapNotNull { it.operateur }
-                        .flatMap { it.split(Regex("[/,\\-]")) }
-                        .map { it.trim().uppercase() }
-                        .filter { it.isNotEmpty() }
-                        .sortedBy { op ->
-                            val match = baseOrder.firstOrNull { op.contains(it) }
-                            if (match != null) baseOrder.indexOf(match) else 99
-                        }
-                        .map { op ->
-                            when {
-                                op.contains("ORANGE") -> "ORANGE"
-                                op.contains("BOUYGUES") -> "BOUYGUES"
-                                op.contains("FREE") -> "FREE"
-                                op.contains("SFR") -> "SFR"
-                                else -> op
-                            }
-                        }
+                        .flatMap { OperatorColors.keysFor(it) }
                         .distinct()
+                        .sortedBy { op -> OperatorColors.orderedKeys.indexOf(op).takeIf { it >= 0 } ?: 99 }
 
                     val operateurText = ops.joinToString(" • ")
                     val colorHex = if (ops.size == 1) {

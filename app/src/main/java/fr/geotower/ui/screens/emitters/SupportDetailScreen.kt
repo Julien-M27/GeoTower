@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -73,10 +72,12 @@ import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.ui.components.SupportShareMenu
 import fr.geotower.ui.components.rememberSafeClick
+import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.OperatorColors
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -90,6 +91,7 @@ fun SupportDetailScreen(
     navController: NavController,
     repository: AnfrRepository,
     siteId: Long,
+    highlightedOperatorKey: String? = null,
     isSplitScreen: Boolean = false,
     onCloseSplitScreen: () -> Unit = {},
     onAntennaClick: (Long) -> Unit = {}
@@ -100,21 +102,21 @@ fun SupportDetailScreen(
 
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
-    val forceOneUi by AppConfig.forceOneUiTheme
+    val useOneUi = AppConfig.useOneUiDesign
 
     val isSystemDark = isSystemInDarkTheme()
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemDark)
     var globalMapRef by remember { mutableStateOf<org.osmdroid.views.MapView?>(null) }
 
-    val useOneUi = forceOneUi
     val mainBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.background
     val cardBgColor = if (useOneUi && isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant
 
     val blockShape = if (useOneUi) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
-    val buttonShape = if (useOneUi) CircleShape else RoundedCornerShape(12.dp)
+    val buttonShape = oneUiActionButtonShape(useOneUi)
     val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
 
     val safeClick = rememberSafeClick()
+    val effectiveHighlightedOperatorKey = OperatorColors.keyFor(highlightedOperatorKey)
 
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "emitters")
 
@@ -138,7 +140,7 @@ fun SupportDetailScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scrollState = rememberScrollState()
 
-    LaunchedEffect(siteId) {
+    LaunchedEffect(siteId, effectiveHighlightedOperatorKey) {
         // 1️⃣ CHARGEMENT RAPIDE (Base de données) -> Bloque l'écran une fraction de seconde
         try {
             isLoading = true
@@ -194,17 +196,19 @@ fun SupportDetailScreen(
                 }
 
                 val defaultOp = AppConfig.defaultOperator.value.uppercase()
-                val baseOrder = listOf("ORANGE", "BOUYGUES", "SFR", "FREE")
+                val baseOrder = OperatorColors.orderedKeys
                 val priorityList = mutableListOf<String>()
-
-                if (defaultOp != "AUCUN" && baseOrder.any { defaultOp.contains(it) }) {
-                    priorityList.add(baseOrder.first { defaultOp.contains(it) })
+                fun addPriorityOperator(key: String?) {
+                    if (key != null && key !in priorityList) priorityList.add(key)
                 }
+
+                addPriorityOperator(effectiveHighlightedOperatorKey)
+                addPriorityOperator(OperatorColors.keyFor(defaultOp))
                 baseOrder.forEach { if (!priorityList.contains(it)) priorityList.add(it) }
 
                 antennas = fetchedAntennas.sortedBy { antenna ->
-                    val name = (antenna.operateur ?: "").uppercase()
-                    val matchedOp = priorityList.firstOrNull { name.contains(it) }
+                    val matchedOp = OperatorColors.keysFor(antenna.operateur)
+                        .minByOrNull { key -> priorityList.indexOf(key).takeIf { it >= 0 } ?: 99 }
                     if (matchedOp != null) priorityList.indexOf(matchedOp) else 99
                 }
 
@@ -478,7 +482,8 @@ fun SupportDetailScreen(
                                         sitesHs = hsDataMap.values.toList(),
                                         blockShape = blockShape,
                                         cardBorder = cardBorder,
-                                        onMapReady = { globalMapRef = it }
+                                        onMapReady = { globalMapRef = it },
+                                        focusOperator = effectiveHighlightedOperatorKey
                                     )
                                 }
                             }
@@ -580,6 +585,7 @@ fun SupportDetailScreen(
                                         cardBgColor = cardBgColor,
                                         blockShape = blockShape,
                                         useOneUi = useOneUi,
+                                        priorityOperatorKey = effectiveHighlightedOperatorKey,
                                         onAntennaClick = { idAnfr ->
                                             safeClick {
                                                 val cleanId = idAnfr.toLongOrNull() ?: 0L

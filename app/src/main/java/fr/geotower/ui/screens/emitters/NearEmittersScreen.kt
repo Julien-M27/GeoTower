@@ -94,6 +94,7 @@ import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -159,18 +160,17 @@ private data class NearbySearchSpec(
 fun NearEmittersScreen(
     navController: NavController,
     repository: AnfrRepository,
-    onSupportClick: ((UiSite) -> Unit)? = null
+    onSupportClick: ((UiSite, String?) -> Unit)? = null
 ) {
     val context = LocalContext.current
 
     // --- LECTURE RÉACTIVE DU THÈME D'ABORD ---
-    val forceOneUi by AppConfig.forceOneUiTheme
+    val useOneUi = AppConfig.useOneUiDesign
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
     val isSystemDark = isSystemInDarkTheme()
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemDark)
 
-    val useOneUi = forceOneUi
     val isOled = isOledMode
 
     val cardShape = if (useOneUi) RoundedCornerShape(28.dp) else RoundedCornerShape(12.dp)
@@ -206,6 +206,14 @@ fun NearEmittersScreen(
     val showSearchSuggestions by remember { mutableStateOf(prefs.getBoolean("show_search_suggestions", true)) }
     val showNearbySites by remember { mutableStateOf(prefs.getBoolean("show_nearby_sites", true)) }
     val nearbyOrder by remember { mutableStateOf(prefs.getString("nearby_order", "search,sites")!!.split(",")) }
+    val searchedOperatorKey = remember(searchQuery) {
+        val spec = parseNearbySearchQuery(searchQuery)
+        if (spec.field == NearbySearchField.Operator) {
+            OperatorColors.keyFor(spec.value)
+        } else {
+            null
+        }
+    }
 
     // --- GESTION DU GPS ---
     DisposableEffect(Unit) {
@@ -622,7 +630,13 @@ fun NearEmittersScreen(
                                             verticalArrangement = Arrangement.spacedBy(12.dp)
                                         ) {
                                             items(filteredSites, key = { it.id }) { site ->
-                                                EmitterCard(site = site, useOneUi = useOneUi, cardShape = cardShape, cardColor = cardColor) {
+                                                EmitterCard(
+                                                    site = site,
+                                                    useOneUi = useOneUi,
+                                                    cardShape = cardShape,
+                                                    cardColor = cardColor,
+                                                    priorityOperatorKey = searchedOperatorKey
+                                                ) {
                                                     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
                                                     prefs.edit()
                                                         .putFloat("clicked_lat", site.latitude.toFloat())
@@ -630,9 +644,10 @@ fun NearEmittersScreen(
                                                         .apply()
 
                                                     if (onSupportClick != null) {
-                                                        onSupportClick(site)
+                                                        onSupportClick(site, searchedOperatorKey)
                                                     } else {
-                                                        navController.navigate("support_detail/${site.id}")
+                                                        val highlightedOperatorParam = searchedOperatorKey?.let { "?operator=$it" }.orEmpty()
+                                                        navController.navigate("support_detail/${site.id}$highlightedOperatorParam")
                                                     }
                                                 }
                                             }
@@ -968,6 +983,7 @@ fun EmitterCard(
     useOneUi: Boolean,
     cardShape: Shape,
     cardColor: Color,
+    priorityOperatorKey: String? = null,
     onClick: () -> Unit
 ) {
     val isMi = AppConfig.distanceUnit.intValue == 1
@@ -1019,7 +1035,7 @@ fun EmitterCard(
 
             Spacer(modifier = Modifier.width(12.dp))
 
-            OperatorGrid(operators = site.operators)
+            OperatorGrid(operators = site.operators, priorityOperatorKey = priorityOperatorKey)
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -1034,18 +1050,21 @@ fun EmitterCard(
 }
 
 @Composable
-fun OperatorGrid(operators: List<String>) {
+fun OperatorGrid(operators: List<String>, priorityOperatorKey: String? = null) {
     val defaultOp = AppConfig.defaultOperator.value.uppercase()
-    val baseOrder = listOf("ORANGE", "BOUYGUES", "SFR", "FREE")
+    val baseOrder = OperatorColors.orderedKeys
     val priorityList = mutableListOf<String>()
-
-    if (defaultOp != "AUCUN" && baseOrder.any { defaultOp.contains(it) }) {
-        priorityList.add(baseOrder.first { defaultOp.contains(it) })
+    fun addPriorityOperator(key: String?) {
+        if (key != null && key !in priorityList) priorityList.add(key)
     }
+
+    addPriorityOperator(priorityOperatorKey)
+    addPriorityOperator(OperatorColors.keyFor(defaultOp))
     baseOrder.forEach { if (!priorityList.contains(it)) priorityList.add(it) }
 
+    val parsedOperators = operators.flatMap { OperatorColors.keysFor(it) }.distinct()
     val sortedOperators = priorityList.filter { priorityOp ->
-        operators.any { op -> op.contains(priorityOp, ignoreCase = true) }
+        priorityOp in parsedOperators
     }
     val displayOps = sortedOperators.take(4)
 
@@ -1071,24 +1090,35 @@ fun OperatorGrid(operators: List<String>) {
 @Composable
 fun GridCell(opName: String?, modifier: Modifier = Modifier) {
     val iconRes = OperatorLogos.drawableRes(opName)
+    val spec = OperatorColors.specForKey(opName)
 
-    val isPresent = iconRes != null
     val cornerShape = RoundedCornerShape(6.dp)
+    val fallbackColor = spec?.let { Color(it.colorArgb) }
 
     Box(
         modifier = modifier
             .fillMaxSize()
             .clip(cornerShape)
-            .background(if (isPresent) Color.Transparent else Color.Gray.copy(alpha = 0.1f)),
+            .background(
+                when {
+                    iconRes != null -> Color.Transparent
+                    fallbackColor != null -> fallbackColor.copy(alpha = 0.14f)
+                    else -> Color.Gray.copy(alpha = 0.1f)
+                }
+            ),
         contentAlignment = Alignment.Center
     ) {
-        iconRes?.let { icon ->
+        if (iconRes != null) {
             Image(
-                painter = painterResource(id = icon),
+                painter = painterResource(id = iconRes),
                 contentDescription = null,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(cornerShape)
+                modifier = Modifier.fillMaxSize().clip(cornerShape)
+            )
+        } else if (spec != null && fallbackColor != null) {
+            Text(
+                text = spec.label.take(1).uppercase(),
+                color = fallbackColor,
+                fontWeight = FontWeight.Bold
             )
         }
     }
@@ -1129,9 +1159,7 @@ private suspend fun mapAntennasToUiSites(
         } ?: 0f
 
         val operators = list.mapNotNull { it.operateur }
-            .flatMap { it.split(Regex("[/,\\-]")) }
-            .map { it.trim().uppercase(Locale.ROOT) }
-            .filter { it.isNotEmpty() }
+            .flatMap { OperatorColors.keysFor(it) }
             .distinct()
 
         val techniques = list.mapNotNull { techniquesById[it.idAnfr] }
@@ -1155,6 +1183,11 @@ private suspend fun mapAntennasToUiSites(
         val technicalText = (technicalParts + technologies).joinToString(" ")
         val postalCode = extractNearbyPostalCode(fullAddress)
         val city = extractNearbyCity(fullAddress)
+        val operatorSearchText = operators.flatMap { key ->
+            val spec = OperatorColors.specForKey(key)
+            listOfNotNull(key, spec?.label) + spec?.aliases.orEmpty()
+        }.joinToString(" ")
+
         val searchText = listOf(
             fullAddress,
             allAddresses.joinToString(" "),
@@ -1165,7 +1198,7 @@ private suspend fun mapAntennasToUiSites(
             main.idAnfr,
             main.latitude.toString(),
             main.longitude.toString(),
-            operators.joinToString(" "),
+            operatorSearchText,
             anfrIds.joinToString(" "),
             supportIds.joinToString(" "),
             supportTypes.joinToString(" "),
@@ -1249,7 +1282,11 @@ private val nearbyCoordinateRegex =
 private fun inferNearbySearchField(value: String): NearbySearchField {
     val normalized = normalizeNearbySearchCompact(value)
     return when {
-        normalized in setOf("orange", "sfr", "bouygues", "free") -> NearbySearchField.Operator
+        OperatorColors.all.any { operator ->
+            normalized == normalizeNearbySearchCompact(operator.key) ||
+                normalized == normalizeNearbySearchCompact(operator.label) ||
+                operator.aliases.any { alias -> normalized == normalizeNearbySearchCompact(alias) }
+        } -> NearbySearchField.Operator
         normalized in setOf("2g", "3g", "4g", "5g", "gsm", "umts", "lte", "nr") -> NearbySearchField.Technology
         else -> NearbySearchField.All
     }

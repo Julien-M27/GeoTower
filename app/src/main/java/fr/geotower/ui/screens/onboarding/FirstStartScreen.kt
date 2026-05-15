@@ -83,6 +83,7 @@ import fr.geotower.ui.components.colorPaletteFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.services.LiveTrackingController
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppUiMode
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorLogos
 import kotlinx.coroutines.Dispatchers
@@ -164,21 +165,16 @@ fun FirstStartScreen(
 
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE) }
-    var forceOneUi by AppConfig.forceOneUiTheme
     val defaultOperator by AppConfig.defaultOperator // Récupération de l'opérateur actuel
     val liveNotifsEnabled by AppConfig.enableLiveNotifications
 
     LaunchedEffect(Unit) {
-        if (!prefs.contains("force_one_ui")) {
-            val isSamsung = android.os.Build.MANUFACTURER.contains("samsung", ignoreCase = true)
-            if (isSamsung) forceOneUi = true
-        }
         AppConfig.localDatabaseState.value = withContext(Dispatchers.IO) {
             GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context).state
         }
     }
 
-    val useOneUi = forceOneUi
+    val useOneUi = AppConfig.useOneUiDesign
     var showOperatorSheet by remember { mutableStateOf(false) }
     var showWarningDialog by remember { mutableStateOf(false) } // État du pop-up d'avertissement
     var showDbWarning by remember { mutableStateOf(false) }
@@ -969,8 +965,13 @@ fun StepThemeDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStrok
     var themeMode by AppConfig.themeMode
     var isOled by AppConfig.isOledMode
     var isBlurEnabled by AppConfig.isBlurEnabled
-    var forceOneUi by AppConfig.forceOneUiTheme
     val menuSize by AppConfig.menuSize
+
+    fun updateOneUi(enabled: Boolean) {
+        val mode = AppUiMode.fromOneUiEnabled(enabled)
+        AppConfig.uiMode.value = mode
+        prefs.edit().putString(AppConfig.PREF_UI_MODE, mode.storageKey).apply()
+    }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         Spacer(modifier = Modifier.height(16.dp))
@@ -987,7 +988,7 @@ fun StepThemeDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStrok
         fr.geotower.ui.components.AppearanceOptionsBlock(
             themeMode = themeMode, onThemeChange = { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() },
             isOled = isOled, onOledChange = { isOled = it; prefs.edit().putBoolean("is_oled_mode", it).apply() },
-            useOneUi = forceOneUi, onOneUiChange = { forceOneUi = it; prefs.edit().putBoolean("force_one_ui", it).apply() },
+            useOneUi = useOneUi, onOneUiChange = ::updateOneUi,
             isBlur = isBlurEnabled, onBlurChange = { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() },
             menuSize = menuSize,
             onMenuSizeChange = { newSize ->

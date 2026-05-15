@@ -405,8 +405,7 @@ fun DatabaseDownloadCard(
             shape = shape,
             containerColor = MaterialTheme.colorScheme.surface,
             dismissButton = {
-                // "Oui" en rouge (Texte pur)
-                TextButton(onClick = {
+                DialogDestructiveButton(text = AppStrings.yes, onClick = {
                     showDeleteDialog = false
 
                     // 1. Fermer proprement la connexion à la BDD
@@ -419,22 +418,10 @@ fun DatabaseDownloadCard(
                     // 3. Déclencher le rafraîchissement visuel instantanément
                     dbRefreshTrigger++
 
-                }) {
-                    Text(AppStrings.yes, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.Bold)
-                }
+                })
             },
             confirmButton = {
-                // "Non" dans un rectangle aux coins ronds
-                Button(
-                    onClick = { showDeleteDialog = false },
-                    shape = RoundedCornerShape(8.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary,
-                        contentColor = MaterialTheme.colorScheme.onPrimary
-                    )
-                ) {
-                    Text(AppStrings.no, fontWeight = FontWeight.Bold)
-                }
+                DialogNeutralButton(text = AppStrings.no, onClick = { showDeleteDialog = false })
             }
         )
     }

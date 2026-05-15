@@ -1,7 +1,5 @@
 package fr.geotower.ui.components
 
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
@@ -14,7 +12,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -28,26 +25,14 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColors
 
+fun oneUiActionButtonShape(
+    useOneUi: Boolean,
+    defaultShape: Shape = RoundedCornerShape(12.dp)
+): Shape = if (useOneUi) RoundedCornerShape(22.dp) else defaultShape
+
 // ============================================================
-// 1. LOGIQUE MATHÉMATIQUE DES SWITCHS ET BOUTONS ONE UI
+// 1. LOGIQUE MATHÉMATIQUE DES BOUTONS ONE UI
 // ============================================================
-
-@Composable
-fun OneUiSwitch(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
-    val isSystemDark = isSystemInDarkTheme()
-    val activeTrackColor = MaterialTheme.colorScheme.primary
-    val inactiveTrackColor = if (isSystemDark) Color(0xFF3E3E40) else Color(0xFFE5E5EA)
-
-    val trackColor by animateColorAsState(targetValue = if (checked) activeTrackColor else inactiveTrackColor, animationSpec = tween(durationMillis = 250, easing = LinearOutSlowInEasing), label = "trackColor")
-
-    // Logique mathématique pour l'animation et la taille
-    val trackWidth = 52.dp; val trackHeight = 32.dp; val thumbSize = 24.dp; val padding = (trackHeight - thumbSize) / 2
-    val thumbOffset by animateDpAsState(targetValue = if (checked) trackWidth - thumbSize - padding else padding, animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessLow), label = "thumbOffset")
-
-    Box(modifier = Modifier.width(trackWidth).height(trackHeight).clip(CircleShape).background(trackColor).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = { onCheckedChange(!checked) }), contentAlignment = Alignment.CenterStart) {
-        Box(modifier = Modifier.offset(x = thumbOffset).size(thumbSize).shadow(1.dp, CircleShape).clip(CircleShape).background(Color.White))
-    }
-}
 
 @Composable
 fun OneUiRadioButton(
@@ -159,14 +144,38 @@ fun OperatorSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
-        Column(modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier
+                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text(AppStrings.defaultOperator, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 24.dp))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OperatorItem(AppStrings.none, null, Color.Gray, tempOp == "Aucun", useOneUi, bubbleColor) { tempOp = "Aucun" }
-                OperatorItem("Orange", R.drawable.logo_orange, Color(OperatorColors.ORANGE_ARGB), tempOp == "Orange", useOneUi, bubbleColor) { tempOp = "Orange" }
-                OperatorItem("Bouygues Telecom", R.drawable.logo_bouygues, Color(OperatorColors.BOUYGUES_ARGB), tempOp == "Bouygues Telecom", useOneUi, bubbleColor) { tempOp = "Bouygues Telecom" }
-                OperatorItem("SFR", R.drawable.logo_sfr, Color(OperatorColors.SFR_ARGB), tempOp == "SFR", useOneUi, bubbleColor) { tempOp = "SFR" }
-                OperatorItem("Free", R.drawable.logo_free, Color(OperatorColors.FREE_ARGB), tempOp == "Free", useOneUi, bubbleColor) { tempOp = "Free" }
+                OperatorGroupTitle(AppStrings.operatorRegionMetro)
+                OperatorColors.metro.forEach { operator ->
+                    OperatorItem(
+                        name = operator.label,
+                        logoRes = fr.geotower.utils.OperatorLogos.drawableRes(operator.key),
+                        operatorColor = Color(operator.colorArgb),
+                        isSelected = OperatorColors.keyFor(tempOp) == operator.key,
+                        useOneUi = useOneUi,
+                        bubbleColor = bubbleColor
+                    ) { tempOp = operator.label }
+                }
+
+                OperatorGroupTitle(AppStrings.operatorRegionOverseas)
+                OperatorColors.overseas.forEach { operator ->
+                    OperatorItem(
+                        name = operator.label,
+                        logoRes = fr.geotower.utils.OperatorLogos.drawableRes(operator.key),
+                        operatorColor = Color(operator.colorArgb),
+                        isSelected = OperatorColors.keyFor(tempOp) == operator.key,
+                        useOneUi = useOneUi,
+                        bubbleColor = bubbleColor
+                    ) { tempOp = operator.label }
+                }
 
                 Button(
                     onClick = { onSelect(tempOp); onDismiss() },
@@ -179,6 +188,17 @@ fun OperatorSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
 }
 
 @Composable
+private fun OperatorGroupTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.labelLarge,
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+    )
+}
+
+@Composable
 fun OperatorItem(name: String, logoRes: Int?, operatorColor: Color, isSelected: Boolean, useOneUi: Boolean, bubbleColor: Color, onClick: () -> Unit) {
     val activeBg = operatorColor.copy(alpha = 0.1f)
     val bgColor = if (isSelected) activeBg else (if (useOneUi) bubbleColor else Color.Transparent)
@@ -187,7 +207,9 @@ fun OperatorItem(name: String, logoRes: Int?, operatorColor: Color, isSelected: 
     Surface(onClick = onClick, modifier = Modifier.fillMaxWidth().height(64.dp), color = bgColor, border = border, shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)) {
         Row(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             if (logoRes != null) Image(painterResource(logoRes), null, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)))
-            else Box(modifier = Modifier.size(40.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Icon(Icons.Default.Block, null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+            else Box(modifier = Modifier.size(40.dp).background(operatorColor.copy(alpha = 0.14f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                Text(text = name.take(1).uppercase(), color = operatorColor, fontWeight = FontWeight.Bold)
+            }
             Spacer(modifier = Modifier.width(16.dp))
             Text(text = name, style = MaterialTheme.typography.titleMedium, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1f))
             if (useOneUi) OneUiRadioButton(isSelected, selectedColor = operatorColor, onClick = onClick) else RadioButton(selected = isSelected, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = operatorColor))

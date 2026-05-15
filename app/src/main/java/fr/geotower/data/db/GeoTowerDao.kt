@@ -284,25 +284,25 @@ interface GeoTowerDao {
     """)
     suspend fun getFaisceauxDetails(idAnfr: String): List<FaisceauxEntity>
 
-    @Query("SELECT AVG(latitude) AS centerLat, AVG(longitude) AS centerLon, COUNT(*) AS count FROM localisation WHERE latitude BETWEEN :minLat AND :maxLat AND longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(latitude / 2.5), ROUND(longitude / 3.0)")
+    @Query("SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators FROM localisation l LEFT JOIN ref_operateur o ON l.operateur_id = o.id WHERE l.latitude BETWEEN :minLat AND :maxLat AND l.longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(l.latitude / 2.5), ROUND(l.longitude / 3.0)")
     suspend fun getL1Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
 
-    @Query("SELECT AVG(latitude) AS centerLat, AVG(longitude) AS centerLon, COUNT(*) AS count FROM localisation WHERE latitude BETWEEN :minLat AND :maxLat AND longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(latitude / 1.0), ROUND(longitude / 1.2)")
+    @Query("SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators FROM localisation l LEFT JOIN ref_operateur o ON l.operateur_id = o.id WHERE l.latitude BETWEEN :minLat AND :maxLat AND l.longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(l.latitude / 1.0), ROUND(l.longitude / 1.2)")
     suspend fun getL2Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
 
-    @Query("SELECT AVG(latitude) AS centerLat, AVG(longitude) AS centerLon, COUNT(*) AS count FROM localisation WHERE latitude BETWEEN :minLat AND :maxLat AND longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(latitude / 0.4), ROUND(longitude / 0.5)")
+    @Query("SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators FROM localisation l LEFT JOIN ref_operateur o ON l.operateur_id = o.id WHERE l.latitude BETWEEN :minLat AND :maxLat AND l.longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(l.latitude / 0.4), ROUND(l.longitude / 0.5)")
     suspend fun getL3Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
 
-    @Query("SELECT AVG(latitude) AS centerLat, AVG(longitude) AS centerLon, COUNT(*) AS count FROM localisation WHERE latitude BETWEEN :minLat AND :maxLat AND longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(latitude / 0.15), ROUND(longitude / 0.2)")
+    @Query("SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators FROM localisation l LEFT JOIN ref_operateur o ON l.operateur_id = o.id WHERE l.latitude BETWEEN :minLat AND :maxLat AND l.longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(l.latitude / 0.15), ROUND(l.longitude / 0.2)")
     suspend fun getL4Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
 
-    @Query("SELECT AVG(latitude) AS centerLat, AVG(longitude) AS centerLon, COUNT(*) AS count FROM localisation WHERE latitude BETWEEN :minLat AND :maxLat AND longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(latitude, 1), ROUND(longitude, 1)")
+    @Query("SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators FROM localisation l LEFT JOIN ref_operateur o ON l.operateur_id = o.id WHERE l.latitude BETWEEN :minLat AND :maxLat AND l.longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(l.latitude, 1), ROUND(l.longitude, 1)")
     suspend fun getL5Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
 
-    @Query("SELECT AVG(latitude) AS centerLat, AVG(longitude) AS centerLon, COUNT(*) AS count FROM localisation WHERE latitude BETWEEN :minLat AND :maxLat AND longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(latitude / 0.05), ROUND(longitude / 0.06)")
+    @Query("SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators FROM localisation l LEFT JOIN ref_operateur o ON l.operateur_id = o.id WHERE l.latitude BETWEEN :minLat AND :maxLat AND l.longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(l.latitude / 0.05), ROUND(l.longitude / 0.06)")
     suspend fun getL6Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
 
-    @Query("SELECT AVG(latitude) AS centerLat, AVG(longitude) AS centerLon, COUNT(*) AS count FROM localisation WHERE latitude BETWEEN :minLat AND :maxLat AND longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(latitude / 0.02), ROUND(longitude / 0.025)")
+    @Query("SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators FROM localisation l LEFT JOIN ref_operateur o ON l.operateur_id = o.id WHERE l.latitude BETWEEN :minLat AND :maxLat AND l.longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(l.latitude / 0.02), ROUND(l.longitude / 0.025)")
     suspend fun getL7Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
 
     @Query("""

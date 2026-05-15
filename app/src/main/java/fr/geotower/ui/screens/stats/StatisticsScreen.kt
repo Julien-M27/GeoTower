@@ -58,31 +58,27 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
             val counts4GMap = mutableMapOf<String, Int>()
             val counts5GMap = mutableMapOf<String, Int>() // ✅ NOUVEAU
 
-            val operatorsToFetch = OperatorColors.orderedKeys
+            val operatorsToFetch = OperatorColors.all
 
-            for (op in operatorsToFetch) {
-                totalMap[op] = repository.getUniqueSupportCountByOperator(op)
-                counts4GMap[op] = repository.get4GSupportCountByOperator(op)
-                counts5GMap[op] = repository.get5GSupportCountByOperator(op) // ✅ NOUVEAU
+            for (operator in operatorsToFetch) {
+                val queryName = operator.aliases.firstOrNull() ?: operator.key
+                totalMap[operator.key] = repository.getUniqueSupportCountByOperator(queryName)
+                counts4GMap[operator.key] = repository.get4GSupportCountByOperator(queryName)
+                counts5GMap[operator.key] = repository.get5GSupportCountByOperator(queryName) // ✅ NOUVEAU
             }
 
             val baseOrder = OperatorColors.orderedKeys
             val displayOrder = mutableListOf<String>()
-            if (defaultOp != "AUCUN" && baseOrder.any { defaultOp.contains(it, ignoreCase = true) }) {
-                displayOrder.add(baseOrder.first { defaultOp.contains(it, ignoreCase = true) })
-            }
+            OperatorColors.keyFor(defaultOp)?.let { displayOrder.add(it) }
             baseOrder.forEach { if (!displayOrder.contains(it)) displayOrder.add(it) }
 
             // Fonction utilitaire pour transformer les Maps en listes triées
-            fun formatData(map: Map<String, Int>) = displayOrder.map { op ->
-                val name = when(op) {
-                    "ORANGE" -> "Orange"
-                    "BOUYGUES" -> "Bouygues"
-                    "SFR" -> "SFR"
-                    "FREE" -> "Free"
-                    else -> op
+            fun formatData(map: Map<String, Int>): List<Pair<String, Int>> {
+                val rows = displayOrder.map { op ->
+                    val name = OperatorColors.specForKey(op)?.label ?: op
+                    Pair(name, map[op] ?: 0)
                 }
-                Pair(name, map[op] ?: 0)
+                return rows.filter { it.second > 0 }.ifEmpty { rows }
             }
 
             supportCounts = formatData(totalMap)

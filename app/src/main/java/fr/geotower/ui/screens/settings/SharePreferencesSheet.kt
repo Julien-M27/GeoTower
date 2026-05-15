@@ -27,8 +27,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.SheetState
 import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -345,11 +343,11 @@ fun SimpleSwitchCardWithDesc(title: String, desc: String, checked: Boolean, onCh
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (useOneUi) {
-                fr.geotower.ui.components.OneUiSwitch(checked, onCheckedChange)
-            } else {
-                Switch(checked = checked, onCheckedChange = onCheckedChange, colors = SwitchDefaults.colors(checkedTrackColor = MaterialTheme.colorScheme.primary))
-            }
+            fr.geotower.ui.components.GeoTowerSwitch(
+                checked = checked,
+                onCheckedChange = onCheckedChange,
+                useOneUi = useOneUi
+            )
         }
     }
 }

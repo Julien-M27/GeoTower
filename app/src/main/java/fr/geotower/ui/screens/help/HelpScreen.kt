@@ -173,7 +173,7 @@ fun HelpScreen(navController: NavController) {
     val themeMode by AppConfig.themeMode
     val isOled by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
-    val useOneUi by AppConfig.forceOneUiTheme
+    val useOneUi = AppConfig.useOneUiDesign
     val helpStyle = HelpUiStyle(
         useOneUi = useOneUi,
         backgroundColor = if (isDark && isOled) Color.Black else MaterialTheme.colorScheme.background,
