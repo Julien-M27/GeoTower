@@ -122,6 +122,7 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SimCard
@@ -129,6 +130,7 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
+import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.components.SafeClick
 import fr.geotower.ui.components.colorPaletteFadingEdge
@@ -163,7 +165,10 @@ private fun resetSettingsToDefaultsAndRestart(context: Context, prefs: SharedPre
     prefs.edit()
         .clear()
         .putBoolean("isFirstRun", false)
+        .putBoolean("is_blur_enabled", true)
         .apply()
+    AppConfig.isBlurEnabled.value = true
+    CommunityDataPreferences.reset(prefs)
 
     UpdateCheckScheduler.reconcile(appContext)
 
@@ -541,6 +546,7 @@ fun SettingsScreen(
 
     var showPagesCustomizationSheet by remember { mutableStateOf(false) }
     var showFrequenciesSheet by remember { mutableStateOf(false) }
+    var showCommunityDataSheet by remember { mutableStateOf(false) }
     var showExternalLinksSheet by remember { mutableStateOf(false) }
     var showStartupPageSheet by remember { mutableStateOf(false) }
     var showThroughputCalculatorSettingsSheet by remember { mutableStateOf(false) }
@@ -793,12 +799,12 @@ fun SettingsScreen(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                             if (navMode == 0 || !isExpanded) {
-                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; offlineMapsBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) }, scrollViewportTop, scrollViewportBottom, scrollState.value, scrollState.maxValue, targetMapFilename = offlineMapsTargetFilename, onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) })
+                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; offlineMapsBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) }, scrollViewportTop, scrollViewportBottom, scrollState.value, scrollState.maxValue, targetMapFilename = offlineMapsTargetFilename, onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) })
                             } else {
                                 when (activeSectionIndex) {
                                     0 -> SectionApparence(themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true })
                                     1 -> SectionCartographie(mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick)
-                                    2 -> SectionPreferences(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick)
+                                    2 -> SectionPreferences(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick)
                                     3 -> SectionSysteme(context, cardShape, border = cardBorder, bubbleColor = bubbleBaseColor, useOneUi = useOneUi, safeClick = safeClick)
                                     4 -> SectionDatabase(
                                         isExpanded,
@@ -1342,6 +1348,13 @@ fun SettingsScreen(
                 bubbleColor = bubbleBaseColor
             )
         }
+        if (showCommunityDataSheet) {
+            CommunityDataSettingsSheet(
+                onDismiss = { showCommunityDataSheet = false },
+                sheetState = sheetState,
+                useOneUi = useOneUi
+            )
+        }
         if (showExternalLinksSheet) {
             ExternalLinksSettingsSheet(
                 onDismiss = { showExternalLinksSheet = false },
@@ -1514,6 +1527,7 @@ fun AllSettingsContent(
     isWide: Boolean, nav: Int, onNav: (Int) -> Unit, theme: Int, onTheme: (Int) -> Unit, oled: Boolean, onOled: (Boolean) -> Unit, oneUi: Boolean, onOneUi: (Boolean) -> Unit, blur: Boolean, onBlur: (Boolean) -> Unit, logo: Int, onIcon: () -> Unit, op: String, onOp: () -> Unit, lang: String, onLang: () -> Unit,
     onUnitSettings: () -> Unit,
     onPages: () -> Unit,
+    onCommunityData: () -> Unit,
     onExternalLinks: () -> Unit,
     onSharePrefs: () -> Unit,
     map: Int,
@@ -1551,7 +1565,7 @@ fun AllSettingsContent(
     }
     Spacer(Modifier.height(32.dp))
     Column(modifier = preferencesSectionModifier.fillMaxWidth()) {
-        SectionPreferences(isWide, nav, onNav, op, onOp, lang, onLang, onUnitSettings, onPages, onExternalLinks, onSharePrefs, shape, border, bubbleColor, useOneUi, safeClick)
+        SectionPreferences(isWide, nav, onNav, op, onOp, lang, onLang, onUnitSettings, onPages, onCommunityData, onExternalLinks, onSharePrefs, shape, border, bubbleColor, useOneUi, safeClick)
     }
     Spacer(Modifier.height(32.dp))
     Column(modifier = systemSectionModifier.fillMaxWidth()) {
@@ -1632,6 +1646,7 @@ fun SectionPreferences(
     op: String, onOp: () -> Unit, lang: String, onLang: () -> Unit,
     onUnitSettings: () -> Unit,
     onPages: () -> Unit,
+    onCommunityData: () -> Unit,
     onExternalLinks: () -> Unit,
     onSharePrefs: () -> Unit,
     shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick
@@ -1868,6 +1883,18 @@ fun SectionPreferences(
         useOneUi = useOneUi,
         safeClick = safeClick,
         icon = Icons.Default.Edit
+    )
+    Spacer(Modifier.height(12.dp))
+    PreferenceActionCard(
+        title = AppStrings.communityDataSettingsTitle,
+        desc = AppStrings.communityDataSettingsDesc,
+        onClick = onCommunityData,
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi,
+        safeClick = safeClick,
+        icon = Icons.Default.Groups
     )
     Spacer(Modifier.height(12.dp))
     PreferenceActionCard(

@@ -558,8 +558,15 @@ object AppStrings {
     val siteAddressOption @Composable get() = get("Adresse et Coordonnées", "Address & Coordinates", "Endereço e Coordonadas")
     val siteFreqsOption @Composable get() = get("Fréquences, Spectres et Azimuts", "Frequencies, Spectrum & Azimuths", "Frequências, Espectros e Azimutes")
     val siteLinksOption @Composable get() = get("Liens externes", "External links", "Links externes")
-    val externalLinksSettingsTitle @Composable get() = get("Liens externes & Communautés", "External links & Communities", "Links externes e Communidades")
-    val externalLinksSettingsDesc @Composable get() = get("Gérer l'ordre et l'affichage des raccourcis", "Manage the order and display of shortcuts", "Gerir a ordre e présentation dos atalhos")
+    val communityDataSettingsTitle @Composable get() = get("Données communautaires", "Community data", "Dados comunitários")
+    val communityDataSettingsDesc @Composable get() = get("Choisir les opérateurs, les sources et l'ordre d'affichage des photos et speedtests.", "Choose operators, sources, and display order for photos and speedtests.", "Escolher operadores, fontes e ordem de apresentação das fotos e speedtests.")
+    val communityDataPhotos @Composable get() = get("Photos", "Photos", "Fotos")
+    val communityDataSpeedtest @Composable get() = get("Speedtest", "Speedtest", "Speedtest")
+    val communityDataShowOperatorPhotos @Composable get() = get("Afficher les photos de cet opérateur", "Show photos for this operator", "Mostrar fotos deste operador")
+    val communityDataPhotoSourceOrder @Composable get() = get("Ordre des sources", "Source order", "Ordem das fontes")
+    val communityDataPhotoSourceFallbackOnly @Composable get() = get("Afficher seulement si les sources au-dessus n'ont aucune photo", "Show only if sources above have no photos", "Mostrar apenas se as fontes acima não tiverem fotos")
+    val externalLinksSettingsTitle @Composable get() = get("Liens externes", "External links", "Links externos")
+    val externalLinksSettingsDesc @Composable get() = get("Gérer l'ordre et l'affichage des raccourcis externes", "Manage the order and display of external shortcuts", "Gerir a ordem e apresentação dos atalhos externos")
     val resetSettings @Composable get() = get("Réinitialiser les paramètres", "Reset settings", "Redefinir configurações")
     val resetWarningTitle @Composable get() = get("Attention", "Warning", "Aviso")
     val resetWarningDesc @Composable get() = get("Êtes-vous sûr de vouloir rétablir les paramètres par défaut ? Cela supprimera tous les réglages que vous avez faits dans l'application.", "Are you sure you want to restore default settings? This will delete all settings you have made in the app.", "Tem certeza de que deseja restaurar as configurações padrão? Isso excluirá toutes as configurações que vous avez fez no aplicativo.")
@@ -1169,6 +1176,7 @@ object AppStrings {
     val addPhotos @Composable get() = get("Ajouter des photos", "Add photos", "Adicionar fotos")
     val camera @Composable get() = get("Appareil photo", "Camera", "Câmara")
     val gallery @Composable get() = get("Galerie", "Gallery", "Galeria")
+    val externalPhotoFiles @Composable get() = get("Fichiers / disque externe", "Files / external drive", "Ficheiros / disco externo")
     val uploadPhotosPrompt @Composable get() = get("Envoyer des photos", "Upload photos", "Enviar fotos")
     val photoPrepareError @Composable get() = get("Impossible de préparer les photos.", "Could not prepare photos.", "Não foi possível preparar as fotos.")
     val previous @Composable get() = get("Précédent", "Previous", "Anterior")
@@ -1291,13 +1299,20 @@ object AppStrings {
         "Pode desativar as notificações live a qualquer momento nas definições do GeoTower."
     )
     val onboardingLiveNotificationsSelectedOperator @Composable get() = get("Opérateur sélectionné", "Selected operator", "Operadora selecionada")
-    val onboardingLocationDisabledTitle @Composable get() = get("Localisation non activée", "Location not enabled", "Localização não ativada")
+    val onboardingLocationDisabledTitle @Composable get() = get("Autorisation de localisation refusée", "Location permission denied", "Autorização de localização recusada")
     val onboardingLocationDisabledDesc @Composable get() = get(
-        "La localisation n'est pas activée. GeoTower ne pourra pas localiser rapidement les émetteurs proches de vous.",
-        "Location is not enabled. GeoTower will not be able to quickly locate nearby transmitters.",
-        "A localização não está ativada. O GeoTower não conseguirá localizar rapidamente os emissores perto de si."
+        "L'autorisation de localisation a été refusée. Certaines fonctionnalités seront limitées, comme la recherche autour de vous, le recentrage de la carte et le suivi live.",
+        "Location permission was denied. Some features will be limited, such as nearby search, map recentering, and live tracking.",
+        "A autorização de localização foi recusada. Algumas funcionalidades ficarão limitadas, como a pesquisa perto de si, o recentramento do mapa e o acompanhamento live."
+    )
+    val onboardingNotificationsDisabledTitle @Composable get() = get("Autorisation de notifications refusée", "Notification permission denied", "Autorização de notificações recusada")
+    val onboardingNotificationsDisabledDesc @Composable get() = get(
+        "L'autorisation de notifications a été refusée. Certaines fonctionnalités seront limitées, comme le suivi des téléchargements, les alertes de mise à jour et les notifications live.",
+        "Notification permission was denied. Some features will be limited, such as download progress, update alerts, and live notifications.",
+        "A autorização de notificações foi recusada. Algumas funcionalidades ficarão limitadas, como o progresso das transferências, os alertas de atualização e as notificações live."
     )
     val retry @Composable get() = get("Réessayer", "Try again", "Tentar novamente")
+    val permissionContinueAnyway @Composable get() = get("Continuer tout de même", "Continue anyway", "Continuar mesmo assim")
     val btnLetsGo @Composable get() = get("C'est parti !", "Let's go!", "Vamos lá!")
 
     val themeDesc @Composable get() = get("Choisissez le style qui vous convient.", "Choose the style that suits you.", "Escolha o estilo que mais lhe convém.")
@@ -1507,7 +1522,10 @@ object AppStrings {
     val operatorDetailsTitle @Composable get() = get("Détail par opérateur", "Operator details", "Detalhe por operadora")
     @Composable
     fun sitesCount(count: Int) = get("$count sites", "$count sites", "$count locais")
+    val activeDeclaredSitesLabel @Composable get() = get("Actifs / déclarés", "Active / declared", "Ativos / declarados")
     val frequenciesAndTechs @Composable get() = get("Technologies / Fréquences", "Technologies / Frequencies", "Tecnologias / Frequências")
+    val loadingOperatorStats @Composable get() = get("Chargement des opérateurs...", "Loading operators...", "A carregar operadoras...")
+    val loadingFrequencies @Composable get() = get("Chargement des fréquences...", "Loading frequencies...", "A carregar frequências...")
     val sitesLabel @Composable get() = get("Sites", "Sites", "Locais")
 
     val statsSupportsTitle @Composable get() = get("Supports (Pylônes)", "Supports (Pylons)", "Suportes (Pilões)")
@@ -1668,9 +1686,9 @@ object AppStrings {
 
     @Composable
     fun uploadResultText(success: Int, total: Int) = get(
-        "$success sur $total photo(s) envoyée(s) avec succès.",
-        "$success out of $total photo(s) successfully sent.",
-        "$success de $total foto(s) enviadas com sucesso."
+        "$success sur $total photo(s) envoyée(s) avec succès vers Signal Quest.",
+        "$success out of $total photo(s) successfully sent to Signal Quest.",
+        "$success de $total foto(s) enviadas com sucesso para Signal Quest."
     )
 
     val uploadErrorWarning @Composable get() = get(
@@ -1899,8 +1917,8 @@ object AppStrings {
     fun signalQuestUploadChannelName(ctx: android.content.Context) = getForService(ctx, "Envoi Signal Quest", "Signal Quest upload", "Envio Signal Quest")
     fun signalQuestUploadProgress(ctx: android.content.Context, current: Int, total: Int) = getForService(ctx, "Envoi en cours ($current/$total)...", "Uploading ($current/$total)...", "A enviar ($current/$total)...")
     fun signalQuestUploadRetry(ctx: android.content.Context) = getForService(ctx, "Échec réseau, nouvel essai plus tard.", "Network error, retrying later.", "Erro de rede, nova tentativa mais tarde.")
-    fun signalQuestUploadSuccess(ctx: android.content.Context, success: Int, total: Int) = getForService(ctx, "$success/$total photos envoyées avec succès !", "$success/$total photos sent successfully!", "$success/$total fotos enviadas com sucesso!")
-    fun signalQuestUploadPartial(ctx: android.content.Context, success: Int, total: Int) = getForService(ctx, "$success/$total photos envoyées. Certaines ont échoué.", "$success/$total photos sent. Some failed.", "$success/$total fotos enviadas. Algumas falharam.")
+    fun signalQuestUploadSuccess(ctx: android.content.Context, success: Int, total: Int) = getForService(ctx, "$success/$total photos envoyées avec succès vers Signal Quest !", "$success/$total photos sent successfully to Signal Quest!", "$success/$total fotos enviadas com sucesso para Signal Quest!")
+    fun signalQuestUploadPartial(ctx: android.content.Context, success: Int, total: Int) = getForService(ctx, "$success/$total photos envoyées vers Signal Quest. Certaines ont échoué.", "$success/$total photos sent to Signal Quest. Some failed.", "$success/$total fotos enviadas para Signal Quest. Algumas falharam.")
 
     fun widgetTitle(ctx: android.content.Context) = getForService(ctx, "📍 Antennes à proximité", "📍 Nearby antennas", "📍 Antenas próximas")
     fun widgetUpdatedAt(ctx: android.content.Context, lastUpdate: String) = getForService(ctx, "Mis à jour à $lastUpdate", "Updated at $lastUpdate", "Atualizado às $lastUpdate")

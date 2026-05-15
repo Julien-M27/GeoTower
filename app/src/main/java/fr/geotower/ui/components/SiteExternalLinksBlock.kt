@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.geotower.R
+import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.utils.AppStrings
 
@@ -85,18 +86,12 @@ fun SiteExternalLinksBlock(
                             }
                         }
                         "signalquest" -> {
-                            if (showSignalQuest && (info.operateur?.contains("SFR", true) == true || info.operateur?.contains("BOUYGUES", true) == true)) {
+                            val signalQuestOperator = SignalQuestOperators.operatorParamFor(info.operateur)
+                            if (showSignalQuest && signalQuestOperator != null) {
                                 CommunityLinkRow(siteExternalLinkById(block)?.label ?: "Signal Quest", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_signalquest, buttonShape) {
                                     safeClick {
-                                        // 1. Formatage de l'opérateur pour l'URL
-                                        val operator = when {
-                                            info.operateur?.contains("SFR", true) == true -> "SFR"
-                                            info.operateur?.contains("BOUYGUES", true) == true -> "BOUYGUES"
-                                            else -> info.operateur ?: ""
-                                        }
-
-                                        // 2. Construction de l'URL avec id_support comme siteId
-                                        val deeplinkUrl = "https://signalquest.fr/site?siteId=${idSupport ?: ""}&operator=$operator&lat=${info.latitude}&lng=${info.longitude}&open=antenna&autoOpen=0"
+                                        // 1. Construction de l'URL avec l'opérateur normalisé
+                                        val deeplinkUrl = "https://signalquest.fr/site?siteId=${idSupport ?: ""}&operator=$signalQuestOperator&lat=${info.latitude}&lng=${info.longitude}&open=antenna&autoOpen=0"
 
                                         if (isSignalQuestInstalled) {
                                             // 3. Création de l'Intent pour ouvrir le deeplink dans l'application

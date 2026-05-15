@@ -21,9 +21,13 @@ interface GeoTowerDao {
             l.code_insee,
             l.azimuts_fh,
             l.tech_mask,
-            l.band_mask
+            l.band_mask,
+            COALESCE(st.libelle, '') AS statut,
+            COALESCE(t.has_active, 0) AS has_active
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
+        LEFT JOIN ref_statut st ON t.statut_id = st.id
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
     """)
@@ -39,7 +43,9 @@ interface GeoTowerDao {
             l.code_insee,
             l.azimuts_fh,
             l.tech_mask,
-            l.band_mask
+            l.band_mask,
+            COALESCE(st.libelle, '') AS statut,
+            COALESCE(t.has_active, 0) AS has_active
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         LEFT JOIN technique t ON l.id_anfr = t.id_anfr
@@ -70,9 +76,13 @@ interface GeoTowerDao {
             l.code_insee,
             l.azimuts_fh,
             l.tech_mask,
-            l.band_mask
+            l.band_mask,
+            COALESCE(st.libelle, '') AS statut,
+            COALESCE(t.has_active, 0) AS has_active
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
+        LEFT JOIN ref_statut st ON t.statut_id = st.id
         ORDER BY ((l.latitude - :lat) * (l.latitude - :lat) + (l.longitude - :lon) * (l.longitude - :lon)) ASC
         LIMIT 100
     """)
@@ -88,9 +98,13 @@ interface GeoTowerDao {
             l.code_insee,
             l.azimuts_fh,
             l.tech_mask,
-            l.band_mask
+            l.band_mask,
+            COALESCE(st.libelle, '') AS statut,
+            COALESCE(t.has_active, 0) AS has_active
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
+        LEFT JOIN ref_statut st ON t.statut_id = st.id
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
         AND ((l.latitude - :lat) * (l.latitude - :lat) + (l.longitude - :lon) * (l.longitude - :lon)) <= :maxDistanceSquared
@@ -315,9 +329,13 @@ interface GeoTowerDao {
             l.code_insee,
             l.azimuts_fh,
             l.tech_mask,
-            l.band_mask
+            l.band_mask,
+            COALESCE(st.libelle, '') AS statut,
+            COALESCE(t.has_active, 0) AS has_active
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
+        LEFT JOIN ref_statut st ON t.statut_id = st.id
         WHERE l.id_anfr LIKE '%' || :query || '%'
         OR l.id_anfr IN (SELECT id_anfr FROM support WHERE id_support LIKE '%' || :query || '%')
         LIMIT 50
@@ -334,10 +352,13 @@ interface GeoTowerDao {
             l.code_insee,
             l.azimuts_fh,
             l.tech_mask,
-            l.band_mask
+            l.band_mask,
+            COALESCE(st.libelle, '') AS statut,
+            COALESCE(t.has_active, 0) AS has_active
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         LEFT JOIN technique t ON l.id_anfr = t.id_anfr
+        LEFT JOIN ref_statut st ON t.statut_id = st.id
         LEFT JOIN support s ON l.id_anfr = s.id_anfr
         LEFT JOIN ref_nature n ON s.nat_id = n.nat_id
         LEFT JOIN ref_proprietaire p ON s.tpo_id = p.tpo_id
@@ -385,10 +406,13 @@ interface GeoTowerDao {
             l.code_insee,
             l.azimuts_fh,
             l.tech_mask,
-            l.band_mask
+            l.band_mask,
+            COALESCE(st.libelle, '') AS statut,
+            COALESCE(t.has_active, 0) AS has_active
         FROM localisation l
         INNER JOIN technique t ON l.id_anfr = t.id_anfr
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN ref_statut st ON t.statut_id = st.id
         WHERE UPPER(COALESCE(t.adresse, '')) LIKE '%' || UPPER(:query) || '%'
         LIMIT :limit
     """)
@@ -404,9 +428,13 @@ interface GeoTowerDao {
             l.code_insee,
             l.azimuts_fh,
             l.tech_mask,
-            l.band_mask
+            l.band_mask,
+            COALESCE(st.libelle, '') AS statut,
+            COALESCE(t.has_active, 0) AS has_active
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
+        LEFT JOIN ref_statut st ON t.statut_id = st.id
         WHERE CAST(l.id_anfr AS INTEGER) = CAST(:exactId AS INTEGER)
         OR l.id_anfr IN (
             SELECT id_anfr FROM support WHERE CAST(id_support AS INTEGER) = CAST(:exactId AS INTEGER)

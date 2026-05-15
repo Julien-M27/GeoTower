@@ -1982,30 +1982,6 @@ fun SitePhotosSettingsSheet(
                         Column {
                             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                             
-                            // CellularFR
-                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(AppStrings.showCellularFrPhotosLabel, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                                fr.geotower.ui.components.GeoTowerSwitch(
-                                    checked = AppConfig.siteShowCellularFrPhotos.value,
-                                    onCheckedChange = { saveBool("site_show_cellularfr_photos", AppConfig.siteShowCellularFrPhotos, it) },
-                                    modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
-                                    useOneUi = useOneUi,
-                                    checkedColor = switchColor
-                                )
-                            }
-                            
-                            // SignalQuest
-                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(AppStrings.showSignalQuestPhotosLabel, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-                                fr.geotower.ui.components.GeoTowerSwitch(
-                                    checked = AppConfig.siteShowSignalQuestPhotos.value,
-                                    onCheckedChange = { saveBool("site_show_signalquest_photos", AppConfig.siteShowSignalQuestPhotos, it) },
-                                    modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
-                                    useOneUi = useOneUi,
-                                    checkedColor = switchColor
-                                )
-                            }
-                            
                             // Schematics
                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                 Text(AppStrings.showSchemesLabel, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
@@ -2026,8 +2002,6 @@ fun SitePhotosSettingsSheet(
             TextButton(
                 onClick = {
                     saveBool("page_site_photos", AppConfig.siteShowPhotos, true)
-                    saveBool("site_show_cellularfr_photos", AppConfig.siteShowCellularFrPhotos, true)
-                    saveBool("site_show_signalquest_photos", AppConfig.siteShowSignalQuestPhotos, true)
                     saveBool("site_show_schemes", AppConfig.siteShowSchemes, true)
                 },
                 modifier = Modifier.align(Alignment.CenterHorizontally)

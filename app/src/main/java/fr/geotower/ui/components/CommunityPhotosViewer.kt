@@ -76,10 +76,11 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.isNetworkAvailable
-import fr.geotower.ui.components.readSiteExternalLinkOrder
+import fr.geotower.data.api.SignalQuestOperators
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import androidx.compose.material.icons.filled.CloudOff
@@ -177,6 +178,7 @@ fun formatPhotoDate(isoDate: String?): String {
 fun CommunityPhotosSectionShared(
     photos: List<CommunityPhoto>,
     operatorName: String?,
+    operatorNames: List<String?> = listOf(operatorName),
     supportNature: String? = null, // 🚨 AJOUT DE LA NATURE DU SUPPORT
     supportOwner: String? = null,
     bgColor: Color,
@@ -186,40 +188,70 @@ fun CommunityPhotosSectionShared(
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
-    val linksOrder = readSiteExternalLinkOrder(prefs)
-    val showCellularFr = AppConfig.siteShowCellularFrPhotos.value
-    val showSignalQuest = AppConfig.siteShowSignalQuestPhotos.value
-    val showRncMobile = prefs.getBoolean("link_rncmobile", true) // Fallback to link pref if no specific site pref
-    val showEnbAnalytics = prefs.getBoolean("link_enbanalytics", true)
+    val dataOperators = operatorNames.ifEmpty { listOf(operatorName) }
+    val dataOperatorKeys = remember(dataOperators, AppConfig.defaultOperator.value) {
+        val availableKeys = dataOperators
+            .mapNotNull { CommunityDataPreferences.operatorKeyFor(it) }
+            .distinct()
+        val preferredKeys = CommunityDataPreferences
+            .orderedOperators(AppConfig.defaultOperator.value)
+            .map { it.key }
+        preferredKeys.filter { it in availableKeys } + availableKeys.filterNot { it in preferredKeys }
+    }
+    val showCellularFr = CommunityDataPreferences.isPhotoSourceEnabledForAny(
+        prefs,
+        dataOperators,
+        CommunityDataPreferences.SOURCE_CELLULARFR
+    )
+    val showSignalQuest = CommunityDataPreferences.isPhotoSourceEnabledForAny(
+        prefs,
+        dataOperators,
+        CommunityDataPreferences.SOURCE_SIGNALQUEST
+    )
+    val photoSourceOrder = CommunityDataPreferences.orderedPhotoSourceIdsForOperatorKeys(prefs, dataOperatorKeys)
+    val photoSourceRank = photoSourceOrder.withIndex().associate { (index, sourceId) -> sourceId to index }
+    val sourceEnabledById = mapOf(
+        CommunityDataPreferences.SOURCE_CELLULARFR to showCellularFr,
+        CommunityDataPreferences.SOURCE_SIGNALQUEST to showSignalQuest
+    )
+    val availablePhotoSourceIds = remember(photos) {
+        photos.mapNotNull { photo -> CommunityDataPreferences.sourceIdForCommunityName(photo.communityName) }.toSet()
+    }
+    val fallbackOnlyBySource = photoSourceOrder.associateWith { sourceId ->
+        CommunityDataPreferences.isPhotoSourceFallbackOnlyForOperatorKeys(prefs, dataOperatorKeys, sourceId)
+    }
+    val visiblePhotoSourceIds = photoSourceOrder.filterIndexed { index, sourceId ->
+        val isEnabled = sourceEnabledById[sourceId] ?: true
+        if (!isEnabled) {
+            false
+        } else if (fallbackOnlyBySource[sourceId] == true) {
+            val previousSourceHasPhotos = photoSourceOrder
+                .take(index)
+                .any { previousSourceId ->
+                    sourceEnabledById[previousSourceId] == true &&
+                        previousSourceId in availablePhotoSourceIds
+                }
+            !previousSourceHasPhotos
+        } else {
+            true
+        }
+    }.toSet()
 
     // FILTRAGE
-    val filteredPhotos = remember(photos, linksOrder, showCellularFr, showSignalQuest, showRncMobile, showEnbAnalytics) {
+    val filteredPhotos = remember(photos, visiblePhotoSourceIds, photoSourceOrder) {
         photos.filter { photo ->
-            val name = photo.communityName.lowercase()
-            when {
-                name.contains("cellular") -> showCellularFr
-                name.contains("signal") -> showSignalQuest
-                name.contains("rnc") -> showRncMobile
-                name.contains("enb") -> showEnbAnalytics
-                else -> true
-            }
+            CommunityDataPreferences.sourceIdForCommunityName(photo.communityName)
+                ?.let { it in visiblePhotoSourceIds }
+                ?: true
         }.sortedBy { photo ->
-            val name = photo.communityName.lowercase()
-            val id = when {
-                name.contains("cellular") -> "cellularfr"
-                name.contains("rnc") -> "rncmobile"
-                name.contains("signal") -> "signalquest"
-                name.contains("enb") -> "enbanalytics"
-                else -> ""
-            }
-            val index = linksOrder.indexOf(id)
-            if (index != -1) index else 999
+            photoSourceRank[CommunityDataPreferences.sourceIdForCommunityName(photo.communityName)] ?: 99
         }
     }
 
     // --- SÉCURITÉ : On vérifie bien la liste FILTRÉE ---
-    // --- NOUVEAU : On vérifie si l'opérateur autorise l'upload (SFR / Bouygues) ---
-    val canUpload = operatorName != null && (operatorName.contains("SFR", true) || operatorName.contains("BOUYGUES", true))
+    // --- NOUVEAU : On vérifie si l'opérateur est supporté par SignalQuest ---
+    val canUpload = SignalQuestOperators.supports(operatorName) &&
+            CommunityDataPreferences.isSignalQuestPhotosEnabled(prefs, operatorName)
 
     // ✅ NOUVEAU : On vérifie si on est en ligne en réutilisant ta fonction MapScreen
     val isOnline = isNetworkAvailable(context)
@@ -413,7 +445,7 @@ fun CommunityPhotosSectionShared(
                             }
                         }
 
-                        // 4. ENFIN, LE BOUTON D'UPLOAD (Seulement pour SFR / Bouygues)
+                        // 4. ENFIN, LE BOUTON D'UPLOAD (opérateur supporté par SignalQuest)
                         // Il se mettra en tout dernier
                         if (canUpload && onAddPhotoClick != null) {
                             item {

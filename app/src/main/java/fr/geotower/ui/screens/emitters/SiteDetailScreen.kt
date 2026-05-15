@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Terrain
@@ -104,6 +105,8 @@ import androidx.work.WorkManager
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.CellularFrApi
+import fr.geotower.data.api.SignalQuestOperators
+import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
@@ -231,10 +234,22 @@ fun SiteDetailScreen(
     var refreshPhotosTrigger by remember { mutableIntStateOf(0) }
     val completedWorkIds = remember { mutableSetOf<UUID>() }
 
-    val currentSiteId = antenna?.idAnfr ?: ""
+    val currentUploadSiteId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: antenna?.idAnfr.orEmpty()
     val unknownText = AppStrings.unknown
-    val workInfos by remember(currentSiteId) {
-        WorkManager.getInstance(context).getWorkInfosByTagFlow("sq_upload_$currentSiteId")
+
+    fun navigateToUploadWithUris(uris: List<Uri>) {
+        val selectedUris = uris.take(SignalQuestUploadRules.MAX_PHOTOS)
+        if (selectedUris.isNotEmpty() && antenna != null) {
+            val draftId = SignalQuestUploadDraftStore.put(selectedUris.map { it.toString() })
+            val uploadSiteId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: antenna!!.idAnfr
+            val safeOperator = Uri.encode(antenna!!.operateur ?: unknownText)
+            val safeAzimuts = Uri.encode(antenna!!.azimuts ?: "")
+            navController.navigate("sq_upload/${uploadSiteId}/${safeOperator}?draftId=$draftId&lat=${antenna!!.latitude}&lon=${antenna!!.longitude}&azimuts=$safeAzimuts")
+        }
+    }
+
+    val workInfos by remember(currentUploadSiteId) {
+        WorkManager.getInstance(context).getWorkInfosByTagFlow("sq_upload_$currentUploadSiteId")
     }.collectAsState(initial = emptyList())
 
     LaunchedEffect(workInfos) {
@@ -247,6 +262,8 @@ fun SiteDetailScreen(
         }
         if (needsRefresh) {
             refreshPhotosTrigger++
+            kotlinx.coroutines.delay(1500L)
+            refreshPhotosTrigger++
         }
     }
 
@@ -258,13 +275,14 @@ fun SiteDetailScreen(
     val photoPickerLauncher = rememberLauncherForActivityResult<PickVisualMediaRequest, List<Uri>>(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = SignalQuestUploadRules.MAX_PHOTOS),
         onResult = { uris ->
-            if (uris.isNotEmpty() && antenna != null) {
-                val draftId = SignalQuestUploadDraftStore.put(uris.map { it.toString() })
-                val uploadSiteId = physique?.idSupport ?: antenna!!.idAnfr
-                val safeOperator = Uri.encode(antenna!!.operateur ?: unknownText)
-                val safeAzimuts = Uri.encode(antenna!!.azimuts ?: "")
-                navController.navigate("sq_upload/${uploadSiteId}/${safeOperator}?draftId=$draftId&lat=${antenna!!.latitude}&lon=${antenna!!.longitude}&azimuts=$safeAzimuts")
-            }
+            navigateToUploadWithUris(uris)
+        }
+    )
+
+    val documentPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments(),
+        onResult = { uris ->
+            navigateToUploadWithUris(uris)
         }
     )
 
@@ -275,11 +293,7 @@ fun SiteDetailScreen(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
         if (success && currentCameraUri != null && antenna != null) {
-            val draftId = SignalQuestUploadDraftStore.put(listOf(currentCameraUri.toString()))
-            val uploadSiteId = physique?.idSupport ?: antenna!!.idAnfr
-            val safeOperator = Uri.encode(antenna!!.operateur ?: unknownText)
-            val safeAzimuts = Uri.encode(antenna!!.azimuts ?: "")
-            navController.navigate("sq_upload/${uploadSiteId}/${safeOperator}?draftId=$draftId&lat=${antenna!!.latitude}&lon=${antenna!!.longitude}&azimuts=$safeAzimuts")
+            navigateToUploadWithUris(listOf(currentCameraUri!!))
         }
     }
 
@@ -420,13 +434,13 @@ fun SiteDetailScreen(
             val photosTemp = mutableListOf<CommunityPhoto>()
 
             // ✅ Séparation en deux blocs `if` distincts (Plus de `else if`)
-            if (opName.contains("ORANGE", true)) {
+            if (CommunityDataPreferences.isCellularFrPhotosEnabled(prefs, opName)) {
                 CellularFrApi.getCellularFrPhotos(trueSupportId).forEach { photo ->
                     photosTemp.add(CommunityPhoto(photo.url, "CellularFR", photo.author, photo.uploadedAt))
                 }
             }
 
-            if (opName.contains("SFR", true) || opName.contains("BOUYGUES", true)) {
+            if (CommunityDataPreferences.isSignalQuestPhotosEnabled(prefs, opName)) {
                 try {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                         val response = fr.geotower.data.api.SignalQuestClient.api.getSitePhotos(
@@ -449,19 +463,17 @@ fun SiteDetailScreen(
         val currentAntenna = antenna
         if (currentAntenna == null || currentAntenna.idAnfr.isBlank()) return@LaunchedEffect
 
-        val opName = currentAntenna.operateur ?: ""
-        val isOpCompatible = opName.contains("SFR", true) || opName.contains("BOUYGUES", true)
+        val apiOperator = SignalQuestOperators.operatorParamFor(currentAntenna.operateur)
 
-        if (fr.geotower.utils.AppConfig.siteShowSpeedtest.value && isOpCompatible) {
+        if (
+            fr.geotower.utils.AppConfig.siteShowSpeedtest.value &&
+            apiOperator != null &&
+            CommunityDataPreferences.isSignalQuestSpeedtestEnabled(prefs, currentAntenna.operateur)
+        ) {
             speedtestData = null
             isSpeedtestLoading = true
             try {
                 val anfrCodeToSend = currentAntenna.idAnfr
-                val apiOperator = when {
-                    opName.contains("SFR", true) -> "SFR"
-                    opName.contains("BOUYGUES", true) -> "BOUYGUES"
-                    else -> null
-                }
 
                 AppLogger.d(TAG_SPEEDTEST, "Speedtest request anfr=$anfrCodeToSend operator=$apiOperator")
 
@@ -1057,6 +1069,22 @@ fun SiteDetailScreen(
                                 Icon(Icons.Default.PhotoLibrary, null)
                                 Spacer(Modifier.width(8.dp))
                                 Text(AppStrings.gallery, fontWeight = FontWeight.Bold)
+                            }
+                            OutlinedButton(
+                                onClick = {
+                                    safeClick {
+                                        showImageSourceDialog = false
+                                        documentPickerLauncher.launch(arrayOf("image/*"))
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                shape = buttonShape,
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                            ) {
+                                Icon(Icons.Default.FolderOpen, null)
+                                Spacer(Modifier.width(8.dp))
+                                Text(AppStrings.externalPhotoFiles, fontWeight = FontWeight.Bold)
                             }
                         }
                     },

@@ -13,9 +13,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.geotower.data.community.CommunityDataPreferences
+import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.api.SqSpeedtestData
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
@@ -35,11 +38,12 @@ fun SpeedtestCard(
     // 1. Vérification du paramètre utilisateur (Affichage activé ?)
     if (!AppConfig.siteShowSpeedtest.value) return
 
-    // 2. Vérification de l'opérateur (Seulement SFR et Bouygues)
-    val isCompatible = operatorName?.contains("SFR", ignoreCase = true) == true ||
-            operatorName?.contains("BOUYGUES", ignoreCase = true) == true
+    // 2. Vérification de l'opérateur supporté par SignalQuest
+    val prefs = LocalContext.current.getSharedPreferences("GeoTowerPrefs", android.content.Context.MODE_PRIVATE)
+    val isCompatible = SignalQuestOperators.supports(operatorName) &&
+            CommunityDataPreferences.isSignalQuestSpeedtestEnabled(prefs, operatorName)
 
-    // Si ce n'est pas SFR ou Bouygues, on ne dessine rien et le bloc disparaît
+    // Si l'opérateur n'est pas supporté, on ne dessine rien et le bloc disparaît
     if (!isCompatible) return
 
     // 3. Dessin de la carte

@@ -119,8 +119,8 @@ fun MapSettingsSheet(
             // 1. OPÉRATEURS
             SectionTitle(AppStrings.operatorsTitle)
             fun saveOperatorSelection(next: Set<String>) {
-                selectedOperatorKeys = next
-                prefs.edit().putStringSet(AppConfig.PREF_SELECTED_OPERATORS, next).apply()
+                AppConfig.saveSelectedOperatorKeys(prefs, next)
+                selectedOperatorKeys = AppConfig.selectedOperatorKeys.value
             }
             val metroOperators = listOfNotNull(
                 OperatorColors.specForKey(OperatorColors.ORANGE_KEY),

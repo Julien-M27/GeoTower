@@ -5,23 +5,28 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -31,6 +36,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import android.net.Uri // 🚨 NOUVEAU
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Add // 🚨 NOUVEAU
@@ -64,13 +70,23 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.oneUiActionButtonShape
@@ -88,6 +104,9 @@ import org.osmdroid.mapsforge.MapsForgeTileProvider
 import org.osmdroid.mapsforge.MapsForgeTileSource
 import org.mapsforge.map.rendertheme.InternalRenderTheme
 import org.osmdroid.tileprovider.MapTileProviderBasic
+import kotlinx.coroutines.delay
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -125,6 +144,92 @@ fun SignalQuestUploadScreen(
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showImageSourceDialog by remember { mutableStateOf(false) }
 
+    fun addSelectedUris(uris: List<Uri>) {
+        if (uris.isNotEmpty()) {
+            val newUris = uris.map { it.toString() }.filter { !currentUris.contains(it) }
+            val availableSlots = SignalQuestUploadRules.MAX_PHOTOS - currentUris.size
+            if (availableSlots > 0) {
+                currentUris.addAll(newUris.take(availableSlots))
+            }
+        }
+    }
+
+    val density = LocalDensity.current
+    val photoCardWidth = 240.dp
+    val photoCardHeight = 280.dp
+    val photoSpacing = 12.dp
+    val addPhotoCardWidth = 100.dp
+    val photoCardWidthPx = with(density) { photoCardWidth.toPx() }
+    val photoSpacingPx = with(density) { photoSpacing.toPx() }
+    val addPhotoCardWidthPx = with(density) { addPhotoCardWidth.toPx() }
+    val photoReorderStepPx = photoCardWidthPx + photoSpacingPx
+    val addPhotoPullThresholdPx = with(density) { 72.dp.toPx() }
+    val addPhotoPullMaxPx = with(density) { 120.dp.toPx() }
+    var draggedPhotoUri by remember { mutableStateOf<String?>(null) }
+    var draggedPhotoOffsetX by remember { mutableStateOf(0f) }
+    var draggedPhotoStartViewportX by remember { mutableStateOf(0f) }
+    var draggedPhotoStartScrollX by remember { mutableStateOf(0f) }
+    var draggedPhotoStartIndex by remember { mutableIntStateOf(-1) }
+    var draggedPhotoTargetIndex by remember { mutableIntStateOf(-1) }
+    var draggedPhotoHasMoved by remember { mutableStateOf(false) }
+    var dragAutoScrollVelocityPx by remember { mutableStateOf(0f) }
+    var addPhotoPullPx by remember { mutableStateOf(0f) }
+    val addPhotoPullProgress by animateFloatAsState(
+        targetValue = if (showImageSourceDialog) {
+            1f
+        } else {
+            (addPhotoPullPx / addPhotoPullThresholdPx).coerceIn(0f, 1f)
+        },
+        label = "add-photo-pull-progress"
+    )
+    val addPhotoExpandedWidth = 76.dp
+    val addPhotoExpandedWidthPx = with(density) { addPhotoExpandedWidth.toPx() }
+    val addPhotoPushPx = addPhotoPullProgress * addPhotoExpandedWidthPx
+
+    fun resetAddPhotoPull() {
+        addPhotoPullPx = 0f
+    }
+
+    fun openImageSourceFromPull() {
+        addPhotoPullPx = addPhotoPullThresholdPx
+        if (!showImageSourceDialog) {
+            showImageSourceDialog = true
+        }
+    }
+
+    fun updateDraggedPhotoTarget(currentScrollX: Float) {
+        if (draggedPhotoStartIndex >= 0 && currentUris.size > 1) {
+            val scrollDelta = currentScrollX - draggedPhotoStartScrollX
+            draggedPhotoTargetIndex = (
+                draggedPhotoStartIndex + ((draggedPhotoOffsetX + scrollDelta) / photoReorderStepPx).roundToInt()
+            ).coerceIn(0, currentUris.lastIndex)
+        }
+    }
+
+    fun clearPhotoDrag() {
+        draggedPhotoUri = null
+        draggedPhotoOffsetX = 0f
+        draggedPhotoStartViewportX = 0f
+        draggedPhotoStartScrollX = 0f
+        draggedPhotoStartIndex = -1
+        draggedPhotoTargetIndex = -1
+        draggedPhotoHasMoved = false
+        dragAutoScrollVelocityPx = 0f
+    }
+
+    fun finishPhotoDrag() {
+        val uri = draggedPhotoUri
+        val targetIndex = draggedPhotoTargetIndex
+        if (uri != null && targetIndex >= 0) {
+            val currentIndex = currentUris.indexOf(uri)
+            if (currentIndex >= 0 && currentIndex != targetIndex) {
+                val movedUri = currentUris.removeAt(currentIndex)
+                currentUris.add(targetIndex.coerceIn(0, currentUris.size), movedUri)
+            }
+        }
+        clearPhotoDrag()
+    }
+
     // Pour la carte
     val ignStyle by AppConfig.ignStyle
 
@@ -151,13 +256,13 @@ fun SignalQuestUploadScreen(
     val photoPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = SignalQuestUploadRules.MAX_PHOTOS)
     ) { uris ->
-        if (uris.isNotEmpty()) {
-            val newUris = uris.map { it.toString() }.filter { !currentUris.contains(it) }
-            val availableSlots = SignalQuestUploadRules.MAX_PHOTOS - currentUris.size
-            if (availableSlots > 0) {
-                currentUris.addAll(newUris.take(availableSlots))
-            }
-        }
+        addSelectedUris(uris)
+    }
+
+    val documentPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenMultipleDocuments()
+    ) { uris ->
+        addSelectedUris(uris)
     }
 
     var currentCameraUri by remember { mutableStateOf<Uri?>(null) }
@@ -191,6 +296,11 @@ fun SignalQuestUploadScreen(
     val activeColor = MaterialTheme.colorScheme.primary
     val backgroundColor = when { effectiveOled -> Color.Black; isDark -> Color(0xFF141414); else -> MaterialTheme.colorScheme.background }
     val surfaceColor = when { effectiveOled -> Color(0xFF222222); isDark -> Color(0xFF2C2C2C); else -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f) }
+    val dialogContainerColor = when {
+        effectiveOled -> Color(0xFF222222)
+        isDark -> Color(0xFF2C2C2C)
+        else -> MaterialTheme.colorScheme.surfaceContainerHigh
+    }
     val textColor = if (isDark) Color.White else MaterialTheme.colorScheme.onSurface
 
     Scaffold(
@@ -260,53 +370,322 @@ fun SignalQuestUploadScreen(
                     }
                 }
             } else {
-                LazyRow(
-                    horizontalArrangement = if (currentUris.size == 1) Arrangement.Center else Arrangement.spacedBy(12.dp),
-                    modifier = Modifier.fillMaxWidth()
+                val carouselScrollState = rememberScrollState()
+                val carouselContentWidth = with(density) {
+                    val photoSlotsWidth = (photoCardWidthPx * currentUris.size) +
+                        (photoSpacingPx * (currentUris.size - 1).coerceAtLeast(0))
+                    val addSlotWidth = if (currentUris.size < SignalQuestUploadRules.MAX_PHOTOS) {
+                        photoSpacingPx + addPhotoCardWidthPx
+                    } else {
+                        0f
+                    }
+                    (photoSlotsWidth + addSlotWidth).toDp()
+                }
+                val addPhotoPullConnection = remember(carouselScrollState, currentUris.size) {
+                    object : NestedScrollConnection {
+                        override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                            if (showImageSourceDialog) return Offset.Zero
+                            if (source != NestedScrollSource.UserInput || addPhotoPullPx <= 0f) return Offset.Zero
+                            if (available.x <= 0f) return Offset.Zero
+
+                            val shrink = minOf(addPhotoPullPx, available.x)
+                            addPhotoPullPx -= shrink
+                            return Offset(x = shrink, y = 0f)
+                        }
+
+                        override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
+                            if (showImageSourceDialog) {
+                                addPhotoPullPx = addPhotoPullThresholdPx
+                                return Offset.Zero
+                            }
+                            if (source != NestedScrollSource.UserInput || currentUris.size >= SignalQuestUploadRules.MAX_PHOTOS) {
+                                resetAddPhotoPull()
+                                return Offset.Zero
+                            }
+
+                            val isAtEnd = carouselScrollState.value >= carouselScrollState.maxValue - 1
+                            if (!isAtEnd && addPhotoPullPx <= 0f) {
+                                return Offset.Zero
+                            }
+
+                            val leftPull = -available.x
+                            return when {
+                                leftPull > 0f -> {
+                                    addPhotoPullPx = (addPhotoPullPx + leftPull).coerceIn(0f, addPhotoPullMaxPx)
+                                    if (addPhotoPullPx >= addPhotoPullThresholdPx) {
+                                        openImageSourceFromPull()
+                                    }
+                                    Offset(x = available.x, y = 0f)
+                                }
+                                available.x > 0f && addPhotoPullPx > 0f -> {
+                                    val shrink = minOf(addPhotoPullPx, available.x)
+                                    addPhotoPullPx -= shrink
+                                    Offset(x = shrink, y = 0f)
+                                }
+                                else -> Offset.Zero
+                            }
+                        }
+
+                        override suspend fun onPostFling(consumed: Velocity, available: Velocity): Velocity {
+                            if (showImageSourceDialog) {
+                                addPhotoPullPx = addPhotoPullThresholdPx
+                                return Velocity.Zero
+                            }
+                            if (addPhotoPullPx >= addPhotoPullThresholdPx * 0.45f) {
+                                openImageSourceFromPull()
+                            } else {
+                                resetAddPhotoPull()
+                            }
+                            return Velocity.Zero
+                        }
+                    }
+                }
+
+                fun currentCarouselScrollX(): Float {
+                    return carouselScrollState.value.toFloat()
+                }
+
+                BoxWithConstraints(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(photoCardHeight)
+                        .nestedScroll(addPhotoPullConnection)
                 ) {
-                    items(currentUris) { uri ->
-                        Box(modifier = Modifier.size(width = 240.dp, height = 280.dp)) {
+                    val viewportWidthPx = with(density) { maxWidth.toPx() }
+                    val autoScrollEdgePx = with(density) { 88.dp.toPx() }
+                    val dragAutoScrollActivationPx = with(density) { 16.dp.toPx() }
+                    val maxAutoScrollVelocityPx = with(density) { 7.dp.toPx() }
+
+                    fun updateDragAutoScroll() {
+                        if (draggedPhotoStartIndex < 0 || draggedPhotoUri == null || !draggedPhotoHasMoved) {
+                            dragAutoScrollVelocityPx = 0f
+                            return
+                        }
+
+                        val draggedLeftInViewport = draggedPhotoStartViewportX + draggedPhotoOffsetX
+                        val draggedRightInViewport = draggedLeftInViewport + photoCardWidthPx
+                        dragAutoScrollVelocityPx = when {
+                            draggedRightInViewport > viewportWidthPx - autoScrollEdgePx -> {
+                                val edgeProgress = (
+                                    (draggedRightInViewport - (viewportWidthPx - autoScrollEdgePx)) /
+                                        autoScrollEdgePx
+                                ).coerceIn(0f, 1f)
+                                edgeProgress * edgeProgress * maxAutoScrollVelocityPx
+                            }
+                            draggedLeftInViewport < autoScrollEdgePx -> {
+                                val edgeProgress = ((autoScrollEdgePx - draggedLeftInViewport) / autoScrollEdgePx)
+                                    .coerceIn(0f, 1f)
+                                -edgeProgress * edgeProgress * maxAutoScrollVelocityPx
+                            }
+                            else -> 0f
+                        }
+                    }
+
+                    LaunchedEffect(draggedPhotoUri) {
+                        while (draggedPhotoUri != null) {
+                            updateDragAutoScroll()
+                            val velocity = dragAutoScrollVelocityPx
+                            if (velocity != 0f) {
+                                val consumedScroll = carouselScrollState.scrollBy(velocity)
+                                if (abs(consumedScroll) < 0.5f) {
+                                    dragAutoScrollVelocityPx = 0f
+                                } else {
+                                    updateDraggedPhotoTarget(currentCarouselScrollX())
+                                }
+                            }
+                            delay(16L)
+                        }
+                    }
+
+                    Box(
+                        modifier = Modifier.fillMaxSize()
+                            .horizontalScroll(carouselScrollState)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .width(carouselContentWidth)
+                                .height(photoCardHeight)
+                        ) {
+                            currentUris.forEachIndexed { index, uri ->
+                                val isDragging = draggedPhotoUri == uri
+                                val targetShift = when {
+                                    isDragging || draggedPhotoStartIndex < 0 || draggedPhotoTargetIndex < 0 -> 0f
+                                    draggedPhotoTargetIndex > draggedPhotoStartIndex &&
+                                        index > draggedPhotoStartIndex &&
+                                        index <= draggedPhotoTargetIndex -> -photoReorderStepPx
+                                    draggedPhotoTargetIndex < draggedPhotoStartIndex &&
+                                        index >= draggedPhotoTargetIndex &&
+                                        index < draggedPhotoStartIndex -> photoReorderStepPx
+                                    else -> 0f
+                                }
+                                val animatedShift by animateFloatAsState(
+                                    targetValue = targetShift,
+                                    animationSpec = tween(durationMillis = 180),
+                                    label = "photo-reorder-shift"
+                                )
+
+                                Box(
+                                    modifier = Modifier
+                                        .offset {
+                                            IntOffset(
+                                                x = ((index * photoReorderStepPx) + animatedShift - addPhotoPushPx).roundToInt(),
+                                                y = 0
+                                            )
+                                        }
+                                        .size(width = photoCardWidth, height = photoCardHeight)
+                                        .graphicsLayer {
+                                            alpha = if (isDragging) 0f else 1f
+                                            shape = photoShape
+                                            clip = true
+                                        }
+                                        .pointerInput(uri, currentUris.size) {
+                                            detectDragGesturesAfterLongPress(
+                                                onDragStart = {
+                                                    val currentScroll = currentCarouselScrollX()
+                                                    draggedPhotoUri = uri
+                                                    draggedPhotoStartIndex = currentUris.indexOf(uri)
+                                                    draggedPhotoTargetIndex = draggedPhotoStartIndex
+                                                    draggedPhotoStartScrollX = currentScroll
+                                                    draggedPhotoStartViewportX =
+                                                        draggedPhotoStartIndex * photoReorderStepPx - currentScroll
+                                                    draggedPhotoOffsetX = 0f
+                                                    draggedPhotoHasMoved = false
+                                                    dragAutoScrollVelocityPx = 0f
+                                                },
+                                                onDragEnd = { finishPhotoDrag() },
+                                                onDragCancel = { clearPhotoDrag() },
+                                                onDrag = { change, dragAmount ->
+                                                    change.consume()
+                                                    if (draggedPhotoStartIndex >= 0) {
+                                                        draggedPhotoOffsetX += dragAmount.x
+                                                        if (!draggedPhotoHasMoved && abs(draggedPhotoOffsetX) >= dragAutoScrollActivationPx) {
+                                                            draggedPhotoHasMoved = true
+                                                        }
+                                                        updateDraggedPhotoTarget(currentCarouselScrollX())
+                                                        updateDragAutoScroll()
+                                                    }
+                                                }
+                                            )
+                                        }
+                                ) {
+                                    Card(
+                                        modifier = Modifier.fillMaxSize(),
+                                        shape = photoShape,
+                                        colors = CardDefaults.cardColors(containerColor = surfaceColor)
+                                    ) {
+                                        AsyncImage(model = uri, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                    }
+                                    // Bouton de suppression avec marge dynamique
+                                    IconButton(
+                                        onClick = { safeClick { currentUris.remove(uri) } },
+                                        modifier = Modifier
+                                            .align(Alignment.TopEnd)
+                                            // NOUVEAU : 16.dp pour OneUI (radius 32), 8.dp pour Classique (radius 24)
+                                            .padding(if (useOneUi) 16.dp else 8.dp)
+                                            .background(Color.Black.copy(alpha = 0.5f), CircleShape)
+                                            .size(32.dp)
+                                    ) {
+                                        Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                    }
+                                    PhotoPositionBadge(
+                                        position = index + 1,
+                                        total = currentUris.size,
+                                        modifier = Modifier
+                                            .align(Alignment.BottomEnd)
+                                            .padding(if (useOneUi) 16.dp else 8.dp)
+                                    )
+                                }
+                            }
+
+                            if (currentUris.size < SignalQuestUploadRules.MAX_PHOTOS) {
+                                val addPhotoExtraWidth = addPhotoExpandedWidth * addPhotoPullProgress
+                                val addPhotoIconScale = 1f + (addPhotoPullProgress * 0.25f)
+                                val addPhotoBorderWidth = 2.dp + (2.dp * addPhotoPullProgress)
+                                Card(
+                                    modifier = Modifier
+                                        .offset {
+                                            IntOffset(
+                                                x = ((currentUris.size * photoReorderStepPx) - addPhotoPushPx).roundToInt(),
+                                                y = 0
+                                            )
+                                        }
+                                        .size(width = addPhotoCardWidth + addPhotoExtraWidth, height = photoCardHeight)
+                                        .clip(photoShape)
+                                        .clickable { safeClick { showImageSourceDialog = true } },
+                                    shape = photoShape,
+                                    colors = CardDefaults.cardColors(containerColor = surfaceColor.copy(alpha = 0.3f)),
+                                    border = BorderStroke(addPhotoBorderWidth, activeColor.copy(alpha = 0.5f + (0.35f * addPhotoPullProgress)))
+                                ) {
+                                    Column(
+                                        modifier = Modifier.fillMaxSize(),
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Add,
+                                            null,
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .graphicsLayer {
+                                                    scaleX = addPhotoIconScale
+                                                    scaleY = addPhotoIconScale
+                                                },
+                                            tint = activeColor
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    val draggedUri = draggedPhotoUri
+                    if (draggedUri != null && draggedPhotoStartIndex >= 0) {
+                        val draggedPosition = (
+                            if (draggedPhotoTargetIndex >= 0) draggedPhotoTargetIndex else draggedPhotoStartIndex
+                        ).coerceIn(0, currentUris.lastIndex) + 1
+                        Box(
+                            modifier = Modifier
+                                .offset {
+                                    IntOffset(
+                                        x = (draggedPhotoStartViewportX + draggedPhotoOffsetX).roundToInt(),
+                                        y = 0
+                                    )
+                                }
+                                .size(width = photoCardWidth, height = photoCardHeight)
+                                .zIndex(1f)
+                                .graphicsLayer {
+                                    shape = photoShape
+                                    clip = true
+                                    val dragScale = 1.03f
+                                    scaleX = dragScale
+                                    scaleY = dragScale
+                                }
+                        ) {
                             Card(
                                 modifier = Modifier.fillMaxSize(),
                                 shape = photoShape,
                                 colors = CardDefaults.cardColors(containerColor = surfaceColor)
                             ) {
-                                AsyncImage(model = uri, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                                AsyncImage(model = draggedUri, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
                             }
-                            // Bouton de suppression avec marge dynamique
                             IconButton(
-                                onClick = { safeClick { currentUris.remove(uri) } },
+                                onClick = {},
+                                enabled = false,
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
-                                    // NOUVEAU : 16.dp pour OneUI (radius 32), 8.dp pour Classique (radius 24)
                                     .padding(if (useOneUi) 16.dp else 8.dp)
                                     .background(Color.Black.copy(alpha = 0.5f), CircleShape)
                                     .size(32.dp)
                             ) {
                                 Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(16.dp))
                             }
-                        }
-                    }
-
-                    if (currentUris.size < SignalQuestUploadRules.MAX_PHOTOS) {
-                        item {
-                            Card(
+                            PhotoPositionBadge(
+                                position = draggedPosition,
+                                total = currentUris.size,
                                 modifier = Modifier
-                                    .size(width = 100.dp, height = 280.dp)
-                                    .clip(photoShape)
-                                    .clickable { safeClick { showImageSourceDialog = true } },
-                                shape = photoShape,
-                                colors = CardDefaults.cardColors(containerColor = surfaceColor.copy(alpha = 0.3f)),
-                                border = BorderStroke(2.dp, activeColor.copy(alpha = 0.5f))
-                            ) {
-                                Column(
-                                    modifier = Modifier.fillMaxSize(),
-                                    horizontalAlignment = Alignment.CenterHorizontally,
-                                    verticalArrangement = Arrangement.Center
-                                ) {
-                                    Icon(Icons.Default.Add, null, modifier = Modifier.size(36.dp), tint = activeColor)
-                                }
-                            }
+                                    .align(Alignment.BottomEnd)
+                                    .padding(if (useOneUi) 16.dp else 8.dp)
+                            )
                         }
                     }
                 }
@@ -365,9 +744,12 @@ fun SignalQuestUploadScreen(
 
         if (showImageSourceDialog) {
             AlertDialog(
-                onDismissRequest = { showImageSourceDialog = false },
+                onDismissRequest = {
+                    showImageSourceDialog = false
+                    resetAddPhotoPull()
+                },
                 shape = blockShape,
-                containerColor = surfaceColor,
+                containerColor = dialogContainerColor,
                 title = { Text(AppStrings.addPhotos, fontWeight = FontWeight.Bold, color = textColor) },
                 text = {
                     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
@@ -375,6 +757,7 @@ fun SignalQuestUploadScreen(
                             onClick = {
                                 safeClick {
                                     showImageSourceDialog = false
+                                    resetAddPhotoPull()
                                     val uri = createCameraUri()
                                     currentCameraUri = uri
                                     cameraLauncher.launch(uri)
@@ -392,6 +775,7 @@ fun SignalQuestUploadScreen(
                             onClick = {
                                 safeClick {
                                     showImageSourceDialog = false
+                                    resetAddPhotoPull()
                                     photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                                 }
                             },
@@ -403,6 +787,23 @@ fun SignalQuestUploadScreen(
                             Icon(Icons.Default.PhotoLibrary, null)
                             Spacer(Modifier.width(8.dp))
                             Text(AppStrings.gallery, fontWeight = FontWeight.Bold)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                safeClick {
+                                    showImageSourceDialog = false
+                                    resetAddPhotoPull()
+                                    documentPickerLauncher.launch(arrayOf("image/*"))
+                                }
+                            },
+                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                            shape = buttonShape,
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = textColor),
+                            border = BorderStroke(1.dp, textColor.copy(alpha = 0.3f))
+                        ) {
+                            Icon(Icons.Default.FolderOpen, null)
+                            Spacer(Modifier.width(8.dp))
+                            Text(AppStrings.externalPhotoFiles, fontWeight = FontWeight.Bold)
                         }
                     }
                 },
@@ -543,7 +944,7 @@ fun SignalQuestUploadScreen(
                         }
                     }
                 },
-                containerColor = surfaceColor,
+                containerColor = dialogContainerColor,
                 titleContentColor = textColor,
                 textContentColor = textColor,
                 confirmButton = {
@@ -568,4 +969,21 @@ fun SignalQuestUploadScreen(
             )
         }
     }
+}
+
+@Composable
+private fun PhotoPositionBadge(
+    position: Int,
+    total: Int,
+    modifier: Modifier = Modifier
+) {
+    Text(
+        text = "$position/$total",
+        color = Color.White,
+        fontSize = 13.sp,
+        fontWeight = FontWeight.Bold,
+        modifier = modifier
+            .background(Color.Black.copy(alpha = 0.62f), RoundedCornerShape(999.dp))
+            .padding(horizontal = 10.dp, vertical = 5.dp)
+    )
 }

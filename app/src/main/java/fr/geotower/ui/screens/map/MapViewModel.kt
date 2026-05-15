@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.TechniqueEntity
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,7 +25,15 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
 
+    private val _cityStatsTechniques = MutableStateFlow<Map<String, TechniqueEntity>>(emptyMap())
+    val cityStatsTechniques = _cityStatsTechniques.asStateFlow()
+
+    private val _isCityStatsTechniquesLoading = MutableStateFlow(false)
+    val isCityStatsTechniquesLoading = _isCityStatsTechniquesLoading.asStateFlow()
+
     private var searchJob: Job? = null
+    private var cityStatsTechniquesJob: Job? = null
+    private var loadedCityStatsTechniqueIds: Set<String> = emptySet()
     private var cityPolygons: List<List<GeoPoint>>? = null
     private var isCityLocked = false
 
@@ -118,6 +127,41 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
         }
     }
 
+    fun loadCityStatsTechniques(idAnfrs: List<String>) {
+        val requestedIds = idAnfrs.filter { it.isNotBlank() && !it.startsWith("CLUSTER_") }.toSet()
+        if (requestedIds.isEmpty()) {
+            clearCityStatsTechniques()
+            return
+        }
+        val missingIds = requestedIds - loadedCityStatsTechniqueIds
+        if (missingIds.isEmpty()) return
+
+        cityStatsTechniquesJob?.cancel()
+        cityStatsTechniquesJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            _isCityStatsTechniquesLoading.value = true
+            try {
+                val loadedTechniques = missingIds
+                    .chunked(CITY_STATS_TECHNIQUE_BATCH_SIZE)
+                    .fold(emptyMap<String, TechniqueEntity>()) { acc, chunk ->
+                        acc + repository.getTechniqueDetailsByIds(chunk)
+                    }
+                _cityStatsTechniques.value = _cityStatsTechniques.value + loadedTechniques
+                loadedCityStatsTechniqueIds = loadedCityStatsTechniqueIds + missingIds
+            } catch (e: Exception) {
+                AppLogger.w(TAG, "City stats technique details request failed", e)
+            } finally {
+                _isCityStatsTechniquesLoading.value = false
+            }
+        }
+    }
+
+    fun clearCityStatsTechniques() {
+        cityStatsTechniquesJob?.cancel()
+        _cityStatsTechniques.value = emptyMap()
+        _isCityStatsTechniquesLoading.value = false
+        loadedCityStatsTechniqueIds = emptySet()
+    }
+
     // =================================================================
 
     fun clearCityFilterAndReload(zoom: Double, latNorth: Double, lonEast: Double, latSouth: Double, lonWest: Double) {
@@ -174,3 +218,4 @@ class MapViewModelFactory(private val repository: AnfrRepository) : ViewModelPro
 }
 
 private const val TAG = "GeoTowerMap"
+private const val CITY_STATS_TECHNIQUE_BATCH_SIZE = 400

@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
@@ -73,6 +74,9 @@ fun OperatorsListSection(
     if (filteredAntennas.isEmpty()) return
 
     val defaultOperatorKey = OperatorColors.keyFor(AppConfig.defaultOperator.value)
+    val hasPriorityMatch = priorityOperatorKey != null && filteredAntennas.any { antenna ->
+        priorityOperatorKey in OperatorColors.keysFor(antenna.operateur)
+    }
     val sortedAntennas = filteredAntennas.sortedBy { antenna ->
         val operatorKeys = OperatorColors.keysFor(antenna.operateur)
         when {
@@ -93,6 +97,7 @@ fun OperatorsListSection(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
         }
         sortedAntennas.forEach { antenna ->
+            val operatorKeys = OperatorColors.keysFor(antenna.operateur)
             OperatorDetailItem(
                 antenna = antenna,
                 technique = techniques[antenna.idAnfr],
@@ -100,6 +105,7 @@ fun OperatorsListSection(
                 cardBgColor = cardBgColor,
                 blockShape = blockShape,
                 useOneUi = useOneUi,
+                isMuted = hasPriorityMatch && priorityOperatorKey !in operatorKeys,
                 onClick = { onAntennaClick(antenna.idAnfr) }
             )
             if (!useOneUi) {
@@ -117,6 +123,7 @@ fun OperatorDetailItem(
     cardBgColor: Color,
     blockShape: Shape,
     useOneUi: Boolean,
+    isMuted: Boolean = false,
     onClick: () -> Unit
 ) {
     val modifier = if (useOneUi) {
@@ -125,7 +132,7 @@ fun OperatorDetailItem(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp)
     }
 
-    Column(modifier = modifier) {
+    Column(modifier = modifier.alpha(if (isMuted) 0.42f else 1f)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             val opName = antenna.operateur ?: AppStrings.unknown
             val logoRes = getLocalLogoRes(opName)

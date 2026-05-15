@@ -67,6 +67,7 @@ import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.CellularFrApi
+import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
@@ -251,19 +252,20 @@ fun SupportDetailScreen(
         // 2️⃣ CHARGEMENT RÉSEAU DES PHOTOS (En arrière-plan, ne bloque pas l'écran)
         launch(Dispatchers.IO) {
             try {
+                val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
                 val photosTemp = mutableListOf<CommunityPhoto>()
-                val hasOrange = antennas.any { (it.operateur ?: "").contains("ORANGE", true) }
-                val hasSfrOrBouygues = antennas.any { (it.operateur ?: "").contains("SFR", true) || (it.operateur ?: "").contains("BOUYGUES", true) }
+                val hasCellularFrPhotos = antennas.any { CommunityDataPreferences.isCellularFrPhotosEnabled(prefs, it.operateur) }
+                val hasSignalQuestPhotos = antennas.any { CommunityDataPreferences.isSignalQuestPhotosEnabled(prefs, it.operateur) }
                 val trueSupportId = physique?.idSupport ?: antennas.firstOrNull()?.idAnfr
 
                 if (!trueSupportId.isNullOrBlank()) {
-                    if (hasOrange) {
+                    if (hasCellularFrPhotos) {
                         CellularFrApi.getCellularFrPhotos(trueSupportId).forEach { photo ->
                             photosTemp.add(CommunityPhoto(photo.url, "CellularFR", photo.author, photo.uploadedAt))
                         }
                     }
 
-                    if (hasSfrOrBouygues) {
+                    if (hasSignalQuestPhotos) {
                         try {
                             val response = fr.geotower.data.api.SignalQuestClient.api.getSitePhotos(
                                 authHeader = "Bearer ${fr.geotower.BuildConfig.SQ_API_KEY}",
@@ -507,6 +509,7 @@ fun SupportDetailScreen(
                                         CommunityPhotosSectionShared(
                                             photos = communityPhotos,
                                             operatorName = null,
+                                            operatorNames = antennas.map { it.operateur },
                                             supportNature = physique?.natureSupport, // ✅ LE BON NOM DE VARIABLE
                                             supportOwner = physique?.proprietaire,
                                             bgColor = cardBgColor,

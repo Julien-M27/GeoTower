@@ -1,5 +1,6 @@
 package fr.geotower.utils
 
+import android.content.SharedPreferences
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import fr.geotower.data.db.GeoTowerDatabaseValidator
@@ -308,6 +309,32 @@ object AppConfig {
 
     // --- MISE À JOUR BASE DE DONNÉES ---
     var isDbUpdateAvailable = mutableStateOf(false)
+
+    fun setSelectedOperatorKeys(keys: Set<String>): Set<String> {
+        val normalizedKeys = keys
+            .mapNotNull { OperatorColors.specForKey(it)?.key }
+            .toSet()
+
+        selectedOperatorKeys.value = normalizedKeys
+        showOrange.value = OperatorColors.ORANGE_KEY in normalizedKeys
+        showSfr.value = OperatorColors.SFR_KEY in normalizedKeys
+        showBouygues.value = OperatorColors.BOUYGUES_KEY in normalizedKeys
+        showFree.value = OperatorColors.FREE_KEY in normalizedKeys
+
+        return normalizedKeys
+    }
+
+    fun saveSelectedOperatorKeys(prefs: SharedPreferences, keys: Set<String>) {
+        val normalizedKeys = setSelectedOperatorKeys(keys)
+
+        prefs.edit()
+            .putStringSet(PREF_SELECTED_OPERATORS, normalizedKeys)
+            .putBoolean("show_orange", showOrange.value)
+            .putBoolean("show_sfr", showSfr.value)
+            .putBoolean("show_bouygues", showBouygues.value)
+            .putBoolean("show_free", showFree.value)
+            .apply()
+    }
 
     private fun loadSelectedOperatorKeys(prefs: android.content.SharedPreferences): Set<String> {
         val savedKeys = prefs.getStringSet(PREF_SELECTED_OPERATORS, null)

@@ -140,6 +140,7 @@ fun FirstStartScreen(
     }
 
     var showLocationPermissionDialog by remember { mutableStateOf(false) }
+    var showNotificationPermissionDialog by remember { mutableStateOf(false) }
     var isLocationPermissionHandled by remember { mutableStateOf(false) }
     var isNotificationPermissionHandled by remember { mutableStateOf(Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) }
 
@@ -159,8 +160,12 @@ fun FirstStartScreen(
 
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
-    ) {
-        isNotificationPermissionHandled = true
+    ) { isGranted ->
+        if (isGranted) {
+            isNotificationPermissionHandled = true
+        } else {
+            showNotificationPermissionDialog = true
+        }
     }
 
     val context = LocalContext.current
@@ -396,39 +401,40 @@ fun FirstStartScreen(
         }
     }
 
-    // --- POP-UP D'AVERTISSEMENT SI AUCUN OPÉRATEUR ---
+    // --- POP-UP D'AVERTISSEMENT SI UNE AUTORISATION EST REFUSÉE ---
     if (showLocationPermissionDialog) {
-        AlertDialog(
-            onDismissRequest = { showLocationPermissionDialog = false },
+        OnboardingPermissionDeniedDialog(
             title = { Text(text = AppStrings.onboardingLocationDisabledTitle, fontWeight = FontWeight.Bold) },
             text = { Text(AppStrings.onboardingLocationDisabledDesc) },
             shape = cardShape,
-            containerColor = MaterialTheme.colorScheme.surface,
-            confirmButton = {
-                Button(
-                    onClick = {
-                        showLocationPermissionDialog = false
-                        isLocationPermissionHandled = true
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text(AppStrings.continueAnyway, fontWeight = FontWeight.Bold)
-                }
+            onContinue = {
+                showLocationPermissionDialog = false
+                isLocationPermissionHandled = true
             },
-            dismissButton = {
-                TextButton(
-                    onClick = {
-                        showLocationPermissionDialog = false
-                        locationPermissionLauncher.launch(
-                            arrayOf(
-                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                Manifest.permission.ACCESS_COARSE_LOCATION
-                            )
-                        )
-                    }
-                ) {
-                    Text(AppStrings.retry)
-                }
+            onRetry = {
+                showLocationPermissionDialog = false
+                locationPermissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    )
+                )
+            }
+        )
+    }
+
+    if (showNotificationPermissionDialog) {
+        OnboardingPermissionDeniedDialog(
+            title = { Text(text = AppStrings.onboardingNotificationsDisabledTitle, fontWeight = FontWeight.Bold) },
+            text = { Text(AppStrings.onboardingNotificationsDisabledDesc) },
+            shape = cardShape,
+            onContinue = {
+                showNotificationPermissionDialog = false
+                isNotificationPermissionHandled = true
+            },
+            onRetry = {
+                showNotificationPermissionDialog = false
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         )
     }
@@ -705,6 +711,36 @@ fun StepPreferencesDesign(
             }
         }
     }
+}
+
+@Composable
+private fun OnboardingPermissionDeniedDialog(
+    title: @Composable () -> Unit,
+    text: @Composable () -> Unit,
+    shape: Shape,
+    onContinue: () -> Unit,
+    onRetry: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = { },
+        title = title,
+        text = text,
+        shape = shape,
+        containerColor = MaterialTheme.colorScheme.surface,
+        confirmButton = {
+            Button(
+                onClick = onRetry,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Text(AppStrings.retry, fontWeight = FontWeight.Bold)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onContinue) {
+                Text(AppStrings.permissionContinueAnyway, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    )
 }
 
 @Composable

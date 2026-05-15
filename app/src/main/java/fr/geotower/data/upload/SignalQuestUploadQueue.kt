@@ -10,6 +10,8 @@ import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
 import com.google.gson.Gson
+import fr.geotower.data.api.SignalQuestOperators
+import fr.geotower.data.community.CommunityDataPreferences
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -131,6 +133,12 @@ object SignalQuestUploadQueue {
         if (uriStrings.size > SignalQuestUploadRules.MAX_PHOTOS) {
             throw SignalQuestUploadQueueException("Maximum ${SignalQuestUploadRules.MAX_PHOTOS} photos par envoi.")
         }
+        val signalQuestOperator = SignalQuestOperators.operatorParamFor(operator)
+            ?: throw SignalQuestUploadQueueException("Operateur SignalQuest non pris en charge.")
+        val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+        if (!CommunityDataPreferences.isSignalQuestPhotosEnabled(prefs, operator)) {
+            throw SignalQuestUploadQueueException("Envoi SignalQuest desactive pour cet operateur.")
+        }
 
         val uploadId = UUID.randomUUID().toString()
         val uploadDir = uploadDir(context, uploadId).apply { mkdirs() }
@@ -167,7 +175,7 @@ object SignalQuestUploadQueue {
             val manifest = SignalQuestUploadManifest(
                 uploadId = uploadId,
                 siteId = siteId,
-                operator = operator,
+                operator = signalQuestOperator,
                 description = description,
                 createdAtMillis = System.currentTimeMillis(),
                 files = files
@@ -284,10 +292,44 @@ object SignalQuestUploadQueue {
     private fun manifestFile(uploadDir: File): File = File(uploadDir, MANIFEST_FILE_NAME)
 
     private fun resolveMimeType(context: Context, uri: Uri): String? {
-        val resolverMime = context.contentResolver.getType(uri)?.lowercase(Locale.US)
-        if (resolverMime != null) return resolverMime
+        val resolverMime = normalizeMimeType(context.contentResolver.getType(uri))
+        if (SignalQuestUploadRules.isAcceptedMimeType(resolverMime)) return resolverMime
 
-        val extension = MimeTypeMap.getFileExtensionFromUrl(uri.toString())?.lowercase(Locale.US)
+        val extension = resolveFileExtension(context, uri)
+        val extensionMimeType = mimeTypeForExtension(extension)
+        if (extensionMimeType != null && (resolverMime == null || isGenericMimeType(resolverMime))) {
+            return extensionMimeType
+        }
+        return resolverMime ?: extensionMimeType
+    }
+
+    private fun normalizeMimeType(mimeType: String?): String? {
+        return when (val normalized = mimeType?.lowercase(Locale.US)) {
+            "image/jpg" -> "image/jpeg"
+            else -> normalized
+        }
+    }
+
+    private fun isGenericMimeType(mimeType: String): Boolean {
+        return mimeType == "application/octet-stream" || mimeType == "image/*" || mimeType == "*/*"
+    }
+
+    private fun resolveFileExtension(context: Context, uri: Uri): String? {
+        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
+            val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (nameIndex >= 0 && cursor.moveToFirst() && !cursor.isNull(nameIndex)) {
+                val displayName = cursor.getString(nameIndex)
+                val displayExtension = displayName.substringAfterLast('.', missingDelimiterValue = "")
+                    .lowercase(Locale.US)
+                    .takeIf { it.isNotBlank() }
+                if (displayExtension != null) return displayExtension
+            }
+        }
+
+        return MimeTypeMap.getFileExtensionFromUrl(uri.toString())?.lowercase(Locale.US)
+    }
+
+    private fun mimeTypeForExtension(extension: String?): String? {
         return when (extension) {
             "jpg", "jpeg" -> "image/jpeg"
             "png" -> "image/png"

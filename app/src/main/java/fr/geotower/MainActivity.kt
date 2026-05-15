@@ -75,6 +75,17 @@ import org.mapsforge.map.android.graphics.AndroidGraphicFactory
 // ✅ ÉTAPE 1 : État global pour afficher le popup de la BDD depuis n'importe où
 object AppGlobalState {
     val showDbSuccessPopup = androidx.compose.runtime.mutableStateOf(false)
+    val showUploadResultPopup = androidx.compose.runtime.mutableStateOf(false)
+    val uploadResultPopupMessage = androidx.compose.runtime.mutableStateOf<String?>(null)
+    val uploadResultPopupSuccessCount = androidx.compose.runtime.mutableIntStateOf(0)
+    val uploadResultPopupTotal = androidx.compose.runtime.mutableIntStateOf(0)
+    val uploadResultPopupHasErrors = androidx.compose.runtime.mutableStateOf(false)
+
+    const val EXTRA_SHOW_UPLOAD_RESULT_POPUP = "SHOW_SQ_UPLOAD_RESULT_POPUP"
+    const val EXTRA_UPLOAD_RESULT_MESSAGE = "SQ_UPLOAD_RESULT_MESSAGE"
+    const val EXTRA_UPLOAD_RESULT_SUCCESS_COUNT = "SQ_UPLOAD_RESULT_SUCCESS_COUNT"
+    const val EXTRA_UPLOAD_RESULT_TOTAL = "SQ_UPLOAD_RESULT_TOTAL"
+    const val EXTRA_UPLOAD_RESULT_HAS_ERRORS = "SQ_UPLOAD_RESULT_HAS_ERRORS"
 }
 
 class MainActivity : ComponentActivity() {
@@ -97,6 +108,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        handleGlobalPopupIntent(intent)
 
         intent.data?.let { uri ->
             if (uri.scheme == "geotower") {
@@ -114,6 +126,24 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    private fun handleGlobalPopupIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra("SHOW_DB_SUCCESS_POPUP", false) == true) {
+            AppGlobalState.showDbSuccessPopup.value = true
+        }
+
+        if (intent?.getBooleanExtra(AppGlobalState.EXTRA_SHOW_UPLOAD_RESULT_POPUP, false) == true) {
+            AppGlobalState.uploadResultPopupMessage.value =
+                intent.getStringExtra(AppGlobalState.EXTRA_UPLOAD_RESULT_MESSAGE)
+            AppGlobalState.uploadResultPopupSuccessCount.intValue =
+                intent.getIntExtra(AppGlobalState.EXTRA_UPLOAD_RESULT_SUCCESS_COUNT, 0)
+            AppGlobalState.uploadResultPopupTotal.intValue =
+                intent.getIntExtra(AppGlobalState.EXTRA_UPLOAD_RESULT_TOTAL, 0)
+            AppGlobalState.uploadResultPopupHasErrors.value =
+                intent.getBooleanExtra(AppGlobalState.EXTRA_UPLOAD_RESULT_HAS_ERRORS, false)
+            AppGlobalState.showUploadResultPopup.value = true
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -121,6 +151,7 @@ class MainActivity : ComponentActivity() {
         // 🏗️ INITIALISATION DU MOTEUR VECTORIEL (Mapsforge)
         // Indispensable pour que le téléphone sache "dessiner" les données du fichier .map
         AndroidGraphicFactory.createInstance(this.application)
+        handleGlobalPopupIntent(intent)
 
         // ✅ ÉTAPE 2 : Vérifie si on a cliqué sur la notif quand l'app était fermée
         if (intent?.getBooleanExtra("SHOW_DB_SUCCESS_POPUP", false) == true) {

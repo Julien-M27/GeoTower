@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Block
+import androidx.compose.material.icons.filled.SimCard
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -146,13 +147,21 @@ fun OperatorSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         Column(
             modifier = Modifier
-                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp)
-                .verticalScroll(rememberScrollState()),
+                .fillMaxWidth()
+                .fillMaxHeight(0.92f)
+                .navigationBarsPadding()
+                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(AppStrings.defaultOperator, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 24.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OperatorItem(AppStrings.none, null, Color.Gray, tempOp == "Aucun", useOneUi, bubbleColor) { tempOp = "Aucun" }
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                OperatorItem(AppStrings.none, null, Color.Gray, tempOp == "Aucun", useOneUi, bubbleColor, showSimFallback = true) { tempOp = "Aucun" }
                 OperatorGroupTitle(AppStrings.operatorRegionMetro)
                 OperatorColors.metro.forEach { operator ->
                     OperatorItem(
@@ -176,13 +185,13 @@ fun OperatorSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
                         bubbleColor = bubbleColor
                     ) { tempOp = operator.label }
                 }
-
-                Button(
-                    onClick = { onSelect(tempOp); onDismiss() },
-                    modifier = Modifier.padding(top = 4.dp).fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(28.dp)
-                ) { Text(AppStrings.validate, fontWeight = FontWeight.Bold) }
             }
+
+            Button(
+                onClick = { onSelect(tempOp); onDismiss() },
+                modifier = Modifier.padding(top = 16.dp).fillMaxWidth().height(56.dp),
+                shape = RoundedCornerShape(28.dp)
+            ) { Text(AppStrings.validate, fontWeight = FontWeight.Bold) }
         }
     }
 }
@@ -199,7 +208,16 @@ private fun OperatorGroupTitle(text: String) {
 }
 
 @Composable
-fun OperatorItem(name: String, logoRes: Int?, operatorColor: Color, isSelected: Boolean, useOneUi: Boolean, bubbleColor: Color, onClick: () -> Unit) {
+fun OperatorItem(
+    name: String,
+    logoRes: Int?,
+    operatorColor: Color,
+    isSelected: Boolean,
+    useOneUi: Boolean,
+    bubbleColor: Color,
+    showSimFallback: Boolean = false,
+    onClick: () -> Unit
+) {
     val activeBg = operatorColor.copy(alpha = 0.1f)
     val bgColor = if (isSelected) activeBg else (if (useOneUi) bubbleColor else Color.Transparent)
     val border = if (useOneUi) { if (isSelected) BorderStroke(2.dp, operatorColor) else null } else { BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) operatorColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) }
@@ -208,7 +226,16 @@ fun OperatorItem(name: String, logoRes: Int?, operatorColor: Color, isSelected: 
         Row(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
             if (logoRes != null) Image(painterResource(logoRes), null, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)))
             else Box(modifier = Modifier.size(40.dp).background(operatorColor.copy(alpha = 0.14f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
-                Text(text = name.take(1).uppercase(), color = operatorColor, fontWeight = FontWeight.Bold)
+                if (showSimFallback) {
+                    Icon(
+                        imageVector = Icons.Default.SimCard,
+                        contentDescription = null,
+                        tint = operatorColor,
+                        modifier = Modifier.size(24.dp)
+                    )
+                } else {
+                    Text(text = name.take(1).uppercase(), color = operatorColor, fontWeight = FontWeight.Bold)
+                }
             }
             Spacer(modifier = Modifier.width(16.dp))
             Text(text = name, style = MaterialTheme.typography.titleMedium, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1f))

@@ -62,12 +62,13 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
@@ -104,6 +105,7 @@ import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -115,6 +117,8 @@ import androidx.navigation.NavController
 import fr.geotower.data.api.NominatimApi
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.SiteHsEntity
+import fr.geotower.data.models.isDeclaredActive
+import fr.geotower.data.models.physicalSiteKey
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
@@ -145,6 +149,8 @@ import org.mapsforge.map.rendertheme.InternalRenderTheme
 import org.osmdroid.tileprovider.MapTileProviderBasic
 import org.mapsforge.map.android.rendertheme.AssetsRenderTheme
 import java.io.File
+import java.text.Normalizer
+import java.util.Locale
 import android.os.Environment
 import kotlin.math.log2
 import kotlin.math.roundToInt
@@ -154,6 +160,24 @@ private const val INITIAL_LOCATION_ZOOM = 16.0
 private const val MOUSE_WHEEL_ZOOM_STEP = 1.0
 private const val MOUSE_WHEEL_ZOOM_ANIMATION_MS = 80L
 private const val WEB_MERCATOR_WORLD_TILE_SIZE_PX = 256.0
+
+private data class DeclaredSiteStats(
+    val activeCount: Int,
+    val totalCount: Int
+)
+
+private fun declaredSiteStats(antennas: List<LocalisationEntity>): DeclaredSiteStats {
+    val siteGroups = antennas
+        .asSequence()
+        .filter { !it.idAnfr.startsWith("CLUSTER_") }
+        .groupBy { it.physicalSiteKey() }
+
+    return DeclaredSiteStats(
+        activeCount = siteGroups.values.count { siteAntennas -> siteAntennas.any { it.isDeclaredActive() } },
+        totalCount = siteGroups.size
+    )
+}
+
 private fun hasSavedMapPosition(prefs: SharedPreferences): Boolean {
     if (!prefs.contains("last_map_lat") || !prefs.contains("last_map_lon") || !prefs.contains("last_map_zoom")) {
         return false
@@ -238,6 +262,73 @@ private fun extractOperatorKeys(value: String?): List<String> {
     return OperatorColors.keysFor(value)
 }
 
+private val operatorSearchSplitRegex = Regex("\\s*(?:[,;/\\u2022]|\\bet\\b|\\+|&|\\|)\\s*", RegexOption.IGNORE_CASE)
+private val operatorSearchCombiningMarksRegex = Regex("\\p{Mn}+")
+private val operatorSearchNonWordRegex = Regex("[^A-Z0-9]+")
+private val operatorSearchRepeatedSpacesRegex = Regex("\\s+")
+
+private fun normalizeOperatorSearchToken(value: String): String {
+    return Normalizer.normalize(value, Normalizer.Form.NFD)
+        .replace(operatorSearchCombiningMarksRegex, "")
+        .uppercase(Locale.ROOT)
+        .replace(operatorSearchNonWordRegex, " ")
+        .trim()
+        .replace(operatorSearchRepeatedSpacesRegex, " ")
+}
+
+private fun parseOperatorSearchKeys(query: String): List<String> {
+    val trimmed = query.trim()
+    val splitIndex = trimmed.indexOf(':')
+    if (splitIndex <= 0) return emptyList()
+
+    val prefix = normalizeOperatorSearchToken(trimmed.substring(0, splitIndex)).replace(" ", "")
+    if (prefix !in setOf("OP", "OPERATEUR", "OPERATOR", "O")) return emptyList()
+
+    val cleanQuery = trimmed.substring(splitIndex + 1).trim()
+    if (cleanQuery.isBlank()) return emptyList()
+
+    val separatedTokens = cleanQuery
+        .split(operatorSearchSplitRegex)
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+    val separatedKeys = separatedTokens.map { OperatorColors.keyFor(it) }
+    if (separatedKeys.size > 1 && separatedKeys.all { it != null }) {
+        return separatedKeys.filterNotNull().distinct()
+    }
+
+    val normalizedQuery = normalizeOperatorSearchToken(cleanQuery)
+    if (normalizedQuery.isBlank()) return emptyList()
+
+    val candidates = OperatorColors.all
+        .flatMap { spec ->
+            (listOf(spec.key, spec.label) + spec.aliases).map { rawAlias ->
+                spec.key to normalizeOperatorSearchToken(rawAlias)
+            }
+        }
+        .filter { (_, alias) -> alias.isNotBlank() }
+        .distinct()
+        .sortedByDescending { (_, alias) -> alias.length }
+
+    var reducedQuery = " $normalizedQuery "
+    val matches = mutableListOf<Pair<Int, String>>()
+
+    candidates.forEach { (key, alias) ->
+        val pattern = Regex("(?<![A-Z0-9])${Regex.escape(alias)}(?![A-Z0-9])")
+        pattern.find(reducedQuery)?.let { match ->
+            matches += match.range.first to key
+            reducedQuery = reducedQuery.replaceRange(match.range, " ".repeat(match.value.length))
+        }
+    }
+
+    val leftover = reducedQuery.replace(operatorSearchNonWordRegex, "")
+    if (matches.isEmpty() || leftover.isNotEmpty()) return emptyList()
+
+    return matches
+        .sortedBy { it.first }
+        .map { it.second }
+        .distinct()
+}
+
 private fun buildHsOperatorMap(sitesHs: List<SiteHsEntity>): Map<String, Set<String>> {
     val result = mutableMapOf<String, MutableSet<String>>()
 
@@ -296,7 +387,7 @@ private fun hasVisibleHsOperator(
 }
 
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun MapScreen(
     navController: NavController,
@@ -311,6 +402,8 @@ fun MapScreen(
     val antennas by viewModel.antennas.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val sitesHs by viewModel.sitesHs.collectAsState()
+    val cityStatsTechniques by viewModel.cityStatsTechniques.collectAsState()
+    val isCityStatsTechniquesLoading by viewModel.isCityStatsTechniquesLoading.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val rawPrimaryColor = MaterialTheme.colorScheme.primary.toArgb()
@@ -385,6 +478,20 @@ fun MapScreen(
     var currentSpeedKmH by remember { mutableIntStateOf(0) }
     var isToolboxExpanded by remember { mutableStateOf(false) }
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
+    var operatorSearchPreviousOperatorKeys by remember { mutableStateOf<Set<String>?>(null) }
+
+    fun applyOperatorSearchSelection(operatorKeys: Set<String>) {
+        if (operatorSearchPreviousOperatorKeys == null) {
+            operatorSearchPreviousOperatorKeys = AppConfig.selectedOperatorKeys.value
+        }
+        AppConfig.setSelectedOperatorKeys(operatorKeys)
+    }
+
+    fun restoreOperatorSearchSelection() {
+        val previousOperatorKeys = operatorSearchPreviousOperatorKeys ?: return
+        AppConfig.setSelectedOperatorKeys(previousOperatorKeys)
+        operatorSearchPreviousOperatorKeys = null
+    }
 
     // ✅ CORRECTION : Gère le geste "Retour" physique du téléphone
     androidx.activity.compose.BackHandler {
@@ -392,6 +499,7 @@ fun MapScreen(
             isMeasuringMode = false
             measuredSites.clear()
         } else {
+            restoreOperatorSearchSelection()
             safeBackNavigation.navigateBack()
         }
     }
@@ -581,6 +689,7 @@ fun MapScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
 
         onDispose {
+            restoreOperatorSearchSelection()
             viewModel.resetCityLock()
             lifecycleOwner.lifecycle.removeObserver(observer)
             sensorManager?.unregisterListener(sensorEventListener)
@@ -1226,7 +1335,17 @@ fun MapScreen(
 
         fun performSearch(query: String) {
             val cleanQuery = query.trim()
-            if (cleanQuery.isBlank()) return
+            if (cleanQuery.isBlank()) {
+                restoreOperatorSearchSelection()
+                return
+            }
+
+            val searchedOperatorKeys = parseOperatorSearchKeys(cleanQuery)
+            if (searchedOperatorKeys.isNotEmpty()) {
+                applyOperatorSearchSelection(searchedOperatorKeys.toSet())
+                return
+            }
+            restoreOperatorSearchSelection()
 
             // 1. Recherche Rapide Locale (si l'antenne est déjà affichée à l'écran)
             val foundSite = antennas.find { it.idAnfr == cleanQuery }
@@ -1727,6 +1846,7 @@ fun MapScreen(
                     desc = AppStrings.back,
                     modifier = Modifier.align(Alignment.CenterStart)
                 ) {
+                    restoreOperatorSearchSelection()
                     safeBackNavigation.navigateBack()
                 }
                 Surface(modifier = Modifier.align(Alignment.Center), shape = RoundedCornerShape(32.dp), color = MaterialTheme.colorScheme.surface, shadowElevation = 4.dp, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
@@ -1783,6 +1903,7 @@ fun MapScreen(
                             isMeasuringMode = false
 
                             isSearchActive = false
+                            restoreOperatorSearchSelection()
                             searchQuery = ""
                             currentCityPolygons = null
                             searchBoundaryOverlay.items.clear()
@@ -1803,6 +1924,7 @@ fun MapScreen(
                     onToggleSearch = {
                         isSearchActive = !isSearchActive
                         if (!isSearchActive) {
+                            restoreOperatorSearchSelection()
                             searchQuery = ""
                             currentCityPolygons = null
                             searchBoundaryOverlay.items.clear()
@@ -2189,6 +2311,8 @@ fun MapScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
+                    val cityStats = if (isLoading) null else declaredSiteStats(filteredAntennas)
+
                     Text(
                         text = AppStrings.cityStatsTitle,
                         style = MaterialTheme.typography.titleMedium,
@@ -2226,32 +2350,54 @@ fun MapScreen(
                             Spacer(modifier = Modifier.height(16.dp))
 
                             if (isLoading) {
-                                CircularProgressIndicator(
+                                LoadingIndicator(
+                                    modifier = Modifier.size(48.dp),
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
-                                    modifier = Modifier.size(48.dp)
                                 )
                             } else {
-                                val uniqueSupportsCount = filteredAntennas.distinctBy { "${it.latitude}_${it.longitude}" }.size
+                                val stats = cityStats ?: DeclaredSiteStats(activeCount = 0, totalCount = 0)
+                                val statsText = if (stats.totalCount == 0) "0" else "${stats.activeCount}/${stats.totalCount}"
+                                val statsFontSize = when {
+                                    statsText.length >= 11 -> 36.sp
+                                    statsText.length >= 9 -> 42.sp
+                                    statsText.length >= 7 -> 46.sp
+                                    else -> 52.sp
+                                }
 
                                 Text(
-                                    text = uniqueSupportsCount.toString(),
-                                    fontSize = 56.sp,
+                                    text = statsText,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    fontSize = statsFontSize,
                                     fontWeight = FontWeight.Black,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Clip,
+                                    softWrap = false,
+                                    textAlign = TextAlign.Center
                                 )
+                                if (stats.totalCount > 0) {
+                                    Text(
+                                        text = AppStrings.activeDeclaredSitesLabel,
+                                        style = MaterialTheme.typography.labelLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f)
+                                    )
+                                }
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                            if ((cityStats?.totalCount ?: 0) > 0) {
+                                Spacer(modifier = Modifier.height(16.dp))
 
-                            Button(
-                                onClick = { showCityStatsDetail = true },
-                                shape = RoundedCornerShape(12.dp),
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = MaterialTheme.colorScheme.primary,
-                                    contentColor = MaterialTheme.colorScheme.onPrimary
-                                )
-                            ) {
-                                Text(AppStrings.details, fontWeight = FontWeight.Bold)
+                                Button(
+                                    onClick = { showCityStatsDetail = true },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.primary,
+                                        contentColor = MaterialTheme.colorScheme.onPrimary
+                                    )
+                                ) {
+                                    Text(AppStrings.details, fontWeight = FontWeight.Bold)
+                                }
                             }
                         }
                     }
@@ -2265,9 +2411,18 @@ fun MapScreen(
     }
     if (showCityStatsDetail) {
         fr.geotower.ui.components.CityStatsDetailSheet(
-            antennas = antennas,
+            antennas = filteredAntennas,
+            techniques = cityStatsTechniques,
+            isFrequencyStatusLoading = isCityStatsTechniquesLoading,
+            onRequestFrequencyStatus = { idAnfrs ->
+                viewModel.loadCityStatsTechniques(idAnfrs.toList())
+            },
             onDismiss = { showCityStatsDetail = false }
         )
+    } else {
+        LaunchedEffect(showCityStatsDetail) {
+            viewModel.clearCityStatsTechniques()
+        }
     }
 }
 

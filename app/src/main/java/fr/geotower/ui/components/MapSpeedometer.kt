@@ -32,7 +32,7 @@ fun MapSpeedometer(speedKmH: Int, modifier: Modifier = Modifier) {
     val unitLabel = if (isMph) "mph" else "km/h"
 
     Surface(
-        modifier = modifier.padding(bottom = 4.dp, start = 6.dp),
+        modifier = modifier,
         color = Color.White.copy(alpha = 0.8f),
         shape = RoundedCornerShape(4.dp)
     ) {

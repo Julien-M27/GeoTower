@@ -233,13 +233,27 @@ data class LocalisationEntity(
     @ColumnInfo(name = "code_insee") val codeInsee: String?,
     @ColumnInfo(name = "azimuts_fh") val azimutsFh: String?,
     @ColumnInfo(name = "tech_mask") val techMask: Int = 0,
-    @ColumnInfo(name = "band_mask") val bandMask: Int = 0
+    @ColumnInfo(name = "band_mask") val bandMask: Int = 0,
+    @ColumnInfo(name = "statut") val statut: String? = null,
+    @ColumnInfo(name = "has_active") val hasActive: Int = 0
 ) {
     @androidx.room.Ignore
     var frequences: String? = null
 
     val filtres: String?
         get() = RadioFilterMasks.bandMaskToFilterString(bandMask).takeIf { it.isNotBlank() }
+}
+
+fun LocalisationEntity.isDeclaredActive(): Boolean {
+    if (hasActive == 1) return true
+
+    val normalizedStatus = statut.orEmpty().lowercase()
+    return normalizedStatus.contains("en service") ||
+        normalizedStatus.contains("techniquement")
+}
+
+fun LocalisationEntity.physicalSiteKey(): String {
+    return "${Math.round(latitude * 10000.0)}_${Math.round(longitude * 10000.0)}"
 }
 
 data class TechniqueEntity(

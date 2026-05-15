@@ -591,25 +591,33 @@ class MiniMapAntennaMarker(
 
         val angleToColorsMobile = mutableMapOf<Float, MutableSet<Int>>()
         val angleToColorsFh = mutableMapOf<Float, MutableSet<Int>>()
+        val angleToOperatorsMobile = mutableMapOf<Float, MutableSet<String>>()
+        val angleToOperatorsFh = mutableMapOf<Float, MutableSet<String>>()
 
         siteAntennas.forEach { antenna ->
             val opColorInt = getOpColorInt(antenna.operateur)
+            val operatorKeys = OperatorColors.keysFor(antenna.operateur)
 
             if (!antenna.azimuts.isNullOrBlank()) {
                 antenna.azimuts.split(",").mapNotNull { it.trim().toFloatOrNull() }.forEach { az ->
                     angleToColorsMobile.getOrPut(az) { mutableSetOf() }.add(opColorInt)
+                    angleToOperatorsMobile.getOrPut(az) { mutableSetOf() }.addAll(operatorKeys)
                 }
             }
 
             if (AppConfig.showTechnoFH.value && !antenna.azimutsFh.isNullOrBlank()) {
                 antenna.azimutsFh.split(",").mapNotNull { it.trim().toFloatOrNull() }.forEach { az ->
                     angleToColorsFh.getOrPut(az) { mutableSetOf() }.add(opColorInt)
+                    angleToOperatorsFh.getOrPut(az) { mutableSetOf() }.addAll(operatorKeys)
                 }
             }
         }
 
         // Sur la mini-carte, l'opérateur prioritaire est celui qu'on consulte, sinon le favori
-        val defOpName = focusOperator ?: AppConfig.defaultOperator.value
+        val focusOperatorKey = OperatorColors.keyFor(focusOperator)
+        val hasFocusedMobileAzimuths = focusOperatorKey != null && angleToOperatorsMobile.values.any { focusOperatorKey in it }
+        val hasFocusedFhAzimuths = focusOperatorKey != null && angleToOperatorsFh.values.any { focusOperatorKey in it }
+        val defOpName = focusOperatorKey ?: AppConfig.defaultOperator.value
         val defOpColorInt = getOpColorInt(defOpName)
 
         angleToColorsMobile.forEach { (az, colorsSet) ->
@@ -620,27 +628,32 @@ class MiniMapAntennaMarker(
             // L'opérateur prioritaire donne sa couleur à la ligne
             val sortedColors = colorsSet.toList().sortedByDescending { it == defOpColorInt }
             val mainColor = sortedColors.first()
+            val isMuted = hasFocusedMobileAzimuths && focusOperatorKey !in angleToOperatorsMobile[az].orEmpty()
+            val lineAlpha = if (isMuted) 70 else 255
+            val coneAlpha = if (isMuted) 14 else 50
+            val coneEdgeAlpha = if (isMuted) 55 else 170
+            val dotColors = if (isMuted) sortedColors.map { ColorUtils.setAlphaComponent(it, 80) } else sortedColors
 
             val linePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.STROKE
-                color = mainColor
+                color = ColorUtils.setAlphaComponent(mainColor, lineAlpha)
                 strokeWidth = 3.5f * density
                 strokeCap = android.graphics.Paint.Cap.ROUND
             }
 
             val conePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.FILL
-                color = ColorUtils.setAlphaComponent(mainColor, 50)
+                color = ColorUtils.setAlphaComponent(mainColor, coneAlpha)
             }
 
             val coneEdgePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.STROKE
-                color = ColorUtils.setAlphaComponent(mainColor, 170)
+                color = ColorUtils.setAlphaComponent(mainColor, coneEdgeAlpha)
                 strokeWidth = 2.2f * density
                 strokeCap = android.graphics.Paint.Cap.ROUND
             }
 
-            precalculatedMobileAzimuths.add(GroupedAzimuthData(az, cos, sin, linePaint, conePaint, coneEdgePaint, sortedColors))
+            precalculatedMobileAzimuths.add(GroupedAzimuthData(az, cos, sin, linePaint, conePaint, coneEdgePaint, dotColors))
         }
 
         angleToColorsFh.forEach { (az, colorsSet) ->
@@ -650,16 +663,19 @@ class MiniMapAntennaMarker(
 
             val sortedColors = colorsSet.toList().sortedByDescending { it == defOpColorInt }
             val mainColor = sortedColors.first()
+            val isMuted = hasFocusedFhAzimuths && focusOperatorKey !in angleToOperatorsFh[az].orEmpty()
+            val lineAlpha = if (isMuted) 70 else 200
+            val dotColors = if (isMuted) sortedColors.map { ColorUtils.setAlphaComponent(it, 80) } else sortedColors
 
             val dashedPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.STROKE
-                color = android.graphics.Color.argb(200, android.graphics.Color.red(mainColor), android.graphics.Color.green(mainColor), android.graphics.Color.blue(mainColor))
+                color = android.graphics.Color.argb(lineAlpha, android.graphics.Color.red(mainColor), android.graphics.Color.green(mainColor), android.graphics.Color.blue(mainColor))
                 strokeWidth = 3f * density
                 strokeCap = android.graphics.Paint.Cap.ROUND
                 pathEffect = android.graphics.DashPathEffect(floatArrayOf(5f * density, 5f * density), 0f)
             }
 
-            precalculatedFhAzimuths.add(GroupedAzimuthData(az, cos, sin, dashedPaint, null, null, sortedColors))
+            precalculatedFhAzimuths.add(GroupedAzimuthData(az, cos, sin, dashedPaint, null, null, dotColors))
         }
     }
 

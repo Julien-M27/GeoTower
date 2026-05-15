@@ -20,6 +20,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import fr.geotower.AppGlobalState
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import java.util.UUID
@@ -44,6 +45,8 @@ fun GlobalUploadOverlay() {
 
     var isUploadPopupHidden by remember { mutableStateOf(false) }
     var showFinishedDialog by remember { mutableStateOf(false) }
+    var finishedDialogMessageOverride by remember { mutableStateOf<String?>(null) }
+    var finishedDialogHasErrorsOverride by remember { mutableStateOf<Boolean?>(null) }
 
     // Statistiques du job en cours/terminé
     var currentProgress by remember { mutableIntStateOf(0) }
@@ -95,6 +98,9 @@ fun GlobalUploadOverlay() {
         // Si on a capturé une fin d'envoi en direct :
         if (justFinishedWork != null) {
             finalSuccessCount = justFinishedWork.outputData.getInt("success_count", currentProgress)
+            totalPhotos = justFinishedWork.outputData.getInt("total", totalPhotos)
+            finishedDialogMessageOverride = null
+            finishedDialogHasErrorsOverride = null
 
             // On sauvegarde le nouveau score global
             val newScore = lifetimeScore + finalSuccessCount
@@ -102,6 +108,18 @@ fun GlobalUploadOverlay() {
 
             // On affiche le pop-up de victoire !
             showFinishedDialog = true
+        }
+    }
+
+    val showNotificationUploadResultPopup by AppGlobalState.showUploadResultPopup
+    LaunchedEffect(showNotificationUploadResultPopup) {
+        if (showNotificationUploadResultPopup) {
+            finalSuccessCount = AppGlobalState.uploadResultPopupSuccessCount.intValue
+            totalPhotos = AppGlobalState.uploadResultPopupTotal.intValue
+            finishedDialogMessageOverride = AppGlobalState.uploadResultPopupMessage.value
+            finishedDialogHasErrorsOverride = AppGlobalState.uploadResultPopupHasErrors.value
+            showFinishedDialog = true
+            AppGlobalState.showUploadResultPopup.value = false
         }
     }
 
@@ -130,7 +148,7 @@ fun GlobalUploadOverlay() {
 
     // 2. POP-UP DE FIN (SUCCÈS OU ERREUR PARTIELLE)
     if (showFinishedDialog) {
-        val hasErrors = finalSuccessCount < totalPhotos
+        val hasErrors = finishedDialogHasErrorsOverride ?: (totalPhotos > 0 && finalSuccessCount < totalPhotos)
         val finalIcon = if (hasErrors) Icons.Default.Warning else Icons.Default.CheckCircle
         val iconColor = if (hasErrors) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
 
@@ -145,7 +163,7 @@ fun GlobalUploadOverlay() {
                     Text(AppStrings.uploadFinishedTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
 
                     Text(
-                        text = AppStrings.uploadResultText(finalSuccessCount, totalPhotos),
+                        text = finishedDialogMessageOverride ?: AppStrings.uploadResultText(finalSuccessCount, totalPhotos),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -178,7 +196,7 @@ fun GlobalUploadOverlay() {
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
-                        Text(AppStrings.awesome, fontWeight = FontWeight.Bold)
+                        Text(AppStrings.dbDownloadTermine, fontWeight = FontWeight.Bold)
                     }
                 }
             }

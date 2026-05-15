@@ -41,6 +41,37 @@ class NetworkingParsersTest {
     }
 
     @Test
+    fun parseNominatimArea_prefersResultWithPolygon() {
+        val json = """
+            [
+              {
+                "boundingbox": ["33.30", "33.90", "-118.10", "-117.40"],
+                "geojson": {
+                  "type": "Point",
+                  "coordinates": [-117.85, 33.78]
+                }
+              },
+              {
+                "boundingbox": ["44.10", "44.20", "4.70", "4.90"],
+                "geojson": {
+                  "type": "Polygon",
+                  "coordinates": [
+                    [[4.70, 44.10], [4.90, 44.10], [4.90, 44.20], [4.70, 44.20], [4.70, 44.10]]
+                  ]
+                }
+              }
+            ]
+        """.trimIndent()
+
+        val area = parseNominatimArea(json)
+
+        assertNotNull(area)
+        assertEquals(44.20, area!!.latNorth, 0.0)
+        assertEquals(4.90, area.lonEast, 0.0)
+        assertEquals(1, area.polygons.size)
+    }
+
+    @Test
     fun parseCellularFrPhotos_validPhotos() {
         val json = """
             {

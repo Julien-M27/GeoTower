@@ -26,6 +26,7 @@ data class NominatimGeoPoint(
 object NominatimApi {
     private const val TAG = "GeoTowerNominatim"
     private const val SEARCH_URL = "https://nominatim.openstreetmap.org/search"
+    private const val FRENCH_TERRITORY_COUNTRY_CODES = "fr,gp,mq,gf,re,yt,pm,nc,pf,wf,bl,mf"
     private val userAgent = "GeoTower/${BuildConfig.VERSION_NAME} (Android)"
 
     fun searchArea(query: String): NominatimArea? {
@@ -36,7 +37,8 @@ object NominatimApi {
             .addQueryParameter("q", trimmedQuery)
             .addQueryParameter("format", "json")
             .addQueryParameter("polygon_geojson", "1")
-            .addQueryParameter("limit", "1")
+            .addQueryParameter("countrycodes", FRENCH_TERRITORY_COUNTRY_CODES)
+            .addQueryParameter("limit", "10")
             .build()
 
         val request = Request.Builder()
@@ -65,22 +67,28 @@ internal fun parseNominatimArea(json: String): NominatimArea? {
         val root = JsonParser.parseString(json).asJsonArrayOrNull() ?: return@runCatching null
         if (root.size() == 0) return@runCatching null
 
-        val firstResult = root[0].asJsonObjectOrNull() ?: return@runCatching null
-        val boundingBox = firstResult.get("boundingbox").asJsonArrayOrNull() ?: return@runCatching null
-        if (boundingBox.size() < 4) return@runCatching null
+        val areas = (0 until root.size())
+            .mapNotNull { index -> root[index].asJsonObjectOrNull()?.toNominatimAreaOrNull() }
 
-        val geoJson = firstResult.get("geojson").asJsonObjectOrNull()
-        NominatimArea(
-            latSouth = boundingBox[0].asDoubleValue(),
-            latNorth = boundingBox[1].asDoubleValue(),
-            lonWest = boundingBox[2].asDoubleValue(),
-            lonEast = boundingBox[3].asDoubleValue(),
-            geoJsonFeature = geoJson?.let { geometry ->
-                """{"type":"Feature","properties":{},"geometry":$geometry}"""
-            },
-            polygons = geoJson?.let(::extractNominatimGeoJsonPolygons).orEmpty()
-        )
+        areas.firstOrNull { it.polygons.isNotEmpty() } ?: areas.firstOrNull()
     }.getOrNull()
+}
+
+private fun JsonObject.toNominatimAreaOrNull(): NominatimArea? {
+    val boundingBox = get("boundingbox").asJsonArrayOrNull() ?: return null
+    if (boundingBox.size() < 4) return null
+
+    val geoJson = get("geojson").asJsonObjectOrNull()
+    return NominatimArea(
+        latSouth = boundingBox[0].asDoubleValue(),
+        latNorth = boundingBox[1].asDoubleValue(),
+        lonWest = boundingBox[2].asDoubleValue(),
+        lonEast = boundingBox[3].asDoubleValue(),
+        geoJsonFeature = geoJson?.let { geometry ->
+            """{"type":"Feature","properties":{},"geometry":$geometry}"""
+        },
+        polygons = geoJson?.let(::extractNominatimGeoJsonPolygons).orEmpty()
+    )
 }
 
 private fun extractNominatimGeoJsonPolygons(geoJson: JsonObject): List<List<NominatimGeoPoint>> {

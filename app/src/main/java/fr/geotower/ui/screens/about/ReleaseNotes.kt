@@ -27,9 +27,71 @@ internal data class ReleaseNoteItem(
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
     section("Général", "General", "Geral") {
         item(
-            "Modification des sélecteurs en mode normal",
-            "Updated selectors in normal mode",
-            "Alteração dos seletores no modo normal"
+            "Ajout d'un panneau Données communautaires",
+            "Added a Community Data panel",
+            "Adição de um painel de Dados comunitários"
+        )
+        item(
+            "Amélioration des tests internes",
+            "Improved internal tests",
+            "Melhoria dos testes internos"
+        )
+    }
+
+    section("Données communautaires", "Community data", "Dados comunitários") {
+        item(
+            "Meilleure gestion des photos et speedtests communautaires",
+            "Improved handling of community photos and speedtests",
+            "Melhor gestão de fotos e speedtests comunitários"
+        )
+        item(
+            "Choix des sources communautaires par opérateur",
+            "Community source selection by operator",
+            "Escolha das fontes comunitárias por operadora"
+        )
+        item(
+            "Amélioration de la prise en charge de SignalQuest",
+            "Improved SignalQuest support",
+            "Melhoria do suporte ao SignalQuest"
+        )
+    }
+
+    section("Carte", "Map", "Mapa") {
+        item(
+            "Ajout de la recherche par opérateur",
+            "Added operator search",
+            "Adição da pesquisa por operadora"
+        )
+        item(
+            "Amélioration de la recherche de lieux",
+            "Improved place search",
+            "Melhoria da pesquisa de locais"
+        )
+        item(
+            "Meilleure mise en avant de l'opérateur recherché",
+            "Better highlighting of the searched operator",
+            "Melhor destaque da operadora pesquisada"
+        )
+    }
+
+    section("Statistiques", "Statistics", "Estatísticas") {
+        item(
+            "Amélioration des statistiques ville",
+            "Improved city statistics",
+            "Melhoria das estatísticas da cidade"
+        )
+        item(
+            "Ajout de compteurs plus détaillés par opérateur et fréquence",
+            "Added more detailed counters by operator and frequency",
+            "Adição de contadores mais detalhados por operadora e frequência"
+        )
+    }
+
+    section("Onboarding", "Onboarding", "Onboarding") {
+        item(
+            "Messages plus clairs lorsque les autorisations sont refusées",
+            "Clearer messages when permissions are denied",
+            "Mensagens mais claras quando as autorizações são recusadas"
         )
     }
 }
