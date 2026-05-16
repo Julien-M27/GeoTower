@@ -2,6 +2,7 @@ package fr.geotower.ui.screens.splash
 
 import android.widget.ImageView
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
@@ -17,6 +18,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppIconManager
+import fr.geotower.utils.AppLogoDrawingResources
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.AppConfig
 import kotlinx.coroutines.*
@@ -32,6 +34,10 @@ fun SplashScreen(
     val context = LocalContext.current
     val appTitle = "GeoTower"
     val logoResId by AppIconManager.currentIconRes
+    val themeMode by AppConfig.themeMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val appLogoDrawingChoice by AppConfig.appLogoDrawingChoice
+    val displayLogoResId = AppLogoDrawingResources.resolve(appLogoDrawingChoice, logoResId, isDark)
 
     LaunchedEffect(Unit) {
         if (logoResId == 0) AppIconManager.getLogoResId(context)
@@ -79,7 +85,7 @@ fun SplashScreen(
             verticalArrangement = Arrangement.Center
         ) {
             DrawableImage(
-                resId = logoResId,
+                resId = displayLogoResId,
                 contentDescription = "Logo",
                 modifier = Modifier.size(150.dp)
             )

@@ -375,6 +375,15 @@ object AppStrings {
     val themeLight @Composable get() = get("Clair", "Light", "Claro")
     val themeDark @Composable get() = get("Sombre", "Dark", "Escuro")
     val appIcon @Composable get() = get("Icône de l'application", "App Icon", "Ícone da aplicação")
+    val appLogoDrawingTitle @Composable get() = get("Logo affiché dans l'application", "In-app logo", "Logótipo na aplicação")
+    val appLogoDrawingSubtitle @Composable get() = get("Choisit le dessin utilisé sur l'accueil, le splash et À propos.", "Chooses the artwork used on Home, splash and About.", "Escolhe o desenho usado no início, no splash e em Sobre.")
+    val logoDrawingAuto @Composable get() = get("Automatique", "Automatic", "Automático")
+    val logoDrawingAutoDesc @Composable get() = get("Suit l'icône d'application active et le thème.", "Follows the active app icon and theme.", "Segue o ícone ativo da aplicação e o tema.")
+    val logoDrawingColorOnDark @Composable get() = get("Couleur fond sombre", "Color on dark", "Cor em fundo escuro")
+    val logoDrawingColorOnLight @Composable get() = get("Couleur fond clair", "Color on light", "Cor em fundo claro")
+    val logoDrawingMonoLight @Composable get() = get("Monochrome clair", "Light monochrome", "Monocromático claro")
+    val logoDrawingMonoDark @Composable get() = get("Monochrome sombre", "Dark monochrome", "Monocromático escuro")
+    val logoDrawingMonoMuted @Composable get() = get("Monochrome gris", "Muted monochrome", "Monocromático cinzento")
     val restartToApply @Composable get() = get("L'app redémarrera pour appliquer le changement.", "The app will restart to apply the change.", "O aplicativo será reiniciado para appliquer a alteração.")
     val colorPaletteTitle @Composable get() = get("Palette de couleur", "Color palette", "Paleta de cores")
     val colorSourceTitle @Composable get() = get("Source des couleurs", "Color source", "Fonte das cores")
@@ -437,6 +446,38 @@ object AppStrings {
         "amber" -> colorPaletteAmberDesc
         "graphite" -> colorPaletteGraphiteDesc
         else -> colorPaletteDynamicDesc
+    }
+
+    @Composable
+    fun logoDrawingFamilyName(family: String): String = when (family) {
+        "georadio" -> "GeoRadio"
+        "fun" -> "Fun"
+        else -> "GeoTower"
+    }
+
+    @Composable
+    fun logoDrawingStyleName(style: String): String = when (style) {
+        "color_on_light" -> logoDrawingColorOnLight
+        "mono_light" -> logoDrawingMonoLight
+        "mono_dark" -> logoDrawingMonoDark
+        "mono_muted" -> logoDrawingMonoMuted
+        else -> logoDrawingColorOnDark
+    }
+
+    @Composable
+    fun logoDrawingChoiceName(choice: String): String {
+        val normalized = AppLogoDrawingResources.normalize(choice)
+        if (normalized == AppLogoDrawingResources.AUTO) return logoDrawingAuto
+        val family = normalized.substringBefore(":")
+        val style = normalized.substringAfter(":")
+        return "${logoDrawingFamilyName(family)} · ${logoDrawingStyleName(style)}"
+    }
+
+    @Composable
+    fun logoDrawingChoiceDescription(choice: String): String {
+        val normalized = AppLogoDrawingResources.normalize(choice)
+        if (normalized == AppLogoDrawingResources.AUTO) return logoDrawingAutoDesc
+        return appLogoDrawingSubtitle
     }
 
     val systemLanguage @Composable get() = get("Langage système", "System language", "Idioma do sistema")

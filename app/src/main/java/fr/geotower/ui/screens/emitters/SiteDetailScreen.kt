@@ -81,14 +81,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalUriHandler
@@ -113,6 +108,7 @@ import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.upload.SignalQuestUploadDraftStore
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadRules
+import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
@@ -701,7 +697,7 @@ fun SiteDetailScreen(
             }
 
             Column(
-                modifier = Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().background(mainBgColor).antennaFadingEdge(scrollState).verticalScroll(scrollState).padding(16.dp),
+                modifier = Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().background(mainBgColor).geoTowerFadingEdge(scrollState).verticalScroll(scrollState).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 val formattedAzimuths = remember(info.azimuts) {
@@ -1121,15 +1117,6 @@ private fun formatSiteHeightMeters(heightMeters: Double?): String {
         "${(heightMeters * 3.28084).roundToInt()} ft"
     } else {
         if (heightMeters % 1.0 == 0.0) "${heightMeters.toInt()} m" else String.format(Locale.US, "%.1f m", heightMeters)
-    }
-}
-
-private fun Modifier.antennaFadingEdge(scrollState: androidx.compose.foundation.ScrollState): Modifier {
-    if (!AppConfig.isBlurEnabled.value) return this
-    return this.graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen).drawWithContent {
-        drawContent(); val hPx = 80.dp.toPx()
-        drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 1f - (scrollState.value / hPx).coerceIn(0f, 1f)), Color.Black), 0f, hPx), blendMode = BlendMode.DstIn)
-        drawRect(Brush.verticalGradient(listOf(Color.Black, Color.Black.copy(alpha = 1f - ((scrollState.maxValue - scrollState.value) / hPx).coerceIn(0f, 1f))), size.height - hPx, size.height), blendMode = BlendMode.DstIn)
     }
 }
 

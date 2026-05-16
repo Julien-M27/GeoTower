@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -41,6 +43,7 @@ fun UnitSettingsSheet(
 
     var currentDistance by remember { mutableIntStateOf(AppConfig.distanceUnit.intValue) }
     var currentSpeed by remember { mutableIntStateOf(AppConfig.speedUnit.intValue) }
+    val scrollState = rememberScrollState()
 
     // Fonction locale de sauvegarde propre à la feuille
     fun saveUnit(key: String, configState: MutableIntState, value: Int) {
@@ -58,7 +61,13 @@ fun UnitSettingsSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
-        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 24.dp, end = 24.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp)
+        ) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(text = AppStrings.unitSettingsTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)

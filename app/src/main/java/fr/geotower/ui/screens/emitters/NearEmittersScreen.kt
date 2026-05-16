@@ -71,13 +71,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -86,6 +81,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import fr.geotower.R
+import fr.geotower.ui.components.geoTowerLazyListFadingEdge
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.NominatimApi
 import fr.geotower.data.api.NominatimGeoPoint
@@ -619,7 +615,7 @@ fun NearEmittersScreen(
                                     else -> {
                                         LazyColumn(
                                             state = lazyListState,
-                                            modifier = Modifier.fillMaxSize().nearEmittersFadingEdge(lazyListState),
+                                            modifier = Modifier.fillMaxSize().geoTowerLazyListFadingEdge(lazyListState),
                                             // 🚨 CORRECTION : On ajoute l'espacement de la barre de navigation à la fin
                                             contentPadding = PaddingValues(
                                                 start = 16.dp,
@@ -806,50 +802,6 @@ private fun nearEmittersScrollStep(remainingItems: Int): Int {
     )
 }
 
-
-private fun Modifier.nearEmittersFadingEdge(lazyListState: LazyListState): Modifier {
-    if (!AppConfig.isBlurEnabled.value) return this
-
-    val fadeHeight = 80.dp
-
-    return this
-        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-        .drawWithContent {
-            drawContent()
-            val heightPx = fadeHeight.toPx()
-
-            val isFirstItemVisible = lazyListState.firstVisibleItemIndex == 0
-            val topAlpha = if (!isFirstItemVisible) 1f
-            else (lazyListState.firstVisibleItemScrollOffset.toFloat() / heightPx).coerceIn(0f, 1f)
-
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Black.copy(alpha = 1f - topAlpha),
-                        Color.Black
-                    ),
-                    startY = 0f,
-                    endY = heightPx
-                ),
-                blendMode = BlendMode.DstIn
-            )
-
-            val canScrollForward = lazyListState.canScrollForward
-            val bottomAlpha = if (canScrollForward) 1f else 0f
-
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Black,
-                        Color.Black.copy(alpha = 1f - bottomAlpha)
-                    ),
-                    startY = size.height - heightPx,
-                    endY = size.height
-                ),
-                blendMode = BlendMode.DstIn
-            )
-        }
-}
 
 @Composable
 private fun NearbyQuickSearchSuggestions(

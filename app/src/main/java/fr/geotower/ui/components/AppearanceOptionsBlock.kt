@@ -41,6 +41,9 @@ fun AppearanceOptionsBlock(
     isBlur: Boolean, onBlurChange: (Boolean) -> Unit,
     menuSize: String, onMenuSizeChange: (String) -> Unit,
     appIconRes: Int? = null, onAppIconClick: (() -> Unit)? = null,
+    appLogoDrawingChoice: String? = null,
+    appLogoDrawingRes: Int? = null,
+    onAppLogoDrawingClick: (() -> Unit)? = null,
     onColorPaletteClick: (() -> Unit)? = null,
     shape: Shape, border: BorderStroke?, bubbleColor: Color, safeClick: SafeClick
 ) {
@@ -98,16 +101,61 @@ fun AppearanceOptionsBlock(
                 )
 
                 // --- Icône mipmap actuelle ---
-                AndroidView(
-                    modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)),
-                    factory = { ctx ->
-                        ImageView(ctx).apply {
-                            scaleType = ImageView.ScaleType.FIT_CENTER
-                            setImageResource(appIconRes)
-                        }
-                    },
-                    update = { it.setImageResource(appIconRes) }
-                )
+                Box(
+                    modifier = Modifier.size(44.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AndroidView(
+                        modifier = Modifier.size(36.dp).clip(RoundedCornerShape(8.dp)),
+                        factory = { ctx ->
+                            ImageView(ctx).apply {
+                                scaleType = ImageView.ScaleType.FIT_CENTER
+                                setImageResource(appIconRes)
+                            }
+                        },
+                        update = { it.setImageResource(appIconRes) }
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+    }
+
+    if (onAppLogoDrawingClick != null && appLogoDrawingRes != null && appLogoDrawingChoice != null) {
+        Surface(onClick = { safeClick("appearance_app_logo_drawing") { onAppLogoDrawingClick() } }, shape = shape, border = border, color = if (useOneUi) bubbleColor else Color.Transparent, modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = AppStrings.appLogoDrawingTitle,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = AppStrings.logoDrawingChoiceName(appLogoDrawingChoice),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                Box(
+                    modifier = Modifier.size(44.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AndroidView(
+                        modifier = Modifier.size(34.dp),
+                        factory = { ctx ->
+                            ImageView(ctx).apply {
+                                scaleType = ImageView.ScaleType.FIT_CENTER
+                                setImageResource(appLogoDrawingRes)
+                            }
+                        },
+                        update = { it.setImageResource(appLogoDrawingRes) }
+                    )
+                }
 
                 Spacer(modifier = Modifier.width(12.dp))
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)

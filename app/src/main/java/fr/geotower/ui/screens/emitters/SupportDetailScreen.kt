@@ -9,7 +9,6 @@ import android.location.Location
 import android.location.LocationManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
@@ -51,12 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.platform.LocalView
@@ -72,6 +66,7 @@ import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.ui.components.SupportShareMenu
+import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
@@ -464,7 +459,7 @@ fun SupportDetailScreen(
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .siteDetailFadingEdge(scrollState)
+                        .geoTowerFadingEdge(scrollState)
                         .verticalScroll(scrollState)
                         // 🚨 AJOUT : Ajoute un espace à la fin du défilement pour ne pas cacher le dernier élément sous les boutons
                         .navigationBarsPadding()
@@ -614,19 +609,6 @@ fun SupportDetailScreen(
                 useOneUi = useOneUi
             )
         }
-    }
-}
-
-private fun Modifier.siteDetailFadingEdge(scrollState: ScrollState): Modifier {
-    if (!AppConfig.isBlurEnabled.value) return this
-    val fadeHeight = 80.dp
-    return this.graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen).drawWithContent {
-        drawContent()
-        val hPx = fadeHeight.toPx()
-        val topAlpha = (scrollState.value.toFloat() / hPx).coerceIn(0f, 1f)
-        drawRect(brush = Brush.verticalGradient(colors = listOf(Color.Black.copy(alpha = 1f - topAlpha), Color.Black), startY = 0f, endY = hPx), blendMode = BlendMode.DstIn)
-        val bottomAlpha = ((scrollState.maxValue - scrollState.value).toFloat() / hPx).coerceIn(0f, 1f)
-        drawRect(brush = Brush.verticalGradient(colors = listOf(Color.Black, Color.Black.copy(alpha = 1f - bottomAlpha)), startY = size.height - hPx, endY = size.height), blendMode = BlendMode.DstIn)
     }
 }
 

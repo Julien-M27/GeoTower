@@ -14,7 +14,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -58,16 +57,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -82,6 +76,7 @@ import fr.geotower.data.api.ElevationProfileApi
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
+import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
@@ -410,7 +405,7 @@ fun ElevationProfileScreen(
             profile != null -> {
                 Column(
                     modifier = contentModifier
-                        .elevationProfileFadingEdge(scrollState)
+                        .geoTowerFadingEdge(scrollState)
                         .verticalScroll(scrollState),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
@@ -612,34 +607,6 @@ private fun ProfileMessageCard(
                 }
             }
         }
-    }
-}
-
-private fun Modifier.elevationProfileFadingEdge(scrollState: ScrollState): Modifier {
-    if (!AppConfig.isBlurEnabled.value) return this
-    val fadeHeight = 80.dp
-    return graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen).drawWithContent {
-        drawContent()
-        val heightPx = fadeHeight.toPx()
-        val topAlpha = (scrollState.value / heightPx).coerceIn(0f, 1f)
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(Color.Black.copy(alpha = 1f - topAlpha), Color.Black),
-                startY = 0f,
-                endY = heightPx
-            ),
-            blendMode = BlendMode.DstIn
-        )
-        val remainingScroll = scrollState.maxValue - scrollState.value
-        val bottomAlpha = (remainingScroll / heightPx).coerceIn(0f, 1f)
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(Color.Black, Color.Black.copy(alpha = 1f - bottomAlpha)),
-                startY = size.height - heightPx,
-                endY = size.height
-            ),
-            blendMode = BlendMode.DstIn
-        )
     }
 }
 

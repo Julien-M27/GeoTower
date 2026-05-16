@@ -21,6 +21,7 @@ object AppConfig {
     var isOledMode = mutableStateOf(true)
     var isBlurEnabled = mutableStateOf(true)
     var colorPalette = mutableStateOf(DEFAULT_COLOR_PALETTE)
+    var appLogoDrawingChoice = mutableStateOf(AppLogoDrawingResources.AUTO)
     // 0 = Plein écran, 1 = Fractionné
     var displayStyle = mutableIntStateOf(0)
 
@@ -183,6 +184,9 @@ object AppConfig {
         //Notification de téléchargement
         enableUpdateNotifications.value = prefs.getBoolean("enable_update_notifications", true)
         colorPalette.value = prefs.getString(PREF_COLOR_PALETTE, DEFAULT_COLOR_PALETTE) ?: DEFAULT_COLOR_PALETTE
+        appLogoDrawingChoice.value = AppLogoDrawingResources.normalize(
+            prefs.getString(AppLogoDrawingResources.PREF_KEY, AppLogoDrawingResources.AUTO)
+        )
         val model = DeviceProfile.model
         val device = DeviceProfile.device
 

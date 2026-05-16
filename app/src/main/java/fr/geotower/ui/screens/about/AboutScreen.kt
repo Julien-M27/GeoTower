@@ -62,13 +62,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -81,6 +76,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppIconManager
+import fr.geotower.utils.AppLogoDrawingResources
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.launch
@@ -91,6 +87,7 @@ import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.navigationBarsPadding
+import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import kotlin.math.roundToInt
@@ -157,6 +154,8 @@ fun AboutScreen(navController: NavController) {
 
     val appTitle = "GeoTower"
     val logoResId by AppIconManager.currentIconRes
+    val appLogoDrawingChoice by AppConfig.appLogoDrawingChoice
+    val displayLogoResId = AppLogoDrawingResources.resolve(appLogoDrawingChoice, logoResId, isDark)
     val isWideScreen = configuration.screenWidthDp >= 600
 
     var activeSectionIndex by remember { mutableIntStateOf(0) }
@@ -415,7 +414,7 @@ fun AboutScreen(navController: NavController) {
                                 scrollViewportTop = coordinates.positionInRoot().y
                                 scrollViewportHeight = coordinates.size.height.toFloat()
                             }
-                            .then(if (navMode == 0 || !isExpanded) Modifier.aboutFadingEdge(scrollState) else Modifier)
+                            .then(if (navMode == 0 || !isExpanded) Modifier.geoTowerFadingEdge(scrollState) else Modifier)
                             .then(if (navMode == 0 || !isExpanded) Modifier.verticalScroll(scrollState) else Modifier)
                             .padding(horizontal = if (isExpanded) 48.dp else 24.dp)
                             // 🚨 CORRECTION 3 : Ajout de la marge de sécurité
@@ -426,7 +425,7 @@ fun AboutScreen(navController: NavController) {
                                 AllAboutContent(
                                     appTitle,
                                     appVersion,
-                                    logoResId,
+                                    displayLogoResId,
                                     cardShape,
                                     bubbleBaseColor,
                                     sectionAnchorModifiers[0],
@@ -441,7 +440,7 @@ fun AboutScreen(navController: NavController) {
                         } else {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 when(activeSectionIndex) {
-                                    0 -> SectionPresentation(appTitle, appVersion, logoResId)
+                                    0 -> SectionPresentation(appTitle, appVersion, displayLogoResId)
                                     1 -> SectionNouveautes(appVersion, cardShape, bubbleBaseColor)
                                     2 -> SectionConfidentialite(cardShape, bubbleBaseColor)
                                     3 -> SectionSources(cardShape, bubbleBaseColor)
@@ -706,20 +705,6 @@ private fun CreditItem(title: String, description: String) {
     Column {
         Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
         Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    }
-}
-
-private fun Modifier.aboutFadingEdge(scrollState: androidx.compose.foundation.ScrollState): Modifier {
-    if (!AppConfig.isBlurEnabled.value) return this
-    val fadeHeight = 80.dp
-    return this.graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen).drawWithContent {
-        drawContent()
-        val heightPx = fadeHeight.toPx()
-        val topAlpha = (scrollState.value / heightPx).coerceIn(0f, 1f)
-        drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 1f - topAlpha), Color.Black), 0f, heightPx), blendMode = BlendMode.DstIn)
-        val remainingScroll = scrollState.maxValue - scrollState.value
-        val bottomAlpha = (remainingScroll / heightPx).coerceIn(0f, 1f)
-        drawRect(Brush.verticalGradient(listOf(Color.Black, Color.Black.copy(alpha = 1f - bottomAlpha)), size.height - heightPx, size.height), blendMode = BlendMode.DstIn)
     }
 }
 

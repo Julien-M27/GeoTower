@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.geotower.ui.components.rememberReorderableDragState
+import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 
@@ -113,6 +114,7 @@ fun SharePreferencesSheet(
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
+                .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
                 .padding(bottom = 24.dp, start = 24.dp, end = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -260,6 +262,7 @@ fun SupportSharePreferencesSheet(
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
+                .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
                 .padding(bottom = 24.dp, start = 24.dp, end = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -389,6 +392,7 @@ fun MapSharePreferencesSheet(
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
+                .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
                 .padding(bottom = 24.dp, start = 24.dp, end = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally

@@ -12,7 +12,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
@@ -68,15 +67,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -107,6 +101,7 @@ import fr.geotower.ui.components.extractThroughputAzimuths
 import fr.geotower.ui.components.extractThroughputPanelHeightMeters
 import fr.geotower.ui.components.formatThroughputDistanceMeters
 import fr.geotower.ui.components.formatThroughputMbps
+import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.parseAndSortFrequencies
 import fr.geotower.ui.components.resolveThroughputBandwidth
 import fr.geotower.ui.components.siteRadioStatusFromBandStatus
@@ -447,7 +442,7 @@ private fun ThroughputContent(
             .fillMaxSize()
             .background(mainBgColor)
             .navigationBarsPadding()
-            .throughputFadingEdge(scrollState)
+            .geoTowerFadingEdge(scrollState)
             .verticalScroll(scrollState)
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -2193,34 +2188,6 @@ private fun bestLastKnownThroughputLocation(context: Context): Location? {
             runCatching { locationManager.getLastKnownLocation(provider) }.getOrNull()
         }
         .maxByOrNull { it.time }
-}
-
-private fun Modifier.throughputFadingEdge(scrollState: ScrollState): Modifier {
-    if (!AppConfig.isBlurEnabled.value) return this
-    val fadeHeight = 80.dp
-    return graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen).drawWithContent {
-        drawContent()
-        val heightPx = fadeHeight.toPx()
-        val topAlpha = (scrollState.value / heightPx).coerceIn(0f, 1f)
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(Color.Black.copy(alpha = 1f - topAlpha), Color.Black),
-                startY = 0f,
-                endY = heightPx
-            ),
-            blendMode = BlendMode.DstIn
-        )
-        val remainingScroll = scrollState.maxValue - scrollState.value
-        val bottomAlpha = (remainingScroll / heightPx).coerceIn(0f, 1f)
-        drawRect(
-            brush = Brush.verticalGradient(
-                colors = listOf(Color.Black, Color.Black.copy(alpha = 1f - bottomAlpha)),
-                startY = size.height - heightPx,
-                endY = size.height
-            ),
-            blendMode = BlendMode.DstIn
-        )
-    }
 }
 
 private enum class ThroughputBlock(val id: String, val prefKey: String) {

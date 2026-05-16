@@ -91,13 +91,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -115,6 +110,7 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.data.workers.DownloadNotificationCenter
 import fr.geotower.data.workers.UpdateCheckScheduler
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppLogoDrawingResources
 import fr.geotower.utils.AppUiMode
 import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.AppStrings
@@ -136,7 +132,9 @@ import fr.geotower.ui.components.SafeClick
 import fr.geotower.ui.components.colorPaletteFadingEdge
 import fr.geotower.ui.components.DialogDestructiveButton
 import fr.geotower.ui.components.DialogNeutralButton
+import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
+import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.services.LiveTrackingController
 import fr.geotower.utils.OperatorLogos
@@ -362,6 +360,7 @@ fun SettingsScreen(
     var showLanguageSheet by remember { mutableStateOf(false) }
     var showOperatorSheet by remember { mutableStateOf(false) }
     var showIconSheet by remember { mutableStateOf(false) }
+    var showLogoDrawingSheet by remember { mutableStateOf(false) }
 
 
     // --- VARIABLES POUR LE PARTAGE ---
@@ -791,7 +790,7 @@ fun SettingsScreen(
                                 scrollViewportTop = coordinates.positionInRoot().y
                                 scrollViewportBottom = scrollViewportTop + coordinates.size.height
                             }
-                            .then(if (navMode == 0 || !isExpanded) Modifier.settingsFadingEdge(scrollState) else Modifier)
+                            .then(if (navMode == 0 || !isExpanded) Modifier.geoTowerFadingEdge(scrollState) else Modifier)
                             .then(if (navMode == 0 || !isExpanded) Modifier.verticalScroll(scrollState) else Modifier)
                             .padding(horizontal = if (isExpanded) 48.dp else 24.dp)
                             // 🚨 CORRECTION 3 : Marge pour pouvoir scroller jusqu'au bout
@@ -799,10 +798,10 @@ fun SettingsScreen(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                             if (navMode == 0 || !isExpanded) {
-                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; offlineMapsBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) }, scrollViewportTop, scrollViewportBottom, scrollState.value, scrollState.maxValue, targetMapFilename = offlineMapsTargetFilename, onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) })
+                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; offlineMapsBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) }, scrollViewportTop, scrollViewportBottom, scrollState.value, scrollState.maxValue, targetMapFilename = offlineMapsTargetFilename, onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) })
                             } else {
                                 when (activeSectionIndex) {
-                                    0 -> SectionApparence(themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true })
+                                    0 -> SectionApparence(themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true })
                                     1 -> SectionCartographie(mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick)
                                     2 -> SectionPreferences(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick)
                                     3 -> SectionSysteme(context, cardShape, border = cardBorder, bubbleColor = bubbleBaseColor, useOneUi = useOneUi, safeClick = safeClick)
@@ -844,6 +843,23 @@ fun SettingsScreen(
                 safeClick = safeClick
             )
         };
+        if (showLogoDrawingSheet) {
+            LogoDrawingSheet(
+                onDismiss = { showLogoDrawingSheet = false },
+                currentChoice = AppConfig.appLogoDrawingChoice.value,
+                activeIconRes = logoResId,
+                isDark = isDark,
+                onSelect = { choice ->
+                    val normalized = AppLogoDrawingResources.normalize(choice)
+                    AppConfig.appLogoDrawingChoice.value = normalized
+                    prefs.edit().putString(AppLogoDrawingResources.PREF_KEY, normalized).apply()
+                },
+                sheetState = sheetState,
+                useOneUi = useOneUi,
+                bubbleColor = bubbleBaseColor,
+                safeClick = safeClick
+            )
+        }
         if (showOperatorSheet) {
             fr.geotower.ui.components.OperatorSheet(
                 defaultOperator,
@@ -1252,12 +1268,19 @@ fun SettingsScreen(
         if (showShareSelectorSheet) {
             val sheetBgColor2 =
                 if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+            val shareSelectorScrollState = rememberScrollState()
             ModalBottomSheet(
                 onDismissRequest = { showShareSelectorSheet = false },
                 sheetState = sheetState,
                 containerColor = sheetBgColor2
             ) {
-                Column(modifier = Modifier.padding(bottom = 48.dp, start = 16.dp, end = 16.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .settingsPopupFadingEdge(shareSelectorScrollState)
+                        .verticalScroll(shareSelectorScrollState)
+                        .padding(bottom = 48.dp, start = 16.dp, end = 16.dp)
+                ) {
                     Text(
                         AppStrings.defaultShareContentTitle,
                         style = MaterialTheme.typography.titleLarge,
@@ -1524,7 +1547,7 @@ fun SectionTitle(title: String) {
 
 @Composable
 fun AllSettingsContent(
-    isWide: Boolean, nav: Int, onNav: (Int) -> Unit, theme: Int, onTheme: (Int) -> Unit, oled: Boolean, onOled: (Boolean) -> Unit, oneUi: Boolean, onOneUi: (Boolean) -> Unit, blur: Boolean, onBlur: (Boolean) -> Unit, logo: Int, onIcon: () -> Unit, op: String, onOp: () -> Unit, lang: String, onLang: () -> Unit,
+    isWide: Boolean, nav: Int, onNav: (Int) -> Unit, theme: Int, onTheme: (Int) -> Unit, oled: Boolean, onOled: (Boolean) -> Unit, oneUi: Boolean, onOneUi: (Boolean) -> Unit, blur: Boolean, onBlur: (Boolean) -> Unit, logo: Int, onIcon: () -> Unit, onLogoDrawing: () -> Unit, op: String, onOp: () -> Unit, lang: String, onLang: () -> Unit,
     onUnitSettings: () -> Unit,
     onPages: () -> Unit,
     onCommunityData: () -> Unit,
@@ -1557,7 +1580,7 @@ fun AllSettingsContent(
     onTargetMapPositioned: (Float, Int) -> Unit = { _, _ -> }
 ) {
     Column(modifier = appearanceSectionModifier.fillMaxWidth()) {
-        SectionApparence(theme, onTheme, oled, onOled, oneUi, onOneUi, blur, onBlur, logo, onIcon, shape, border, bubbleColor, useOneUi, safeClick, onColorPaletteClick)
+        SectionApparence(theme, onTheme, oled, onOled, oneUi, onOneUi, blur, onBlur, logo, onIcon, onLogoDrawing, shape, border, bubbleColor, useOneUi, safeClick, onColorPaletteClick)
     }
     Spacer(Modifier.height(32.dp))
     Column(modifier = mappingSectionModifier.fillMaxWidth()) {
@@ -1595,13 +1618,16 @@ fun AllSettingsContent(
 fun SectionApparence(
     theme: Int, onTheme: (Int) -> Unit, oled: Boolean, onOled: (Boolean) -> Unit,
     oneUi: Boolean, onOneUi: (Boolean) -> Unit, blur: Boolean, onBlur: (Boolean) -> Unit,
-    logo: Int, onIcon: () -> Unit,
+    logo: Int, onIcon: () -> Unit, onLogoDrawing: () -> Unit,
     shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick,
     onColorPaletteClick: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", android.content.Context.MODE_PRIVATE)
     val menuSize by AppConfig.menuSize
+    val logoDrawingChoice by AppConfig.appLogoDrawingChoice
+    val isDark = LocalGeoTowerUiStyle.current.isDark
+    val logoDrawingRes = AppLogoDrawingResources.resolve(logoDrawingChoice, logo, isDark)
 
     SectionTitle(AppStrings.appearance)
 
@@ -1617,6 +1643,9 @@ fun SectionApparence(
         },
         appIconRes = logo,
         onAppIconClick = onIcon,
+        appLogoDrawingChoice = logoDrawingChoice,
+        appLogoDrawingRes = logoDrawingRes,
+        onAppLogoDrawingClick = onLogoDrawing,
         onColorPaletteClick = onColorPaletteClick,
         shape = shape, border = border, bubbleColor = bubbleColor, safeClick = safeClick
     )
@@ -1690,11 +1719,18 @@ fun SectionPreferences(
             }
         }
         if (showModeSheet) {
+            val modeScrollState = rememberScrollState()
             ModalBottomSheet(
                 onDismissRequest = { showModeSheet = false },
                 containerColor = sheetBgColor
             ) {
-                Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .settingsPopupFadingEdge(modeScrollState)
+                        .verticalScroll(modeScrollState)
+                        .padding(bottom = 48.dp, start = 24.dp, end = 24.dp)
+                ) {
                     Text(AppStrings.navStyleTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(16.dp))
                     NavigationModeOption(AppStrings.navScrollTitle, AppStrings.navScrollDesc, nav == 0, useOneUi) {
@@ -1725,11 +1761,18 @@ fun SectionPreferences(
         }
 
         if (showDisplayStylesSheet) {
+            val displayStylesScrollState = rememberScrollState()
             ModalBottomSheet(
                 onDismissRequest = { showDisplayStylesSheet = false },
                 containerColor = sheetBgColor
             ) {
-                Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .settingsPopupFadingEdge(displayStylesScrollState)
+                        .verticalScroll(displayStylesScrollState)
+                        .padding(bottom = 48.dp, start = 24.dp, end = 24.dp)
+                ) {
                     Text(
                         text = AppStrings.displayStyleTitle,
                         style = MaterialTheme.typography.titleLarge,
@@ -2272,6 +2315,134 @@ private fun LauncherIconPreview(iconRes: Int, modifier: Modifier = Modifier) {
     DrawableImage(if (isDark) iconPreviewResource(iconRes) else iconRes, modifier)
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun LogoDrawingSheet(
+    onDismiss: () -> Unit,
+    currentChoice: String,
+    activeIconRes: Int,
+    isDark: Boolean,
+    onSelect: (String) -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    bubbleColor: Color,
+    safeClick: SafeClick
+) {
+    val normalizedCurrent = AppLogoDrawingResources.normalize(currentChoice)
+    val options = remember { AppLogoDrawingResources.choices }
+    val scrollState = rememberScrollState()
+    val sheetBgColor = if (useOneUi) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surface
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(start = 24.dp, end = 24.dp, bottom = 40.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                AppStrings.appLogoDrawingTitle,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+            Text(
+                AppStrings.appLogoDrawingSubtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(bottom = 20.dp)
+            )
+
+            options.forEach { choice ->
+                val family = AppLogoDrawingResources.family(choice)
+                val previousChoice = options.getOrNull(options.indexOf(choice) - 1)
+                val previousFamily = previousChoice?.let { AppLogoDrawingResources.family(it) }
+                if (family != null && family != previousFamily) {
+                    Text(
+                        text = AppStrings.logoDrawingFamilyName(family),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp)
+                    )
+                }
+
+                LogoDrawingOptionRow(
+                    choice = choice,
+                    activeIconRes = activeIconRes,
+                    isDark = isDark,
+                    isSelected = normalizedCurrent == choice,
+                    useOneUi = useOneUi,
+                    bubbleColor = bubbleColor,
+                    onClick = {
+                        safeClick("logo_drawing_$choice") {
+                            onSelect(choice)
+                        }
+                    }
+                )
+                Spacer(Modifier.height(8.dp))
+            }
+        }
+    }
+}
+
+@Composable
+private fun LogoDrawingOptionRow(
+    choice: String,
+    activeIconRes: Int,
+    isDark: Boolean,
+    isSelected: Boolean,
+    useOneUi: Boolean,
+    bubbleColor: Color,
+    onClick: () -> Unit
+) {
+    val previewRes = AppLogoDrawingResources.resolve(choice, activeIconRes, isDark)
+    val cardColor = if (useOneUi) bubbleColor else Color.Transparent
+    val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
+
+    Surface(
+        onClick = onClick,
+        shape = RoundedCornerShape(if (useOneUi) 22.dp else 12.dp),
+        color = cardColor,
+        border = BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            AndroidView(
+                modifier = Modifier.size(52.dp),
+                factory = { ctx ->
+                    ImageView(ctx).apply {
+                        scaleType = ImageView.ScaleType.FIT_CENTER
+                        setImageResource(previewRes)
+                    }
+                },
+                update = { it.setImageResource(previewRes) }
+            )
+            Spacer(Modifier.width(14.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = AppStrings.logoDrawingChoiceName(choice),
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                )
+                Text(
+                    text = AppStrings.logoDrawingChoiceDescription(choice),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            RadioButton(selected = isSelected, onClick = onClick)
+        }
+    }
+}
+
 @Composable
 fun NavigationMenuItem(title: String, icon: ImageVector, isSelected: Boolean, isDark: Boolean, onClick: () -> Unit) {
     // 1. On utilise le beau bleu dynamique pour l'élément sélectionné
@@ -2394,9 +2565,17 @@ fun IconSheet(
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val scrollState = rememberScrollState()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
-        Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Text(AppStrings.appIcon, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 32.dp))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
@@ -2450,8 +2629,6 @@ fun IconSheet(
 
 @Composable
 fun SettingsTopBar(onBack: () -> Unit) { Row(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }; Text(AppStrings.settingsTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center); Spacer(Modifier.width(48.dp)) } }
-
-fun Modifier.settingsFadingEdge(scrollState: ScrollState): Modifier { if (!AppConfig.isBlurEnabled.value) return this; val fadeHeight = 80.dp; return this.graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen).drawWithContent { drawContent(); val heightPx = fadeHeight.toPx(); val topAlpha = (scrollState.value / heightPx).coerceIn(0f, 1f); drawRect(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 1f - topAlpha), Color.Black), 0f, heightPx), blendMode = BlendMode.DstIn); val remainingScroll = scrollState.maxValue - scrollState.value; val bottomAlpha = (remainingScroll / heightPx).coerceIn(0f, 1f); drawRect(Brush.verticalGradient(listOf(Color.Black, Color.Black.copy(alpha = 1f - bottomAlpha)), size.height - heightPx, size.height), blendMode = BlendMode.DstIn) } }
 
 @Composable
 fun DrawableImage(resId: Int, modifier: Modifier = Modifier) { AndroidView({ ctx -> ImageView(ctx).apply { scaleType = ImageView.ScaleType.FIT_CENTER } }, modifier, { view -> view.setImageResource(resId) }) }

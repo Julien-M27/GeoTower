@@ -3,7 +3,6 @@ package fr.geotower.ui.components
 import android.content.Context
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
@@ -36,13 +35,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -59,45 +53,6 @@ fun saveColorPalette(context: Context, palette: AppColorPalette) {
         .edit()
         .putString(AppConfig.PREF_COLOR_PALETTE, palette.storageKey)
         .apply()
-}
-
-fun Modifier.colorPaletteFadingEdge(scrollState: ScrollState): Modifier {
-    if (!AppConfig.isBlurEnabled.value) return this
-
-    val fadeHeight = 80.dp
-
-    return this
-        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-        .drawWithContent {
-            drawContent()
-            val heightPx = fadeHeight.toPx()
-
-            val topAlpha = (scrollState.value.toFloat() / heightPx).coerceIn(0f, 1f)
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Black.copy(alpha = 1f - topAlpha),
-                        Color.Black
-                    ),
-                    startY = 0f,
-                    endY = heightPx
-                ),
-                blendMode = BlendMode.DstIn
-            )
-
-            val bottomAlpha = if (scrollState.canScrollForward) 1f else 0f
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Black,
-                        Color.Black.copy(alpha = 1f - bottomAlpha)
-                    ),
-                    startY = size.height - heightPx,
-                    endY = size.height
-                ),
-                blendMode = BlendMode.DstIn
-            )
-        }
 }
 
 @Composable

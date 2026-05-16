@@ -4,6 +4,8 @@ import android.content.Context
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -52,6 +54,7 @@ import fr.geotower.ui.components.SiteExternalLinkDefinitions
 import fr.geotower.ui.components.readSiteExternalLinkOrder
 import fr.geotower.ui.components.rememberReorderableDragState
 import fr.geotower.ui.components.resetSiteExternalLinks
+import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.ui.components.siteExternalLinkById
 import fr.geotower.ui.components.writeSiteExternalLinkOrder
 import fr.geotower.utils.AppConfig
@@ -92,8 +95,16 @@ fun ExternalLinksSettingsSheet(
     var linksOrder by remember {
         mutableStateOf(readSiteExternalLinkOrder(prefs))
     }
+    val scrollState = rememberScrollState()
+
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
-        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp, start = 24.dp, end = 24.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = 32.dp, start = 24.dp, end = 24.dp)
+        ) {
 
             // --- EN-TÊTE AVEC BOUTON RETOUR ---
             Row(

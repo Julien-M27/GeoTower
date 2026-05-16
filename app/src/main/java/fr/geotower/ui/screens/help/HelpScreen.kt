@@ -58,13 +58,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -72,6 +67,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import fr.geotower.ui.components.geoTowerLazyListFadingEdge
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
@@ -298,7 +294,7 @@ private fun HelpSummary(
         state = listState,
         modifier = modifier
             .fillMaxSize()
-            .nearEmittersFadingEdge(listState),
+            .geoTowerLazyListFadingEdge(listState),
         contentPadding = PaddingValues(
             start = 20.dp,
             top = 20.dp,
@@ -457,7 +453,7 @@ private fun HelpTopicDetail(
         state = listState,
         modifier = modifier
             .fillMaxSize()
-            .nearEmittersFadingEdge(listState),
+            .geoTowerLazyListFadingEdge(listState),
         contentPadding = PaddingValues(
             start = 20.dp,
             top = 20.dp,
@@ -821,50 +817,6 @@ private fun helpVisualBlocks(visual: HelpVisual, compact: Boolean): List<HelpVis
             )
         }
     }
-}
-
-private fun Modifier.nearEmittersFadingEdge(lazyListState: LazyListState): Modifier {
-    if (!AppConfig.isBlurEnabled.value) return this
-
-    val fadeHeight = 80.dp
-
-    return this
-        .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
-        .drawWithContent {
-            drawContent()
-            val heightPx = fadeHeight.toPx()
-
-            val isFirstItemVisible = lazyListState.firstVisibleItemIndex == 0
-            val topAlpha = if (!isFirstItemVisible) 1f
-            else (lazyListState.firstVisibleItemScrollOffset.toFloat() / heightPx).coerceIn(0f, 1f)
-
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Black.copy(alpha = 1f - topAlpha),
-                        Color.Black
-                    ),
-                    startY = 0f,
-                    endY = heightPx
-                ),
-                blendMode = BlendMode.DstIn
-            )
-
-            val canScrollForward = lazyListState.canScrollForward
-            val bottomAlpha = if (canScrollForward) 1f else 0f
-
-            drawRect(
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color.Black,
-                        Color.Black.copy(alpha = 1f - bottomAlpha)
-                    ),
-                    startY = size.height - heightPx,
-                    endY = size.height
-                ),
-                blendMode = BlendMode.DstIn
-            )
-        }
 }
 
 private fun HelpTopic.matches(query: String): Boolean {

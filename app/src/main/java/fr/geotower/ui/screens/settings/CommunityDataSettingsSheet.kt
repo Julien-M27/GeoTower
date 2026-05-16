@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import fr.geotower.data.community.CommunityDataFeature
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.ui.components.GeoTowerSwitch
+import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColors
@@ -75,6 +76,7 @@ fun CommunityDataSettingsSheet(
     } else {
         MaterialTheme.colorScheme.surface
     }
+    val scrollState = rememberScrollState()
     val communityOperators = CommunityDataPreferences.orderedOperators(AppConfig.defaultOperator.value)
     val sheetMaxHeight = (configuration.screenHeightDp.dp * 0.7f).coerceAtMost(560.dp)
 
@@ -160,7 +162,8 @@ fun CommunityDataSettingsSheet(
                 .fillMaxWidth()
                 .heightIn(max = sheetMaxHeight)
                 .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
                 .padding(start = 24.dp, end = 24.dp, bottom = 32.dp)
         ) {
             Row(

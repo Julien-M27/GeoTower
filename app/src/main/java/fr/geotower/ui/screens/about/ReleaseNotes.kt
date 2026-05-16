@@ -25,73 +25,16 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section("Général", "General", "Geral") {
+    section("Global", "Global", "Global") {
         item(
-            "Ajout d'un panneau Données communautaires",
-            "Added a Community Data panel",
-            "Adição de um painel de Dados comunitários"
+            "Mise à jour des icônes",
+            "Updated icons",
+            "Atualização dos ícones"
         )
         item(
-            "Amélioration des tests internes",
-            "Improved internal tests",
-            "Melhoria dos testes internos"
-        )
-    }
-
-    section("Données communautaires", "Community data", "Dados comunitários") {
-        item(
-            "Meilleure gestion des photos et speedtests communautaires",
-            "Improved handling of community photos and speedtests",
-            "Melhor gestão de fotos e speedtests comunitários"
-        )
-        item(
-            "Choix des sources communautaires par opérateur",
-            "Community source selection by operator",
-            "Escolha das fontes comunitárias por operadora"
-        )
-        item(
-            "Amélioration de la prise en charge de SignalQuest",
-            "Improved SignalQuest support",
-            "Melhoria do suporte ao SignalQuest"
-        )
-    }
-
-    section("Carte", "Map", "Mapa") {
-        item(
-            "Ajout de la recherche par opérateur",
-            "Added operator search",
-            "Adição da pesquisa por operadora"
-        )
-        item(
-            "Amélioration de la recherche de lieux",
-            "Improved place search",
-            "Melhoria da pesquisa de locais"
-        )
-        item(
-            "Meilleure mise en avant de l'opérateur recherché",
-            "Better highlighting of the searched operator",
-            "Melhor destaque da operadora pesquisada"
-        )
-    }
-
-    section("Statistiques", "Statistics", "Estatísticas") {
-        item(
-            "Amélioration des statistiques ville",
-            "Improved city statistics",
-            "Melhoria das estatísticas da cidade"
-        )
-        item(
-            "Ajout de compteurs plus détaillés par opérateur et fréquence",
-            "Added more detailed counters by operator and frequency",
-            "Adição de contadores mais detalhados por operadora e frequência"
-        )
-    }
-
-    section("Onboarding", "Onboarding", "Onboarding") {
-        item(
-            "Messages plus clairs lorsque les autorisations sont refusées",
-            "Clearer messages when permissions are denied",
-            "Mensagens mais claras quando as autorizações são recusadas"
+            "Ajout d'un réglage pour choisir le logo affiché dans l'app",
+            "Added a setting to choose the logo displayed in the app",
+            "Adição de uma definição para escolher o logótipo apresentado na app"
         )
     }
 }

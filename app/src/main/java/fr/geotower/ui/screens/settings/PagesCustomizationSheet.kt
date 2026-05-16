@@ -90,6 +90,7 @@ import androidx.compose.ui.unit.sp
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.rememberReorderableDragState
+import fr.geotower.ui.components.settingsPopupFadingEdge
 import kotlin.math.roundToInt
 
 
@@ -114,9 +115,16 @@ fun PagesCustomizationSheet(
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val scrollState = rememberScrollState()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
-        Column(modifier = Modifier.padding(bottom = 48.dp, start = 16.dp, end = 16.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = 48.dp, start = 16.dp, end = 16.dp)
+        ) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(
@@ -174,10 +182,18 @@ fun StartupPageSelectionSheet(
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val scrollState = rememberScrollState()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         BackHandler(onBack = onBack)
-        Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(AppStrings.startupPageSettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
@@ -280,6 +296,7 @@ fun HomeSettingsSheet(
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val scrollState = rememberScrollState()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         BackHandler {
@@ -289,7 +306,14 @@ fun HomeSettingsSheet(
                 else -> onBack()
             }
         }
-        Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             if (showLogoSettings) {
                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { showLogoSettings = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
@@ -572,10 +596,18 @@ fun NearbySettingsSheet(
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val scrollState = rememberScrollState()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         BackHandler(onBack = onBack)
-        Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(AppStrings.pageNearbySettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
@@ -741,10 +773,18 @@ fun CompassSettingsSheet(
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val scrollState = rememberScrollState()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         BackHandler(onBack = onBack)
-        Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(AppStrings.pageCompassSettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
@@ -822,6 +862,7 @@ fun MapSettingsSheet(
             onAzimuthsConeChange(false)
         }
     }
+    val scrollState = rememberScrollState()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         BackHandler {
@@ -830,7 +871,8 @@ fun MapSettingsSheet(
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
                 .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -973,6 +1015,7 @@ fun ThroughputCalculatorSettingsSheet(
     val shape = oneUiActionButtonShape(useOneUi)
     val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
     val currentOrder by rememberUpdatedState(normalizeThroughputBlockOrder(throughputOrder))
+    val scrollState = rememberScrollState()
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         BackHandler(onBack = onBack)
@@ -983,7 +1026,8 @@ fun ThroughputCalculatorSettingsSheet(
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
                 .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -1094,6 +1138,7 @@ fun ThroughputCalculationDefaultsSheet(
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
     val shape = oneUiActionButtonShape(useOneUi)
     val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+    val scrollState = rememberScrollState()
 
     var preset by remember { mutableStateOf(prefs.getString("throughput_default_preset", "conservative") ?: "conservative") }
     var lteDownIndex by remember { mutableStateOf(prefs.getInt("throughput_custom_lte_down", 3).coerceIn(0, throughputModulationLabels.lastIndex)) }
@@ -1137,7 +1182,8 @@ fun ThroughputCalculationDefaultsSheet(
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
-                .verticalScroll(rememberScrollState())
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
                 .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
@@ -1398,6 +1444,7 @@ fun SupportSettingsSheet(
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val scrollState = rememberScrollState()
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1413,7 +1460,14 @@ fun SupportSettingsSheet(
         }
     ) {
         BackHandler(onBack = onBack)
-        Column(modifier = Modifier.padding(bottom = 48.dp, start = 24.dp, end = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(AppStrings.pageSupportSettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
@@ -1523,6 +1577,7 @@ fun SiteSettingsSheet(
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
+                .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
                 .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -1627,6 +1682,7 @@ fun SiteFreqFiltersSheet(
         }
     )
     val emptyFreqOrderState = remember { mutableStateOf(emptyList<String>()) }
+    val scrollState = rememberScrollState()
 
     val txtMinOneTechno = AppStrings.minOneTechnoWarning
     val txtMinOneFreq = AppStrings.minOneFreqWarning
@@ -1656,7 +1712,14 @@ fun SiteFreqFiltersSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface) {
         BackHandler(onBack = onBack)
-        Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(horizontal = 24.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp, top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -1934,6 +1997,7 @@ fun SitePhotosSettingsSheet(
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val switchColor = MaterialTheme.colorScheme.primary
     val useOneUi = AppConfig.useOneUiDesign
+    val scrollState = rememberScrollState()
 
     fun saveBool(key: String, state: androidx.compose.runtime.MutableState<Boolean>, value: Boolean) {
         state.value = value
@@ -1942,7 +2006,14 @@ fun SitePhotosSettingsSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface) {
         BackHandler(onBack = onBack)
-        Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(horizontal = 24.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp, top = 8.dp),
                 verticalAlignment = Alignment.CenterVertically

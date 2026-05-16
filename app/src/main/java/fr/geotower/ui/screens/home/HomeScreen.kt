@@ -78,6 +78,7 @@ import fr.geotower.data.workers.AppUpdateNotifier
 import fr.geotower.data.workers.DatabaseDownloadWorker
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
+import fr.geotower.utils.AppLogoDrawingResources
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.OperatorLogos
 import kotlinx.coroutines.launch
@@ -97,8 +98,6 @@ fun HomeScreen(navController: NavController) {
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val homeLogoChoice = prefs.getString("home_logo_choice", "app") ?: "app"
 
-    // On associe le choix à la bonne image
-    val displayLogoResId = OperatorLogos.homeLogoChoiceRes(homeLogoChoice, logoResId)
 
     // --- 1. LECTURE RÉACTIVE DU THÈME ET DESIGN ---
     val uiStyle = LocalGeoTowerUiStyle.current
@@ -116,6 +115,14 @@ fun HomeScreen(navController: NavController) {
 
     // Couleur des boutons inactifs (Gris One UI ou Classique)
     val buttonBgColor = if (useOneUi) uiStyle.bubbleColor else MaterialTheme.colorScheme.surfaceVariant
+
+    val appLogoDrawingChoice by AppConfig.appLogoDrawingChoice
+    val appLogoDrawingResId = AppLogoDrawingResources.resolve(appLogoDrawingChoice, logoResId, isDark)
+    val displayLogoResId = if (homeLogoChoice == "app") {
+        appLogoDrawingResId
+    } else {
+        OperatorLogos.homeLogoChoiceRes(homeLogoChoice, appLogoDrawingResId)
+    }
 
     // ---> 1. AJOUT : ON ÉCOUTE LE RÉSEAU ICI <---
     val isOnline by fr.geotower.utils.rememberNetworkConnectivityState()
