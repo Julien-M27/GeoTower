@@ -695,14 +695,14 @@ fun FrequenciesGridView(
             .filter { it.isNotBlank() }
             .joinToString("\n")
 
-        // Remplacement élégant des tirets par des "à" comme sur l'image modèle
+        // Normalisation des plages de fréquences pour un rendu compact.
         val displayFreqs = if (freqs.isNotBlank()) {
             Regex("""([0-9]+(?:[.,][0-9]+)?)\s*-\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]*Hz)?""")
                 .replace(freqs) { match ->
                     val unit = match.groupValues[3].takeIf { it.isNotBlank() }
                     buildString {
                         append(match.groupValues[1])
-                        append(" à ")
+                        append(" - ")
                         append(match.groupValues[2])
                         if (unit != null) append(" ").append(unit)
                     }

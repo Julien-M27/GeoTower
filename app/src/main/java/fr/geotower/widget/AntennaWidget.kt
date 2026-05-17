@@ -519,7 +519,7 @@ class RefreshWidgetAction : ActionCallback {
                     } else "#MULTI"
 
                     val technique = dao.getTechniqueDetails(main.idAnfr.toString())
-                    val adresseAffichee = technique?.adresse ?: "Site N°${main.idAnfr}"
+                    val adresseAffichee = technique?.adresse ?: AppStrings.siteAnfrTitle(context, main.idAnfr.toString())
 
                     WidgetSiteData(
                         id = main.idAnfr.toString(),

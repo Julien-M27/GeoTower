@@ -177,6 +177,7 @@ object AppConfig {
     var siteShowCellularFrPhotos = mutableStateOf(true)
     var siteShowSignalQuestPhotos = mutableStateOf(true)
     var siteShowSchemes = mutableStateOf(true)
+    var siteShowPhotoExif = mutableStateOf(true)
 
     // --- FONCTION POUR CHARGER LA MÉMOIRE AU DÉMARRAGE ---
     fun loadSavedFilters(prefs: android.content.SharedPreferences) {
@@ -286,6 +287,7 @@ object AppConfig {
         siteShowCellularFrPhotos.value = prefs.getBoolean("site_show_cellularfr_photos", true)
         siteShowSignalQuestPhotos.value = prefs.getBoolean("site_show_signalquest_photos", true)
         siteShowSchemes.value = prefs.getBoolean("site_show_schemes", true)
+        siteShowPhotoExif.value = prefs.getBoolean("site_show_photo_exif", true)
 
         // --- CHARGEMENT DE L'ORDRE DES TECHNOLOGIES ET FRÉQUENCES ---
         val tOrder = prefs.getString("site_techno_order", "5G,4G,3G,2G,FH")

@@ -19,6 +19,7 @@ import java.util.Locale
 // ⚠️ Assure-toi que cet import correspond au nom exact de ta base de données locale
 import fr.geotower.data.db.AppDatabase
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColors
 
 data class WidgetSiteData(val id: String, val operateur: String, val distance: String, val adresse: String, val colorHex: String)
@@ -150,7 +151,7 @@ class AntennaWidgetWorker(
                 }
 
                 val technique = dao.getTechniqueDetails(main.idAnfr.toString())
-                val adresseAffichee = technique?.adresse ?: "Site N°${main.idAnfr}"
+                val adresseAffichee = technique?.adresse ?: AppStrings.siteAnfrTitle(context, main.idAnfr.toString())
 
                 WidgetSiteData(
                     id = main.idAnfr.toString(),

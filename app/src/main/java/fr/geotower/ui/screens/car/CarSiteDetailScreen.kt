@@ -32,7 +32,7 @@ class CarSiteDetailScreen(
             .build()
 
         return PaneTemplate.Builder(pane)
-            .setTitle("Site ANFR ${site.idAnfr}")
+            .setTitle(AppStrings.siteAnfrTitle(carContext, site.idAnfr))
             .setHeaderAction(Action.BACK)
             .build()
     }

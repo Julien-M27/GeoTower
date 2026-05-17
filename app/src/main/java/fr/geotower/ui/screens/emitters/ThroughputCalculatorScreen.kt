@@ -1691,12 +1691,12 @@ private fun calculateThroughput(
             val azimuths = extractThroughputAzimuths(band)
             val customMultipliers = throughputMultipliersFor(preset, band.gen, customSettings)
             val excludedReason = when {
-                !generationAllowed -> if (band.gen == 5) "5G désactivée" else "4G désactivée"
-                !bandAllowed -> "Bande exclue"
-                operator == null -> "Opérateur non reconnu pour les allocations Arcep"
-                carrierResult == null -> excludedByKey[key]?.reason ?: "Allocation Arcep introuvable"
+                !generationAllowed -> if (band.gen == 5) AppStrings.THROUGHPUT_REASON_5G_DISABLED else AppStrings.THROUGHPUT_REASON_4G_DISABLED
+                !bandAllowed -> AppStrings.THROUGHPUT_REASON_BAND_EXCLUDED
+                operator == null -> AppStrings.THROUGHPUT_REASON_OPERATOR_NOT_RECOGNIZED_ARCEP
+                carrierResult == null -> excludedByKey[key]?.reason ?: AppStrings.THROUGHPUT_REASON_ARCEP_ALLOCATION_NOT_FOUND
                 !carrierResult.included -> carrierResult.excludedReason
-                isPlanned && !includePlanned -> "Bande en projet"
+                isPlanned && !includePlanned -> AppStrings.THROUGHPUT_REASON_PLANNED_BAND
                 else -> null
             }
 
@@ -1725,7 +1725,7 @@ private fun calculateThroughput(
         .mapNotNull { it.downAggregationExcludedReason }
         .distinct()
     val uplinkAggregationWarning = if (aggregationAwareBands.count { it.isIncluded && it.downAggregationExcludedReason == null && it.upMbps > 0.0 } > MAX_FR_UPLINK_AGGREGATED_CARRIERS) {
-        listOf("Le débit montant est limité aux deux meilleures fréquences agrégées, une hypothèse plus réaliste pour les réseaux mobiles en France.")
+        listOf(AppStrings.THROUGHPUT_WARNING_UPLINK_AGGREGATION)
     } else {
         emptyList()
     }
@@ -1736,7 +1736,7 @@ private fun calculateThroughput(
         assumptions = engineResult?.assumptions.orEmpty(),
         confidenceScore = engineResult?.confidenceScore ?: 35,
         calculationVersion = engineResult?.calculationVersion ?: fr.geotower.radio.THROUGHPUT_CALCULATION_VERSION,
-        sourceSummary = engineResult?.sourceSummary ?: "ANFR/data.gouv pour les fréquences déclarées, Arcep pour les allocations opérateur, 3GPP pour le modèle radio."
+        sourceSummary = engineResult?.sourceSummary ?: AppStrings.THROUGHPUT_SOURCE_SUMMARY_DEFAULT
     )
 }
 
@@ -1788,13 +1788,13 @@ private fun modulationName(modulationOrder: Int): String {
         6 -> "64-QAM"
         8 -> "256-QAM"
         10 -> "1024-QAM"
-        else -> "$modulationOrder bits/symbole"
+        else -> "$modulationOrder bits/symbol"
     }
 }
 
 private fun layerLabel(layers: Int): String {
     return if (layers <= 1) {
-        "1 couche"
+        "1 layer"
     } else {
         "MIMO ${layers}x${layers}"
     }
@@ -1820,8 +1820,8 @@ private fun customProfile(customSettings: CustomModulationSettings): ThroughputP
 
     return ThroughputProfile(
         id = "CUSTOM",
-        label = "Personnalisé",
-        description = "Profil personnalisé : modulations descendantes et montantes choisies dans l'interface, débit montant traité comme celui d'un téléphone.",
+        label = AppStrings.THROUGHPUT_PROFILE_CUSTOM_LABEL,
+        description = AppStrings.THROUGHPUT_PROFILE_CUSTOM_DESC,
         lte = RatAssumptions(
             dlModulationOrder = lteDown.modulationOrder,
             ulModulationOrder = lteUp.modulationOrder,
@@ -1911,7 +1911,7 @@ private fun applyLteLowBandAggregationPolicy(
         .filterNot { it.key == keptBand.key }
         .map { it.key }
         .toSet()
-    val reason = "Agrégation 4G entre bandes basses 700/800/900 MHz limitée : beaucoup de téléphones ne cumulent pas ces porteuses."
+    val reason = AppStrings.THROUGHPUT_WARNING_LOW_BAND_AGGREGATION
 
     return bands.map { band ->
         if (band.key in excludedKeys) {
@@ -1934,12 +1934,12 @@ private fun applyCarrierAggregationPolicy(
         .limitAggregatedCarriers(
             generation = 4,
             maxCarriers = maxLteCarriers,
-            reason = "Limite d'agrégation 4G choisie : seules les meilleures porteuses sont comptées."
+            reason = AppStrings.THROUGHPUT_WARNING_LTE_AGGREGATION_LIMIT
         )
         .limitAggregatedCarriers(
             generation = 5,
             maxCarriers = maxNrCarriers,
-            reason = "Limite d'agrégation 5G du profil : seules les meilleures porteuses sont comptées."
+            reason = AppStrings.THROUGHPUT_WARNING_NR_AGGREGATION_LIMIT
         )
 }
 

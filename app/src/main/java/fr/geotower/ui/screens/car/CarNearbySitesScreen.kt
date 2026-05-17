@@ -196,10 +196,10 @@ class CarNearbySitesScreen(
                     main.longitude
                 )
                 val technique = repository.getTechniqueDetails(main.idAnfr)
-                val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: "Site ANFR ${main.idAnfr}"
+                val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: AppStrings.siteAnfrTitle(carContext, main.idAnfr)
                 val splitIndex = fullAddress.lastIndexOf(",")
                 val title = if (splitIndex > 0) fullAddress.substring(0, splitIndex).trim() else fullAddress
-                val subtitle = if (splitIndex > 0) fullAddress.substring(splitIndex + 1).trim() else "Site ANFR ${main.idAnfr}"
+                val subtitle = if (splitIndex > 0) fullAddress.substring(splitIndex + 1).trim() else AppStrings.siteAnfrTitle(carContext, main.idAnfr)
                 val operators = antennas
                     .flatMap { it.operatorSummary().split(", ") }
                     .distinct()

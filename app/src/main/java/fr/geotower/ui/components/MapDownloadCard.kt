@@ -218,7 +218,7 @@ fun MapDownloadCard(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp
                                 )
-                                Text(text = "${map.estimatedSizeMb} Mo", fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(text = AppStrings.fileSizeMb(map.estimatedSizeMb), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
 
                             if (isSyncing) {

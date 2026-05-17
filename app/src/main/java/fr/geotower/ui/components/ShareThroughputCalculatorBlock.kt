@@ -317,12 +317,12 @@ private fun calculateShareThroughput(
             val isIncluded = generationAllowed && bandAllowed && engineIncluded && (includePlanned || !isPlanned)
             val panelHeightMeters = extractThroughputPanelHeightMeters(band, supportHeightMeters)
             val excludedReason = when {
-                !generationAllowed -> if (band.gen == 5) "5G désactivée" else "4G désactivée"
-                !bandAllowed -> "Bande exclue"
-                operator == null -> "Opérateur non reconnu"
-                carrierResult == null -> excludedByKey[key]?.reason ?: "Allocation introuvable"
+                !generationAllowed -> if (band.gen == 5) AppStrings.THROUGHPUT_REASON_5G_DISABLED else AppStrings.THROUGHPUT_REASON_4G_DISABLED
+                !bandAllowed -> AppStrings.THROUGHPUT_REASON_BAND_EXCLUDED
+                operator == null -> AppStrings.THROUGHPUT_REASON_OPERATOR_NOT_RECOGNIZED
+                carrierResult == null -> excludedByKey[key]?.reason ?: AppStrings.THROUGHPUT_REASON_ALLOCATION_NOT_FOUND
                 !carrierResult.included -> carrierResult.excludedReason
-                isPlanned && !includePlanned -> "Bande en projet"
+                isPlanned && !includePlanned -> AppStrings.THROUGHPUT_REASON_PLANNED_BAND
                 else -> null
             }
 
@@ -405,12 +405,12 @@ private fun shareModulationName(modulationOrder: Int): String {
         6 -> "64-QAM"
         8 -> "256-QAM"
         10 -> "1024-QAM"
-        else -> "$modulationOrder bits/symbole"
+        else -> "$modulationOrder bits/symbol"
     }
 }
 
 private fun shareLayerLabel(layers: Int): String {
-    return if (layers <= 1) "1 couche" else "MIMO ${layers}x${layers}"
+    return if (layers <= 1) "1 layer" else "MIMO ${layers}x${layers}"
 }
 
 private fun shareEngineProfileFor(
@@ -433,8 +433,8 @@ private fun shareCustomProfile(customSettings: ShareCustomModulationSettings): T
 
     return ThroughputProfile(
         id = "CUSTOM",
-        label = "Personnalisé",
-        description = "Profil personnalisé : modulations DL/UL choisies dans l'interface, UL traité comme un téléphone.",
+        label = AppStrings.THROUGHPUT_PROFILE_CUSTOM_LABEL,
+        description = AppStrings.THROUGHPUT_PROFILE_CUSTOM_SHORT_DESC,
         lte = RatAssumptions(
             dlModulationOrder = lteDown.modulationOrder,
             ulModulationOrder = lteUp.modulationOrder,

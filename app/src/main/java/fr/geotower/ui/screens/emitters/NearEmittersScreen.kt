@@ -194,6 +194,8 @@ fun NearEmittersScreen(
     var maxItemsToShow by rememberSaveable { mutableIntStateOf(100) }
     var searchRadiusMultiplier by remember { mutableIntStateOf(1) }
     var isSearchingRemote by remember { mutableStateOf(false) }
+    val unknownAddressText = AppStrings.unknownAddress
+    val siteAnfrLabel = AppStrings.siteAnfrLabel
 
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
@@ -268,7 +270,9 @@ fun NearEmittersScreen(
                 mapAntennasToUiSites(
                     repository = repository,
                     antennas = newAntennas,
-                    referenceLocation = currentLoc
+                    referenceLocation = currentLoc,
+                    unknownAddressText = unknownAddressText,
+                    siteAnfrLabel = siteAnfrLabel
                 ).sortedBy { it.distance }
             } else {
                 emptyList()
@@ -429,7 +433,9 @@ fun NearEmittersScreen(
                         val mappedGlobal = mapAntennasToUiSites(
                             repository = repository,
                             antennas = uniqueGlobalAntennas,
-                            referenceLocation = referenceLocation
+                            referenceLocation = referenceLocation,
+                            unknownAddressText = unknownAddressText,
+                            siteAnfrLabel = siteAnfrLabel
                         )
 
                         val keepsGeoAreaResults = targetLat != null && targetLon != null &&
@@ -1077,7 +1083,9 @@ private fun shouldRefreshNearbySearchCenter(current: Location?, next: Location):
 private suspend fun mapAntennasToUiSites(
     repository: AnfrRepository,
     antennas: List<LocalisationEntity>,
-    referenceLocation: Location?
+    referenceLocation: Location?,
+    unknownAddressText: String,
+    siteAnfrLabel: String
 ): List<UiSite> {
     val groupedSites = antennas.groupBy {
         "${String.format(Locale.US, "%.4f", it.latitude)}_${String.format(Locale.US, "%.4f", it.longitude)}"
@@ -1100,8 +1108,8 @@ private suspend fun mapAntennasToUiSites(
         val physiques = list.flatMap { physiquesById[it.idAnfr].orEmpty() }
         val allAddresses = techniques.mapNotNull { it.adresse?.takeIf(String::isNotBlank) }.distinct()
         val fullAddress = allAddresses.firstOrNull()
-            ?: "Adresse inconnue"
-        val addressParts = splitNearbyAddress(fullAddress, main.idAnfr)
+            ?: unknownAddressText
+        val addressParts = splitNearbyAddress(fullAddress, main.idAnfr, siteAnfrLabel)
         val anfrIds = list.map { it.idAnfr }.filter { it.isNotBlank() }.distinct()
         val supportIds = physiques.map { it.idSupport }.filter { it.isNotBlank() }.distinct()
         val supportTypes = physiques.mapNotNull { it.natureSupport?.takeIf(String::isNotBlank) }.distinct()
@@ -1169,13 +1177,13 @@ private data class NearbyAddressParts(
     val subtitle: String
 )
 
-private fun splitNearbyAddress(fullAddress: String, idAnfr: String): NearbyAddressParts {
+private fun splitNearbyAddress(fullAddress: String, idAnfr: String, siteAnfrLabel: String): NearbyAddressParts {
     val lastCommaIndex = fullAddress.lastIndexOf(",")
     val title = if (lastCommaIndex != -1) fullAddress.substring(0, lastCommaIndex).trim() else fullAddress
     val subtitle = if (lastCommaIndex != -1) {
         fullAddress.substring(lastCommaIndex + 1).trim()
     } else {
-        "Site ANFR: $idAnfr"
+        "$siteAnfrLabel: $idAnfr"
     }
     return NearbyAddressParts(title = title, subtitle = subtitle)
 }

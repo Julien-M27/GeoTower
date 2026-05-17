@@ -676,6 +676,9 @@ fun StepPreferencesDesign(
             AppStrings.LANGUAGE_FRENCH -> "🇫🇷"
             AppStrings.LANGUAGE_ENGLISH -> "🇬🇧"
             AppStrings.LANGUAGE_PORTUGUESE -> "🇵🇹"
+            AppStrings.LANGUAGE_ITALIAN -> "🇮🇹"
+            AppStrings.LANGUAGE_GERMAN -> "🇩🇪"
+            AppStrings.LANGUAGE_SPANISH -> "🇪🇸"
             AppStrings.LANGUAGE_SYSTEM -> "📱"
             else -> "🌐"
         }

@@ -2,6 +2,7 @@ package fr.geotower.utils
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.text.intl.Locale as ComposeLocale
+import java.text.Normalizer
 import java.util.Locale
 
 object AppStrings {
@@ -9,14 +10,1112 @@ object AppStrings {
     const val LANGUAGE_FRENCH = "Français"
     const val LANGUAGE_ENGLISH = "English"
     const val LANGUAGE_PORTUGUESE = "Português"
+    const val LANGUAGE_ITALIAN = "Italiano"
+    const val LANGUAGE_GERMAN = "Deutsch"
+    const val LANGUAGE_SPANISH = "Español"
+
+    // Constantes moteur radio : elles servent de clés stables et sont traduites plus bas.
+    const val THROUGHPUT_WARNING_NETWORK_UNKNOWN = "La charge du réseau, le backhaul et les capacités exactes du téléphone ne sont pas connus."
+    const val THROUGHPUT_WARNING_PROFILE_PREFIX = "Le MIMO et la modulation ne sont pas publiés au niveau du site : le profil "
+    const val THROUGHPUT_WARNING_PROFILE_SUFFIX = " est donc appliqué."
+    const val THROUGHPUT_WARNING_ALLOCATION_PREFIX = "Bande "
+    const val THROUGHPUT_WARNING_ALLOCATION_SUFFIX = " exclue : allocation opérateur introuvable."
+    const val THROUGHPUT_WARNING_DSS_PREFIX = "Bande "
+    const val THROUGHPUT_WARNING_DSS_SUFFIX = " potentiellement partagée entre la 4G et la 5G : le débit n'est pas additionné intégralement."
+    const val THROUGHPUT_WARNING_UPLINK_AGGREGATION = "Le débit montant est limité aux deux meilleures fréquences agrégées, une hypothèse plus réaliste pour les réseaux mobiles en France."
+    const val THROUGHPUT_WARNING_LOW_BAND_AGGREGATION = "Agrégation 4G entre bandes basses 700/800/900 MHz limitée : beaucoup de téléphones ne cumulent pas ces porteuses."
+    const val THROUGHPUT_WARNING_LTE_AGGREGATION_LIMIT = "Limite d'agrégation 4G choisie : seules les meilleures porteuses sont comptées."
+    const val THROUGHPUT_WARNING_NR_AGGREGATION_LIMIT = "Limite d'agrégation 5G du profil : seules les meilleures porteuses sont comptées."
+    const val THROUGHPUT_REASON_NO_METROPOLITAN_ARCEP_ALLOCATION = "Aucune allocation Arcep France métropolitaine compatible avec cette technologie et cette bande."
+    const val THROUGHPUT_REASON_DSS_SHARED = "Bande potentiellement partagée entre la 4G et la 5G : elle n'est pas additionnée deux fois."
+    const val THROUGHPUT_REASON_5G_DISABLED = "5G désactivée"
+    const val THROUGHPUT_REASON_4G_DISABLED = "4G désactivée"
+    const val THROUGHPUT_REASON_BAND_EXCLUDED = "Bande exclue"
+    const val THROUGHPUT_REASON_OPERATOR_NOT_RECOGNIZED = "Opérateur non reconnu"
+    const val THROUGHPUT_REASON_OPERATOR_NOT_RECOGNIZED_ARCEP = "Opérateur non reconnu pour les allocations Arcep"
+    const val THROUGHPUT_REASON_ARCEP_ALLOCATION_NOT_FOUND = "Allocation Arcep introuvable"
+    const val THROUGHPUT_REASON_ALLOCATION_NOT_FOUND = "Allocation introuvable"
+    const val THROUGHPUT_REASON_PLANNED_BAND = "Bande en projet"
+    const val THROUGHPUT_SOURCE_SUMMARY_ENGINE = "ANFR/data.gouv pour les fréquences déclarées, Arcep pour les allocations opérateur, ETSI/3GPP TS 38.306 et TS 36.306/36.213 pour le modèle radio."
+    const val THROUGHPUT_SOURCE_SUMMARY_DEFAULT = "ANFR/data.gouv pour les fréquences déclarées, Arcep pour les allocations opérateur, 3GPP pour le modèle radio."
+    const val THROUGHPUT_PROFILE_PRUDENT_DESC = "Profil prudent : 4G 64-QAM en descendant, 16-QAM en montant, 5G NR 64-QAM, agrégation limitée et DSS non compté deux fois."
+    const val THROUGHPUT_PROFILE_STANDARD_DESC = "Profil standard : 4G 256-QAM en descendant avec MIMO 2x2, montant 64-QAM côté téléphone, 5G n78 256-QAM en descendant avec MIMO 4x4, montant 64-QAM sur 2 couches, DSS non compté deux fois."
+    const val THROUGHPUT_PROFILE_IDEAL_LABEL = "Profil idéal"
+    const val THROUGHPUT_PROFILE_IDEAL_DESC = "Profil idéal : très bonnes conditions radio plausibles, 4G en descendant avec MIMO 4x4, 5G NR 256-QAM, agrégation plus ouverte et sans double comptage DSS."
+    const val THROUGHPUT_PROFILE_CUSTOM_LABEL = "Personnalisé"
+    const val THROUGHPUT_PROFILE_CUSTOM_DESC = "Profil personnalisé : modulations descendantes et montantes choisies dans l'interface, débit montant traité comme celui d'un téléphone."
+    const val THROUGHPUT_PROFILE_CUSTOM_SHORT_DESC = "Profil personnalisé : modulations DL/UL choisies dans l'interface, UL traité comme un téléphone."
+
+    private data class FallbackTranslation(
+        val italian: String,
+        val german: String,
+        val spanish: String
+    )
+
+    // Fallbacks italien / allemand / espagnol pour les anciens appels get(fr, en, pt).
+    // Les entrées sont regroupées par écran ou fonctionnalité dominante.
+    private val fallbackTranslations = mapOf(
+        // Historique d'envoi, navigation principale et centre d'aide.
+        "Upload history" to FallbackTranslation("Cronologia invii", "Upload-Verlauf", "Historial de envíos"),
+        "No photo upload recorded on this device." to FallbackTranslation("Nessun invio di foto registrato su questo dispositivo.", "Kein Foto-Upload auf diesem Gerät gespeichert.", "No hay ningún envío de fotos registrado en este dispositivo."),
+        "Clear history" to FallbackTranslation("Cancella cronologia", "Verlauf löschen", "Borrar historial"),
+        "Clear upload history?" to FallbackTranslation("Cancellare la cronologia degli invii?", "Upload-Verlauf löschen?", "¿Borrar el historial de envíos?"),
+        "Local thumbnails and history rows will be deleted. Photos already sent to external apps are not changed." to FallbackTranslation("Le miniature locali e le righe della cronologia saranno eliminate. Le foto già inviate alle app esterne non vengono modificate.", "Lokale Vorschaubilder und Verlaufseinträge werden gelöscht. Bereits an externe Apps gesendete Fotos werden nicht geändert.", "Se eliminarán las miniaturas locales y las líneas del historial. Las fotos ya enviadas a apps externas no se modifican."),
+        "Loading..." to FallbackTranslation("Caricamento...", "Wird geladen...", "Cargando..."),
+        "Nearby Antennas" to FallbackTranslation("Antenne vicine", "Antennen in der Nähe", "Antenas cercanas"),
+        "Nearby antennas" to FallbackTranslation("Antenne vicine", "Antennen in der Nähe", "Antenas cercanas"),
+        "Antenna Map" to FallbackTranslation("Mappa delle antenne", "Antennenkarte", "Mapa de antenas"),
+        "Antenna map" to FallbackTranslation("Mappa delle antenne", "Antennenkarte", "Mapa de antenas"),
+        "Antennas map" to FallbackTranslation("Mappa delle antenne", "Antennenkarte", "Mapa de antenas"),
+        "Compass" to FallbackTranslation("Bussola", "Kompass", "Brújula"),
+        "Statistics" to FallbackTranslation("Statistiche", "Statistiken", "Estadísticas"),
+        "Settings" to FallbackTranslation("Impostazioni", "Einstellungen", "Ajustes"),
+        "About" to FallbackTranslation("Informazioni", "Über", "Acerca de"),
+        "Version" to FallbackTranslation("Versione", "Version", "Versión"),
+        "Help" to FallbackTranslation("Aiuto", "Hilfe", "Ayuda"),
+        "GeoTower help center" to FallbackTranslation("Centro assistenza GeoTower", "GeoTower-Hilfe", "Centro de ayuda de GeoTower"),
+        "Find the table of contents, screen-by-screen explanations, search codes and button meanings here." to FallbackTranslation("Trovi qui il sommario, le spiegazioni schermata per schermata, i codici di ricerca e il significato dei pulsanti.", "Hier findest du Inhaltsverzeichnis, Erklärungen pro Bildschirm, Suchcodes und die Bedeutung der Schaltflächen.", "Aquí encontrarás el índice, explicaciones pantalla por pantalla, códigos de búsqueda y el significado de los botones."),
+        "Search a feature..." to FallbackTranslation("Cerca una funzione...", "Funktion suchen...", "Buscar una función..."),
+        "Table of contents" to FallbackTranslation("Sommario", "Inhaltsverzeichnis", "Índice"),
+        "Results" to FallbackTranslation("Risultati", "Ergebnisse", "Resultados"),
+        "No help topic matches this search." to FallbackTranslation("Nessun argomento di aiuto corrisponde a questa ricerca.", "Kein Hilfethema passt zu dieser Suche.", "Ningún tema de ayuda coincide con esta búsqueda."),
+        "Clear" to FallbackTranslation("Cancella", "Löschen", "Borrar"),
+        "This help section" to FallbackTranslation("Questa sezione di aiuto", "Dieser Hilfebereich", "Esta sección de ayuda"),
+        "Back to contents" to FallbackTranslation("Torna al sommario", "Zurück zum Inhalt", "Volver al índice"),
+        "Getting started" to FallbackTranslation("Primi passi", "Erste Schritte", "Primeros pasos"),
+        "Home" to FallbackTranslation("Home", "Startseite", "Inicio"),
+        "Support details" to FallbackTranslation("Dettagli del supporto", "Supportdetails", "Detalles del soporte"),
+        "Site details" to FallbackTranslation("Dettagli del sito", "Standortdetails", "Detalles del sitio"),
+        "Elevation profile" to FallbackTranslation("Profilo altimetrico", "Höhenprofil", "Perfil altimétrico"),
+        "Throughput calculator" to FallbackTranslation("Calcolatore di velocità", "Durchsatzrechner", "Calculadora de velocidad"),
+        "Community photos" to FallbackTranslation("Foto della community", "Community-Fotos", "Fotos comunitarias"),
+        "Sharing" to FallbackTranslation("Condivisione", "Teilen", "Compartir"),
+        "Database and offline maps" to FallbackTranslation("Database e mappe offline", "Datenbank und Offline-Karten", "Base de datos y mapas sin conexión"),
+        "Button glossary and troubleshooting" to FallbackTranslation("Glossario dei pulsanti e risoluzione problemi", "Schaltflächen-Glossar und Fehlerbehebung", "Glosario de botones y solución de problemas"),
+        "Home diagram" to FallbackTranslation("Schema della home", "Startseiten-Diagramm", "Esquema de inicio"),
+        "Search diagram" to FallbackTranslation("Schema della ricerca", "Suchdiagramm", "Esquema de búsqueda"),
+        "Map diagram" to FallbackTranslation("Schema della mappa", "Kartendiagramm", "Esquema del mapa"),
+        "Support detail diagram" to FallbackTranslation("Schema del dettaglio supporto", "Diagramm der Supportdetails", "Esquema del detalle del soporte"),
+        "Site detail diagram" to FallbackTranslation("Schema del dettaglio sito", "Diagramm der Standortdetails", "Esquema del detalle del sitio"),
+        "Elevation profile diagram" to FallbackTranslation("Schema del profilo altimetrico", "Höhenprofil-Diagramm", "Esquema del perfil altimétrico"),
+        "Calculator diagram" to FallbackTranslation("Schema del calcolatore", "Rechnerdiagramm", "Esquema de la calculadora"),
+        "Photos diagram" to FallbackTranslation("Schema delle foto", "Fotodiagramm", "Esquema de fotos"),
+        "Sharing diagram" to FallbackTranslation("Schema della condivisione", "Teilen-Diagramm", "Esquema de compartir"),
+        "Settings diagram" to FallbackTranslation("Schema delle impostazioni", "Einstellungsdiagramm", "Esquema de ajustes"),
+        "Data diagram" to FallbackTranslation("Schema dei dati", "Datendiagramm", "Esquema de datos"),
+        "About screen diagram" to FallbackTranslation("Schema della schermata Informazioni", "Diagramm der Über-Seite", "Esquema de la pantalla Acerca de"),
+        "Database and network status banner." to FallbackTranslation("Banner di stato del database e della rete.", "Statusbanner für Datenbank und Netzwerk.", "Banner de estado de la base de datos y la red."),
+        "Shortcuts to the main screens." to FallbackTranslation("Scorciatoie verso le schermate principali.", "Verknüpfungen zu den Hauptbildschirmen.", "Accesos a las pantallas principales."),
+        "Customizable Help button." to FallbackTranslation("Pulsante Aiuto personalizzabile.", "Anpassbare Hilfe-Schaltfläche.", "Botón Ayuda personalizable."),
+        "Free text or code search field." to FallbackTranslation("Campo di ricerca libero o per codice.", "Suchfeld für freien Text oder Code.", "Campo de búsqueda libre o por código."),
+        "Quick suggestions and code help." to FallbackTranslation("Suggerimenti rapidi e aiuto sui codici.", "Schnellvorschläge und Codehilfe.", "Sugerencias rápidas y ayuda de códigos."),
+        "Results that open details or split screen." to FallbackTranslation("Risultati che aprono dettagli o split screen.", "Ergebnisse, die Details oder geteilte Ansicht öffnen.", "Resultados que abren detalles o pantalla dividida."),
+        "City, address or area search." to FallbackTranslation("Ricerca per città, indirizzo o zona.", "Suche nach Stadt, Adresse oder Bereich.", "Búsqueda por ciudad, dirección o zona."),
+        "Support and site markers." to FallbackTranslation("Marcatori di supporti e siti.", "Support- und Standortmarker.", "Marcadores de soportes y sitios."),
+        "GPS, zoom and orientation buttons." to FallbackTranslation("Pulsanti GPS, zoom e orientamento.", "GPS-, Zoom- und Ausrichtungsschaltflächen.", "Botones de GPS, zoom y orientación."),
+        "Physical support summary." to FallbackTranslation("Riepilogo del supporto fisico.", "Zusammenfassung des physischen Supports.", "Resumen del soporte físico."),
+        "Linked sites and operators." to FallbackTranslation("Siti e operatori collegati.", "Verknüpfte Standorte und Betreiber.", "Sitios y operadores vinculados."),
+        "Map, navigation, sharing and photo actions." to FallbackTranslation("Azioni mappa, navigazione, condivisione e foto.", "Aktionen für Karte, Navigation, Teilen und Fotos.", "Acciones de mapa, navegación, compartir y fotos."),
+        "Operator banner and status." to FallbackTranslation("Banner operatore e stato.", "Betreiberbanner und Status.", "Banner del operador y estado."),
+        "Frequencies, technologies and azimuths." to FallbackTranslation("Frequenze, tecnologie e azimut.", "Frequenzen, Technologien und Azimute.", "Frecuencias, tecnologías y azimuts."),
+        "Tools: profile, throughput, sharing and settings." to FallbackTranslation("Strumenti: profilo, velocità, condivisione e impostazioni.", "Tools: Profil, Durchsatz, Teilen und Einstellungen.", "Herramientas: perfil, velocidad, compartir y ajustes."),
+        "Route between your position and the site." to FallbackTranslation("Percorso tra la tua posizione e il sito.", "Route zwischen deiner Position und dem Standort.", "Trayecto entre tu posición y el sitio."),
+        "Terrain and estimated radio visibility." to FallbackTranslation("Rilievo e visibilità radio stimata.", "Gelände und geschätzte Funk-Sichtbarkeit.", "Relieve y visibilidad radio estimada."),
+        "Immediate or deferred recalculation." to FallbackTranslation("Ricalcolo immediato o differito.", "Sofortige oder spätere Neuberechnung.", "Recalculo inmediato o diferido."),
+        "Conservative, ideal or custom mode." to FallbackTranslation("Modalità prudente, ideale o personalizzata.", "Vorsichtiger, idealer oder benutzerdefinierter Modus.", "Modo prudente, ideal o personalizado."),
+        "Bands, technologies and modulation." to FallbackTranslation("Bande, tecnologie e modulazione.", "Bänder, Technologien und Modulation.", "Bandas, tecnologías y modulación."),
+        "Optimal distance and mini-map." to FallbackTranslation("Distanza ottimale e mini-mappa.", "Optimale Entfernung und Minikarte.", "Distancia óptima y mini mapa."),
+        "Available photo carousel." to FallbackTranslation("Carosello delle foto disponibili.", "Karussell verfügbarer Fotos.", "Carrusel de fotos disponibles."),
+        "Full screen opening." to FallbackTranslation("Apertura a schermo intero.", "Öffnen im Vollbild.", "Apertura a pantalla completa."),
+        "SignalQuest community upload." to FallbackTranslation("Invio comunitario SignalQuest.", "SignalQuest-Community-Upload.", "Envío comunitario SignalQuest."),
+        "Checkboxes for included blocks." to FallbackTranslation("Caselle per i blocchi inclusi.", "Kontrollkästchen für enthaltene Blöcke.", "Casillas de bloques incluidos."),
+        "Generated image preview." to FallbackTranslation("Anteprima dell'immagine generata.", "Vorschau des erzeugten Bildes.", "Vista previa de la imagen generada."),
+        "Export or Android sharing." to FallbackTranslation("Esportazione o condivisione Android.", "Export oder Android-Teilen.", "Exportación o compartir desde Android."),
+        "Side sections or page mode." to FallbackTranslation("Sezioni laterali o modalità pagine.", "Seitliche Bereiche oder Seitenmodus.", "Secciones laterales o modo por páginas."),
+        "Quick app preferences." to FallbackTranslation("Preferenze rapide dell'app.", "Schnelle App-Einstellungen.", "Preferencias rápidas de la app."),
+        "Page and button customization." to FallbackTranslation("Personalizzazione di pagine e pulsanti.", "Anpassung von Seiten und Schaltflächen.", "Personalización de páginas y botones."),
+        "ANFR database download." to FallbackTranslation("Download del database ANFR.", "ANFR-Datenbankdownload.", "Descarga de la base ANFR."),
+        "Available offline maps." to FallbackTranslation("Mappe offline disponibili.", "Verfügbare Offline-Karten.", "Mapas sin conexión disponibles."),
+        "Notifications leading to the right section." to FallbackTranslation("Notifiche che portano alla sezione corretta.", "Benachrichtigungen führen zum richtigen Bereich.", "Notificaciones que llevan a la sección correcta."),
+        "Section navigation." to FallbackTranslation("Navigazione tra sezioni.", "Bereichsnavigation.", "Navegación por secciones."),
+        "App and data version." to FallbackTranslation("Versione dell'app e dei dati.", "App- und Datenversion.", "Versión de la app y los datos."),
+        "Sources, development and useful links." to FallbackTranslation("Fonti, sviluppo e link utili.", "Quellen, Entwicklung und nützliche Links.", "Fuentes, desarrollo y enlaces útiles."),
+        "Search field" to FallbackTranslation("Campo di ricerca", "Suchfeld", "Campo de búsqueda"),
+        "X / Clear" to FallbackTranslation("X / Cancella", "X / Löschen", "X / Borrar"),
+        "Quick suggestions" to FallbackTranslation("Suggerimenti rapidi", "Schnellvorschläge", "Sugerencias rápidas"),
+        "Info" to FallbackTranslation("Info", "Info", "Info"),
+        "Show more" to FallbackTranslation("Mostra altro", "Mehr anzeigen", "Mostrar más"),
+        "Expand area" to FallbackTranslation("Espandi zona", "Bereich erweitern", "Ampliar zona"),
+        "Location" to FallbackTranslation("Localizzazione", "Standort", "Ubicación"),
+        "Coordinates" to FallbackTranslation("Coordinate", "Koordinaten", "Coordenadas"),
+        "Map compass" to FallbackTranslation("Bussola della mappa", "Kartenkompass", "Brújula del mapa"),
+        "Scale" to FallbackTranslation("Scala", "Maßstab", "Escala"),
+        // Paramètres, apparence, cartes et personnalisation.
+        "System language" to FallbackTranslation("Lingua di sistema", "Systemsprache", "Idioma del sistema"),
+        "IGN (Gov)" to FallbackTranslation("IGN (Gov)", "IGN (Behörde)", "IGN (Gob.)"),
+        "Map Style" to FallbackTranslation("Stile mappa", "Kartenstil", "Estilo del mapa"),
+        "Navigation mode in settings" to FallbackTranslation("Modalità di navigazione nelle impostazioni", "Navigationsmodus in den Einstellungen", "Modo de navegación en ajustes"),
+        "Continuous scroll" to FallbackTranslation("Scorrimento continuo", "Fortlaufendes Scrollen", "Desplazamiento continuo"),
+        "Page system" to FallbackTranslation("Sistema a pagine", "Seitensystem", "Sistema por páginas"),
+        "Scrolling" to FallbackTranslation("Scorrimento", "Scrollen", "Desplazamiento"),
+        "All options on one page" to FallbackTranslation("Tutte le opzioni in una pagina", "Alle Optionen auf einer Seite", "Todas las opciones en una página"),
+        "Pages" to FallbackTranslation("Pagine", "Seiten", "Páginas"),
+        "Show one category at a time" to FallbackTranslation("Mostra una categoria alla volta", "Eine Kategorie auf einmal anzeigen", "Mostrar una categoría cada vez"),
+        "One UI Interface" to FallbackTranslation("Interfaccia One UI", "One-UI-Oberfläche", "Interfaz One UI"),
+        "Default Operator" to FallbackTranslation("Operatore predefinito", "Standardbetreiber", "Operador predeterminado"),
+        "Mainland France" to FallbackTranslation("Francia metropolitana", "Französisches Festland", "Francia metropolitana"),
+        "Overseas" to FallbackTranslation("Oltremare", "Übersee", "Ultramar"),
+        "Select all" to FallbackTranslation("Seleziona tutto", "Alle auswählen", "Seleccionar todo"),
+        "Clear all" to FallbackTranslation("Deseleziona tutto", "Alle abwählen", "Deseleccionar todo"),
+        "None" to FallbackTranslation("Nessuno", "Keine", "Ninguno"),
+        "Select" to FallbackTranslation("Seleziona", "Auswählen", "Seleccionar"),
+        "Up to date" to FallbackTranslation("Aggiornato", "Aktuell", "Actualizado"),
+        "Manage Permissions" to FallbackTranslation("Gestisci autorizzazioni", "Berechtigungen verwalten", "Gestionar permisos"),
+        "Location and Notifications" to FallbackTranslation("Localizzazione e notifiche", "Standort und Benachrichtigungen", "Ubicación y notificaciones"),
+        "Download the entire database to use the list offline. Warning : large file." to FallbackTranslation("Scarica l'intero database per usare l'elenco offline. Attenzione: file grande.", "Lade die gesamte Datenbank herunter, um die Liste offline zu nutzen. Warnung: große Datei.", "Descarga toda la base de datos para usar la lista sin conexión. Atención: archivo grande."),
+        "Download antennas" to FallbackTranslation("Scarica antenne", "Antennen herunterladen", "Descargar antenas"),
+        "Cancel download" to FallbackTranslation("Annulla download", "Download abbrechen", "Cancelar descarga"),
+        "Main menu size" to FallbackTranslation("Dimensione menu principale", "Größe des Hauptmenüs", "Tamaño del menú principal"),
+        "Small" to FallbackTranslation("Piccolo", "Klein", "Pequeño"),
+        "Normal" to FallbackTranslation("Normale", "Normal", "Normal"),
+        "Large" to FallbackTranslation("Grande", "Groß", "Grande"),
+        "Widget refresh rate" to FallbackTranslation("Aggiornamento widget", "Widget-Aktualisierung", "Actualización del widget"),
+        "Navigation style" to FallbackTranslation("Stile di navigazione", "Navigationsstil", "Estilo de navegación"),
+        "Pylon details (Support)" to FallbackTranslation("Dettagli pilone (supporto)", "Mastdetails (Support)", "Detalles del pilón (soporte)"),
+        "Antenna details (Site)" to FallbackTranslation("Dettagli antenna (sito)", "Antennendetails (Standort)", "Detalles de la antena (sitio)"),
+        "Pylon share" to FallbackTranslation("Condivisione pilone", "Mast teilen", "Compartir pilón"),
+        "Offline" to FallbackTranslation("Offline", "Offline", "Sin conexión"),
+        "Pages customization" to FallbackTranslation("Personalizzazione pagine", "Seiten anpassen", "Personalización de páginas"),
+        "Customize the display of the different pages of the application" to FallbackTranslation("Personalizza la visualizzazione delle diverse pagine dell'app", "Passe die Anzeige der verschiedenen App-Seiten an", "Personaliza la visualización de las distintas páginas de la app"),
+        "Startup page" to FallbackTranslation("Pagina di avvio", "Startseite beim Öffnen", "Página de inicio"),
+        "Home page" to FallbackTranslation("Pagina iniziale", "Startseite", "Página principal"),
+        "Help button position" to FallbackTranslation("Posizione del pulsante Aiuto", "Position der Hilfe-Schaltfläche", "Posición del botón Ayuda"),
+        "Top left" to FallbackTranslation("In alto a sinistra", "Oben links", "Arriba a la izquierda"),
+        "Top right" to FallbackTranslation("In alto a destra", "Oben rechts", "Arriba a la derecha"),
+        "Bottom left" to FallbackTranslation("In basso a sinistra", "Unten links", "Abajo a la izquierda"),
+        "Bottom right" to FallbackTranslation("In basso a destra", "Unten rechts", "Abajo a la derecha"),
+        "Search bar" to FallbackTranslation("Barra di ricerca", "Suchleiste", "Barra de búsqueda"),
+        "Nearest sites" to FallbackTranslation("Siti più vicini", "Nächste Standorte", "Sitios más cercanos"),
+        "Search radius" to FallbackTranslation("Raggio di ricerca", "Suchradius", "Radio de búsqueda"),
+        "Accuracy" to FallbackTranslation("Precisione", "Genauigkeit", "Precisión"),
+        "Location button" to FallbackTranslation("Pulsante localizzazione", "Standort-Schaltfläche", "Botón de ubicación"),
+        "GPS dot" to FallbackTranslation("Punto GPS", "GPS-Punkt", "Punto GPS"),
+        "Azimuths" to FallbackTranslation("Azimut", "Azimute", "Azimuts"),
+        "Azimuth lines" to FallbackTranslation("Linee di azimut", "Azimutlinien", "Líneas de azimut"),
+        "Azimuth cones" to FallbackTranslation("Coni di azimut", "Azimutkegel", "Conos de azimut"),
+        "Zoom buttons" to FallbackTranslation("Pulsanti zoom", "Zoom-Schaltflächen", "Botones de zoom"),
+        "Toolbox" to FallbackTranslation("Strumenti", "Werkzeugbox", "Herramientas"),
+        "Map scale" to FallbackTranslation("Scala mappa", "Kartenmaßstab", "Escala del mapa"),
+        "Credits (Attribution)" to FallbackTranslation("Crediti (attribuzione)", "Credits (Zuordnung)", "Créditos (atribución)"),
+        "Reset to default settings" to FallbackTranslation("Ripristina impostazioni predefinite", "Standardeinstellungen wiederherstellen", "Restablecer ajustes predeterminados"),
+        "Community photos and diagrams" to FallbackTranslation("Foto e schemi della community", "Community-Fotos und Diagramme", "Fotos comunitarias y esquemas"),
+        "Photos and diagrams settings" to FallbackTranslation("Impostazioni foto e schemi", "Foto- und Diagrammeinstellungen", "Ajustes de fotos y esquemas"),
+        "Show CellularFR photos" to FallbackTranslation("Mostra foto CellularFR", "CellularFR-Fotos anzeigen", "Mostrar fotos de CellularFR"),
+        "Show SignalQuest photos" to FallbackTranslation("Mostra foto SignalQuest", "SignalQuest-Fotos anzeigen", "Mostrar fotos de SignalQuest"),
+        "Show support diagrams" to FallbackTranslation("Mostra schemi del supporto", "Supportdiagramme anzeigen", "Mostrar esquemas del soporte"),
+        "Show EXIF" to FallbackTranslation("Mostra EXIF", "EXIF anzeigen", "Mostrar EXIF"),
+        "Mini-map" to FallbackTranslation("Mini-mappa", "Minikarte", "Mini mapa"),
+        "Open map button" to FallbackTranslation("Pulsante Apri mappa", "Schaltfläche Karte öffnen", "Botón Abrir mapa"),
+        "Navigate button" to FallbackTranslation("Pulsante Naviga", "Schaltfläche Navigieren", "Botón Navegar"),
+        "Share button" to FallbackTranslation("Pulsante Condividi", "Schaltfläche Teilen", "Botón Compartir"),
+        "Operators list" to FallbackTranslation("Elenco operatori", "Betreiberliste", "Lista de operadores"),
+        "Operator banner" to FallbackTranslation("Banner operatore", "Betreiberbanner", "Banner del operador"),
+        "Bearing and Height" to FallbackTranslation("Direzione e altezza", "Richtung und Höhe", "Rumbo y altura"),
+        "Identifiers" to FallbackTranslation("Identificativi", "Kennungen", "Identificadores"),
+        "Elevation profile button" to FallbackTranslation("Pulsante profilo altimetrico", "Schaltfläche Höhenprofil", "Botón Perfil altimétrico"),
+        "Throughput calculator button" to FallbackTranslation("Pulsante calcolatore velocità", "Schaltfläche Durchsatzrechner", "Botón Calculadora de velocidad"),
+        "Activation dates" to FallbackTranslation("Date di attivazione", "Aktivierungsdaten", "Fechas de activación"),
+        "Address & Coordinates" to FallbackTranslation("Indirizzo e coordinate", "Adresse und Koordinaten", "Dirección y coordenadas"),
+        "Frequencies, Spectrum & Azimuths" to FallbackTranslation("Frequenze, spettro e azimut", "Frequenzen, Spektrum und Azimute", "Frecuencias, espectro y azimuts"),
+        "External links" to FallbackTranslation("Link esterni", "Externe Links", "Enlaces externos"),
+        "Community data" to FallbackTranslation("Dati comunitari", "Community-Daten", "Datos comunitarios"),
+        "Choose operators, sources, and display order for photos and speedtests." to FallbackTranslation("Scegli operatori, fonti e ordine di visualizzazione per foto e speedtest.", "Wähle Betreiber, Quellen und Anzeigereihenfolge für Fotos und Speedtests.", "Elige operadores, fuentes y orden de visualización de fotos y speedtests."),
+        "Photos" to FallbackTranslation("Foto", "Fotos", "Fotos"),
+        "Show photos for this operator" to FallbackTranslation("Mostra foto per questo operatore", "Fotos für diesen Betreiber anzeigen", "Mostrar fotos de este operador"),
+        "Source order" to FallbackTranslation("Ordine delle fonti", "Quellenreihenfolge", "Orden de fuentes"),
+        "Show only if sources above have no photos" to FallbackTranslation("Mostra solo se le fonti sopra non hanno foto", "Nur anzeigen, wenn die Quellen darüber keine Fotos haben", "Mostrar solo si las fuentes superiores no tienen fotos"),
+        "Manage the order and display of external shortcuts" to FallbackTranslation("Gestisci ordine e visualizzazione delle scorciatoie esterne", "Reihenfolge und Anzeige externer Verknüpfungen verwalten", "Gestionar el orden y la visualización de accesos externos"),
+        "Reset settings" to FallbackTranslation("Reimposta impostazioni", "Einstellungen zurücksetzen", "Restablecer ajustes"),
+        "Warning" to FallbackTranslation("Attenzione", "Warnung", "Atención"),
+        "Yes" to FallbackTranslation("Sì", "Ja", "Sí"),
+        "No" to FallbackTranslation("No", "Nein", "No"),
+        "You are offline" to FallbackTranslation("Sei offline", "Du bist offline", "Estás sin conexión"),
+        "App logo" to FallbackTranslation("Logo app", "App-Logo", "Logo de la app"),
+        "Home page logo" to FallbackTranslation("Logo della home", "Logo der Startseite", "Logo de la página principal"),
+        "Application" to FallbackTranslation("Applicazione", "Anwendung", "Aplicación"),
+        "Calculating size..." to FallbackTranslation("Calcolo dimensione...", "Größe wird berechnet...", "Calculando tamaño..."),
+        "Unknown size" to FallbackTranslation("Dimensione sconosciuta", "Unbekannte Größe", "Tamaño desconocido"),
+        "Speedometer" to FallbackTranslation("Tachimetro", "Tachometer", "Velocímetro"),
+        "Antenna frequency filters" to FallbackTranslation("Filtri frequenze antenna", "Antennenfrequenzfilter", "Filtros de frecuencias de la antena"),
+        "Display frequencies in a grid" to FallbackTranslation("Mostra frequenze in griglia", "Frequenzen als Raster anzeigen", "Mostrar frecuencias en una cuadrícula"),
+        "Emitters" to FallbackTranslation("Emettitori", "Sender", "Emisores"),
+        "Antennas" to FallbackTranslation("Antenne", "Antennen", "Antenas"),
+        "Band" to FallbackTranslation("Banda", "Band", "Banda"),
+        "In service" to FallbackTranslation("In servizio", "In Betrieb", "En servicio"),
+        "State" to FallbackTranslation("Stato", "Status", "Estado"),
+        "Azimuth" to FallbackTranslation("Azimut", "Azimut", "Azimut"),
+        "Height" to FallbackTranslation("Altezza", "Höhe", "Altura"),
+        "Frequencies" to FallbackTranslation("Frequenze", "Frequenzen", "Frecuencias"),
+        "Show azimuths" to FallbackTranslation("Mostra azimut", "Azimute anzeigen", "Mostrar azimuts"),
+        "Elevation Profile" to FallbackTranslation("Profilo altimetrico", "Höhenprofil", "Perfil altimétrico"),
+        "Calculating elevation profile..." to FallbackTranslation("Calcolo del profilo altimetrico...", "Höhenprofil wird berechnet...", "Calculando perfil altimétrico..."),
+        "Terrain and Fresnel zone analysis in progress." to FallbackTranslation("Analisi del rilievo e della zona di Fresnel in corso.", "Gelände- und Fresnelzonenanalyse läuft.", "Análisis del relieve y de la zona de Fresnel en curso."),
+        "User location unavailable. Enable location and try again." to FallbackTranslation("Posizione utente non disponibile. Attiva la localizzazione e riprova.", "Benutzerstandort nicht verfügbar. Standort aktivieren und erneut versuchen.", "Ubicación del usuario no disponible. Activa la ubicación e inténtalo de nuevo."),
+        "Site not found for this profile." to FallbackTranslation("Sito non trovato per questo profilo.", "Standort für dieses Profil nicht gefunden.", "Sitio no encontrado para este perfil."),
+        "Unable to load elevation profile." to FallbackTranslation("Impossibile caricare il profilo altimetrico.", "Höhenprofil kann nicht geladen werden.", "No se puede cargar el perfil altimétrico."),
+        "Elevation profile unavailable offline" to FallbackTranslation("Profilo altimetrico non disponibile offline", "Höhenprofil offline nicht verfügbar", "Perfil altimétrico no disponible sin conexión"),
+        "Calculate later" to FallbackTranslation("Calcola più tardi", "Später berechnen", "Calcular más tarde"),
+        "Calculation saved for later" to FallbackTranslation("Calcolo salvato per dopo", "Berechnung für später gespeichert", "Cálculo guardado para más tarde"),
+        "Saved profile available" to FallbackTranslation("Profilo salvato disponibile", "Gespeichertes Profil verfügbar", "Perfil guardado disponible"),
+        "Show" to FallbackTranslation("Mostra", "Anzeigen", "Mostrar"),
+        "Do not show" to FallbackTranslation("Non mostrare", "Nicht anzeigen", "No mostrar"),
+        "Distance" to FallbackTranslation("Distanza", "Entfernung", "Distancia"),
+        "Panel height" to FallbackTranslation("Altezza pannello", "Panelhöhe", "Altura del panel"),
+        "Start height" to FallbackTranslation("Altezza iniziale", "Starthöhe", "Altura inicial"),
+        "Arrival height" to FallbackTranslation("Altezza di arrivo", "Ankunftshöhe", "Altura de llegada"),
+        "Frequency" to FallbackTranslation("Frequenza", "Frequenz", "Frecuencia"),
+        "Direct signal path" to FallbackTranslation("Percorso diretto del segnale", "Direkter Signalweg", "Trayecto directo de la señal"),
+        "Fresnel zone" to FallbackTranslation("Zona di Fresnel", "Fresnelzone", "Zona de Fresnel"),
+        "Theoretical throughput" to FallbackTranslation("Velocità teorica", "Theoretischer Durchsatz", "Velocidad teórica"),
+        "Throughput Calculator" to FallbackTranslation("Calcolatore di velocità", "Durchsatzrechner", "Calculadora de velocidad"),
+        "Site not found for this calculation." to FallbackTranslation("Sito non trovato per questo calcolo.", "Standort für diese Berechnung nicht gefunden.", "Sitio no encontrado para este cálculo."),
+        "Estimated theoretical radio throughput" to FallbackTranslation("Velocità radio teorica stimata", "Geschätzter theoretischer Funkdurchsatz", "Velocidad radio teórica estimada"),
+        "Download" to FallbackTranslation("Download", "Download", "Descarga"),
+        "Upload (phone)" to FallbackTranslation("Upload (telefono)", "Upload (Telefon)", "Subida (teléfono)"),
+        "Estimated optimal distance" to FallbackTranslation("Distanza ottimale stimata", "Geschätzte optimale Entfernung", "Distancia óptima estimada"),
+        "Radio assumption" to FallbackTranslation("Ipotesi radio", "Funkannahme", "Hipótesis radio"),
+        "Include planned" to FallbackTranslation("Includi progetti", "Geplante einschließen", "Incluir proyectos"),
+        "Included bands" to FallbackTranslation("Bande incluse", "Einbezogene Bänder", "Bandas incluidas"),
+        "Custom modulation" to FallbackTranslation("Modulazione personalizzata", "Benutzerdefinierte Modulation", "Modulación personalizada"),
+        "Frequencies and modulation" to FallbackTranslation("Frequenze e modulazione", "Frequenzen und Modulation", "Frecuencias y modulación"),
+        "(estimated)" to FallbackTranslation("(stimato)", "(geschätzt)", "(estimado)"),
+        "Modulation and antennas" to FallbackTranslation("Modulazione e antenne", "Modulation und Antennen", "Modulación y antenas"),
+        "Read as an estimate" to FallbackTranslation("Da leggere come stima", "Als Schätzung lesen", "Leer como una estimación"),
+        "Conservative" to FallbackTranslation("Prudente", "Vorsichtig", "Prudente"),
+        "Ideal" to FallbackTranslation("Ideale", "Ideal", "Ideal"),
+        "Custom" to FallbackTranslation("Personalizzato", "Benutzerdefiniert", "Personalizado"),
+        "Standard" to FallbackTranslation("Standard", "Standard", "Estándar"),
+        "Phone upload" to FallbackTranslation("Upload telefono", "Telefon-Upload", "Subida tel."),
+        "Sources and warnings" to FallbackTranslation("Fonti e avvisi", "Quellen und Warnungen", "Fuentes y advertencias"),
+        "Calculation settings" to FallbackTranslation("Impostazioni di calcolo", "Berechnungseinstellungen", "Ajustes de cálculo"),
+        "Default calculation mode" to FallbackTranslation("Modalità di calcolo predefinita", "Standard-Berechnungsmodus", "Modo de cálculo predeterminado"),
+        "Include 4G" to FallbackTranslation("Includi 4G", "4G einschließen", "Incluir 4G"),
+        "Include 5G" to FallbackTranslation("Includi 5G", "5G einschließen", "Incluir 5G"),
+        "Default frequency bands" to FallbackTranslation("Bande di frequenza predefinite", "Standard-Frequenzbänder", "Bandas de frecuencia predeterminadas"),
+        "Important notes" to FallbackTranslation("Note importanti", "Wichtige Hinweise", "Notas importantes"),
+        "Measured signal" to FallbackTranslation("Segnale misurato", "Gemessenes Signal", "Señal medida"),
+        "Environment" to FallbackTranslation("Ambiente", "Umgebung", "Entorno"),
+        "Position" to FallbackTranslation("Posizione", "Position", "Posición"),
+        "Use my current position" to FallbackTranslation("Usa la mia posizione attuale", "Meinen aktuellen Standort verwenden", "Usar mi ubicación actual"),
+        "Choose a point on the map" to FallbackTranslation("Scegli un punto sulla mappa", "Punkt auf der Karte wählen", "Elegir un punto en el mapa"),
+        "Remove location from calculation" to FallbackTranslation("Rimuovi posizione dal calcolo", "Standort aus der Berechnung entfernen", "Quitar ubicación del cálculo"),
+        "Current position used for the analysis." to FallbackTranslation("Posizione attuale usata per l'analisi.", "Aktueller Standort wird für die Analyse verwendet.", "Ubicación actual usada para el análisis."),
+        "Map point used for the analysis." to FallbackTranslation("Punto sulla mappa usato per l'analisi.", "Kartenpunkt wird für die Analyse verwendet.", "Punto del mapa usado para el análisis."),
+        "Location removed from the calculation." to FallbackTranslation("Localizzazione rimossa dal calcolo.", "Standort aus der Berechnung entfernt.", "Ubicación quitada del cálculo."),
+        "Current position is unavailable for now." to FallbackTranslation("La posizione attuale non è disponibile al momento.", "Der aktuelle Standort ist momentan nicht verfügbar.", "La ubicación actual no está disponible por ahora."),
+        "Locating..." to FallbackTranslation("Localizzazione...", "Standort wird gesucht...", "Localizando..."),
+        "Network and aggregation" to FallbackTranslation("Rete e aggregazione", "Netz und Aggregation", "Red y agregación"),
+        "Network load" to FallbackTranslation("Carico rete", "Netzlast", "Carga de red"),
+        "4G aggregation" to FallbackTranslation("Aggregazione 4G", "4G-Aggregation", "Agregación 4G"),
+        "Outdoor" to FallbackTranslation("Esterno", "Draußen", "Exterior"),
+        "Vehicle" to FallbackTranslation("Veicolo", "Fahrzeug", "Vehículo"),
+        "Indoor" to FallbackTranslation("Interno", "Innenbereich", "Interior"),
+        "Deep indoor" to FallbackTranslation("Interno profondo", "Tief im Gebäude", "Interior profundo"),
+        "Unknown" to FallbackTranslation("Sconosciuto", "Unbekannt", "Desconocido"),
+        "In the beam" to FallbackTranslation("Nel fascio", "Im Strahl", "En el haz"),
+        "Too close" to FallbackTranslation("Troppo vicino", "Zu nah", "Demasiado cerca"),
+        "Too far" to FallbackTranslation("Troppo lontano", "Zu weit", "Demasiado lejos"),
+        "Outside beam" to FallbackTranslation("Fuori fascio", "Außerhalb des Strahls", "Fuera del haz"),
+        "Light" to FallbackTranslation("Leggero", "Gering", "Baja"),
+        "Medium" to FallbackTranslation("Medio", "Mittel", "Media"),
+        "Heavy" to FallbackTranslation("Forte", "Hoch", "Alta"),
+        "Saturated" to FallbackTranslation("Satura", "Ausgelastet", "Saturada"),
+        "Fiber / very good" to FallbackTranslation("Fibra / molto buono", "Glasfaser / sehr gut", "Fibra / muy bueno"),
+        "Microwave link" to FallbackTranslation("Ponte radio", "Richtfunkstrecke", "Enlace radio"),
+        "Limited" to FallbackTranslation("Limitato", "Begrenzt", "Limitado"),
+        "Realistic" to FallbackTranslation("Realistico", "Realistisch", "Realista"),
+        "Wide" to FallbackTranslation("Ampia", "Breit", "Amplia"),
+        "Impact on the calculation" to FallbackTranslation("Impatto sul calcolo", "Auswirkung auf die Berechnung", "Impacto en el cálculo"),
+        "Modulation" to FallbackTranslation("Modulazione", "Modulation", "Modulación"),
+        "New database" to FallbackTranslation("Nuovo database", "Neue Datenbank", "Nueva base de datos"),
+        "An antenna update is available. Tap to open the download section." to FallbackTranslation("È disponibile un aggiornamento delle antenne. Tocca per aprire la sezione download.", "Ein Antennen-Update ist verfügbar. Tippe, um den Download-Bereich zu öffnen.", "Hay una actualización de antenas disponible. Toca para abrir la sección de descarga."),
+        "New GeoTower version" to FallbackTranslation("Nuova versione GeoTower", "Neue GeoTower-Version", "Nueva versión de GeoTower"),
+        "GeoTower updates" to FallbackTranslation("Aggiornamenti GeoTower", "GeoTower-Updates", "Actualizaciones de GeoTower"),
+        "Nearby" to FallbackTranslation("Vicino", "In der Nähe", "Cerca"),
+        "Live antenna tracking" to FallbackTranslation("Monitoraggio antenne in tempo reale", "Live-Antennenverfolgung", "Seguimiento de antenas en directo"),
+        "Searching..." to FallbackTranslation("Ricerca...", "Suche läuft...", "Buscando..."),
+        "Stop" to FallbackTranslation("Esci", "Beenden", "Salir"),
+        "Error" to FallbackTranslation("Errore", "Fehler", "Error"),
+        "Database Update" to FallbackTranslation("Aggiornamento database", "Datenbank-Update", "Actualización de base de datos"),
+        "Database update" to FallbackTranslation("Aggiornamento database", "Datenbankaktualisierung", "Actualización de la base"),
+        "Database" to FallbackTranslation("Database", "Datenbank", "Base de datos"),
+        "Database downloaded. Tap to open." to FallbackTranslation("Database scaricato. Tocca per aprire.", "Datenbank heruntergeladen. Zum Öffnen tippen.", "Base de datos descargada. Toca para abrir."),
+        "Download failed. Please check your connection." to FallbackTranslation("Download non riuscito. Controlla la connessione.", "Download fehlgeschlagen. Bitte Verbindung prüfen.", "Descarga fallida. Comprueba tu conexión."),
+        "Database updates" to FallbackTranslation("Aggiornamenti database", "Datenbank-Updates", "Actualizaciones de base de datos"),
+        "Maps download" to FallbackTranslation("Download mappe", "Kartendownload", "Descarga de mapas"),
+        "Map downloaded" to FallbackTranslation("Mappa scaricata", "Karte heruntergeladen", "Mapa descargado"),
+        "Signal Quest upload" to FallbackTranslation("Invio Signal Quest", "Signal-Quest-Upload", "Envío Signal Quest"),
+        "Network error, retrying later." to FallbackTranslation("Errore di rete, nuovo tentativo più tardi.", "Netzwerkfehler, später erneuter Versuch.", "Error de red, se reintentará más tarde."),
+        "📍 Nearby antennas" to FallbackTranslation("📍 Antenne vicine", "📍 Antennen in der Nähe", "📍 Antenas cercanas"),
+        "Waiting for GPS..." to FallbackTranslation("In attesa del GPS...", "Warte auf GPS...", "Esperando GPS..."),
+        "GeoTower is connected to Android Auto." to FallbackTranslation("GeoTower è connesso ad Android Auto.", "GeoTower ist mit Android Auto verbunden.", "GeoTower está conectado a Android Auto."),
+        "Nearby sites" to FallbackTranslation("Siti vicini", "Standorte in der Nähe", "Sitios cercanos"),
+        "Sites around me" to FallbackTranslation("Siti intorno a me", "Standorte um mich herum", "Sitios a mi alrededor"),
+        "No site found around your position." to FallbackTranslation("Nessun sito trovato intorno alla tua posizione.", "Kein Standort in deiner Nähe gefunden.", "No se ha encontrado ningún sitio cerca de tu posición."),
+        "Try again" to FallbackTranslation("Riprova", "Erneut versuchen", "Reintentar"),
+        "Searching nearby sites..." to FallbackTranslation("Ricerca dei siti vicini...", "Suche nach Standorten in der Nähe...", "Buscando sitios cercanos..."),
+        "Position unavailable for now." to FallbackTranslation("Posizione al momento non disponibile.", "Position momentan nicht verfügbar.", "Posición no disponible por ahora."),
+        "Allow location in GeoTower on the phone." to FallbackTranslation("Autorizza la localizzazione in GeoTower sul telefono.", "Erlaube GeoTower den Standortzugriff auf dem Telefon.", "Autoriza la ubicación en GeoTower en el teléfono."),
+        "GeoTower needs location to show sites around you." to FallbackTranslation("GeoTower ha bisogno della posizione per mostrare i siti intorno a te.", "GeoTower benötigt den Standort, um Standorte in deiner Nähe anzuzeigen.", "GeoTower necesita la ubicación para mostrar sitios a tu alrededor."),
+        "Location required" to FallbackTranslation("Localizzazione richiesta", "Standort erforderlich", "Ubicación requerida"),
+        "Open app" to FallbackTranslation("Apri app", "App öffnen", "Abrir app"),
+        "Operators" to FallbackTranslation("Operatori", "Betreiber", "Operadores"),
+        "Address" to FallbackTranslation("Indirizzo", "Adresse", "Dirección"),
+        "Navigate" to FallbackTranslation("Naviga", "Navigieren", "Navegar"),
+        "Live Notification" to FallbackTranslation("Notifica live", "Live-Benachrichtigung", "Notificación en directo"),
+        "Enable real-time notifications" to FallbackTranslation("Attiva le notifiche in tempo reale", "Echtzeitbenachrichtigungen aktivieren", "Activar notificaciones en tiempo real"),
+        "Update notifications" to FallbackTranslation("Notifiche di aggiornamento", "Update-Benachrichtigungen", "Notificaciones de actualización"),
+        "Get alerted when a new database or APK is available" to FallbackTranslation("Ricevi un avviso quando è disponibile un nuovo database o APK", "Benachrichtigen, wenn eine neue Datenbank oder APK verfügbar ist", "Recibe una alerta cuando haya una nueva base de datos o APK"),
+        "Requires choosing a default operator" to FallbackTranslation("Richiede la scelta di un operatore predefinito", "Erfordert einen Standardbetreiber", "Requiere elegir un operador predeterminado"),
+        "You must keep at least one mobile technology (2G, 3G, 4G, or 5G)." to FallbackTranslation("Devi mantenere almeno una tecnologia mobile (2G, 3G, 4G o 5G).", "Du musst mindestens eine Mobilfunktechnologie behalten (2G, 3G, 4G oder 5G).", "Debes mantener al menos una tecnología móvil (2G, 3G, 4G o 5G)."),
+        "You must keep at least one frequency." to FallbackTranslation("Devi mantenere almeno una frequenza.", "Du musst mindestens eine Frequenz behalten.", "Debes mantener al menos una frecuencia."),
+        "Weekly data currently downloaded:" to FallbackTranslation("Dati settimanali attualmente scaricati:", "Aktuell heruntergeladene Wochendaten:", "Datos semanales descargados actualmente:"),
+        "No database installed" to FallbackTranslation("Nessun database installato", "Keine Datenbank installiert", "No hay base de datos instalada"),
+        "Invalid local database" to FallbackTranslation("Database locale non valido", "Ungültige lokale Datenbank", "Base local no válida"),
+        "Old version (Undated)" to FallbackTranslation("Vecchia versione (senza data)", "Alte Version (ohne Datum)", "Versión antigua (sin fecha)"),
+        "Latest database:" to FallbackTranslation("Ultimo database:", "Neueste Datenbank:", "Última base:"),
+        "Currently downloaded:" to FallbackTranslation("Attualmente scaricato:", "Aktuell heruntergeladen:", "Descargada actualmente:"),
+        "Delete data" to FallbackTranslation("Elimina dati", "Daten löschen", "Eliminar datos"),
+        "Are you sure you want to delete the database?" to FallbackTranslation("Vuoi davvero eliminare il database?", "Möchtest du die Datenbank wirklich löschen?", "¿Seguro que quieres eliminar la base de datos?"),
+        // Base ANFR, cartes hors ligne et mises à jour.
+        "Offline Maps" to FallbackTranslation("Mappe offline", "Offline-Karten", "Mapas sin conexión"),
+        "Download maps of France to navigate without an internet connection." to FallbackTranslation("Scarica le mappe della Francia per navigare senza connessione internet.", "Lade Frankreich-Karten herunter, um ohne Internetverbindung zu navigieren.", "Descarga mapas de Francia para navegar sin conexión a internet."),
+        "Delete map?" to FallbackTranslation("Eliminare la mappa?", "Karte löschen?", "¿Eliminar mapa?"),
+        "Do you really want to delete this map from your device?" to FallbackTranslation("Vuoi davvero eliminare questa mappa dal dispositivo?", "Möchtest du diese Karte wirklich von deinem Gerät löschen?", "¿Seguro que quieres eliminar este mapa de tu dispositivo?"),
+        "Download All" to FallbackTranslation("Scarica tutto", "Alle herunterladen", "Descargar todo"),
+        "Delete All" to FallbackTranslation("Elimina tutto", "Alle löschen", "Eliminar todo"),
+        "Delete all maps?" to FallbackTranslation("Eliminare tutte le mappe?", "Alle Karten löschen?", "¿Eliminar todos los mapas?"),
+        "Do you really want to delete all downloaded maps?" to FallbackTranslation("Vuoi davvero eliminare tutte le mappe scaricate?", "Möchtest du wirklich alle heruntergeladenen Karten löschen?", "¿Seguro que quieres eliminar todos los mapas descargados?"),
+        "Split share image" to FallbackTranslation("Dividi immagine di condivisione", "Teilen-Bild aufteilen", "Dividir imagen compartida"),
+        "Separates frequencies on a 2nd image" to FallbackTranslation("Separa le frequenze in una seconda immagine", "Trennt Frequenzen auf ein zweites Bild", "Separa las frecuencias en una segunda imagen"),
+        "Units of measure" to FallbackTranslation("Unità di misura", "Maßeinheiten", "Unidades de medida"),
+        "Distance and speed" to FallbackTranslation("Distanza e velocità", "Entfernung und Geschwindigkeit", "Distancia y velocidad"),
+        "Speed :" to FallbackTranslation("Velocità: ", "Geschwindigkeit: ", "Velocidad: "),
+        "Kilometers (km)" to FallbackTranslation("Chilometri (km)", "Kilometer (km)", "Kilómetros (km)"),
+        "Miles (mi)" to FallbackTranslation("Miglia (mi)", "Meilen (mi)", "Millas (mi)"),
+        "Kilometers/hour (km/h)" to FallbackTranslation("Chilometri/ora (km/h)", "Kilometer/Stunde (km/h)", "Kilómetros/hora (km/h)"),
+        "Miles/hour (mph)" to FallbackTranslation("Miglia/ora (mph)", "Meilen/Stunde (mph)", "Millas/hora (mph)"),
+        "Nearby Emitters" to FallbackTranslation("Emettitori vicini", "Sender in der Nähe", "Emisores cercanos"),
+        "Searching for GPS position..." to FallbackTranslation("Ricerca posizione GPS...", "GPS-Position wird gesucht...", "Buscando posición GPS..."),
+        "No sites found." to FallbackTranslation("Nessun sito trovato.", "Keine Standorte gefunden.", "No se han encontrado sitios."),
+        "Load more sites" to FallbackTranslation("Carica altri siti", "Mehr Standorte laden", "Cargar más sitios"),
+        "City" to FallbackTranslation("Città", "Stadt", "Ciudad"),
+        "Pylon" to FallbackTranslation("Pilone", "Mast", "Pilón"),
+        "Roof" to FallbackTranslation("Tetto", "Dach", "Tejado"),
+        "Postal code" to FallbackTranslation("Codice postale", "Postleitzahl", "Código postal"),
+        "Search help" to FallbackTranslation("Aiuto ricerca", "Suchhilfe", "Ayuda de búsqueda"),
+        "Search codes" to FallbackTranslation("Codici di ricerca", "Suchcodes", "Códigos de búsqueda"),
+        "Got it" to FallbackTranslation("Capito", "Verstanden", "Entendido"),
+        "Searches for sites in the city using the Nominatim area, like the map." to FallbackTranslation("Cerca i siti nella città usando l'area Nominatim, come la mappa.", "Sucht Standorte in der Stadt über den Nominatim-Bereich, wie die Karte.", "Busca sitios en la ciudad usando el área de Nominatim, como el mapa."),
+        "Searches the full ANFR address of the site." to FallbackTranslation("Cerca nell'indirizzo ANFR completo del sito.", "Sucht in der vollständigen ANFR-Adresse des Standorts.", "Busca en toda la dirección ANFR del sitio."),
+        "Searches by postal code." to FallbackTranslation("Cerca per codice postale.", "Sucht nach Postleitzahl.", "Busca por código postal."),
+        "Searches around GPS coordinates." to FallbackTranslation("Cerca intorno a coordinate GPS.", "Sucht um GPS-Koordinaten herum.", "Busca alrededor de coordenadas GPS."),
+        "Searches for an ANFR identifier." to FallbackTranslation("Cerca un identificativo ANFR.", "Sucht nach einer ANFR-Kennung.", "Busca un identificador ANFR."),
+        "Searches for a support identifier." to FallbackTranslation("Cerca un identificativo di supporto.", "Sucht nach einer Support-Kennung.", "Busca un identificador de soporte."),
+        "Filters by operator." to FallbackTranslation("Filtra per operatore.", "Filtert nach Betreiber.", "Filtra por operador."),
+        "Filters by technology." to FallbackTranslation("Filtra per tecnologia.", "Filtert nach Technologie.", "Filtra por tecnología."),
+        "Filters by support type." to FallbackTranslation("Filtra per tipo di supporto.", "Filtert nach Supporttyp.", "Filtra por tipo de soporte."),
+        "Open" to FallbackTranslation("Apri", "Öffnen", "Abrir"),
+        // Détail support, actions carte et navigation.
+        "Support Detail" to FallbackTranslation("Dettaglio supporto", "Supportdetail", "Detalle del soporte"),
+        "No data found." to FallbackTranslation("Nessun dato trovato.", "Keine Daten gefunden.", "No se han encontrado datos."),
+        "Identification number : " to FallbackTranslation("Numero identificativo: ", "Identifikationsnummer: ", "Número de identificación: "),
+        "Identification number copied" to FallbackTranslation("Numero identificativo copiato", "Identifikationsnummer kopiert", "Número de identificación copiado"),
+        "Number unavailable at the moment" to FallbackTranslation("Numero al momento non disponibile", "Nummer momentan nicht verfügbar", "Número no disponible por ahora"),
+        "Address : " to FallbackTranslation("Indirizzo: ", "Adresse: ", "Dirección: "),
+        "Not specified" to FallbackTranslation("Non specificato", "Nicht angegeben", "No especificado"),
+        "Address copied" to FallbackTranslation("Indirizzo copiato", "Adresse kopiert", "Dirección copiada"),
+        "GPS : " to FallbackTranslation("GPS: ", "GPS: ", "GPS: "),
+        "Coordinates copied" to FallbackTranslation("Coordinate copiate", "Koordinaten kopiert", "Coordenadas copiadas"),
+        "Support height : " to FallbackTranslation("Altezza supporto: ", "Supporthöhe: ", "Altura del soporte: "),
+        "Distance : " to FallbackTranslation("Distanza: ", "Entfernung: ", "Distancia: "),
+        "from you" to FallbackTranslation("da te", "von dir", "de ti"),
+        "Bearing measured from the antenna : " to FallbackTranslation("Direzione misurata dall'antenna: ", "Peilung von der Antenne gemessen: ", "Rumbo medido desde la antena: "),
+        "Open map" to FallbackTranslation("Apri mappa", "Karte öffnen", "Abrir mapa"),
+        "Navigate to this site" to FallbackTranslation("Naviga verso questo sito", "Zu diesem Standort navigieren", "Navegar a este sitio"),
+        "Share this site" to FallbackTranslation("Condividi questo sito", "Diesen Standort teilen", "Compartir este sitio"),
+        "Share as..." to FallbackTranslation("Condividi come...", "Teilen als...", "Compartir como..."),
+        "Ideal for emails or messages" to FallbackTranslation("Ideale per email o messaggi", "Ideal für E-Mails oder Nachrichten", "Ideal para correos o mensajes"),
+        "Ideal for social media (Twitter, Discord)" to FallbackTranslation("Ideale per social network (Twitter, Discord)", "Ideal für soziale Netzwerke (Twitter, Discord)", "Ideal para redes sociales (Twitter, Discord)"),
+        "Open route with..." to FallbackTranslation("Apri itinerario con...", "Route öffnen mit...", "Abrir ruta con..."),
+        "Installed application" to FallbackTranslation("Applicazione installata", "Installierte App", "Aplicación instalada"),
+        "Open with Waze, Maps, OsmAnd..." to FallbackTranslation("Apri con Waze, Maps, OsmAnd...", "Mit Waze, Maps, OsmAnd öffnen...", "Abrir con Waze, Maps, OsmAnd..."),
+        "On the internet" to FallbackTranslation("Su internet", "Im Internet", "En internet"),
+        "Open in web browser" to FallbackTranslation("Apri nel browser web", "Im Webbrowser öffnen", "Abrir en el navegador web"),
+        "No GPS application found." to FallbackTranslation("Nessuna applicazione GPS trovata.", "Keine GPS-App gefunden.", "No se ha encontrado ninguna aplicación GPS."),
+        "Share site via..." to FallbackTranslation("Condividi sito tramite...", "Standort teilen über...", "Compartir sitio por..."),
+        "Implementation : " to FallbackTranslation("Installazione: ", "Implementierung: ", "Implantación: "),
+        "Last modification : " to FallbackTranslation("Ultima modifica: ", "Letzte Änderung: ", "Última modificación: "),
+        "Generated via the GeoTower app" to FallbackTranslation("Generato tramite l'app GeoTower", "Erstellt mit der GeoTower-App", "Generado con la app GeoTower"),
+        "Support nature" to FallbackTranslation("Natura del supporto", "Supportart", "Naturaleza del soporte"),
+        "Owner" to FallbackTranslation("Proprietario", "Eigentümer", "Propietario"),
+        "Likely network vendor" to FallbackTranslation("Probabile fornitore di rete", "Wahrscheinlicher Netzausrüster", "Proveedor de red probable"),
+        "Antenna type" to FallbackTranslation("Tipo di antenna", "Antennentyp", "Tipo de antena"),
+        "Support diagram" to FallbackTranslation("Schema del supporto", "Supportdiagramm", "Esquema del soporte"),
+        "Add photos" to FallbackTranslation("Aggiungi foto", "Fotos hinzufügen", "Añadir fotos"),
+        "Camera" to FallbackTranslation("Fotocamera", "Kamera", "Cámara"),
+        "Gallery" to FallbackTranslation("Galleria", "Galerie", "Galería"),
+        "Files / external drive" to FallbackTranslation("File / unità esterna", "Dateien / externes Laufwerk", "Archivos / unidad externa"),
+        "Upload photos" to FallbackTranslation("Invia foto", "Fotos hochladen", "Enviar fotos"),
+        "Could not prepare photos." to FallbackTranslation("Impossibile preparare le foto.", "Fotos konnten nicht vorbereitet werden.", "No se han podido preparar las fotos."),
+        "Previous" to FallbackTranslation("Precedente", "Zurück", "Anterior"),
+        "Next" to FallbackTranslation("Successivo", "Weiter", "Siguiente"),
+        "Bands not specified" to FallbackTranslation("Bande non specificate", "Bänder nicht angegeben", "Bandas no especificadas"),
+        "External Links" to FallbackTranslation("Link esterni", "Externe Links", "Enlaces externos"),
+        "Install application" to FallbackTranslation("Installa applicazione", "App installieren", "Instalar aplicación"),
+        "4G Map" to FallbackTranslation("Mappa 4G", "4G-Karte", "Mapa 4G"),
+        "5G Map" to FallbackTranslation("Mappa 5G", "5G-Karte", "Mapa 5G"),
+        "Unavailable" to FallbackTranslation("Non disponibile", "Nicht verfügbar", "No disponible"),
+        "Which map to consult?" to FallbackTranslation("Quale mappa consultare?", "Welche Karte anzeigen?", "¿Qué mapa consultar?"),
+        "Technically operational" to FallbackTranslation("Tecnicamente operativo", "Technisch betriebsbereit", "Técnicamente operativo"),
+        "Project approved" to FallbackTranslation("Progetto approvato", "Projekt genehmigt", "Proyecto aprobado"),
+        "Unknown status" to FallbackTranslation("Stato sconosciuto", "Unbekannter Status", "Estado desconocido"),
+        "ANFR Station Number : " to FallbackTranslation("Numero stazione ANFR: ", "ANFR-Stationsnummer: ", "Número de estación ANFR: "),
+        "Dates" to FallbackTranslation("Date", "Daten", "Fechas"),
+        "Initialization error" to FallbackTranslation("Errore di inizializzazione", "Initialisierungsfehler", "Error de inicialización"),
+        "Total spectrum" to FallbackTranslation("Spettro totale", "Gesamtspektrum", "Espectro total"),
+        "The total spectrum may be inaccurate due to likely declaration errors." to FallbackTranslation("Lo spettro totale può essere impreciso a causa di probabili errori di dichiarazione.", "Das Gesamtspektrum kann wegen wahrscheinlicher Meldefehler ungenau sein.", "El espectro total puede ser impreciso por posibles errores de declaración."),
+        "Spectrum" to FallbackTranslation("Spettro", "Spektrum", "Espectro"),
+        "Spectrum by frequency band" to FallbackTranslation("Spettro per banda di frequenza", "Spektrum nach Frequenzband", "Espectro por banda de frecuencia"),
+        "City, address, site ID..." to FallbackTranslation("Città, indirizzo, ID sito...", "Stadt, Adresse, Standort-ID...", "Ciudad, dirección, ID de sitio..."),
+        "Location not found" to FallbackTranslation("Luogo non trovato", "Ort nicht gefunden", "Lugar no encontrado"),
+        "Network error during search" to FallbackTranslation("Errore di rete durante la ricerca", "Netzwerkfehler bei der Suche", "Error de red durante la búsqueda"),
+        "Delete traces" to FallbackTranslation("Elimina tracciati", "Spuren löschen", "Eliminar trazados"),
+        "Closest site" to FallbackTranslation("Sito più vicino", "Nächster Standort", "Sitio más cercano"),
+        "Filters" to FallbackTranslation("Filtri", "Filter", "Filtros"),
+        "Dark" to FallbackTranslation("Scuro", "Dunkel", "Oscuro"),
+        "Satellite" to FallbackTranslation("Satellite", "Satellit", "Satélite"),
+        "Technologies" to FallbackTranslation("Tecnologie", "Technologien", "Tecnologías"),
+        // Détail site, statistiques et photos communautaires.
+        "Site Detail" to FallbackTranslation("Dettaglio sito", "Standortdetail", "Detalle del sitio"),
+        "Open on" to FallbackTranslation("Apri su", "Öffnen auf", "Abrir en"),
+        "Website" to FallbackTranslation("Sito web", "Website", "Sitio web"),
+        "Activated on : " to FallbackTranslation("Attivato il: ", "Aktiviert am: ", "Activado el: "),
+        "Activation date not specified by ANFR" to FallbackTranslation("Data di attivazione non specificata da ANFR", "Aktivierungsdatum von ANFR nicht angegeben", "Fecha de activación no especificada por ANFR"),
+        "Azimuth not specified" to FallbackTranslation("Azimut non specificato", "Azimut nicht angegeben", "Azimut no especificado"),
+        "Panel heights" to FallbackTranslation("Altezze dei pannelli", "Panelhöhen", "Alturas de paneles"),
+        "Support ID : " to FallbackTranslation("ID supporto: ", "Support-ID: ", "ID del soporte: "),
+        "Show azimuths (antenna direction)" to FallbackTranslation("Mostra azimut (direzione antenna)", "Azimute anzeigen (Antennenrichtung)", "Mostrar azimuts (dirección de la antena)"),
+        "Show azimuths (cone representation)" to FallbackTranslation("Mostra azimut (rappresentazione a cono)", "Azimute anzeigen (Kegeldarstellung)", "Mostrar azimuts (representación en cono)"),
+        "Site display" to FallbackTranslation("Visualizzazione siti", "Standortanzeige", "Visualización de sitios"),
+        "Out of Service" to FallbackTranslation("Fuori servizio", "Außer Betrieb", "Fuera de servicio"),
+        "Global tracking active..." to FallbackTranslation("Monitoraggio globale attivo...", "Globale Verfolgung aktiv...", "Seguimiento global activo..."),
+        "View statistics" to FallbackTranslation("Consulta statistiche", "Statistiken anzeigen", "Ver estadísticas"),
+        "Mobile telephony" to FallbackTranslation("Telefonia mobile", "Mobiltelefonie", "Telefonía móvil"),
+        "Details" to FallbackTranslation("Dettagli", "Details", "Detalles"),
+        "Operator details" to FallbackTranslation("Dettaglio per operatore", "Betreiberdetails", "Detalle por operador"),
+        "Active / declared" to FallbackTranslation("Attivi / dichiarati", "Aktiv / gemeldet", "Activos / declarados"),
+        "Technologies / Frequencies" to FallbackTranslation("Tecnologie / Frequenze", "Technologien / Frequenzen", "Tecnologías / Frecuencias"),
+        "Loading operators..." to FallbackTranslation("Caricamento operatori...", "Betreiber werden geladen...", "Cargando operadores..."),
+        "Loading frequencies..." to FallbackTranslation("Caricamento frequenze...", "Frequenzen werden geladen...", "Cargando frecuencias..."),
+        "Supports (Pylons)" to FallbackTranslation("Supporti (piloni)", "Supports (Masten)", "Soportes (pilones)"),
+        "Number of physical sites per operator" to FallbackTranslation("Numero di siti fisici per operatore", "Anzahl physischer Standorte pro Betreiber", "Número de sitios físicos por operador"),
+        "4G Sites" to FallbackTranslation("Siti 4G", "4G-Standorte", "Sitios 4G"),
+        "Number of 4G-equipped sites per operator" to FallbackTranslation("Numero di siti dotati di 4G per operatore", "Anzahl 4G-ausgerüsteter Standorte pro Betreiber", "Número de sitios con 4G por operador"),
+        "5G Sites" to FallbackTranslation("Siti 5G", "5G-Standorte", "Sitios 5G"),
+        "Number of 5G-equipped sites per operator" to FallbackTranslation("Numero di siti dotati di 5G per operatore", "Anzahl 5G-ausgerüsteter Standorte pro Betreiber", "Número de sitios con 5G por operador"),
+        "Widget Permission" to FallbackTranslation("Autorizzazione widget", "Widget-Berechtigung", "Permiso del widget"),
+        "Allow \"Always\" for the widget to refresh" to FallbackTranslation("Consenti \"Sempre\" per aggiornare il widget", "\"Immer\" erlauben, damit das Widget aktualisiert wird", "Permite \"Siempre\" para que el widget se actualice"),
+        "You are offline.\nCommunity photos cannot be retrieved without an internet connection. The diagram remains visible when available." to FallbackTranslation("Sei offline.\nLe foto della community non possono essere recuperate senza connessione Internet. Lo schema resta visibile quando disponibile.", "Du bist offline.\nCommunity-Fotos können ohne Internetverbindung nicht abgerufen werden. Das Diagramm bleibt sichtbar, wenn es verfügbar ist.", "Estás sin conexión.\nLas fotos comunitarias no pueden recuperarse sin Internet. El esquema seguirá visible cuando esté disponible."),
+        "Site photo" to FallbackTranslation("Foto del sito", "Standortfoto", "Foto del sitio"),
+        "Full screen photo" to FallbackTranslation("Foto a schermo intero", "Vollbildfoto", "Foto a pantalla completa"),
+        "Support image" to FallbackTranslation("Immagine del supporto", "Supportbild", "Imagen del soporte"),
+        "Full screen image" to FallbackTranslation("Immagine a schermo intero", "Vollbildbild", "Imagen a pantalla completa"),
+        // Partage, génération d'image et actions communes.
+        "Default share content" to FallbackTranslation("Contenuto di condivisione predefinito", "Standard-Teilen-Inhalt", "Contenido compartido predeterminado"),
+        "Choose the elements to include on the image" to FallbackTranslation("Scegli gli elementi da includere nell'immagine", "Wähle die Elemente aus, die im Bild enthalten sein sollen", "Elige los elementos que incluir en la imagen"),
+        "Display the map" to FallbackTranslation("Mostra la mappa", "Karte anzeigen", "Mostrar el mapa"),
+        "Elevation profile (separate image)" to FallbackTranslation("Profilo altimetrico (immagine separata)", "Höhenprofil (separates Bild)", "Perfil altimétrico (imagen separada)"),
+        "Best Speedtest" to FallbackTranslation("Miglior Speedtest", "Bester Speedtest", "Mejor Speedtest"),
+        "Address and Coordinates" to FallbackTranslation("Indirizzo e coordinate", "Adresse und Koordinaten", "Dirección y coordenadas"),
+        "Antenna identifiers" to FallbackTranslation("Identificativi antenna", "Antennenkennungen", "Identificadores de la antena"),
+        "Confidential share" to FallbackTranslation("Condivisione riservata", "Vertrauliches Teilen", "Compartir confidencial"),
+        "Removes data allowing location identification" to FallbackTranslation("Rimuove i dati che permettono di identificare il luogo", "Entfernt Daten, mit denen der Ort identifiziert werden kann", "Elimina datos que permiten identificar el lugar"),
+        "Scan to open in" to FallbackTranslation("Scansiona per aprire in", "Scannen zum Öffnen in", "Escanea para abrir en"),
+        "the GeoTower app" to FallbackTranslation("l'app GeoTower", "der GeoTower-App", "la app GeoTower"),
+        "Open menu" to FallbackTranslation("Apri menu", "Menü öffnen", "Abrir menú"),
+        "Close menu" to FallbackTranslation("Chiudi menu", "Menü schließen", "Cerrar menú"),
+        "Search" to FallbackTranslation("Cerca", "Suchen", "Buscar"),
+        "Delete" to FallbackTranslation("Elimina", "Löschen", "Eliminar"),
+        "Apply" to FallbackTranslation("Applica", "Anwenden", "Aplicar"),
+        "Technical data unavailable" to FallbackTranslation("Dati tecnici non disponibili", "Technische Daten nicht verfügbar", "Datos técnicos no disponibles"),
+        "Ruler" to FallbackTranslation("Righello", "Lineal", "Regla"),
+        "Layers" to FallbackTranslation("Livelli", "Ebenen", "Capas"),
+        "Tools" to FallbackTranslation("Strumenti", "Werkzeuge", "Herramientas"),
+        "Locate" to FallbackTranslation("Localizza", "Orten", "Localizar"),
+        "Top" to FallbackTranslation("Alto", "Oben", "Arriba"),
+        "Bottom" to FallbackTranslation("Basso", "Unten", "Abajo"),
+        "(No offline map installed)" to FallbackTranslation("(Nessuna mappa offline installata)", "(Keine Offline-Karte installiert)", "(Ningún mapa sin conexión instalado)"),
+        "Image content" to FallbackTranslation("Contenuto dell'immagine", "Bildinhalt", "Contenido de la imagen"),
+        "Generate image" to FallbackTranslation("Genera immagine", "Bild erstellen", "Generar imagen"),
+        "Generating share images..." to FallbackTranslation("Generazione immagini di condivisione...", "Teilen-Bilder werden erstellt...", "Generando imágenes para compartir..."),
+        "Preparing the main image..." to FallbackTranslation("Preparazione dell'immagine principale...", "Hauptbild wird vorbereitet...", "Preparando la imagen principal..."),
+        "Elevation profile unavailable for sharing." to FallbackTranslation("Profilo altimetrico non disponibile per la condivisione.", "Höhenprofil zum Teilen nicht verfügbar.", "Perfil altimétrico no disponible para compartir."),
+        "Distance hidden (Confidential mode)" to FallbackTranslation("Distanza nascosta (modalità riservata)", "Entfernung ausgeblendet (vertraulicher Modus)", "Distancia oculta (modo confidencial)"),
+        "Support ID" to FallbackTranslation("ID supporto", "Support-ID", "ID del soporte"),
+        "GPS Coordinates" to FallbackTranslation("Coordinate GPS", "GPS-Koordinaten", "Coordenadas GPS"),
+        "Your MaterialUi color is too light. For better readability, dark blue has been applied." to FallbackTranslation("Il colore MaterialUi è troppo chiaro. Per una migliore leggibilità è stato applicato il blu scuro.", "Deine MaterialUi-Farbe ist zu hell. Für bessere Lesbarkeit wurde Dunkelblau angewendet.", "Tu color MaterialUi es demasiado claro. Para mejorar la legibilidad se ha aplicado azul oscuro."),
+        "Do not show this message again" to FallbackTranslation("Non mostrare più questo messaggio", "Diese Meldung nicht mehr anzeigen", "No volver a mostrar este mensaje"),
+        "Understood" to FallbackTranslation("Ho capito", "Verstanden", "Entendido"),
+        "Send to Signal Quest" to FallbackTranslation("Invia a Signal Quest", "An Signal Quest senden", "Enviar a Signal Quest"),
+        "Remove EXIF data" to FallbackTranslation("Rimuovi dati EXIF", "EXIF-Daten entfernen", "Eliminar datos EXIF"),
+        "Add a description for this batch (optional)..." to FallbackTranslation("Aggiungi una descrizione per questo lotto (opzionale)...", "Beschreibung für diesen Stapel hinzufügen (optional)...", "Añadir una descripción para este lote (opcional)..."),
+        "Target operator" to FallbackTranslation("Operatore target", "Zielbetreiber", "Operador objetivo"),
+        "Site ID" to FallbackTranslation("ID sito", "Standort-ID", "ID del sitio"),
+        "Limit: 20 MB per photo" to FallbackTranslation("Limite: 20 MB per foto", "Limit: 20 MB pro Foto", "Límite: 20 MB por foto"),
+        "Upload Confirmation" to FallbackTranslation("Conferma invio", "Upload-Bestätigung", "Confirmación de envío"),
+        "Uploading" to FallbackTranslation("Invio in corso", "Upload läuft", "Enviando"),
+        "Preparing..." to FallbackTranslation("Preparazione...", "Vorbereitung...", "Preparando..."),
+        "⚠️ Background location required" to FallbackTranslation("⚠️ Localizzazione in background richiesta", "⚠️ Hintergrundstandort erforderlich", "⚠️ Ubicación en segundo plano requerida"),
+        "Support" to FallbackTranslation("Supporto", "Support", "Soporte"),
+        "Authorize" to FallbackTranslation("Autorizza", "Autorisieren", "Autorizar"),
+        "Start setup ➜" to FallbackTranslation("Avvia configurazione ➜", "Einrichtung starten ➜", "Iniciar configuración ➜"),
+        "Welcome to GeoTower, the app for locating nearby cell towers and getting information about them." to FallbackTranslation("Benvenuto in GeoTower, l'app per localizzare le antenne mobili vicine e ottenere informazioni su di esse.", "Willkommen bei GeoTower, der App zum Finden von Mobilfunkstandorten in deiner Nähe und ihren Informationen.", "Bienvenido a GeoTower, la app para localizar antenas móviles cercanas y obtener información sobre ellas."),
+        "Find what is nearby" to FallbackTranslation("Trova cosa c'è vicino", "Finde, was in der Nähe ist", "Encuentra lo que está cerca"),
+        "Quickly list the nearest radio supports and sites around your position." to FallbackTranslation("Elenca rapidamente i supporti radio e i siti più vicini alla tua posizione.", "Liste schnell die nächsten Funkstandorte und Träger um deine Position auf.", "Lista rápidamente los soportes y sitios de radio más cercanos a tu posición."),
+        "Explore on the map" to FallbackTranslation("Esplora sulla mappa", "Auf der Karte erkunden", "Explorar en el mapa"),
+        "Browse antennas, filters, layers and technical information directly on a map." to FallbackTranslation("Consulta antenne, filtri, livelli e informazioni tecniche direttamente su una mappa.", "Durchsuche Antennen, Filter, Ebenen und technische Informationen direkt auf der Karte.", "Consulta antenas, filtros, capas e información técnica directamente en un mapa."),
+        "Understand the network" to FallbackTranslation("Capire la rete", "Das Netz verstehen", "Entender la red"),
+        "Access frequencies, azimuths, photos, profiles and measurement tools when data is available." to FallbackTranslation("Accedi a frequenze, azimut, foto, profili e strumenti di misura quando i dati sono disponibili.", "Greife auf Frequenzen, Azimute, Fotos, Profile und Messwerkzeuge zu, wenn Daten verfügbar sind.", "Accede a frecuencias, azimuts, fotos, perfiles y herramientas de medición cuando haya datos disponibles."),
+        "Please allow location permission so GeoTower can quickly locate nearby transmitters." to FallbackTranslation("Concedi l'autorizzazione alla posizione affinché GeoTower trovi rapidamente i trasmettitori vicini.", "Erlaube den Standortzugriff, damit GeoTower Sender in der Nähe schnell finden kann.", "Permite la ubicación para que GeoTower localice rápidamente emisores cercanos."),
+        "Nearby in one tap" to FallbackTranslation("Vicino con un tocco", "Nähe mit einem Tippen", "Cerca en un toque"),
+        "Your position is used to sort antennas around you and open the right area immediately." to FallbackTranslation("La tua posizione serve a ordinare le antenne intorno a te e aprire subito l'area corretta.", "Deine Position sortiert Antennen in deiner Umgebung und öffnet sofort den passenden Bereich.", "Tu posición se usa para ordenar antenas cercanas y abrir directamente la zona correcta."),
+        "More precise map" to FallbackTranslation("Mappa più precisa", "Präzisere Karte", "Mapa más preciso"),
+        "The location button can center the map, then follow your movement when you enable it." to FallbackTranslation("Il pulsante posizione può centrare la mappa e poi seguire i tuoi spostamenti quando lo abiliti.", "Die Standorttaste kann die Karte zentrieren und danach deiner Bewegung folgen, wenn du es aktivierst.", "El botón de ubicación puede centrar el mapa y seguir tu movimiento cuando lo actives."),
+        "You stay in control" to FallbackTranslation("Resti tu al comando", "Du behältst die Kontrolle", "Tú mantienes el control"),
+        "You can continue without permission and change it later from Android settings." to FallbackTranslation("Puoi continuare senza autorizzazione e modificarla più tardi dalle impostazioni Android.", "Du kannst ohne Berechtigung fortfahren und sie später in den Android-Einstellungen ändern.", "Puedes continuar sin permiso y cambiarlo más tarde desde los ajustes de Android."),
+        "Notifications" to FallbackTranslation("Notifiche", "Benachrichtigungen", "Notificaciones"),
+        "Please allow notification permission to show notifications for database downloads, offline map downloads, and new database availability." to FallbackTranslation("Concedi l'autorizzazione alle notifiche per mostrare download del database, download delle mappe offline e disponibilità di un nuovo database.", "Erlaube Benachrichtigungen für Datenbankdownloads, Offline-Kartendownloads und neue verfügbare Datenbanken.", "Permite las notificaciones para mostrar descargas de la base, mapas sin conexión y nuevas bases disponibles."),
+        "Visible downloads" to FallbackTranslation("Download visibili", "Sichtbare Downloads", "Descargas visibles"),
+        "GeoTower can show progress for database and offline map downloads while they are running." to FallbackTranslation("GeoTower può mostrare l'avanzamento dei download del database e delle mappe offline mentre sono in corso.", "GeoTower kann den Fortschritt von Datenbank- und Offline-Kartendownloads anzeigen.", "GeoTower puede mostrar el progreso de la base y de los mapas sin conexión durante la descarga."),
+        "Up-to-date data" to FallbackTranslation("Dati aggiornati", "Aktuelle Daten", "Datos actualizados"),
+        "You can be notified when a new database is available without opening the app to check." to FallbackTranslation("Puoi ricevere un avviso quando è disponibile un nuovo database senza aprire l'app.", "Du kannst benachrichtigt werden, wenn eine neue Datenbank verfügbar ist, ohne die App zu öffnen.", "Puedes recibir un aviso cuando haya una nueva base disponible sin abrir la app."),
+        "Useful alerts only" to FallbackTranslation("Solo avvisi utili", "Nur nützliche Hinweise", "Solo avisos útiles"),
+        "No social notifications or ads: only long-running operations and important data updates." to FallbackTranslation("Niente notifiche social o pubblicità: solo operazioni lunghe e aggiornamenti dati importanti.", "Keine Social-Benachrichtigungen oder Werbung: nur lange Vorgänge und wichtige Datenupdates.", "Sin notificaciones sociales ni anuncios: solo operaciones largas y actualizaciones importantes."),
+        "Selected operator" to FallbackTranslation("Operatore selezionato", "Ausgewählter Betreiber", "Operador seleccionado"),
+        "Location permission denied" to FallbackTranslation("Autorizzazione posizione negata", "Standortberechtigung abgelehnt", "Permiso de ubicación denegado"),
+        "Location permission was denied. Some features will be limited, such as nearby search, map recentering, and live tracking." to FallbackTranslation("L'autorizzazione alla posizione è stata negata. Alcune funzioni saranno limitate, come la ricerca vicina, il ricentraggio della mappa e il tracciamento live.", "Die Standortberechtigung wurde abgelehnt. Einige Funktionen sind eingeschränkt, etwa Suche in der Nähe, Kartenzentrierung und Live-Tracking.", "Se denegó el permiso de ubicación. Algunas funciones estarán limitadas, como la búsqueda cercana, centrar el mapa y el seguimiento en directo."),
+        "Notification permission denied" to FallbackTranslation("Autorizzazione notifiche negata", "Benachrichtigungsberechtigung abgelehnt", "Permiso de notificaciones denegado"),
+        "Notification permission was denied. Some features will be limited, such as download progress, update alerts, and live notifications." to FallbackTranslation("L'autorizzazione alle notifiche è stata negata. Alcune funzioni saranno limitate, come avanzamento download, avvisi di aggiornamento e notifiche live.", "Die Benachrichtigungsberechtigung wurde abgelehnt. Einige Funktionen sind eingeschränkt, etwa Downloadfortschritt, Update-Hinweise und Live-Benachrichtigungen.", "Se denegó el permiso de notificaciones. Algunas funciones estarán limitadas, como progreso de descargas, avisos de actualización y notificaciones en directo."),
+        "Continue anyway" to FallbackTranslation("Continua comunque", "Trotzdem fortfahren", "Continuar de todos modos"),
+        "Let's go!" to FallbackTranslation("Andiamo!", "Los geht's!", "¡Vamos!"),
+        "Choose the style that suits you." to FallbackTranslation("Scegli lo stile più adatto a te.", "Wähle den Stil, der zu dir passt.", "Elige el estilo que prefieras."),
+        "OLED Mode (Pure Black)" to FallbackTranslation("Modalità OLED (nero puro)", "OLED-Modus (reines Schwarz)", "Modo OLED (negro puro)"),
+        "Saves battery" to FallbackTranslation("Risparmia batteria", "Spart Akku", "Ahorra batería"),
+        "Scroll Blur" to FallbackTranslation("Sfocatura scorrimento", "Scroll-Weichzeichnung", "Desenfoque al desplazar"),
+        "Enable or disable blur (consumes more battery)" to FallbackTranslation("Attiva o disattiva la sfocatura (consuma più batteria)", "Weichzeichnung aktivieren oder deaktivieren (verbraucht mehr Akku)", "Activa o desactiva el desenfoque (consume más batería)"),
+        "Which map provider do you prefer?" to FallbackTranslation("Quale provider di mappe preferisci?", "Welchen Kartenanbieter bevorzugst du?", "¿Qué proveedor de mapas prefieres?"),
+        "Configure your main operator to make it easier to use the measurement tools on the map." to FallbackTranslation("Configura il tuo operatore principale per usare più facilmente gli strumenti di misura sulla mappa.", "Konfiguriere deinen Hauptbetreiber, damit die Messwerkzeuge auf der Karte leichter nutzbar sind.", "Configura tu operador principal para facilitar el uso de las herramientas de medición en el mapa."),
+        "Select your main operator" to FallbackTranslation("Seleziona il tuo operatore principale", "Wähle deinen Hauptbetreiber", "Selecciona tu operador principal"),
+        "Use One UI display (rounded bubbles)" to FallbackTranslation("Usa visualizzazione One UI (bolle arrotondate)", "One-UI-Anzeige verwenden (runde Kacheln)", "Usar visualización One UI (burbujas redondeadas)"),
+        "No operator selected" to FallbackTranslation("Nessun operatore selezionato", "Kein Betreiber ausgewählt", "Ningún operador seleccionado"),
+        "You have not chosen a default operator. The filtering tools on the map will be disabled.\n\nDo you really want to continue?" to FallbackTranslation("Non hai scelto un operatore predefinito. Gli strumenti di filtro sulla mappa saranno disattivati.\n\nVuoi davvero continuare?", "Du hast keinen Standardbetreiber gewählt. Die Filterwerkzeuge auf der Karte werden deaktiviert.\n\nMöchtest du wirklich fortfahren?", "No has elegido un operador predeterminado. Las herramientas de filtro del mapa se desactivarán.\n\n¿Quieres continuar?"),
+        "Choose an operator" to FallbackTranslation("Scegli un operatore", "Betreiber wählen", "Elegir un operador"),
+        "Display Style" to FallbackTranslation("Stile di visualizzazione", "Anzeigestil", "Estilo de visualización"),
+        "Full screen" to FallbackTranslation("Schermo intero", "Vollbild", "Pantalla completa"),
+        "Display support details and site details individually in full screen" to FallbackTranslation("Mostra i dettagli del supporto e del sito singolarmente a schermo intero", "Support- und Standortdetails einzeln im Vollbild anzeigen", "Mostrar los detalles del soporte y del sitio por separado en pantalla completa"),
+        "Split" to FallbackTranslation("Diviso", "Geteilt", "Dividido"),
+        "Split display for compatible screens: the context stays on the left while details open on the right." to FallbackTranslation("Visualizzazione divisa per schermate compatibili: il contesto resta a sinistra e i dettagli si aprono a destra.", "Geteilte Ansicht für kompatible Bildschirme: der Kontext bleibt links, Details öffnen sich rechts.", "Vista dividida en pantallas compatibles: el contexto queda a la izquierda y los detalles se abren a la derecha."),
+        "Download finished!" to FallbackTranslation("Download completato!", "Download abgeschlossen!", "¡Descarga terminada!"),
+        "The offline database has been successfully installed. The application is ready to run at full speed." to FallbackTranslation("Il database offline è stato installato correttamente. L'applicazione è pronta a funzionare al massimo.", "Die Offline-Datenbank wurde erfolgreich installiert. Die Anwendung ist vollständig bereit.", "La base sin conexión se ha instalado correctamente. La aplicación está lista para funcionar a pleno rendimiento."),
+        // À propos, crédits, onboarding et libellés techniques ANFR.
+        "Presentation" to FallbackTranslation("Presentazione", "Präsentation", "Presentación"),
+        "What's New" to FallbackTranslation("Novità", "Neuigkeiten", "Novedades"),
+        "Download the new database" to FallbackTranslation("Scarica il nuovo database", "Neue Datenbank herunterladen", "Descargar la nueva base"),
+        "Not installed" to FallbackTranslation("Non installato", "Nicht installiert", "No instalado"),
+        "Data Sources" to FallbackTranslation("Fonti dati", "Datenquellen", "Fuentes de datos"),
+        "Development" to FallbackTranslation("Sviluppo", "Entwicklung", "Desarrollo"),
+        "GeoTower allows you to locate cell towers around you and identify available technologies." to FallbackTranslation("GeoTower ti permette di localizzare le antenne mobili intorno a te e identificare le tecnologie disponibili.", "GeoTower ermöglicht es dir, Mobilfunkstandorte in deiner Umgebung zu finden und verfügbare Technologien zu erkennen.", "GeoTower te permite localizar antenas móviles a tu alrededor e identificar las tecnologías disponibles."),
+        "Antenna Data" to FallbackTranslation("Dati antenne", "Antennendaten", "Datos de antenas"),
+        "IGN Basemap" to FallbackTranslation("Mappa base IGN", "IGN-Basiskarte", "Mapa base IGN"),
+        "OSM Basemap" to FallbackTranslation("Mappa base OSM", "OSM-Basiskarte", "Mapa base OSM"),
+        "Inspiration & External Sources" to FallbackTranslation("Ispirazione e fonti esterne", "Inspiration und externe Quellen", "Inspiración y fuentes externas"),
+        "Privacy" to FallbackTranslation("Privacy", "Datenschutz", "Privacidad"),
+        "Your data" to FallbackTranslation("I tuoi dati", "Deine Daten", "Tus datos"),
+        "GeoTower does not collect any personal data. Your settings and favorites are stored only on your device." to FallbackTranslation("GeoTower non raccoglie dati personali. Le impostazioni e i preferiti restano solo sul tuo dispositivo.", "GeoTower sammelt keine personenbezogenen Daten. Deine Einstellungen und Favoriten bleiben nur auf deinem Gerät.", "GeoTower no recopila datos personales. Tus ajustes y favoritos se guardan solo en tu dispositivo."),
+        "Developed by Julien and GitHub contributors 😉" to FallbackTranslation("Sviluppato da Julien e dai contributori GitHub 😉", "Entwickelt von Julien und GitHub-Mitwirkenden 😉", "Desarrollado por Julien y colaboradores de GitHub 😉"),
+        "Close" to FallbackTranslation("Chiudi", "Schließen", "Cerrar"),
+        "Map" to FallbackTranslation("Mappa", "Karte", "Mapa"),
+        "Back" to FallbackTranslation("Indietro", "Zurück", "Atrás"),
+        "Show more sites" to FallbackTranslation("Mostra altri siti", "Mehr Standorte anzeigen", "Mostrar más sitios"),
+        "Unknown address" to FallbackTranslation("Indirizzo sconosciuto", "Unbekannte Adresse", "Dirección desconocida"),
+        "ANFR site" to FallbackTranslation("Sito ANFR", "ANFR-Standort", "Sitio ANFR"),
+        "Move" to FallbackTranslation("Sposta", "Verschieben", "Mover"),
+        "Copy" to FallbackTranslation("Copia", "Kopieren", "Copiar"),
+        "Cancel" to FallbackTranslation("Annulla", "Abbrechen", "Cancelar"),
+        "Hide" to FallbackTranslation("Nascondi", "Ausblenden", "Ocultar"),
+        "Upload finished!" to FallbackTranslation("Invio completato!", "Upload abgeschlossen!", "¡Envío terminado!"),
+        "Some photos could not be sent (network issue)." to FallbackTranslation("Alcune foto non sono state inviate (problema di rete).", "Einige Fotos konnten nicht gesendet werden (Netzwerkproblem).", "Algunas fotos no se pudieron enviar (problema de red)."),
+        "Awesome!" to FallbackTranslation("Perfetto!", "Super!", "¡Genial!"),
+        "Download finished" to FallbackTranslation("Download completato", "Download abgeschlossen", "Descarga terminada"),
+        "The database was successfully downloaded!" to FallbackTranslation("Il database è stato scaricato correttamente!", "Die Datenbank wurde erfolgreich heruntergeladen!", "¡La base se descargó correctamente!"),
+        "Finish" to FallbackTranslation("Fine", "Fertig", "Finalizar"),
+        "Database not downloaded" to FallbackTranslation("Database non scaricato", "Datenbank nicht heruntergeladen", "Base no descargada"),
+        "You haven't downloaded the app's database, so you won't have any items displayed on the screen." to FallbackTranslation("Non hai scaricato il database dell'app, quindi non verrà mostrato alcun elemento sullo schermo.", "Du hast die App-Datenbank nicht heruntergeladen, daher werden keine Einträge angezeigt.", "No has descargado la base de la app, así que no se mostrará ningún elemento en la pantalla."),
+        "Are you sure you want to continue?" to FallbackTranslation("Vuoi davvero continuare?", "Möchtest du wirklich fortfahren?", "¿Seguro que quieres continuar?"),
+        "Continue" to FallbackTranslation("Continua", "Fortfahren", "Continuar"),
+        "Missing database" to FallbackTranslation("Database mancante", "Datenbank fehlt", "Base ausente"),
+        "Invalid database" to FallbackTranslation("Database non valido", "Ungültige Datenbank", "Base no válida"),
+        "Update available" to FallbackTranslation("Aggiornamento disponibile", "Update verfügbar", "Actualización disponible"),
+        "Download the database to use the app." to FallbackTranslation("Scarica il database per usare l'app.", "Lade die Datenbank herunter, um die App zu nutzen.", "Descarga la base para usar la app."),
+        "The local database is incompatible. Download a valid database to continue." to FallbackTranslation("Il database locale non è compatibile. Scarica un database valido per continuare.", "Die lokale Datenbank ist inkompatibel. Lade eine gültige Datenbank herunter, um fortzufahren.", "La base local es incompatible. Descarga una base válida para continuar."),
+        "No type" to FallbackTranslation("Nessun tipo", "Kein Typ", "Sin tipo"),
+        "Semaphore tower" to FallbackTranslation("Torre semaforica", "Semaphor-Turm", "Torre de semáforo"),
+        "Lighthouse" to FallbackTranslation("Faro", "Leuchtturm", "Faro"),
+        "Water tower / reservoir" to FallbackTranslation("Torre dell'acqua / serbatoio", "Wasserturm / Reservoir", "Torre de agua / depósito"),
+        "Building" to FallbackTranslation("Edificio", "Gebäude", "Edificio"),
+        "Technical room / equipment shelter" to FallbackTranslation("Locale tecnico / shelter", "Technikraum / Geräteschutzraum", "Sala técnica / caseta"),
+        "Mast" to FallbackTranslation("Palo", "Mast", "Mástil"),
+        "Inside gallery" to FallbackTranslation("Interno galleria", "Innenbereich einer Galerie", "Interior de galería"),
+        "Underground interior" to FallbackTranslation("Interno sotterraneo", "Unterirdischer Innenbereich", "Interior subterráneo"),
+        "Concrete mast" to FallbackTranslation("Palo in cemento", "Betonmast", "Mástil de hormigón"),
+        "Metal mast" to FallbackTranslation("Palo metallico", "Metallmast", "Mástil metálico"),
+        "Tower / pylon" to FallbackTranslation("Torre / traliccio", "Turm / Mast", "Torre / pilón"),
+        "Historic monument" to FallbackTranslation("Monumento storico", "Historisches Denkmal", "Monumento histórico"),
+        "Religious monument" to FallbackTranslation("Monumento religioso", "Religiöses Denkmal", "Monumento religioso"),
+        "Self-supporting pylon" to FallbackTranslation("Traliccio autoportante", "Selbsttragender Mast", "Pilón autoportante"),
+        "Free-standing pylon" to FallbackTranslation("Traliccio autostabile", "Freistehender Mast", "Pilón autosoportado"),
+        "Guyed tower" to FallbackTranslation("Torre strallata", "Abgespannter Mast", "Torre arriostrada"),
+        "Lattice tower" to FallbackTranslation("Torre a traliccio", "Gittermast", "Torre de celosía"),
+        "Tubular tower" to FallbackTranslation("Torre tubolare", "Rohrmast", "Torre tubular"),
+        "Engineering structure (bridge, viaduct)" to FallbackTranslation("Opera d'arte (ponte, viadotto)", "Ingenieurbauwerk (Brücke, Viadukt)", "Estructura de ingeniería (puente, viaducto)"),
+        "Microwave tower" to FallbackTranslation("Torre hertziana", "Richtfunkturm", "Torre de microondas"),
+        "Concrete slab" to FallbackTranslation("Soletta in cemento", "Betonplatte", "Losa de hormigón"),
+        "Unspecified support" to FallbackTranslation("Supporto non specificato", "Nicht beschriebener Träger", "Soporte no especificado"),
+        "Column / shaft" to FallbackTranslation("Colonna / fusto", "Säule / Schaft", "Columna / fuste"),
+        "Control tower" to FallbackTranslation("Torre di controllo", "Kontrollturm", "Torre de control"),
+        "Ground counterweight" to FallbackTranslation("Contrappeso a terra", "Bodengegengewicht", "Contrapeso en el suelo"),
+        "Shelter counterweight" to FallbackTranslation("Contrappeso su shelter", "Shelter-Gegengewicht", "Contrapeso sobre caseta"),
+        "Defense support" to FallbackTranslation("Supporto Difesa", "Verteidigungsträger", "Soporte de defensa"),
+        "Tree mast / camouflaged tower" to FallbackTranslation("Palo ad albero / torre mimetizzata", "Baummast / getarnter Turm", "Mástil árbol / torre camuflada"),
+        "Signage structure (road gantry, road panel)" to FallbackTranslation("Struttura di segnaletica (portale o pannello stradale)", "Signalbauwerk (Straßenportal, Schild)", "Estructura de señalización (pórtico o panel vial)"),
+        "Beacon or buoy" to FallbackTranslation("Balise o boa", "Bake oder Boje", "Baliza o boya"),
+        "Wind turbine" to FallbackTranslation("Pala eolica", "Windkraftanlage", "Aerogenerador"),
+        "Urban furniture / street structure" to FallbackTranslation("Arredo urbano / struttura stradale", "Stadtmobiliar / Straßenstruktur", "Mobiliario urbano / estructura vial"),
+        "Outage warning" to FallbackTranslation("Avviso di guasto", "Störungswarnung", "Aviso de avería"),
+        "Unknown reason" to FallbackTranslation("Motivo sconosciuto", "Unbekannter Grund", "Motivo desconocido"),
+        "Technical intervention" to FallbackTranslation("Intervento tecnico", "Technischer Einsatz", "Intervención técnica"),
+        "Voice" to FallbackTranslation("Voce", "Sprache", "Voz"),
+        "Degraded" to FallbackTranslation("Degradato", "Beeinträchtigt", "Degradado"),
+        "Site Status" to FallbackTranslation("Stato del sito", "Standortstatus", "Estado del sitio"),
+        "Functional" to FallbackTranslation("Funzionante", "Funktionsfähig", "Funcional"),
+        "Out of service" to FallbackTranslation("Fuori servizio", "Außer Betrieb", "Fuera de servicio"),
+        "Planned" to FallbackTranslation("Pianificato", "Geplant", "Planificado"),
+        "Show status" to FallbackTranslation("Mostra stato", "Status anzeigen", "Mostrar estado"),
+        "Share status" to FallbackTranslation("Condividi stato", "Status teilen", "Compartir estado"),
+        "Last updated at" to FallbackTranslation("Ultimo aggiornamento alle", "Zuletzt aktualisiert um", "Última actualización a las"),
+        "Ongoing incident" to FallbackTranslation("Incidente in corso", "Laufender Vorfall", "Incidencia en curso"),
+        "Maintenance work" to FallbackTranslation("Lavori di manutenzione", "Wartungsarbeiten", "Trabajos de mantenimiento"),
+        "Versions" to FallbackTranslation("Versioni", "Versionen", "Versiones"),
+        "App\nversion" to FallbackTranslation("Versione\napp", "App-\nVersion", "Versión\nde la app"),
+        "Database\nversion" to FallbackTranslation("Versione\ndatabase", "Datenbank-\nversion", "Versión\nde la base"),
+        "Weekly\ndata" to FallbackTranslation("Dati\nsettimanali", "Wochen-\ndaten", "Datos\nsemanales"),
+        "Monthly\ndata" to FallbackTranslation("Dati\nmensili", "Monats-\ndaten", "Datos\nmensuales"),
+        "HS sites\ndata" to FallbackTranslation("Dati siti\nHS", "Daten HS-\nStandorte", "Datos de\nsitios HS"),
+        "at" to FallbackTranslation("alle", "um", "a las"),
+        "Show best Speedtest" to FallbackTranslation("Mostra il miglior Speedtest", "Besten Speedtest anzeigen", "Mostrar mejor Speedtest"),
+        "No speedtest recorded for this site." to FallbackTranslation("Nessuno speedtest registrato per questo sito.", "Kein Speedtest für diesen Standort gespeichert.", "No hay ningún speedtest registrado para este sitio."),
+
+        // Centre d'aide : sommaire, rubriques, descriptions et glossaire.
+        "The recommended path to set up GeoTower and quickly find an antenna." to FallbackTranslation("Il percorso consigliato per configurare GeoTower e trovare rapidamente un'antenna.", "Der empfohlene Ablauf, um GeoTower einzurichten und schnell eine Antenne zu finden.", "El recorrido recomendado para configurar GeoTower y encontrar rápidamente una antena."),
+        "Explains the main buttons, database banner and Help button." to FallbackTranslation("Spiega i pulsanti principali, il banner del database e il pulsante Aiuto.", "Erklärt die Hauptschaltflächen, das Datenbank-Banner und die Hilfe-Schaltfläche.", "Explica los botones principales, el banner de la base de datos y el botón Ayuda."),
+        "Search by city, address, postal code, support, ANFR, coordinates, type and technology." to FallbackTranslation("Ricerca per città, indirizzo, codice postale, supporto, ANFR, coordinate, tipo e tecnologia.", "Suche nach Stadt, Adresse, Postleitzahl, Träger, ANFR, Koordinaten, Typ und Technologie.", "Búsqueda por ciudad, dirección, código postal, soporte, ANFR, coordenadas, tipo y tecnología."),
+        "Markers, search, filters, GPS position, layers and map tools." to FallbackTranslation("Marcatori, ricerca, filtri, posizione GPS, livelli e strumenti mappa.", "Marker, Suche, Filter, GPS-Position, Ebenen und Kartenwerkzeuge.", "Marcadores, búsqueda, filtros, posición GPS, capas y herramientas de mapa."),
+        "Orientation toward antennas and understanding bearings around your position." to FallbackTranslation("Orientamento verso le antenne e comprensione delle direzioni intorno alla tua posizione.", "Ausrichtung zu Antennen und Verständnis der Richtungen rund um deine Position.", "Orientación hacia antenas y comprensión de los rumbos alrededor de tu posición."),
+        "Everything about the tower, roof, operators and linked sites." to FallbackTranslation("Tutto su traliccio, tetto, operatori e siti collegati.", "Alles über Mast, Dach, Betreiber und verknüpfte Standorte.", "Todo sobre la torre, el tejado, los operadores y los sitios vinculados."),
+        "Frequencies, azimuths, height, status, photos, links, sharing and advanced tools." to FallbackTranslation("Frequenze, azimut, altezza, stato, foto, link, condivisione e strumenti avanzati.", "Frequenzen, Azimute, Höhe, Status, Fotos, Links, Teilen und erweiterte Werkzeuge.", "Frecuencias, azimuts, altura, estado, fotos, enlaces, compartir y herramientas avanzadas."),
+        "Terrain, line of sight, Fresnel zone, recalculation and network limits." to FallbackTranslation("Rilievo, linea di vista, zona di Fresnel, ricalcolo e limiti di rete.", "Gelände, Sichtlinie, Fresnel-Zone, Neuberechnung und Netzgrenzen.", "Relieve, línea de vista, zona de Fresnel, recálculo y límites de red."),
+        "Conservative/ideal/custom modes, bands, modulations, MIMO and optimal distance." to FallbackTranslation("Modalità prudente/ideale/personalizzata, bande, modulazioni, MIMO e distanza ottimale.", "Vorsichtig/ideal/benutzerdefiniert, Bänder, Modulationen, MIMO und optimale Entfernung.", "Modos prudente/ideal/personalizado, bandas, modulaciones, MIMO y distancia óptima."),
+        "Carousel, full screen, SignalQuest upload, descriptions and target operator." to FallbackTranslation("Carosello, schermo intero, invio SignalQuest, descrizioni e operatore target.", "Karussell, Vollbild, SignalQuest-Upload, Beschreibungen und Zielbetreiber.", "Carrusel, pantalla completa, envío SignalQuest, descripciones y operador objetivo."),
+        "Image options, support, frequencies, dates, speedtest, throughput and elevation profile." to FallbackTranslation("Opzioni immagine, supporto, frequenze, date, speedtest, velocità e profilo altimetrico.", "Bildoptionen, Träger, Frequenzen, Daten, Speedtest, Durchsatz und Höhenprofil.", "Opciones de imagen, soporte, frecuencias, fechas, speedtest, velocidad y perfil altimétrico."),
+        "Appearance, One UI, units, split screen, customization, database, offline maps and notifications." to FallbackTranslation("Aspetto, One UI, unità, schermo diviso, personalizzazione, database, mappe offline e notifiche.", "Darstellung, One UI, Einheiten, geteilte Ansicht, Anpassung, Datenbank, Offline-Karten und Benachrichtigungen.", "Apariencia, One UI, unidades, pantalla dividida, personalización, base de datos, mapas sin conexión y notificaciones."),
+        "Downloads, progress notifications, updates and local storage." to FallbackTranslation("Download, notifiche di avanzamento, aggiornamenti e archiviazione locale.", "Downloads, Fortschrittsbenachrichtigungen, Updates und lokaler Speicher.", "Descargas, notificaciones de progreso, actualizaciones y almacenamiento local."),
+        "Version, data sources, development information and useful links." to FallbackTranslation("Versione, fonti dati, informazioni di sviluppo e link utili.", "Version, Datenquellen, Entwicklungsinformationen und nützliche Links.", "Versión, fuentes de datos, información de desarrollo y enlaces útiles."),
+        "Meaning of common icons and solutions to frequent issues." to FallbackTranslation("Significato delle icone comuni e soluzioni ai problemi frequenti.", "Bedeutung häufiger Symbole und Lösungen für typische Probleme.", "Significado de iconos comunes y soluciones a problemas frecuentes."),
+        "Prepare the app" to FallbackTranslation("Prepara l'app", "App vorbereiten", "Preparar la app"),
+        "Search for an antenna" to FallbackTranslation("Cercare un'antenna", "Nach einer Antenne suchen", "Buscar una antena"),
+        "Understand detail pages" to FallbackTranslation("Capire le schede", "Detailseiten verstehen", "Entender las fichas"),
+        "Navigation buttons" to FallbackTranslation("Pulsanti di navigazione", "Navigationsschaltflächen", "Botones de navegación"),
+        "Status banners" to FallbackTranslation("Banner di stato", "Statusbanner", "Banners de estado"),
+        "Useful codes" to FallbackTranslation("Codici utili", "Nützliche Codes", "Códigos útiles"),
+        "Site list" to FallbackTranslation("Elenco siti", "Standortliste", "Lista de sitios"),
+        "Map controls" to FallbackTranslation("Controlli mappa", "Kartensteuerung", "Controles del mapa"),
+        "Search and filters" to FallbackTranslation("Ricerca e filtri", "Suche und Filter", "Búsqueda y filtros"),
+        "Offline maps" to FallbackTranslation("Mappe offline", "Offline-Karten", "Mapas sin conexión"),
+        "How it works" to FallbackTranslation("Funzionamento", "Funktionsweise", "Funcionamiento"),
+        "Buttons" to FallbackTranslation("Pulsanti", "Schaltflächen", "Botones"),
+        "Understand the support" to FallbackTranslation("Capire il supporto", "Den Träger verstehen", "Entender el soporte"),
+        "Available actions" to FallbackTranslation("Azioni disponibili", "Verfügbare Aktionen", "Acciones disponibles"),
+        "Displayed information" to FallbackTranslation("Informazioni visualizzate", "Angezeigte Informationen", "Información mostrada"),
+        "Buttons and tools" to FallbackTranslation("Pulsanti e strumenti", "Schaltflächen und Werkzeuge", "Botones y herramientas"),
+        "Usage" to FallbackTranslation("Utilizzo", "Nutzung", "Uso"),
+        "Calculation assumptions" to FallbackTranslation("Ipotesi di calcolo", "Berechnungsannahmen", "Supuestos de cálculo"),
+        "Controls" to FallbackTranslation("Comandi", "Steuerung", "Controles"),
+        "View photos" to FallbackTranslation("Vedere le foto", "Fotos ansehen", "Ver fotos"),
+        "Create a share image" to FallbackTranslation("Creare un'immagine di condivisione", "Ein Teilen-Bild erstellen", "Crear una imagen para compartir"),
+        "Understand the options" to FallbackTranslation("Capire le opzioni", "Optionen verstehen", "Entender las opciones"),
+        "General preferences" to FallbackTranslation("Preferenze generali", "Allgemeine Einstellungen", "Preferencias generales"),
+        "Display and split screen" to FallbackTranslation("Visualizzazione e schermo diviso", "Anzeige und geteilte Ansicht", "Visualización y pantalla dividida"),
+        "Page customization" to FallbackTranslation("Personalizzazione delle pagine", "Seitenanpassung", "Personalización de páginas"),
+        "Sections" to FallbackTranslation("Sezioni", "Bereiche", "Secciones"),
+        "Navigation loops" to FallbackTranslation("Cicli di navigazione", "Navigationsschleifen", "Bucles de navegación"),
+        "Common icons" to FallbackTranslation("Icone comuni", "Häufige Symbole", "Iconos comunes"),
+        "Frequent issues" to FallbackTranslation("Problemi frequenti", "Häufige Probleme", "Problemas frecuentes"),
+        "On first launch, make sure the database is downloaded, location is allowed and your main operator is set in settings. Without the local database, antenna screens cannot show ANFR sites." to FallbackTranslation("Al primo avvio, verifica che il database sia scaricato, che la posizione sia autorizzata e che il tuo operatore principale sia impostato. Senza database locale, le schermate delle antenne non possono mostrare i siti ANFR.", "Prüfe beim ersten Start, ob die Datenbank heruntergeladen ist, Standortzugriff erlaubt ist und dein Hauptbetreiber in den Einstellungen gesetzt wurde. Ohne lokale Datenbank können Antennenseiten keine ANFR-Standorte anzeigen.", "En el primer inicio, comprueba que la base de datos esté descargada, que la ubicación esté permitida y que tu operador principal esté configurado. Sin base local, las pantallas de antenas no pueden mostrar sitios ANFR."),
+        "From Home, open Nearby antennas for a list around you or Antenna map to explore visually. Both paths then lead to support details and site details." to FallbackTranslation("Dalla Home, apri Antenne vicine per una lista intorno a te o Mappa antenne per esplorare visivamente. Entrambi i percorsi portano poi ai dettagli del supporto e del sito.", "Öffne auf der Startseite Antennen in der Nähe für eine Liste um dich herum oder Antennenkarte für die visuelle Erkundung. Beide Wege führen anschließend zu Support- und Standortdetails.", "Desde Inicio, abre Antenas cercanas para ver una lista a tu alrededor o Mapa de antenas para explorar visualmente. Ambos caminos llevan luego a los detalles de soporte y de sitio."),
+        "A support is the tower, roof or building. A site is an operator installation on that support. Technical details, frequencies, azimuths and advanced tools are mostly on the site detail page." to FallbackTranslation("Un supporto è il traliccio, il tetto o l'edificio. Un sito è l'installazione di un operatore su quel supporto. Dettagli tecnici, frequenze, azimut e strumenti avanzati sono soprattutto nella scheda del sito.", "Ein Träger ist der Mast, das Dach oder Gebäude. Ein Standort ist die Installation eines Betreibers auf diesem Träger. Technische Details, Frequenzen, Azimute und erweiterte Werkzeuge findest du meist auf der Standortdetailseite.", "Un soporte es la torre, el tejado o el edificio. Un sitio es la instalación de un operador sobre ese soporte. Los detalles técnicos, frecuencias, azimuts y herramientas avanzadas están sobre todo en la ficha del sitio."),
+        "Home groups the app's main shortcuts. Some buttons can be hidden or moved from Settings > Page customization." to FallbackTranslation("La Home raggruppa le scorciatoie principali dell'app. Alcuni pulsanti possono essere nascosti o spostati da Impostazioni > Personalizzazione pagine.", "Die Startseite bündelt die wichtigsten App-Verknüpfungen. Einige Schaltflächen können unter Einstellungen > Seitenanpassung ausgeblendet oder verschoben werden.", "Inicio agrupa los accesos principales de la app. Algunos botones se pueden ocultar o mover desde Ajustes > Personalización de páginas."),
+        "If the database is missing, outdated or downloading, a banner appears at the top. If the network is unavailable, an offline banner warns that some features cannot update." to FallbackTranslation("Se il database manca, è obsoleto o è in download, appare un banner in alto. Se la rete non è disponibile, un banner offline avvisa che alcune funzioni non possono aggiornarsi.", "Wenn die Datenbank fehlt, veraltet ist oder heruntergeladen wird, erscheint oben ein Banner. Wenn kein Netz verfügbar ist, warnt ein Offline-Banner, dass manche Funktionen nicht aktualisiert werden können.", "Si falta la base, está obsoleta o se está descargando, aparece un banner arriba. Si no hay red, un banner sin conexión avisa de que algunas funciones no podrán actualizarse."),
+        "Search accepts free text and codes. For a city, GeoTower can use the same logic as the map: find the municipality area, then filter sites across the full ANFR address." to FallbackTranslation("La ricerca accetta testo libero e codici. Per una città, GeoTower può usare la stessa logica della mappa: trova l'area del comune, poi filtra i siti sull'intero indirizzo ANFR.", "Die Suche akzeptiert freien Text und Codes. Für eine Stadt kann GeoTower dieselbe Logik wie die Karte verwenden: Gemeindegebiet finden und dann Standorte über die vollständige ANFR-Adresse filtern.", "La búsqueda acepta texto libre y códigos. Para una ciudad, GeoTower puede usar la misma lógica que el mapa: encuentra el área municipal y filtra los sitios por toda la dirección ANFR."),
+        "Use prefixes when a search may be ambiguous: ville:Paris, cp:75015, gps:48.8566,2.3522, support:123456, anfr:987654, tech:5G, type:pylon, op:Orange. Accents, uppercase letters and hyphens are normalized to make city searches easier." to FallbackTranslation("Usa prefissi quando una ricerca può essere ambigua: ville:Paris, cp:75015, gps:48.8566,2.3522, support:123456, anfr:987654, tech:5G, type:pylon, op:Orange. Accenti, maiuscole e trattini sono normalizzati per facilitare le ricerche dei comuni.", "Verwende Präfixe, wenn eine Suche mehrdeutig sein kann: ville:Paris, cp:75015, gps:48.8566,2.3522, support:123456, anfr:987654, tech:5G, type:pylon, op:Orange. Akzente, Großbuchstaben und Bindestriche werden normalisiert, um Stadtsuchen zu erleichtern.", "Usa prefijos cuando una búsqueda pueda ser ambigua: ville:Paris, cp:75015, gps:48.8566,2.3522, support:123456, anfr:987654, tech:5G, type:pylon, op:Orange. Acentos, mayúsculas y guiones se normalizan para facilitar búsquedas de municipios."),
+        "Each result card shows the support, address, distance and available operators. Tapping opens the detail page. In split screen, the list stays on the left and details open on the right." to FallbackTranslation("Ogni scheda risultato mostra supporto, indirizzo, distanza e operatori disponibili. Un tocco apre il dettaglio. In schermo diviso, la lista resta a sinistra e i dettagli si aprono a destra.", "Jede Ergebnis-Karte zeigt Träger, Adresse, Entfernung und verfügbare Betreiber. Tippen öffnet die Detailseite. In geteilter Ansicht bleibt die Liste links und Details öffnen rechts.", "Cada tarjeta de resultado muestra soporte, dirección, distancia y operadores disponibles. Al tocar se abre el detalle. En pantalla dividida, la lista queda a la izquierda y el detalle se abre a la derecha."),
+        "The map lets you browse supports and sites. Tapping a marker opens its information. The GPS button recenters on your position when location is available." to FallbackTranslation("La mappa permette di esplorare supporti e siti. Toccando un marcatore si aprono le informazioni. Il pulsante GPS ricentra sulla tua posizione quando disponibile.", "Die Karte ermöglicht das Durchsuchen von Trägern und Standorten. Tippen auf einen Marker öffnet seine Informationen. Die GPS-Schaltfläche zentriert auf deine Position, wenn Standort verfügbar ist.", "El mapa permite explorar soportes y sitios. Al tocar un marcador se abre su información. El botón GPS recentra en tu posición cuando la ubicación está disponible."),
+        "The toolbox lets you search a city or address, then refine display by operator, technology, frequency or layer. Filters avoid overloading the map when an area contains many antennas." to FallbackTranslation("La toolbox permette di cercare una città o un indirizzo, poi affinare la visualizzazione per operatore, tecnologia, frequenza o livello. I filtri evitano di sovraccaricare la mappa quando un'area contiene molte antenne.", "Die Werkzeugleiste ermöglicht Stadt- oder Adresssuche und anschließend Filter nach Betreiber, Technologie, Frequenz oder Ebene. Filter verhindern eine überladene Karte, wenn ein Bereich viele Antennen enthält.", "La caja de herramientas permite buscar una ciudad o dirección y luego refinar por operador, tecnología, frecuencia o capa. Los filtros evitan sobrecargar el mapa cuando una zona contiene muchas antenas."),
+        "If an offline map is downloaded and selected, GeoTower can show the local layer without downloading standard tiles. Files and areas are managed in settings." to FallbackTranslation("Se una mappa offline è scaricata e selezionata, GeoTower può mostrare il livello locale senza scaricare tile standard. File e aree si gestiscono nelle impostazioni.", "Wenn eine Offline-Karte heruntergeladen und ausgewählt ist, kann GeoTower die lokale Ebene ohne Standard-Kacheln anzeigen. Dateien und Bereiche werden in den Einstellungen verwaltet.", "Si se descarga y selecciona un mapa sin conexión, GeoTower puede mostrar la capa local sin descargar teselas estándar. Archivos y zonas se gestionan en ajustes."),
+        "The compass uses your position, phone sensors and antenna data to help you understand where nearby sites are located." to FallbackTranslation("La bussola usa la tua posizione, i sensori del telefono e i dati antenna per aiutarti a capire dove si trovano i siti vicini.", "Der Kompass nutzt deine Position, Telefonsensoren und Antennendaten, um dir die Richtung naher Standorte zu zeigen.", "La brújula usa tu posición, los sensores del teléfono y datos de antenas para ayudarte a entender dónde están los sitios cercanos."),
+        "The back button closes the screen. Internal actions can start antenna search, stop live tracking or open details depending on the displayed mode." to FallbackTranslation("Il pulsante indietro chiude la schermata. Le azioni interne possono avviare la ricerca antenna, fermare il tracciamento live o aprire dettagli in base alla modalità mostrata.", "Die Zurück-Schaltfläche schließt die Seite. Interne Aktionen können je nach Modus Antennensuche starten, Live-Tracking stoppen oder Details öffnen.", "El botón volver cierra la pantalla. Las acciones internas pueden iniciar la búsqueda de antena, detener el seguimiento en directo o abrir detalles según el modo mostrado."),
+        "The support is the physical structure: tower, building, water tower, roof or another type. Several operators and sites can be linked to the same support." to FallbackTranslation("Il supporto è la struttura fisica: traliccio, edificio, torre dell'acqua, tetto o altro tipo. Più operatori e siti possono essere collegati allo stesso supporto.", "Der Träger ist die physische Struktur: Mast, Gebäude, Wasserturm, Dach oder ein anderer Typ. Mehrere Betreiber und Standorte können mit demselben Träger verknüpft sein.", "El soporte es la estructura física: torre, edificio, depósito de agua, tejado u otro tipo. Varios operadores y sitios pueden estar vinculados al mismo soporte."),
+        "Support detail buttons open the location on the map, start navigation, share information or view community photos." to FallbackTranslation("I pulsanti del dettaglio supporto aprono la posizione sulla mappa, avviano la navigazione, condividono informazioni o mostrano foto della community.", "Schaltflächen in den Supportdetails öffnen den Ort auf der Karte, starten Navigation, teilen Informationen oder zeigen Community-Fotos.", "Los botones del detalle de soporte abren la ubicación en el mapa, inician navegación, comparten información o muestran fotos comunitarias."),
+        "The site page describes an operator installation: operator banner, support, height, azimuths, frequencies, technologies, activation status and external links." to FallbackTranslation("La pagina sito descrive un'installazione operatore: banner operatore, supporto, altezza, azimut, frequenze, tecnologie, stato di attivazione e link esterni.", "Die Standortseite beschreibt eine Betreiberinstallation: Betreiberbanner, Träger, Höhe, Azimute, Frequenzen, Technologien, Aktivierungsstatus und externe Links.", "La página del sitio describe una instalación de operador: banner del operador, soporte, altura, azimuts, frecuencias, tecnologías, estado de activación y enlaces externos."),
+        "Action buttons open tools related to the site. Some blocks can be hidden or moved from site page customization." to FallbackTranslation("I pulsanti azione aprono strumenti legati al sito. Alcuni blocchi possono essere nascosti o spostati dalla personalizzazione della pagina sito.", "Aktionsschaltflächen öffnen standortbezogene Werkzeuge. Einige Blöcke können über die Standortseiten-Anpassung ausgeblendet oder verschoben werden.", "Los botones de acción abren herramientas relacionadas con el sitio. Algunos bloques se pueden ocultar o mover desde la personalización de la página del sitio."),
+        "The elevation profile compares your current position to the selected site. It helps estimate whether terrain may block the signal. The calculation depends on GPS position and online elevation data." to FallbackTranslation("Il profilo altimetrico confronta la tua posizione attuale con il sito selezionato. Aiuta a stimare se il rilievo può ostacolare il segnale. Il calcolo dipende da posizione GPS e dati altimetrici online.", "Das Höhenprofil vergleicht deine aktuelle Position mit dem ausgewählten Standort. Es hilft einzuschätzen, ob Gelände das Signal blockieren kann. Die Berechnung hängt von GPS-Position und Online-Höhendaten ab.", "El perfil altimétrico compara tu posición actual con el sitio seleccionado. Ayuda a estimar si el relieve puede bloquear la señal. El cálculo depende de la posición GPS y de datos de altitud en línea."),
+        "The calculation gives theoretical throughput. Conservative mode lowers expectations, ideal mode shows a favorable scenario, and custom mode lets you adjust bands, technologies and modulations. Upload accounts for the fact that a phone transmits with far less power than an antenna." to FallbackTranslation("Il calcolo fornisce una velocità teorica. La modalità prudente riduce le aspettative, quella ideale mostra uno scenario favorevole e quella personalizzata permette di regolare bande, tecnologie e modulazioni. L'upload considera che un telefono trasmette con molta meno potenza di un'antenna.", "Die Berechnung liefert theoretischen Durchsatz. Der vorsichtige Modus senkt die Erwartungen, der ideale Modus zeigt ein günstiges Szenario und der benutzerdefinierte Modus erlaubt Anpassungen von Bändern, Technologien und Modulationen. Der Upload berücksichtigt, dass ein Telefon viel schwächer sendet als eine Antenne.", "El cálculo da una velocidad teórica. El modo prudente reduce expectativas, el modo ideal muestra un escenario favorable y el modo personalizado permite ajustar bandas, tecnologías y modulaciones. La subida considera que un teléfono transmite con mucha menos potencia que una antena."),
+        "The 4G, 5G and project buttons choose which technologies are included. Band checkboxes select frequencies. Modulation sliders choose QPSK, 16 QAM, 64 QAM or 256 QAM depending on the expected radio level." to FallbackTranslation("I pulsanti 4G, 5G e progetto scelgono le tecnologie incluse. Le caselle delle bande selezionano le frequenze. Gli slider di modulazione scelgono QPSK, 16 QAM, 64 QAM o 256 QAM in base al livello radio previsto.", "Die 4G-, 5G- und Projekt-Schaltflächen wählen die einbezogenen Technologien. Band-Checkboxen wählen Frequenzen. Modulationsregler wählen je nach erwartetem Funkniveau QPSK, 16 QAM, 64 QAM oder 256 QAM.", "Los botones 4G, 5G y proyecto eligen las tecnologías incluidas. Las casillas de bandas seleccionan frecuencias. Los controles de modulación eligen QPSK, 16 QAM, 64 QAM o 256 QAM según el nivel radio esperado."),
+        "The carousel shows available community photos. In full screen, controls let you close, switch photos and inspect the image more comfortably." to FallbackTranslation("Il carosello mostra le foto della community disponibili. A schermo intero, i controlli permettono di chiudere, cambiare foto e ispezionare l'immagine più comodamente.", "Das Karussell zeigt verfügbare Community-Fotos. Im Vollbild kannst du mit den Bedienelementen schließen, Fotos wechseln und das Bild bequemer betrachten.", "El carrusel muestra las fotos comunitarias disponibles. En pantalla completa, los controles permiten cerrar, cambiar de foto e inspeccionar la imagen con más comodidad."),
+        "SignalQuest upload lets you attach images to a support or site. Select files, check the target operator, add a description if needed, then start the upload. Upload requires a network connection." to FallbackTranslation("L'invio SignalQuest permette di allegare immagini a un supporto o sito. Seleziona file, controlla l'operatore target, aggiungi una descrizione se serve, poi avvia l'invio. L'upload richiede connessione di rete.", "Mit dem SignalQuest-Upload kannst du Bilder an einen Träger oder Standort anhängen. Wähle Dateien, prüfe den Zielbetreiber, füge bei Bedarf eine Beschreibung hinzu und starte den Upload. Der Upload benötigt eine Netzwerkverbindung.", "El envío SignalQuest permite adjuntar imágenes a un soporte o sitio. Selecciona archivos, comprueba el operador objetivo, añade una descripción si hace falta y empieza el envío. Requiere conexión de red."),
+        "From a detail page, the Share button opens options. You can include support details, frequencies, activation dates, best speedtest, throughput calculator and sometimes the elevation profile." to FallbackTranslation("Da una scheda dettaglio, il pulsante Condividi apre le opzioni. Puoi includere dettagli del supporto, frequenze, date di attivazione, miglior speedtest, calcolatore di velocità e talvolta profilo altimetrico.", "Auf einer Detailseite öffnet Teilen die Optionen. Du kannst Supportdetails, Frequenzen, Aktivierungsdaten, besten Speedtest, Durchsatzrechner und manchmal das Höhenprofil einbeziehen.", "Desde una ficha, el botón Compartir abre opciones. Puedes incluir detalles del soporte, frecuencias, fechas de activación, mejor speedtest, calculadora de velocidad y a veces el perfil altimétrico."),
+        "Each checkbox adds or removes a block from the final image. The image respects the units chosen in settings, such as distances in kilometers or miles." to FallbackTranslation("Ogni casella aggiunge o rimuove un blocco dall'immagine finale. L'immagine rispetta le unità scelte nelle impostazioni, come distanze in chilometri o miglia.", "Jede Checkbox fügt einen Block zum endgültigen Bild hinzu oder entfernt ihn. Das Bild nutzt die in den Einstellungen gewählten Einheiten, etwa Kilometer oder Meilen.", "Cada casilla añade o quita un bloque de la imagen final. La imagen respeta las unidades elegidas en ajustes, como distancias en kilómetros o millas."),
+        "Settings group theme, OLED mode, One UI design, language, default operator, metric or imperial units and settings navigation style." to FallbackTranslation("Le impostazioni raggruppano tema, modalità OLED, design One UI, lingua, operatore predefinito, unità metriche o imperiali e stile di navigazione.", "Einstellungen bündeln Design, OLED-Modus, One-UI-Design, Sprache, Standardbetreiber, metrische oder imperiale Einheiten und Navigationsstil.", "Los ajustes agrupan tema, modo OLED, diseño One UI, idioma, operador predeterminado, unidades métricas o imperiales y estilo de navegación."),
+        "Page mode makes settings more compartmentalized. Split screen shows compatible screens in two panels: context on the left, detail or tool on the right." to FallbackTranslation("La modalità pagina rende le impostazioni più compartimentate. Lo schermo diviso mostra le schermate compatibili in due pannelli: contesto a sinistra, dettaglio o strumento a destra.", "Der Seitenmodus unterteilt Einstellungen stärker. Die geteilte Ansicht zeigt kompatible Seiten in zwei Bereichen: Kontext links, Detail oder Werkzeug rechts.", "El modo por páginas compartimenta más los ajustes. La pantalla dividida muestra pantallas compatibles en dos paneles: contexto a la izquierda, detalle o herramienta a la derecha."),
+        "This menu is used to show, hide or move page blocks. For Home, you can also enable the Help button and choose its corner." to FallbackTranslation("Questo menu serve a mostrare, nascondere o spostare i blocchi delle pagine. Per la Home puoi anche attivare il pulsante Aiuto e scegliere il suo angolo.", "Dieses Menü zeigt, versteckt oder verschiebt Seitenblöcke. Für die Startseite kannst du auch die Hilfe-Schaltfläche aktivieren und ihre Ecke wählen.", "Este menú sirve para mostrar, ocultar o mover bloques de páginas. Para Inicio, también puedes activar el botón Ayuda y elegir su esquina."),
+        "The database contains ANFR information used by detail pages, the map and searches. Download can be started from Home or Settings. Progress notifications take you to the corresponding section." to FallbackTranslation("Il database contiene informazioni ANFR usate da schede dettaglio, mappa e ricerche. Il download può partire da Home o Impostazioni. Le notifiche di avanzamento portano alla sezione corrispondente.", "Die Datenbank enthält ANFR-Informationen für Detailseiten, Karte und Suche. Der Download kann über Startseite oder Einstellungen gestartet werden. Fortschrittsbenachrichtigungen führen zum passenden Bereich.", "La base contiene información ANFR usada por fichas, mapa y búsquedas. La descarga puede iniciarse desde Inicio o Ajustes. Las notificaciones de progreso llevan a la sección correspondiente."),
+        "Offline maps let you display an area without relying on network tiles. Download an area, select the offline layer, then use the map normally inside the available area." to FallbackTranslation("Le mappe offline permettono di visualizzare un'area senza dipendere dai tile di rete. Scarica un'area, seleziona il livello offline e usa normalmente la mappa nell'area disponibile.", "Offline-Karten zeigen einen Bereich ohne Netz-Kacheln. Lade ein Gebiet herunter, wähle die Offline-Ebene und nutze die Karte im verfügbaren Bereich normal.", "Los mapas sin conexión permiten mostrar una zona sin depender de teselas de red. Descarga un área, selecciona la capa sin conexión y usa el mapa normalmente dentro de la zona disponible."),
+        "About shows the GeoTower version, data sources, development information and useful links. The side bar lets you quickly switch sections when the screen is wide enough." to FallbackTranslation("Informazioni mostra versione GeoTower, fonti dati, informazioni di sviluppo e link utili. La barra laterale permette di cambiare sezione rapidamente quando lo schermo è abbastanza largo.", "Über zeigt GeoTower-Version, Datenquellen, Entwicklungsinformationen und nützliche Links. Die Seitenleiste erlaubt schnellen Bereichswechsel, wenn der Bildschirm breit genug ist.", "Acerca de muestra la versión de GeoTower, fuentes de datos, información de desarrollo y enlaces útiles. La barra lateral permite cambiar rápido de sección cuando la pantalla es lo bastante ancha."),
+        "If you come from settings or go back there from About, GeoTower limits unnecessary navigation stacking so you do not need to press Back many times." to FallbackTranslation("Se arrivi dalle impostazioni o ci torni da Informazioni, GeoTower limita gli accumuli inutili di navigazione, così non devi premere Indietro troppe volte.", "Wenn du aus den Einstellungen kommst oder von Über dorthin zurückgehst, begrenzt GeoTower unnötige Navigationsstapel, damit du nicht oft Zurück drücken musst.", "Si vienes de ajustes o vuelves allí desde Acerca de, GeoTower limita apilados de navegación innecesarios para que no tengas que pulsar Atrás muchas veces."),
+        "The same icons appear across several screens. They generally keep the same role." to FallbackTranslation("Le stesse icone compaiono in più schermate e in genere mantengono lo stesso ruolo.", "Dieselben Symbole erscheinen auf mehreren Seiten und behalten meist dieselbe Rolle.", "Los mismos iconos aparecen en varias pantallas y generalmente mantienen el mismo rol."),
+        "If no antenna appears, check the database, filters and search area. If GPS does not respond, check Android permission and wait a few seconds outside or near a window. If the offline map does not appear, make sure the file covers the visible area." to FallbackTranslation("Se non appare alcuna antenna, controlla database, filtri e area di ricerca. Se il GPS non risponde, controlla il permesso Android e attendi qualche secondo all'aperto o vicino a una finestra. Se la mappa offline non appare, verifica che il file copra l'area visibile.", "Wenn keine Antenne erscheint, prüfe Datenbank, Filter und Suchbereich. Wenn GPS nicht reagiert, prüfe die Android-Berechtigung und warte draußen oder am Fenster einige Sekunden. Wenn die Offline-Karte nicht erscheint, stelle sicher, dass die Datei den sichtbaren Bereich abdeckt.", "Si no aparece ninguna antena, comprueba la base, filtros y zona de búsqueda. Si el GPS no responde, revisa el permiso Android y espera unos segundos fuera o cerca de una ventana. Si el mapa sin conexión no aparece, asegúrate de que el archivo cubre la zona visible."),
+        "Zoom + / -" to FallbackTranslation("Zoom + / -", "Zoom + / -", "Zoom + / -"),
+        "Live search" to FallbackTranslation("Ricerca live", "Live-Suche", "Búsqueda en directo"),
+        "Share" to FallbackTranslation("Condividi", "Teilen", "Compartir"),
+        "Operator site" to FallbackTranslation("Sito operatore", "Betreiberstandort", "Sitio del operador"),
+        "Recalculate" to FallbackTranslation("Ricalcola", "Neu berechnen", "Recalcular"),
+        "Optimal distance" to FallbackTranslation("Distanza ottimale", "Optimale Entfernung", "Distancia óptima"),
+        "Back arrow" to FallbackTranslation("Freccia indietro", "Zurück-Pfeil", "Flecha atrás"),
+        "Magnifier" to FallbackTranslation("Lente", "Lupe", "Lupa"),
+        "X" to FallbackTranslation("X", "X", "X"),
+        "Gear" to FallbackTranslation("Ingranaggio", "Zahnrad", "Engranaje"),
+        "Refresh" to FallbackTranslation("Aggiorna", "Aktualisieren", "Actualizar"),
+        "Opens the list of sites around your position or searched area." to FallbackTranslation("Apre la lista dei siti intorno alla tua posizione o all'area cercata.", "Öffnet die Liste der Standorte um deine Position oder den Suchbereich.", "Abre la lista de sitios alrededor de tu posición o zona buscada."),
+        "Opens the interactive map with markers, filters and map tools." to FallbackTranslation("Apre la mappa interattiva con marcatori, filtri e strumenti mappa.", "Öffnet die interaktive Karte mit Markern, Filtern und Kartenwerkzeugen.", "Abre el mapa interactivo con marcadores, filtros y herramientas de mapa."),
+        "Opens the orientation tool to aim toward antennas around you." to FallbackTranslation("Apre lo strumento di orientamento verso le antenne intorno a te.", "Öffnet das Orientierungswerkzeug zum Ausrichten auf Antennen um dich herum.", "Abre la herramienta de orientación para apuntar hacia antenas cercanas."),
+        "Opens preferences, customization, offline maps and database management." to FallbackTranslation("Apre preferenze, personalizzazione, mappe offline e gestione database.", "Öffnet Einstellungen, Anpassung, Offline-Karten und Datenbankverwaltung.", "Abre preferencias, personalización, mapas sin conexión y gestión de base de datos."),
+        "Shows version, data sources and development information." to FallbackTranslation("Mostra versione, fonti dati e informazioni di sviluppo.", "Zeigt Version, Datenquellen und Entwicklungsinformationen.", "Muestra versión, fuentes de datos e información de desarrollo."),
+        "Opens this help center. Its position is configured in Home page customization." to FallbackTranslation("Apre questo centro assistenza. La posizione si configura nella personalizzazione della Home.", "Öffnet diese Hilfe. Ihre Position wird in der Startseiten-Anpassung konfiguriert.", "Abre este centro de ayuda. Su posición se configura en la personalización de Inicio."),
+        "Type a city, address, postal code, support ID, ANFR ID, technology, support type or GPS coordinates." to FallbackTranslation("Digita città, indirizzo, codice postale, ID supporto, ID ANFR, tecnologia, tipo supporto o coordinate GPS.", "Gib Stadt, Adresse, Postleitzahl, Support-ID, ANFR-ID, Technologie, Trägertyp oder GPS-Koordinaten ein.", "Escribe ciudad, dirección, código postal, ID de soporte, ID ANFR, tecnología, tipo de soporte o coordenadas GPS."),
+        "Clears the search and returns to the previous list." to FallbackTranslation("Cancella la ricerca e torna alla lista precedente.", "Löscht die Suche und kehrt zur vorherigen Liste zurück.", "Borra la búsqueda y vuelve a la lista anterior."),
+        "Inserts common searches. They can be hidden from page customization." to FallbackTranslation("Inserisce ricerche comuni. Possono essere nascoste dalla personalizzazione delle pagine.", "Fügt häufige Suchen ein. Sie können in der Seitenanpassung ausgeblendet werden.", "Inserta búsquedas comunes. Se pueden ocultar desde la personalización de páginas."),
+        "Shows the list of available codes and how to use them." to FallbackTranslation("Mostra la lista dei codici disponibili e come usarli.", "Zeigt die Liste verfügbarer Codes und deren Nutzung.", "Muestra la lista de códigos disponibles y cómo usarlos."),
+        "Adds more results to the list." to FallbackTranslation("Aggiunge altri risultati alla lista.", "Fügt der Liste weitere Ergebnisse hinzu.", "Añade más resultados a la lista."),
+        "Increases the search area when no relevant site is found." to FallbackTranslation("Aumenta l'area di ricerca quando non viene trovato un sito pertinente.", "Vergrößert den Suchbereich, wenn kein relevanter Standort gefunden wird.", "Aumenta la zona de búsqueda cuando no se encuentra un sitio relevante."),
+        "Starts or restarts GPS search and centers the map on your position." to FallbackTranslation("Avvia o riavvia la ricerca GPS e centra la mappa sulla tua posizione.", "Startet oder wiederholt die GPS-Suche und zentriert die Karte auf deine Position.", "Inicia o reinicia la búsqueda GPS y centra el mapa en tu posición."),
+        "Zooms the map in or out." to FallbackTranslation("Avvicina o allontana la mappa.", "Vergrößert oder verkleinert die Karte.", "Acerca o aleja el mapa."),
+        "Shows the current map orientation if enabled." to FallbackTranslation("Mostra l'orientamento attuale della mappa se attivo.", "Zeigt die aktuelle Kartenausrichtung, wenn aktiviert.", "Muestra la orientación actual del mapa si está activada."),
+        "Shows an estimate of visible distances." to FallbackTranslation("Mostra una stima delle distanze visibili.", "Zeigt eine Schätzung sichtbarer Entfernungen.", "Muestra una estimación de distancias visibles."),
+        "Updates the target antenna or site based on your position." to FallbackTranslation("Aggiorna l'antenna o il sito target in base alla tua posizione.", "Aktualisiert die Zielantenne oder den Zielstandort anhand deiner Position.", "Actualiza la antena o sitio objetivo según tu posición."),
+        "Stops active tracking and returns to normal mode." to FallbackTranslation("Ferma il tracciamento attivo e torna alla modalità normale.", "Stoppt aktives Tracking und kehrt zum normalen Modus zurück.", "Detiene el seguimiento activo y vuelve al modo normal."),
+        "Centers the GeoTower map on this support." to FallbackTranslation("Centra la mappa GeoTower su questo supporto.", "Zentriert die GeoTower-Karte auf diesen Träger.", "Centra el mapa GeoTower en este soporte."),
+        "Opens the phone navigation app toward the coordinates." to FallbackTranslation("Apre l'app di navigazione del telefono verso le coordinate.", "Öffnet die Navigations-App des Telefons zu den Koordinaten.", "Abre la app de navegación del teléfono hacia las coordenadas."),
+        "Opens sharing and image generation options." to FallbackTranslation("Apre le opzioni di condivisione e generazione immagine.", "Öffnet Optionen zum Teilen und zur Bilderzeugung.", "Abre opciones de compartir y generación de imagen."),
+        "Shows community photos and diagrams if available." to FallbackTranslation("Mostra foto della community e schemi se disponibili.", "Zeigt Community-Fotos und Diagramme, wenn verfügbar.", "Muestra fotos comunitarias y esquemas si están disponibles."),
+        "Opens the detail page for an operator installed on the support." to FallbackTranslation("Apre la pagina dettaglio di un operatore installato sul supporto.", "Öffnet die Detailseite eines auf dem Träger installierten Betreibers.", "Abre la ficha detallada de un operador instalado en el soporte."),
+        "Calculates terrain between your position and the site." to FallbackTranslation("Calcola il rilievo tra la tua posizione e il sito.", "Berechnet das Gelände zwischen deiner Position und dem Standort.", "Calcula el relieve entre tu posición y el sitio."),
+        "Opens the throughput calculator based on frequencies and radio assumptions." to FallbackTranslation("Apre il calcolatore di velocità basato su frequenze e ipotesi radio.", "Öffnet den Durchsatzrechner auf Basis von Frequenzen und Funkannahmen.", "Abre la calculadora de velocidad basada en frecuencias y supuestos radio."),
+        "Opens page block customization when available." to FallbackTranslation("Apre la personalizzazione dei blocchi pagina quando disponibile.", "Öffnet die Anpassung der Seitenblöcke, wenn verfügbar.", "Abre la personalización de bloques de página cuando está disponible."),
+        "Runs the analysis again with current position and data." to FallbackTranslation("Rilancia l'analisi con posizione e dati attuali.", "Führt die Analyse erneut mit aktueller Position und aktuellen Daten aus.", "Ejecuta de nuevo el análisis con la posición y datos actuales."),
+        "Temporarily saves the request to run it when the connection returns." to FallbackTranslation("Salva temporaneamente la richiesta per eseguirla quando torna la connessione.", "Speichert die Anfrage vorübergehend, um sie bei Rückkehr der Verbindung auszuführen.", "Guarda temporalmente la solicitud para ejecutarla cuando vuelva la conexión."),
+        "Unlocks fine settings for modulation, technologies and bands." to FallbackTranslation("Sblocca impostazioni avanzate per modulazione, tecnologie e bande.", "Schaltet Feineinstellungen für Modulation, Technologien und Bänder frei.", "Desbloquea ajustes finos de modulación, tecnologías y bandas."),
+        "Shows the area where the user is most likely to be inside the antenna emission cone." to FallbackTranslation("Mostra l'area in cui è più probabile trovarsi nel cono di emissione dell'antenna.", "Zeigt den Bereich, in dem sich der Nutzer am wahrscheinlichsten im Sendekegel der Antenne befindet.", "Muestra la zona donde el usuario tiene más probabilidad de estar dentro del cono de emisión de la antena."),
+        "Visualizes the optimal distance circle and points where estimated throughput is strongest." to FallbackTranslation("Visualizza il cerchio della distanza ottimale e i punti in cui la velocità stimata è più forte.", "Visualisiert den Kreis der optimalen Entfernung und Punkte mit dem höchsten geschätzten Durchsatz.", "Visualiza el círculo de distancia óptima y los puntos donde la velocidad estimada es mayor."),
+        "Returns to the previous screen or local contents." to FallbackTranslation("Torna alla schermata precedente o al sommario locale.", "Kehrt zum vorherigen Bildschirm oder lokalen Inhalt zurück.", "Vuelve a la pantalla anterior o al índice local."),
+        "Opens or represents search." to FallbackTranslation("Apre o rappresenta la ricerca.", "Öffnet oder steht für Suche.", "Abre o representa la búsqueda."),
+        "Clears a field or closes a mode." to FallbackTranslation("Cancella un campo o chiude una modalità.", "Leert ein Feld oder schließt einen Modus.", "Borra un campo o cierra un modo."),
+        "Opens settings or block customization." to FallbackTranslation("Apre impostazioni o personalizzazione blocchi.", "Öffnet Einstellungen oder Blockanpassung.", "Abre ajustes o personalización de bloques."),
+        "Opens sharing options." to FallbackTranslation("Apre le opzioni di condivisione.", "Öffnet Teilen-Optionen.", "Abre opciones de compartir."),
+        "Starts a database or map download." to FallbackTranslation("Avvia il download di un database o di una mappa.", "Startet einen Datenbank- oder Kartendownload.", "Inicia una descarga de base de datos o mapa."),
+        "Restarts a calculation, check or resets settings depending on context." to FallbackTranslation("Riavvia un calcolo, una verifica o ripristina le impostazioni secondo il contesto.", "Startet je nach Kontext eine Berechnung oder Prüfung neu oder setzt Einstellungen zurück.", "Reinicia un cálculo, comprobación o restablece ajustes según el contexto."),
+
+        // Paramètres : apparence, palette, opérateur et personnalisation.
+        "Appearance" to FallbackTranslation("Aspetto", "Darstellung", "Apariencia"),
+        "Mapping" to FallbackTranslation("Cartografia", "Kartografie", "Cartografía"),
+        "Preferences" to FallbackTranslation("Preferenze", "Einstellungen", "Preferencias"),
+        "System" to FallbackTranslation("Sistema", "System", "Sistema"),
+        "App Icon" to FallbackTranslation("Icona app", "App-Symbol", "Icono de la app"),
+        "In-app logo" to FallbackTranslation("Logo nell'app", "Logo in der App", "Logo en la app"),
+        "Chooses the artwork used on Home, splash and About." to FallbackTranslation("Sceglie l'illustrazione usata in Home, splash e Informazioni.", "Wählt die Grafik für Startseite, Splash und Über.", "Elige la ilustración usada en Inicio, splash y Acerca de."),
+        "Automatic" to FallbackTranslation("Automatico", "Automatisch", "Automático"),
+        "Follows the active app icon and theme." to FallbackTranslation("Segue l'icona app attiva e il tema.", "Folgt dem aktiven App-Symbol und Design.", "Sigue el icono activo de la app y el tema."),
+        "Color on dark" to FallbackTranslation("Colore su scuro", "Farbe auf dunkel", "Color sobre oscuro"),
+        "Color on light" to FallbackTranslation("Colore su chiaro", "Farbe auf hell", "Color sobre claro"),
+        "Light monochrome" to FallbackTranslation("Monocromo chiaro", "Helles Monochrom", "Monocromo claro"),
+        "Dark monochrome" to FallbackTranslation("Monocromo scuro", "Dunkles Monochrom", "Monocromo oscuro"),
+        "Muted monochrome" to FallbackTranslation("Monocromo attenuato", "Gedämpftes Monochrom", "Monocromo apagado"),
+        "The app will restart to apply the change." to FallbackTranslation("L'app si riavvierà per applicare la modifica.", "Die App startet neu, um die Änderung anzuwenden.", "La app se reiniciará para aplicar el cambio."),
+        "Color palette" to FallbackTranslation("Palette colori", "Farbpalette", "Paleta de colores"),
+        "Color source" to FallbackTranslation("Origine colori", "Farbquelle", "Fuente de color"),
+        "Dynamic mode (wallpaper) takes priority. Otherwise, choose a native Material 3 palette." to FallbackTranslation("La modalità dinamica (sfondo) ha priorità. Altrimenti scegli una palette nativa Material 3.", "Der dynamische Modus (Hintergrundbild) hat Vorrang. Andernfalls wähle eine native Material-3-Palette.", "El modo dinámico (fondo de pantalla) tiene prioridad. Si no, elige una paleta Material 3 nativa."),
+        "Dynamic (wallpaper)" to FallbackTranslation("Dinamico (sfondo)", "Dynamisch (Hintergrundbild)", "Dinámico (fondo)"),
+        "Automatically uses the phone system colors (Material You)." to FallbackTranslation("Usa automaticamente i colori di sistema del telefono (Material You).", "Verwendet automatisch die Systemfarben des Telefons (Material You).", "Usa automáticamente los colores del sistema del teléfono (Material You)."),
+        "Material Baseline" to FallbackTranslation("Material Baseline", "Material Baseline", "Material Baseline"),
+        "Native reference Android Material 3 palette" to FallbackTranslation("Palette nativa Android Material 3 di riferimento", "Native Referenzpalette von Android Material 3", "Paleta nativa de referencia Android Material 3"),
+        "Material Red" to FallbackTranslation("Material Red", "Material Red", "Material Red"),
+        "Material 3 red system palette" to FallbackTranslation("Palette sistema rossa Material 3", "Rote Systempalette Material 3", "Paleta del sistema roja Material 3"),
+        "Material Green" to FallbackTranslation("Material Green", "Material Green", "Material Green"),
+        "Material 3 green system palette" to FallbackTranslation("Palette sistema verde Material 3", "Grüne Systempalette Material 3", "Paleta del sistema verde Material 3"),
+        "Material Blue" to FallbackTranslation("Material Blue", "Material Blue", "Material Blue"),
+        "Material 3 blue system palette" to FallbackTranslation("Palette sistema blu Material 3", "Blaue Systempalette Material 3", "Paleta del sistema azul Material 3"),
+        "Material Cyan" to FallbackTranslation("Material Cyan", "Material Cyan", "Material Cyan"),
+        "Material 3 cyan system palette" to FallbackTranslation("Palette sistema ciano Material 3", "Cyan-Systempalette Material 3", "Paleta del sistema cian Material 3"),
+        "Material Teal" to FallbackTranslation("Material Teal", "Material Teal", "Material Teal"),
+        "Material 3 teal system palette" to FallbackTranslation("Palette sistema teal Material 3", "Teal-Systempalette Material 3", "Paleta del sistema teal Material 3"),
+        "Material Indigo" to FallbackTranslation("Material Indigo", "Material Indigo", "Material Indigo"),
+        "Material 3 indigo system palette" to FallbackTranslation("Palette sistema indaco Material 3", "Indigo-Systempalette Material 3", "Paleta del sistema índigo Material 3"),
+        "Material Rose" to FallbackTranslation("Material Rose", "Material Rose", "Material Rose"),
+        "Expressive Material 3 rose system palette" to FallbackTranslation("Palette sistema rosa espressiva Material 3", "Expressive rosa Systempalette Material 3", "Paleta del sistema rosa expresiva Material 3"),
+        "Material Amber" to FallbackTranslation("Material Amber", "Material Amber", "Material Amber"),
+        "Material 3 amber system palette" to FallbackTranslation("Palette sistema ambra Material 3", "Bernstein-Systempalette Material 3", "Paleta del sistema ámbar Material 3"),
+        "Material Graphite" to FallbackTranslation("Material Graphite", "Material Graphite", "Material Graphite"),
+        "Material 3 graphite system palette" to FallbackTranslation("Palette sistema grafite Material 3", "Graphit-Systempalette Material 3", "Paleta del sistema grafito Material 3"),
+        "(Long press and drag to reorder)" to FallbackTranslation("(Tieni premuto e trascina per riordinare)", "(Lange drücken und ziehen zum Neuordnen)", "(Mantén pulsado y arrastra para reordenar)"),
+        "Warning: A high frequency (30 min) may increase background battery consumption." to FallbackTranslation("Attenzione: una frequenza alta (30 min) può aumentare il consumo della batteria in background.", "Warnung: Eine hohe Frequenz (30 min) kann den Akkuverbrauch im Hintergrund erhöhen.", "Aviso: una frecuencia alta (30 min) puede aumentar el consumo de batería en segundo plano."),
+        "MapLibre" to FallbackTranslation("MapLibre", "MapLibre", "MapLibre"),
+        "OpenTopoMap" to FallbackTranslation("OpenTopoMap", "OpenTopoMap", "OpenTopoMap"),
+        "Speedtest" to FallbackTranslation("Speedtest", "Speedtest", "Speedtest"),
+        "Are you sure you want to restore default settings? This will delete all settings you have made in the app." to FallbackTranslation("Vuoi davvero ripristinare le impostazioni predefinite? Verranno eliminate tutte le impostazioni fatte nell'app.", "Möchtest du wirklich die Standardeinstellungen wiederherstellen? Dadurch werden alle App-Einstellungen gelöscht, die du vorgenommen hast.", "¿Seguro que quieres restaurar los ajustes predeterminados? Se eliminarán todos los ajustes que hayas hecho en la app."),
+        "Orange" to FallbackTranslation("Orange", "Orange", "Orange"),
+        "SFR" to FallbackTranslation("SFR", "SFR", "SFR"),
+        "Bouygues" to FallbackTranslation("Bouygues", "Bouygues", "Bouygues"),
+        "Free" to FallbackTranslation("Free", "Free", "Free"),
+        "Techno." to FallbackTranslation("Tecno.", "Techno.", "Tecno."),
+
+        // Profil altimétrique et calculateur de débit.
+        "The calculation uses IGN elevation data and requires an internet connection. Try again when the network is available." to FallbackTranslation("Il calcolo usa dati altimetrici IGN e richiede una connessione internet. Riprova quando la rete è disponibile.", "Die Berechnung nutzt IGN-Höhendaten und benötigt eine Internetverbindung. Versuche es erneut, wenn das Netz verfügbar ist.", "El cálculo usa datos de altitud IGN y requiere conexión a internet. Vuelve a intentarlo cuando haya red."),
+        "The calculation uses IGN elevation data and requires an internet connection. You can temporarily save your current position to run the calculation automatically when the network returns." to FallbackTranslation("Il calcolo usa dati altimetrici IGN e richiede una connessione internet. Puoi salvare temporaneamente la posizione attuale per eseguirlo automaticamente quando torna la rete.", "Die Berechnung nutzt IGN-Höhendaten und benötigt eine Internetverbindung. Du kannst deine aktuelle Position vorübergehend speichern, damit die Berechnung automatisch startet, wenn die Verbindung zurückkehrt.", "El cálculo usa datos de altitud IGN y requiere conexión a internet. Puedes guardar temporalmente tu posición actual para ejecutar el cálculo automáticamente cuando vuelva la red."),
+        "Your current position and this site are temporarily saved. The elevation profile will be calculated automatically when the connection returns." to FallbackTranslation("La tua posizione attuale e questo sito sono salvati temporaneamente. Il profilo altimetrico sarà calcolato automaticamente quando torna la connessione.", "Deine aktuelle Position und dieser Standort wurden vorübergehend gespeichert. Das Höhenprofil wird automatisch berechnet, wenn die Verbindung zurückkehrt.", "Tu posición actual y este sitio se han guardado temporalmente. El perfil altimétrico se calculará automáticamente cuando vuelva la conexión."),
+        "Calculated at" to FallbackTranslation("Calcolato alle", "Berechnet um", "Calculado a las"),
+        "GPS coordinates used" to FallbackTranslation("Coordinate GPS usate", "Verwendete GPS-Koordinaten", "Coordenadas GPS usadas"),
+        "You are offline. A previously calculated elevation profile exists for this site. Do you want to display it?" to FallbackTranslation("Sei offline. Esiste un profilo altimetrico calcolato in precedenza per questo sito. Vuoi visualizzarlo?", "Du bist offline. Für diesen Standort gibt es ein zuvor berechnetes Höhenprofil. Möchtest du es anzeigen?", "Estás sin conexión. Existe un perfil altimétrico calculado previamente para este sitio. ¿Quieres mostrarlo?"),
+        "Panel height for the selected frequency." to FallbackTranslation("Altezza del pannello per la frequenza selezionata.", "Panelhöhe für die ausgewählte Frequenz.", "Altura del panel para la frecuencia seleccionada."),
+        "Start point altitude + 1.5 m." to FallbackTranslation("Altitudine del punto di partenza + 1,5 m.", "Höhe des Startpunkts + 1,5 m.", "Altitud del punto inicial + 1,5 m."),
+        "Site altitude + panel height." to FallbackTranslation("Altitudine del sito + altezza pannello.", "Standorthöhe + Panelhöhe.", "Altitud del sitio + altura del panel."),
+        "Terrain does not cut the direct path between you and the panel" to FallbackTranslation("Il terreno non taglia il percorso diretto tra te e il pannello", "Das Gelände schneidet den direkten Pfad zwischen dir und dem Panel nicht", "El terreno no corta el trayecto directo entre tú y el panel"),
+        "Terrain may cut the direct path" to FallbackTranslation("Il terreno può tagliare il percorso diretto", "Das Gelände kann den direkten Pfad schneiden", "El terreno puede cortar el trayecto directo"),
+        "60% Fresnel clear" to FallbackTranslation("60% Fresnel libero", "60% Fresnel frei", "60% Fresnel despejado"),
+        "60% Fresnel obstructed" to FallbackTranslation("60% Fresnel ostruito", "60% Fresnel verdeckt", "60% Fresnel obstruido"),
+        "The Fresnel zone is the volume around the radio path. For a more reliable link, at least 60% of this zone is usually kept clear, so terrain can affect the signal even if it does not exactly cut the direct path." to FallbackTranslation("La zona di Fresnel è il volume attorno al percorso radio. Per un collegamento più affidabile, di solito si mantiene libero almeno il 60% di questa zona; quindi il terreno può influire sul segnale anche se non taglia esattamente il percorso diretto.", "Die Fresnel-Zone ist das Volumen um den Funkpfad. Für eine zuverlässigere Verbindung bleiben normalerweise mindestens 60% dieser Zone frei, daher kann Gelände das Signal beeinflussen, selbst wenn es den direkten Pfad nicht exakt schneidet.", "La zona de Fresnel es el volumen alrededor del trayecto radio. Para un enlace más fiable, normalmente se mantiene libre al menos el 60% de esta zona, por lo que el relieve puede afectar a la señal aunque no corte exactamente el trayecto directo."),
+        "Source: IGN Geoplatform - RGE ALTI" to FallbackTranslation("Fonte: IGN Geopiattaforma - RGE ALTI", "Quelle: IGN Geoplattform - RGE ALTI", "Fuente: IGN Geoplataforma - RGE ALTI"),
+        "No usable 4G or 5G band was detected for this site." to FallbackTranslation("Nessuna banda 4G o 5G utilizzabile è stata rilevata per questo sito.", "Für diesen Standort wurde kein nutzbares 4G- oder 5G-Band erkannt.", "No se detectó ninguna banda 4G o 5G utilizable para este sitio."),
+        "The result is a theoretical radio throughput: it does not account for distance, signal level, SINR, network load, backhaul, or phone limits." to FallbackTranslation("Il risultato è una velocità radio teorica: non considera distanza, livello del segnale, SINR, carico rete, backhaul o limiti del telefono.", "Das Ergebnis ist ein theoretischer Funkdurchsatz: Entfernung, Signalpegel, SINR, Netzlast, Backhaul und genaue Telefonlimits werden nicht berücksichtigt.", "El resultado es una velocidad radio teórica: no considera distancia, nivel de señal, SINR, carga de red, backhaul ni límites del teléfono."),
+        "Upload is weighted for a handset: lower transmit power, less MIMO and usually lower modulation than download." to FallbackTranslation("L'upload è ponderato per un telefono: potenza di trasmissione più bassa, meno MIMO e modulazione di solito inferiore al download.", "Upload wird für ein Mobilgerät gewichtet: geringere Sendeleistung, weniger MIMO und meist niedrigere Modulation als beim Download.", "La subida se pondera para un teléfono: menor potencia de transmisión, menos MIMO y normalmente modulación inferior a la descarga."),
+        "Panel/support height unavailable: unable to estimate the main cone zone." to FallbackTranslation("Altezza pannello/supporto non disponibile: impossibile stimare la zona principale del cono.", "Panel-/Trägerhöhe nicht verfügbar: Hauptzone des Kegels kann nicht geschätzt werden.", "Altura del panel/soporte no disponible: no se puede estimar la zona principal del cono."),
+        "Assumption: panel/support height, handset at 1.5 m, typical vertical tilt 4°-8° with a 6° nominal point." to FallbackTranslation("Ipotesi: altezza pannello/supporto, telefono a 1,5 m, tilt verticale tipico 4°-8° con punto nominale a 6°.", "Annahme: Panel-/Trägerhöhe, Mobilgerät auf 1,5 m, typischer vertikaler Tilt 4°-8° mit 6° nominalem Punkt.", "Supuesto: altura panel/soporte, teléfono a 1,5 m, inclinación vertical típica 4°-8° con punto nominal a 6°."),
+        "The circle marks the optimal distance; dots show panel axes where signal should be strongest." to FallbackTranslation("Il cerchio indica la distanza ottimale; i punti mostrano gli assi dei pannelli dove il segnale dovrebbe essere più forte.", "Der Kreis markiert die optimale Entfernung; Punkte zeigen Panelachsen, auf denen das Signal am stärksten sein sollte.", "El círculo marca la distancia óptima; los puntos muestran ejes de panel donde la señal debería ser más fuerte."),
+        "4G download" to FallbackTranslation("Download 4G", "4G-Download", "Descarga 4G"),
+        "4G upload" to FallbackTranslation("Upload 4G", "4G-Upload", "Subida 4G"),
+        "5G download" to FallbackTranslation("Download 5G", "5G-Download", "Descarga 5G"),
+        "5G upload" to FallbackTranslation("Upload 5G", "5G-Upload", "Subida 5G"),
+        "Conservative profile: average modulation, upload strongly limited by handset transmit power." to FallbackTranslation("Profilo prudente: modulazione media, upload fortemente limitato dalla potenza di trasmissione del telefono.", "Vorsichtiges Profil: durchschnittliche Modulation, Upload stark durch die Sendeleistung des Mobilgeräts begrenzt.", "Perfil prudente: modulación media, subida muy limitada por la potencia de transmisión del teléfono."),
+        "Ideal profile: plausible very good radio conditions, but upload remains capped on the handset side." to FallbackTranslation("Profilo ideale: condizioni radio plausibilmente molto buone, ma upload ancora limitato lato telefono.", "Ideales Profil: plausibel sehr gute Funkbedingungen, aber Upload bleibt auf Mobilgerät-Seite begrenzt.", "Perfil ideal: condiciones radio muy buenas y plausibles, pero la subida sigue limitada del lado del teléfono."),
+        "Custom profile: DL/UL modulations are manually tuned, with upload still limited like a handset." to FallbackTranslation("Profilo personalizzato: modulazioni DL/UL regolate manualmente, con upload ancora limitato come su un telefono.", "Benutzerdefiniertes Profil: DL/UL-Modulationen werden manuell eingestellt, Upload bleibt wie bei einem Mobilgerät begrenzt.", "Perfil personalizado: modulaciones DL/UL ajustadas manualmente, con subida aún limitada como en un teléfono."),
+        "Standard profile: 4G MIMO 2x2 and 5G MIMO 4x4 for download, upload calculated like a real handset." to FallbackTranslation("Profilo standard: MIMO 2x2 in 4G e MIMO 4x4 in 5G per il download, upload calcolato come su un telefono reale.", "Standardprofil: 4G MIMO 2x2 und 5G MIMO 4x4 für Download, Upload wie bei einem realen Mobilgerät berechnet.", "Perfil estándar: MIMO 2x2 en 4G y MIMO 4x4 en 5G para descarga, subida calculada como en un teléfono real."),
+        "Estimated radio throughput: excludes network load, real signal, backhaul and exact phone limits." to FallbackTranslation("Velocità radio stimata: esclude carico rete, segnale reale, backhaul e limiti esatti del telefono.", "Geschätzter Funkdurchsatz: ohne Netzlast, reales Signal, Backhaul und genaue Telefonlimits.", "Velocidad radio estimada: excluye carga de red, señal real, backhaul y límites exactos del teléfono."),
+        "Site header" to FallbackTranslation("Intestazione sito", "Standortkopf", "Encabezado del sitio"),
+        "Throughput summary" to FallbackTranslation("Riepilogo velocità", "Durchsatzübersicht", "Resumen de velocidad"),
+        "Assumptions and filters" to FallbackTranslation("Ipotesi e filtri", "Annahmen und Filter", "Supuestos y filtros"),
+        "Standard profile: 4G 256-QAM downlink with 2x2 MIMO, 64-QAM phone-side uplink, 5G n78 256-QAM downlink with 4x4 MIMO, 64-QAM uplink on 2 layers, DSS not counted twice." to FallbackTranslation("Profilo standard: 4G downlink 256-QAM con MIMO 2x2, uplink lato telefono 64-QAM, 5G n78 downlink 256-QAM con MIMO 4x4, uplink 64-QAM su 2 layer, DSS non contato due volte.", "Standardprofil: 4G 256-QAM Downlink mit 2x2 MIMO, 64-QAM Upload auf Telefonseite, 5G n78 256-QAM Downlink mit 4x4 MIMO, 64-QAM Upload auf 2 Layern, DSS nicht doppelt gezählt.", "Perfil estándar: 4G 256-QAM en descarga con MIMO 2x2, subida 64-QAM del lado del teléfono, 5G n78 256-QAM en descarga con MIMO 4x4, subida 64-QAM en 2 capas, DSS sin doble conteo."),
+        "Ideal profile: plausible very good radio conditions, 4G downlink with 4x4 MIMO, 5G NR 256-QAM, more open aggregation and no DSS double counting." to FallbackTranslation("Profilo ideale: condizioni radio plausibilmente molto buone, 4G downlink con MIMO 4x4, 5G NR 256-QAM, aggregazione più aperta e nessun doppio conteggio DSS.", "Ideales Profil: plausibel sehr gute Funkbedingungen, 4G Downlink mit 4x4 MIMO, 5G NR 256-QAM, offenere Aggregation und keine DSS-Doppelzählung.", "Perfil ideal: condiciones radio muy buenas plausibles, 4G en descarga con MIMO 4x4, 5G NR 256-QAM, agregación más abierta y sin doble conteo DSS."),
+        "These values weight the estimate: good SINR allows more efficient modulation, while weak RSRP reduces stability." to FallbackTranslation("Questi valori ponderano la stima: un buon SINR permette una modulazione più efficiente, mentre un RSRP debole riduce la stabilità.", "Diese Werte gewichten die Schätzung: gutes SINR ermöglicht effizientere Modulation, schwaches RSRP reduziert die Stabilität.", "Estos valores ponderan la estimación: un buen SINR permite modulación más eficiente, mientras un RSRP débil reduce la estabilidad."),
+        "Move/zoom the mini map if needed, then tap the point to analyze." to FallbackTranslation("Sposta/ingrandisci la mini-mappa se necessario, poi tocca il punto da analizzare.", "Verschiebe oder zoome die Minikarte bei Bedarf und tippe dann auf den zu analysierenden Punkt.", "Mueve o amplía el mini mapa si hace falta y toca el punto que quieres analizar."),
+        "Location permission denied: choose a point on the map or try again after enabling it." to FallbackTranslation("Permesso posizione negato: scegli un punto sulla mappa o riprova dopo averlo abilitato.", "Standortberechtigung verweigert: Wähle einen Punkt auf der Karte oder versuche es nach der Aktivierung erneut.", "Permiso de ubicación denegado: elige un punto en el mapa o inténtalo de nuevo tras activarlo."),
+        "No position selected: the calculation keeps a neutral position coefficient." to FallbackTranslation("Nessuna posizione selezionata: il calcolo mantiene un coefficiente posizione neutro.", "Keine Position ausgewählt: Die Berechnung behält einen neutralen Positionskoeffizienten.", "No hay posición seleccionada: el cálculo mantiene un coeficiente de posición neutral."),
+        "Panel azimuth unavailable: only the distance cone can be used." to FallbackTranslation("Azimut pannello non disponibile: si può usare solo il cono di distanza.", "Panel-Azimut nicht verfügbar: Nur der Entfernungskegel kann genutzt werden.", "Azimut del panel no disponible: solo se puede usar el cono de distancia."),
+        "Radio cone unavailable: missing panel/support height." to FallbackTranslation("Cono radio non disponibile: altezza pannello/supporto mancante.", "Funkkegel nicht verfügbar: Panel-/Trägerhöhe fehlt.", "Cono radio no disponible: falta altura de panel/soporte."),
+        "These choices adjust cell load, backhaul quality and the number of counted 4G carriers." to FallbackTranslation("Queste scelte regolano carico cella, qualità backhaul e numero di portanti 4G conteggiate.", "Diese Auswahl passt Zelllast, Backhaul-Qualität und Anzahl gezählter 4G-Träger an.", "Estas opciones ajustan carga de celda, calidad de backhaul y número de portadoras 4G contadas."),
+        "Backhaul" to FallbackTranslation("Backhaul", "Backhaul", "Backhaul"),
+        "1 carrier" to FallbackTranslation("1 portante", "1 Träger", "1 portadora"),
+        "The selected QAM sets the raw radio throughput: higher modulation increases theoretical speed but assumes a better signal." to FallbackTranslation("Il QAM selezionato definisce la velocità radio grezza: una modulazione più alta aumenta la velocità teorica ma presuppone un segnale migliore.", "Das gewählte QAM bestimmt den rohen Funkdurchsatz: höhere Modulation erhöht die theoretische Geschwindigkeit, setzt aber ein besseres Signal voraus.", "El QAM seleccionado fija la velocidad radio bruta: una modulación más alta aumenta la velocidad teórica pero asume mejor señal."),
+        "Environment multiplies the result: outdoor 100%, vehicle 85%, indoor 65%, deep indoor 45%." to FallbackTranslation("L'ambiente moltiplica il risultato: esterno 100%, veicolo 85%, interno 65%, interno profondo 45%.", "Die Umgebung multipliziert das Ergebnis: außen 100%, Fahrzeug 85%, innen 65%, tief innen 45%.", "El entorno multiplica el resultado: exterior 100%, vehículo 85%, interior 65%, interior profundo 45%."),
+        "Position adjusts throughput by radio zone: in the beam 106%, too close 75%, too far 68%, outside azimuth 45%." to FallbackTranslation("La posizione regola la velocità per zona radio: nel fascio 106%, troppo vicino 75%, troppo lontano 68%, fuori azimut 45%.", "Die Position passt den Durchsatz nach Funkzone an: im Strahl 106%, zu nah 75%, zu weit 68%, außerhalb Azimut 45%.", "La posición ajusta la velocidad por zona radio: en el haz 106%, demasiado cerca 75%, demasiado lejos 68%, fuera de azimut 45%."),
+        "Network load reduces per-user throughput: unknown 100%, light 90%, medium 68%, heavy 46%, saturated 28% on download." to FallbackTranslation("Il carico di rete riduce la velocità per utente: sconosciuto 100%, leggero 90%, medio 68%, alto 46%, saturo 28% in download.", "Netzlast reduziert den Durchsatz pro Nutzer: unbekannt 100%, leicht 90%, mittel 68%, hoch 46%, gesättigt 28% im Download.", "La carga de red reduce la velocidad por usuario: desconocida 100%, ligera 90%, media 68%, alta 46%, saturada 28% en descarga."),
+        "Backhaul represents the link behind the antenna: fiber 100%, microwave link 84%, limited 55% on download." to FallbackTranslation("Il backhaul rappresenta il collegamento dietro l'antenna: fibra 100%, ponte radio 84%, limitato 55% in download.", "Backhaul steht für die Anbindung hinter der Antenne: Glasfaser 100%, Richtfunk 84%, begrenzt 55% im Download.", "El backhaul representa el enlace detrás de la antena: fibra 100%, radioenlace 84%, limitado 55% en descarga."),
+
+        // Onboarding, notifications live, crédits et libellés communs.
+        "OpenStreetMap" to FallbackTranslation("OpenStreetMap", "OpenStreetMap", "OpenStreetMap"),
+        "Sat" to FallbackTranslation("Sat", "Sat", "Sat"),
+        "LAT" to FallbackTranslation("LAT", "LAT", "LAT"),
+        "LONG" to FallbackTranslation("LONG", "LONG", "LONG"),
+        "ACCURACY" to FallbackTranslation("PRECISIONE", "GENAUIGKEIT", "PRECISIÓN"),
+        "GeoTower" to FallbackTranslation("GeoTower", "GeoTower", "GeoTower"),
+        "Live notifications" to FallbackTranslation("Notifiche live", "Live-Benachrichtigungen", "Notificaciones en directo"),
+        "Enable a discreet live tracker to keep the nearest antenna for your operator visible in a notification." to FallbackTranslation("Attiva un tracciamento discreto per mantenere visibile in notifica l'antenna più vicina del tuo operatore.", "Aktiviere einen dezenten Live-Tracker, damit die nächste Antenne deines Betreibers in einer Benachrichtigung sichtbar bleibt.", "Activa un seguimiento discreto para mantener visible en una notificación la antena más cercana de tu operador."),
+        "Linked to your operator" to FallbackTranslation("Collegato al tuo operatore", "Mit deinem Betreiber verknüpft", "Vinculado a tu operador"),
+        "Live tracking uses the default operator you just chose to show relevant information." to FallbackTranslation("Il tracciamento live usa l'operatore predefinito appena scelto per mostrare informazioni pertinenti.", "Live-Tracking nutzt den gerade gewählten Standardbetreiber, um relevante Informationen zu zeigen.", "El seguimiento en directo usa el operador predeterminado que acabas de elegir para mostrar información relevante."),
+        "Nearest antenna live" to FallbackTranslation("Antenna vicina live", "Nächste Antenne live", "Antena cercana en directo"),
+        "The notification can update while you move to show the nearest site." to FallbackTranslation("La notifica può aggiornarsi mentre ti sposti per mostrare il sito più vicino.", "Die Benachrichtigung kann sich während deiner Bewegung aktualisieren und den nächsten Standort zeigen.", "La notificación puede actualizarse mientras te desplazas para mostrar el sitio más cercano."),
+        "Always optional" to FallbackTranslation("Sempre opzionale", "Immer optional", "Siempre opcional"),
+        "You can turn live notifications off at any time from GeoTower settings." to FallbackTranslation("Puoi disattivare le notifiche live in qualsiasi momento dalle impostazioni di GeoTower.", "Du kannst Live-Benachrichtigungen jederzeit in den GeoTower-Einstellungen ausschalten.", "Puedes desactivar las notificaciones en directo en cualquier momento desde los ajustes de GeoTower."),
+        "The " to FallbackTranslation("Le ", "Die ", "Las "),
+        "live notifications" to FallbackTranslation("notifiche live", "Live-Benachrichtigungen", "notificaciones en directo"),
+        " you enabled " to FallbackTranslation(" che hai attivato ", " die du aktiviert hast ", " que has activado "),
+        "will be turned off" to FallbackTranslation("saranno disattivate", "werden deaktiviert", "se desactivarán"),
+        " because they require a default operator." to FallbackTranslation(" perché richiedono un operatore predefinito.", ", da sie einen Standardbetreiber benötigen.", " porque requieren un operador predeterminado."),
+        "National Frequency Agency (ANFR).\nData from Cartoradio (Open Data)." to FallbackTranslation("Agenzia nazionale delle frequenze (ANFR).\nDati da Cartoradio (Open Data).", "Nationale Frequenzagentur (ANFR).\nDaten von Cartoradio (Open Data).", "Agencia Nacional de Frecuencias (ANFR).\nDatos de Cartoradio (Open Data)."),
+        "© IGN - National Institute of Geographic and Forest Information." to FallbackTranslation("© IGN - Istituto nazionale dell'informazione geografica e forestale.", "© IGN - Nationales Institut für geografische und forstliche Informationen.", "© IGN - Instituto Nacional de Información Geográfica y Forestal."),
+        "© OpenStreetMap contributors." to FallbackTranslation("© contributori OpenStreetMap.", "© OpenStreetMap-Mitwirkende.", "© colaboradores de OpenStreetMap."),
+        "MapsForges" to FallbackTranslation("MapsForges", "MapsForges", "MapsForges"),
+        "Offline vector maps and render theme (Elevate)." to FallbackTranslation("Mappe vettoriali offline e tema di rendering (Elevate).", "Offline-Vektorkarten und Rendering-Theme (Elevate).", "Mapas vectoriales sin conexión y tema de renderizado (Elevate)."),
+        "Sites" to FallbackTranslation("Siti", "Standorte", "Sitios"),
+        "Latest changes" to FallbackTranslation("Ultime modifiche", "Letzte Änderungen", "Últimos cambios"),
+        "Geoportal (IGN)" to FallbackTranslation("Geoportale (IGN)", "Geoportal (IGN)", "Geoportal (IGN)"),
+
+        // Données ANFR : natures, types d'antennes et propriétaires.
+        "Tunnel" to FallbackTranslation("Tunnel", "Tunnel", "Túnel"),
+        "Silo" to FallbackTranslation("Silo", "Silo", "Silo"),
+        "Ran-Sharing antenna" to FallbackTranslation("Antenna Ran-Sharing", "Ran-Sharing-Antenne", "Antena Ran-Sharing"),
+        "Tube" to FallbackTranslation("Tubo", "Rohr", "Tubo"),
+        "Tunable" to FallbackTranslation("Accordabile", "Abstimmbar", "Sintonizable"),
+        "Active (directional or omni)" to FallbackTranslation("Attiva (direzionale o omnidirezionale)", "Aktiv (gerichtet oder omnidirektional)", "Activa (direccional u omnidireccional)"),
+        "Cigar antenna" to FallbackTranslation("Antenna a sigaro", "Zigarrenantenne", "Antena tipo cigarro"),
+        "Corolla antenna" to FallbackTranslation("Antenna a corolla", "Korollenantenne", "Antena corola"),
+        "Wideband dipole" to FallbackTranslation("Dipolo a larga banda", "Breitbanddipol", "Dipolo de banda ancha"),
+        "Adjustable dipole" to FallbackTranslation("Dipolo regolabile", "Verstellbarer Dipol", "Dipolo ajustable"),
+        "Directional antenna" to FallbackTranslation("Antenna direttiva", "Richtantenne", "Antena direccional"),
+        "Wire antenna" to FallbackTranslation("Antenna filare", "Drahtantenne", "Antena de hilo"),
+        "Whip antenna" to FallbackTranslation("Antenna a frusta", "Stabantenne", "Antena látigo"),
+        "Spindle antenna" to FallbackTranslation("Antenna a fuso", "Spindelantenne", "Antena fusiforme"),
+        "Linear array (25 antennas)" to FallbackTranslation("Array lineare (25 antenne)", "Lineares Array (25 Antennen)", "Matriz lineal (25 antenas)"),
+        "Ground plane" to FallbackTranslation("Piano di massa", "Groundplane", "Plano de tierra"),
+        "HLO" to FallbackTranslation("HLO", "HLO", "HLO"),
+        "Log-periodic antenna" to FallbackTranslation("Antenna log-periodica", "Logperiodische Antenne", "Antena log-periódica"),
+        "Diamond antenna" to FallbackTranslation("Antenna a losanga", "Rautenantenne", "Antena romboidal"),
+        "Panel" to FallbackTranslation("Pannello", "Panel", "Panel"),
+        "Dish antenna" to FallbackTranslation("Antenna parabolica", "Parabolantenne", "Antena parabólica"),
+        "Whip / Pole antenna" to FallbackTranslation("Antenna a frusta / palo", "Stab-/Mastantenne", "Antena látigo / poste"),
+        "Antenna array" to FallbackTranslation("Array di antenne", "Antennenarray", "Matriz de antenas"),
+        "Antenna system" to FallbackTranslation("Sistema antenne", "Antennensystem", "Sistema de antenas"),
+        "Yagi" to FallbackTranslation("Yagi", "Yagi", "Yagi"),
+        "Linear array (13 antennas)" to FallbackTranslation("Array lineare (13 antenne)", "Lineares Array (13 Antennen)", "Matriz lineal (13 antenas)"),
+        "Slot antenna" to FallbackTranslation("Antenna a fessure", "Schlitzantenne", "Antena de ranuras"),
+        "Circular array (49 antennas)" to FallbackTranslation("Array circolare (49 antenne)", "Kreisförmiges Array (49 Antennen)", "Matriz circular (49 antenas)"),
+        "Vertical array" to FallbackTranslation("Array verticale", "Vertikales Array", "Matriz vertical"),
+        "Vertical array (2 antennas, type P)" to FallbackTranslation("Array verticale (2 antenne, tipo P)", "Vertikales Array (2 Antennen, Typ P)", "Matriz vertical (2 antenas, tipo P)"),
+        "Vertical array (3 antennas, type M)" to FallbackTranslation("Array verticale (3 antenne, tipo M)", "Vertikales Array (3 Antennen, Typ M)", "Matriz vertical (3 antenas, tipo M)"),
+        "Daisy antenna" to FallbackTranslation("Antenna margherita", "Gänseblümchen-Antenne", "Antena margarita"),
+        "Umbrella antenna" to FallbackTranslation("Antenna ombrello", "Schirmantenne", "Antena paraguas"),
+        "Goniometric antenna" to FallbackTranslation("Antenna goniometrica", "Goniometrische Antenne", "Antena goniométrica"),
+        "Dipole" to FallbackTranslation("Dipolo", "Dipol", "Dipolo"),
+        "Folded dipole" to FallbackTranslation("Dipolo ripiegato", "Faltdipol", "Dipolo plegado"),
+        "Collinear antenna" to FallbackTranslation("Antenna collineare", "Kollineare Antenne", "Antena colineal"),
+        "Flat antenna LVA" to FallbackTranslation("Antenna piana LVA", "Flachantenne LVA", "Antena plana LVA"),
+        "VHF dipole" to FallbackTranslation("Dipolo VHF", "VHF-Dipol", "Dipolo VHF"),
+        "HF antenna" to FallbackTranslation("Antenna HF", "HF-Antenne", "Antena HF"),
+        "Flat antenna" to FallbackTranslation("Antenna piana", "Flachantenne", "Antena plana"),
+        "DAB mast" to FallbackTranslation("Palo DAB", "DAB-Mast", "Mástil DAB"),
+        "Recovered electronic data antenna" to FallbackTranslation("Antenna da recupero dati elettronici", "Antenne aus übernommenen elektronischen Daten", "Antena procedente de recuperación de datos electrónicos"),
+        "DAB panel" to FallbackTranslation("Pannello DAB", "DAB-Panel", "Panel DAB"),
+        "DAB antenna" to FallbackTranslation("Antenna DAB", "DAB-Antenne", "Antena DAB"),
+        "Passive plane or reflector" to FallbackTranslation("Piano passivo o riflettore", "Passive Ebene oder Reflektor", "Plano pasivo o reflector"),
+        "Grid antenna" to FallbackTranslation("Antenna a griglia", "Gitterantenne", "Antena de rejilla"),
+        "Horn antenna" to FallbackTranslation("Antenna a tromba", "Hornantenne", "Antena de bocina"),
+        "Dual-band panel" to FallbackTranslation("Pannello bibanda", "Dualband-Panel", "Panel bibanda"),
+        "Tri-band panel" to FallbackTranslation("Pannello tribanda", "Triband-Panel", "Panel tribanda"),
+        "Cylindrical antenna" to FallbackTranslation("Antenna cilindrica", "Zylindrische Antenne", "Antena cilíndrica"),
+        "Dihedral antenna" to FallbackTranslation("Antenna diedrica", "Diederantenne", "Antena diédrica"),
+        "Ceiling globe antenna" to FallbackTranslation("Antenna a globo da soffitto", "Decken-Kugelantenne", "Antena globo de techo"),
+        "Discone" to FallbackTranslation("Discone", "Discone", "Discone"),
+        "Tile antenna" to FallbackTranslation("Antenna a lastra", "Kachelantenne", "Antena de losa"),
+        "Radar antenna" to FallbackTranslation("Antenna radar", "Radarantenne", "Antena radar"),
+        "Shell antenna" to FallbackTranslation("Antenna a obice", "Granatenantenne", "Antena ojival"),
+        "Helical antenna" to FallbackTranslation("Antenna elicoidale", "Helixantenne", "Antena helicoidal"),
+        "Defense aerial" to FallbackTranslation("Aereo Difesa", "Verteidigungsantenne", "Aéreo Defensa"),
+        "Tri-sector antenna" to FallbackTranslation("Antenna trisettoriale", "Dreisektorantenne", "Antena trisectorial"),
+        "Indoor antenna" to FallbackTranslation("Antenna indoor", "Innenantenne", "Antena interior"),
+        "Leaky feeder (coaxial antenna)" to FallbackTranslation("Cavo radiante (antenna coassiale)", "Leckkabel (Koaxialantenne)", "Cable radiante (antena coaxial)"),
+        "Equidirectional antenna in one plane" to FallbackTranslation("Antenna equidirezionale in un piano", "Gleichgerichtete Antenne in einer Ebene", "Antena equidireccional en un plano"),
+        "Longitudinal radiation antenna" to FallbackTranslation("Antenna a radiazione longitudinale", "Antenne mit longitudinaler Abstrahlung", "Antena de radiación longitudinal"),
+        "Zenithal radiation antenna" to FallbackTranslation("Antenna a radiazione zenitale", "Antenne mit zenitaler Abstrahlung", "Antena de radiación cenital"),
+        "Multi-dipole array" to FallbackTranslation("Array multi-dipolo", "Multi-Dipol-Array", "Matriz multidipolo"),
+        "Beam antenna" to FallbackTranslation("Antenna a fascio", "Strahlantenne", "Antena de haz"),
+        "Skirt antenna" to FallbackTranslation("Antenna a gonna", "Schürzenantenne", "Antena de falda"),
+        "Biconical antenna" to FallbackTranslation("Antenna biconica", "Bikonische Antenne", "Antena bicónica"),
+        "REC-465" to FallbackTranslation("REC-465", "REC-465", "REC-465"),
+        "REC-580" to FallbackTranslation("REC-580", "REC-580", "REC-580"),
+        "AP27" to FallbackTranslation("AP27", "AP27", "AP27"),
+        "29-25LOG(FI)" to FallbackTranslation("29-25LOG(FI)", "29-25LOG(FI)", "29-25LOG(FI)"),
+        "Radiating tower" to FallbackTranslation("Torre radiante", "Strahlender Mast", "Torre radiante"),
+        "Dual-mode panel" to FallbackTranslation("Pannello bimodale", "Dual-Mode-Panel", "Panel bimodo"),
+        "Shortwave broadcast antenna (ALLOUIS ISSOUDUN)" to FallbackTranslation("Antenna di diffusione a onde corte (ALLOUIS ISSOUDUN)", "Kurzwellen-Rundfunkantenne (ALLOUIS ISSOUDUN)", "Antena de difusión de onda corta (ALLOUIS ISSOUDUN)"),
+        "All-in-one (steerable panel-beam)" to FallbackTranslation("Tutto in uno (pannello-fascio orientabile)", "All-in-one (steuerbares Panel-Bündel)", "Todo en uno (panel-haz orientable)"),
+        "Steerable beam antenna" to FallbackTranslation("Antenna a fasci orientabili", "Antenne mit steuerbaren Strahlen", "Antena de haces orientables"),
+        "Frame antenna" to FallbackTranslation("Antenna a telaio", "Rahmenantenne", "Antena de marco"),
+        "BYT antenna" to FallbackTranslation("Antenna BYT", "BYT-Antenne", "Antena BYT"),
+        "SFR antenna" to FallbackTranslation("Antenna SFR", "SFR-Antenne", "Antena SFR"),
+        "Private individual" to FallbackTranslation("Privato", "Privatperson", "Particular"),
+        "Condominium, Trustee, SCI" to FallbackTranslation("Condominio, amministratore, SCI", "Eigentümergemeinschaft, Verwalter, SCI", "Comunidad, administrador, SCI"),
+        "Municipality" to FallbackTranslation("Comune", "Gemeinde", "Municipio"),
+        "Departmental Council" to FallbackTranslation("Consiglio dipartimentale", "Départementrat", "Consejo departamental"),
+        "Regional Council" to FallbackTranslation("Consiglio regionale", "Regionalrat", "Consejo regional"),
+        "Private company" to FallbackTranslation("Società privata", "Privatunternehmen", "Empresa privada"),
+        "Healthcare facility" to FallbackTranslation("Struttura sanitaria", "Gesundheitseinrichtung", "Centro sanitario"),
+        "State / Ministry" to FallbackTranslation("Stato / Ministero", "Staat / Ministerium", "Estado / Ministerio"),
+        "Civil Aviation" to FallbackTranslation("Aviazione civile", "Zivilluftfahrt", "Aviación civil"),
+
+        // Statuts, dates, versions et libellés courts.
+        "Maintenance" to FallbackTranslation("Manutenzione", "Wartung", "Mantenimiento"),
+        "Incident" to FallbackTranslation("Incidente", "Vorfall", "Incidente"),
+        "Data" to FallbackTranslation("Dati", "Daten", "Datos"),
+        "SMS" to FallbackTranslation("SMS", "SMS", "SMS"),
+        "Internet" to FallbackTranslation("Internet", "Internet", "Internet"),
+        "January" to FallbackTranslation("Gennaio", "Januar", "Enero"),
+        "February" to FallbackTranslation("Febbraio", "Februar", "Febrero"),
+        "March" to FallbackTranslation("Marzo", "März", "Marzo"),
+        "April" to FallbackTranslation("Aprile", "April", "Abril"),
+        "May" to FallbackTranslation("Maggio", "Mai", "Mayo"),
+        "June" to FallbackTranslation("Giugno", "Juni", "Junio"),
+        "July" to FallbackTranslation("Luglio", "Juli", "Julio"),
+        "August" to FallbackTranslation("Agosto", "August", "Agosto"),
+        "September" to FallbackTranslation("Settembre", "September", "Septiembre"),
+        "October" to FallbackTranslation("Ottobre", "Oktober", "Octubre"),
+        "November" to FallbackTranslation("Novembre", "November", "Noviembre"),
+        "December" to FallbackTranslation("Dicembre", "Dezember", "Diciembre"),
+        "Week" to FallbackTranslation("Settimana", "Woche", "Semana"),
+        "Upload" to FallbackTranslation("Upload", "Upload", "Subida"),
+        "Ping" to FallbackTranslation("Ping", "Ping", "Ping")
+    )
 
     // Lecture en temps réel de la langue choisie dans les paramètres
     private val language: String
         @Composable get() = AppConfig.appLanguage.value
 
-    // Fonction utilitaire pour 3 langues
+    // Fonction utilitaire pour les langues de l'application.
     @Composable
-    fun get(fr: String, en: String, pt: String): String {
+    fun get(
+        fr: String,
+        en: String,
+        pt: String,
+        it: String = fallbackTranslation(en, LANGUAGE_ITALIAN),
+        de: String = fallbackTranslation(en, LANGUAGE_GERMAN),
+        es: String = fallbackTranslation(en, LANGUAGE_SPANISH)
+    ): String {
         val currentLang = AppConfig.appLanguage.value
 
         // Si "Système" est sélectionné, on récupère le code langue du téléphone
@@ -26,12 +1125,279 @@ object AppStrings {
             currentLang
         }
 
-        return when {
-            langToCheck == LANGUAGE_FRENCH || langToCheck == "fr" -> fr
-            langToCheck == LANGUAGE_PORTUGUESE || langToCheck == "pt" -> pt
-            // Anglais par défaut
-            else -> en
+        return resolveForLanguage(langToCheck, fr, en, pt, it, de, es)
+    }
+
+    fun resolveForLanguage(
+        langToCheck: String,
+        fr: String,
+        en: String,
+        pt: String,
+        it: String = fallbackTranslation(en, LANGUAGE_ITALIAN),
+        de: String = fallbackTranslation(en, LANGUAGE_GERMAN),
+        es: String = fallbackTranslation(en, LANGUAGE_SPANISH)
+    ): String = when {
+        matchesLanguage(langToCheck, LANGUAGE_FRENCH, "fr") -> fr
+        matchesLanguage(langToCheck, LANGUAGE_PORTUGUESE, "pt") -> pt
+        matchesLanguage(langToCheck, LANGUAGE_ITALIAN, "it") -> it
+        matchesLanguage(langToCheck, LANGUAGE_GERMAN, "de") -> de
+        matchesLanguage(langToCheck, LANGUAGE_SPANISH, "es") -> es
+        else -> en
+    }
+
+    private fun matchesLanguage(value: String, displayName: String, isoCode: String): Boolean {
+        return value.equals(displayName, ignoreCase = true) || value.equals(isoCode, ignoreCase = true)
+    }
+
+    private fun fallbackTranslation(english: String, targetLanguage: String): String {
+        fallbackDynamicTranslation(english, targetLanguage)?.let { return it }
+
+        val translated = fallbackTranslations[english] ?: return english
+        return when (targetLanguage) {
+            LANGUAGE_ITALIAN -> translated.italian
+            LANGUAGE_GERMAN -> translated.german
+            LANGUAGE_SPANISH -> translated.spanish
+            else -> english
         }
+    }
+
+    private fun fallbackDynamicTranslation(english: String, targetLanguage: String): String? {
+        fun translated(italian: String, german: String, spanish: String): String = when (targetLanguage) {
+            LANGUAGE_ITALIAN -> italian
+            LANGUAGE_GERMAN -> german
+            LANGUAGE_SPANISH -> spanish
+            else -> english
+        }
+
+        Regex("""^GeoTower (.+) is available\. Tap to open the download\.$""").matchEntire(english)?.let {
+            val versionName = it.groupValues[1]
+            return translated(
+                "GeoTower $versionName è disponibile. Tocca per aprire il download.",
+                "GeoTower $versionName ist verfügbar. Tippe, um den Download zu öffnen.",
+                "GeoTower $versionName está disponible. Toca para abrir la descarga."
+            )
+        }
+        Regex("""^Downloading\.\.\. (\d+)%$""").matchEntire(english)?.let {
+            val progress = it.groupValues[1]
+            return translated("Download... $progress%", "Download läuft... $progress%", "Descargando... $progress%")
+        }
+        Regex("""^Downloading : (\d+) %$""").matchEntire(english)?.let {
+            val progress = it.groupValues[1]
+            return translated("Download: $progress %", "Download: $progress %", "Descarga: $progress %")
+        }
+        Regex("""^Updated at (.+)$""").matchEntire(english)?.let {
+            val lastUpdate = it.groupValues[1]
+            return translated("Aggiornato alle $lastUpdate", "Aktualisiert um $lastUpdate", "Actualizado a las $lastUpdate")
+        }
+        Regex("""^Map: (.+)$""").matchEntire(english)?.let {
+            val mapName = it.groupValues[1]
+            return translated("Mappa: $mapName", "Karte: $mapName", "Mapa: $mapName")
+        }
+        Regex("""^Map (.+) is ready offline\. Tap to open\.$""").matchEntire(english)?.let {
+            val mapName = it.groupValues[1]
+            return translated("La mappa $mapName è pronta offline. Tocca per aprire.", "Karte $mapName ist offline bereit. Zum Öffnen tippen.", "El mapa $mapName está listo sin conexión. Toca para abrir.")
+        }
+        Regex("""^Site (.+) is not in the displayed area\. Move the map to its city first\.$""").matchEntire(english)?.let {
+            val siteId = it.groupValues[1]
+            return translated(
+                "Il sito $siteId non è nell'area visualizzata. Sposta prima la mappa verso la sua città.",
+                "Standort $siteId liegt nicht im angezeigten Bereich. Verschiebe die Karte zuerst zu seiner Stadt.",
+                "El sitio $siteId no está en la zona mostrada. Mueve primero el mapa hacia su ciudad."
+            )
+        }
+        Regex("""^Uploading \((\d+)/(\d+)\)\.\.\.$""").matchEntire(english)?.let {
+            val current = it.groupValues[1]
+            val total = it.groupValues[2]
+            return translated("Invio in corso ($current/$total)...", "Upload läuft ($current/$total)...", "Enviando ($current/$total)...")
+        }
+        Regex("""^(\d+)/(\d+) photos sent successfully to Signal Quest!$""").matchEntire(english)?.let {
+            val success = it.groupValues[1]
+            val total = it.groupValues[2]
+            return translated("$success/$total foto inviate correttamente a Signal Quest!", "$success/$total Fotos erfolgreich an Signal Quest gesendet!", "$success/$total fotos enviadas correctamente a Signal Quest!")
+        }
+        Regex("""^(\d+) out of (\d+) photo\(s\) successfully sent to Signal Quest\.$""").matchEntire(english)?.let {
+            val success = it.groupValues[1]
+            val total = it.groupValues[2]
+            return translated("$success su $total foto inviate correttamente a Signal Quest.", "$success von $total Foto(s) erfolgreich an Signal Quest gesendet.", "$success de $total foto(s) enviadas correctamente a Signal Quest.")
+        }
+        Regex("""^(\d+)/(\d+) photos sent to Signal Quest\. Some failed\.$""").matchEntire(english)?.let {
+            val success = it.groupValues[1]
+            val total = it.groupValues[2]
+            return translated("$success/$total foto inviate a Signal Quest. Alcune non sono riuscite.", "$success/$total Fotos an Signal Quest gesendet. Einige sind fehlgeschlagen.", "$success/$total fotos enviadas a Signal Quest. Algunas han fallado.")
+        }
+        Regex("""^🏆 Total: (\d+) photos shared since you started!$""").matchEntire(english)?.let {
+            val score = it.groupValues[1]
+            return translated("🏆 Totale: $score foto condivise dall'inizio!", "🏆 Gesamt: $score Fotos seit Beginn geteilt!", "🏆 Total: $score fotos compartidas desde tus inicios!")
+        }
+        Regex("""^Current : (.+)$""").matchEntire(english)?.let {
+            val value = it.groupValues[1]
+            return translated("Attuale: $value", "Aktuell: $value", "Actual: $value")
+        }
+        Regex("""^Optimal distance: (.+)$""").matchEntire(english)?.let {
+            val distance = it.groupValues[1]
+            return translated("Distanza ottimale: $distance", "Optimale Entfernung: $distance", "Distancia óptima: $distance")
+        }
+        Regex("""^Zone: (.+) to (.+)$""").matchEntire(english)?.let {
+            val near = it.groupValues[1]
+            val far = it.groupValues[2]
+            return translated("Zona: da $near a $far", "Zone: $near bis $far", "Zona: de $near a $far")
+        }
+        Regex("""^Selected position: (.+)$""").matchEntire(english)?.let {
+            val label = it.groupValues[1]
+            return translated("Posizione scelta: $label", "Ausgewählte Position: $label", "Posición elegida: $label")
+        }
+        Regex("""^Distance to site: (.+)$""").matchEntire(english)?.let {
+            val distance = it.groupValues[1]
+            return translated("Distanza dal sito: $distance", "Entfernung zum Standort: $distance", "Distancia al sitio: $distance")
+        }
+        Regex("""^↓ Number of operators : (\d+)$""").matchEntire(english)?.let {
+            val count = it.groupValues[1]
+            return translated("↓ Numero di operatori: $count", "↓ Anzahl Betreiber: $count", "↓ Número de operadores: $count")
+        }
+        Regex("""^By (.+)$""").matchEntire(english)?.let {
+            val author = it.groupValues[1]
+            return translated("Da $author", "Von $author", "Por $author")
+        }
+        Regex("""^on (.+)$""").matchEntire(english)?.let {
+            val date = it.groupValues[1]
+            return translated("il $date", "am $date", "el $date")
+        }
+        Regex("""^No (.+) antenna found nearby\.$""").matchEntire(english)?.let {
+            val operator = it.groupValues[1]
+            return translated("Nessuna antenna $operator trovata nelle vicinanze.", "Keine $operator-Antenne in der Nähe gefunden.", "No se encontró ninguna antena $operator cerca.")
+        }
+        Regex("""^(.+) antenna : (.+)$""").matchEntire(english)?.let {
+            val operator = it.groupValues[1]
+            val distance = it.groupValues[2]
+            return translated("Antenna $operator: $distance", "$operator-Antenne: $distance", "Antena $operator: $distance")
+        }
+        Regex("""^(\d+) sections$""").matchEntire(english)?.let {
+            val count = it.groupValues[1]
+            return translated("$count sezioni", "$count Abschnitte", "$count secciones")
+        }
+        Regex("""^What's new \((.+)\)$""").matchEntire(english)?.let {
+            val version = it.groupValues[1]
+            return translated("Novità ($version)", "Neuigkeiten ($version)", "Novedades ($version)")
+        }
+        Regex("""^(\d+) sites found$""").matchEntire(english)?.let {
+            val count = it.groupValues[1]
+            return translated("$count siti trovati", "$count Standorte gefunden", "$count sitios encontrados")
+        }
+        Regex("""^(\d+) sites$""").matchEntire(english)?.let {
+            val count = it.groupValues[1]
+            return translated("$count siti", "$count Standorte", "$count sitios")
+        }
+        Regex("""^(.+) tracking active\.\.\.$""").matchEntire(english)?.let {
+            val operator = it.groupValues[1]
+            return translated("Tracciamento $operator in corso...", "$operator-Tracking aktiv...", "Seguimiento de $operator activo...")
+        }
+        Regex("""^(\d+) / (\d+) photo\(s\) sent\.\.\.$""").matchEntire(english)?.let {
+            val current = it.groupValues[1]
+            val total = it.groupValues[2]
+            return translated("$current / $total foto inviate...", "$current / $total Foto(s) gesendet...", "$current / $total foto(s) enviadas...")
+        }
+        Regex("""^File size: (.+) MB\nWi-Fi download is recommended\.$""").matchEntire(english)?.let {
+            val size = it.groupValues[1]
+            return translated(
+                "Dimensione file: $size MB\nDownload tramite Wi-Fi consigliato.",
+                "Dateigröße: $size MB\nDownload über WLAN empfohlen.",
+                "Tamaño del archivo: $size MB\nSe recomienda descargar por Wi-Fi."
+            )
+        }
+        Regex("""^(\d+) band\(s\) included out of (\d+)$""").matchEntire(english)?.let {
+            val included = it.groupValues[1]
+            val total = it.groupValues[2]
+            return translated("$included banda/e incluse su $total", "$included von $total Band/Bändern einbezogen", "$included banda(s) incluidas de $total")
+        }
+        Regex("""^Estimated main zone: (.+) to (.+)$""").matchEntire(english)?.let {
+            val near = it.groupValues[1]
+            val far = it.groupValues[2]
+            return translated("Zona principale stimata: da $near a $far", "Geschätzte Hauptzone: $near bis $far", "Zona principal estimada: de $near a $far")
+        }
+        Regex("""^Estimated cone: (.+) \((.+)-(.+)\)$""").matchEntire(english)?.let {
+            val center = it.groupValues[1]
+            val near = it.groupValues[2]
+            val far = it.groupValues[3]
+            return translated("Cono stimato: $center ($near-$far)", "Geschätzter Kegel: $center ($near-$far)", "Cono estimado: $center ($near-$far)")
+        }
+        Regex("""^(.+) · (\d+)/(\d+) band\(s\)$""").matchEntire(english)?.let {
+            val profile = it.groupValues[1]
+            val included = it.groupValues[2]
+            val total = it.groupValues[3]
+            return translated("$profile · $included/$total banda/e", "$profile · $included/$total Band/Bänder", "$profile · $included/$total banda(s)")
+        }
+        Regex("""^Calculation assumptions: (.+)$""").matchEntire(english)?.let {
+            val assumptions = it.groupValues[1]
+            return translated("Ipotesi di calcolo: $assumptions", "Berechnungsannahmen: $assumptions", "Supuestos de cálculo: $assumptions")
+        }
+        Regex("""^Sources: (.+)$""").matchEntire(english)?.let {
+            val summary = it.groupValues[1]
+            return translated("Fonti: $summary", "Quellen: $summary", "Fuentes: $summary")
+        }
+        Regex("""^MIMO and modulation are not published at site level, so the (.+) profile is applied\.$""").matchEntire(english)?.let {
+            val profile = it.groupValues[1]
+            return translated(
+                "MIMO e modulazione non sono pubblicati a livello di sito, quindi viene applicato il profilo $profile.",
+                "MIMO und Modulation werden nicht auf Standortebene veröffentlicht, daher wird das Profil $profile angewendet.",
+                "MIMO y modulación no se publican a nivel de sitio, así que se aplica el perfil $profile."
+            )
+        }
+        Regex("""^Band (.+) excluded: operator allocation not found\.$""").matchEntire(english)?.let {
+            val band = it.groupValues[1]
+            return translated("Banda $band esclusa: allocazione operatore non trovata.", "Band $band ausgeschlossen: Betreiberzuteilung nicht gefunden.", "Banda $band excluida: asignación del operador no encontrada.")
+        }
+        Regex("""^Band (.+) may be shared between 4G and 5G, so its throughput is not fully added\.$""").matchEntire(english)?.let {
+            val band = it.groupValues[1]
+            return translated(
+                "La banda $band può essere condivisa tra 4G e 5G, quindi il suo throughput non viene sommato integralmente.",
+                "Band $band kann zwischen 4G und 5G geteilt sein, daher wird sein Durchsatz nicht vollständig addiert.",
+                "La banda $band puede compartirse entre 4G y 5G, por eso su velocidad no se suma por completo."
+            )
+        }
+        Regex("""^Inside a panel azimuth \((.+), (\d+)° offset\)\.$""").matchEntire(english)?.let {
+            val azimuth = it.groupValues[1]
+            val delta = it.groupValues[2]
+            return translated("Dentro l'azimut di un pannello ($azimuth, scarto $delta°).", "Innerhalb eines Panel-Azimuts ($azimuth, Abweichung $delta°).", "Dentro del azimut de un panel ($azimuth, desvío $delta°).")
+        }
+        Regex("""^Outside beam: closest panel (.+), (\d+)° offset\.$""").matchEntire(english)?.let {
+            val azimuth = it.groupValues[1]
+            val delta = it.groupValues[2]
+            return translated("Fuori fascio: pannello più vicino $azimuth, scarto $delta°.", "Außerhalb des Strahls: nächstes Panel $azimuth, Abweichung $delta°.", "Fuera del haz: panel más cercano $azimuth, desvío $delta°.")
+        }
+        Regex("""^Estimated radio cone: nominal point (.+), useful zone (.+)-(.+) from panel/support height\.$""").matchEntire(english)?.let {
+            val center = it.groupValues[1]
+            val near = it.groupValues[2]
+            val far = it.groupValues[3]
+            return translated(
+                "Cono radio stimato: punto nominale $center, zona utile $near-$far dalla quota pannello/supporto.",
+                "Geschätzter Funkkegel: nominaler Punkt $center, Nutzbereich $near-$far aus Panel-/Trägerhöhe.",
+                "Cono radio estimado: punto nominal $center, zona útil $near-$far según altura del panel/soporte."
+            )
+        }
+        Regex("""^Estimated impact: 4G (\d+)% / 5G (\d+)%$""").matchEntire(english)?.let {
+            val lte = it.groupValues[1]
+            val nr = it.groupValues[2]
+            return translated("Impatto stimato: 4G $lte% / 5G $nr%", "Geschätzter Einfluss: 4G $lte% / 5G $nr%", "Impacto estimado: 4G $lte% / 5G $nr%")
+        }
+        Regex("""^RSRP accounts for 40% of the radio score and SNR/SINR for 60%\. The current coefficient gives 4G (\d+)% / 5G (\d+)%\.$""").matchEntire(english)?.let {
+            val lte = it.groupValues[1]
+            val nr = it.groupValues[2]
+            return translated(
+                "RSRP pesa il 40% del punteggio radio e SNR/SINR il 60%. Il coefficiente attuale dà 4G $lte% / 5G $nr%.",
+                "RSRP zählt zu 40% für den Funkwert, SNR/SINR zu 60%. Der aktuelle Koeffizient ergibt 4G $lte% / 5G $nr%.",
+                "RSRP cuenta el 40% de la puntuación radio y SNR/SINR el 60%. El coeficiente actual da 4G $lte% / 5G $nr%."
+            )
+        }
+        Regex("""^The total keeps the best (\d+) 4G carrier\(s\) for the profile\. Low bands 700/800/900 MHz are not added together\.$""").matchEntire(english)?.let {
+            val maxCarriers = it.groupValues[1]
+            return translated(
+                "Il totale mantiene le migliori $maxCarriers portanti 4G del profilo. Le bande basse 700/800/900 MHz non vengono sommate tra loro.",
+                "Die Summe behält die besten $maxCarriers 4G-Träger des Profils. Niedrige Bänder 700/800/900 MHz werden nicht miteinander addiert.",
+                "El total conserva las mejores $maxCarriers portadoras 4G del perfil. Las bandas bajas 700/800/900 MHz no se suman entre sí."
+            )
+        }
+
+        return null
     }
 
     @Composable
@@ -536,7 +1902,7 @@ object AppStrings {
         return appLogoDrawingSubtitle
     }
 
-    val systemLanguage @Composable get() = get("Langage système", "System language", "Idioma do sistema")
+    val systemLanguage @Composable get() = get("Langage système", "System language", "Idioma do sistema", "Lingua di sistema", "Systemsprache", "Idioma del sistema")
 
     val mapIgn @Composable get() = get("IGN (Gouv)", "IGN (Gov)", "IGN (Gov)")
     val mapOsm @Composable get() = get("OpenStreetMap", "OpenStreetMap", "OpenStreetMap")
@@ -558,13 +1924,26 @@ object AppStrings {
     val operatorRegionOverseas @Composable get() = get("Outre-mer", "Overseas", "Ultramar")
     val selectAll @Composable get() = get("Tout sélectionner", "Select all", "Selecionar tudo")
     val clearAll @Composable get() = get("Tout désélectionner", "Clear all", "Limpar tudo")
-    val appLanguageLabel @Composable get() = get("Langue de l'application", "App Language", "Idioma da aplicação")
+    val appLanguageLabel @Composable get() = get("Langue de l'application", "App Language", "Idioma da aplicação", "Lingua dell'app", "App-Sprache", "Idioma de la aplicación")
     val none @Composable get() = get("Aucun", "None", "Nenhum")
     val select @Composable get() = get("Sélectionner", "Select", "Selecionar")
 
     @Composable
     fun current(value: String) = get("Actuel : $value", "Current : $value", "Atual : $value")
-    val validate @Composable get() = get("Valider", "Validate", "Validar")
+    val validate @Composable get() = get("Valider", "Validate", "Validar", "Conferma", "Bestätigen", "Validar")
+    @Composable
+    fun validateForLanguage(languageValue: String): String {
+        val langToCheck = if (languageValue == LANGUAGE_SYSTEM) currentSystemLanguage() else languageValue
+        return resolveForLanguage(
+            langToCheck,
+            "Valider",
+            "Validate",
+            "Validar",
+            "Conferma",
+            "Bestätigen",
+            "Validar"
+        )
+    }
     val upToDate @Composable get() = get("À jour", "Up to date", "Atualizado")
 
     val managePermissions @Composable get() = get("Gérer les permissions", "Manage Permissions", "Gerir permissões")
@@ -577,6 +1956,8 @@ object AppStrings {
     val dragToReorderHint @Composable get() = get("(Appui long et glissé pour déplacer)", "(Long press and drag to reorder)", "(Pressione e segure para arrastar)")
     @Composable
     fun downloadProgress(progress: Int) = get("Téléchargement : $progress %", "Downloading : $progress %", "A transferir : $progress %")
+    @Composable
+    fun fileSizeMb(sizeMb: Int) = get("$sizeMb Mo", "$sizeMb MB", "$sizeMb MB", "$sizeMb MB", "$sizeMb MB", "$sizeMb MB")
 
     val menuSizeTitle @Composable get() = get("Taille du menu principal", "Main menu size", "Tamanho do menu principal")
     val menuSizeSmall @Composable get() = get("Petit", "Small", "Pequeno")
@@ -634,6 +2015,7 @@ object AppStrings {
     val showCellularFrPhotosLabel @Composable get() = get("Afficher les photos de CellularFR", "Show CellularFR photos", "Mostrar fotos do CellularFR")
     val showSignalQuestPhotosLabel @Composable get() = get("Afficher les photos de SignalQuest", "Show SignalQuest photos", "Mostrar fotos do SignalQuest")
     val showSchemesLabel @Composable get() = get("Afficher les schémas du support", "Show support diagrams", "Mostrar esquemas do suporte")
+    val showExifLabel @Composable get() = get("Afficher les EXIF", "Show EXIF", "Mostrar EXIF", "Mostra EXIF", "EXIF anzeigen", "Mostrar EXIF")
     val supportMapOption @Composable get() = get("Mini-carte", "Mini-map", "Mini-mapa")
     val supportDetailsOption @Composable get() = get("Détails du pylône", "Support details", "Detalhes do suporte")
     val supportPhotosOption @Composable get() = get("Photos communautaires", "Community photos", "Fotos da comunidade")
@@ -857,9 +2239,12 @@ object AppStrings {
     @Composable fun throughputCalculationAssumptions(assumptions: String) = get("Hypothèses de calcul : $assumptions", "Calculation assumptions: $assumptions", "Hipóteses de cálculo: $assumptions")
     @Composable fun throughputSources(summary: String) = get("Sources : $summary", "Sources: $summary", "Fontes: $summary")
     val throughputWarningNetworkUnknown @Composable get() = get(
-        "La charge du réseau, le backhaul et les capacités exactes du téléphone ne sont pas connus.",
+        THROUGHPUT_WARNING_NETWORK_UNKNOWN,
         "Network load, backhaul and the phone's exact capabilities are not known.",
-        "A carga da rede, o backhaul e as capacidades exatas do telemóvel não são conhecidos."
+        "A carga da rede, o backhaul e as capacidades exatas do telemóvel não são conhecidos.",
+        "Il carico della rete, il backhaul e le capacità esatte del telefono non sono noti.",
+        "Netzlast, Backhaul und die genauen Fähigkeiten des Telefons sind nicht bekannt.",
+        "No se conocen la carga de red, el backhaul ni las capacidades exactas del teléfono."
     )
     @Composable fun throughputWarningProfileApplied(profileLabel: String) = get(
         "Le MIMO et la modulation ne sont pas publiés au niveau du site : le profil $profileLabel est donc appliqué.",
@@ -877,64 +2262,94 @@ object AppStrings {
         "A banda $band pode ser partilhada entre 4G e 5G; por isso, o débito não é somado integralmente."
     )
     val throughputWarningUplinkAggregation @Composable get() = get(
-        "Le débit montant est limité aux deux meilleures fréquences agrégées, une hypothèse plus réaliste pour les réseaux mobiles en France.",
+        THROUGHPUT_WARNING_UPLINK_AGGREGATION,
         "Upload throughput is limited to the two best aggregated frequencies, which is a more realistic assumption for mobile networks in France.",
-        "O débito ascendente é limitado às duas melhores frequências agregadas, uma hipótese mais realista para redes móveis em França."
+        "O débito ascendente é limitado às duas melhores frequências agregadas, uma hipótese mais realista para redes móveis em França.",
+        "La velocità in upload è limitata alle due migliori frequenze aggregate, un'ipotesi più realistica per le reti mobili in Francia.",
+        "Der Upload-Durchsatz ist auf die zwei besten aggregierten Frequenzen begrenzt, eine realistischere Annahme für Mobilfunknetze in Frankreich.",
+        "La velocidad de subida se limita a las dos mejores frecuencias agregadas, una hipótesis más realista para las redes móviles en Francia."
     )
     val throughputWarningLowBandAggregation @Composable get() = get(
-        "Agrégation 4G entre bandes basses 700/800/900 MHz limitée : beaucoup de téléphones ne cumulent pas ces porteuses.",
+        THROUGHPUT_WARNING_LOW_BAND_AGGREGATION,
         "4G aggregation between low bands 700/800/900 MHz is limited: many phones do not combine these carriers.",
-        "A agregação 4G entre bandas baixas 700/800/900 MHz é limitada: muitos telemóveis não combinam estas portadoras."
+        "A agregação 4G entre bandas baixas 700/800/900 MHz é limitada: muitos telemóveis não combinam estas portadoras.",
+        "L'aggregazione 4G tra bande basse 700/800/900 MHz è limitata: molti telefoni non combinano queste portanti.",
+        "Die 4G-Aggregation zwischen den niedrigen Bändern 700/800/900 MHz ist begrenzt: viele Telefone bündeln diese Träger nicht.",
+        "La agregación 4G entre bandas bajas 700/800/900 MHz es limitada: muchos teléfonos no combinan esas portadoras."
     )
     val throughputWarningLteAggregationLimit @Composable get() = get(
-        "Limite d'agrégation 4G choisie : seules les meilleures porteuses sont comptées.",
+        THROUGHPUT_WARNING_LTE_AGGREGATION_LIMIT,
         "Selected 4G aggregation limit: only the best carriers are counted.",
-        "Limite de agregação 4G escolhida: apenas as melhores portadoras são contabilizadas."
+        "Limite de agregação 4G escolhida: apenas as melhores portadoras são contabilizadas.",
+        "Limite di aggregazione 4G selezionato: vengono conteggiate solo le migliori portanti.",
+        "Gewählte 4G-Aggregationsgrenze: nur die besten Träger werden gezählt.",
+        "Límite de agregación 4G elegido: solo se cuentan las mejores portadoras."
     )
     val throughputWarningNrAggregationLimit @Composable get() = get(
-        "Limite d'agrégation 5G du profil : seules les meilleures porteuses sont comptées.",
+        THROUGHPUT_WARNING_NR_AGGREGATION_LIMIT,
         "Profile 5G aggregation limit: only the best carriers are counted.",
-        "Limite de agregação 5G do perfil: apenas as melhores portadoras são contabilizadas."
+        "Limite de agregação 5G do perfil: apenas as melhores portadoras são contabilizadas.",
+        "Limite di aggregazione 5G del profilo: vengono conteggiate solo le migliori portanti.",
+        "5G-Aggregationsgrenze des Profils: nur die besten Träger werden gezählt.",
+        "Límite de agregación 5G del perfil: solo se cuentan las mejores portadoras."
     )
     val throughputExcludedNoMetropolitanArcepAllocation @Composable get() = get(
-        "Aucune allocation Arcep France métropolitaine compatible avec cette technologie et cette bande.",
+        THROUGHPUT_REASON_NO_METROPOLITAN_ARCEP_ALLOCATION,
         "No compatible Arcep allocation for metropolitan France was found for this technology and band.",
-        "Não foi encontrada nenhuma alocação Arcep da França metropolitana compatível com esta tecnologia e esta banda."
+        "Não foi encontrada nenhuma alocação Arcep da França metropolitana compatível com esta tecnologia e esta banda.",
+        "Nessuna allocazione Arcep della Francia metropolitana compatibile trovata per questa tecnologia e questa banda.",
+        "Keine kompatible Arcep-Zuteilung für Metropolitan-Frankreich für diese Technologie und dieses Band gefunden.",
+        "No se ha encontrado ninguna asignación Arcep de Francia metropolitana compatible con esta tecnología y esta banda."
     )
     val throughputExcludedDssShared @Composable get() = get(
-        "Bande potentiellement partagée entre la 4G et la 5G : elle n'est pas additionnée deux fois.",
+        THROUGHPUT_REASON_DSS_SHARED,
         "Band potentially shared between 4G and 5G: it is not counted twice.",
-        "Banda potencialmente partilhada entre 4G e 5G: não é contabilizada duas vezes."
+        "Banda potencialmente partilhada entre 4G e 5G: não é contabilizada duas vezes.",
+        "Banda potenzialmente condivisa tra 4G e 5G: non viene conteggiata due volte.",
+        "Potenziell zwischen 4G und 5G geteiltes Band: es wird nicht doppelt gezählt.",
+        "Banda potencialmente compartida entre 4G y 5G: no se cuenta dos veces."
     )
     val throughputSourceSummaryEngine @Composable get() = get(
-        "ANFR/data.gouv pour les fréquences déclarées, Arcep pour les allocations opérateur, ETSI/3GPP TS 38.306 et TS 36.306/36.213 pour le modèle radio.",
+        THROUGHPUT_SOURCE_SUMMARY_ENGINE,
         "ANFR/data.gouv for declared frequencies, Arcep for operator allocations, ETSI/3GPP TS 38.306 and TS 36.306/36.213 for the radio model.",
-        "ANFR/data.gouv para as frequências declaradas, Arcep para as alocações das operadoras, ETSI/3GPP TS 38.306 e TS 36.306/36.213 para o modelo rádio."
+        "ANFR/data.gouv para as frequências declaradas, Arcep para as alocações das operadoras, ETSI/3GPP TS 38.306 e TS 36.306/36.213 para o modelo rádio.",
+        "ANFR/data.gouv per le frequenze dichiarate, Arcep per le allocazioni degli operatori, ETSI/3GPP TS 38.306 e TS 36.306/36.213 per il modello radio.",
+        "ANFR/data.gouv für deklarierte Frequenzen, Arcep für Betreiberzuteilungen, ETSI/3GPP TS 38.306 und TS 36.306/36.213 für das Funkmodell.",
+        "ANFR/data.gouv para las frecuencias declaradas, Arcep para las asignaciones de operadores, ETSI/3GPP TS 38.306 y TS 36.306/36.213 para el modelo radio."
     )
     val throughputSourceSummaryDefault @Composable get() = get(
-        "ANFR/data.gouv pour les fréquences déclarées, Arcep pour les allocations opérateur, 3GPP pour le modèle radio.",
+        THROUGHPUT_SOURCE_SUMMARY_DEFAULT,
         "ANFR/data.gouv for declared frequencies, Arcep for operator allocations, 3GPP for the radio model.",
-        "ANFR/data.gouv para as frequências declaradas, Arcep para as alocações das operadoras, 3GPP para o modelo rádio."
+        "ANFR/data.gouv para as frequências declaradas, Arcep para as alocações das operadoras, 3GPP para o modelo rádio.",
+        "ANFR/data.gouv per le frequenze dichiarate, Arcep per le allocazioni degli operatori, 3GPP per il modello radio.",
+        "ANFR/data.gouv für deklarierte Frequenzen, Arcep für Betreiberzuteilungen, 3GPP für das Funkmodell.",
+        "ANFR/data.gouv para las frecuencias declaradas, Arcep para las asignaciones de operadores, 3GPP para el modelo radio."
     )
     val throughputProfilePrudentEngineDesc @Composable get() = get(
-        "Profil prudent : 4G 64-QAM en descendant, 16-QAM en montant, 5G NR 64-QAM, agrégation limitée et DSS non compté deux fois.",
+        THROUGHPUT_PROFILE_PRUDENT_DESC,
         "Conservative profile: 4G 64-QAM downlink, 16-QAM uplink, 5G NR 64-QAM, limited aggregation and DSS not counted twice.",
-        "Perfil prudente: 4G 64-QAM em download, 16-QAM em upload, 5G NR 64-QAM, agregação limitada e DSS sem dupla contagem."
+        "Perfil prudente: 4G 64-QAM em download, 16-QAM em upload, 5G NR 64-QAM, agregação limitada e DSS sem dupla contagem.",
+        "Profilo prudente: 4G 64-QAM in download, 16-QAM in upload, 5G NR 64-QAM, aggregazione limitata e DSS non conteggiato due volte.",
+        "Vorsichtiges Profil: 4G 64-QAM im Download, 16-QAM im Upload, 5G NR 64-QAM, begrenzte Aggregation und DSS nicht doppelt gezählt.",
+        "Perfil prudente: 4G 64-QAM en bajada, 16-QAM en subida, 5G NR 64-QAM, agregación limitada y DSS sin doble conteo."
     )
     val throughputProfileStandardEngineDesc @Composable get() = get(
-        "Profil standard : 4G 256-QAM en descendant avec MIMO 2x2, montant 64-QAM côté téléphone, 5G n78 256-QAM en descendant avec MIMO 4x4, montant 64-QAM sur 2 couches, DSS non compté deux fois.",
+        THROUGHPUT_PROFILE_STANDARD_DESC,
         "Standard profile: 4G 256-QAM downlink with 2x2 MIMO, 64-QAM phone-side uplink, 5G n78 256-QAM downlink with 4x4 MIMO, 64-QAM uplink on 2 layers, DSS not counted twice.",
         "Perfil padrão: 4G 256-QAM em download com MIMO 2x2, upload 64-QAM no telemóvel, 5G n78 256-QAM em download com MIMO 4x4, upload 64-QAM em 2 camadas, DSS sem dupla contagem."
     )
     val throughputProfileIdealEngineDesc @Composable get() = get(
-        "Profil idéal : très bonnes conditions radio plausibles, 4G en descendant avec MIMO 4x4, 5G NR 256-QAM, agrégation plus ouverte et sans double comptage DSS.",
+        THROUGHPUT_PROFILE_IDEAL_DESC,
         "Ideal profile: plausible very good radio conditions, 4G downlink with 4x4 MIMO, 5G NR 256-QAM, more open aggregation and no DSS double counting.",
         "Perfil ideal: condições rádio muito boas e plausíveis, 4G em download com MIMO 4x4, 5G NR 256-QAM, agregação mais aberta e sem dupla contagem DSS."
     )
     val throughputProfileCustomEngineDesc @Composable get() = get(
-        "Profil personnalisé : modulations descendantes et montantes choisies dans l'interface, débit montant traité comme celui d'un téléphone.",
+        THROUGHPUT_PROFILE_CUSTOM_DESC,
         "Custom profile: downlink and uplink modulations chosen in the interface, with upload treated like a phone.",
-        "Perfil personalizado: modulações de download e upload escolhidas na interface, com o upload tratado como o de um telemóvel."
+        "Perfil personalizado: modulações de download e upload escolhidas na interface, com o upload tratado como o de um telemóvel.",
+        "Profilo personalizzato: modulazioni di download e upload scelte nell'interfaccia, con upload trattato come quello di un telefono.",
+        "Benutzerdefiniertes Profil: Download- und Upload-Modulationen werden in der Oberfläche gewählt, der Upload wird wie bei einem Telefon behandelt.",
+        "Perfil personalizado: modulaciones de bajada y subida elegidas en la interfaz, con la subida tratada como la de un teléfono."
     )
     val throughputCustomSignalTitle @Composable get() = get("Signal mesuré", "Measured signal", "Sinal medido")
     val throughputCustomSignalDesc @Composable get() = get(
@@ -1113,71 +2528,67 @@ object AppStrings {
 
     @Composable
     fun translateThroughputWarning(warning: String): String {
-        val profilePrefix = "Le MIMO et la modulation ne sont pas publiés au niveau du site : le profil "
-        val allocationPrefix = "Bande "
-        val allocationSuffix = " exclue : allocation opérateur introuvable."
-        val dssPrefix = "Bande "
-        val dssSuffix = " potentiellement partagée entre la 4G et la 5G : le débit n'est pas additionné intégralement."
-
         return when {
-            warning == "La charge du réseau, le backhaul et les capacités exactes du téléphone ne sont pas connus." -> throughputWarningNetworkUnknown
-            warning.startsWith(profilePrefix) && warning.endsWith(" est donc appliqué.") -> {
-                val rawLabel = warning.removePrefix(profilePrefix).removeSuffix(" est donc appliqué.")
+            warning == THROUGHPUT_WARNING_NETWORK_UNKNOWN -> throughputWarningNetworkUnknown
+            warning.startsWith(THROUGHPUT_WARNING_PROFILE_PREFIX) && warning.endsWith(THROUGHPUT_WARNING_PROFILE_SUFFIX) -> {
+                val rawLabel = warning.removePrefix(THROUGHPUT_WARNING_PROFILE_PREFIX).removeSuffix(THROUGHPUT_WARNING_PROFILE_SUFFIX)
                 throughputWarningProfileApplied(translateThroughputProfileLabel(rawLabel))
             }
-            warning.startsWith(allocationPrefix) && warning.endsWith(allocationSuffix) -> {
-                throughputWarningAllocationMissing(warning.removePrefix(allocationPrefix).removeSuffix(allocationSuffix))
+            warning.startsWith(THROUGHPUT_WARNING_ALLOCATION_PREFIX) && warning.endsWith(THROUGHPUT_WARNING_ALLOCATION_SUFFIX) -> {
+                throughputWarningAllocationMissing(warning.removePrefix(THROUGHPUT_WARNING_ALLOCATION_PREFIX).removeSuffix(THROUGHPUT_WARNING_ALLOCATION_SUFFIX))
             }
-            warning.startsWith(dssPrefix) && warning.endsWith(dssSuffix) -> {
-                throughputWarningDssShared(warning.removePrefix(dssPrefix).removeSuffix(dssSuffix))
+            warning.startsWith(THROUGHPUT_WARNING_DSS_PREFIX) && warning.endsWith(THROUGHPUT_WARNING_DSS_SUFFIX) -> {
+                throughputWarningDssShared(warning.removePrefix(THROUGHPUT_WARNING_DSS_PREFIX).removeSuffix(THROUGHPUT_WARNING_DSS_SUFFIX))
             }
-            warning == "Le débit montant est limité aux deux meilleures fréquences agrégées, une hypothèse plus réaliste pour les réseaux mobiles en France." -> throughputWarningUplinkAggregation
-            warning == "Agrégation 4G entre bandes basses 700/800/900 MHz limitée : beaucoup de téléphones ne cumulent pas ces porteuses." -> throughputWarningLowBandAggregation
-            warning == "Limite d'agrégation 4G choisie : seules les meilleures porteuses sont comptées." -> throughputWarningLteAggregationLimit
-            warning == "Limite d'agrégation 5G du profil : seules les meilleures porteuses sont comptées." -> throughputWarningNrAggregationLimit
+            warning == THROUGHPUT_WARNING_UPLINK_AGGREGATION -> throughputWarningUplinkAggregation
+            warning == THROUGHPUT_WARNING_LOW_BAND_AGGREGATION -> throughputWarningLowBandAggregation
+            warning == THROUGHPUT_WARNING_LTE_AGGREGATION_LIMIT -> throughputWarningLteAggregationLimit
+            warning == THROUGHPUT_WARNING_NR_AGGREGATION_LIMIT -> throughputWarningNrAggregationLimit
             else -> warning
         }
     }
 
     @Composable
     fun translateThroughputAssumption(assumption: String): String = when (assumption) {
-        "Profil prudent : 4G 64-QAM en descendant, 16-QAM en montant, 5G NR 64-QAM, agrégation limitée et DSS non compté deux fois." -> throughputProfilePrudentEngineDesc
-        "Profil standard : 4G 256-QAM en descendant avec MIMO 2x2, montant 64-QAM côté téléphone, 5G n78 256-QAM en descendant avec MIMO 4x4, montant 64-QAM sur 2 couches, DSS non compté deux fois." -> throughputProfileStandardEngineDesc
-        "Profil idéal : très bonnes conditions radio plausibles, 4G en descendant avec MIMO 4x4, 5G NR 256-QAM, agrégation plus ouverte et sans double comptage DSS." -> throughputProfileIdealEngineDesc
-        "Profil personnalisé : modulations descendantes et montantes choisies dans l'interface, débit montant traité comme celui d'un téléphone." -> throughputProfileCustomEngineDesc
-        "Profil personnalisé : modulations DL/UL choisies dans l'interface, UL traité comme un téléphone." -> throughputProfileCustomEngineDesc
+        THROUGHPUT_PROFILE_PRUDENT_DESC -> throughputProfilePrudentEngineDesc
+        THROUGHPUT_PROFILE_STANDARD_DESC -> throughputProfileStandardEngineDesc
+        THROUGHPUT_PROFILE_IDEAL_DESC -> throughputProfileIdealEngineDesc
+        THROUGHPUT_PROFILE_CUSTOM_DESC -> throughputProfileCustomEngineDesc
+        THROUGHPUT_PROFILE_CUSTOM_SHORT_DESC -> throughputProfileCustomEngineDesc
         else -> assumption
     }
 
     @Composable
     fun translateThroughputExcludedReason(reason: String): String = when (reason) {
-        "5G désactivée" -> get("5G désactivée", "5G disabled", "5G desativado")
-        "4G désactivée" -> get("4G désactivée", "4G disabled", "4G desativado")
-        "Bande exclue" -> get("Bande exclue", "Band excluded", "Banda excluída")
-        "Opérateur non reconnu pour les allocations Arcep" -> get("Opérateur non reconnu pour les allocations Arcep", "Operator not recognized for Arcep allocations", "Operadora não reconhecida nas alocações Arcep")
-        "Allocation Arcep introuvable" -> get("Allocation Arcep introuvable", "Arcep allocation not found", "Alocação Arcep não encontrada")
-        "Bande en projet" -> get("Bande en projet", "Planned band", "Banda em projeto")
-        "Aucune allocation Arcep France métropolitaine compatible avec cette technologie et cette bande." -> throughputExcludedNoMetropolitanArcepAllocation
-        "Bande potentiellement partagée entre la 4G et la 5G : elle n'est pas additionnée deux fois." -> throughputExcludedDssShared
-        "Agrégation 4G entre bandes basses 700/800/900 MHz limitée : beaucoup de téléphones ne cumulent pas ces porteuses." -> throughputWarningLowBandAggregation
-        "Limite d'agrégation 4G choisie : seules les meilleures porteuses sont comptées." -> throughputWarningLteAggregationLimit
-        "Limite d'agrégation 5G du profil : seules les meilleures porteuses sont comptées." -> throughputWarningNrAggregationLimit
+        THROUGHPUT_REASON_5G_DISABLED -> get("5G désactivée", "5G disabled", "5G desativado", "5G disattivato", "5G deaktiviert", "5G desactivada")
+        THROUGHPUT_REASON_4G_DISABLED -> get("4G désactivée", "4G disabled", "4G desativado", "4G disattivato", "4G deaktiviert", "4G desactivada")
+        THROUGHPUT_REASON_BAND_EXCLUDED -> get("Bande exclue", "Band excluded", "Banda excluída", "Banda esclusa", "Band ausgeschlossen", "Banda excluida")
+        THROUGHPUT_REASON_OPERATOR_NOT_RECOGNIZED -> get("Opérateur non reconnu", "Operator not recognized", "Operadora não reconhecida", "Operatore non riconosciuto", "Betreiber nicht erkannt", "Operador no reconocido")
+        THROUGHPUT_REASON_OPERATOR_NOT_RECOGNIZED_ARCEP -> get("Opérateur non reconnu pour les allocations Arcep", "Operator not recognized for Arcep allocations", "Operadora não reconhecida nas alocações Arcep", "Operatore non riconosciuto per le allocazioni Arcep", "Betreiber für Arcep-Zuteilungen nicht erkannt", "Operador no reconocido para las asignaciones Arcep")
+        THROUGHPUT_REASON_ARCEP_ALLOCATION_NOT_FOUND -> get("Allocation Arcep introuvable", "Arcep allocation not found", "Alocação Arcep não encontrada", "Allocazione Arcep non trovata", "Arcep-Zuteilung nicht gefunden", "Asignación Arcep no encontrada")
+        THROUGHPUT_REASON_ALLOCATION_NOT_FOUND -> get("Allocation introuvable", "Allocation not found", "Alocação não encontrada", "Allocazione non trovata", "Zuteilung nicht gefunden", "Asignación no encontrada")
+        THROUGHPUT_REASON_PLANNED_BAND -> get("Bande en projet", "Planned band", "Banda em projeto", "Banda pianificata", "Geplantes Band", "Banda planificada")
+        THROUGHPUT_REASON_NO_METROPOLITAN_ARCEP_ALLOCATION -> throughputExcludedNoMetropolitanArcepAllocation
+        THROUGHPUT_REASON_DSS_SHARED -> throughputExcludedDssShared
+        THROUGHPUT_WARNING_LOW_BAND_AGGREGATION -> throughputWarningLowBandAggregation
+        THROUGHPUT_WARNING_LTE_AGGREGATION_LIMIT -> throughputWarningLteAggregationLimit
+        THROUGHPUT_WARNING_NR_AGGREGATION_LIMIT -> throughputWarningNrAggregationLimit
         else -> reason
     }
 
     @Composable
     fun translateThroughputSourceSummary(summary: String): String = when (summary) {
-        "ANFR/data.gouv pour les fréquences déclarées, Arcep pour les allocations opérateur, ETSI/3GPP TS 38.306 et TS 36.306/36.213 pour le modèle radio." -> throughputSourceSummaryEngine
-        "ANFR/data.gouv pour les fréquences déclarées, Arcep pour les allocations opérateur, 3GPP pour le modèle radio." -> throughputSourceSummaryDefault
+        THROUGHPUT_SOURCE_SUMMARY_ENGINE -> throughputSourceSummaryEngine
+        THROUGHPUT_SOURCE_SUMMARY_DEFAULT -> throughputSourceSummaryDefault
         else -> summary
     }
 
     @Composable
     private fun translateThroughputProfileLabel(label: String): String = when (label) {
-        "Prudent" -> get("prudent", "conservative", "prudente")
-        "Standard" -> get("standard", "standard", "padrão")
-        "Profil idéal" -> get("idéal", "ideal", "ideal")
-        "Personnalisé" -> get("personnalisé", "custom", "personalizado")
+        "Prudent" -> get("prudent", "conservative", "prudente", "prudente", "vorsichtig", "prudente")
+        "Standard" -> get("standard", "standard", "padrão", "standard", "Standard", "estándar")
+        THROUGHPUT_PROFILE_IDEAL_LABEL -> get("idéal", "ideal", "ideal", "ideale", "ideal", "ideal")
+        THROUGHPUT_PROFILE_CUSTOM_LABEL -> get("personnalisé", "custom", "personalizado", "personalizzato", "benutzerdefiniert", "personalizado")
         else -> label
     }
 
@@ -1463,7 +2874,14 @@ object AppStrings {
     val aboutSources @Composable get() = get("Sources de données", "Data Sources", "Fontes de données")
     val aboutDev @Composable get() = get("Développement", "Development", "Desenvolvimento")
     val aboutIntro @Composable get() = get("GeoTower vous permet de localiser les antennes relais autour de vous et d'identifier les technologies disponibles.", "GeoTower allows you to locate cell towers around you and identify available technologies.", "A GeoTower permite-lhe localizar torres de celular à sua volta e identificar as tecnologias disponibles.")
-    val devCredit @Composable get() = get("Développé par Julien et les contributeurs de GitHub 😉", "Developed by Julien and GitHub contributors 😉", "Desenvolvido por Julien e os collaborateurs do GitHub 😉")
+    val devCredit @Composable get() = get(
+        "Développé par Julien et les contributeurs de GitHub 😉",
+        "Developed by Julien and GitHub contributors 😉",
+        "Desenvolvido por Julien e colaboradores do GitHub 😉",
+        "Sviluppato da Julien e dai contributori GitHub 😉",
+        "Entwickelt von Julien und GitHub-Mitwirkenden 😉",
+        "Desarrollado por Julien y colaboradores de GitHub 😉"
+    )
     val srcAntennas @Composable get() = get("Données Antennes", "Antenna Data", "Dados de Antenas")
     val srcAntennasDesc @Composable get() = get("Agence Nationale des Fréquences (ANFR).\nDonnées issues de Cartoradio (Open Data).", "National Frequency Agency (ANFR).\nData from Cartoradio (Open Data).", "Agência Nacional de Frequências (ANFR).\nDados do Cartoradio (Open Data).")
     val srcIgn @Composable get() = get("Fond de carte IGN", "IGN Basemap", "Mapa base IGN")
@@ -1471,7 +2889,14 @@ object AppStrings {
     val srcOsm @Composable get() = get("Fond de carte OSM", "OSM Basemap", "Mapa base OSM")
     val srcOsmDesc @Composable get() = get("© les contributeurs d'OpenStreetMap.", "© OpenStreetMap contributors.", "© os colaboradores do OpenStreetMap.")
     val srcInspo @Composable get() = get("Inspiration & Sources Externes", "Inspiration & External Sources", "Inspiração e Fontes Externas")
-    val srcInspoDesc @Composable get() = get("• © CellularFR développé par Luis Baker\n• © Signal Quest développé par Alexandre Germain\n• © RNC Mobile développé par Cédric\n• © eNB-Analytics développé par Tristan\n• © GeoRadio - L'icône alternative provient de l'application GéoRadio sur iOS développée par Hugo Martin.\n• Concept original basé sur l'application GéoRadio\n• Icône fun dessinée par Johan", "• © CellularFR developed by Luis Baker\n• © Signal Quest developed by Alexandre Germain\n• © RNC Mobile developed by Cédric\n• © eNB-Analytics developed par Tristan\n• © GeoRadio - The alternative icon comes from the GéoRadio iOS app developed by Hugo Martin.\n• Original concept based on the GéoRadio app\n• Fun icon designed by Johan", "• © CellularFR desenvolvido por Luis Baker\n• © Signal Quest desenvolvido par Alexandre Germain\n• © RNC Mobile desenvolvido por Cédric\n• © eNB-Analytics desenvolvido par Tristan\n• © GeoRadio - O ícone alternativo vem da application GéoRadio para iOS desenvolvida por Hugo Martin.\n• Conceito original baseado na application GéoRadio\n• Ícone divertido desenhado por Johan")
+    val srcInspoDesc @Composable get() = get(
+        "• © CellularFR développé par Luis Baker\n• © Signal Quest développé par Alexandre Germain\n• © RNC Mobile développé par Cédric\n• © eNB-Analytics développé par Tristan\n• © GeoRadio - L'icône alternative provient de l'application GéoRadio sur iOS développée par Hugo Martin.\n• Concept original basé sur l'application GéoRadio\n• Icône fun dessinée par Johan",
+        "• © CellularFR developed by Luis Baker\n• © Signal Quest developed by Alexandre Germain\n• © RNC Mobile developed by Cédric\n• © eNB-Analytics developed by Tristan\n• © GeoRadio - The alternative icon comes from the GéoRadio iOS app developed by Hugo Martin.\n• Original concept based on the GéoRadio app\n• Fun icon designed by Johan",
+        "• © CellularFR desenvolvido por Luis Baker\n• © Signal Quest desenvolvido por Alexandre Germain\n• © RNC Mobile desenvolvido por Cédric\n• © eNB-Analytics desenvolvido por Tristan\n• © GeoRadio - O ícone alternativo vem da aplicação GéoRadio para iOS desenvolvida por Hugo Martin.\n• Conceito original baseado na aplicação GéoRadio\n• Ícone divertido desenhado por Johan",
+        "• © CellularFR sviluppato da Luis Baker\n• © Signal Quest sviluppato da Alexandre Germain\n• © RNC Mobile sviluppato da Cédric\n• © eNB-Analytics sviluppato da Tristan\n• © GeoRadio - L'icona alternativa proviene dall'app GéoRadio per iOS sviluppata da Hugo Martin.\n• Concetto originale basato sull'app GéoRadio\n• Icona fun disegnata da Johan",
+        "• © CellularFR entwickelt von Luis Baker\n• © Signal Quest entwickelt von Alexandre Germain\n• © RNC Mobile entwickelt von Cédric\n• © eNB-Analytics entwickelt von Tristan\n• © GeoRadio - Das alternative Symbol stammt aus der von Hugo Martin entwickelten iOS-App GéoRadio.\n• Ursprüngliches Konzept auf Basis der GéoRadio-App\n• Fun-Symbol von Johan gestaltet",
+        "• © CellularFR desarrollado por Luis Baker\n• © Signal Quest desarrollado por Alexandre Germain\n• © RNC Mobile desarrollado por Cédric\n• © eNB-Analytics desarrollado por Tristan\n• © GeoRadio - El icono alternativo proviene de la app GéoRadio para iOS desarrollada por Hugo Martin.\n• Concepto original basado en la app GéoRadio\n• Icono fun diseñado por Johan"
+    )
 
     // ==========================================
     // 🗺️ CRÉDITS CARTES (AboutScreen)
@@ -1535,6 +2960,9 @@ object AppStrings {
     val generatedBy @Composable get() = get("Généré via l'application GeoTower", "Generated via the GeoTower app", "Gerado através da application GeoTower")
     val operatorsTitle @Composable get() = get("Opérateurs", "Operators", "Operadoras")
 
+    // ==========================================
+    // 📡 DÉTAIL DU SITE
+    // ==========================================
     val frequenciesTitle @Composable get() = get("Fréquences", "Frequencies", "Frequências")
     val bandsNotSpecified @Composable get() = get("Bandes non spécifiées", "Bands not specified", "Bandas não especificadas")
     val externalLinks @Composable get() = get("Liens externes", "External Links", "Links externos")
@@ -1563,6 +2991,9 @@ object AppStrings {
     val spectrumTitle @Composable get() = get("Spectre", "Spectrum", "Espectro")
     val spectrumByBand @Composable get() = get("Spectre par plage de fréquence", "Spectrum by frequency band", "Espectro por faixa de fréquence")
 
+    // ==========================================
+    // 🗺️ CARTE ET RECHERCHE
+    // ==========================================
     val searchCityOrId @Composable get() = get("Ville, adresse, ID de site...", "City, address, site ID...", "Cidade, endereço, ID do local...")
     val locationNotFound @Composable get() = get("Lieu introuvable", "Location not found", "Localização não encontrada")
     val networkErrorSearch @Composable get() = get("Erreur réseau lors de la recherche", "Network error during search", "Erro de rede durante a pesquisa")
@@ -1613,6 +3044,9 @@ object AppStrings {
         )
     }
 
+    // ==========================================
+    // 📊 STATISTIQUES
+    // ==========================================
     val cityStatsTitle @Composable get() = get("Consulter les statistiques", "View statistics", "Ver estatísticas")
     val mobileTelephony @Composable get() = get("Téléphonie mobile", "Mobile telephony", "Telefonia móvel")
     val details @Composable get() = get("Détails", "Details", "Detalhes")
@@ -1632,10 +3066,16 @@ object AppStrings {
     val stats5GTitle @Composable get() = get("Sites 5G", "5G Sites", "Locais 5G")
     val stats5GDesc @Composable get() = get("Nombre de sites équipés en 5G par opérateur", "Number of 5G-equipped sites per operator", "Número de locaux équipés com 5G por operadora")
 
+    // ==========================================
+    // 🧩 WIDGET
+    // ==========================================
     val widgetTitle @Composable get() = get("📍 Antennes à proximité", "📍 Nearby antennas", "📍 Antenas próximas")
     val bgLocationPermTitle @Composable get() = get("Autorisation Widget", "Widget Permission", "Permissão do Widget")
     val bgLocationPermDesc @Composable get() = get("Autorisez \"Toujours\" pour que le widget s'actualise", "Allow \"Always\" for the widget to refresh", "Permita \"Sempre\" para o widget atualizar")
 
+    // ==========================================
+    // 📸 PHOTOS COMMUNAUTAIRES
+    // ==========================================
     @Composable
     fun communityPhotosTitle(count: Int, communityName: String): String {
         val cleanName = communityName.replace(" ", "\u00A0")
@@ -1669,8 +3109,93 @@ object AppStrings {
     val fullScreenPhotoDesc @Composable get() = get("Photo en plein écran", "Full screen photo", "Foto em tela cheia")
     val supportImageDesc @Composable get() = get("Image du support", "Support image", "Imagem do suporte")
     val supportImageFullScreenDesc @Composable get() = get("Image en plein écran", "Full screen image", "Imagem em ecrã inteiro")
+    val photoExifInfoDesc @Composable get() = get("Infos EXIF", "EXIF info", "Informações EXIF", "Info EXIF", "EXIF-Infos", "Información EXIF")
+    val photoExifMetadataTitle @Composable get() = get("Métadonnées EXIF", "EXIF metadata", "Metadados EXIF", "Metadati EXIF", "EXIF-Metadaten", "Metadatos EXIF")
+    val photoExifGpsPosition @Composable get() = get("Position GPS", "GPS position", "Posição GPS", "Posizione GPS", "GPS-Position", "Posición GPS")
+
+    @Composable
+    fun formatPhotoExifMonth(rawValue: String): String {
+        val cleanValue = rawValue.trim().replace(Regex("\\s+"), " ")
+        if (cleanValue.isEmpty()) return cleanValue
+
+        val year = Regex("""\b(\d{4})\b""").find(cleanValue)?.groupValues?.get(1)
+        val monthIndex = photoExifMonthIndex(cleanValue)
+
+        return if (year != null && monthIndex != null) {
+            "${getMonthName(monthIndex)} $year"
+        } else {
+            cleanValue.replaceFirstChar { if (it.isLowerCase()) it.titlecase(currentJavaLocale()) else it.toString() }
+        }
+    }
+
+    private fun photoExifMonthIndex(rawValue: String): String? {
+        Regex("""\b(\d{4})[-_/](\d{1,2})\b""").find(rawValue)
+            ?.groupValues
+            ?.getOrNull(2)
+            ?.toPhotoExifMonthIndexOrNull()
+            ?.let { return it }
+
+        Regex("""\b(\d{1,2})[-_/](\d{4})\b""").find(rawValue)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toPhotoExifMonthIndexOrNull()
+            ?.let { return it }
+
+        Regex("""\b(\d{4})(\d{2})(?:\d{2})?\b""").find(rawValue)
+            ?.groupValues
+            ?.getOrNull(2)
+            ?.toPhotoExifMonthIndexOrNull()
+            ?.let { return it }
+
+        val normalizedValue = rawValue.normalizedMonthSearchText()
+        return photoExifMonthNamesByIndex.firstNotNullOfOrNull { (index, names) ->
+            index.takeIf { names.any { monthName -> normalizedValue.contains(monthName) } }
+        }
+    }
+
+    private fun String.toPhotoExifMonthIndexOrNull(): String? {
+        val month = toIntOrNull()?.takeIf { it in 1..12 } ?: return null
+        return month.toString().padStart(2, '0')
+    }
+
+    private fun String.normalizedMonthSearchText(): String {
+        return Normalizer.normalize(this, Normalizer.Form.NFD)
+            .replace(Regex("\\p{Mn}+"), "")
+            .lowercase(Locale.ROOT)
+    }
+
+    private val photoExifMonthNamesByIndex = mapOf(
+        "01" to listOf("janvier", "january", "janeiro", "gennaio", "januar", "enero"),
+        "02" to listOf("fevrier", "february", "fevereiro", "febbraio", "februar"),
+        "03" to listOf("mars", "march", "marco", "marzo", "marz"),
+        "04" to listOf("avril", "april", "abril", "aprile"),
+        "05" to listOf("mai", "may", "maio", "maggio", "mayo"),
+        "06" to listOf("juin", "june", "junho", "giugno", "juni", "junio"),
+        "07" to listOf("juillet", "july", "julho", "luglio", "juli", "julio"),
+        "08" to listOf("aout", "august", "agosto"),
+        "09" to listOf("septembre", "september", "setembro", "settembre", "septiembre"),
+        "10" to listOf("octobre", "october", "outubro", "ottobre", "oktober", "octubre"),
+        "11" to listOf("novembre", "november", "novembro", "noviembre"),
+        "12" to listOf("decembre", "december", "dezembro", "dicembre", "dezember", "diciembre")
+    )
+
+    @Composable
+    fun photoExifLabel(key: String): String = when (key) {
+        "cameraModel" -> get("Appareil", "Device", "Aparelho", "Dispositivo", "Gerät", "Dispositivo")
+        "distanceToSiteMeters" -> get("Distance au site", "Distance to site", "Distância ao site", "Distanza dal sito", "Entfernung zum Standort", "Distancia al sitio")
+        "takenMonthLabel" -> get("Date de prise de vue", "Capture date", "Data de captura", "Data di scatto", "Aufnahmedatum", "Fecha de captura")
+        "takenMonth" -> get("Mois EXIF", "EXIF month", "Mês EXIF", "Mese EXIF", "EXIF-Monat", "Mes EXIF")
+        "gpsImgDirectionDegrees" -> get("Direction GPS", "GPS direction", "Direção GPS", "Direzione GPS", "GPS-Richtung", "Dirección GPS")
+        "orientationDegrees" -> get("Orientation", "Orientation", "Orientação", "Orientamento", "Ausrichtung", "Orientación")
+        "gpsLatitude", "latitude", "lat" -> get("Latitude GPS", "GPS latitude", "Latitude GPS", "Latitudine GPS", "GPS-Breitengrad", "Latitud GPS")
+        "gpsLongitude", "longitude", "lng", "lon" -> get("Longitude GPS", "GPS longitude", "Longitude GPS", "Longitudine GPS", "GPS-Längengrad", "Longitud GPS")
+        else -> key.replace(Regex("(?<=[a-z])(?=[A-Z])"), " ").replaceFirstChar { it.uppercase() }
+    }
     val close @Composable get() = get("Fermer", "Close", "Fechar")
 
+    // ==========================================
+    // 🖼️ PARTAGE ET GÉNÉRATION D'IMAGE
+    // ==========================================
     val defaultShareContentTitle @Composable get() = get("Contenu du partage par défaut", "Default share content", "Conteúdo de partilha predefinido")
     val defaultShareContentDesc @Composable get() = get("Choisir les éléments à inclure sur l'image", "Choose the elements to include on the image", "Escolher os éléments a incluir na image")
 
@@ -1694,6 +3219,9 @@ object AppStrings {
     val scanToOpen @Composable get() = get("Scannez pour ouvrir dans", "Scan to open in", "Escaneie para ouvrir no")
     val geoTowerApp @Composable get() = get("l'application GeoTower", "the GeoTower app", "aplicativo GeoTower")
 
+    // ==========================================
+    // 🔁 ACTIONS COMMUNES ET NAVIGATION
+    // ==========================================
     val back @Composable get() = get("Retour", "Back", "Voltar")
     val openMenu @Composable get() = get("Ouvrir menu", "Open menu", "Abrir menu")
     val closeMenu @Composable get() = get("Fermer menu", "Close menu", "Fechar menu")
@@ -1710,18 +3238,98 @@ object AppStrings {
     val top @Composable get() = get("Haut", "Top", "Topo")
     val bottom @Composable get() = get("Bas", "Bottom", "Fundo")
     val noOfflineMapsInstalled @Composable get() = get("(Aucune carte hors-ligne installée)", "(No offline map installed)", "(Nenhum mapa offline instalado)")
+
+    // ==========================================
+    // 📝 NOTES DE VERSION
+    // ==========================================
     val latestChanges @Composable get() = get("Dernières modifications", "Latest changes", "Últimas alterações")
+    val releaseSectionLanguages @Composable get() = get("Langues", "Languages", "Idiomas", "Lingue", "Sprachen", "Idiomas")
+    val releaseSectionTranslations @Composable get() = get("Traductions", "Translations", "Traduções", "Traduzioni", "Übersetzungen", "Traducciones")
+    val releaseSectionCommunityPhotos @Composable get() = get("Photos communautaires", "Community photos", "Fotos comunitárias", "Foto della comunità", "Community-Fotos", "Fotos comunitarias")
+    val releaseSectionInterface @Composable get() = get("Interface", "Interface", "Interface", "Interfaccia", "Oberfläche", "Interfaz")
+    val releaseLanguageAdditions @Composable get() = get(
+        "Ajout de l'italien, de l'allemand et de l'espagnol",
+        "Added Italian, German and Spanish",
+        "Adição de italiano, alemão e espanhol",
+        "Aggiunti italiano, tedesco e spagnolo",
+        "Italienisch, Deutsch und Spanisch hinzugefügt",
+        "Añadidos italiano, alemán y español"
+    )
+    val releaseMultilingualManagement @Composable get() = get(
+        "Amélioration de la gestion multilingue dans toute l'application",
+        "Improved multilingual handling across the app",
+        "Melhoria da gestão multilingue em toda a aplicação",
+        "Migliorata la gestione multilingue in tutta l'app",
+        "Mehrsprachige Verwaltung in der gesamten App verbessert",
+        "Mejorada la gestión multilingüe en toda la aplicación"
+    )
+    val releaseNotificationsWidgetAutoTranslations @Composable get() = get(
+        "Ajout de nouvelles traductions pour les notifications, le widget et Android Auto",
+        "Added new translations for notifications, the widget and Android Auto",
+        "Adição de novas traduções para notificações, widget e Android Auto",
+        "Aggiunte nuove traduzioni per notifiche, widget e Android Auto",
+        "Neue Übersetzungen für Benachrichtigungen, Widget und Android Auto hinzugefügt",
+        "Añadidas nuevas traducciones para notificaciones, widget y Android Auto"
+    )
+    val releaseSignalQuestHelpErrorTranslations @Composable get() = get(
+        "Amélioration des textes traduits pour SignalQuest, l'aide, les erreurs et le calculateur de débit",
+        "Improved translated texts for SignalQuest, help, errors and the throughput calculator",
+        "Melhoria dos textos traduzidos para SignalQuest, ajuda, erros e calculadora de débito",
+        "Migliorati i testi tradotti per SignalQuest, guida, errori e calcolatore di velocità",
+        "Übersetzte Texte für SignalQuest, Hilfe, Fehler und Durchsatzrechner verbessert",
+        "Mejorados los textos traducidos para SignalQuest, ayuda, errores y calculadora de velocidad"
+    )
+    val releaseCommunityExifSetting @Composable get() = get(
+        "Ajout d'un réglage pour afficher ou masquer les informations EXIF",
+        "Added a setting to show or hide EXIF information",
+        "Adição de uma definição para mostrar ou ocultar informações EXIF",
+        "Aggiunta un'impostazione per mostrare o nascondere le informazioni EXIF",
+        "Einstellung zum Ein- oder Ausblenden von EXIF-Informationen hinzugefügt",
+        "Añadido un ajuste para mostrar u ocultar la información EXIF"
+    )
+    val releaseCommunityPhotoLocalization @Composable get() = get(
+        "Meilleure localisation des informations liées aux photos",
+        "Improved localization of photo-related information",
+        "Melhor localização das informações relacionadas com fotos",
+        "Migliore localizzazione delle informazioni relative alle foto",
+        "Bessere Lokalisierung fotobezogener Informationen",
+        "Mejor localización de la información relacionada con las fotos"
+    )
+    val releaseWidgetLocalization @Composable get() = get(
+        "Amélioration de la localisation du widget",
+        "Improved widget localization",
+        "Melhoria da localização do widget",
+        "Migliorata la localizzazione del widget",
+        "Lokalisierung des Widgets verbessert",
+        "Mejorada la localización del widget"
+    )
+    val releaseTranslatedReleaseNotes @Composable get() = get(
+        "Notes de version désormais mieux intégrées aux traductions",
+        "Release notes are now better integrated with translations",
+        "Notas de versão agora melhor integradas nas traduções",
+        "Note di versione ora meglio integrate nelle traduzioni",
+        "Versionshinweise sind jetzt besser in die Übersetzungen integriert",
+        "Notas de versión ahora mejor integradas con las traducciones"
+    )
     val showMoreSites @Composable get() = get("Afficher plus de sites", "Show more sites", "Mostrar mais")
     val geoportailIgn @Composable get() = get("Géoportail (IGN)", "Geoportal (IGN)", "Geoportal (IGN)")
-    val languageFrenchName @Composable get() = get("Français", "French", "Francês")
-    val languageEnglishName @Composable get() = get("Anglais", "English", "Inglês")
-    val languagePortugueseName @Composable get() = get("Portugais", "Portuguese", "Português")
+    val unknownAddress @Composable get() = get("Adresse inconnue", "Unknown address", "Endereço desconhecido", "Indirizzo sconosciuto", "Unbekannte Adresse", "Dirección desconocida")
+    val siteAnfrLabel @Composable get() = get("Site ANFR", "ANFR site", "Site ANFR", "Sito ANFR", "ANFR-Standort", "Sitio ANFR")
+    val languageFrenchName @Composable get() = get("Français", "French", "Francês", "Francese", "Französisch", "Francés")
+    val languageEnglishName @Composable get() = get("Anglais", "English", "Inglês", "Inglese", "Englisch", "Inglés")
+    val languagePortugueseName @Composable get() = get("Portugais", "Portuguese", "Português", "Portoghese", "Portugiesisch", "Portugués")
+    val languageItalianName @Composable get() = get("Italien", "Italian", "Italiano", "Italiano", "Italienisch", "Italiano")
+    val languageGermanName @Composable get() = get("Allemand", "German", "Alemão", "Tedesco", "Deutsch", "Alemán")
+    val languageSpanishName @Composable get() = get("Espagnol", "Spanish", "Espanhol", "Spagnolo", "Spanisch", "Español")
     @Composable
     fun languageDisplayName(languageValue: String): String = when (languageValue) {
         LANGUAGE_SYSTEM -> systemLanguage
         LANGUAGE_FRENCH -> languageFrenchName
         LANGUAGE_ENGLISH -> languageEnglishName
         LANGUAGE_PORTUGUESE -> languagePortugueseName
+        LANGUAGE_ITALIAN -> languageItalianName
+        LANGUAGE_GERMAN -> languageGermanName
+        LANGUAGE_SPANISH -> languageSpanishName
         else -> languageValue
     }
     val imageContent @Composable get() = get("Contenu de l'image", "Image content", "Conteúdo da imagem")
@@ -1746,6 +3354,9 @@ object AppStrings {
     val doNotShowAgain @Composable get() = get("Ne plus afficher ce message", "Do not show this message again", "Não mostrar esta mensagem novamente")
     val understood @Composable get() = get("J'ai compris", "Understood", "Entendi")
 
+    // ==========================================
+    // 🚀 ENVOI SIGNALQUEST
+    // ==========================================
     val uploadSqTitle @Composable get() = get("Envoi vers Signal Quest", "Send to Signal Quest", "Enviar para Signal Quest")
     val uploadSqStripExif @Composable get() = get("Supprimer les donn\u00e9es EXIF", "Remove EXIF data", "Remover dados EXIF")
     val uploadSqDescPlaceholder @Composable get() = get("Ajouter une description pour ce lot (optionnel)...", "Add a description for this batch (optional)...", "Adicionar uma descrição pour este lote (optionnal)...")
@@ -1803,6 +3414,10 @@ object AppStrings {
     )
 
     val awesome @Composable get() = get("Super !", "Awesome!", "¡Genial!")
+
+    // ==========================================
+    // 💾 TÉLÉCHARGEMENTS ET BANNIÈRES BASE
+    // ==========================================
     val notifDbDownloadSuccess @Composable get() = get("Téléchargement terminé", "Download finished", "Transferência concluída")
     val dbDownloadSuccessDesc @Composable get() = get("La base de données a été téléchargée avec succès !", "The database was successfully downloaded!", "A base de données foi transferida com sucesso!")
     val dbDownloadTermine @Composable get() = get("Terminer", "Finish", "Terminar")
@@ -1819,6 +3434,9 @@ object AppStrings {
     val invalidDbBannerDesc @Composable get() = get("La base locale est incompatible. Téléchargez une base valide pour continuer.", "The local database is incompatible. Download a valid database to continue.", "A base local e incompativel. Baixe uma base valida para continuar.")
     val btnDownloadBanner @Composable get() = get("Télécharger", "Download", "Baixar")
 
+    // ==========================================
+    // 🗂️ DONNÉES ANFR : NATURES, TYPES, PROPRIÉTAIRES
+    // ==========================================
     @Composable
     fun translateNature(nature: String?): String {
         if (nature.isNullOrBlank()) return get("Non spécifiée", "Not specified", "Não especificado")
@@ -1973,17 +3591,24 @@ object AppStrings {
         }
     }
 
+    // ==========================================
+    // 🔔 SERVICES, NOTIFICATIONS, WIDGET ET ANDROID AUTO
+    // ==========================================
     // Fonction utilitaire spéciale pour lire la langue sans @Composable
-    fun getForService(context: android.content.Context, fr: String, en: String, pt: String): String {
+    fun getForService(
+        context: android.content.Context,
+        fr: String,
+        en: String,
+        pt: String,
+        it: String = fallbackTranslation(en, LANGUAGE_ITALIAN),
+        de: String = fallbackTranslation(en, LANGUAGE_GERMAN),
+        es: String = fallbackTranslation(en, LANGUAGE_SPANISH)
+    ): String {
         val prefs = context.getSharedPreferences("GeoTowerPrefs", android.content.Context.MODE_PRIVATE)
-        val currentLang = prefs.getString("app_language", "Système") ?: "Système"
-        val langToCheck = if (currentLang == "Système") java.util.Locale.getDefault().language else currentLang
+        val currentLang = prefs.getString("app_language", LANGUAGE_SYSTEM) ?: LANGUAGE_SYSTEM
+        val langToCheck = if (currentLang == LANGUAGE_SYSTEM) java.util.Locale.getDefault().language else currentLang
 
-        return when {
-            langToCheck == "Français" || langToCheck == "fr" -> fr
-            langToCheck == "Português" || langToCheck == "pt" -> pt
-            else -> en
-        }
+        return resolveForLanguage(langToCheck, fr, en, pt, it, de, es)
     }
 
     fun newDbNotifTitle(ctx: android.content.Context) = getForService(ctx, "Nouvelle base de données", "New database", "Nova base de données")
@@ -1997,6 +3622,7 @@ object AppStrings {
     fun quitAction(ctx: android.content.Context) = getForService(ctx, "Quitter", "Stop", "Sair")
     fun errorForService(ctx: android.content.Context) = getForService(ctx, "Erreur", "Error", "Erro")
 
+    // Notifications base de données et cartes hors ligne.
     fun dbDownloadChannelName(ctx: android.content.Context) = getForService(ctx, "Mise à jour Base de données", "Database Update", "Atualização da base de dados")
     fun dbDownloadTitle(ctx: android.content.Context) = getForService(ctx, "Mise à jour de la base", "Database update", "Atualização da base")
     fun dbDownloadProgress(ctx: android.content.Context, progress: Int) = getForService(ctx, "Téléchargement en cours... $progress%", "Downloading... $progress%", "A transferir... $progress%")
@@ -2012,16 +3638,32 @@ object AppStrings {
     fun mapDownloadedContent(ctx: android.content.Context, mapName: String) = getForService(ctx, "La carte $mapName est prête hors ligne. Appuyez pour ouvrir.", "Map $mapName is ready offline. Tap to open.", "O mapa $mapName está pronto offline. Toque para abrir.")
     fun mapSiteNotInArea(ctx: android.content.Context, siteId: String) = getForService(ctx, "Le site $siteId n'est pas dans la zone affichée. Déplacez la carte vers sa ville d'abord.", "Site $siteId is not in the displayed area. Move the map to its city first.", "O site $siteId não está na área apresentada. Mova primeiro o mapa para a sua cidade.")
 
+    // Service d'envoi SignalQuest.
     fun signalQuestUploadChannelName(ctx: android.content.Context) = getForService(ctx, "Envoi Signal Quest", "Signal Quest upload", "Envio Signal Quest")
     fun signalQuestUploadProgress(ctx: android.content.Context, current: Int, total: Int) = getForService(ctx, "Envoi en cours ($current/$total)...", "Uploading ($current/$total)...", "A enviar ($current/$total)...")
     fun signalQuestUploadRetry(ctx: android.content.Context) = getForService(ctx, "Échec réseau, nouvel essai plus tard.", "Network error, retrying later.", "Erro de rede, nova tentativa mais tarde.")
     fun signalQuestUploadSuccess(ctx: android.content.Context, success: Int, total: Int) = getForService(ctx, "$success/$total photos envoyées avec succès vers Signal Quest !", "$success/$total photos sent successfully to Signal Quest!", "$success/$total fotos enviadas com sucesso para Signal Quest!")
     fun signalQuestUploadPartial(ctx: android.content.Context, success: Int, total: Int) = getForService(ctx, "$success/$total photos envoyées vers Signal Quest. Certaines ont échoué.", "$success/$total photos sent to Signal Quest. Some failed.", "$success/$total fotos enviadas para Signal Quest. Algumas falharam.")
+    fun signalQuestInvalidSite(ctx: android.content.Context) = getForService(ctx, "Site SignalQuest invalide.", "Invalid SignalQuest site.", "Site SignalQuest inválido.", "Sito SignalQuest non valido.", "Ungültiger SignalQuest-Standort.", "Sitio SignalQuest no válido.")
+    fun signalQuestPhotoRequired(ctx: android.content.Context) = getForService(ctx, "Ajoutez au moins une photo avant l'envoi.", "Add at least one photo before uploading.", "Adicione pelo menos uma foto antes do envio.", "Aggiungi almeno una foto prima dell'invio.", "Füge vor dem Upload mindestens ein Foto hinzu.", "Añade al menos una foto antes del envío.")
+    fun signalQuestMaxPhotos(ctx: android.content.Context, max: Int) = getForService(ctx, "Maximum $max photos par envoi.", "Maximum $max photos per upload.", "Máximo de $max fotos por envio.", "Massimo $max foto per invio.", "Maximal $max Fotos pro Upload.", "Máximo $max fotos por envío.")
+    fun signalQuestUnsupportedOperator(ctx: android.content.Context) = getForService(ctx, "Opérateur SignalQuest non pris en charge.", "SignalQuest operator not supported.", "Operadora SignalQuest não suportada.", "Operatore SignalQuest non supportato.", "SignalQuest-Betreiber wird nicht unterstützt.", "Operador SignalQuest no compatible.")
+    fun signalQuestUploadDisabledForOperator(ctx: android.content.Context) = getForService(ctx, "Envoi SignalQuest désactivé pour cet opérateur.", "SignalQuest upload is disabled for this operator.", "Envio SignalQuest desativado para esta operadora.", "Invio SignalQuest disattivato per questo operatore.", "SignalQuest-Upload ist für diesen Betreiber deaktiviert.", "Envío SignalQuest desactivado para este operador.")
+    fun signalQuestUnsupportedPhotoFormat(ctx: android.content.Context) = getForService(ctx, "Format de photo non pris en charge.", "Photo format not supported.", "Formato de foto não suportado.", "Formato foto non supportato.", "Fotoformat wird nicht unterstützt.", "Formato de foto no compatible.")
+    fun signalQuestPhotoTooLarge(ctx: android.content.Context) = getForService(ctx, "Une photo dépasse la limite de 20 Mo.", "A photo exceeds the 20 MB limit.", "Uma foto ultrapassa o limite de 20 MB.", "Una foto supera il limite di 20 MB.", "Ein Foto überschreitet das Limit von 20 MB.", "Una foto supera el límite de 20 MB.")
+    fun signalQuestPreparePhotosFailed(ctx: android.content.Context) = getForService(ctx, "Impossible de préparer les photos.", "Unable to prepare photos.", "Não foi possível preparar as fotos.", "Impossibile preparare le foto.", "Fotos konnten nicht vorbereitet werden.", "No se han podido preparar las fotos.")
+    fun signalQuestManifestMissing(ctx: android.content.Context) = getForService(ctx, "Manifeste d'envoi introuvable.", "Upload manifest not found.", "Manifesto de envio não encontrado.", "Manifesto di invio non trovato.", "Upload-Manifest nicht gefunden.", "Manifiesto de envío no encontrado.")
+    fun signalQuestManifestInvalid(ctx: android.content.Context) = getForService(ctx, "Manifeste d'envoi invalide.", "Invalid upload manifest.", "Manifesto de envio inválido.", "Manifesto di invio non valido.", "Ungültiges Upload-Manifest.", "Manifiesto de envío no válido.")
+    fun signalQuestPhotoInaccessible(ctx: android.content.Context) = getForService(ctx, "Photo inaccessible.", "Photo inaccessible.", "Foto inacessível.", "Foto non accessibile.", "Foto nicht zugänglich.", "Foto inaccesible.")
 
+    // Widget Android et Android Auto.
     fun widgetTitle(ctx: android.content.Context) = getForService(ctx, "📍 Antennes à proximité", "📍 Nearby antennas", "📍 Antenas próximas")
     fun widgetUpdatedAt(ctx: android.content.Context, lastUpdate: String) = getForService(ctx, "Mis à jour à $lastUpdate", "Updated at $lastUpdate", "Atualizado às $lastUpdate")
     fun widgetWaitingGps(ctx: android.content.Context) = getForService(ctx, "En attente du GPS...", "Waiting for GPS...", "À espera do GPS...")
     fun widgetImmediateSearch(ctx: android.content.Context) = getForService(ctx, "Recherche immédiate...", "Searching...", "Pesquisa imediata...")
+    fun unknownAddress(ctx: android.content.Context) = getForService(ctx, "Adresse inconnue", "Unknown address", "Endereço desconhecido", "Indirizzo sconosciuto", "Unbekannte Adresse", "Dirección desconocida")
+    fun siteAnfrLabel(ctx: android.content.Context) = getForService(ctx, "Site ANFR", "ANFR site", "Site ANFR", "Sito ANFR", "ANFR-Standort", "Sitio ANFR")
+    fun siteAnfrTitle(ctx: android.content.Context, idAnfr: String) = "${siteAnfrLabel(ctx)} $idAnfr"
 
     fun carConnected(ctx: android.content.Context) = getForService(ctx, "GeoTower est connecté à Android Auto.", "GeoTower is connected to Android Auto.", "GeoTower está ligado ao Android Auto.")
     fun carNearbySites(ctx: android.content.Context) = getForService(ctx, "Sites proches", "Nearby sites", "Sites próximos")
@@ -2048,9 +3690,15 @@ object AppStrings {
         ctx,
         "Touchez ici, allez dans Autorisations > Localisation, puis choisissez \"Toujours autoriser\".",
         "Tap here, go to Permissions > Location, then select \"Allow all the time\".",
-        "Toque aqui, vá em Permissões > Localização e selecione \"Permitir o tempo todo\"."
+        "Toque aqui, vá em Permissões > Localização e selecione \"Permitir o tempo todo\".",
+        "Tocca qui, vai in Autorizzazioni > Posizione, poi seleziona \"Consenti sempre\".",
+        "Tippe hier, gehe zu Berechtigungen > Standort und wähle dann \"Immer zulassen\".",
+        "Toca aquí, ve a Permisos > Ubicación y selecciona \"Permitir todo el tiempo\"."
     )
 
+    // ==========================================
+    // 🚨 INCIDENTS, STATUTS ET API OPÉRATEUR
+    // ==========================================
     val outageAttentionDesc @Composable get() = get("Attention panne", "Outage warning", "Aviso de falha")
     val unknownOutageReason @Composable get() = get("Raison inconnue", "Unknown reason", "Motivo desconhecido")
     val outageReasonMaintenance @Composable get() = get("Maintenance", "Maintenance", "Manutenção")
@@ -2077,6 +3725,9 @@ object AppStrings {
     val apiDetailIncident @Composable get() = get("Incident en cours", "Ongoing incident", "Incidente em curso")
     val apiDetailMaintenance @Composable get() = get("Travaux de maintenance", "Maintenance work", "Trabalhos de manutenção")
 
+    // ==========================================
+    // 🧾 VERSIONS, CARTES ET FORMATAGE
+    // ==========================================
     val aboutVersionsTitle @Composable get() = get("Versions", "Versions", "Versões")
     val versionAppLabel @Composable get() = get("Version de\nl'application", "App\nversion", "Versão do\napp")
     val versionDbLabel @Composable get() = get("Version de la base\nde données", "Database\nversion", "Versão da base\nde dados")
@@ -2173,7 +3824,7 @@ object AppStrings {
     // ==========================================
     // 🚀 SPEEDTEST (Signal Quest)
     // ==========================================
-    val showSpeedtestLabel @Composable get() = get("Afficher le meilleur Speedtest (SFR/Bouygues)", "Show best Speedtest (SFR/Bouygues)", "Mostrar o meilleur Speedtest (SFR/Bouygues)")
+    val showSpeedtestLabel @Composable get() = get("Afficher le meilleur Speedtest", "Show best Speedtest", "Mostrar o melhor Speedtest")
     val speedtestTitle @Composable get() = get("Meilleur Speedtest", "Best Speedtest", "Melhor Speedtest")
     val speedtestDownload @Composable get() = get("Descendant", "Download", "Download")
     val speedtestUpload @Composable get() = get("Montant", "Upload", "Upload")

@@ -112,8 +112,27 @@ private data class PhotoExifCoordinate(
 )
 
 private data class PhotoExifDisplayItem(
-    val label: String,
+    val key: String,
     val value: String
+)
+
+private val hiddenExifDisplayKeys = setOf(
+    "takenMonth",
+    "orientationDegrees"
+)
+
+private val exifPreferredDisplayOrder = listOf(
+    "cameraModel",
+    "distanceToSiteMeters",
+    "takenMonthLabel",
+    "gpsImgDirectionDegrees",
+    "gpsLatitude",
+    "gpsLongitude",
+    "latitude",
+    "longitude",
+    "lat",
+    "lon",
+    "lng"
 )
 
 private data class DisplayedPhotoFrame(
@@ -194,32 +213,31 @@ fun formatPhotoDate(isoDate: String?): String {
 }
 
 private fun CommunityPhoto.hasExifInfo(): Boolean {
-    return exifDisplayItems(exifMetadata).isNotEmpty() || exifCoordinate(exifMetadata) != null
+    return exifDisplayKeys(exifMetadata).any { key -> exifMetadata?.get(key).hasVisibleExifValue() } ||
+        exifCoordinate(exifMetadata) != null
 }
 
+private fun exifDisplayKeys(metadata: Map<String, Any?>?): List<String> {
+    if (metadata.isNullOrEmpty()) return emptyList()
+    return exifPreferredDisplayOrder
+        .filter { it in metadata && it !in hiddenExifDisplayKeys } +
+        metadata.keys
+            .filterNot { it in exifPreferredDisplayOrder || it in hiddenExifDisplayKeys }
+            .sorted()
+}
+
+private fun Any?.hasVisibleExifValue(): Boolean {
+    val cleanValue = this?.toString()?.trim()
+    return !cleanValue.isNullOrBlank() && cleanValue != "null"
+}
+
+@Composable
 private fun exifDisplayItems(metadata: Map<String, Any?>?): List<PhotoExifDisplayItem> {
     if (metadata.isNullOrEmpty()) return emptyList()
-    val preferredOrder = listOf(
-        "cameraModel",
-        "distanceToSiteMeters",
-        "takenMonthLabel",
-        "takenMonth",
-        "gpsImgDirectionDegrees",
-        "orientationDegrees",
-        "gpsLatitude",
-        "gpsLongitude",
-        "latitude",
-        "longitude",
-        "lat",
-        "lon",
-        "lng"
-    )
-    val sortedKeys = preferredOrder.filter { it in metadata } + metadata.keys.filterNot { it in preferredOrder }.sorted()
-
-    return sortedKeys.mapNotNull { key ->
+    return exifDisplayKeys(metadata).mapNotNull { key ->
         val value = metadata[key]
         val formattedValue = formatExifValue(key, value) ?: return@mapNotNull null
-        PhotoExifDisplayItem(label = exifLabel(key), value = formattedValue)
+        PhotoExifDisplayItem(key = key, value = formattedValue)
     }
 }
 
@@ -267,10 +285,13 @@ private fun Any?.asDoubleOrNull(): Double? {
     }
 }
 
+@Composable
 private fun formatExifValue(key: String, value: Any?): String? {
-    val cleanValue = value?.toString()?.takeIf { it.isNotBlank() && it != "null" } ?: return null
+    val cleanValue = value?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" } ?: return null
     val number = value.asDoubleOrNull()
     return when (key) {
+        "cameraModel" -> formatCameraModel(cleanValue)
+        "takenMonthLabel" -> AppStrings.formatPhotoExifMonth(cleanValue)
         "distanceToSiteMeters" -> number?.let { "${formatDecimal(it, maximumFractionDigits = 1)} m" } ?: cleanValue
         "gpsImgDirectionDegrees",
         "orientationDegrees" -> number?.let { "${formatDecimal(it, maximumFractionDigits = 0)} deg" } ?: cleanValue
@@ -285,25 +306,27 @@ private fun formatExifValue(key: String, value: Any?): String? {
     }
 }
 
+private fun formatCameraModel(value: String): String {
+    return value
+        .trim()
+        .replace(Regex("\\s+"), " ")
+        .split(" ")
+        .joinToString(" ") { token -> formatCameraModelToken(token) }
+}
+
+private fun formatCameraModelToken(token: String): String {
+    if (token.isBlank()) return token
+    if (token.matches(Regex("\\d+g", RegexOption.IGNORE_CASE))) return token.uppercase(Locale.getDefault())
+    return token.replaceFirstChar { first ->
+        if (first.isLowerCase()) first.titlecase(Locale.getDefault()) else first.toString()
+    }
+}
+
 private fun formatDecimal(value: Double, maximumFractionDigits: Int): String {
     return NumberFormat.getNumberInstance(Locale.FRANCE).apply {
         minimumFractionDigits = 0
         this.maximumFractionDigits = maximumFractionDigits
     }.format(value)
-}
-
-private fun exifLabel(key: String): String {
-    return when (key) {
-        "cameraModel" -> "Appareil"
-        "distanceToSiteMeters" -> "Distance au site"
-        "takenMonthLabel" -> "Date de prise de vue"
-        "takenMonth" -> "Mois EXIF"
-        "gpsImgDirectionDegrees" -> "Direction GPS"
-        "orientationDegrees" -> "Orientation"
-        "gpsLatitude", "latitude", "lat" -> "Latitude GPS"
-        "gpsLongitude", "longitude", "lng", "lon" -> "Longitude GPS"
-        else -> key.replace(Regex("(?<=[a-z])(?=[A-Z])"), " ").replaceFirstChar { it.uppercase() }
-    }
 }
 
 @Composable
@@ -423,6 +446,10 @@ fun CommunityPhotosSectionShared(
 
     var selectedPhotoIndex by remember { mutableStateOf<Int?>(null) }
     var exifDialogPhoto by remember { mutableStateOf<CommunityPhoto?>(null) }
+    val showPhotoExif = AppConfig.siteShowPhotoExif.value
+    LaunchedEffect(showPhotoExif) {
+        if (!showPhotoExif) exifDialogPhoto = null
+    }
     // 🚨 AJOUT : Variable pour afficher le château d'eau en grand
     var showPlaceholderFullScreen by remember { mutableStateOf(false) }
 
@@ -912,7 +939,7 @@ fun CommunityPhotosSectionShared(
                         )
                     }
 
-                    if (currentPhoto.hasExifInfo() && currentPhotoSourceSize != null) {
+                    if (showPhotoExif && currentPhoto.hasExifInfo() && currentPhotoSourceSize != null) {
                         PhotoInfoButton(
                             modifier = Modifier.align(Alignment.TopEnd).padding(top = photoTopPadding, end = photoEndPadding),
                             backgroundColor = overlayButtonBg,
@@ -1039,7 +1066,7 @@ private fun PhotoInfoButton(
     ) {
         Icon(
             imageVector = Icons.Default.Info,
-            contentDescription = "Infos EXIF",
+            contentDescription = AppStrings.photoExifInfoDesc,
             tint = contentColor,
             modifier = Modifier.size(18.dp)
         )
@@ -1051,7 +1078,7 @@ private fun PhotoExifDialog(
     photo: CommunityPhoto,
     onDismiss: () -> Unit
 ) {
-    val items = remember(photo.exifMetadata) { exifDisplayItems(photo.exifMetadata) }
+    val items = exifDisplayItems(photo.exifMetadata)
     val coordinate = remember(photo.exifMetadata) { exifCoordinate(photo.exifMetadata) }
     val dialogShape = RoundedCornerShape(18.dp)
     val mapShape = RoundedCornerShape(12.dp)
@@ -1074,7 +1101,7 @@ private fun PhotoExifDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Metadonnees EXIF",
+                        text = AppStrings.photoExifMetadataTitle,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
@@ -1092,7 +1119,7 @@ private fun PhotoExifDialog(
                     coordinate?.let { point ->
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "Position GPS",
+                            text = AppStrings.photoExifGpsPosition,
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -1121,7 +1148,7 @@ private fun PhotoExifDialog(
                                     verticalAlignment = Alignment.Top
                                 ) {
                                     Text(
-                                        text = item.label,
+                                        text = AppStrings.photoExifLabel(item.key),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.weight(1f)

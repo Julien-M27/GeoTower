@@ -2064,6 +2064,17 @@ fun SitePhotosSettingsSheet(
                                     checkedColor = switchColor
                                 )
                             }
+
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(AppStrings.showExifLabel, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                                fr.geotower.ui.components.GeoTowerSwitch(
+                                    checked = AppConfig.siteShowPhotoExif.value,
+                                    onCheckedChange = { saveBool("site_show_photo_exif", AppConfig.siteShowPhotoExif, it) },
+                                    modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                                    useOneUi = useOneUi,
+                                    checkedColor = switchColor
+                                )
+                            }
                         }
                     }
                 }
@@ -2074,6 +2085,7 @@ fun SitePhotosSettingsSheet(
                 onClick = {
                     saveBool("page_site_photos", AppConfig.siteShowPhotos, true)
                     saveBool("site_show_schemes", AppConfig.siteShowSchemes, true)
+                    saveBool("site_show_photo_exif", AppConfig.siteShowPhotoExif, true)
                 },
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             ) {

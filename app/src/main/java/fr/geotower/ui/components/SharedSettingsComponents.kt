@@ -249,7 +249,7 @@ fun OperatorItem(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LanguageSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> Unit, sheetState: SheetState, useOneUi: Boolean, bubbleColor: Color) {
-    var tempLang by remember { mutableStateOf(current) }
+    var tempLang by remember(current) { mutableStateOf(current) }
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
@@ -274,6 +274,9 @@ fun LanguageSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
                 LanguageItem(AppStrings.languageFrenchName, "🇫🇷", tempLang == AppStrings.LANGUAGE_FRENCH, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_FRENCH }
                 LanguageItem(AppStrings.languageEnglishName, "🇬🇧", tempLang == AppStrings.LANGUAGE_ENGLISH, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_ENGLISH }
                 LanguageItem(AppStrings.languagePortugueseName, "🇵🇹", tempLang == AppStrings.LANGUAGE_PORTUGUESE, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_PORTUGUESE }
+                LanguageItem(AppStrings.languageItalianName, "🇮🇹", tempLang == AppStrings.LANGUAGE_ITALIAN, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_ITALIAN }
+                LanguageItem(AppStrings.languageGermanName, "🇩🇪", tempLang == AppStrings.LANGUAGE_GERMAN, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_GERMAN }
+                LanguageItem(AppStrings.languageSpanishName, "🇪🇸", tempLang == AppStrings.LANGUAGE_SPANISH, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_SPANISH }
 
                 Button(
                     onClick = { onSelect(tempLang); onDismiss() },
@@ -281,7 +284,7 @@ fun LanguageSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
                     shape = RoundedCornerShape(28.dp),
                     // ✅ MODIFICATION : On s'assure que le texte du bouton utilise "onPrimary" (généralement blanc) pour contraster avec la couleur vive
                     colors = ButtonDefaults.buttonColors(containerColor = activeColor, contentColor = MaterialTheme.colorScheme.onPrimary)
-                ) { Text(AppStrings.validate, fontWeight = FontWeight.Bold) }
+                ) { Text(AppStrings.validateForLanguage(tempLang), fontWeight = FontWeight.Bold) }
             }
         }
     }
