@@ -25,16 +25,55 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section("Global", "Global", "Global") {
+    section("SignalQuest", "SignalQuest", "SignalQuest") {
         item(
-            "Mise à jour des icônes",
-            "Updated icons",
-            "Atualização dos ícones"
+            "Ajout d'un historique local des envois photo",
+            "Added a local history of photo uploads",
+            "Adição de um histórico local dos envios de fotos"
         )
         item(
-            "Ajout d'un réglage pour choisir le logo affiché dans l'app",
-            "Added a setting to choose the logo displayed in the app",
-            "Adição de uma definição para escolher o logótipo apresentado na app"
+            "Ajout du suivi de validation des photos envoyées",
+            "Added validation tracking for uploaded photos",
+            "Adição do acompanhamento de validação das fotos enviadas"
+        )
+        item(
+            "Amélioration de l'envoi des photos et des métadonnées",
+            "Improved photo and metadata uploads",
+            "Melhoria do envio de fotos e metadados"
+        )
+    }
+
+    section("Galerie communautaire", "Community gallery", "Galeria comunitária") {
+        item(
+            "Affichage des informations EXIF des photos",
+            "Displayed photo EXIF information",
+            "Apresentação das informações EXIF das fotos"
+        )
+        item(
+            "Ajout d'une mini-carte lorsqu'une position GPS est disponible",
+            "Added a mini map when a GPS position is available",
+            "Adição de um minimapa quando há uma posição GPS disponível"
+        )
+    }
+
+    section("Photos", "Photos", "Fotos") {
+        item(
+            "Meilleure gestion des photos prises avec l'appareil photo",
+            "Improved handling of photos taken with the camera",
+            "Melhor gestão das fotos tiradas com a câmara"
+        )
+        item(
+            "Ajout d'options pour gérer les données EXIF avant l'envoi",
+            "Added options to manage EXIF data before upload",
+            "Adição de opções para gerir os dados EXIF antes do envio"
+        )
+    }
+
+    section("Interface", "Interface", "Interface") {
+        item(
+            "Harmonisation de la barre de retour sur plusieurs écrans",
+            "Harmonized the back bar across several screens",
+            "Uniformização da barra de retorno em vários ecrãs"
         )
     }
 }
