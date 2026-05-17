@@ -54,7 +54,8 @@ class SignalQuestUploadRulesTest {
                     sourceMimeType = "image/jpeg",
                     sourceSizeBytes = 42L
                 )
-            )
+            ),
+            stripExifBeforeUpload = true
         )
 
         val decoded = SignalQuestUploadManifestCodec.decode(

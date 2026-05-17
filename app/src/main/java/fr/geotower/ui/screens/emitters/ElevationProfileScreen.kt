@@ -30,7 +30,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Terrain
@@ -76,6 +75,7 @@ import fr.geotower.data.api.ElevationProfileApi
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
+import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
@@ -297,30 +297,12 @@ fun ElevationProfileScreen(
     Scaffold(
         containerColor = mainBgColor,
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(mainBgColor)
-                    .padding(top = 2.dp, bottom = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = { handleBackNavigation() },
-                    enabled = isSplitScreen || !safeBackNavigation.isLocked,
-                    modifier = Modifier.padding(start = 4.dp)
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, AppStrings.back, tint = MaterialTheme.colorScheme.onSurface)
-                }
-                Text(
-                    text = AppStrings.elevationProfileTitle,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center
-                )
-                Spacer(Modifier.width(48.dp))
-            }
+            GeoTowerBackTopBar(
+                title = AppStrings.elevationProfileTitle,
+                onBack = { handleBackNavigation() },
+                backgroundColor = mainBgColor,
+                backEnabled = isSplitScreen || !safeBackNavigation.isLocked
+            )
         }
     ) { padding ->
         val scrollState = rememberScrollState()

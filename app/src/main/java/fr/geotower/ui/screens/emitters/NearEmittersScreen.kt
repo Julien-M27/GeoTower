@@ -34,7 +34,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -81,6 +80,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import fr.geotower.R
+import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.geoTowerLazyListFadingEdge
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.NominatimApi
@@ -500,39 +500,21 @@ fun NearEmittersScreen(
     Scaffold(
         containerColor = mainBgColor,
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(mainBgColor)
-                    .padding(top = 2.dp, bottom = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = { safeBackNavigation.navigateBack() },
-                    enabled = !safeBackNavigation.isLocked,
-                    modifier = Modifier.padding(start = 4.dp)
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppStrings.back, tint = MaterialTheme.colorScheme.onSurface)
+            GeoTowerBackTopBar(
+                title = AppStrings.nearEmittersTitle,
+                onBack = { safeBackNavigation.navigateBack() },
+                backgroundColor = mainBgColor,
+                backEnabled = !safeBackNavigation.isLocked,
+                actions = {
+                    IconButton(onClick = { safeClick { navController.navigate("settings?section=nearby") } }) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = AppStrings.settingsTitle,
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
-                Text(
-                    text = AppStrings.nearEmittersTitle,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-                IconButton(
-                    onClick = { safeClick { navController.navigate("settings?section=nearby") } },
-                    modifier = Modifier.padding(end = 4.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Settings,
-                        contentDescription = AppStrings.settingsTitle,
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
+            )
         }
     ) { padding ->
         // 🚨 CORRECTION : On applique uniquement le padding du haut pour glisser sous les boutons

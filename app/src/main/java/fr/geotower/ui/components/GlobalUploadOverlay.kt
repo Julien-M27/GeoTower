@@ -25,8 +25,11 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import java.util.UUID
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
-fun GlobalUploadOverlay() {
+fun GlobalUploadOverlay(
+    onOpenUploadHistory: () -> Unit = {}
+) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
@@ -133,7 +136,10 @@ fun GlobalUploadOverlay() {
                 Column(modifier = Modifier.padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
                     Text(AppStrings.uploadingTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
 
-                    SequentialWavyLoader(modifier = Modifier.size(56.dp), color = MaterialTheme.colorScheme.primary)
+                    CircularWavyProgressIndicator(
+                        modifier = Modifier.size(56.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    )
 
                     val textProgress = if (totalPhotos > 0) AppStrings.uploadProgressText(currentProgress, totalPhotos) else AppStrings.uploadPreparing
                     Text(textProgress, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -189,6 +195,17 @@ fun GlobalUploadOverlay() {
                     )
 
                     Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedButton(
+                        onClick = {
+                            showFinishedDialog = false
+                            onOpenUploadHistory()
+                        },
+                        shape = CircleShape,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(AppStrings.uploadHistoryTitle, fontWeight = FontWeight.Bold)
+                    }
 
                     Button(
                         onClick = { showFinishedDialog = false },

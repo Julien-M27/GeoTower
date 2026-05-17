@@ -40,7 +40,9 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppUiMode
 import fr.geotower.utils.AppStrings
+import fr.geotower.utils.OperatorColors
 import fr.geotower.data.api.RetrofitClient
+import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.services.LiveTrackingController
 
 
@@ -56,6 +58,7 @@ import fr.geotower.ui.screens.emitters.SiteDetailToolWrapperScreen
 import fr.geotower.ui.screens.emitters.ThroughputCalculatorScreen
 import fr.geotower.ui.screens.stats.StatisticsScreen
 import fr.geotower.ui.screens.about.AboutScreen
+import fr.geotower.ui.screens.about.PhotoUploadHistoryScreen
 import fr.geotower.ui.screens.compass.CompassScreen
 import fr.geotower.ui.screens.emitters.SignalQuestUploadScreen
 import android.net.Uri
@@ -482,6 +485,42 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
+                            composable("photo_upload_history") {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    PhotoUploadHistoryScreen(
+                                        onNavigateBack = { navController.popBackStack() },
+                                        onOpenSite = { supportId, operator ->
+                                            lifecycleScope.launch {
+                                                val targetAntenna = withContext(Dispatchers.IO) {
+                                                    val operatorKey = OperatorColors.keyFor(operator)
+                                                    val antennas = repository.getAntennasByExactId(supportId)
+                                                    antennas.firstOrNull { antenna ->
+                                                        val antennaKeys = OperatorColors.keysFor(antenna.operateur)
+                                                        val signalQuestOperator = SignalQuestOperators.operatorParamFor(antenna.operateur)
+                                                        (operatorKey != null && operatorKey in antennaKeys) ||
+                                                            signalQuestOperator.equals(operator, ignoreCase = true)
+                                                    } ?: antennas.firstOrNull()
+                                                }
+
+                                                if (targetAntenna != null) {
+                                                    getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+                                                        .edit()
+                                                        .putFloat("clicked_lat", targetAntenna.latitude.toFloat())
+                                                        .putFloat("clicked_lon", targetAntenna.longitude.toFloat())
+                                                        .apply()
+                                                    navController.navigate("site_detail/${Uri.encode(targetAntenna.idAnfr)}")
+                                                } else {
+                                                    val operatorParam = OperatorColors.keyFor(operator)
+                                                        ?.let { "?operator=${Uri.encode(it)}" }
+                                                        .orEmpty()
+                                                    navController.navigate("support_detail/${Uri.encode(supportId)}$operatorParam")
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
+                            }
+
                             // --- 1. DÉTAIL DU SUPPORT (Le Pylône) ---
                             composable(
                                 route = "support_detail/{id}?operator={operator}",
@@ -573,7 +612,7 @@ class MainActivity : ComponentActivity() {
                                         lon = lon,
                                         azimuts = decodedAzimuts,
                                         onNavigateBack = { navController.popBackStack() },
-                                        onStartUpload = { finalUris, description ->
+                                        onStartUpload = { finalUris, description, stripExifBeforeUpload ->
                                             lifecycleScope.launch {
                                                 try {
                                                     val manifest = withContext(Dispatchers.IO) {
@@ -582,7 +621,8 @@ class MainActivity : ComponentActivity() {
                                                             siteId = siteId,
                                                             operator = operatorName,
                                                             description = description,
-                                                            uriStrings = finalUris
+                                                            uriStrings = finalUris,
+                                                            stripExifBeforeUpload = stripExifBeforeUpload
                                                         )
                                                     }
 
@@ -622,7 +662,13 @@ class MainActivity : ComponentActivity() {
                             }
 
                         }
-                        fr.geotower.ui.components.GlobalUploadOverlay()
+                        fr.geotower.ui.components.GlobalUploadOverlay(
+                            onOpenUploadHistory = {
+                                navController.navigate("photo_upload_history") {
+                                    launchSingleTop = true
+                                }
+                            }
+                        )
 
                         // ✅ NOUVEAU : On écoute la page sur laquelle se trouve l'utilisateur
                         val navBackStackEntry by navController.currentBackStackEntryAsState()

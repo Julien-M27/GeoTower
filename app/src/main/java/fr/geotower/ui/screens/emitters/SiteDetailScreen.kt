@@ -10,6 +10,7 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -38,7 +39,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Map
@@ -77,6 +77,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -94,6 +95,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
@@ -108,6 +110,7 @@ import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.upload.SignalQuestUploadDraftStore
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadRules
+import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.oneUiActionButtonShape
@@ -283,18 +286,47 @@ fun SiteDetailScreen(
     )
 
     var showImageSourceDialog by remember { mutableStateOf(false) }
-    var currentCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var currentCameraUriString by rememberSaveable { mutableStateOf<String?>(null) }
 
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
-        if (success && currentCameraUri != null && antenna != null) {
-            navigateToUploadWithUris(listOf(currentCameraUri!!))
+        val capturedUri = currentCameraUriString?.let(Uri::parse)
+        if (capturedUri != null) {
+            SignalQuestUploadQueue.completeCameraCapture(context, capturedUri, success)
+            if (success && antenna != null) {
+                navigateToUploadWithUris(listOf(capturedUri))
+            }
         }
+        currentCameraUriString = null
     }
 
     fun createCameraUri(): Uri {
         return SignalQuestUploadQueue.createCameraUri(context)
+    }
+
+    fun launchCameraCapture() {
+        val uri = createCameraUri()
+        currentCameraUriString = uri.toString()
+        cameraLauncher.launch(uri)
+    }
+
+    val legacyCameraStoragePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            launchCameraCapture()
+        }
+    }
+
+    fun launchCameraCaptureWithStorageCheck() {
+        val needsLegacyStoragePermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+        if (needsLegacyStoragePermission) {
+            legacyCameraStoragePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            launchCameraCapture()
+        }
     }
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
@@ -425,27 +457,35 @@ fun SiteDetailScreen(
         if (localData != null && localData.idAnfr.isNotBlank()) {
             val opName = localData.operateur ?: ""
             // ✅ CORRECTION MAJEURE : On utilise le numéro de support physique universel
-            val trueSupportId = physique?.idSupport ?: localData.idAnfr
+            val supportSiteId = physique?.idSupport ?: localData.idAnfr
+            val signalQuestOperator = SignalQuestOperators.operatorParamFor(opName)
 
             val photosTemp = mutableListOf<CommunityPhoto>()
 
             // ✅ Séparation en deux blocs `if` distincts (Plus de `else if`)
             if (CommunityDataPreferences.isCellularFrPhotosEnabled(prefs, opName)) {
-                CellularFrApi.getCellularFrPhotos(trueSupportId).forEach { photo ->
+                CellularFrApi.getCellularFrPhotos(supportSiteId).forEach { photo ->
                     photosTemp.add(CommunityPhoto(photo.url, "CellularFR", photo.author, photo.uploadedAt))
                 }
             }
 
-            if (CommunityDataPreferences.isSignalQuestPhotosEnabled(prefs, opName)) {
+            if (signalQuestOperator != null && CommunityDataPreferences.isSignalQuestPhotosEnabled(prefs, opName)) {
                 try {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                         val response = fr.geotower.data.api.SignalQuestClient.api.getSitePhotos(
                             authHeader = "Bearer ${fr.geotower.BuildConfig.SQ_API_KEY}",
-                            siteId = trueSupportId
+                            siteId = supportSiteId
                         )
-                        response.body()?.data?.forEach {
-                            photosTemp.add(CommunityPhoto(it.imageUrl, "Signal Quest", it.authorName, it.uploadedAt))
-                        }
+                        response.body()?.data
+                            ?.filter { photo ->
+                                val photoOperator = photo.operator
+                                photoOperator.isNullOrBlank() ||
+                                    photoOperator.equals(signalQuestOperator, ignoreCase = true) ||
+                                    SignalQuestOperators.operatorParamFor(photoOperator).equals(signalQuestOperator, ignoreCase = true)
+                            }
+                            ?.forEach {
+                                photosTemp.add(CommunityPhoto(it.imageUrl, "Signal Quest", it.authorName, it.uploadedAt, it.publicMetadata))
+                            }
                     }
                 } catch (e: Exception) { AppLogger.w(TAG_SITE_DETAIL, "SignalQuest photos request failed", e) }
             }
@@ -573,18 +613,21 @@ fun SiteDetailScreen(
     Scaffold(
         containerColor = mainBgColor,
         topBar = {
-            Row(modifier = Modifier.fillMaxWidth().background(mainBgColor).padding(top = 2.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(
-                    onClick = {
-                        handleBackNavigation() // ✅ 3. ON APPELLE NOTRE FONCTION DANS LA TOPBAR
-                    },
-                    enabled = isSplitScreen || !safeBackNavigation.isLocked,
-                    modifier = Modifier.padding(start = 4.dp)
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, AppStrings.back, tint = MaterialTheme.colorScheme.onSurface)
+            GeoTowerBackTopBar(
+                onBack = { handleBackNavigation() },
+                backgroundColor = mainBgColor,
+                backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
+                actions = {
+                    IconButton(onClick = { safeClick { navController.navigate("settings?section=site") } }) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = AppStrings.settingsTitle,
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    Text(
+            ) {
+                Text(
                         text = txtSiteDetailsTitle,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
@@ -596,18 +639,7 @@ fun SiteDetailScreen(
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             Toast.makeText(context, "$txtIdCopied : $antennaId", Toast.LENGTH_SHORT).show()
                         }.padding(horizontal = 16.dp, vertical = 4.dp)
-                    )
-                }
-                IconButton(
-                    onClick = { safeClick { navController.navigate("settings?section=site") } },
-                    modifier = Modifier.padding(end = 4.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Settings,
-                        contentDescription = AppStrings.settingsTitle,
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
+                )
             }
         }
     ) { padding ->
@@ -1037,9 +1069,7 @@ fun SiteDetailScreen(
                                 onClick = {
                                     safeClick {
                                         showImageSourceDialog = false
-                                        val uri = createCameraUri()
-                                        currentCameraUri = uri
-                                        cameraLauncher.launch(uri)
+                                        launchCameraCaptureWithStorageCheck()
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth().height(56.dp),

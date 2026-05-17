@@ -128,6 +128,7 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
+import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.SafeClick
 import fr.geotower.ui.components.colorPaletteFadingEdge
 import fr.geotower.ui.components.DialogDestructiveButton
@@ -2628,7 +2629,13 @@ fun IconSheet(
 
 
 @Composable
-fun SettingsTopBar(onBack: () -> Unit) { Row(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) { IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }; Text(AppStrings.settingsTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center); Spacer(Modifier.width(48.dp)) } }
+fun SettingsTopBar(onBack: () -> Unit) {
+    GeoTowerBackTopBar(
+        title = AppStrings.settingsTitle,
+        onBack = onBack,
+        backgroundColor = MaterialTheme.colorScheme.background
+    )
+}
 
 @Composable
 fun DrawableImage(resId: Int, modifier: Modifier = Modifier) { AndroidView({ ctx -> ImageView(ctx).apply { scaleType = ImageView.ScaleType.FIT_CENTER } }, modifier, { view -> view.setImageResource(resId) }) }

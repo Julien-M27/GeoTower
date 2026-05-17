@@ -38,10 +38,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.outlined.LocationOn
-import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -50,7 +48,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -86,6 +83,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
+import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.map.MapViewModel
 import fr.geotower.utils.AppConfig
@@ -344,18 +342,12 @@ fun CompassScreen(
 
     Scaffold(
         topBar = {
-            CenterAlignedTopAppBar(
-                title = {
-                    Text(AppStrings.compassTitle, color = oncompassBg, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                },
-                navigationIcon = {
-                    IconButton(
-                        onClick = { safeBackNavigation.navigateBack() },
-                        enabled = !safeBackNavigation.isLocked
-                    ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppStrings.back, tint = oncompassBg)
-                    }
-                },
+            GeoTowerBackTopBar(
+                title = AppStrings.compassTitle,
+                onBack = { safeBackNavigation.navigateBack() },
+                backgroundColor = compassBg,
+                contentColor = oncompassBg,
+                backEnabled = !safeBackNavigation.isLocked,
                 actions = {
                     IconButton(onClick = { navController.navigate("settings?section=compass") }) {
                         Icon(
@@ -364,10 +356,7 @@ fun CompassScreen(
                             tint = oncompassBg
                         )
                     }
-                },
-                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(containerColor = compassBg),
-                // --- NOUVEAU : Supprime la marge du haut pour remonter le menu ! ---
-                windowInsets = androidx.compose.foundation.layout.WindowInsets(top = 0.dp)
+                }
             )
         }
     ) { padding ->

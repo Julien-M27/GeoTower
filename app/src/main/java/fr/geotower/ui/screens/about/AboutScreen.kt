@@ -74,6 +74,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
+import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.AppLogoDrawingResources
@@ -433,7 +434,10 @@ fun AboutScreen(navController: NavController) {
                                     sectionAnchorModifiers[2],
                                     sectionAnchorModifiers[3],
                                     sectionAnchorModifiers[4],
-                                    sectionAnchorModifiers[5]
+                                    sectionAnchorModifiers[5],
+                                    onOpenPhotoUploadHistory = {
+                                        navController.navigate("photo_upload_history")
+                                    }
                                 )
                                 Spacer(modifier = Modifier.height(60.dp))
                             }
@@ -442,7 +446,13 @@ fun AboutScreen(navController: NavController) {
                                 when(activeSectionIndex) {
                                     0 -> SectionPresentation(appTitle, appVersion, displayLogoResId)
                                     1 -> SectionNouveautes(appVersion, cardShape, bubbleBaseColor)
-                                    2 -> SectionConfidentialite(cardShape, bubbleBaseColor)
+                                    2 -> SectionConfidentialite(
+                                        cardShape,
+                                        bubbleBaseColor,
+                                        onOpenPhotoUploadHistory = {
+                                            navController.navigate("photo_upload_history")
+                                        }
+                                    )
                                     3 -> SectionSources(cardShape, bubbleBaseColor)
                                     4 -> SectionVersions(cardShape, bubbleBaseColor)
                                     5 -> SectionDeveloppement()
@@ -493,14 +503,7 @@ fun AboutNavigationMenuItem(title: String, icon: ImageVector, isSelected: Boolea
 
 @Composable
 fun AboutTopBar(onBack: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth().background(Color.Transparent).padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, AppStrings.back) }
-        Text(AppStrings.about, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-        Spacer(Modifier.width(48.dp))
-    }
+    GeoTowerBackTopBar(title = AppStrings.about, onBack = onBack)
 }
 
 // ============================================================
@@ -519,7 +522,8 @@ fun AllAboutContent(
     privacyModifier: Modifier = Modifier,
     sourcesModifier: Modifier = Modifier,
     versionsModifier: Modifier = Modifier,
-    developmentModifier: Modifier = Modifier
+    developmentModifier: Modifier = Modifier,
+    onOpenPhotoUploadHistory: () -> Unit = {}
 ) {
     Column(
         modifier = presentationModifier.fillMaxWidth(),
@@ -541,7 +545,7 @@ fun AllAboutContent(
         modifier = privacyModifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        SectionConfidentialite(cardShape, bubbleColor)
+        SectionConfidentialite(cardShape, bubbleColor, onOpenPhotoUploadHistory)
     }
     Spacer(modifier = Modifier.height(48.dp))
     // ---------------
@@ -873,7 +877,11 @@ private fun VersionLine(label: String, value: String) {
 }
 
 @Composable
-fun SectionConfidentialite(cardShape: Shape, bubbleColor: Color) {
+fun SectionConfidentialite(
+    cardShape: Shape,
+    bubbleColor: Color,
+    onOpenPhotoUploadHistory: () -> Unit = {}
+) {
     SectionTitle(AppStrings.privacyCategory)
     val cardColor = if (bubbleColor == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else bubbleColor
 
@@ -892,4 +900,11 @@ fun SectionConfidentialite(cardShape: Shape, bubbleColor: Color) {
             Text(AppStrings.yourDataDesc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
+
+    Spacer(modifier = Modifier.height(12.dp))
+    PhotoUploadHistoryShortcut(
+        cardShape = cardShape,
+        cardColor = cardColor,
+        onOpenHistory = onOpenPhotoUploadHistory
+    )
 }

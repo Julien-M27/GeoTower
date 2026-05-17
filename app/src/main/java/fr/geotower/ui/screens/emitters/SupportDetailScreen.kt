@@ -26,7 +26,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Settings
@@ -65,6 +64,7 @@ import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
+import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.SupportShareMenu
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
@@ -268,7 +268,7 @@ fun SupportDetailScreen(
                             )
                             if (response.isSuccessful) {
                                 response.body()?.data?.forEach { photo ->
-                                    photosTemp.add(CommunityPhoto(photo.imageUrl, "Signal Quest", photo.authorName, photo.uploadedAt))
+                                    photosTemp.add(CommunityPhoto(photo.imageUrl, "Signal Quest", photo.authorName, photo.uploadedAt, photo.publicMetadata))
                                 }
                             }
                         } catch (e: Exception) { AppLogger.w(TAG_SUPPORT_DETAIL, "SignalQuest photos request failed", e) }
@@ -361,7 +361,6 @@ fun SupportDetailScreen(
     val txtDarkModeDesc = AppStrings.darkModeDesc
     val txtIdNumber = AppStrings.idNumber
     val txtSupportNature = AppStrings.supportNature
-    val txtBack = AppStrings.back
     val txtIdSupportCopy = AppStrings.idSupportCopy
     val txtAddressCopy = AppStrings.addressCopy
     val txtGpsCoordsCopy = AppStrings.gpsCoordsCopy
@@ -404,48 +403,29 @@ fun SupportDetailScreen(
     Scaffold(
         containerColor = mainBgColor,
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(mainBgColor)
-                    .padding(top = 2.dp, bottom = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = {
-                        if (isSplitScreen) {
-                            onCloseSplitScreen()
-                        } else {
-                            safeBackNavigation.navigateBack()
-                        }
-                    },
-                    enabled = isSplitScreen || !safeBackNavigation.isLocked,
-                    modifier = Modifier.padding(start = 4.dp)
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, txtBack, tint = MaterialTheme.colorScheme.onSurface)
+            GeoTowerBackTopBar(
+                title = AppStrings.supportDetailTitle,
+                onBack = {
+                    if (isSplitScreen) {
+                        onCloseSplitScreen()
+                    } else {
+                        safeBackNavigation.navigateBack()
+                    }
+                },
+                backgroundColor = mainBgColor,
+                backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
+                actions = {
+                    IconButton(
+                        onClick = { safeClick { navController.navigate("settings?section=support") } }
+                    ) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = AppStrings.settingsTitle,
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
-
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    Text(
-                        text = AppStrings.supportDetailTitle,
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                }
-
-                IconButton(
-                    onClick = { safeClick { navController.navigate("settings?section=support") } },
-                    modifier = Modifier.padding(end = 4.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Settings,
-                        contentDescription = AppStrings.settingsTitle,
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
+            )
         }
     ) { padding ->
         // 🚨 CORRECTION : On applique UNIQUEMENT le padding du haut (top) pour passer sous les boutons en bas !

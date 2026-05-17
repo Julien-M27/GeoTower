@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -21,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import fr.geotower.data.AnfrRepository
+import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
@@ -91,22 +90,12 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
     Scaffold(
         containerColor = mainBgColor,
         topBar = {
-            Row(
-                modifier = Modifier.fillMaxWidth().background(mainBgColor).padding(vertical = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = { safeBackNavigation.navigateBack() },
-                    enabled = !safeBackNavigation.isLocked,
-                    modifier = Modifier.padding(start = 4.dp)
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, AppStrings.back, tint = MaterialTheme.colorScheme.onSurface)
-                }
-                Box(modifier = Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                    Text(AppStrings.statsTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                }
-                Spacer(modifier = Modifier.width(48.dp))
-            }
+            GeoTowerBackTopBar(
+                title = AppStrings.statsTitle,
+                onBack = { safeBackNavigation.navigateBack() },
+                backgroundColor = mainBgColor,
+                backEnabled = !safeBackNavigation.isLocked
+            )
         }
     ) { padding ->
         Column(

@@ -40,6 +40,62 @@ object AppStrings {
     @Composable
     private fun currentJavaLocale(): Locale = Locale.forLanguageTag(ComposeLocale.current.language.ifBlank { "en" })
 
+    val uploadHistoryTitle @Composable get() = get("Historique d'envoi", "Upload history", "Hist\u00f3rico de envios")
+    @Composable
+    fun uploadHistorySubtitle(count: Int) = get(
+        if (count == 0) "Aucune photo enregistr\u00e9e" else "$count photo${if (count > 1) "s" else ""} enregistr\u00e9e${if (count > 1) "s" else ""}",
+        if (count == 0) "No photo recorded" else "$count photo${if (count > 1) "s" else ""} recorded",
+        if (count == 0) "Nenhuma foto registada" else "$count foto${if (count > 1) "s" else ""} registada${if (count > 1) "s" else ""}"
+    )
+    @Composable
+    fun uploadHistorySelectedCount(count: Int) = get(
+        "$count photo${if (count > 1) "s" else ""} s\u00e9lectionn\u00e9e${if (count > 1) "s" else ""}",
+        "$count photo${if (count > 1) "s" else ""} selected",
+        "$count foto${if (count > 1) "s" else ""} selecionada${if (count > 1) "s" else ""}"
+    )
+    val uploadHistoryEmpty @Composable get() = get(
+        "Aucun envoi de photo enregistr\u00e9 sur cet appareil.",
+        "No photo upload recorded on this device.",
+        "Nenhum envio de foto registado neste dispositivo."
+    )
+    val uploadHistoryClear @Composable get() = get("Effacer l'historique", "Clear history", "Limpar hist\u00f3rico")
+    val uploadHistoryClearTitle @Composable get() = get("Effacer l'historique d'envoi ?", "Clear upload history?", "Limpar hist\u00f3rico de envios?")
+    val uploadHistoryClearDesc @Composable get() = get(
+        "Les miniatures locales et les lignes d'historique seront supprim\u00e9es. Les photos d\u00e9j\u00e0 envoy\u00e9es sur les apps externes ne sont pas modifi\u00e9es.",
+        "Local thumbnails and history rows will be deleted. Photos already sent to external apps are not changed.",
+        "As miniaturas locais e linhas de hist\u00f3rico ser\u00e3o eliminadas. As fotos j\u00e1 enviadas para apps externas n\u00e3o ser\u00e3o alteradas."
+    )
+    @Composable
+    fun uploadHistoryExif(stripped: Boolean) = get(
+        if (stripped) "EXIF supprim\u00e9s" else "EXIF conserv\u00e9s",
+        if (stripped) "EXIF removed" else "EXIF kept",
+        if (stripped) "EXIF removidos" else "EXIF preservados"
+    )
+    @Composable
+    fun uploadHistoryStatus(status: String) = get(
+        when (status) {
+            "success" -> "Valid\u00e9e"
+            "awaiting_validation" -> "En validation"
+            "failed" -> "\u00c9chec"
+            "retry" -> "En attente"
+            else -> "En cours"
+        },
+        when (status) {
+            "success" -> "Approved"
+            "awaiting_validation" -> "Awaiting approval"
+            "failed" -> "Failed"
+            "retry" -> "Waiting"
+            else -> "In progress"
+        },
+        when (status) {
+            "success" -> "Validada"
+            "awaiting_validation" -> "A aguardar valida\u00e7\u00e3o"
+            "failed" -> "Falhou"
+            "retry" -> "Em espera"
+            else -> "Em curso"
+        }
+    )
+
     // ==========================================
     // 🚀 SPLASH SCREEN
     // ==========================================
@@ -1691,6 +1747,7 @@ object AppStrings {
     val understood @Composable get() = get("J'ai compris", "Understood", "Entendi")
 
     val uploadSqTitle @Composable get() = get("Envoi vers Signal Quest", "Send to Signal Quest", "Enviar para Signal Quest")
+    val uploadSqStripExif @Composable get() = get("Supprimer les donn\u00e9es EXIF", "Remove EXIF data", "Remover dados EXIF")
     val uploadSqDescPlaceholder @Composable get() = get("Ajouter une description pour ce lot (optionnel)...", "Add a description for this batch (optional)...", "Adicionar uma descrição pour este lote (optionnal)...")
     val uploadSqTargetOperator @Composable get() = get("Opérateur cible", "Target operator", "Operadora destino")
     val uploadSqTargetSite @Composable get() = get("Support N°", "Site ID", "ID do Suporte")

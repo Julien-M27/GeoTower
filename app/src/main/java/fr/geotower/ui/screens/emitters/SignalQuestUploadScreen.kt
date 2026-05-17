@@ -1,6 +1,9 @@
 package fr.geotower.ui.screens.emitters
 
 // NOUVEAUX IMPORTS POUR LA CARTE
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -32,10 +35,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import android.net.Uri // 🚨 NOUVEAU
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -67,6 +70,7 @@ import androidx.compose.runtime.remember
 // The crucial imports that fix the delegation error:
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -87,7 +91,10 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.Velocity
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
+import androidx.core.content.ContextCompat
 import coil.compose.AsyncImage
+import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.GeoTowerSwitch
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.data.upload.SignalQuestUploadQueue
@@ -118,7 +125,7 @@ fun SignalQuestUploadScreen(
     lon: Double,
     azimuts: String,
     onNavigateBack: () -> Unit,
-    onStartUpload: (List<String>, String) -> Unit
+    onStartUpload: (List<String>, String, Boolean) -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -141,6 +148,7 @@ fun SignalQuestUploadScreen(
     // --- 1. ÉTATS ---
     val currentUris = remember { mutableStateListOf<String>().apply { addAll(imageUris) } }
     var description by remember { mutableStateOf("") }
+    var stripExifBeforeUpload by rememberSaveable { mutableStateOf(false) }
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showImageSourceDialog by remember { mutableStateOf(false) }
 
@@ -265,19 +273,46 @@ fun SignalQuestUploadScreen(
         addSelectedUris(uris)
     }
 
-    var currentCameraUri by remember { mutableStateOf<Uri?>(null) }
+    var currentCameraUriString by rememberSaveable { mutableStateOf<String?>(null) }
     val cameraLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.TakePicture()
     ) { success ->
-        if (success && currentCameraUri != null) {
-            if (currentUris.size < 10) {
-                currentUris.add(currentCameraUri.toString())
+        val capturedUri = currentCameraUriString?.let(Uri::parse)
+        if (capturedUri != null) {
+            SignalQuestUploadQueue.completeCameraCapture(context, capturedUri, success)
+            if (success && currentUris.size < SignalQuestUploadRules.MAX_PHOTOS) {
+                currentUris.add(capturedUri.toString())
             }
         }
+        currentCameraUriString = null
     }
 
     fun createCameraUri(): Uri {
         return SignalQuestUploadQueue.createCameraUri(context)
+    }
+
+    fun launchCameraCapture() {
+        val uri = createCameraUri()
+        currentCameraUriString = uri.toString()
+        cameraLauncher.launch(uri)
+    }
+
+    val legacyCameraStoragePermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            launchCameraCapture()
+        }
+    }
+
+    fun launchCameraCaptureWithStorageCheck() {
+        val needsLegacyStoragePermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
+        if (needsLegacyStoragePermission) {
+            legacyCameraStoragePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        } else {
+            launchCameraCapture()
+        }
     }
 
     // Thème et couleurs
@@ -306,34 +341,13 @@ fun SignalQuestUploadScreen(
     Scaffold(
         containerColor = backgroundColor,
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(backgroundColor)
-                    .padding(top = 2.dp, bottom = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = { handleBackNavigation() },
-                    enabled = !isBackNavigationLocked,
-                    modifier = Modifier.padding(start = 4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                        contentDescription = AppStrings.back,
-                        tint = textColor
-                    )
-                }
-                Text(
-                    text = AppStrings.uploadSqTitle,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = textColor,
-                    modifier = Modifier.weight(1f),
-                    textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                )
-                Spacer(modifier = Modifier.width(48.dp))
-            }
+            GeoTowerBackTopBar(
+                title = AppStrings.uploadSqTitle,
+                onBack = { handleBackNavigation() },
+                backgroundColor = backgroundColor,
+                contentColor = textColor,
+                backEnabled = !isBackNavigationLocked
+            )
         }
     ) { padding ->
         Column(
@@ -693,6 +707,48 @@ fun SignalQuestUploadScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { stripExifBeforeUpload = !stripExifBeforeUpload },
+                shape = blockShape,
+                border = BorderStroke(
+                    1.dp,
+                    if (stripExifBeforeUpload) activeColor.copy(alpha = 0.55f) else textColor.copy(alpha = 0.16f)
+                ),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (stripExifBeforeUpload) activeColor.copy(alpha = 0.12f) else surfaceColor
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.DeleteSweep,
+                        contentDescription = null,
+                        tint = if (stripExifBeforeUpload) activeColor else textColor.copy(alpha = 0.7f)
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Text(
+                        text = AppStrings.uploadSqStripExif,
+                        modifier = Modifier.weight(1f),
+                        fontWeight = FontWeight.SemiBold,
+                        color = textColor
+                    )
+                    GeoTowerSwitch(
+                        checked = stripExifBeforeUpload,
+                        onCheckedChange = { stripExifBeforeUpload = it },
+                        useOneUi = useOneUi,
+                        checkedColor = activeColor
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
             // --- 3. CHAMP DESCRIPTION ---
             OutlinedTextField(
                 value = description,
@@ -758,9 +814,7 @@ fun SignalQuestUploadScreen(
                                 safeClick {
                                     showImageSourceDialog = false
                                     resetAddPhotoPull()
-                                    val uri = createCameraUri()
-                                    currentCameraUri = uri
-                                    cameraLauncher.launch(uri)
+                                    launchCameraCaptureWithStorageCheck()
                                 }
                             },
                             modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -952,7 +1006,7 @@ fun SignalQuestUploadScreen(
                         onClick = {
                             safeClick {
                                 showConfirmDialog = false
-                                onStartUpload(currentUris.toList(), description)
+                                onStartUpload(currentUris.toList(), description, stripExifBeforeUpload)
                             }
                         },
                         shape = buttonShape,

@@ -1,10 +1,14 @@
 package fr.geotower.data.upload
 
+import android.content.ContentValues
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Matrix
 import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
@@ -15,6 +19,9 @@ import fr.geotower.data.community.CommunityDataPreferences
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.lang.reflect.Modifier
+import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
@@ -60,7 +67,8 @@ object SignalQuestUploadRules {
 data class SignalQuestUploadFile(
     val sourceFileName: String,
     val sourceMimeType: String,
-    val sourceSizeBytes: Long
+    val sourceSizeBytes: Long,
+    val historyEntryId: String? = null
 )
 
 data class SignalQuestUploadManifest(
@@ -69,7 +77,11 @@ data class SignalQuestUploadManifest(
     val operator: String,
     val description: String,
     val createdAtMillis: Long,
-    val files: List<SignalQuestUploadFile>
+    val files: List<SignalQuestUploadFile>,
+    val stripExifBeforeUpload: Boolean = false,
+    val anfrCode: String? = null,
+    val nationalSiteCode: String? = null,
+    val sourceCode: String? = null
 )
 
 object SignalQuestUploadManifestCodec {
@@ -102,16 +114,43 @@ class SignalQuestInvalidPhotoException(message: String, cause: Throwable? = null
 object SignalQuestUploadQueue {
     const val INPUT_UPLOAD_ID = "uploadId"
 
+    private val gson = Gson()
     private const val UPLOAD_DIR_NAME = "sq_upload"
     private const val CAMERA_DIR_NAME = "sq_camera"
+    private const val PUBLIC_CAMERA_DIR_NAME = "Camera"
+    private const val PUBLIC_FALLBACK_PHOTOS_DIR_NAME = "GeoTower Photos"
     private const val MANIFEST_FILE_NAME = "manifest.json"
     private const val STALE_CACHE_MAX_AGE_MS = 48L * 60L * 60L * 1000L
+    private val exifAttributeTags: List<String> by lazy { discoverExifAttributeTags() }
+    private val transferableExifAttributeTags: Set<String> by lazy {
+        exifAttributeTags.filterNot { tag -> tag in nonTransferableExifTags }.toSet()
+    }
+    private val nonTransferableExifTags = setOf(
+        ExifInterface.TAG_STRIP_OFFSETS,
+        ExifInterface.TAG_STRIP_BYTE_COUNTS,
+        ExifInterface.TAG_JPEG_INTERCHANGE_FORMAT,
+        ExifInterface.TAG_JPEG_INTERCHANGE_FORMAT_LENGTH,
+        ExifInterface.TAG_ORF_THUMBNAIL_IMAGE,
+        ExifInterface.TAG_ORF_PREVIEW_IMAGE_START,
+        ExifInterface.TAG_ORF_PREVIEW_IMAGE_LENGTH,
+        ExifInterface.TAG_RW2_JPG_FROM_RAW
+    )
 
     fun createCameraUri(context: Context): Uri {
         cleanupStaleFiles(context)
-        val cameraDir = cameraRoot(context).apply { mkdirs() }
-        val tempFile = File.createTempFile("sq_camera_", ".jpg", cameraDir)
-        return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tempFile)
+        return createCacheCameraUri(context)
+    }
+
+    fun completeCameraCapture(context: Context, uri: Uri, success: Boolean) {
+        if (success) {
+            if (isMediaStoreUri(uri)) {
+                publishPendingMediaStoreImage(context, uri)
+            } else {
+                publishCachedCameraImage(context, uri)
+            }
+        } else {
+            deleteCameraCapture(context, uri)
+        }
     }
 
     @Throws(SignalQuestUploadQueueException::class)
@@ -120,11 +159,13 @@ object SignalQuestUploadQueue {
         siteId: String,
         operator: String,
         description: String,
-        uriStrings: List<String>
+        uriStrings: List<String>,
+        stripExifBeforeUpload: Boolean = false
     ): SignalQuestUploadManifest {
         cleanupStaleFiles(context)
 
-        if (siteId.isBlank()) {
+        val normalizedSiteId = siteId.trim()
+        if (normalizedSiteId.isBlank()) {
             throw SignalQuestUploadQueueException("Site SignalQuest invalide.")
         }
         if (uriStrings.isEmpty()) {
@@ -141,6 +182,7 @@ object SignalQuestUploadQueue {
         }
 
         val uploadId = UUID.randomUUID().toString()
+        val createdAtMillis = System.currentTimeMillis()
         val uploadDir = uploadDir(context, uploadId).apply { mkdirs() }
         val files = mutableListOf<SignalQuestUploadFile>()
 
@@ -153,7 +195,7 @@ object SignalQuestUploadQueue {
                 }
 
                 val sourceSize = querySourceSize(context, uri)
-                if (sourceSize != null && !SignalQuestUploadRules.isAcceptedSourceSize(sourceSize)) {
+                if (sourceSize != null && sourceSize > SignalQuestUploadRules.MAX_SOURCE_BYTES) {
                     throw SignalQuestUploadQueueException("Une photo depasse la limite de 20 Mo.")
                 }
 
@@ -165,27 +207,42 @@ object SignalQuestUploadQueue {
                     throw SignalQuestUploadQueueException("Une photo depasse la limite de 20 Mo.")
                 }
 
+                val historyEntryId = ExternalPhotoUploadHistoryStore.addPendingPhoto(
+                    context = context,
+                    uploadId = uploadId,
+                    sourceName = ExternalPhotoUploadHistoryStore.SOURCE_SIGNALQUEST,
+                    supportId = normalizedSiteId,
+                    operator = signalQuestOperator,
+                    createdAtMillis = createdAtMillis,
+                    sourceFile = targetFile,
+                    stripExifBeforeUpload = stripExifBeforeUpload
+                )
+
                 files += SignalQuestUploadFile(
                     sourceFileName = targetFile.name,
                     sourceMimeType = mimeType.lowercase(Locale.US),
-                    sourceSizeBytes = copiedBytes
+                    sourceSizeBytes = copiedBytes,
+                    historyEntryId = historyEntryId
                 )
             }
 
             val manifest = SignalQuestUploadManifest(
                 uploadId = uploadId,
-                siteId = siteId,
+                siteId = normalizedSiteId,
                 operator = signalQuestOperator,
                 description = description,
-                createdAtMillis = System.currentTimeMillis(),
-                files = files
+                createdAtMillis = createdAtMillis,
+                files = files,
+                stripExifBeforeUpload = stripExifBeforeUpload
             )
             manifestFile(uploadDir).writeText(SignalQuestUploadManifestCodec.encode(manifest))
             return manifest
         } catch (e: SignalQuestUploadQueueException) {
+            ExternalPhotoUploadHistoryStore.removeUpload(context, uploadId)
             deleteInsideRoot(uploadRoot(context), uploadDir)
             throw e
         } catch (e: Exception) {
+            ExternalPhotoUploadHistoryStore.removeUpload(context, uploadId)
             deleteInsideRoot(uploadRoot(context), uploadDir)
             throw SignalQuestUploadQueueException("Impossible de preparer les photos.", e)
         }
@@ -218,6 +275,23 @@ object SignalQuestUploadQueue {
         cleanupOldChildren(cameraRoot(context), maxAgeMillis)
     }
 
+    fun exifMetadataJsonForUpload(
+        context: Context,
+        manifest: SignalQuestUploadManifest,
+        uploadFile: SignalQuestUploadFile
+    ): String? {
+        if (manifest.stripExifBeforeUpload) return null
+
+        val source = sourceFile(context, manifest.uploadId, uploadFile)
+        if (!source.isFile) return null
+
+        return runCatching {
+            readExifAttributes(source)
+                .takeIf { it.isNotEmpty() }
+                ?.let { attributes -> gson.toJson(attributes) }
+        }.getOrNull()
+    }
+
     @Throws(SignalQuestInvalidPhotoException::class)
     fun prepareJpegForUpload(context: Context, manifest: SignalQuestUploadManifest, uploadFile: SignalQuestUploadFile): File {
         if (!SignalQuestUploadRules.isAcceptedMimeType(uploadFile.sourceMimeType)) {
@@ -231,9 +305,7 @@ object SignalQuestUploadQueue {
 
         val uploadDir = uploadDir(context, manifest.uploadId)
         val preparedFile = File(uploadDir, "prepared_${source.nameWithoutExtension}.jpg")
-        if (preparedFile.isFile && preparedFile.length() in 1..SignalQuestUploadRules.MAX_OUTPUT_BYTES) {
-            return preparedFile
-        }
+        if (preparedFile.isFile) preparedFile.delete()
 
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(source.absolutePath, bounds)
@@ -241,8 +313,12 @@ object SignalQuestUploadQueue {
             throw SignalQuestInvalidPhotoException("Image illisible.")
         }
 
+        if (!manifest.stripExifBeforeUpload && canUploadOriginalJpeg(uploadFile, source, bounds)) {
+            return source
+        }
+
         var decoded: Bitmap? = null
-        var transformed: Bitmap? = null
+        var oriented: Bitmap? = null
         var scaled: Bitmap? = null
 
         try {
@@ -253,19 +329,37 @@ object SignalQuestUploadQueue {
             decoded = BitmapFactory.decodeFile(source.absolutePath, decodeOptions)
                 ?: throw SignalQuestInvalidPhotoException("Image illisible.")
 
-            transformed = applyExifOrientation(source, decoded)
-            if (transformed !== decoded) {
-                decoded.recycle()
-                decoded = null
+            val bitmapForScale = if (manifest.stripExifBeforeUpload) {
+                val orientedBitmap = applyExifOrientation(source, decoded)
+                if (orientedBitmap !== decoded) {
+                    decoded.recycle()
+                    decoded = null
+                    oriented = orientedBitmap
+                }
+                orientedBitmap
+            } else {
+                decoded
             }
 
-            scaled = scaleToMaxDimension(transformed, SignalQuestUploadRules.MAX_DIMENSION_PX)
-            if (scaled !== transformed) {
-                transformed.recycle()
-                transformed = null
+            scaled = scaleToMaxDimension(bitmapForScale, SignalQuestUploadRules.MAX_DIMENSION_PX)
+            if (scaled !== bitmapForScale) {
+                when (bitmapForScale) {
+                    decoded -> {
+                        decoded.recycle()
+                        decoded = null
+                    }
+                    oriented -> {
+                        oriented.recycle()
+                        oriented = null
+                    }
+                }
             }
 
-            writeCompressedJpeg(scaled, preparedFile)
+            writeCompressedJpeg(scaled, preparedFile) {
+                if (!manifest.stripExifBeforeUpload) {
+                    copyExifAttributes(source, preparedFile)
+                }
+            }
             return preparedFile
         } catch (e: SignalQuestInvalidPhotoException) {
             preparedFile.delete()
@@ -277,9 +371,11 @@ object SignalQuestUploadQueue {
             preparedFile.delete()
             throw SignalQuestInvalidPhotoException("Preparation de l'image impossible.", e)
         } finally {
+            if (scaled !== decoded && scaled !== oriented) {
+                scaled?.recycle()
+            }
             decoded?.recycle()
-            transformed?.recycle()
-            scaled?.recycle()
+            oriented?.recycle()
         }
     }
 
@@ -290,6 +386,95 @@ object SignalQuestUploadQueue {
     private fun uploadDir(context: Context, uploadId: String): File = File(uploadRoot(context), uploadId)
 
     private fun manifestFile(uploadDir: File): File = File(uploadDir, MANIFEST_FILE_NAME)
+
+    private fun createCacheCameraUri(context: Context): Uri {
+        val cameraDir = cameraRoot(context).apply { mkdirs() }
+        val tempFile = File.createTempFile("sq_camera_", ".jpg", cameraDir)
+        return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", tempFile)
+    }
+
+    private fun createPublicCameraUri(context: Context): Uri? {
+        val displayName = createCameraDisplayName()
+        val publicDirName = publicPhotoDirectoryName()
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
+            put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+            put(MediaStore.Images.Media.DATE_TAKEN, System.currentTimeMillis())
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                put(MediaStore.Images.Media.RELATIVE_PATH, publicPhotoRelativePath(publicDirName))
+                put(MediaStore.Images.Media.IS_PENDING, 1)
+            } else {
+                val photoDir = publicPhotoDirectory(publicDirName)
+                if (publicDirName != PUBLIC_CAMERA_DIR_NAME) {
+                    photoDir.mkdirs()
+                }
+                put(MediaStore.Images.Media.DATA, File(photoDir, displayName).absolutePath)
+            }
+        }
+
+        return runCatching {
+            context.contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+        }.getOrNull()
+    }
+
+    private fun publishPendingMediaStoreImage(context: Context, uri: Uri) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
+        val values = ContentValues().apply {
+            put(MediaStore.Images.Media.IS_PENDING, 0)
+        }
+        runCatching {
+            context.contentResolver.update(uri, values, null, null)
+        }
+    }
+
+    private fun publishCachedCameraImage(context: Context, sourceUri: Uri) {
+        val targetUri = createPublicCameraUri(context) ?: return
+        runCatching {
+            context.contentResolver.openInputStream(sourceUri)?.use { input ->
+                context.contentResolver.openOutputStream(targetUri, "w")?.use { output ->
+                    input.copyTo(output)
+                } ?: throw IOException("Destination camera inaccessible.")
+            } ?: throw IOException("Photo camera inaccessible.")
+
+            publishPendingMediaStoreImage(context, targetUri)
+        }.onFailure {
+            deleteCameraCapture(context, targetUri)
+        }
+    }
+
+    private fun deleteCameraCapture(context: Context, uri: Uri) {
+        runCatching {
+            context.contentResolver.delete(uri, null, null)
+        }
+    }
+
+    private fun isMediaStoreUri(uri: Uri): Boolean {
+        return uri.scheme == "content" && uri.authority == MediaStore.AUTHORITY
+    }
+
+    private fun publicPhotoDirectoryName(): String {
+        return if (publicPhotoDirectory(PUBLIC_CAMERA_DIR_NAME).isDirectory) {
+            PUBLIC_CAMERA_DIR_NAME
+        } else {
+            PUBLIC_FALLBACK_PHOTOS_DIR_NAME
+        }
+    }
+
+    private fun publicPhotoDirectory(dirName: String): File {
+        return File(
+            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DCIM),
+            dirName
+        )
+    }
+
+    private fun publicPhotoRelativePath(dirName: String): String {
+        return "${Environment.DIRECTORY_DCIM}${File.separator}$dirName"
+    }
+
+    private fun createCameraDisplayName(): String {
+        val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss_SSS", Locale.US).format(Date())
+        return "GeoTower_$timestamp.jpg"
+    }
 
     private fun resolveMimeType(context: Context, uri: Uri): String? {
         val resolverMime = normalizeMimeType(context.contentResolver.getType(uri))
@@ -394,9 +579,19 @@ object SignalQuestUploadQueue {
         return copiedBytes
     }
 
+    private fun canUploadOriginalJpeg(
+        uploadFile: SignalQuestUploadFile,
+        source: File,
+        bounds: BitmapFactory.Options
+    ): Boolean {
+        return uploadFile.sourceMimeType.equals("image/jpeg", ignoreCase = true) &&
+            max(bounds.outWidth, bounds.outHeight) <= SignalQuestUploadRules.MAX_DIMENSION_PX &&
+            source.length() in 1..SignalQuestUploadRules.MAX_OUTPUT_BYTES
+    }
+
     private fun applyExifOrientation(source: File, bitmap: Bitmap): Bitmap {
         val orientation = runCatching {
-            ExifInterface(source).getAttributeInt(
+            ExifInterface(source.absolutePath).getAttributeInt(
                 ExifInterface.TAG_ORIENTATION,
                 ExifInterface.ORIENTATION_NORMAL
             )
@@ -434,7 +629,7 @@ object SignalQuestUploadQueue {
     }
 
     @Throws(SignalQuestInvalidPhotoException::class)
-    private fun writeCompressedJpeg(bitmap: Bitmap, targetFile: File) {
+    private fun writeCompressedJpeg(bitmap: Bitmap, targetFile: File, afterWrite: () -> Unit) {
         var quality = SignalQuestUploadRules.JPEG_QUALITY
         while (quality >= SignalQuestUploadRules.MIN_JPEG_QUALITY) {
             FileOutputStream(targetFile).use { output ->
@@ -443,6 +638,7 @@ object SignalQuestUploadQueue {
                 }
             }
 
+            afterWrite()
             if (targetFile.length() in 1..SignalQuestUploadRules.MAX_OUTPUT_BYTES) {
                 return
             }
@@ -450,6 +646,43 @@ object SignalQuestUploadQueue {
         }
         targetFile.delete()
         throw SignalQuestInvalidPhotoException("Photo compressee trop volumineuse.")
+    }
+
+    @Throws(IOException::class)
+    private fun copyExifAttributes(source: File, target: File) {
+        val targetExif = ExifInterface(target.absolutePath)
+        var hasCopiedAttribute = false
+
+        readExifAttributes(source)
+            .filterKeys { tag -> tag in transferableExifAttributeTags }
+            .forEach { (tag, value) ->
+                targetExif.setAttribute(tag, value)
+                hasCopiedAttribute = true
+            }
+
+        if (hasCopiedAttribute) {
+            targetExif.saveAttributes()
+        }
+    }
+
+    private fun readExifAttributes(source: File): Map<String, String> {
+        val sourceExif = ExifInterface(source.absolutePath)
+        return exifAttributeTags
+            .mapNotNull { tag -> sourceExif.getAttribute(tag)?.let { value -> tag to value } }
+            .toMap()
+    }
+
+    private fun discoverExifAttributeTags(): List<String> {
+        return ExifInterface::class.java.fields
+            .asSequence()
+            .filter { field ->
+                Modifier.isStatic(field.modifiers) &&
+                    field.type == String::class.java &&
+                    field.name.startsWith("TAG_")
+            }
+            .mapNotNull { field -> runCatching { field.get(null) as? String }.getOrNull() }
+            .distinct()
+            .toList()
     }
 
     private fun cleanupOldChildren(root: File, maxAgeMillis: Long) {

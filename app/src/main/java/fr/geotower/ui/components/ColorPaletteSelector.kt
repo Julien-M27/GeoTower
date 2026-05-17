@@ -20,7 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
@@ -57,25 +56,11 @@ fun saveColorPalette(context: Context, palette: AppColorPalette) {
 
 @Composable
 fun ColorPaletteTopBar(onBack: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.background)
-            .padding(vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onBack) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
-        }
-        Text(
-            text = AppStrings.colorPaletteTitle,
-            style = MaterialTheme.typography.titleLarge,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.weight(1f),
-            textAlign = TextAlign.Center
-        )
-        Spacer(Modifier.width(48.dp))
-    }
+    GeoTowerBackTopBar(
+        title = AppStrings.colorPaletteTitle,
+        onBack = onBack,
+        backgroundColor = MaterialTheme.colorScheme.background
+    )
 }
 
 @Composable

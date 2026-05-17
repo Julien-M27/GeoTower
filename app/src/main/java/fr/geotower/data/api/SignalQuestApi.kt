@@ -2,7 +2,6 @@ package fr.geotower.data.api
 
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
-import okhttp3.ResponseBody
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
@@ -20,7 +19,27 @@ data class SqPhotosResponse(
 data class SqPhotoData(
     val imageUrl: String,
     val authorName: String?,
-    val uploadedAt: String?
+    val uploadedAt: String?,
+    val operator: String? = null,
+    val publicMetadata: Map<String, Any?>? = null,
+    val id: String? = null,
+    val thumbnailUrl: String? = null,
+    val approved: Boolean? = null
+)
+
+data class SqPhotoUploadResponse(
+    val data: SqPhotoUploadData?
+)
+
+data class SqPhotoUploadData(
+    val id: String?,
+    val siteId: String?,
+    val imageUrl: String?,
+    val thumbnailUrl: String?,
+    val operator: String?,
+    val authorName: String?,
+    val uploadedAt: String?,
+    val approved: Boolean?
 )
 
 data class SqSpeedtestsResponse(
@@ -39,7 +58,10 @@ interface SignalQuestApiService {
     @GET("api/external/v1/sites/{siteId}/photos")
     suspend fun getSitePhotos(
         @Header("Authorization") authHeader: String,
-        @Path("siteId") siteId: String
+        @Path("siteId") siteId: String,
+        @Query("operator") operator: String? = null,
+        @Query("limit") limit: Int? = null,
+        @Query("offset") offset: Int? = null
     ): retrofit2.Response<SqPhotosResponse>
 
     @Multipart
@@ -49,8 +71,12 @@ interface SignalQuestApiService {
         @Path("siteId") siteId: String,
         @Part file: MultipartBody.Part,
         @Part("description") description: RequestBody?,
-        @Part("operator") operator: RequestBody?
-    ): retrofit2.Response<ResponseBody>
+        @Part("operator") operator: RequestBody?,
+        @Part("anfrCode") anfrCode: RequestBody?,
+        @Part("nationalSiteCode") nationalSiteCode: RequestBody?,
+        @Part("sourceCode") sourceCode: RequestBody?,
+        @Part("exifMetadata") exifMetadata: RequestBody?
+    ): retrofit2.Response<SqPhotoUploadResponse>
 
     @GET("api/external/v1/speedtests/site")
     suspend fun getSiteSpeedtests(

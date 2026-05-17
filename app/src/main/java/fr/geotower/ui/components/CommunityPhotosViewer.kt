@@ -5,6 +5,7 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,6 +15,7 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -24,6 +26,7 @@ import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -34,11 +37,13 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Outbox
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material3.Card
@@ -77,6 +82,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import fr.geotower.data.community.CommunityDataPreferences
+import fr.geotower.ui.components.SharedMiniMapCard
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppStrings
 import fr.geotower.utils.isNetworkAvailable
@@ -88,13 +94,26 @@ import androidx.compose.ui.res.painterResource // 🚨 Pour régler "painterReso
 import fr.geotower.R // 🚨 Pour régler "R" (le lien vers vos dossiers res/)
 import androidx.compose.foundation.Image
 import java.text.Normalizer
+import java.text.NumberFormat
+import java.util.Locale
 
 // Modèle de données unifié
 data class CommunityPhoto(
     val url: String,
     val communityName: String,
     val author: String? = null,
-    val date: String? = null
+    val date: String? = null,
+    val exifMetadata: Map<String, Any?>? = null
+)
+
+private data class PhotoExifCoordinate(
+    val latitude: Double,
+    val longitude: Double
+)
+
+private data class PhotoExifDisplayItem(
+    val label: String,
+    val value: String
 )
 
 private data class DisplayedPhotoFrame(
@@ -171,6 +190,119 @@ fun formatPhotoDate(isoDate: String?): String {
         if (date != null) outputFormat.format(date) else ""
     } catch (e: Exception) {
         ""
+    }
+}
+
+private fun CommunityPhoto.hasExifInfo(): Boolean {
+    return exifDisplayItems(exifMetadata).isNotEmpty() || exifCoordinate(exifMetadata) != null
+}
+
+private fun exifDisplayItems(metadata: Map<String, Any?>?): List<PhotoExifDisplayItem> {
+    if (metadata.isNullOrEmpty()) return emptyList()
+    val preferredOrder = listOf(
+        "cameraModel",
+        "distanceToSiteMeters",
+        "takenMonthLabel",
+        "takenMonth",
+        "gpsImgDirectionDegrees",
+        "orientationDegrees",
+        "gpsLatitude",
+        "gpsLongitude",
+        "latitude",
+        "longitude",
+        "lat",
+        "lon",
+        "lng"
+    )
+    val sortedKeys = preferredOrder.filter { it in metadata } + metadata.keys.filterNot { it in preferredOrder }.sorted()
+
+    return sortedKeys.mapNotNull { key ->
+        val value = metadata[key]
+        val formattedValue = formatExifValue(key, value) ?: return@mapNotNull null
+        PhotoExifDisplayItem(label = exifLabel(key), value = formattedValue)
+    }
+}
+
+private fun exifCoordinate(metadata: Map<String, Any?>?): PhotoExifCoordinate? {
+    if (metadata.isNullOrEmpty()) return null
+
+    fun nestedCoordinate(key: String): PhotoExifCoordinate? {
+        val nested = metadata[key].asMapOrNull() ?: return null
+        val lat = firstExifDouble(nested, "latitude", "lat", "gpsLatitude")
+        val lon = firstExifDouble(nested, "longitude", "lng", "lon", "gpsLongitude")
+        return validExifCoordinate(lat, lon)
+    }
+
+    nestedCoordinate("coordinates")?.let { return it }
+    nestedCoordinate("gps")?.let { return it }
+    nestedCoordinate("gpsCoordinates")?.let { return it }
+    nestedCoordinate("location")?.let { return it }
+
+    val lat = firstExifDouble(metadata, "gpsLatitude", "latitude", "lat")
+    val lon = firstExifDouble(metadata, "gpsLongitude", "longitude", "lng", "lon")
+    return validExifCoordinate(lat, lon)
+}
+
+private fun firstExifDouble(metadata: Map<*, *>, vararg keys: String): Double? {
+    return keys.firstNotNullOfOrNull { key -> metadata[key].asDoubleOrNull() }
+}
+
+private fun validExifCoordinate(latitude: Double?, longitude: Double?): PhotoExifCoordinate? {
+    val lat = latitude ?: return null
+    val lon = longitude ?: return null
+    return if (lat in -90.0..90.0 && lon in -180.0..180.0) {
+        PhotoExifCoordinate(lat, lon)
+    } else {
+        null
+    }
+}
+
+private fun Any?.asMapOrNull(): Map<*, *>? = this as? Map<*, *>
+
+private fun Any?.asDoubleOrNull(): Double? {
+    return when (this) {
+        is Number -> toDouble()
+        is String -> replace(',', '.').toDoubleOrNull()
+        else -> null
+    }
+}
+
+private fun formatExifValue(key: String, value: Any?): String? {
+    val cleanValue = value?.toString()?.takeIf { it.isNotBlank() && it != "null" } ?: return null
+    val number = value.asDoubleOrNull()
+    return when (key) {
+        "distanceToSiteMeters" -> number?.let { "${formatDecimal(it, maximumFractionDigits = 1)} m" } ?: cleanValue
+        "gpsImgDirectionDegrees",
+        "orientationDegrees" -> number?.let { "${formatDecimal(it, maximumFractionDigits = 0)} deg" } ?: cleanValue
+        "gpsLatitude",
+        "gpsLongitude",
+        "latitude",
+        "longitude",
+        "lat",
+        "lon",
+        "lng" -> number?.let { formatDecimal(it, maximumFractionDigits = 6) } ?: cleanValue
+        else -> cleanValue
+    }
+}
+
+private fun formatDecimal(value: Double, maximumFractionDigits: Int): String {
+    return NumberFormat.getNumberInstance(Locale.FRANCE).apply {
+        minimumFractionDigits = 0
+        this.maximumFractionDigits = maximumFractionDigits
+    }.format(value)
+}
+
+private fun exifLabel(key: String): String {
+    return when (key) {
+        "cameraModel" -> "Appareil"
+        "distanceToSiteMeters" -> "Distance au site"
+        "takenMonthLabel" -> "Date de prise de vue"
+        "takenMonth" -> "Mois EXIF"
+        "gpsImgDirectionDegrees" -> "Direction GPS"
+        "orientationDegrees" -> "Orientation"
+        "gpsLatitude", "latitude", "lat" -> "Latitude GPS"
+        "gpsLongitude", "longitude", "lng", "lon" -> "Longitude GPS"
+        else -> key.replace(Regex("(?<=[a-z])(?=[A-Z])"), " ").replaceFirstChar { it.uppercase() }
     }
 }
 
@@ -290,14 +422,12 @@ fun CommunityPhotosSectionShared(
     val overlayButtonBg = if (isDark) Color.Black.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.7f)
 
     var selectedPhotoIndex by remember { mutableStateOf<Int?>(null) }
+    var exifDialogPhoto by remember { mutableStateOf<CommunityPhoto?>(null) }
     // 🚨 AJOUT : Variable pour afficher le château d'eau en grand
     var showPlaceholderFullScreen by remember { mutableStateOf(false) }
 
     // 🚨 NOUVEAU : On gère le titre dynamiquement
-    val isFree = operatorName != null && operatorName.contains("FREE", ignoreCase = true)
-
-    // On veut le titre "Schéma" si on n'a pas de vraies photos (ou si c'est Free) ET qu'on a bien un schéma à montrer
-    val showSchemaTitle = (filteredPhotos.isEmpty() || isFree) && placeholderRes != null
+    val showSchemaTitle = filteredPhotos.isEmpty() && placeholderRes != null
 
     val sectionTitle = if (showSchemaTitle) {
         AppStrings.supportDiagram
@@ -375,6 +505,43 @@ fun CommunityPhotosSectionShared(
                     // 🚨 VÉRIFICATION : EST-CE QUE L'OPÉRATEUR EST FREE ?
                     if (operatorName != null && operatorName.contains("FREE", ignoreCase = true)) {
 
+                        if (filteredPhotos.isNotEmpty()) {
+                            itemsIndexed(filteredPhotos) { index, photo ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(120.dp)
+                                        .clip(thumbnailShape)
+                                        .clickable { selectedPhotoIndex = index }
+                                ) {
+                                    AsyncImage(
+                                        model = photo.url,
+                                        contentDescription = AppStrings.sitePhotoDesc,
+                                        contentScale = ContentScale.Crop,
+                                        error = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
+                                        fallback = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
+                                        placeholder = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
+                            }
+                        }
+
+                        if (filteredPhotos.isNotEmpty() && placeholderRes != null) {
+                            item {
+                                Box(
+                                    modifier = Modifier.height(120.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .width(2.dp)
+                                            .height(80.dp)
+                                            .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                                    )
+                                }
+                            }
+                        }
+
                         // 1. POUR FREE : ON AFFICHE L'IMAGE (Si on en a trouvé une correspondante)
                         if (placeholderRes != null) {
                             item {
@@ -391,23 +558,62 @@ fun CommunityPhotosSectionShared(
                             }
                         }
 
+                        if (canUpload && onAddPhotoClick != null) {
+                            item {
+                                Box(
+                                    modifier = Modifier
+                                        .size(120.dp)
+                                        .clip(thumbnailShape)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
+                                        .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), thumbnailShape)
+                                        .clickable { onAddPhotoClick() },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Column(
+                                        horizontalAlignment = Alignment.CenterHorizontally,
+                                        verticalArrangement = Arrangement.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Outbox,
+                                            contentDescription = null,
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(28.dp)
+                                        )
+                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Text(
+                                            text = AppStrings.uploadPhotosPrompt,
+                                            fontWeight = FontWeight.Bold,
+                                            color = MaterialTheme.colorScheme.primary,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.padding(horizontal = 8.dp)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
                     } else {
 
                         // 2. POUR LES AUTRES OPÉRATEURS : ON AFFICHE D'ABORD LES VRAIES PHOTOS
                         if (filteredPhotos.isNotEmpty()) {
                             itemsIndexed(filteredPhotos) { index, photo ->
-                                AsyncImage(
-                                    model = photo.url,
-                                    contentDescription = AppStrings.sitePhotoDesc,
-                                    contentScale = ContentScale.Crop,
-                                    error = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
-                                    fallback = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
-                                    placeholder = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
+                                Box(
                                     modifier = Modifier
                                         .size(120.dp)
                                         .clip(thumbnailShape)
                                         .clickable { selectedPhotoIndex = index }
-                                )
+                                ) {
+                                    AsyncImage(
+                                        model = photo.url,
+                                        contentDescription = AppStrings.sitePhotoDesc,
+                                        contentScale = ContentScale.Crop,
+                                        error = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
+                                        fallback = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
+                                        placeholder = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                }
                             }
                         }
 
@@ -543,9 +749,11 @@ fun CommunityPhotosSectionShared(
         ) {
             val bgAlpha = (1f - (abs(dismissOffset.value) / 800f)).coerceIn(0f, 1f)
             val density = LocalDensity.current
-            val currentPhotoFrame = fittedPhotoFrame(viewerContainerSize, photoSourceSizes[pagerState.currentPage])
+            val currentPhotoSourceSize = photoSourceSizes[pagerState.currentPage]
+            val currentPhotoFrame = fittedPhotoFrame(viewerContainerSize, currentPhotoSourceSize)
             val photoStartPadding = with(density) { currentPhotoFrame.left.coerceAtLeast(0f).toDp() + 16.dp }
             val photoEndPadding = with(density) { (viewerContainerSize.width - currentPhotoFrame.right).coerceAtLeast(0f).toDp() + 16.dp }
+            val photoTopPadding = with(density) { currentPhotoFrame.top.coerceAtLeast(0f).toDp() + 16.dp }
             val navigationBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             val photoBottomPadding = maxOf(
                 with(density) { (viewerContainerSize.height - currentPhotoFrame.bottom).coerceAtLeast(0f).toDp() + 12.dp },
@@ -704,6 +912,15 @@ fun CommunityPhotosSectionShared(
                         )
                     }
 
+                    if (currentPhoto.hasExifInfo() && currentPhotoSourceSize != null) {
+                        PhotoInfoButton(
+                            modifier = Modifier.align(Alignment.TopEnd).padding(top = photoTopPadding, end = photoEndPadding),
+                            backgroundColor = overlayButtonBg,
+                            contentColor = viewerContentColor,
+                            onClick = { exifDialogPhoto = currentPhoto }
+                        )
+                    }
+
                     IconButton(
                         onClick = { selectedPhotoIndex = null; coroutineScope.launch { dismissOffset.snapTo(0f) } },
                         modifier = Modifier.align(Alignment.TopEnd).padding(top = 20.dp, end = 4.dp).background(overlayButtonBg, shape = CircleShape)
@@ -790,6 +1007,133 @@ fun CommunityPhotosSectionShared(
                                     ) {
                                         Box(modifier = Modifier.size(width = animatedWidth, height = 7.dp).clip(CircleShape).background(dotColor))
                                     }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    exifDialogPhoto?.let { photo ->
+        PhotoExifDialog(
+            photo = photo,
+            onDismiss = { exifDialogPhoto = null }
+        )
+    }
+}
+
+@Composable
+private fun PhotoInfoButton(
+    modifier: Modifier,
+    backgroundColor: Color,
+    contentColor: Color,
+    onClick: () -> Unit
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = modifier
+            .size(32.dp)
+            .background(backgroundColor, CircleShape)
+    ) {
+        Icon(
+            imageVector = Icons.Default.Info,
+            contentDescription = "Infos EXIF",
+            tint = contentColor,
+            modifier = Modifier.size(18.dp)
+        )
+    }
+}
+
+@Composable
+private fun PhotoExifDialog(
+    photo: CommunityPhoto,
+    onDismiss: () -> Unit
+) {
+    val items = remember(photo.exifMetadata) { exifDisplayItems(photo.exifMetadata) }
+    val coordinate = remember(photo.exifMetadata) { exifCoordinate(photo.exifMetadata) }
+    val dialogShape = RoundedCornerShape(18.dp)
+    val mapShape = RoundedCornerShape(12.dp)
+
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            shape = dialogShape,
+            color = MaterialTheme.colorScheme.surface,
+            tonalElevation = 8.dp
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 640.dp)
+                    .padding(20.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Metadonnees EXIF",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    IconButton(onClick = onDismiss) {
+                        Icon(Icons.Default.Close, contentDescription = AppStrings.close)
+                    }
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    coordinate?.let { point ->
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Position GPS",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        SharedMiniMapCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            centerLat = point.latitude,
+                            centerLon = point.longitude,
+                            mappedAntennas = emptyList(),
+                            blockShape = mapShape,
+                            cardBorder = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                            onMapReady = {},
+                            initialZoom = 17.0,
+                            allowGestures = true
+                        )
+                    }
+
+                    if (items.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            items.forEach { item ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.Top
+                                ) {
+                                    Text(
+                                        text = item.label,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Text(
+                                        text = item.value,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        textAlign = TextAlign.End,
+                                        modifier = Modifier.weight(1f)
+                                    )
                                 }
                             }
                         }

@@ -19,6 +19,7 @@ import fr.geotower.BuildConfig
 import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.api.SignalQuestClient
+import fr.geotower.data.upload.ExternalPhotoUploadHistoryStore
 import fr.geotower.data.upload.SignalQuestInvalidPhotoException
 import fr.geotower.data.upload.SignalQuestUploadFile
 import fr.geotower.data.upload.SignalQuestUploadManifest
@@ -29,6 +30,7 @@ import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.CancellationException
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.IOException
@@ -70,11 +72,20 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
 
             manifest.files.forEachIndexed { index, uploadFile ->
                 val result = uploadOneFile(manifest, uploadFile)
-                when (result) {
-                    UploadFileResult.Success -> successCount++
-                    UploadFileResult.PermanentFailure -> permanentFailureCount++
-                    UploadFileResult.RetryableFailure -> retryableFailureCount++
+                when (result.outcome) {
+                    UploadFileOutcome.Success,
+                    UploadFileOutcome.AwaitingValidation -> successCount++
+                    UploadFileOutcome.PermanentFailure -> permanentFailureCount++
+                    UploadFileOutcome.RetryableFailure -> retryableFailureCount++
                 }
+                ExternalPhotoUploadHistoryStore.updateUploadResult(
+                    context = applicationContext,
+                    entryId = uploadFile.historyEntryId,
+                    status = result.toHistoryStatus(),
+                    remotePhotoId = result.remotePhotoId,
+                    remoteImageUrl = result.remoteImageUrl,
+                    remoteUploadedAt = result.remoteUploadedAt
+                )
 
                 val current = index + 1
                 setProgress(workDataOf("current" to current, "total" to total))
@@ -116,7 +127,7 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
             SignalQuestUploadQueue.prepareJpegForUpload(applicationContext, manifest, uploadFile)
         } catch (e: SignalQuestInvalidPhotoException) {
             logUploadIssue("invalid_photo", e)
-            return UploadFileResult.PermanentFailure
+            return UploadFileResult(UploadFileOutcome.PermanentFailure)
         }
 
         return try {
@@ -124,38 +135,62 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
             val body = MultipartBody.Part.createFormData("file", preparedFile.name, requestFile)
             val descBody = manifest.description.toRequestBody("text/plain".toMediaTypeOrNull())
             val opBody = manifest.operator.toRequestBody("text/plain".toMediaTypeOrNull())
+            val anfrCodeBody = manifest.anfrCode.toTextPartBody()
+            val nationalSiteCodeBody = manifest.nationalSiteCode.toTextPartBody()
+            val sourceCodeBody = manifest.sourceCode.toTextPartBody()
+            val exifBody = SignalQuestUploadQueue.exifMetadataJsonForUpload(applicationContext, manifest, uploadFile)
+                ?.toRequestBody("application/json".toMediaTypeOrNull())
 
             val response = SignalQuestClient.api.uploadSitePhoto(
                 authHeader = "Bearer ${BuildConfig.SQ_API_KEY}",
                 siteId = manifest.siteId,
                 file = body,
                 description = descBody,
-                operator = opBody
+                operator = opBody,
+                anfrCode = anfrCodeBody,
+                nationalSiteCode = nationalSiteCodeBody,
+                sourceCode = sourceCodeBody,
+                exifMetadata = exifBody
             )
 
             if (response.isSuccessful) {
+                val uploadedPhoto = response.body()?.data
                 preparedFile.delete()
-                UploadFileResult.Success
+                UploadFileResult(
+                    outcome = if (uploadedPhoto?.approved == true) {
+                        UploadFileOutcome.Success
+                    } else {
+                        UploadFileOutcome.AwaitingValidation
+                    },
+                    remotePhotoId = uploadedPhoto?.id,
+                    remoteImageUrl = uploadedPhoto?.imageUrl,
+                    remoteUploadedAt = uploadedPhoto?.uploadedAt
+                )
             } else {
                 val code = response.code()
                 response.errorBody()?.close()
                 logApiFailure(code)
                 if (isRetryableHttpCode(code)) {
-                    UploadFileResult.RetryableFailure
+                    UploadFileResult(UploadFileOutcome.RetryableFailure)
                 } else {
                     preparedFile.delete()
-                    UploadFileResult.PermanentFailure
+                    UploadFileResult(UploadFileOutcome.PermanentFailure)
                 }
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: IOException) {
             logUploadIssue("network_failure", e)
-            UploadFileResult.RetryableFailure
+            UploadFileResult(UploadFileOutcome.RetryableFailure)
         } catch (e: Exception) {
             logUploadIssue("upload_exception", e)
-            UploadFileResult.RetryableFailure
+            UploadFileResult(UploadFileOutcome.RetryableFailure)
         }
+    }
+
+    private fun String?.toTextPartBody(): RequestBody? {
+        val normalized = this?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        return normalized.toRequestBody("text/plain".toMediaTypeOrNull())
     }
 
     private suspend fun startForegroundSafely(
@@ -422,10 +457,27 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         return workDataOf("success_count" to successCount, "total" to total)
     }
 
-    private enum class UploadFileResult {
+    private data class UploadFileResult(
+        val outcome: UploadFileOutcome,
+        val remotePhotoId: String? = null,
+        val remoteImageUrl: String? = null,
+        val remoteUploadedAt: String? = null
+    )
+
+    private enum class UploadFileOutcome {
         Success,
+        AwaitingValidation,
         PermanentFailure,
         RetryableFailure
+    }
+
+    private fun UploadFileResult.toHistoryStatus(): String {
+        return when (outcome) {
+            UploadFileOutcome.Success -> ExternalPhotoUploadHistoryStore.STATUS_SUCCESS
+            UploadFileOutcome.AwaitingValidation -> ExternalPhotoUploadHistoryStore.STATUS_AWAITING_VALIDATION
+            UploadFileOutcome.PermanentFailure -> ExternalPhotoUploadHistoryStore.STATUS_FAILED
+            UploadFileOutcome.RetryableFailure -> ExternalPhotoUploadHistoryStore.STATUS_RETRY
+        }
     }
 
     private companion object {

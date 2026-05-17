@@ -29,7 +29,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Search
@@ -67,6 +66,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
+import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.geoTowerLazyListFadingEdge
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
@@ -256,26 +256,12 @@ private fun HelpTopBar(
     backEnabled: Boolean,
     backgroundColor: Color
 ) {
-    Surface(color = backgroundColor) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            IconButton(onClick = onBack, enabled = backEnabled) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppStrings.back)
-            }
-            Text(
-                text = AppStrings.helpTitle,
-                style = MaterialTheme.typography.titleLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.weight(1f),
-                textAlign = TextAlign.Center
-            )
-            Spacer(Modifier.width(48.dp))
-        }
-    }
+    GeoTowerBackTopBar(
+        title = AppStrings.helpTitle,
+        onBack = onBack,
+        backgroundColor = backgroundColor,
+        backEnabled = backEnabled
+    )
 }
 
 @Composable

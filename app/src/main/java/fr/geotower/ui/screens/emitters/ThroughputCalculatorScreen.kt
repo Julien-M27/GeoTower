@@ -34,7 +34,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
@@ -92,6 +91,7 @@ import fr.geotower.radio.SiteRadioSystem
 import fr.geotower.radio.ThroughputProfile
 import fr.geotower.radio.ThroughputProfiles
 import fr.geotower.ui.components.FreqBand
+import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.MiniMapConeOverlayData
 import fr.geotower.ui.components.MiniMapStrongPoint
 import fr.geotower.ui.components.SharedMiniMapCard
@@ -302,39 +302,21 @@ fun ThroughputCalculatorScreen(
     Scaffold(
         containerColor = mainBgColor,
         topBar = {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(mainBgColor)
-                    .padding(top = 2.dp, bottom = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = { handleBackNavigation() },
-                    enabled = isSplitScreen || !safeBackNavigation.isLocked,
-                    modifier = Modifier.padding(start = 4.dp)
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, AppStrings.back, tint = MaterialTheme.colorScheme.onSurface)
+            GeoTowerBackTopBar(
+                title = AppStrings.throughputCalculatorTitle,
+                onBack = { handleBackNavigation() },
+                backgroundColor = mainBgColor,
+                backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
+                actions = {
+                    IconButton(onClick = { navController.navigate("settings?section=throughput") }) {
+                        Icon(
+                            Icons.Default.Settings,
+                            contentDescription = AppStrings.pagesCustomizationTitle,
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
-                Text(
-                    text = AppStrings.throughputCalculatorTitle,
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center
-                )
-                IconButton(
-                    onClick = { navController.navigate("settings?section=throughput") },
-                    modifier = Modifier.padding(end = 4.dp)
-                ) {
-                    Icon(
-                        Icons.Default.Settings,
-                        contentDescription = AppStrings.pagesCustomizationTitle,
-                        tint = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            }
+            )
         }
     ) { padding ->
         when {
