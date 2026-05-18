@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Point
+import android.location.Location
 import android.view.MotionEvent
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
@@ -11,6 +12,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -23,9 +26,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.ColorUtils
+import fr.geotower.R
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.utils.AppConfig
@@ -45,12 +50,28 @@ import org.osmdroid.mapsforge.MapsForgeTileProvider
 import org.osmdroid.mapsforge.MapsForgeTileSource
 import org.mapsforge.map.rendertheme.InternalRenderTheme
 import org.osmdroid.tileprovider.MapTileProviderBasic
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
 import kotlin.math.sqrt
 
 private const val MINI_MAP_HS_OPERATOR_WILDCARD = "*"
+private const val MINI_MAP_DEFAULT_MIN_ZOOM = 14.0
+private const val MINI_MAP_TILE_SIZE = 256.0
+private const val MINI_MAP_EARTH_RADIUS_METERS = 6_378_137.0
+private val MINI_MAP_EARTH_CIRCUMFERENCE_METERS = 2.0 * Math.PI * MINI_MAP_EARTH_RADIUS_METERS
+
+enum class MiniMapViewMode(val storageKey: String) {
+    AntennaCentered("antenna_centered"),
+    UserToAntenna("user_to_antenna");
+
+    companion object {
+        fun fromStorageKey(storageKey: String?): MiniMapViewMode {
+            return values().firstOrNull { it.storageKey == storageKey } ?: AntennaCentered
+        }
+    }
+}
 
 @Composable
 fun SharedMiniMapCard(
@@ -63,6 +84,9 @@ fun SharedMiniMapCard(
     cardBorder: BorderStroke?,
     onMapReady: (MapView) -> Unit,
     focusOperator: String? = null,
+    userLocation: Location? = null,
+    defaultViewMode: MiniMapViewMode = MiniMapViewMode.AntennaCentered,
+    showViewModeToggle: Boolean = false,
     coneOverlay: MiniMapConeOverlayData? = null,
     initialZoom: Double = 17.5,
     onMapTap: ((Double, Double) -> Unit)? = null,
@@ -100,12 +124,21 @@ fun SharedMiniMapCard(
     val shouldInvertColors = (mapProvider == 0 && ignStyle == 1)
     var currentZoom by remember(initialZoom) { mutableDoubleStateOf(initialZoom) }
     var lastFitSelectedPointRequest by remember { mutableIntStateOf(fitSelectedPointRequest) }
+    var viewMode by remember(defaultViewMode, centerLat, centerLon) { mutableStateOf(defaultViewMode) }
+    var lastAppliedViewportKey by remember { mutableStateOf("") }
 
     // ✅ NOUVEAU : Récupération de la couleur du thème pour le marqueur par défaut
     val rawPrimaryColor = MaterialTheme.colorScheme.primary.toArgb()
     val isColorTooLight = ColorUtils.calculateLuminance(rawPrimaryColor) > 0.85
     val safePrimaryColor = remember(rawPrimaryColor, isColorTooLight) {
         if (isColorTooLight) android.graphics.Color.parseColor("#2196F3") else rawPrimaryColor
+    }
+    val effectiveViewMode = if (userLocation != null) viewMode else MiniMapViewMode.AntennaCentered
+    val canUseUserView = userLocation != null
+    val toggleContentDescription = if (effectiveViewMode == MiniMapViewMode.UserToAntenna) {
+        stringResource(R.string.appstrings_mini_map_switch_to_antenna)
+    } else {
+        stringResource(R.string.appstrings_mini_map_switch_to_user)
     }
 
     Box(modifier = modifier.height(200.dp).clip(blockShape).border(cardBorder ?: BorderStroke(0.dp, Color.Transparent), blockShape)) {
@@ -129,7 +162,7 @@ fun SharedMiniMapCard(
                     zoomController.setVisibility(CustomZoomButtonsController.Visibility.NEVER)
                     controller.setZoom(initialZoom)
                     controller.setCenter(GeoPoint(centerLat, centerLon))
-                    setMinZoomLevel(14.0)
+                    setMinZoomLevel(MINI_MAP_DEFAULT_MIN_ZOOM)
 
                     addMapListener(object : MapListener {
                         override fun onScroll(event: ScrollEvent?): Boolean = false
@@ -171,7 +204,38 @@ fun SharedMiniMapCard(
                     currentZoom = viewport.zoom
                     lastFitSelectedPointRequest = fitSelectedPointRequest
                 } else if (!allowGestures) {
-                    map.controller.setCenter(GeoPoint(centerLat, centerLon))
+                    val viewportKey = if (effectiveViewMode == MiniMapViewMode.UserToAntenna && userLocation != null) {
+                        "gps:${centerLat.roundForViewportKey()},${centerLon.roundForViewportKey()}:" +
+                            "${userLocation.latitude.roundForViewportKey()},${userLocation.longitude.roundForViewportKey()}:" +
+                            "${map.width}x${map.height}"
+                    } else {
+                        "antenna:${centerLat.roundForViewportKey()},${centerLon.roundForViewportKey()}:${map.width}x${map.height}"
+                    }
+
+                    if (viewportKey != lastAppliedViewportKey) {
+                        if (effectiveViewMode == MiniMapViewMode.UserToAntenna && userLocation != null) {
+                            val viewport = miniMapViewportForUserPath(
+                                antennaLat = centerLat,
+                                antennaLon = centerLon,
+                                userLat = userLocation.latitude,
+                                userLon = userLocation.longitude,
+                                fallbackZoom = initialZoom,
+                                viewportWidthPx = map.width,
+                                viewportHeightPx = map.height,
+                                density = context.resources.displayMetrics.density
+                            )
+                            map.setMinZoomLevel(viewport.zoom)
+                            map.controller.setZoom(viewport.zoom)
+                            map.controller.setCenter(GeoPoint(viewport.centerLat, viewport.centerLon))
+                            currentZoom = viewport.zoom
+                        } else {
+                            map.setMinZoomLevel(MINI_MAP_DEFAULT_MIN_ZOOM)
+                            map.controller.setZoom(initialZoom)
+                            map.controller.setCenter(GeoPoint(centerLat, centerLon))
+                            currentZoom = initialZoom
+                        }
+                        lastAppliedViewportKey = viewportKey
+                    }
                 }
 
                 // 🗺️ LOGIQUE HORS-LIGNE
@@ -229,6 +293,20 @@ fun SharedMiniMapCard(
                 map.updateMiniMapConeOverlay(coneOverlay, safePrimaryColor)
 
                 // ✅ CORRECTION ICI : On cherche notre marqueur spécifique (MiniMapAntennaMarker)
+                map.updateMiniMapUserPathOverlay(
+                    data = if (effectiveViewMode == MiniMapViewMode.UserToAntenna && userLocation != null) {
+                        MiniMapUserPathOverlayData(
+                            antennaLat = centerLat,
+                            antennaLon = centerLon,
+                            userLat = userLocation.latitude,
+                            userLon = userLocation.longitude
+                        )
+                    } else {
+                        null
+                    },
+                    primaryColor = safePrimaryColor
+                )
+
                 val marker = map.overlays.filterIsInstance<MiniMapAntennaMarker>().firstOrNull()
 
                 if (marker != null) {
@@ -289,6 +367,31 @@ fun SharedMiniMapCard(
             Surface(onClick = { mapRef?.controller?.zoomIn() }, shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), shadowElevation = 4.dp, modifier = Modifier.size(38.dp)) { Icon(Icons.Default.Add, null, modifier = Modifier.padding(6.dp)) }
             Surface(onClick = { mapRef?.controller?.zoomOut() }, shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), shadowElevation = 4.dp, modifier = Modifier.size(38.dp)) { Icon(Icons.Default.Remove, null, modifier = Modifier.padding(6.dp)) }
         }
+        if (showViewModeToggle) {
+            Surface(
+                onClick = {
+                    if (canUseUserView) {
+                        viewMode = if (effectiveViewMode == MiniMapViewMode.UserToAntenna) {
+                            MiniMapViewMode.AntennaCentered
+                        } else {
+                            MiniMapViewMode.UserToAntenna
+                        }
+                    }
+                },
+                enabled = canUseUserView,
+                shape = CircleShape,
+                color = MaterialTheme.colorScheme.surface.copy(alpha = if (canUseUserView) 0.88f else 0.58f),
+                shadowElevation = 4.dp,
+                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(38.dp)
+            ) {
+                Icon(
+                    imageVector = if (effectiveViewMode == MiniMapViewMode.UserToAntenna) Icons.Default.Map else Icons.Default.MyLocation,
+                    contentDescription = toggleContentDescription,
+                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (canUseUserView) 1f else 0.45f),
+                    modifier = Modifier.padding(7.dp)
+                )
+            }
+        }
     }
 }
 
@@ -322,6 +425,103 @@ private fun miniMapViewportForSelection(
         centerLon = (centerLon + selectedLon) / 2.0,
         zoom = zoom
     )
+}
+
+private fun miniMapViewportForUserPath(
+    antennaLat: Double,
+    antennaLon: Double,
+    userLat: Double,
+    userLon: Double,
+    fallbackZoom: Double,
+    viewportWidthPx: Int,
+    viewportHeightPx: Int,
+    density: Float
+): MiniMapViewport {
+    if (viewportWidthPx <= 0 || viewportHeightPx <= 0) {
+        val distanceMeters = roughDistanceMeters(antennaLat, antennaLon, userLat, userLon)
+        val zoom = miniMapZoomForRadius((distanceMeters / 2.0) + 650.0).coerceAtMost(fallbackZoom)
+        return MiniMapViewport(
+            centerLat = (antennaLat + userLat) / 2.0,
+            centerLon = (antennaLon + userLon) / 2.0,
+            zoom = zoom
+        )
+    }
+
+    val antenna = miniMapMercatorPoint(antennaLat, antennaLon)
+    val user = miniMapMercatorPoint(userLat, userLon)
+    val safeDensity = density.toDouble().coerceAtLeast(0.75)
+    val safeGutterPx = 12.0 * safeDensity
+    val antennaPaddingPx = (76.0 * safeDensity) + safeGutterPx
+    val userPaddingPx = (20.0 * safeDensity) + safeGutterPx
+    val usableWidthPx = (viewportWidthPx.toDouble() - antennaPaddingPx - userPaddingPx).coerceAtLeast(1.0)
+    val usableHeightPx = (viewportHeightPx.toDouble() - antennaPaddingPx - userPaddingPx).coerceAtLeast(1.0)
+
+    val requiredMetersPerPixel = max(
+        abs(antenna.x - user.x) / usableWidthPx,
+        abs(antenna.y - user.y) / usableHeightPx
+    ).coerceAtLeast(0.05)
+    val referenceLat = ((antennaLat + userLat) / 2.0).coerceIn(-80.0, 80.0)
+    val zoom = miniMapZoomForMetersPerPixel(referenceLat, requiredMetersPerPixel)
+        .coerceAtMost(fallbackZoom)
+        .coerceAtLeast(3.0)
+    val metersPerPixel = miniMapMetersPerPixel(referenceLat, zoom)
+    val antennaPaddingMeters = antennaPaddingPx * metersPerPixel
+    val userPaddingMeters = userPaddingPx * metersPerPixel
+
+    val minX = minOf(antenna.x - antennaPaddingMeters, user.x - userPaddingMeters)
+    val maxX = maxOf(antenna.x + antennaPaddingMeters, user.x + userPaddingMeters)
+    val minY = minOf(antenna.y - antennaPaddingMeters, user.y - userPaddingMeters)
+    val maxY = maxOf(antenna.y + antennaPaddingMeters, user.y + userPaddingMeters)
+    val center = miniMapLatLonFromMercator(
+        x = (minX + maxX) / 2.0,
+        y = (minY + maxY) / 2.0
+    )
+
+    return MiniMapViewport(
+        centerLat = center.latitude,
+        centerLon = center.longitude,
+        zoom = zoom
+    )
+}
+
+private data class MiniMapMercatorPoint(
+    val x: Double,
+    val y: Double
+)
+
+private data class MiniMapLatLon(
+    val latitude: Double,
+    val longitude: Double
+)
+
+private fun miniMapMercatorPoint(latitude: Double, longitude: Double): MiniMapMercatorPoint {
+    val safeLat = latitude.coerceIn(-85.05112878, 85.05112878)
+    val latRad = Math.toRadians(safeLat)
+    return MiniMapMercatorPoint(
+        x = MINI_MAP_EARTH_RADIUS_METERS * Math.toRadians(longitude),
+        y = MINI_MAP_EARTH_RADIUS_METERS * Math.log(Math.tan(Math.PI / 4.0 + latRad / 2.0))
+    )
+}
+
+private fun miniMapLatLonFromMercator(x: Double, y: Double): MiniMapLatLon {
+    return MiniMapLatLon(
+        latitude = Math.toDegrees(2.0 * Math.atan(Math.exp(y / MINI_MAP_EARTH_RADIUS_METERS)) - Math.PI / 2.0),
+        longitude = Math.toDegrees(x / MINI_MAP_EARTH_RADIUS_METERS)
+    )
+}
+
+private fun miniMapZoomForMetersPerPixel(latitude: Double, metersPerPixel: Double): Double {
+    val latitudeScale = cos(Math.toRadians(latitude)).coerceAtLeast(0.01)
+    return Math.log(latitudeScale * MINI_MAP_EARTH_CIRCUMFERENCE_METERS / (MINI_MAP_TILE_SIZE * metersPerPixel)) / Math.log(2.0)
+}
+
+private fun miniMapMetersPerPixel(latitude: Double, zoom: Double): Double {
+    val latitudeScale = cos(Math.toRadians(latitude)).coerceAtLeast(0.01)
+    return latitudeScale * MINI_MAP_EARTH_CIRCUMFERENCE_METERS / (MINI_MAP_TILE_SIZE * Math.pow(2.0, zoom))
+}
+
+private fun Double.roundForViewportKey(): String {
+    return String.format(Locale.US, "%.4f", this)
 }
 
 private fun roughDistanceMeters(
@@ -404,6 +604,94 @@ private class MiniMapTapOverlay(
 // =====================================================================
 // MARQUEUR MINI-CARTE (DESSINE LES AZIMUTS + L'ICÔNE)
 // =====================================================================
+private data class MiniMapUserPathOverlayData(
+    val antennaLat: Double,
+    val antennaLon: Double,
+    val userLat: Double,
+    val userLon: Double
+)
+
+private fun MapView.updateMiniMapUserPathOverlay(data: MiniMapUserPathOverlayData?, primaryColor: Int) {
+    val current = overlays.filterIsInstance<MiniMapUserPathOverlay>().firstOrNull()
+    if (data == null) {
+        if (current != null) overlays.remove(current)
+        return
+    }
+
+    if (current == null) {
+        overlays.add(0, MiniMapUserPathOverlay(data, primaryColor, context.resources.displayMetrics.density))
+    } else {
+        current.data = data
+        current.primaryColor = primaryColor
+        current.refreshPaints()
+    }
+}
+
+private class MiniMapUserPathOverlay(
+    var data: MiniMapUserPathOverlayData,
+    var primaryColor: Int,
+    private val density: Float
+) : Overlay() {
+    private val userPoint = Point()
+    private val antennaPoint = Point()
+    private val lineShadowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val linePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val userFillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val userStrokePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val userOuterPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+
+    init {
+        refreshPaints()
+    }
+
+    fun refreshPaints() {
+        lineShadowPaint.apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 5.5f * density
+            strokeCap = Paint.Cap.ROUND
+            color = android.graphics.Color.argb(210, 255, 255, 255)
+        }
+        linePaint.apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 3.2f * density
+            strokeCap = Paint.Cap.ROUND
+            color = ColorUtils.setAlphaComponent(primaryColor, 230)
+        }
+        userOuterPaint.apply {
+            style = Paint.Style.FILL
+            color = android.graphics.Color.argb(
+                72,
+                android.graphics.Color.red(primaryColor),
+                android.graphics.Color.green(primaryColor),
+                android.graphics.Color.blue(primaryColor)
+            )
+        }
+        userFillPaint.apply {
+            style = Paint.Style.FILL
+            color = primaryColor
+        }
+        userStrokePaint.apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 2.5f * density
+            color = android.graphics.Color.WHITE
+        }
+    }
+
+    override fun draw(canvas: Canvas, projection: Projection) {
+        projection.toPixels(GeoPoint(data.userLat, data.userLon), userPoint)
+        projection.toPixels(GeoPoint(data.antennaLat, data.antennaLon), antennaPoint)
+
+        canvas.drawLine(userPoint.x.toFloat(), userPoint.y.toFloat(), antennaPoint.x.toFloat(), antennaPoint.y.toFloat(), lineShadowPaint)
+        canvas.drawLine(userPoint.x.toFloat(), userPoint.y.toFloat(), antennaPoint.x.toFloat(), antennaPoint.y.toFloat(), linePaint)
+
+        val outerRadius = 12f * density
+        val innerRadius = 6.5f * density
+        canvas.drawCircle(userPoint.x.toFloat(), userPoint.y.toFloat(), outerRadius, userOuterPaint)
+        canvas.drawCircle(userPoint.x.toFloat(), userPoint.y.toFloat(), innerRadius, userFillPaint)
+        canvas.drawCircle(userPoint.x.toFloat(), userPoint.y.toFloat(), innerRadius, userStrokePaint)
+    }
+}
+
 data class MiniMapConeOverlayData(
     val centerLat: Double,
     val centerLon: Double,

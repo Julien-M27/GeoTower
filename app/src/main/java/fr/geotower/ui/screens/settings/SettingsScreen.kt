@@ -134,6 +134,7 @@ import fr.geotower.ui.components.SafeClick
 import fr.geotower.ui.components.colorPaletteFadingEdge
 import fr.geotower.ui.components.DialogDestructiveButton
 import fr.geotower.ui.components.DialogNeutralButton
+import fr.geotower.ui.components.MiniMapViewMode
 import fr.geotower.ui.components.appLogoDrawingChoiceDescription
 import fr.geotower.ui.components.appLogoDrawingChoiceName
 import fr.geotower.ui.components.appLogoDrawingFamilyName
@@ -436,6 +437,8 @@ fun SettingsScreen(
     // --- Variables d'état pour le Pylône et l'Antenne ---
     var showSupportSettingsSheet by remember { mutableStateOf(false) }
     var showSiteSettingsSheet by remember { mutableStateOf(false) }
+    var showSupportMiniMapSettingsSheet by remember { mutableStateOf(false) }
+    var showSiteMiniMapSettingsSheet by remember { mutableStateOf(false) }
     var showPhotosSettingsSheet by remember { mutableStateOf(false) }
 
     fun insertMissingAfter(order: MutableList<String>, item: String, after: String) {
@@ -509,6 +512,7 @@ fun SettingsScreen(
     var pageSupportNav by remember { mutableStateOf(prefs.getBoolean("page_support_nav", true)) }
     var pageSupportShare by remember { mutableStateOf(prefs.getBoolean("page_support_share", true)) }
     var pageSupportOperators by remember { mutableStateOf(prefs.getBoolean("page_support_operators", true)) }
+    var pageSupportMiniMapMode by remember { mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString("page_support_mini_map_mode", null))) }
 
     // --- Variables d'état pour l'Antenne (Site) ---
     var pageSiteOrder by remember {
@@ -533,6 +537,7 @@ fun SettingsScreen(
     var pageSiteAddress by remember { mutableStateOf(prefs.getBoolean("page_site_address", true)) }
     var pageSiteFreqs by remember { mutableStateOf(prefs.getBoolean("page_site_freqs", true)) }
     var pageSiteLinks by remember { mutableStateOf(prefs.getBoolean("page_site_links", true)) }
+    var pageSiteMiniMapMode by remember { mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString("page_site_mini_map_mode", null))) }
     var pageThroughputOrder by remember {
         mutableStateOf(
             normalizeThroughputOrder(
@@ -1225,6 +1230,10 @@ fun SettingsScreen(
                 showNav = pageSupportNav, onNavChange = { pageSupportNav = it; prefs.edit().putBoolean("page_support_nav", it).apply() },
                 showShare = pageSupportShare, onShareChange = { pageSupportShare = it; prefs.edit().putBoolean("page_support_share", it).apply() },
                 showOperators = pageSupportOperators, onOperatorsChange = { pageSupportOperators = it; prefs.edit().putBoolean("page_support_operators", it).apply() },
+                onOpenMiniMapSettings = {
+                    showSupportSettingsSheet = false
+                    showSupportMiniMapSettingsSheet = true
+                },
                 onDismiss = { showSupportSettingsSheet = false },
                 onBack = { safeClick { showSupportSettingsSheet = false; showPagesCustomizationSheet = true } },
                 sheetState = sheetState,
@@ -1254,6 +1263,10 @@ fun SettingsScreen(
                 showSpeedtest = AppConfig.siteShowSpeedtest.value, onSpeedtestChange = { AppConfig.siteShowSpeedtest.value = it; prefs.edit().putBoolean("site_show_speedtest", it).apply() }, // 🚨 NEW
                 showFreqs = pageSiteFreqs, onFreqsChange = { pageSiteFreqs = it; prefs.edit().putBoolean("page_site_freqs", it).apply() },
                 showLinks = pageSiteLinks, onLinksChange = { pageSiteLinks = it; prefs.edit().putBoolean("page_site_links", it).apply() },
+                onOpenMiniMapSettings = {
+                    showSiteSettingsSheet = false
+                    showSiteMiniMapSettingsSheet = true
+                },
                 onOpenFrequencies = {
                     showSiteSettingsSheet = false
                     showFrequenciesSheet = true
@@ -1269,6 +1282,47 @@ fun SettingsScreen(
                 bubbleColor = bubbleBaseColor
             )
         }
+        // --- SOUS-MENU MINI-CARTE ---
+        if (showSupportMiniMapSettingsSheet) {
+            MiniMapSettingsSheet(
+                selectedMode = pageSupportMiniMapMode,
+                onModeChange = {
+                    pageSupportMiniMapMode = it
+                    prefs.edit().putString("page_support_mini_map_mode", it.storageKey).apply()
+                },
+                onDismiss = { showSupportMiniMapSettingsSheet = false },
+                onBack = {
+                    safeClick {
+                        showSupportMiniMapSettingsSheet = false
+                        showSupportSettingsSheet = true
+                    }
+                },
+                sheetState = sheetState,
+                useOneUi = useOneUi,
+                bubbleColor = bubbleBaseColor
+            )
+        }
+
+        if (showSiteMiniMapSettingsSheet) {
+            MiniMapSettingsSheet(
+                selectedMode = pageSiteMiniMapMode,
+                onModeChange = {
+                    pageSiteMiniMapMode = it
+                    prefs.edit().putString("page_site_mini_map_mode", it.storageKey).apply()
+                },
+                onDismiss = { showSiteMiniMapSettingsSheet = false },
+                onBack = {
+                    safeClick {
+                        showSiteMiniMapSettingsSheet = false
+                        showSiteSettingsSheet = true
+                    }
+                },
+                sheetState = sheetState,
+                useOneUi = useOneUi,
+                bubbleColor = bubbleBaseColor
+            )
+        }
+
         // --- MENU DES PRÉFÉRENCES DE PARTAGE ---
         // --- SOUS-MENU DE SÉLECTION DU PARTAGE ---
         if (showShareSelectorSheet) {

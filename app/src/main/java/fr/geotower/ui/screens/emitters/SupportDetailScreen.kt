@@ -65,6 +65,7 @@ import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.MiniMapViewMode
 import fr.geotower.ui.components.SupportShareMenu
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
@@ -395,6 +396,9 @@ fun SupportDetailScreen(
     val txtUnknown = stringResource(R.string.appstrings_unknown)
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val miniMapDefaultMode = remember {
+        MiniMapViewMode.fromStorageKey(prefs.getString("page_support_mini_map_mode", null))
+    }
 
     fun normalizeSupportOrder(order: List<String>): List<String> {
         val mutableOrder = order.filter { it.isNotBlank() }.toMutableList()
@@ -484,7 +488,10 @@ fun SupportDetailScreen(
                                         blockShape = blockShape,
                                         cardBorder = cardBorder,
                                         onMapReady = { globalMapRef = it },
-                                        focusOperator = effectiveHighlightedOperatorKey
+                                        focusOperator = effectiveHighlightedOperatorKey,
+                                        userLocation = userLocation,
+                                        defaultViewMode = miniMapDefaultMode,
+                                        showViewModeToggle = true
                                     )
                                 }
                             }

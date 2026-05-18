@@ -419,22 +419,7 @@ fun MapScreen(
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
     LaunchedEffect(Unit) {
-        AppConfig.defaultOperator.value = prefs.getString("default_operator", "Aucun") ?: "Aucun"
-        // ✅ AJOUT : On lit la préférence, mais le défaut est 'true' si la clé n'existe pas
-        AppConfig.showAzimuths.value = prefs.getBoolean(
-            AppConfig.PREF_SHOW_AZIMUTH_LINES,
-            AppConfig.DEFAULT_SHOW_AZIMUTH_LINES
-        )
-        AppConfig.showAzimuthsCone.value = prefs.getBoolean(
-            AppConfig.PREF_SHOW_AZIMUTH_CONES,
-            AppConfig.DEFAULT_SHOW_AZIMUTH_CONES
-        )
-        AppConfig.showSitesInService.value = prefs.getBoolean("show_sites_in_service", true)
-        AppConfig.showSitesOutOfService.value = prefs.getBoolean("show_sites_out_of_service", true)
-
-        // ✅ LA LIGNE MANQUANTE EST ICI : On charge la préférence du compteur
-        AppConfig.showSpeedometer.value = prefs.getBoolean("show_speedometer", true)
-        AppConfig.showMapLocationMarker.value = prefs.getBoolean(AppConfig.PREF_SHOW_MAP_LOCATION_MARKER, true)
+        AppConfig.loadMapDisplayPreferences(prefs)
     }
 
     val safeClick = rememberSafeClick()

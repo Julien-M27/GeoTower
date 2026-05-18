@@ -780,6 +780,11 @@
     <string name="appstrings_site_ids_option">Identificadores</string>
     <string name="appstrings_site_links_option">Links externes</string>
     <string name="appstrings_site_map_option">Mini-mapa</string>
+    <string name="appstrings_mini_map_settings_title">Configurações do mini-mapa</string>
+    <string name="appstrings_mini_map_antenna_centered">Antena centrada</string>
+    <string name="appstrings_mini_map_user_to_antenna">A minha posição e a antena</string>
+    <string name="appstrings_mini_map_switch_to_antenna">Mostrar vista com antena centrada</string>
+    <string name="appstrings_mini_map_switch_to_user">Mostrar a minha posição e a antena</string>
     <string name="appstrings_site_nav_option">Botão Navegar</string>
     <string name="appstrings_site_open_map_option">Botao Abrir o mapa</string>
     <string name="appstrings_site_operator_option">Banner da operadora</string>

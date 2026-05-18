@@ -780,6 +780,11 @@
     <string name="appstrings_site_ids_option">Kennungen</string>
     <string name="appstrings_site_links_option">Externe Links</string>
     <string name="appstrings_site_map_option">Minikarte</string>
+    <string name="appstrings_mini_map_settings_title">Minikarten-Einstellungen</string>
+    <string name="appstrings_mini_map_antenna_centered">Antenne zentriert</string>
+    <string name="appstrings_mini_map_user_to_antenna">Meine Position und Antenne</string>
+    <string name="appstrings_mini_map_switch_to_antenna">Ansicht mit zentrierter Antenne anzeigen</string>
+    <string name="appstrings_mini_map_switch_to_user">Meine Position und Antenne anzeigen</string>
     <string name="appstrings_site_nav_option">Schaltfläche Navigieren</string>
     <string name="appstrings_site_open_map_option">Schaltfläche Karte öffnen</string>
     <string name="appstrings_site_operator_option">Betreiberbanner</string>

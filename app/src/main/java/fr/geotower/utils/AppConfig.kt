@@ -179,6 +179,48 @@ object AppConfig {
     var siteShowSchemes = mutableStateOf(true)
     var siteShowPhotoExif = mutableStateOf(true)
 
+    fun loadMapDisplayPreferences(prefs: SharedPreferences) {
+        defaultOperator.value = prefs.getString("default_operator", "Aucun") ?: "Aucun"
+
+        showOrange.value = prefs.getBoolean("show_orange", true)
+        showSfr.value = prefs.getBoolean("show_sfr", true)
+        showBouygues.value = prefs.getBoolean("show_bouygues", true)
+        showFree.value = prefs.getBoolean("show_free", true)
+        setSelectedOperatorKeys(loadSelectedOperatorKeys(prefs))
+
+        showAzimuths.value = prefs.getBoolean(PREF_SHOW_AZIMUTH_LINES, DEFAULT_SHOW_AZIMUTH_LINES)
+        showAzimuthsCone.value = prefs.getBoolean(PREF_SHOW_AZIMUTH_CONES, DEFAULT_SHOW_AZIMUTH_CONES)
+        showMapLocationMarker.value = prefs.getBoolean(PREF_SHOW_MAP_LOCATION_MARKER, true)
+        showSpeedometer.value = prefs.getBoolean("show_speedometer", true)
+
+        showSitesInService.value = prefs.getBoolean("show_sites_in_service", true)
+        showSitesOutOfService.value = prefs.getBoolean("show_sites_out_of_service", true)
+
+        showTechno2G.value = prefs.getBoolean("show_techno_2g", true)
+        showTechno3G.value = prefs.getBoolean("show_techno_3g", true)
+        showTechno4G.value = prefs.getBoolean("show_techno_4g", true)
+        showTechno5G.value = prefs.getBoolean("show_techno_5g", true)
+        showTechnoFH.value = prefs.getBoolean("show_techno_fh", true)
+
+        f2G_900.value = prefs.getBoolean("f2g_900", true)
+        f2G_1800.value = prefs.getBoolean("f2g_1800", true)
+
+        f3G_900.value = prefs.getBoolean("f3g_900", true)
+        f3G_2100.value = prefs.getBoolean("f3g_2100", true)
+
+        f4G_700.value = prefs.getBoolean("f4g_700", true)
+        f4G_800.value = prefs.getBoolean("f4g_800", true)
+        f4G_900.value = prefs.getBoolean("f4g_900", true)
+        f4G_1800.value = prefs.getBoolean("f4g_1800", true)
+        f4G_2100.value = prefs.getBoolean("f4g_2100", true)
+        f4G_2600.value = prefs.getBoolean("f4g_2600", true)
+
+        f5G_700.value = prefs.getBoolean("f5g_700", true)
+        f5G_2100.value = prefs.getBoolean("f5g_2100", true)
+        f5G_3500.value = prefs.getBoolean("f5g_3500", true)
+        f5G_26000.value = prefs.getBoolean("f5g_26000", true)
+    }
+
     // --- FONCTION POUR CHARGER LA MÉMOIRE AU DÉMARRAGE ---
     fun loadSavedFilters(prefs: android.content.SharedPreferences) {
 
@@ -210,42 +252,7 @@ object AppConfig {
         distanceUnit.intValue = prefs.getInt("distance_unit", 0)
         speedUnit.intValue = prefs.getInt("speed_unit", 0)
 
-        showOrange.value = prefs.getBoolean("show_orange", true)
-        showSfr.value = prefs.getBoolean("show_sfr", true)
-        showBouygues.value = prefs.getBoolean("show_bouygues", true)
-        showFree.value = prefs.getBoolean("show_free", true)
-        selectedOperatorKeys.value = loadSelectedOperatorKeys(prefs)
-
-        showAzimuths.value = prefs.getBoolean(PREF_SHOW_AZIMUTH_LINES, DEFAULT_SHOW_AZIMUTH_LINES)
-        showAzimuthsCone.value = prefs.getBoolean(PREF_SHOW_AZIMUTH_CONES, DEFAULT_SHOW_AZIMUTH_CONES)
-        showMapLocationMarker.value = prefs.getBoolean(PREF_SHOW_MAP_LOCATION_MARKER, true)
-
-        showSitesInService.value = prefs.getBoolean("show_sites_in_service", true)
-        showSitesOutOfService.value = prefs.getBoolean("show_sites_out_of_service", true)
-
-        showTechno2G.value = prefs.getBoolean("show_techno_2g", true)
-        showTechno3G.value = prefs.getBoolean("show_techno_3g", true)
-        showTechno4G.value = prefs.getBoolean("show_techno_4g", true)
-        showTechno5G.value = prefs.getBoolean("show_techno_5g", true)
-        showTechnoFH.value = prefs.getBoolean("show_techno_fh", true)
-
-        f2G_900.value = prefs.getBoolean("f2g_900", true)
-        f2G_1800.value = prefs.getBoolean("f2g_1800", true)
-
-        f3G_900.value = prefs.getBoolean("f3g_900", true)
-        f3G_2100.value = prefs.getBoolean("f3g_2100", true)
-
-        f4G_700.value = prefs.getBoolean("f4g_700", true)
-        f4G_800.value = prefs.getBoolean("f4g_800", true)
-        f4G_900.value = prefs.getBoolean("f4g_900", true)
-        f4G_1800.value = prefs.getBoolean("f4g_1800", true)
-        f4G_2100.value = prefs.getBoolean("f4g_2100", true)
-        f4G_2600.value = prefs.getBoolean("f4g_2600", true)
-
-        f5G_700.value = prefs.getBoolean("f5g_700", true)
-        f5G_2100.value = prefs.getBoolean("f5g_2100", true)
-        f5G_3500.value = prefs.getBoolean("f5g_3500", true)
-        f5G_26000.value = prefs.getBoolean("f5g_26000", true)
+        loadMapDisplayPreferences(prefs)
 
         siteShowTechno2G.value = prefs.getBoolean("site_show_techno_2g", true)
         siteShowTechno3G.value = prefs.getBoolean("site_show_techno_3g", true)
@@ -343,10 +350,12 @@ object AppConfig {
     }
 
     private fun loadSelectedOperatorKeys(prefs: android.content.SharedPreferences): Set<String> {
-        val savedKeys = prefs.getStringSet(PREF_SELECTED_OPERATORS, null)
-            ?.mapNotNull { OperatorColors.specForKey(it)?.key }
-            ?.toSet()
-        if (!savedKeys.isNullOrEmpty()) return savedKeys
+        if (prefs.contains(PREF_SELECTED_OPERATORS)) {
+            return prefs.getStringSet(PREF_SELECTED_OPERATORS, emptySet())
+                .orEmpty()
+                .mapNotNull { OperatorColors.specForKey(it)?.key }
+                .toSet()
+        }
 
         return buildSet {
             if (showOrange.value) add(OperatorColors.ORANGE_KEY)

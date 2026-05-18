@@ -111,6 +111,7 @@ import fr.geotower.data.upload.SignalQuestUploadDraftStore
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadRules
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.MiniMapViewMode
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.oneUiActionButtonShape
@@ -331,6 +332,9 @@ fun SiteDetailScreen(
     }
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val miniMapDefaultMode = remember {
+        MiniMapViewMode.fromStorageKey(prefs.getString("page_site_mini_map_mode", null))
+    }
 
     fun normalizeSiteOrder(order: List<String>): List<String> {
         val mutableOrder = order.filter { it.isNotBlank() }.toMutableList()
@@ -902,7 +906,10 @@ fun SiteDetailScreen(
                                     blockShape = blockShape,
                                     cardBorder = cardBorder,
                                     onMapReady = { globalMapRef = it },
-                                    focusOperator = info.operateur
+                                    focusOperator = info.operateur,
+                                    userLocation = userLocation,
+                                    defaultViewMode = miniMapDefaultMode,
+                                    showViewModeToggle = true
                                 )
                             }
                         }

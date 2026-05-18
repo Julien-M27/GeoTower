@@ -92,6 +92,7 @@ import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.rememberReorderableDragState
 import fr.geotower.ui.components.settingsPopupFadingEdge
+import fr.geotower.ui.components.MiniMapViewMode
 import kotlin.math.roundToInt
 import fr.geotower.utils.ThroughputDisplayText
 
@@ -1438,6 +1439,7 @@ fun SupportSettingsSheet(
     showNav: Boolean, onNavChange: (Boolean) -> Unit,
     showShare: Boolean, onShareChange: (Boolean) -> Unit,
     showOperators: Boolean, onOperatorsChange: (Boolean) -> Unit,
+    onOpenMiniMapSettings: () -> Unit,
     onDismiss: () -> Unit, onBack: () -> Unit,
     sheetState: SheetState, useOneUi: Boolean, bubbleColor: Color
 ) {
@@ -1492,7 +1494,7 @@ fun SupportSettingsSheet(
                         val dragOffset = reorderState.offsetFor(blockId)
 
                         when (blockId) {
-                            "map" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_map_option), showMap, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "map" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_map_option), showMap, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = onOpenMiniMapSettings)
                             "details" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_details_option), showDetails, onDetailsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "photos" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_photos_option), showPhotos, onPhotosChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "open_map" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_open_map_option), showOpenMap, onOpenMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
@@ -1546,6 +1548,7 @@ fun SiteSettingsSheet(
     showSpeedtest: Boolean, onSpeedtestChange: (Boolean) -> Unit,
     showFreqs: Boolean, onFreqsChange: (Boolean) -> Unit,
     showLinks: Boolean, onLinksChange: (Boolean) -> Unit,
+    onOpenMiniMapSettings: () -> Unit,
     onOpenFrequencies: () -> Unit,
     onOpenPhotosSettings: () -> Unit,
     onDismiss: () -> Unit,
@@ -1608,7 +1611,7 @@ fun SiteSettingsSheet(
                         when (blockId) {
                             "operator" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_operator_option), showOperator, onOperatorChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "bearing_height" -> if (AppConfig.hasCompass.value) DraggableSwitchCard(stringResource(R.string.appstrings_site_bearing_height_option), showBearingHeight, onBearingHeightChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "map" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_map_option), showMap, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "map" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_map_option), showMap, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = onOpenMiniMapSettings)
                             "support_details" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_support_details_option), showSupportDetails, onSupportDetailsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "photos" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_photos_and_schemes_option), showPhotos, onPhotosChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = {
                                 onDismiss()
@@ -1661,6 +1664,117 @@ fun SiteSettingsSheet(
                 Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MiniMapSettingsSheet(
+    selectedMode: MiniMapViewMode,
+    onModeChange: (MiniMapViewMode) -> Unit,
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    bubbleColor: Color
+) {
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val shape = oneUiActionButtonShape(useOneUi)
+    val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+    val cardBg = if (useOneUi) bubbleColor else Color.Transparent
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = sheetBgColor,
+        dragHandle = {
+            Column(
+                modifier = Modifier.fillMaxWidth().statusBarsPadding(),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                BottomSheetDefaults.DragHandle(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+            }
+        }
+    ) {
+        BackHandler(onBack = onBack)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .navigationBarsPadding()
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                Text(
+                    stringResource(R.string.appstrings_mini_map_settings_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.width(48.dp))
+            }
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                MiniMapModeOption(
+                    title = stringResource(R.string.appstrings_mini_map_antenna_centered),
+                    selected = selectedMode == MiniMapViewMode.AntennaCentered,
+                    shape = shape,
+                    border = border,
+                    cardBg = cardBg
+                ) {
+                    onModeChange(MiniMapViewMode.AntennaCentered)
+                }
+                MiniMapModeOption(
+                    title = stringResource(R.string.appstrings_mini_map_user_to_antenna),
+                    selected = selectedMode == MiniMapViewMode.UserToAntenna,
+                    shape = shape,
+                    border = border,
+                    cardBg = cardBg
+                ) {
+                    onModeChange(MiniMapViewMode.UserToAntenna)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MiniMapModeOption(
+    title: String,
+    selected: Boolean,
+    shape: androidx.compose.ui.graphics.Shape,
+    border: BorderStroke?,
+    cardBg: Color,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = shape,
+        border = border,
+        color = cardBg,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.weight(1f)
+            )
+            RadioButton(
+                selected = selected,
+                onClick = onClick,
+                colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary)
+            )
         }
     }
 }
