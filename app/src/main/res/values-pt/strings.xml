@@ -696,6 +696,11 @@
     <string name="appstrings_release_section_signalquest">SignalQuest</string>
     <string name="appstrings_release_section_notifications">Notificações</string>
     <string name="appstrings_release_section_database">Base de dados</string>
+    <string name="appstrings_release_community_source_settings">Adição de novas definições para fontes de fotos e speedtests</string>
+    <string name="appstrings_release_photo_visibility_sync">Apresentação das fotos melhor sincronizada entre as páginas Suporte e Site</string>
+    <string name="appstrings_release_community_photo_filters">Fotos filtradas pela operadora e fontes ativadas</string>
+    <string name="appstrings_release_signalquest_photo_order">Melhoria da ordem de envio das fotos</string>
+    <string name="appstrings_release_signalquest_upload_checks">Adição de verificações para tornar o envio mais fiável</string>
     <string name="appstrings_release_languages_complete_management">Melhoria completa da gestão de idiomas em toda a aplicação</string>
     <string name="appstrings_release_languages_expanded_translations">Traduções enriquecidas em francês, inglês, português, italiano, alemão e espanhol</string>
     <string name="appstrings_release_interface_better_translation">Melhor tradução dos ecrãs, widgets, notificações, Android Auto, ajuda, mapas e partilha</string>

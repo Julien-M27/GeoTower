@@ -26,30 +26,15 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_languages)) {
-        item(stringResource(R.string.appstrings_release_languages_complete_management))
-        item(stringResource(R.string.appstrings_release_languages_expanded_translations))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_interface)) {
-        item(stringResource(R.string.appstrings_release_interface_better_translation))
-        item(stringResource(R.string.appstrings_release_interface_consistent_texts))
+    section(stringResource(R.string.appstrings_release_section_community_photos)) {
+        item(stringResource(R.string.appstrings_release_community_source_settings))
+        item(stringResource(R.string.appstrings_release_photo_visibility_sync))
+        item(stringResource(R.string.appstrings_release_community_photo_filters))
     }
 
     section(stringResource(R.string.appstrings_release_section_signalquest)) {
-        item(stringResource(R.string.appstrings_release_signalquest_reliable_uploads))
-        item(stringResource(R.string.appstrings_release_signalquest_failure_recovery))
-        item(stringResource(R.string.appstrings_release_signalquest_photo_status))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_notifications)) {
-        item(stringResource(R.string.appstrings_release_notifications_live_improved))
-        item(stringResource(R.string.appstrings_release_notifications_site_photo))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_database)) {
-        item(stringResource(R.string.appstrings_release_database_older_support))
-        item(stringResource(R.string.appstrings_release_database_careful_cleanup))
+        item(stringResource(R.string.appstrings_release_signalquest_photo_order))
+        item(stringResource(R.string.appstrings_release_signalquest_upload_checks))
     }
 }
 
