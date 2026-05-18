@@ -339,6 +339,10 @@
     <string name="appstrings_community_data_photo_source_fallback_only">Afficher seulement si les sources au-dessus n\'ont aucune photo</string>
     <string name="appstrings_community_data_photo_source_order">Ordre des sources</string>
     <string name="appstrings_community_data_photos">Photos</string>
+    <string name="appstrings_photo_sources_settings_desc">Choisir les opérateurs, les sources photo et l\'ordre d\'affichage.</string>
+    <string name="appstrings_photo_sources_settings_title">Sources des photos</string>
+    <string name="appstrings_speedtest_sources_settings_desc">Choisir les opérateurs et les sources utilisées pour les meilleurs speedtests.</string>
+    <string name="appstrings_speedtest_sources_settings_title">Sources des speedtests</string>
     <string name="appstrings_community_data_settings_desc">Choisir les opérateurs, les sources et l\'ordre d\'affichage des photos et speedtests.</string>
     <string name="appstrings_community_data_settings_title">Données communautaires</string>
     <string name="appstrings_community_data_show_operator_photos">Afficher les photos de cet opérateur</string>

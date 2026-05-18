@@ -305,6 +305,10 @@ object SignalQuestUploadQueue {
         manifestFile(uploadDir).writeText(SignalQuestUploadManifestCodec.encode(manifest))
     }
 
+    fun filesInUploadOrder(files: List<SignalQuestUploadFile>): List<SignalQuestUploadFile> {
+        return files.asReversed()
+    }
+
     @Synchronized
     fun updateFileResult(
         context: Context,

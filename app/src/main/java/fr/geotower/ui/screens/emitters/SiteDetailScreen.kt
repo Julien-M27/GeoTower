@@ -406,7 +406,7 @@ fun SiteDetailScreen(
     val showBearingHeight by remember { mutableStateOf(prefs.getBoolean("page_site_bearing_height", true)) }
     val showMap by remember { mutableStateOf(prefs.getBoolean("page_site_map", true)) }
     val showSupportDetails by remember { mutableStateOf(prefs.getBoolean("page_site_support_details", true)) }
-    val showPhotos by remember { mutableStateOf(prefs.getBoolean("page_site_photos", true)) }
+    val showPhotos by AppConfig.siteShowPhotos
     val showPanelHeights by remember { mutableStateOf(prefs.getBoolean("page_site_panel_heights", true)) }
     val showIds by remember { mutableStateOf(prefs.getBoolean("page_site_ids", true)) }
     val showOpenMap by remember { mutableStateOf(prefs.getBoolean("page_site_open_map", true)) }

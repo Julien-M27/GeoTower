@@ -589,19 +589,33 @@ fun CommunityPhotosSectionShared(
         }
     }.toSet()
 
+    fun isPhotoEnabledForItsOperator(photo: CommunityPhoto): Boolean {
+        val sourceId = photo.resolvedSourceId() ?: return true
+        if (sourceId !in visiblePhotoSourceIds) return false
+
+        val photoOperatorKey = photo.operatorKey?.takeIf { it.isNotBlank() } ?: return true
+        if (photoOperatorKey !in dataOperatorKeys) return false
+
+        return CommunityDataPreferences.isEnabled(
+            prefs = prefs,
+            operatorKey = photoOperatorKey,
+            featureId = CommunityDataPreferences.FEATURE_PHOTOS,
+            sourceId = sourceId
+        )
+    }
+
     // FILTRAGE
     val filteredPhotos = remember(
         photos,
         visiblePhotoSourceIds,
+        dataOperatorKeys,
         photoSourceOrder,
         favoritePhotoIdsByBucket,
         canSelectFavoritePhoto,
         signalQuestOperatorOrder
     ) {
         photos.filter { photo ->
-            photo.resolvedSourceId()
-                ?.let { it in visiblePhotoSourceIds }
-                ?: true
+            isPhotoEnabledForItsOperator(photo)
         }.sortedWith(
             compareBy<CommunityPhoto>(
                 { photo ->

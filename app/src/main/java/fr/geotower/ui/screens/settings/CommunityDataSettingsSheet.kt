@@ -60,7 +60,8 @@ import fr.geotower.utils.OperatorColors
 fun CommunityDataSettingsSheet(
     onDismiss: () -> Unit,
     sheetState: SheetState,
-    useOneUi: Boolean
+    useOneUi: Boolean,
+    featureId: String? = null
 ) {
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
@@ -80,6 +81,16 @@ fun CommunityDataSettingsSheet(
     val scrollState = rememberScrollState()
     val communityOperators = CommunityDataPreferences.orderedOperators(AppConfig.defaultOperator.value)
     val sheetMaxHeight = (configuration.screenHeightDp.dp * 0.7f).coerceAtMost(560.dp)
+    val sheetTitle = when (featureId) {
+        CommunityDataPreferences.FEATURE_PHOTOS -> stringResource(R.string.appstrings_photo_sources_settings_title)
+        CommunityDataPreferences.FEATURE_SPEEDTEST -> stringResource(R.string.appstrings_speedtest_sources_settings_title)
+        else -> stringResource(R.string.settings_community_data_title)
+    }
+    val sheetDescription = when (featureId) {
+        CommunityDataPreferences.FEATURE_PHOTOS -> stringResource(R.string.appstrings_photo_sources_settings_desc)
+        CommunityDataPreferences.FEATURE_SPEEDTEST -> stringResource(R.string.appstrings_speedtest_sources_settings_desc)
+        else -> stringResource(R.string.settings_community_data_desc)
+    }
 
     val enabledStates = remember {
         mutableStateMapOf<String, Boolean>().apply {
@@ -156,6 +167,50 @@ fun CommunityDataSettingsSheet(
         CommunityDataPreferences.setSourceOrder(prefs, operatorKey, feature.id, nextOrder)
     }
 
+    fun resetVisiblePreferences() {
+        if (featureId == null) {
+            CommunityDataPreferences.reset(prefs)
+            enabledStates.clear()
+            photosEnabledStates.clear()
+            sourceOrderStates.clear()
+            fallbackOnlyStates.clear()
+            CommunityDataPreferences.operators.forEach { operator ->
+                photosEnabledStates[operator.key] = true
+                operator.features.forEach { feature ->
+                    sourceOrderStates[CommunityDataPreferences.sourceOrderPrefKey(operator.key, feature.id)] =
+                        feature.sources.map { it.id }
+                    feature.sources.forEach { source ->
+                        enabledStates[CommunityDataPreferences.prefKey(operator.key, feature.id, source.id)] = true
+                        fallbackOnlyStates[CommunityDataPreferences.sourceFallbackPrefKey(operator.key, feature.id, source.id)] = false
+                    }
+                }
+            }
+            return
+        }
+
+        CommunityDataPreferences.operators.forEach { operator ->
+            if (featureId == CommunityDataPreferences.FEATURE_PHOTOS) {
+                photosEnabledStates[operator.key] = true
+                CommunityDataPreferences.setPhotosEnabled(prefs, operator.key, true)
+            }
+            operator.features
+                .filter { feature -> feature.id == featureId }
+                .forEach { feature ->
+                    val defaultOrder = feature.sources.map { it.id }
+                    sourceOrderStates[CommunityDataPreferences.sourceOrderPrefKey(operator.key, feature.id)] = defaultOrder
+                    CommunityDataPreferences.setSourceOrder(prefs, operator.key, feature.id, defaultOrder)
+                    feature.sources.forEach { source ->
+                        val enabledKey = CommunityDataPreferences.prefKey(operator.key, feature.id, source.id)
+                        val fallbackKey = CommunityDataPreferences.sourceFallbackPrefKey(operator.key, feature.id, source.id)
+                        enabledStates[enabledKey] = true
+                        fallbackOnlyStates[fallbackKey] = false
+                        CommunityDataPreferences.setEnabled(prefs, operator.key, feature.id, source.id, true)
+                        CommunityDataPreferences.setSourceFallbackOnly(prefs, operator.key, feature.id, source.id, false)
+                    }
+                }
+        }
+    }
+
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         BackHandler(onBack = onDismiss)
         Column(
@@ -175,7 +230,7 @@ fun CommunityDataSettingsSheet(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                 }
                 Text(
-                    text = stringResource(R.string.settings_community_data_title),
+                    text = sheetTitle,
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -185,13 +240,15 @@ fun CommunityDataSettingsSheet(
             }
 
             Text(
-                text = stringResource(R.string.settings_community_data_desc),
+                text = sheetDescription,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 16.dp)
             )
 
             communityOperators.forEach { operator ->
+                val visibleFeatures = operator.features.filter { feature -> featureId == null || feature.id == featureId }
+                if (visibleFeatures.isEmpty()) return@forEach
                 Surface(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                     shape = cardShape,
@@ -209,7 +266,7 @@ fun CommunityDataSettingsSheet(
                             Text(operator.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                         }
 
-                        operator.features.forEach { feature ->
+                        visibleFeatures.forEach { feature ->
                             HorizontalDivider(
                                 modifier = Modifier.padding(top = 14.dp, bottom = 12.dp),
                                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
@@ -331,24 +388,7 @@ fun CommunityDataSettingsSheet(
             Spacer(modifier = Modifier.height(12.dp))
 
             TextButton(
-                onClick = {
-                    CommunityDataPreferences.reset(prefs)
-                    enabledStates.clear()
-                    photosEnabledStates.clear()
-                    sourceOrderStates.clear()
-                    fallbackOnlyStates.clear()
-                    CommunityDataPreferences.operators.forEach { operator ->
-                        photosEnabledStates[operator.key] = true
-                        operator.features.forEach { feature ->
-                            sourceOrderStates[CommunityDataPreferences.sourceOrderPrefKey(operator.key, feature.id)] =
-                                feature.sources.map { it.id }
-                            feature.sources.forEach { source ->
-                                enabledStates[CommunityDataPreferences.prefKey(operator.key, feature.id, source.id)] = true
-                                fallbackOnlyStates[CommunityDataPreferences.sourceFallbackPrefKey(operator.key, feature.id, source.id)] = false
-                            }
-                        }
-                    }
-                },
+                onClick = { resetVisiblePreferences() },
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)

@@ -352,6 +352,10 @@
     <string name="appstrings_community_data_photo_source_fallback_only">Show only if sources above have no photos</string>
     <string name="appstrings_community_data_photo_source_order">Source order</string>
     <string name="appstrings_community_data_photos">Photos</string>
+    <string name="appstrings_photo_sources_settings_desc">Choose operators, photo sources, and display order.</string>
+    <string name="appstrings_photo_sources_settings_title">Photo sources</string>
+    <string name="appstrings_speedtest_sources_settings_desc">Choose operators and sources used for best speedtests.</string>
+    <string name="appstrings_speedtest_sources_settings_title">Speedtest sources</string>
     <string name="appstrings_community_data_settings_desc">Choose operators, sources, and display order for photos and speedtests.</string>
     <string name="appstrings_community_data_settings_title">Community data</string>
     <string name="appstrings_community_data_show_operator_photos">Show photos for this operator</string>

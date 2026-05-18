@@ -422,7 +422,7 @@ fun SupportDetailScreen(
     val pageSupportOrder by remember { mutableStateOf(normalizeSupportOrder(prefs.getString("page_support_order", "map,details,photos,open_map,nav,share,operators")!!.split(","))) }
     val showMap by remember { mutableStateOf(prefs.getBoolean("page_support_map", true)) }
     val showDetails by remember { mutableStateOf(prefs.getBoolean("page_support_details", true)) }
-    val showPhotos by remember { mutableStateOf(prefs.getBoolean("page_support_photos", true)) }
+    val showPhotos by AppConfig.siteShowPhotos
     val showOpenMap by remember { mutableStateOf(prefs.getBoolean("page_support_open_map", true)) }
     val showNav by remember { mutableStateOf(prefs.getBoolean("page_support_nav", true)) }
     val showShare by remember { mutableStateOf(prefs.getBoolean("page_support_share", true)) }

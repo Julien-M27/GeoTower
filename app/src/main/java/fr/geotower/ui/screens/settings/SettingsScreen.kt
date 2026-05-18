@@ -119,7 +119,6 @@ import kotlinx.coroutines.launch
 import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SimCard
@@ -556,6 +555,9 @@ fun SettingsScreen(
     var showPagesCustomizationSheet by remember { mutableStateOf(false) }
     var showFrequenciesSheet by remember { mutableStateOf(false) }
     var showCommunityDataSheet by remember { mutableStateOf(false) }
+    var communityDataSettingsFeatureId by remember { mutableStateOf<String?>(null) }
+    var communityDataReturnTarget by remember { mutableStateOf<String?>(null) }
+    var photosSettingsReturnTarget by remember { mutableStateOf("site") }
     var showExternalLinksSheet by remember { mutableStateOf(false) }
     var showStartupPageSheet by remember { mutableStateOf(false) }
     var showThroughputCalculatorSettingsSheet by remember { mutableStateOf(false) }
@@ -589,6 +591,15 @@ fun SettingsScreen(
 
     val logoResId by AppIconManager.currentIconRes
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    fun updateSharedPhotosVisibility(visible: Boolean) {
+        pageSupportPhotos = visible
+        AppConfig.siteShowPhotos.value = visible
+        prefs.edit()
+            .putBoolean("page_support_photos", visible)
+            .putBoolean("page_site_photos", visible)
+            .apply()
+    }
 
     LaunchedEffect(initialSection) {
         when (initialSection) {
@@ -956,7 +967,18 @@ fun SettingsScreen(
                 onDismiss = { showPhotosSettingsSheet = false },
                 onBack = {
                     showPhotosSettingsSheet = false
-                    showSiteSettingsSheet = true
+                    when (photosSettingsReturnTarget) {
+                        "support" -> showSupportSettingsSheet = true
+                        else -> showSiteSettingsSheet = true
+                    }
+                },
+                photosVisible = AppConfig.siteShowPhotos.value,
+                onPhotosVisibilityChange = ::updateSharedPhotosVisibility,
+                onOpenCommunityDataSettings = {
+                    showPhotosSettingsSheet = false
+                    communityDataSettingsFeatureId = CommunityDataPreferences.FEATURE_PHOTOS
+                    communityDataReturnTarget = "photos"
+                    showCommunityDataSheet = true
                 }
             )
         }
@@ -1225,7 +1247,7 @@ fun SettingsScreen(
                 supportOrder = pageSupportOrder, onOrderChange = { pageSupportOrder = it; prefs.edit().putString("page_support_order", it.joinToString(",")).apply() },
                 showMap = pageSupportMap, onMapChange = { pageSupportMap = it; prefs.edit().putBoolean("page_support_map", it).apply() },
                 showDetails = pageSupportDetails, onDetailsChange = { pageSupportDetails = it; prefs.edit().putBoolean("page_support_details", it).apply() },
-                showPhotos = pageSupportPhotos, onPhotosChange = { pageSupportPhotos = it; prefs.edit().putBoolean("page_support_photos", it).apply() },
+                showPhotos = AppConfig.siteShowPhotos.value, onPhotosChange = ::updateSharedPhotosVisibility,
                 showOpenMap = pageSupportOpenMap, onOpenMapChange = { pageSupportOpenMap = it; prefs.edit().putBoolean("page_support_open_map", it).apply() },
                 showNav = pageSupportNav, onNavChange = { pageSupportNav = it; prefs.edit().putBoolean("page_support_nav", it).apply() },
                 showShare = pageSupportShare, onShareChange = { pageSupportShare = it; prefs.edit().putBoolean("page_support_share", it).apply() },
@@ -1233,6 +1255,11 @@ fun SettingsScreen(
                 onOpenMiniMapSettings = {
                     showSupportSettingsSheet = false
                     showSupportMiniMapSettingsSheet = true
+                },
+                onOpenPhotosSettings = {
+                    photosSettingsReturnTarget = "support"
+                    showSupportSettingsSheet = false
+                    showPhotosSettingsSheet = true
                 },
                 onDismiss = { showSupportSettingsSheet = false },
                 onBack = { safeClick { showSupportSettingsSheet = false; showPagesCustomizationSheet = true } },
@@ -1249,7 +1276,7 @@ fun SettingsScreen(
                 showBearingHeight = pageSiteBearingHeight, onBearingHeightChange = { pageSiteBearingHeight = it; prefs.edit().putBoolean("page_site_bearing_height", it).apply() },
                 showMap = pageSiteMap, onMapChange = { pageSiteMap = it; prefs.edit().putBoolean("page_site_map", it).apply() },
                 showSupportDetails = pageSiteSupportDetails, onSupportDetailsChange = { pageSiteSupportDetails = it; prefs.edit().putBoolean("page_site_support_details", it).apply() },
-                showPhotos = AppConfig.siteShowPhotos.value, onPhotosChange = { AppConfig.siteShowPhotos.value = it; prefs.edit().putBoolean("page_site_photos", it).apply() },
+                showPhotos = AppConfig.siteShowPhotos.value, onPhotosChange = ::updateSharedPhotosVisibility,
                 showPanelHeights = pageSitePanelHeights, onPanelHeightsChange = { pageSitePanelHeights = it; prefs.edit().putBoolean("page_site_panel_heights", it).apply() },
                 showIds = pageSiteIds, onIdsChange = { pageSiteIds = it; prefs.edit().putBoolean("page_site_ids", it).apply() },
                 showOpenMap = pageSiteOpenMap, onOpenMapChange = { pageSiteOpenMap = it; prefs.edit().putBoolean("page_site_open_map", it).apply() },
@@ -1272,8 +1299,15 @@ fun SettingsScreen(
                     showFrequenciesSheet = true
                 },
                 onOpenPhotosSettings = {
+                    photosSettingsReturnTarget = "site"
                     showSiteSettingsSheet = false
                     showPhotosSettingsSheet = true
+                },
+                onOpenSpeedtestSettings = {
+                    communityDataSettingsFeatureId = CommunityDataPreferences.FEATURE_SPEEDTEST
+                    communityDataReturnTarget = "site"
+                    showSiteSettingsSheet = false
+                    showCommunityDataSheet = true
                 },
                 onDismiss = { showSiteSettingsSheet = false },
                 onBack = { safeClick { showSiteSettingsSheet = false; showPagesCustomizationSheet = true } },
@@ -1433,9 +1467,19 @@ fun SettingsScreen(
         }
         if (showCommunityDataSheet) {
             CommunityDataSettingsSheet(
-                onDismiss = { showCommunityDataSheet = false },
+                onDismiss = {
+                    showCommunityDataSheet = false
+                    val returnTarget = communityDataReturnTarget
+                    communityDataSettingsFeatureId = null
+                    communityDataReturnTarget = null
+                    when (returnTarget) {
+                        "photos" -> showPhotosSettingsSheet = true
+                        "site" -> showSiteSettingsSheet = true
+                    }
+                },
                 sheetState = sheetState,
-                useOneUi = useOneUi
+                useOneUi = useOneUi,
+                featureId = communityDataSettingsFeatureId
             )
         }
         if (showExternalLinksSheet) {
@@ -1986,18 +2030,6 @@ fun SectionPreferences(
         useOneUi = useOneUi,
         safeClick = safeClick,
         icon = Icons.Default.Edit
-    )
-    Spacer(Modifier.height(12.dp))
-    PreferenceActionCard(
-        title = stringResource(R.string.settings_community_data_title),
-        desc = stringResource(R.string.settings_community_data_desc),
-        onClick = onCommunityData,
-        shape = shape,
-        border = border,
-        bubbleColor = bubbleColor,
-        useOneUi = useOneUi,
-        safeClick = safeClick,
-        icon = Icons.Default.Groups
     )
     Spacer(Modifier.height(12.dp))
     PreferenceActionCard(

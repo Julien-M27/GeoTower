@@ -66,6 +66,39 @@ class SignalQuestUploadRulesTest {
     }
 
     @Test
+    fun uploadOrderSendsPhotosFromLastPositionToFirst() {
+        val files = listOf(
+            SignalQuestUploadFile(
+                sourceFileName = "source_1.jpg",
+                sourceMimeType = "image/jpeg",
+                sourceSizeBytes = 42L
+            ),
+            SignalQuestUploadFile(
+                sourceFileName = "source_2.jpg",
+                sourceMimeType = "image/jpeg",
+                sourceSizeBytes = 42L
+            ),
+            SignalQuestUploadFile(
+                sourceFileName = "source_3.jpg",
+                sourceMimeType = "image/jpeg",
+                sourceSizeBytes = 42L
+            ),
+            SignalQuestUploadFile(
+                sourceFileName = "source_4.jpg",
+                sourceMimeType = "image/jpeg",
+                sourceSizeBytes = 42L
+            )
+        )
+
+        val uploadOrder = SignalQuestUploadQueue.filesInUploadOrder(files)
+
+        assertEquals(
+            listOf("source_4.jpg", "source_3.jpg", "source_2.jpg", "source_1.jpg"),
+            uploadOrder.map { it.sourceFileName }
+        )
+    }
+
+    @Test
     fun legacyManifestFileWithoutStatusIsStillUploadable() {
         val decoded = SignalQuestUploadManifestCodec.decode(
             """

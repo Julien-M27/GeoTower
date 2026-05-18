@@ -1440,6 +1440,7 @@ fun SupportSettingsSheet(
     showShare: Boolean, onShareChange: (Boolean) -> Unit,
     showOperators: Boolean, onOperatorsChange: (Boolean) -> Unit,
     onOpenMiniMapSettings: () -> Unit,
+    onOpenPhotosSettings: () -> Unit,
     onDismiss: () -> Unit, onBack: () -> Unit,
     sheetState: SheetState, useOneUi: Boolean, bubbleColor: Color
 ) {
@@ -1496,7 +1497,10 @@ fun SupportSettingsSheet(
                         when (blockId) {
                             "map" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_map_option), showMap, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = onOpenMiniMapSettings)
                             "details" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_details_option), showDetails, onDetailsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "photos" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_photos_option), showPhotos, onPhotosChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "photos" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_photos_option), showPhotos, onPhotosChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = {
+                                onDismiss()
+                                onOpenPhotosSettings()
+                            })
                             "open_map" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_open_map_option), showOpenMap, onOpenMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "nav" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_nav_option), showNav, onNavChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "share" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_share_option), showShare, onShareChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
@@ -1551,6 +1555,7 @@ fun SiteSettingsSheet(
     onOpenMiniMapSettings: () -> Unit,
     onOpenFrequencies: () -> Unit,
     onOpenPhotosSettings: () -> Unit,
+    onOpenSpeedtestSettings: () -> Unit,
     onDismiss: () -> Unit,
     onBack: () -> Unit,
     sheetState: SheetState,
@@ -1626,7 +1631,10 @@ fun SiteSettingsSheet(
                             "dates" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_dates_option), showDates, onDatesChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "address" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_address_option), showAddress, onAddressChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "status" -> DraggableSwitchCard(stringResource(R.string.appstrings_show_status_option), showStatus, onStatusChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "speedtest" -> DraggableSwitchCard(stringResource(R.string.appstrings_show_speedtest_label), showSpeedtest, onSpeedtestChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "speedtest" -> DraggableSwitchCard(stringResource(R.string.appstrings_show_speedtest_label), showSpeedtest, onSpeedtestChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = {
+                                onDismiss()
+                                onOpenSpeedtestSettings()
+                            })
                             "freqs" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_freqs_option), showFreqs, onFreqsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = {
                                 onDismiss()
                                 onOpenFrequencies()
@@ -2107,7 +2115,10 @@ fun SiteFreqFiltersSheet(
 @Composable
 fun SitePhotosSettingsSheet(
     onDismiss: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    photosVisible: Boolean,
+    onPhotosVisibilityChange: (Boolean) -> Unit,
+    onOpenCommunityDataSettings: () -> Unit
 ) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
@@ -2155,17 +2166,17 @@ fun SitePhotosSettingsSheet(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(stringResource(R.string.appstrings_site_photos_and_schemes_option), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), fontSize = 16.sp)
                         val onMasterChange = { newValue: Boolean ->
-                            saveBool("page_site_photos", AppConfig.siteShowPhotos, newValue)
+                            onPhotosVisibilityChange(newValue)
                         }
                         fr.geotower.ui.components.GeoTowerSwitch(
-                            checked = AppConfig.siteShowPhotos.value,
+                            checked = photosVisible,
                             onCheckedChange = onMasterChange,
                             useOneUi = useOneUi,
                             checkedColor = switchColor
                         )
                     }
                     
-                    androidx.compose.animation.AnimatedVisibility(visible = AppConfig.siteShowPhotos.value) {
+                    androidx.compose.animation.AnimatedVisibility(visible = photosVisible) {
                         Column {
                             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                             
@@ -2196,10 +2207,41 @@ fun SitePhotosSettingsSheet(
                 }
             }
 
+            Card(
+                onClick = onOpenCommunityDataSettings,
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.appstrings_photo_sources_settings_title),
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        Text(
+                            text = stringResource(R.string.appstrings_photo_sources_settings_desc),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.Settings,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 12.dp).size(28.dp)
+                    )
+                }
+            }
+
             Spacer(modifier = Modifier.height(24.dp))
             TextButton(
                 onClick = {
-                    saveBool("page_site_photos", AppConfig.siteShowPhotos, true)
+                    onPhotosVisibilityChange(true)
                     saveBool("site_show_schemes", AppConfig.siteShowSchemes, true)
                     saveBool("site_show_photo_exif", AppConfig.siteShowPhotoExif, true)
                 },

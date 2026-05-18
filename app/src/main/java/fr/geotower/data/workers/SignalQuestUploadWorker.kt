@@ -67,7 +67,7 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
             setProgress(workDataOf("current" to initialProgress, "total" to total))
             startForegroundSafely(manifest, current = initialProgress, total = total, notificationId = progressNotificationId)
 
-            for (uploadFile in manifest.files) {
+            for (uploadFile in SignalQuestUploadQueue.filesInUploadOrder(manifest.files)) {
                 if (!SignalQuestUploadFileStatus.shouldUpload(uploadFile.status)) {
                     syncHistoryFromManifest(uploadFile)
                     continue
