@@ -700,6 +700,9 @@
     <string name="appstrings_release_section_signalquest">SignalQuest</string>
     <string name="appstrings_release_section_notifications">Notifications</string>
     <string name="appstrings_release_section_database">Base de données</string>
+    <string name="appstrings_release_section_live_tracking">Suivi en direct</string>
+    <string name="appstrings_release_live_site_photos_rounded">Affichage des photos de site avec des coins arrondis</string>
+    <string name="appstrings_release_live_operator_fallback_logos">Meilleur rendu des logos opérateur lorsqu’aucune photo de site n’est disponible</string>
     <string name="appstrings_release_community_source_settings">Ajout de nouveaux réglages pour les sources photos et speedtests</string>
     <string name="appstrings_release_photo_visibility_sync">Affichage des photos mieux synchronisé entre les pages Support et Site</string>
     <string name="appstrings_release_community_photo_filters">Photos filtrées selon l’opérateur et les sources activées</string>
