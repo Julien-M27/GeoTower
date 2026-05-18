@@ -21,9 +21,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppIconManager
-import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 data class HomeLogoOption(val id: String, val name: String, val resId: Int?)
 
@@ -67,12 +68,12 @@ fun HomeLogoSelectorBlock(
 
     // ---> 4. LISTE FINALE (Application toujours en premier) <---
     val options = listOf(
-        HomeLogoOption("app", AppStrings.logoApp, appLogoRes.takeIf { it != 0 })
+        HomeLogoOption("app", stringResource(R.string.appstrings_logo_app), appLogoRes.takeIf { it != 0 })
     ) + sortedOperators
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
-            text = AppStrings.homeLogoSettingTitle,
+            text = stringResource(R.string.appstrings_home_logo_setting_title),
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,

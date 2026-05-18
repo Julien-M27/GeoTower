@@ -1,0 +1,42 @@
+<resources>
+    <plurals name="upload_history_recorded">
+        <item quantity="one">%1$d photo recorded</item>
+        <item quantity="other">%1$d photos recorded</item>
+    </plurals>
+    <plurals name="upload_history_selected">
+        <item quantity="one">%1$d photo selected</item>
+        <item quantity="other">%1$d photos selected</item>
+    </plurals>
+    <plurals name="sites_found">
+        <item quantity="one">%1$d site found</item>
+        <item quantity="other">%1$d sites found</item>
+    </plurals>
+    <plurals name="sites_count">
+        <item quantity="one">%1$d site</item>
+        <item quantity="other">%1$d sites</item>
+    </plurals>
+    <plurals name="upload_sq_button">
+        <item quantity="one">Send %1$d photo</item>
+        <item quantity="other">Send %1$d photos</item>
+    </plurals>
+    <plurals name="upload_confirm_message">
+        <item quantity="one">Are you sure you want to send this photo to Signal Quest?</item>
+        <item quantity="other">Are you sure you want to send these %1$d photos to Signal Quest?</item>
+    </plurals>
+    <plurals name="community_photos_title">
+        <item quantity="one">Community photo from\n%1$s</item>
+        <item quantity="other">Community photos from\n%1$s</item>
+    </plurals>
+    <plurals name="community_photos_title_short">
+        <item quantity="one">Community photo</item>
+        <item quantity="other">Community photos</item>
+    </plurals>
+    <plurals name="help_section_count">
+        <item quantity="one">%1$d section</item>
+        <item quantity="other">%1$d sections</item>
+    </plurals>
+    <plurals name="upload_lifetime_score">
+        <item quantity="one">🏆 Total: %1$d photo shared since you started!</item>
+        <item quantity="other">🏆 Total: %1$d photos shared since you started!</item>
+    </plurals>
+</resources>

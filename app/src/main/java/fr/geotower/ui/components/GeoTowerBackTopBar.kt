@@ -25,7 +25,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import fr.geotower.utils.AppStrings
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 @Composable
 fun GeoTowerBackTopBar(
@@ -80,7 +81,7 @@ fun GeoTowerBackTopBar(
         IconButton(onClick = onBack, enabled = backEnabled) {
             Icon(
                 imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                contentDescription = AppStrings.back,
+                contentDescription = stringResource(R.string.appstrings_back),
                 tint = contentColor
             )
         }

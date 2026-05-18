@@ -19,12 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import fr.geotower.R
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun UnitSettingsSheet(
@@ -70,22 +70,22 @@ fun UnitSettingsSheet(
         ) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text(text = AppStrings.unitSettingsTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Text(text = stringResource(R.string.settings_units_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Spacer(Modifier.width(48.dp))
             }
 
-            Text(text = AppStrings.distanceLabel, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp, start = 8.dp))
+            Text(text = stringResource(R.string.appstrings_distance_label), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp, start = 8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                UnitOptionItem(AppStrings.unitKm, currentDistance == 0, useOneUi, bubbleColor) { currentDistance = 0; saveUnit("distance_unit", AppConfig.distanceUnit, 0) }
-                UnitOptionItem(AppStrings.unitMi, currentDistance == 1, useOneUi, bubbleColor) { currentDistance = 1; saveUnit("distance_unit", AppConfig.distanceUnit, 1) }
+                UnitOptionItem(stringResource(R.string.appstrings_unit_km), currentDistance == 0, useOneUi, bubbleColor) { currentDistance = 0; saveUnit("distance_unit", AppConfig.distanceUnit, 0) }
+                UnitOptionItem(stringResource(R.string.appstrings_unit_mi), currentDistance == 1, useOneUi, bubbleColor) { currentDistance = 1; saveUnit("distance_unit", AppConfig.distanceUnit, 1) }
             }
 
             Spacer(Modifier.height(24.dp))
 
-            Text(text = AppStrings.speedLabel, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp, start = 8.dp))
+            Text(text = stringResource(R.string.appstrings_speed_label), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp, start = 8.dp))
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                UnitOptionItem(AppStrings.unitKmh, currentSpeed == 0, useOneUi, bubbleColor) { currentSpeed = 0; saveUnit("speed_unit", AppConfig.speedUnit, 0) }
-                UnitOptionItem(AppStrings.unitMph, currentSpeed == 1, useOneUi, bubbleColor) { currentSpeed = 1; saveUnit("speed_unit", AppConfig.speedUnit, 1) }
+                UnitOptionItem(stringResource(R.string.appstrings_unit_kmh), currentSpeed == 0, useOneUi, bubbleColor) { currentSpeed = 0; saveUnit("speed_unit", AppConfig.speedUnit, 0) }
+                UnitOptionItem(stringResource(R.string.appstrings_unit_mph), currentSpeed == 1, useOneUi, bubbleColor) { currentSpeed = 1; saveUnit("speed_unit", AppConfig.speedUnit, 1) }
             }
             Spacer(Modifier.height(16.dp))
         }

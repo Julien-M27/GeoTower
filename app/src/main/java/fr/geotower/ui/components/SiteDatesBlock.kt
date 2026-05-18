@@ -13,8 +13,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.TechniqueEntity // ✅ NOUVEL IMPORT
-import fr.geotower.ui.screens.emitters.formatDateToFrench // ✅ IMPORT DE LA FONCTION DE FORMATAGE
-import fr.geotower.utils.AppStrings
+import fr.geotower.ui.screens.emitters.formatDateToFrench // ✅ Formatage localisé des dates
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 @Composable
 fun SiteDatesBlock(
@@ -23,10 +24,10 @@ fun SiteDatesBlock(
     cardBgColor: Color,
     blockShape: Shape
 ) {
-    val txtDates = AppStrings.dates
-    val txtImplementation = AppStrings.implementation
-    val txtActivatedOn = AppStrings.activatedOn
-    val txtLastModification = AppStrings.lastModification // ✅ NOUVELLE TRADUCTION
+    val txtDates = stringResource(R.string.appstrings_dates)
+    val txtImplementation = stringResource(R.string.appstrings_implementation)
+    val txtActivatedOn = stringResource(R.string.appstrings_activated_on)
+    val txtLastModification = stringResource(R.string.appstrings_last_modification) // ✅ NOUVELLE TRADUCTION
 
     Card(
         shape = blockShape,
@@ -50,19 +51,19 @@ fun SiteDatesBlock(
             val dateSer = technique?.dateService?.takeIf { it.isNotBlank() }
             val dateMod = technique?.dateModif?.takeIf { it.isNotBlank() } // ✅ RÉCUPÉRATION DE LA MODIFICATION
 
-            val dateImpStr = dateImp?.let { formatDateToFrench(it) } ?: AppStrings.notSpecified
-            val dateSerStr = dateSer?.let { formatDateToFrench(it) } ?: AppStrings.notSpecified
+            val dateImpStr = dateImp?.let { formatDateToFrench(it) } ?: stringResource(R.string.appstrings_not_specified)
+            val dateSerStr = dateSer?.let { formatDateToFrench(it) } ?: stringResource(R.string.appstrings_not_specified)
             val dateModStr = dateMod?.let { formatDateToFrench(it) } ?: "-"
 
             // ✅ PLUS DE " : " EN TROP ICI NON PLUS !
-            Text(text = "$txtImplementation$dateImpStr", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            InfoLine(txtImplementation, dateImpStr)
             Spacer(modifier = Modifier.height(4.dp))
-            Text(text = "$txtActivatedOn$dateSerStr", color = MaterialTheme.colorScheme.onSurfaceVariant)
+            InfoLine(txtActivatedOn, dateSerStr)
 
             // ✅ CONDITION : On affiche la dernière modification seulement si elle existe
-            if (dateModStr != "-" && dateModStr != AppStrings.notSpecified) {
+            if (dateModStr != "-" && dateModStr != stringResource(R.string.appstrings_not_specified)) {
                 Spacer(modifier = Modifier.height(4.dp))
-                Text(text = "$txtLastModification$dateModStr", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                InfoLine(txtLastModification, dateModStr)
             }
         }
     }

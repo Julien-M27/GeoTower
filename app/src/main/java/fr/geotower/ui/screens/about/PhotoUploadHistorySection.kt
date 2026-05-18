@@ -72,12 +72,14 @@ import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.geoTowerLazyListFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.delay
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 private const val VALIDATION_REFRESH_ATTEMPTS = 12
 private const val VALIDATION_REFRESH_INTERVAL_MS = 10_000L
@@ -116,12 +118,16 @@ fun PhotoUploadHistoryShortcut(
             Spacer(modifier = Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = AppStrings.uploadHistoryTitle,
+                    text = stringResource(R.string.appstrings_upload_history_title),
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = AppStrings.uploadHistorySubtitle(historyCount),
+                    text = if (historyCount == 0) {
+                        stringResource(R.string.upload_history_no_photo_recorded)
+                    } else {
+                        pluralStringResource(R.plurals.upload_history_recorded, historyCount, historyCount)
+                    },
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -230,19 +236,19 @@ fun PhotoUploadHistoryScreen(
                         },
                         modifier = Modifier.padding(start = 4.dp)
                     ) {
-                        Text(if (isAllSelected) AppStrings.clearAll else AppStrings.selectAll)
+                        Text(if (isAllSelected) stringResource(R.string.appstrings_clear_all) else stringResource(R.string.appstrings_select_all))
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     IconButton(
                         onClick = { selectedIds = emptyList() },
                         modifier = Modifier.padding(end = 4.dp)
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = AppStrings.cancel)
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_cancel))
                     }
                 }
             } else {
                 GeoTowerBackTopBar(
-                    title = AppStrings.uploadHistoryTitle,
+                    title = stringResource(R.string.appstrings_upload_history_title),
                     onBack = {
                         safeClick("photo_upload_history_back") {
                             onNavigateBack()
@@ -281,7 +287,7 @@ fun PhotoUploadHistoryScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                text = AppStrings.uploadHistoryEmpty,
+                                text = stringResource(R.string.appstrings_upload_history_empty),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(16.dp)
@@ -334,7 +340,7 @@ fun PhotoUploadHistoryScreen(
                             ) {
                                 Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
                                 Spacer(modifier = Modifier.width(8.dp))
-                                Text("${AppStrings.uploadHistoryClear} (${formatUploadHistoryBytes(totalFreedBytes)})")
+                                Text("${stringResource(R.string.appstrings_upload_history_clear)} (${formatUploadHistoryBytes(totalFreedBytes)})")
                             }
                         }
                     }
@@ -365,7 +371,7 @@ fun PhotoUploadHistoryScreen(
                     ) {
                         Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("${AppStrings.delete} (${selectedIds.size}) - ${formatUploadHistoryBytes(selectedFreedBytes)}")
+                        Text("${stringResource(R.string.appstrings_delete)} (${selectedIds.size}) - ${formatUploadHistoryBytes(selectedFreedBytes)}")
                     }
                 }
             }
@@ -379,8 +385,8 @@ fun PhotoUploadHistoryScreen(
                     showClearDialog = false
                 }
             },
-            title = { Text(AppStrings.uploadHistoryClearTitle) },
-            text = { Text(AppStrings.uploadHistoryClearDesc) },
+            title = { Text(stringResource(R.string.appstrings_upload_history_clear_title)) },
+            text = { Text(stringResource(R.string.appstrings_upload_history_clear_desc)) },
             confirmButton = {
                 Button(
                     onClick = {
@@ -391,7 +397,7 @@ fun PhotoUploadHistoryScreen(
                         }
                     }
                 ) {
-                    Text(AppStrings.uploadHistoryClear)
+                    Text(stringResource(R.string.appstrings_upload_history_clear))
                 }
             },
             dismissButton = {
@@ -402,7 +408,7 @@ fun PhotoUploadHistoryScreen(
                         }
                     }
                 ) {
-                    Text(AppStrings.cancel)
+                    Text(stringResource(R.string.appstrings_cancel))
                 }
             }
         )
@@ -419,7 +425,7 @@ private fun PhotoUploadHistoryRow(
     onSelect: () -> Unit,
     onToggleSelection: () -> Unit
 ) {
-    val statusLabel = AppStrings.uploadHistoryStatus(item.status)
+    val statusLabel = uploadHistoryStatusLabel(item.status)
     val statusColor = when (item.status) {
         ExternalPhotoUploadHistoryStore.STATUS_SUCCESS -> Color(0xFF4CAF50)
         ExternalPhotoUploadHistoryStore.STATUS_FAILED -> MaterialTheme.colorScheme.error
@@ -467,7 +473,7 @@ private fun PhotoUploadHistoryRow(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = "${AppStrings.uploadSqTargetSite} ${item.supportId}",
+                text = "${stringResource(R.string.appstrings_upload_sq_target_site)} ${item.supportId}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
@@ -492,7 +498,11 @@ private fun PhotoUploadHistoryRow(
                     Icon(statusIcon, contentDescription = null, modifier = Modifier.size(14.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = AppStrings.uploadHistoryExif(item.stripExifBeforeUpload),
+                        text = if (item.stripExifBeforeUpload) {
+                            stringResource(R.string.upload_history_exif_removed)
+                        } else {
+                            stringResource(R.string.upload_history_exif_kept)
+                        },
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -500,6 +510,15 @@ private fun PhotoUploadHistoryRow(
             }
         }
     }
+}
+
+@Composable
+private fun uploadHistoryStatusLabel(status: String): String = when (status) {
+    ExternalPhotoUploadHistoryStore.STATUS_SUCCESS -> stringResource(R.string.upload_history_status_success)
+    ExternalPhotoUploadHistoryStore.STATUS_AWAITING_VALIDATION -> stringResource(R.string.upload_history_status_awaiting_validation)
+    ExternalPhotoUploadHistoryStore.STATUS_FAILED -> stringResource(R.string.upload_history_status_failed)
+    ExternalPhotoUploadHistoryStore.STATUS_RETRY -> stringResource(R.string.upload_history_status_retry)
+    else -> stringResource(R.string.upload_history_status_in_progress)
 }
 
 @Composable

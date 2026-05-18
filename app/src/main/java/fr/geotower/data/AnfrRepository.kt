@@ -1,9 +1,13 @@
 package fr.geotower.data
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import fr.geotower.data.api.AnfrService
 import fr.geotower.data.db.AppDatabase
+import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.db.GeoTowerDao
+import fr.geotower.data.db.InvalidGeoTowerDatabaseException
 import fr.geotower.data.models.DbCluster
 import fr.geotower.data.models.FaisceauxEntity
 import fr.geotower.data.models.LocalisationEntity
@@ -11,7 +15,9 @@ import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.models.SiteHsEntity
+import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import kotlinx.coroutines.CancellationException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -36,9 +42,35 @@ class AnfrRepository(
     private suspend fun <T> queryLocalDatabase(defaultValue: T, block: suspend GeoTowerDao.() -> T): T {
         return try {
             dao.block()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: InvalidGeoTowerDatabaseException) {
+            AppLogger.w(TAG_DB, "Local database is unavailable", e)
+            publishLocalDatabaseStatus(
+                GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context).state
+            )
+            defaultValue
         } catch (e: Exception) {
             AppLogger.w(TAG_DB, "Local database query failed", e)
+            refreshLocalDatabaseStatusAfterFailure()
             defaultValue
+        }
+    }
+
+    private fun refreshLocalDatabaseStatusAfterFailure() {
+        try {
+            val status = GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context)
+            if (status.state != GeoTowerDatabaseValidator.LocalDatabaseState.VALID) {
+                publishLocalDatabaseStatus(status.state)
+            }
+        } catch (statusError: Exception) {
+            AppLogger.w(TAG_DB, "Local database status refresh failed", statusError)
+        }
+    }
+
+    private fun publishLocalDatabaseStatus(state: GeoTowerDatabaseValidator.LocalDatabaseState) {
+        Handler(Looper.getMainLooper()).post {
+            AppConfig.localDatabaseState.value = state
         }
     }
 
@@ -138,7 +170,7 @@ class AnfrRepository(
                 if (nearest.size >= 100) return@queryLocalDatabase nearest
             }
 
-            bestResult.ifEmpty { getNearest100(lat, lon) }
+            bestResult
         }
     }
 
@@ -383,6 +415,8 @@ class AnfrRepository(
             prefs.edit().putString("last_hs_update", currentDate).apply()
 
             hsList
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             AppLogger.w(TAG_MAP, "Outage data request failed", e)
             emptyList()

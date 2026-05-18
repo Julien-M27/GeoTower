@@ -14,9 +14,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fr.geotower.data.models.LocalisationEntity // ✅ NOUVEL IMPORT
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
 import java.util.Locale
 import kotlin.math.roundToInt
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 @Composable
 fun SitePanelHeightsBlock(
@@ -24,7 +25,7 @@ fun SitePanelHeightsBlock(
     cardBgColor: Color,
     blockShape: Shape
 ) {
-    val txtPanelHeightsTitle = AppStrings.panelHeightsTitle
+    val txtPanelHeightsTitle = stringResource(R.string.appstrings_panel_heights_title)
 
     val distanceUnit = AppConfig.distanceUnit.intValue
     val formattedHeights = remember(info.azimuts, distanceUnit) {

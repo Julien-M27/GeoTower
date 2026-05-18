@@ -21,9 +21,11 @@ import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.api.SqSpeedtestData
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
+import fr.geotower.utils.LocalizedDateLabels
 
 import java.util.Locale
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -39,7 +41,8 @@ fun SpeedtestCard(
     if (!AppConfig.siteShowSpeedtest.value) return
 
     // 2. Vérification de l'opérateur supporté par SignalQuest
-    val prefs = LocalContext.current.getSharedPreferences("GeoTowerPrefs", android.content.Context.MODE_PRIVATE)
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences("GeoTowerPrefs", android.content.Context.MODE_PRIVATE)
     val isCompatible = SignalQuestOperators.supports(operatorName) &&
             CommunityDataPreferences.isSignalQuestSpeedtestEnabled(prefs, operatorName)
 
@@ -57,7 +60,7 @@ fun SpeedtestCard(
 
             // Titre du bloc
             Text(
-                text = AppStrings.speedtestTitle,
+                text = stringResource(R.string.appstrings_speedtest_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
@@ -73,7 +76,7 @@ fun SpeedtestCard(
             // État 2 : Aucun test de débit trouvé
             else if (speedtestData == null) {
                 Text(
-                    text = AppStrings.speedtestNoData,
+                    text = stringResource(R.string.appstrings_speedtest_no_data),
                     style = MaterialTheme.typography.bodyMedium,
                     color = contentColor.copy(alpha = 0.7f),
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -88,7 +91,7 @@ fun SpeedtestCard(
                     // Colonne : Débit Descendant
                     SpeedStatColumn(
                         icon = Icons.Default.KeyboardArrowDown,
-                        label = AppStrings.speedtestDownload,
+                        label = stringResource(R.string.appstrings_speedtest_download),
                         value = if (speedtestData.downloadSpeed != null) String.format(Locale.US, "%.1f", speedtestData.downloadSpeed) else "--",
                         unit = "Mbps",
                         color = Color(0xFF4CAF50) // Vert
@@ -97,7 +100,7 @@ fun SpeedtestCard(
                     // Colonne : Débit Montant
                     SpeedStatColumn(
                         icon = Icons.Default.KeyboardArrowUp,
-                        label = AppStrings.speedtestUpload,
+                        label = stringResource(R.string.appstrings_speedtest_upload),
                         value = if (speedtestData.uploadSpeed != null) String.format(Locale.US, "%.1f", speedtestData.uploadSpeed) else "--",
                         unit = "Mbps",
                         color = Color(0xFF2196F3) // Bleu
@@ -106,7 +109,7 @@ fun SpeedtestCard(
                     // Colonne : Ping (Latence)
                     SpeedStatColumn(
                         icon = Icons.Default.Timer,
-                        label = AppStrings.speedtestPing,
+                        label = stringResource(R.string.appstrings_speedtest_ping),
                         value = if (speedtestData.ping != null) speedtestData.ping.toInt().toString() else "--",
                         unit = "ms",
                         color = Color(0xFFFF9800) // Orange
@@ -121,7 +124,7 @@ fun SpeedtestCard(
                         val year = parts[0]
                         val month = parts[1]
                         val day = parts[2].toInt().toString() // "07" -> "7"
-                        val monthName = AppStrings.getMonthName(month)
+                        val monthName = LocalizedDateLabels.monthName(context, month)
                         
                         Text(
                             text = "$day $monthName $year",

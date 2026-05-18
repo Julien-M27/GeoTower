@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.TechniqueEntity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -50,6 +51,8 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
 
                 _antennas.value = filteredMarkers
                 AppLogger.d(TAG, "City map markers filtered=${filteredMarkers.size} total=${apiMarkers.size}")
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 AppLogger.w(TAG, "City map request failed", e)
             } finally {
@@ -96,7 +99,10 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
                         _antennas.value = rawAntennas
                     }
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
+                AppLogger.w(TAG, "Map markers request failed", e)
                 _antennas.value = emptyList()
             } finally {
                 _isLoading.value = false
@@ -121,6 +127,8 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
                 val allHs = repository.getSitesHs()
                 _sitesHs.value = allHs
                 AppLogger.d(TAG, "Outage markers loaded count=${allHs.size}")
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 AppLogger.w(TAG, "Outage markers request failed", e)
             }
@@ -147,6 +155,8 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
                     }
                 _cityStatsTechniques.value = _cityStatsTechniques.value + loadedTechniques
                 loadedCityStatsTechniqueIds = loadedCityStatsTechniqueIds + missingIds
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 AppLogger.w(TAG, "City stats technique details request failed", e)
             } finally {
@@ -182,6 +192,8 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
         return try {
             val results = repository.searchAntennasById(query)
             results.firstOrNull()
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
             null
         }

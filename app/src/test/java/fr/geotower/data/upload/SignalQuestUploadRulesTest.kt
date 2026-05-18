@@ -64,4 +64,54 @@ class SignalQuestUploadRulesTest {
 
         assertEquals(manifest, decoded)
     }
+
+    @Test
+    fun legacyManifestFileWithoutStatusIsStillUploadable() {
+        val decoded = SignalQuestUploadManifestCodec.decode(
+            """
+            {
+              "uploadId": "upload-legacy",
+              "siteId": "12345",
+              "operator": "SFR",
+              "description": "",
+              "createdAtMillis": 123,
+              "files": [
+                {
+                  "sourceFileName": "source_0.jpg",
+                  "sourceMimeType": "image/jpeg",
+                  "sourceSizeBytes": 42
+                }
+              ],
+              "stripExifBeforeUpload": false
+            }
+            """.trimIndent()
+        )
+
+        val uploadFile = decoded.files.single()
+        assertEquals(SignalQuestUploadFileStatus.PENDING, SignalQuestUploadFileStatus.normalized(uploadFile.status))
+        assertTrue(SignalQuestUploadFileStatus.shouldUpload(uploadFile.status))
+        assertFalse(SignalQuestUploadFileStatus.countsAsFinished(uploadFile.status))
+    }
+
+    @Test
+    fun retryStatusIsUploadableButNotFinished() {
+        assertTrue(SignalQuestUploadFileStatus.shouldUpload(SignalQuestUploadFileStatus.RETRY))
+        assertFalse(SignalQuestUploadFileStatus.countsAsFinished(SignalQuestUploadFileStatus.RETRY))
+        assertFalse(SignalQuestUploadFileStatus.countsAsUploaded(SignalQuestUploadFileStatus.RETRY))
+    }
+
+    @Test
+    fun terminalStatusesAreNotUploadedAgain() {
+        assertFalse(SignalQuestUploadFileStatus.shouldUpload(SignalQuestUploadFileStatus.UPLOADED))
+        assertFalse(SignalQuestUploadFileStatus.shouldUpload(SignalQuestUploadFileStatus.AWAITING_VALIDATION))
+        assertFalse(SignalQuestUploadFileStatus.shouldUpload(SignalQuestUploadFileStatus.FAILED_PERMANENT))
+
+        assertTrue(SignalQuestUploadFileStatus.countsAsFinished(SignalQuestUploadFileStatus.UPLOADED))
+        assertTrue(SignalQuestUploadFileStatus.countsAsFinished(SignalQuestUploadFileStatus.AWAITING_VALIDATION))
+        assertTrue(SignalQuestUploadFileStatus.countsAsFinished(SignalQuestUploadFileStatus.FAILED_PERMANENT))
+
+        assertTrue(SignalQuestUploadFileStatus.countsAsUploaded(SignalQuestUploadFileStatus.UPLOADED))
+        assertTrue(SignalQuestUploadFileStatus.countsAsUploaded(SignalQuestUploadFileStatus.AWAITING_VALIDATION))
+        assertFalse(SignalQuestUploadFileStatus.countsAsUploaded(SignalQuestUploadFileStatus.FAILED_PERMANENT))
+    }
 }

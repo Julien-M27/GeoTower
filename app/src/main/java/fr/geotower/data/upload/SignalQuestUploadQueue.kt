@@ -14,9 +14,9 @@ import android.webkit.MimeTypeMap
 import androidx.core.content.FileProvider
 import androidx.exifinterface.media.ExifInterface
 import com.google.gson.Gson
+import fr.geotower.R
 import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.community.CommunityDataPreferences
-import fr.geotower.utils.AppStrings
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -69,8 +69,42 @@ data class SignalQuestUploadFile(
     val sourceFileName: String,
     val sourceMimeType: String,
     val sourceSizeBytes: Long,
-    val historyEntryId: String? = null
+    val historyEntryId: String? = null,
+    val status: String? = SignalQuestUploadFileStatus.PENDING,
+    val remotePhotoId: String? = null,
+    val remoteImageUrl: String? = null,
+    val remoteUploadedAt: String? = null
 )
+
+object SignalQuestUploadFileStatus {
+    const val PENDING = "pending"
+    const val UPLOADED = "uploaded"
+    const val AWAITING_VALIDATION = "awaiting_validation"
+    const val FAILED_PERMANENT = "failed_permanent"
+    const val RETRY = "retry"
+
+    fun normalized(status: String?): String {
+        return when (status) {
+            UPLOADED -> UPLOADED
+            AWAITING_VALIDATION -> AWAITING_VALIDATION
+            FAILED_PERMANENT -> FAILED_PERMANENT
+            RETRY -> RETRY
+            else -> PENDING
+        }
+    }
+
+    fun shouldUpload(status: String?): Boolean {
+        return normalized(status) == PENDING || normalized(status) == RETRY
+    }
+
+    fun countsAsUploaded(status: String?): Boolean {
+        return normalized(status) == UPLOADED || normalized(status) == AWAITING_VALIDATION
+    }
+
+    fun countsAsFinished(status: String?): Boolean {
+        return countsAsUploaded(status) || normalized(status) == FAILED_PERMANENT
+    }
+}
 
 data class SignalQuestUploadManifest(
     val uploadId: String,
@@ -167,19 +201,21 @@ object SignalQuestUploadQueue {
 
         val normalizedSiteId = siteId.trim()
         if (normalizedSiteId.isBlank()) {
-            throw SignalQuestUploadQueueException(AppStrings.signalQuestInvalidSite(context))
+            throw SignalQuestUploadQueueException(context.getString(R.string.signalquest_invalid_site))
         }
         if (uriStrings.isEmpty()) {
-            throw SignalQuestUploadQueueException(AppStrings.signalQuestPhotoRequired(context))
+            throw SignalQuestUploadQueueException(context.getString(R.string.signalquest_photo_required))
         }
         if (uriStrings.size > SignalQuestUploadRules.MAX_PHOTOS) {
-            throw SignalQuestUploadQueueException(AppStrings.signalQuestMaxPhotos(context, SignalQuestUploadRules.MAX_PHOTOS))
+            throw SignalQuestUploadQueueException(
+                context.getString(R.string.signalquest_max_photos, SignalQuestUploadRules.MAX_PHOTOS)
+            )
         }
         val signalQuestOperator = SignalQuestOperators.operatorParamFor(operator)
-            ?: throw SignalQuestUploadQueueException(AppStrings.signalQuestUnsupportedOperator(context))
+            ?: throw SignalQuestUploadQueueException(context.getString(R.string.signalquest_unsupported_operator))
         val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
         if (!CommunityDataPreferences.isSignalQuestPhotosEnabled(prefs, operator)) {
-            throw SignalQuestUploadQueueException(AppStrings.signalQuestUploadDisabledForOperator(context))
+            throw SignalQuestUploadQueueException(context.getString(R.string.signalquest_upload_disabled_for_operator))
         }
 
         val uploadId = UUID.randomUUID().toString()
@@ -192,12 +228,12 @@ object SignalQuestUploadQueue {
                 val uri = Uri.parse(uriString)
                 val mimeType = resolveMimeType(context, uri)
                 if (!SignalQuestUploadRules.isAcceptedMimeType(mimeType)) {
-                    throw SignalQuestUploadQueueException(AppStrings.signalQuestUnsupportedPhotoFormat(context))
+                    throw SignalQuestUploadQueueException(context.getString(R.string.signalquest_unsupported_photo_format))
                 }
 
                 val sourceSize = querySourceSize(context, uri)
                 if (sourceSize != null && sourceSize > SignalQuestUploadRules.MAX_SOURCE_BYTES) {
-                    throw SignalQuestUploadQueueException(AppStrings.signalQuestPhotoTooLarge(context))
+                    throw SignalQuestUploadQueueException(context.getString(R.string.signalquest_photo_too_large))
                 }
 
                 val extension = extensionForMimeType(mimeType!!)
@@ -205,7 +241,7 @@ object SignalQuestUploadQueue {
                 val copiedBytes = copyUriToInternalFile(context, uri, targetFile)
                 if (!SignalQuestUploadRules.isAcceptedSourceSize(copiedBytes)) {
                     targetFile.delete()
-                    throw SignalQuestUploadQueueException(AppStrings.signalQuestPhotoTooLarge(context))
+                    throw SignalQuestUploadQueueException(context.getString(R.string.signalquest_photo_too_large))
                 }
 
                 val historyEntryId = ExternalPhotoUploadHistoryStore.addPendingPhoto(
@@ -245,7 +281,7 @@ object SignalQuestUploadQueue {
         } catch (e: Exception) {
             ExternalPhotoUploadHistoryStore.removeUpload(context, uploadId)
             deleteInsideRoot(uploadRoot(context), uploadDir)
-            throw SignalQuestUploadQueueException(AppStrings.signalQuestPreparePhotosFailed(context), e)
+            throw SignalQuestUploadQueueException(context.getString(R.string.signalquest_prepare_photos_failed), e)
         }
     }
 
@@ -254,13 +290,46 @@ object SignalQuestUploadQueue {
         val uploadDir = uploadDir(context, uploadId)
         val file = manifestFile(uploadDir)
         if (!file.isFile) {
-            throw SignalQuestUploadQueueException(AppStrings.signalQuestManifestMissing(context))
+            throw SignalQuestUploadQueueException(context.getString(R.string.signalquest_manifest_missing))
         }
         return try {
             SignalQuestUploadManifestCodec.decode(file.readText())
         } catch (e: Exception) {
-            throw SignalQuestUploadQueueException(AppStrings.signalQuestManifestInvalid(context), e)
+            throw SignalQuestUploadQueueException(context.getString(R.string.signalquest_manifest_invalid), e)
         }
+    }
+
+    @Synchronized
+    fun saveManifest(context: Context, manifest: SignalQuestUploadManifest) {
+        val uploadDir = uploadDir(context, manifest.uploadId).apply { mkdirs() }
+        manifestFile(uploadDir).writeText(SignalQuestUploadManifestCodec.encode(manifest))
+    }
+
+    @Synchronized
+    fun updateFileResult(
+        context: Context,
+        manifest: SignalQuestUploadManifest,
+        uploadFile: SignalQuestUploadFile,
+        status: String,
+        remotePhotoId: String? = null,
+        remoteImageUrl: String? = null,
+        remoteUploadedAt: String? = null
+    ): SignalQuestUploadManifest {
+        val nextFiles = manifest.files.map { file ->
+            if (file.sourceFileName == uploadFile.sourceFileName) {
+                file.copy(
+                    status = SignalQuestUploadFileStatus.normalized(status),
+                    remotePhotoId = remotePhotoId ?: file.remotePhotoId,
+                    remoteImageUrl = remoteImageUrl ?: file.remoteImageUrl,
+                    remoteUploadedAt = remoteUploadedAt ?: file.remoteUploadedAt
+                )
+            } else {
+                file
+            }
+        }
+        val nextManifest = manifest.copy(files = nextFiles)
+        saveManifest(context, nextManifest)
+        return nextManifest
     }
 
     fun sourceFile(context: Context, uploadId: String, uploadFile: SignalQuestUploadFile): File {
@@ -272,7 +341,7 @@ object SignalQuestUploadQueue {
     }
 
     fun cleanupStaleFiles(context: Context, maxAgeMillis: Long = STALE_CACHE_MAX_AGE_MS) {
-        cleanupOldChildren(uploadRoot(context), maxAgeMillis)
+        cleanupOldUploadChildren(uploadRoot(context), maxAgeMillis)
         cleanupOldChildren(cameraRoot(context), maxAgeMillis)
     }
 
@@ -296,12 +365,12 @@ object SignalQuestUploadQueue {
     @Throws(SignalQuestInvalidPhotoException::class)
     fun prepareJpegForUpload(context: Context, manifest: SignalQuestUploadManifest, uploadFile: SignalQuestUploadFile): File {
         if (!SignalQuestUploadRules.isAcceptedMimeType(uploadFile.sourceMimeType)) {
-            throw SignalQuestInvalidPhotoException("Type MIME refuse.")
+            throw SignalQuestInvalidPhotoException(context.getString(R.string.signalquest_mime_refused))
         }
 
         val source = sourceFile(context, manifest.uploadId, uploadFile)
         if (!source.isFile || !SignalQuestUploadRules.isAcceptedSourceSize(source.length())) {
-            throw SignalQuestInvalidPhotoException("Fichier source invalide.")
+            throw SignalQuestInvalidPhotoException(context.getString(R.string.signalquest_invalid_source_file))
         }
 
         val uploadDir = uploadDir(context, manifest.uploadId)
@@ -311,7 +380,7 @@ object SignalQuestUploadQueue {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(source.absolutePath, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
-            throw SignalQuestInvalidPhotoException("Image illisible.")
+            throw SignalQuestInvalidPhotoException(context.getString(R.string.signalquest_unreadable_image))
         }
 
         if (!manifest.stripExifBeforeUpload && canUploadOriginalJpeg(uploadFile, source, bounds)) {
@@ -328,7 +397,7 @@ object SignalQuestUploadQueue {
                 inPreferredConfig = Bitmap.Config.RGB_565
             }
             decoded = BitmapFactory.decodeFile(source.absolutePath, decodeOptions)
-                ?: throw SignalQuestInvalidPhotoException("Image illisible.")
+                ?: throw SignalQuestInvalidPhotoException(context.getString(R.string.signalquest_unreadable_image))
 
             val bitmapForScale = if (manifest.stripExifBeforeUpload) {
                 val orientedBitmap = applyExifOrientation(source, decoded)
@@ -356,7 +425,7 @@ object SignalQuestUploadQueue {
                 }
             }
 
-            writeCompressedJpeg(scaled, preparedFile) {
+            writeCompressedJpeg(context, scaled, preparedFile) {
                 if (!manifest.stripExifBeforeUpload) {
                     copyExifAttributes(source, preparedFile)
                 }
@@ -367,10 +436,10 @@ object SignalQuestUploadQueue {
             throw e
         } catch (e: OutOfMemoryError) {
             preparedFile.delete()
-            throw SignalQuestInvalidPhotoException("Image trop grande pour etre preparee.", e)
+            throw SignalQuestInvalidPhotoException(context.getString(R.string.signalquest_image_too_large_prepare), e)
         } catch (e: Exception) {
             preparedFile.delete()
-            throw SignalQuestInvalidPhotoException("Preparation de l'image impossible.", e)
+            throw SignalQuestInvalidPhotoException(context.getString(R.string.signalquest_image_prepare_failed), e)
         } finally {
             if (scaled !== decoded && scaled !== oriented) {
                 scaled?.recycle()
@@ -560,7 +629,7 @@ object SignalQuestUploadQueue {
     @Throws(IOException::class, SignalQuestUploadQueueException::class)
     private fun copyUriToInternalFile(context: Context, uri: Uri, targetFile: File): Long {
         val input = context.contentResolver.openInputStream(uri)
-            ?: throw SignalQuestUploadQueueException(AppStrings.signalQuestPhotoInaccessible(context))
+            ?: throw SignalQuestUploadQueueException(context.getString(R.string.signalquest_photo_inaccessible))
 
         var copiedBytes = 0L
         input.use { source ->
@@ -571,7 +640,7 @@ object SignalQuestUploadQueue {
                     if (read == -1) break
                     copiedBytes += read
                     if (copiedBytes > SignalQuestUploadRules.MAX_SOURCE_BYTES) {
-                        throw SignalQuestUploadQueueException(AppStrings.signalQuestPhotoTooLarge(context))
+                        throw SignalQuestUploadQueueException(context.getString(R.string.signalquest_photo_too_large))
                     }
                     target.write(buffer, 0, read)
                 }
@@ -630,12 +699,12 @@ object SignalQuestUploadQueue {
     }
 
     @Throws(SignalQuestInvalidPhotoException::class)
-    private fun writeCompressedJpeg(bitmap: Bitmap, targetFile: File, afterWrite: () -> Unit) {
+    private fun writeCompressedJpeg(context: Context, bitmap: Bitmap, targetFile: File, afterWrite: () -> Unit) {
         var quality = SignalQuestUploadRules.JPEG_QUALITY
         while (quality >= SignalQuestUploadRules.MIN_JPEG_QUALITY) {
             FileOutputStream(targetFile).use { output ->
                 if (!bitmap.compress(Bitmap.CompressFormat.JPEG, quality, output)) {
-                    throw SignalQuestInvalidPhotoException("Compression JPEG impossible.")
+                    throw SignalQuestInvalidPhotoException(context.getString(R.string.signalquest_jpeg_compression_failed))
                 }
             }
 
@@ -646,7 +715,7 @@ object SignalQuestUploadQueue {
             quality -= 6
         }
         targetFile.delete()
-        throw SignalQuestInvalidPhotoException("Photo compressee trop volumineuse.")
+        throw SignalQuestInvalidPhotoException(context.getString(R.string.signalquest_compressed_photo_too_large))
     }
 
     @Throws(IOException::class)
@@ -694,6 +763,26 @@ object SignalQuestUploadQueue {
                 deleteInsideRoot(root, child)
             }
         }
+    }
+
+    private fun cleanupOldUploadChildren(root: File, maxAgeMillis: Long) {
+        if (!root.exists()) return
+        val cutoff = System.currentTimeMillis() - maxAgeMillis
+        root.listFiles().orEmpty().forEach { child ->
+            if (child.lastModified() < cutoff && !hasUploadWaitingForRetry(child)) {
+                deleteInsideRoot(root, child)
+            }
+        }
+    }
+
+    private fun hasUploadWaitingForRetry(uploadDir: File): Boolean {
+        val file = manifestFile(uploadDir)
+        if (!file.isFile) return false
+        return runCatching {
+            SignalQuestUploadManifestCodec.decode(file.readText())
+                .files
+                .any { uploadFile -> SignalQuestUploadFileStatus.shouldUpload(uploadFile.status) }
+        }.getOrDefault(false)
     }
 
     private fun deleteInsideRoot(root: File, target: File) {

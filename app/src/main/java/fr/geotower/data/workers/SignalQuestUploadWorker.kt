@@ -22,11 +22,11 @@ import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.upload.ExternalPhotoUploadHistoryStore
 import fr.geotower.data.upload.SignalQuestInvalidPhotoException
 import fr.geotower.data.upload.SignalQuestUploadFile
+import fr.geotower.data.upload.SignalQuestUploadFileStatus
 import fr.geotower.data.upload.SignalQuestUploadManifest
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadQueueException
 import fr.geotower.utils.AppLogger
-import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.CancellationException
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -46,7 +46,7 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         val uploadId = inputData.getString(SignalQuestUploadQueue.INPUT_UPLOAD_ID)
             ?: return Result.failure()
 
-        val manifest = try {
+        var manifest = try {
             SignalQuestUploadQueue.loadManifest(applicationContext, uploadId)
         } catch (e: SignalQuestUploadQueueException) {
             logUploadIssue("invalid_manifest", e)
@@ -61,23 +61,28 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
 
         val progressNotificationId = progressNotificationId(uploadId)
         val resultNotificationId = resultNotificationId(uploadId)
-        var successCount = 0
-        var permanentFailureCount = 0
-        var retryableFailureCount = 0
-
         return try {
             ensureNotificationChannel()
-            setProgress(workDataOf("current" to 0, "total" to total))
-            startForegroundSafely(manifest, current = 0, total = total, notificationId = progressNotificationId)
+            val initialProgress = finishedCount(manifest)
+            setProgress(workDataOf("current" to initialProgress, "total" to total))
+            startForegroundSafely(manifest, current = initialProgress, total = total, notificationId = progressNotificationId)
 
-            manifest.files.forEachIndexed { index, uploadFile ->
-                val result = uploadOneFile(manifest, uploadFile)
-                when (result.outcome) {
-                    UploadFileOutcome.Success,
-                    UploadFileOutcome.AwaitingValidation -> successCount++
-                    UploadFileOutcome.PermanentFailure -> permanentFailureCount++
-                    UploadFileOutcome.RetryableFailure -> retryableFailureCount++
+            for (uploadFile in manifest.files) {
+                if (!SignalQuestUploadFileStatus.shouldUpload(uploadFile.status)) {
+                    syncHistoryFromManifest(uploadFile)
+                    continue
                 }
+
+                val result = uploadOneFile(manifest, uploadFile)
+                manifest = SignalQuestUploadQueue.updateFileResult(
+                    context = applicationContext,
+                    manifest = manifest,
+                    uploadFile = uploadFile,
+                    status = result.toManifestStatus(),
+                    remotePhotoId = result.remotePhotoId,
+                    remoteImageUrl = result.remoteImageUrl,
+                    remoteUploadedAt = result.remoteUploadedAt
+                )
                 ExternalPhotoUploadHistoryStore.updateUploadResult(
                     context = applicationContext,
                     entryId = uploadFile.historyEntryId,
@@ -87,30 +92,36 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
                     remoteUploadedAt = result.remoteUploadedAt
                 )
 
-                val current = index + 1
+                val current = finishedCount(manifest)
                 setProgress(workDataOf("current" to current, "total" to total))
                 showProgressNotification(manifest, current, total, progressNotificationId)
+
+                if (result.outcome == UploadFileOutcome.RetryableFailure) {
+                    showRetryNotification(progressNotificationId, resultNotificationId)
+                    return Result.retry()
+                }
             }
 
+            val summary = manifestSummary(manifest)
             when {
-                successCount == total -> {
-                    SignalQuestUploadQueue.cleanupUpload(applicationContext, uploadId)
-                    showFinishedNotification(successCount, total, partial = false, progressNotificationId, resultNotificationId)
-                    Result.success(uploadResultData(successCount, total))
-                }
-                successCount > 0 -> {
-                    SignalQuestUploadQueue.cleanupUpload(applicationContext, uploadId)
-                    showFinishedNotification(successCount, total, partial = true, progressNotificationId, resultNotificationId)
-                    Result.success(uploadResultData(successCount, total))
-                }
-                retryableFailureCount > 0 && permanentFailureCount == 0 -> {
+                summary.retryableCount > 0 || summary.pendingCount > 0 -> {
                     showRetryNotification(progressNotificationId, resultNotificationId)
                     Result.retry()
                 }
+                summary.uploadedCount == total -> {
+                    SignalQuestUploadQueue.cleanupUpload(applicationContext, uploadId)
+                    showFinishedNotification(summary.uploadedCount, total, partial = false, progressNotificationId, resultNotificationId)
+                    Result.success(uploadResultData(summary.uploadedCount, total))
+                }
+                summary.uploadedCount > 0 -> {
+                    SignalQuestUploadQueue.cleanupUpload(applicationContext, uploadId)
+                    showFinishedNotification(summary.uploadedCount, total, partial = true, progressNotificationId, resultNotificationId)
+                    Result.success(uploadResultData(summary.uploadedCount, total))
+                }
                 else -> {
                     SignalQuestUploadQueue.cleanupUpload(applicationContext, uploadId)
-                    showFinishedNotification(successCount, total, partial = true, progressNotificationId, resultNotificationId)
-                    Result.failure(uploadResultData(successCount, total))
+                    showFinishedNotification(summary.uploadedCount, total, partial = true, progressNotificationId, resultNotificationId)
+                    Result.failure(uploadResultData(summary.uploadedCount, total))
                 }
             }
         } catch (e: CancellationException) {
@@ -241,9 +252,9 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
     ) {
         cancelSafely(progressNotificationId)
         val message = if (!partial) {
-            AppStrings.signalQuestUploadSuccess(applicationContext, successCount, total)
+            applicationContext.getString(R.string.notification_signalquest_upload_success, successCount, total)
         } else {
-            AppStrings.signalQuestUploadPartial(applicationContext, successCount, total)
+            applicationContext.getString(R.string.notification_signalquest_upload_partial, successCount, total)
         }
         notifySafely(
             resultNotificationId,
@@ -262,7 +273,7 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         notifySafely(
             resultNotificationId,
             createResultNotification(
-                message = AppStrings.signalQuestUploadRetry(applicationContext),
+                message = applicationContext.getString(R.string.notification_signalquest_upload_retry),
                 successCount = 0,
                 total = 0,
                 hasErrors = true,
@@ -295,7 +306,7 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
     ): Notification {
         ensureNotificationChannel()
         val title = APP_NOTIFICATION_TITLE
-        val message = AppStrings.signalQuestUploadProgress(applicationContext, current, total)
+        val message = applicationContext.getString(R.string.notification_signalquest_upload_progress, current, total)
         val progressPercent = progressPercent(current, total)
         val shortCriticalText = "$current/$total"
         val pendingIntent = createUploadPendingIntent(manifest, notificationId)
@@ -479,6 +490,70 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
             UploadFileOutcome.RetryableFailure -> ExternalPhotoUploadHistoryStore.STATUS_RETRY
         }
     }
+
+    private fun UploadFileResult.toManifestStatus(): String {
+        return when (outcome) {
+            UploadFileOutcome.Success -> SignalQuestUploadFileStatus.UPLOADED
+            UploadFileOutcome.AwaitingValidation -> SignalQuestUploadFileStatus.AWAITING_VALIDATION
+            UploadFileOutcome.PermanentFailure -> SignalQuestUploadFileStatus.FAILED_PERMANENT
+            UploadFileOutcome.RetryableFailure -> SignalQuestUploadFileStatus.RETRY
+        }
+    }
+
+    private fun syncHistoryFromManifest(uploadFile: SignalQuestUploadFile) {
+        val historyStatus = when (SignalQuestUploadFileStatus.normalized(uploadFile.status)) {
+            SignalQuestUploadFileStatus.UPLOADED -> ExternalPhotoUploadHistoryStore.STATUS_SUCCESS
+            SignalQuestUploadFileStatus.AWAITING_VALIDATION -> ExternalPhotoUploadHistoryStore.STATUS_AWAITING_VALIDATION
+            SignalQuestUploadFileStatus.FAILED_PERMANENT -> ExternalPhotoUploadHistoryStore.STATUS_FAILED
+            else -> return
+        }
+
+        ExternalPhotoUploadHistoryStore.updateUploadResult(
+            context = applicationContext,
+            entryId = uploadFile.historyEntryId,
+            status = historyStatus,
+            remotePhotoId = uploadFile.remotePhotoId,
+            remoteImageUrl = uploadFile.remoteImageUrl,
+            remoteUploadedAt = uploadFile.remoteUploadedAt
+        )
+    }
+
+    private fun finishedCount(manifest: SignalQuestUploadManifest): Int {
+        return manifest.files.count { uploadFile ->
+            SignalQuestUploadFileStatus.countsAsFinished(uploadFile.status)
+        }
+    }
+
+    private fun manifestSummary(manifest: SignalQuestUploadManifest): UploadManifestSummary {
+        var uploadedCount = 0
+        var permanentFailureCount = 0
+        var retryableCount = 0
+        var pendingCount = 0
+
+        manifest.files.forEach { uploadFile ->
+            when (SignalQuestUploadFileStatus.normalized(uploadFile.status)) {
+                SignalQuestUploadFileStatus.UPLOADED,
+                SignalQuestUploadFileStatus.AWAITING_VALIDATION -> uploadedCount++
+                SignalQuestUploadFileStatus.FAILED_PERMANENT -> permanentFailureCount++
+                SignalQuestUploadFileStatus.RETRY -> retryableCount++
+                else -> pendingCount++
+            }
+        }
+
+        return UploadManifestSummary(
+            uploadedCount = uploadedCount,
+            permanentFailureCount = permanentFailureCount,
+            retryableCount = retryableCount,
+            pendingCount = pendingCount
+        )
+    }
+
+    private data class UploadManifestSummary(
+        val uploadedCount: Int,
+        val permanentFailureCount: Int,
+        val retryableCount: Int,
+        val pendingCount: Int
+    )
 
     private companion object {
         private const val TAG = "GeoTowerUpload"

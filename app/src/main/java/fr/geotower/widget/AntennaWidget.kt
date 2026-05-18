@@ -70,7 +70,6 @@ import fr.geotower.data.db.AppDatabase
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppUiMode
-import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
 import kotlinx.coroutines.Dispatchers
@@ -110,8 +109,8 @@ class AntennaWidget : GlanceAppWidget() {
             ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         }
 
-        val txtWarningTitle = AppStrings.widgetBgLocationWarning(context)
-        val txtWarningDesc = AppStrings.widgetBgLocationDesc(context)
+        val txtWarningTitle = context.getString(R.string.widget_bg_location_warning)
+        val txtWarningDesc = context.getString(R.string.widget_bg_location_desc)
 
         provideContent {
             val size = LocalSize.current
@@ -120,7 +119,7 @@ class AntennaWidget : GlanceAppWidget() {
             // Détection de la hauteur réduite (Format 2x1)
             val isShortWidget = size.height < 130.dp
 
-            val widgetTitleText = AppStrings.widgetTitle(context)
+            val widgetTitleText = context.getString(R.string.widget_title)
 
             // Si le widget est court, on n'affiche que LA première antenne de la liste !
             val displaySites = if (isShortWidget) realSites.take(1) else realSites
@@ -180,7 +179,7 @@ class AntennaWidget : GlanceAppWidget() {
                     // ✅ On cache l'heure de mise à jour si le widget est en format 2x1 pour gagner de la place
                     if (!isShortWidget) {
                         Text(
-                            text = AppStrings.widgetUpdatedAt(context, lastUpdate),
+                            text = context.getString(R.string.widget_updated_at, lastUpdate),
                             style = TextStyle(
                                 color = GlanceTheme.colors.onSurfaceVariant,
                                 fontSize = 11.sp,
@@ -223,7 +222,7 @@ class AntennaWidget : GlanceAppWidget() {
                     // ✅ SINON ON CONTINUE NORMALEMENT
                     else if (displaySites.isEmpty()) {
                         Text(
-                            text = AppStrings.widgetWaitingGps(context),
+                            text = context.getString(R.string.widget_waiting_gps),
                             style = TextStyle(color = GlanceTheme.colors.onSurfaceVariant, fontSize = 12.sp, textAlign = TextAlign.Center),
                             modifier = GlanceModifier.padding(top = 8.dp).fillMaxWidth()
                         )
@@ -412,7 +411,7 @@ class RefreshWidgetAction : ActionCallback {
         // 1. On affiche le message TOUT DE SUITE pour confirmer le clic
         val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
         Handler(Looper.getMainLooper()).post {
-            Toast.makeText(context, AppStrings.widgetImmediateSearch(context), Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, context.getString(R.string.widget_immediate_search), Toast.LENGTH_SHORT).show()
         }
 
         val timeFormat = java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
@@ -519,7 +518,7 @@ class RefreshWidgetAction : ActionCallback {
                     } else "#MULTI"
 
                     val technique = dao.getTechniqueDetails(main.idAnfr.toString())
-                    val adresseAffichee = technique?.adresse ?: AppStrings.siteAnfrTitle(context, main.idAnfr.toString())
+                    val adresseAffichee = technique?.adresse ?: context.getString(R.string.site_anfr_title, main.idAnfr.toString())
 
                     WidgetSiteData(
                         id = main.idAnfr.toString(),

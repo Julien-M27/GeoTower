@@ -32,7 +32,7 @@ object GeoTowerDatabaseValidator {
     )
 
     fun getInstalledDatabaseFileStatus(context: Context): LocalDatabaseStatus {
-        deleteObsoleteDatabases(context)
+        migrateLegacyDatabaseIfCurrentMissing(context)
         val dbFile = context.getDatabasePath(DB_NAME)
         if (!dbFile.isFile || dbFile.length() <= 0L) {
             clearInstalledDatabaseInvalid(context)
@@ -43,7 +43,7 @@ object GeoTowerDatabaseValidator {
     }
 
     fun getInstalledDatabaseVersion(context: Context): String? {
-        deleteObsoleteDatabases(context)
+        migrateLegacyDatabaseIfCurrentMissing(context)
         val dbFile = context.getDatabasePath(DB_NAME)
         if (!dbFile.isFile || dbFile.length() <= 0L) return null
         return readDatabaseVersion(dbFile)
@@ -218,7 +218,7 @@ object GeoTowerDatabaseValidator {
     )
 
     fun getInstalledDatabaseStatus(context: Context): LocalDatabaseStatus {
-        deleteObsoleteDatabases(context)
+        migrateLegacyDatabaseIfCurrentMissing(context)
         val dbFile = context.getDatabasePath(DB_NAME)
         if (!dbFile.isFile || dbFile.length() <= 0L) {
             clearInstalledDatabaseInvalid(context)
@@ -227,6 +227,7 @@ object GeoTowerDatabaseValidator {
 
         val validation = validateDatabaseFile(dbFile)
         return if (validation.isValid) {
+            deleteObsoleteDatabaseArtifacts(context)
             clearInstalledDatabaseInvalid(context)
             LocalDatabaseStatus(LocalDatabaseState.VALID)
         } else {
@@ -237,9 +238,13 @@ object GeoTowerDatabaseValidator {
     }
 
     fun deleteObsoleteDatabases(context: Context) {
-        obsoleteDatabaseNames
-            .filterNot { it == DB_NAME }
-            .forEach { dbName -> deleteDatabaseArtifacts(context, dbName) }
+        migrateLegacyDatabaseIfCurrentMissing(context)
+
+        val currentDb = context.getDatabasePath(DB_NAME)
+        if (!currentDb.isFile || currentDb.length() <= 0L) return
+        if (!validateDatabaseFile(currentDb).isValid) return
+
+        deleteObsoleteDatabaseArtifacts(context)
     }
 
     fun validateDatabaseFile(file: File): ValidationResult {
@@ -419,6 +424,48 @@ object GeoTowerDatabaseValidator {
         return "\"" + identifier.replace("\"", "\"\"") + "\""
     }
 
+    private fun migrateLegacyDatabaseIfCurrentMissing(context: Context) {
+        val currentDb = context.getDatabasePath(DB_NAME)
+        if (currentDb.isFile && currentDb.length() > 0L) return
+
+        obsoleteDatabaseNames
+            .filterNot { it == DB_NAME }
+            .asSequence()
+            .map { context.getDatabasePath(it) }
+            .firstOrNull { legacyDb ->
+                legacyDb.isFile &&
+                    legacyDb.length() > 0L &&
+                    validateDatabaseFile(legacyDb).isValid
+            }
+            ?.let { legacyDb ->
+                currentDb.parentFile?.mkdirs()
+                deleteSqliteFiles(currentDb)
+                if (legacyDb.renameTo(currentDb)) {
+                    moveSqliteSidecars(legacyDb, currentDb)
+                }
+            }
+    }
+
+    private fun deleteObsoleteDatabaseArtifacts(context: Context) {
+        obsoleteDatabaseNames
+            .filterNot { it == DB_NAME }
+            .forEach { dbName -> deleteDatabaseArtifacts(context, dbName) }
+    }
+
+    private fun moveSqliteSidecars(sourceDb: File, targetDb: File) {
+        sqliteSidecarSuffixes.forEach { suffix ->
+            val source = File(sourceDb.path + suffix)
+            if (source.exists()) {
+                source.renameTo(File(targetDb.path + suffix))
+            }
+        }
+    }
+
+    private fun deleteSqliteFiles(dbFile: File) {
+        if (dbFile.exists()) dbFile.delete()
+        sqliteSidecarSuffixes.forEach { suffix -> File(dbFile.path + suffix).delete() }
+    }
+
     private fun deleteDatabaseArtifacts(context: Context, dbName: String) {
         val relatedNames = listOf(dbName, "$dbName.download", "$dbName.backup")
         relatedNames.forEach { name ->
@@ -433,4 +480,6 @@ object GeoTowerDatabaseValidator {
             }
         }
     }
+
+    private val sqliteSidecarSuffixes = listOf("-wal", "-shm", "-journal")
 }

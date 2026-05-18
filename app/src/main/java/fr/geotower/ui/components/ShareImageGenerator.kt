@@ -68,9 +68,9 @@ import fr.geotower.ui.screens.emitters.formatDateToFrench
 import fr.geotower.ui.screens.emitters.formatTechnologies
 import fr.geotower.ui.screens.emitters.getElevationProfileLastKnownLocation
 import fr.geotower.ui.screens.emitters.getDetailLogoRes
+import fr.geotower.utils.AnfrDisplayText
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
-import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -80,6 +80,9 @@ import java.util.Locale
 import kotlin.math.roundToInt
 import android.net.Uri
 import fr.geotower.ui.components.SiteStatusCard
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 private const val TAG_SHARE_IMAGE = "GeoTower"
 
@@ -334,14 +337,14 @@ fun shareFullAntennaCapture(
                                     Spacer(modifier = Modifier.width(16.dp))
                                     Column {
                                         Text(
-                                            info.operateur ?: AppStrings.unknown,
+                                            info.operateur ?: stringResource(R.string.appstrings_unknown),
                                             fontWeight = FontWeight.Bold
                                         )
                                         val rawTechs =
                                             technique?.technologies?.takeIf { it.isNotBlank() }
                                                 ?: info.frequences
                                         Text(
-                                            formatTechnologies(rawTechs, AppStrings.unknown),
+                                            formatTechnologies(rawTechs, stringResource(R.string.appstrings_unknown)),
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                     }
@@ -466,7 +469,7 @@ fun shareFullAntennaCapture(
                                                             ?: txtNotSpecified
                                                     val proprietaire =
                                                         physique?.proprietaire?.takeIf { it.isNotBlank() }
-                                                            ?: AppStrings.unknown
+                                                            ?: stringResource(R.string.appstrings_unknown)
                                                     Text(
                                                         "$txtSupportNature : $nature",
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -614,7 +617,7 @@ fun shareFullAntennaCapture(
                                                     )
                                                     val fullAddress =
                                                         technique?.adresse?.takeIf { it.isNotBlank() }
-                                                            ?: AppStrings.notSpecified
+                                                            ?: stringResource(R.string.appstrings_not_specified)
                                                     Text(
                                                         fullAddress,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -634,7 +637,7 @@ fun shareFullAntennaCapture(
                                                     )
                                                     if (incConfidential) {
                                                         Text(
-                                                            AppStrings.distanceHidden,
+                                                            stringResource(R.string.appstrings_distance_hidden),
                                                             fontSize = 12.sp,
                                                             color = MaterialTheme.colorScheme.primary,
                                                             fontWeight = FontWeight.Bold
@@ -669,7 +672,7 @@ fun shareFullAntennaCapture(
                                                         )
                                                         Spacer(modifier = Modifier.width(8.dp))
                                                         Text(
-                                                            AppStrings.speedtestTitle,
+                                                            stringResource(R.string.appstrings_speedtest_title),
                                                             fontWeight = FontWeight.Bold
                                                         )
                                                     }
@@ -708,7 +711,7 @@ fun shareFullAntennaCapture(
                                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                                             )
                                                             Text(
-                                                                AppStrings.speedtestDownload,
+                                                                stringResource(R.string.appstrings_speedtest_download),
                                                                 fontSize = 10.sp
                                                             )
                                                         }
@@ -734,7 +737,7 @@ fun shareFullAntennaCapture(
                                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                                             )
                                                             Text(
-                                                                AppStrings.speedtestUpload,
+                                                                stringResource(R.string.appstrings_speedtest_upload),
                                                                 fontSize = 10.sp
                                                             )
                                                         }
@@ -757,7 +760,7 @@ fun shareFullAntennaCapture(
                                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                                             )
                                                             Text(
-                                                                AppStrings.speedtestPing,
+                                                                stringResource(R.string.appstrings_speedtest_ping),
                                                                 fontSize = 10.sp
                                                             )
                                                         }
@@ -896,8 +899,8 @@ fun shareFullAntennaCapture(
                                                 technique?.detailsFrequences ?: info.frequences
                                             val parsedBands = parseAndSortFrequencies(
                                                 rawFreqs,
-                                                AppStrings.unknown,
-                                                AppStrings.azimuthNotSpecified
+                                                stringResource(R.string.appstrings_unknown),
+                                                stringResource(R.string.appstrings_azimuth_not_specified)
                                             ).filter { band ->
                                                 when (band.gen) {
                                                     5 -> AppConfig.siteShowTechno5G.value && when (band.value) {
@@ -1070,7 +1073,7 @@ fun shareFullAntennaCapture(
                                                                         }.ifBlank { preciseFreqs }
                                                                     if (AppConfig.siteShowSpectrumBand.value) {
                                                                         Text(
-                                                                            text = "${AppStrings.spectrumByBand} :\n\n$detailedFreqs",
+                                                                            text = "${stringResource(R.string.appstrings_spectrum_by_band)} :\n\n$detailedFreqs",
                                                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                             fontSize = 12.sp,
                                                                             fontWeight = FontWeight.Normal,
@@ -1091,7 +1094,7 @@ fun shareFullAntennaCapture(
                                                                             )
                                                                         )
                                                                         Text(
-                                                                            text = "${AppStrings.totalspectrum} : $totalStr $detectedUnit",
+                                                                            text = "${stringResource(R.string.appstrings_totalspectrum)} : $totalStr $detectedUnit",
                                                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                             fontSize = 12.sp,
                                                                             fontWeight = FontWeight.Medium
@@ -1155,7 +1158,7 @@ fun shareFullAntennaCapture(
                                                                                     ""
                                                                                 ).trim()
                                                                             val translatedType =
-                                                                                AppStrings.translateAntennaType(
+                                                                                AnfrDisplayText.antennaType(
                                                                                     typePart
                                                                                 )
                                                                             val finalPhysText =
@@ -1195,11 +1198,11 @@ fun shareFullAntennaCapture(
                                     }
                                     Column(horizontalAlignment = Alignment.Start) {
                                         Text(
-                                            text = AppStrings.scanToOpen,
+                                            text = stringResource(R.string.appstrings_scan_to_open),
                                             fontSize = 11.sp,
                                             color = Color.Gray
                                         ); Text(
-                                        text = AppStrings.geoTowerApp,
+                                        text = stringResource(R.string.appstrings_geo_tower_app),
                                         fontSize = 14.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = MaterialTheme.colorScheme.primary
@@ -1253,14 +1256,14 @@ fun shareFullAntennaCapture(
                                         Spacer(modifier = Modifier.width(16.dp))
                                         Column {
                                             Text(
-                                                info.operateur ?: AppStrings.unknown,
+                                                info.operateur ?: stringResource(R.string.appstrings_unknown),
                                                 fontWeight = FontWeight.Bold
                                             )
                                             val rawTechs =
                                                 technique?.technologies?.takeIf { it.isNotBlank() }
                                                     ?: info.frequences
                                             Text(
-                                                formatTechnologies(rawTechs, AppStrings.unknown),
+                                                formatTechnologies(rawTechs, stringResource(R.string.appstrings_unknown)),
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
@@ -1314,8 +1317,8 @@ fun shareFullAntennaCapture(
                                     val rawFreqs = technique?.detailsFrequences ?: info.frequences
                                     val parsedBands = parseAndSortFrequencies(
                                         rawFreqs,
-                                        AppStrings.unknown,
-                                        AppStrings.azimuthNotSpecified
+                                        stringResource(R.string.appstrings_unknown),
+                                        stringResource(R.string.appstrings_azimuth_not_specified)
                                     ).filter { band ->
                                         when (band.gen) {
                                             5 -> AppConfig.siteShowTechno5G.value && when (band.value) {
@@ -1465,7 +1468,7 @@ fun shareFullAntennaCapture(
                                                                 }.ifBlank { preciseFreqs }
                                                             if (AppConfig.siteShowSpectrumBand.value) {
                                                                 Text(
-                                                                    text = "${AppStrings.spectrumByBand} :\n\n$detailedFreqs",
+                                                                    text = "${stringResource(R.string.appstrings_spectrum_by_band)} :\n\n$detailedFreqs",
                                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                     fontSize = 12.sp,
                                                                     fontWeight = FontWeight.Normal,
@@ -1484,7 +1487,7 @@ fun shareFullAntennaCapture(
                                                                     modifier = Modifier.height(2.dp)
                                                                 )
                                                                 Text(
-                                                                    text = "${AppStrings.totalspectrum} : $totalStr $detectedUnit",
+                                                                    text = "${stringResource(R.string.appstrings_totalspectrum)} : $totalStr $detectedUnit",
                                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                     fontSize = 12.sp,
                                                                     fontWeight = FontWeight.Medium
@@ -1535,7 +1538,7 @@ fun shareFullAntennaCapture(
                                                                             ""
                                                                         ).trim()
                                                                     val translatedType =
-                                                                        AppStrings.translateAntennaType(
+                                                                        AnfrDisplayText.antennaType(
                                                                             typePart
                                                                         )
                                                                     val finalPhysText =
@@ -1573,11 +1576,11 @@ fun shareFullAntennaCapture(
                                         }
                                         Column(horizontalAlignment = Alignment.Start) {
                                             Text(
-                                                text = AppStrings.scanToOpen,
+                                                text = stringResource(R.string.appstrings_scan_to_open),
                                                 fontSize = 11.sp,
                                                 color = Color.Gray
                                             ); Text(
-                                            text = AppStrings.geoTowerApp,
+                                            text = stringResource(R.string.appstrings_geo_tower_app),
                                             fontSize = 14.sp,
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary
@@ -1774,15 +1777,15 @@ fun shareFullSiteCapture(
                                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                                         Icon(Icons.Default.Info, null, tint = MaterialTheme.colorScheme.primary)
                                                         Spacer(modifier = Modifier.width(8.dp))
-                                                        Text(AppStrings.supportDetailsTitle, fontWeight = FontWeight.Bold)
+                                                        Text(stringResource(R.string.appstrings_support_details_title), fontWeight = FontWeight.Bold)
                                                     }
                                                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
                                                     // ✅ ON UTILISE LES VRAIES DONNÉES DU PYLÔNE
                                                     val technique = techniquesMap[mainInfo.idAnfr]
-                                                    val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: AppStrings.notSpecified
+                                                    val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: stringResource(R.string.appstrings_not_specified)
                                                     val nature = physique?.natureSupport?.takeIf { it.isNotBlank() } ?: txtNotSpecified
-                                                    val proprietaire = physique?.proprietaire?.takeIf { it.isNotBlank() } ?: AppStrings.unknown
+                                                    val proprietaire = physique?.proprietaire?.takeIf { it.isNotBlank() } ?: stringResource(R.string.appstrings_unknown)
                                                     val hauteur = formatShareHeightMeters(physique?.hauteur)
                                                     val idSupportValue = physique?.idSupport?.takeIf { it.isNotBlank() } ?: txtNotSpecified
 
@@ -1800,7 +1803,7 @@ fun shareFullSiteCapture(
 
                                                     if (incConfidential) {
                                                         Spacer(modifier = Modifier.height(8.dp))
-                                                        Text(AppStrings.distanceHidden, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                                                        Text(stringResource(R.string.appstrings_distance_hidden), fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                                                     } else {
                                                         Spacer(modifier = Modifier.height(4.dp))
                                                         Text(buildAnnotatedString { withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) { append("$txtDistanceLabel ") }; withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append("$distanceStr $txtFromMyPosition") } }, fontSize = 14.sp)
@@ -1849,8 +1852,8 @@ fun shareFullSiteCapture(
                                         Spacer(modifier = Modifier.width(16.dp))
                                     }
                                     Column(horizontalAlignment = Alignment.Start) {
-                                        Text(text = fr.geotower.utils.AppStrings.scanToOpen, fontSize = 11.sp, color = Color.Gray)
-                                        Text(text = fr.geotower.utils.AppStrings.geoTowerApp, fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                        Text(text = stringResource(R.string.appstrings_scan_to_open), fontSize = 11.sp, color = Color.Gray)
+                                        Text(text = stringResource(R.string.appstrings_geo_tower_app), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                                     }
                                 }
                             }
@@ -2042,73 +2045,73 @@ fun AntennaShareMenu(
         }
     }
 
-    val txtSiteDetailsTitle = AppStrings.siteDetailTitle
-    val txtAddressLabel = AppStrings.addressLabel
-    val txtNotSpecified = AppStrings.notSpecified
-    val txtGpsLabel = AppStrings.gpsLabel
-    val txtSupportHeight = AppStrings.supportHeight
-    val txtDistanceLabel = AppStrings.distanceLabel
-    val txtFromMyPosition = AppStrings.fromMyPosition
-    val txtBearingLabel = AppStrings.bearingLabel
-    val txtGeneratedBy = AppStrings.generatedBy
-    val txtShareSiteVia = AppStrings.shareSiteVia
-    val txtimplementation = AppStrings.implementation
-    val txtLastModification = AppStrings.lastModification
-    val txtIdentifiers = AppStrings.identifiers
-    val txtIdNumber = AppStrings.idNumber
-    val txtFrequenciesTitle = AppStrings.frequenciesTitle
-    val txtBandsNotSpecified = AppStrings.bandsNotSpecified
-    val txtInService = AppStrings.inService
-    val txtTechnically = AppStrings.technically
-    val txtUnknownStatus = AppStrings.unknownStatus
-    val txtAnfrStationNumber = AppStrings.anfrStationNumber
-    val txtDates = AppStrings.dates
-    val txtError = AppStrings.error
-    val txtProjectApproved = AppStrings.projectApproved
-    val txtActivatedOn = AppStrings.activatedOn
-    val txtDateNotSpecifiedAnfr = AppStrings.dateNotSpecifiedAnfr
-    val txtPanelHeightsTitle = AppStrings.panelHeightsTitle
-    val txtAzimuths = AppStrings.azimuthsLabel
-    val txtIdSupportLabel = AppStrings.idSupportLabel
-    val txtSupportDetailsTitle = AppStrings.supportDetailsTitle
-    val txtSupportNature = AppStrings.supportNature
-    val txtOwner = AppStrings.owner
-    val txtAntennaType = AppStrings.antennaType
-    val txtCommunityPhotosTitle = AppStrings.communityPhotosTitleShort(communityPhotosSize)
-    val txtThemeLight = AppStrings.themeLight
-    val txtLightModeDesc = AppStrings.lightModeDesc
-    val txtThemeDark = AppStrings.themeDark
-    val txtDarkModeDesc = AppStrings.darkModeDesc
-    val txtShareSite = AppStrings.shareSite
-    val txtShareAs = AppStrings.shareAs
-    val txtImageContent = AppStrings.imageContent
-    val txtShareConfidentialOption = AppStrings.shareConfidentialOption
-    val txtShareConfidentialDesc = AppStrings.shareConfidentialDesc
-    val txtGenerateImage = AppStrings.generateImage
-    val txtMove = AppStrings.move
-    val txtInitError = AppStrings.initError
-    val txtUnknown = AppStrings.unknown
-    val txtShareImageGenerationInProgress = AppStrings.shareImageGenerationInProgress
-    val txtShareImagePreparingInProgress = AppStrings.shareImagePreparingInProgress
-    val txtShareElevationProfileOnlyUnavailable = AppStrings.shareElevationProfileOnlyUnavailable
-    val txtElevationProfileTitle = AppStrings.elevationProfileTitle
-    val txtElevationProfileLoading = AppStrings.elevationProfileLoading
-    val txtElevationProfileDistance = AppStrings.elevationProfileDistance
-    val txtElevationProfileSupportHeight = AppStrings.elevationProfileSupportHeight
-    val txtElevationProfileSupportHeightDetail = AppStrings.elevationProfileSupportHeightDetail
-    val txtElevationProfileStartAltitude = AppStrings.elevationProfileStartAltitude
-    val txtElevationProfileStartAltitudeDetail = AppStrings.elevationProfileStartAltitudeDetail
-    val txtElevationProfileSiteAltitude = AppStrings.elevationProfileSiteAltitude
-    val txtElevationProfileSiteAltitudeDetail = AppStrings.elevationProfileSiteAltitudeDetail
-    val txtElevationProfileFrequency = AppStrings.elevationProfileFrequency
-    val txtElevationProfileDirectLineLabel = AppStrings.elevationProfileDirectLineLabel
-    val txtElevationProfileFresnelLabel = AppStrings.elevationProfileFresnelLabel
-    val txtElevationProfileLineClear = AppStrings.elevationProfileLineClear
-    val txtElevationProfileLineBlocked = AppStrings.elevationProfileLineBlocked
-    val txtElevationProfileFresnelClear = AppStrings.elevationProfileFresnelClear
-    val txtElevationProfileFresnelBlocked = AppStrings.elevationProfileFresnelBlocked
-    val txtElevationProfileFresnelExplanation = AppStrings.elevationProfileFresnelExplanation
-    val txtElevationProfileIgnSource = AppStrings.elevationProfileIgnSource
+    val txtSiteDetailsTitle = stringResource(R.string.appstrings_site_detail_title)
+    val txtAddressLabel = stringResource(R.string.appstrings_address_label)
+    val txtNotSpecified = stringResource(R.string.appstrings_not_specified)
+    val txtGpsLabel = stringResource(R.string.appstrings_gps_label)
+    val txtSupportHeight = stringResource(R.string.appstrings_support_height)
+    val txtDistanceLabel = stringResource(R.string.appstrings_distance_label)
+    val txtFromMyPosition = stringResource(R.string.appstrings_from_my_position)
+    val txtBearingLabel = stringResource(R.string.appstrings_bearing_label)
+    val txtGeneratedBy = stringResource(R.string.appstrings_generated_by)
+    val txtShareSiteVia = stringResource(R.string.appstrings_share_site_via)
+    val txtimplementation = stringResource(R.string.appstrings_implementation)
+    val txtLastModification = stringResource(R.string.appstrings_last_modification)
+    val txtIdentifiers = stringResource(R.string.appstrings_identifiers)
+    val txtIdNumber = stringResource(R.string.appstrings_id_number)
+    val txtFrequenciesTitle = stringResource(R.string.appstrings_frequencies_title)
+    val txtBandsNotSpecified = stringResource(R.string.appstrings_bands_not_specified)
+    val txtInService = stringResource(R.string.appstrings_in_service)
+    val txtTechnically = stringResource(R.string.appstrings_technically)
+    val txtUnknownStatus = stringResource(R.string.appstrings_unknown_status)
+    val txtAnfrStationNumber = stringResource(R.string.appstrings_anfr_station_number)
+    val txtDates = stringResource(R.string.appstrings_dates)
+    val txtError = stringResource(R.string.appstrings_error)
+    val txtProjectApproved = stringResource(R.string.appstrings_project_approved)
+    val txtActivatedOn = stringResource(R.string.appstrings_activated_on)
+    val txtDateNotSpecifiedAnfr = stringResource(R.string.appstrings_date_not_specified_anfr)
+    val txtPanelHeightsTitle = stringResource(R.string.appstrings_panel_heights_title)
+    val txtAzimuths = stringResource(R.string.appstrings_azimuths_label)
+    val txtIdSupportLabel = stringResource(R.string.appstrings_id_support_label)
+    val txtSupportDetailsTitle = stringResource(R.string.appstrings_support_details_title)
+    val txtSupportNature = stringResource(R.string.appstrings_support_nature)
+    val txtOwner = stringResource(R.string.appstrings_owner)
+    val txtAntennaType = stringResource(R.string.appstrings_antenna_type)
+    val txtCommunityPhotosTitle = pluralStringResource(R.plurals.community_photos_title_short, communityPhotosSize)
+    val txtThemeLight = stringResource(R.string.appstrings_theme_light)
+    val txtLightModeDesc = stringResource(R.string.appstrings_light_mode_desc)
+    val txtThemeDark = stringResource(R.string.appstrings_theme_dark)
+    val txtDarkModeDesc = stringResource(R.string.appstrings_dark_mode_desc)
+    val txtShareSite = stringResource(R.string.appstrings_share_site)
+    val txtShareAs = stringResource(R.string.appstrings_share_as)
+    val txtImageContent = stringResource(R.string.appstrings_image_content)
+    val txtShareConfidentialOption = stringResource(R.string.appstrings_share_confidential_option)
+    val txtShareConfidentialDesc = stringResource(R.string.appstrings_share_confidential_desc)
+    val txtGenerateImage = stringResource(R.string.appstrings_generate_image)
+    val txtMove = stringResource(R.string.appstrings_move)
+    val txtInitError = stringResource(R.string.appstrings_init_error)
+    val txtUnknown = stringResource(R.string.appstrings_unknown)
+    val txtShareImageGenerationInProgress = stringResource(R.string.appstrings_share_image_generation_in_progress)
+    val txtShareImagePreparingInProgress = stringResource(R.string.appstrings_share_image_preparing_in_progress)
+    val txtShareElevationProfileOnlyUnavailable = stringResource(R.string.appstrings_share_elevation_profile_only_unavailable)
+    val txtElevationProfileTitle = stringResource(R.string.appstrings_elevation_profile_title)
+    val txtElevationProfileLoading = stringResource(R.string.appstrings_elevation_profile_loading)
+    val txtElevationProfileDistance = stringResource(R.string.appstrings_elevation_profile_distance)
+    val txtElevationProfileSupportHeight = stringResource(R.string.appstrings_elevation_profile_support_height)
+    val txtElevationProfileSupportHeightDetail = stringResource(R.string.appstrings_elevation_profile_support_height_detail)
+    val txtElevationProfileStartAltitude = stringResource(R.string.appstrings_elevation_profile_start_altitude)
+    val txtElevationProfileStartAltitudeDetail = stringResource(R.string.appstrings_elevation_profile_start_altitude_detail)
+    val txtElevationProfileSiteAltitude = stringResource(R.string.appstrings_elevation_profile_site_altitude)
+    val txtElevationProfileSiteAltitudeDetail = stringResource(R.string.appstrings_elevation_profile_site_altitude_detail)
+    val txtElevationProfileFrequency = stringResource(R.string.appstrings_elevation_profile_frequency)
+    val txtElevationProfileDirectLineLabel = stringResource(R.string.appstrings_elevation_profile_direct_line_label)
+    val txtElevationProfileFresnelLabel = stringResource(R.string.appstrings_elevation_profile_fresnel_label)
+    val txtElevationProfileLineClear = stringResource(R.string.appstrings_elevation_profile_line_clear)
+    val txtElevationProfileLineBlocked = stringResource(R.string.appstrings_elevation_profile_line_blocked)
+    val txtElevationProfileFresnelClear = stringResource(R.string.appstrings_elevation_profile_fresnel_clear)
+    val txtElevationProfileFresnelBlocked = stringResource(R.string.appstrings_elevation_profile_fresnel_blocked)
+    val txtElevationProfileFresnelExplanation = stringResource(R.string.appstrings_elevation_profile_fresnel_explanation)
+    val txtElevationProfileIgnSource = stringResource(R.string.appstrings_elevation_profile_ign_source)
 
     Button(
         onClick = { safeClick { showShareSheet = true } },
@@ -2138,13 +2141,17 @@ fun AntennaShareMenu(
 
     if (showSelectionSheet) {
         ModalBottomSheet(onDismissRequest = { showSelectionSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .verticalScroll(rememberScrollState())
-                    .padding(bottom = 32.dp, start = 24.dp, end = 24.dp)
-            ) {
+            Box(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(
+                            start = 24.dp,
+                            end = 24.dp,
+                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 112.dp
+                        )
+                ) {
                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { safeClick { showSelectionSheet = false; showShareSheet = true } }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }
                     Text(text = txtImageContent, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
@@ -2171,16 +2178,16 @@ fun AntennaShareMenu(
                             // Dans AntennaShareMenu -> showSelectionSheet -> shareOrder.forEach
                             val (label, checked, onChecked) = when (blockId) {
                                 // ✅ ON SUPPRIME prefs.edit() : les changements restent locaux au menu
-                                "map" -> Triple(AppStrings.shareMapOption, incMap, { it: Boolean -> incMap = it })
-                                "elevation_profile" -> Triple(AppStrings.shareElevationProfileOption, incElevationProfile, { it: Boolean -> incElevationProfile = it })
-                                "support" -> Triple(AppStrings.shareSupportOption, incSupport, { it: Boolean -> incSupport = it })
-                                "ids" -> Triple(AppStrings.shareIdsOption, incIds, { it: Boolean -> incIds = it })
-                                "dates" -> Triple(AppStrings.shareDatesOption, incDates, { it: Boolean -> incDates = it })
-                                "address" -> Triple(AppStrings.shareAddressOption, incAddress, { it: Boolean -> incAddress = it })
-                                "speedtest" -> Triple(AppStrings.shareSpeedtestOption, incSpeedtest, { it: Boolean -> incSpeedtest = it })
-                                "throughput" -> Triple(AppStrings.shareThroughputOption, incThroughput, { it: Boolean -> incThroughput = it })
-                                "status" -> Triple(AppStrings.shareStatusOption, AppConfig.shareSiteStatus.value, { it: Boolean -> AppConfig.shareSiteStatus.value = it })
-                                "freq" -> Triple(AppStrings.shareFreqOption, incFreqs, { it: Boolean -> incFreqs = it })
+                                "map" -> Triple(stringResource(R.string.appstrings_share_map_option), incMap, { it: Boolean -> incMap = it })
+                                "elevation_profile" -> Triple(stringResource(R.string.appstrings_share_elevation_profile_option), incElevationProfile, { it: Boolean -> incElevationProfile = it })
+                                "support" -> Triple(stringResource(R.string.appstrings_share_support_option), incSupport, { it: Boolean -> incSupport = it })
+                                "ids" -> Triple(stringResource(R.string.appstrings_share_ids_option), incIds, { it: Boolean -> incIds = it })
+                                "dates" -> Triple(stringResource(R.string.appstrings_share_dates_option), incDates, { it: Boolean -> incDates = it })
+                                "address" -> Triple(stringResource(R.string.appstrings_share_address_option), incAddress, { it: Boolean -> incAddress = it })
+                                "speedtest" -> Triple(stringResource(R.string.appstrings_share_speedtest_option), incSpeedtest, { it: Boolean -> incSpeedtest = it })
+                                "throughput" -> Triple(stringResource(R.string.appstrings_share_throughput_option), incThroughput, { it: Boolean -> incThroughput = it })
+                                "status" -> Triple(stringResource(R.string.appstrings_share_status_option), AppConfig.shareSiteStatus.value, { it: Boolean -> AppConfig.shareSiteStatus.value = it })
+                                "freq" -> Triple(stringResource(R.string.appstrings_share_freq_option), incFreqs, { it: Boolean -> incFreqs = it })
                                 else -> Triple("", false, { _: Boolean -> })
                             }
 
@@ -2223,7 +2230,7 @@ fun AntennaShareMenu(
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(8.dp))
-                        Text(fr.geotower.utils.AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
@@ -2232,8 +2239,8 @@ fun AntennaShareMenu(
                     if (incFreqs) {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
                             Column(modifier = Modifier.weight(1f)) {
-                                Text(AppStrings.splitShareImage, fontWeight = FontWeight.Bold, color = if(incSplitImage) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
-                                Text(AppStrings.splitShareImageDesc, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(stringResource(R.string.appstrings_split_share_image), fontWeight = FontWeight.Bold, color = if(incSplitImage) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                                Text(stringResource(R.string.appstrings_split_share_image_desc), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
                             GeoTowerSwitch(
                                 checked = incSplitImage,
@@ -2267,9 +2274,10 @@ fun AntennaShareMenu(
                             useOneUi = useOneUi
                         )
                     }
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Button(
+            Button(
                         onClick = {
                             if (isGeneratingShare) return@Button
                             isGeneratingShare = true
@@ -2380,11 +2388,23 @@ fun AntennaShareMenu(
                                 }, 300)
                             }
                         },
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        shape = buttonShape,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(
+                                start = 24.dp,
+                                end = 24.dp,
+                                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
+                            )
+                            .fillMaxWidth()
+                            .widthIn(max = 420.dp)
+                            .height(56.dp),
+                        shape = CircleShape,
                         enabled = !isGeneratingShare
-                    ) { Text(txtGenerateImage, fontWeight = FontWeight.Bold) }
-                }
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(txtGenerateImage, fontWeight = FontWeight.Bold)
+                    }
             }
         }
     }
@@ -2441,33 +2461,33 @@ fun SupportShareMenu(
         }
     }
 
-    val txtSupportDetailTitle = AppStrings.supportDetailTitle
-    val txtAddressLabel = AppStrings.addressLabel
-    val txtNotSpecified = AppStrings.notSpecified
-    val txtGpsLabel = AppStrings.gpsLabel
-    val txtSupportHeight = AppStrings.supportHeight
-    val txtDistanceLabel = AppStrings.distanceLabel
-    val txtFromMyPosition = AppStrings.fromMyPosition
-    val txtBearingLabel = AppStrings.bearingLabel
-    val txtOperatorsTitle = AppStrings.operatorsTitle
-    val txtGeneratedBy = AppStrings.generatedBy
-    val txtShareSiteVia = AppStrings.shareSiteVia
-    val txtThemeLight = AppStrings.themeLight
-    val txtLightModeDesc = AppStrings.lightModeDesc
-    val txtThemeDark = AppStrings.themeDark
-    val txtDarkModeDesc = AppStrings.darkModeDesc
-    val txtIdNumber = AppStrings.idNumber
-    val txtSupportNature = AppStrings.supportNature
-    val txtOwner = AppStrings.owner // ✅ AJOUT DE LA TRADUCTION
-    val txtShareSite = AppStrings.shareSite
-    val txtShareAs = AppStrings.shareAs
-    val txtImageContent = AppStrings.imageContent
-    val txtShareConfidentialOption = AppStrings.shareConfidentialOption
-    val txtShareConfidentialDesc = AppStrings.shareConfidentialDesc
-    val txtGenerateImage = AppStrings.generateImage
-    val txtShareImagePreparingInProgress = AppStrings.shareImagePreparingInProgress
-    val txtMove = AppStrings.move
-    val txtInitError = AppStrings.initError
+    val txtSupportDetailTitle = stringResource(R.string.appstrings_support_detail_title)
+    val txtAddressLabel = stringResource(R.string.appstrings_address_label)
+    val txtNotSpecified = stringResource(R.string.appstrings_not_specified)
+    val txtGpsLabel = stringResource(R.string.appstrings_gps_label)
+    val txtSupportHeight = stringResource(R.string.appstrings_support_height)
+    val txtDistanceLabel = stringResource(R.string.appstrings_distance_label)
+    val txtFromMyPosition = stringResource(R.string.appstrings_from_my_position)
+    val txtBearingLabel = stringResource(R.string.appstrings_bearing_label)
+    val txtOperatorsTitle = stringResource(R.string.appstrings_operators_title)
+    val txtGeneratedBy = stringResource(R.string.appstrings_generated_by)
+    val txtShareSiteVia = stringResource(R.string.appstrings_share_site_via)
+    val txtThemeLight = stringResource(R.string.appstrings_theme_light)
+    val txtLightModeDesc = stringResource(R.string.appstrings_light_mode_desc)
+    val txtThemeDark = stringResource(R.string.appstrings_theme_dark)
+    val txtDarkModeDesc = stringResource(R.string.appstrings_dark_mode_desc)
+    val txtIdNumber = stringResource(R.string.appstrings_id_number)
+    val txtSupportNature = stringResource(R.string.appstrings_support_nature)
+    val txtOwner = stringResource(R.string.appstrings_owner) // ✅ AJOUT DE LA TRADUCTION
+    val txtShareSite = stringResource(R.string.appstrings_share_site)
+    val txtShareAs = stringResource(R.string.appstrings_share_as)
+    val txtImageContent = stringResource(R.string.appstrings_image_content)
+    val txtShareConfidentialOption = stringResource(R.string.appstrings_share_confidential_option)
+    val txtShareConfidentialDesc = stringResource(R.string.appstrings_share_confidential_desc)
+    val txtGenerateImage = stringResource(R.string.appstrings_generate_image)
+    val txtShareImagePreparingInProgress = stringResource(R.string.appstrings_share_image_preparing_in_progress)
+    val txtMove = stringResource(R.string.appstrings_move)
+    val txtInitError = stringResource(R.string.appstrings_init_error)
 
     Button(
         onClick = { safeClick { showShareSheet = true } },
@@ -2500,13 +2520,17 @@ fun SupportShareMenu(
     if (showSelectionSheet && antennas.isNotEmpty()) {
         val mainInfo = antennas.first()
         ModalBottomSheet(onDismissRequest = { showSelectionSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .navigationBarsPadding()
-                    .verticalScroll(rememberScrollState())
-                    .padding(bottom = 32.dp, start = 24.dp, end = 24.dp)
-            ) {
+            Box(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(
+                            start = 24.dp,
+                            end = 24.dp,
+                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 112.dp
+                        )
+                ) {
                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { safeClick { showSelectionSheet = false; showShareSheet = true } }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }
                     Text(text = txtImageContent, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
@@ -2532,9 +2556,9 @@ fun SupportShareMenu(
 
                             // Dans SupportShareMenu -> showSelectionSheet -> shareOrder.forEach
                             val (label, checked, onChecked) = when (blockId) {
-                                "map" -> Triple(AppStrings.shareMapOption, incMap, { it: Boolean -> incMap = it })
-                                "support" -> Triple(AppStrings.shareSupportOption, incSupport, { it: Boolean -> incSupport = it })
-                                "operators" -> Triple(AppStrings.operatorsTitle, incOperators, { it: Boolean -> incOperators = it })
+                                "map" -> Triple(stringResource(R.string.appstrings_share_map_option), incMap, { it: Boolean -> incMap = it })
+                                "support" -> Triple(stringResource(R.string.appstrings_share_support_option), incSupport, { it: Boolean -> incSupport = it })
+                                "operators" -> Triple(stringResource(R.string.appstrings_operators_title), incOperators, { it: Boolean -> incOperators = it })
                                 else -> Triple("", false, { _: Boolean -> })
                             }
 
@@ -2576,7 +2600,7 @@ fun SupportShareMenu(
                     ) {
                         Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Spacer(Modifier.width(8.dp))
-                        Text(fr.geotower.utils.AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                     }
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
@@ -2604,9 +2628,10 @@ fun SupportShareMenu(
                             useOneUi = useOneUi
                         )
                     }
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Button(
+            Button(
                         onClick = {
                             if (isGeneratingShare) return@Button
                             isGeneratingShare = true
@@ -2632,13 +2657,23 @@ fun SupportShareMenu(
                                 }
                             }, 300)
                         },
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        shape = buttonShape,
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(
+                                start = 24.dp,
+                                end = 24.dp,
+                                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
+                            )
+                            .fillMaxWidth()
+                            .widthIn(max = 420.dp)
+                            .height(56.dp),
+                        shape = CircleShape,
                         enabled = !isGeneratingShare
                     ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(txtGenerateImage, fontWeight = FontWeight.Bold)
                     }
-                }
             }
         }
     }

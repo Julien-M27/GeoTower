@@ -75,6 +75,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -89,20 +90,27 @@ import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
-import fr.geotower.utils.AppStrings
+import fr.geotower.utils.LocationHelper
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import fr.geotower.data.models.LocalisationEntity
 import androidx.compose.runtime.saveable.rememberSaveable
 import java.text.Normalizer
 import java.util.Locale
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
 
 private const val TAG_NEAR_EMITTERS = "GeoTower"
 private const val NEARBY_RELOAD_DISTANCE_METERS = 100f
+private const val NEARBY_REMOTE_SEARCH_DEBOUNCE_MS = 450L
+private const val NEARBY_ADDRESS_SEARCH_LIMIT = 1000
+private const val NEARBY_GLOBAL_MAPPING_LIMIT = 800
 
 data class UiSite(
     val id: Long,
@@ -190,12 +198,14 @@ fun NearEmittersScreen(
     var isLoading by remember { mutableStateOf(true) }
     var sites by remember { mutableStateOf<List<UiSite>>(emptyList()) }
     var filteredSites by remember { mutableStateOf<List<UiSite>>(emptyList()) }
+    var remoteSearchQuery by remember { mutableStateOf("") }
+    var remoteSearchSites by remember { mutableStateOf<List<UiSite>>(emptyList()) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var maxItemsToShow by rememberSaveable { mutableIntStateOf(100) }
     var searchRadiusMultiplier by remember { mutableIntStateOf(1) }
     var isSearchingRemote by remember { mutableStateOf(false) }
-    val unknownAddressText = AppStrings.unknownAddress
-    val siteAnfrLabel = AppStrings.siteAnfrLabel
+    val unknownAddressText = stringResource(R.string.appstrings_unknown_address)
+    val siteAnfrLabel = stringResource(R.string.appstrings_site_anfr_label)
 
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
@@ -213,6 +223,24 @@ fun NearEmittersScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        if (!hasNearbyLocationPermission(context)) return@LaunchedEffect
+
+        val locationHelper = LocationHelper(context)
+        val cachedLocation = locationHelper.getLastLocation()
+            ?: withContext(Dispatchers.IO) { getLastKnownLocation(context) }
+        if (cachedLocation != null) {
+            userLocation = cachedLocation
+        }
+
+        val freshLocation = withTimeoutOrNull(2_500L) {
+            locationHelper.getCurrentLocation()
+        }
+        if (freshLocation != null) {
+            userLocation = freshLocation
+        }
+    }
+
     // --- GESTION DU GPS ---
     DisposableEffect(Unit) {
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
@@ -226,10 +254,13 @@ fun NearEmittersScreen(
             override fun onStatusChanged(provider: String?, status: Int, extras: android.os.Bundle?) {}
         }
 
-        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
-            userLocation = getLastKnownLocation(context)
+        val hasFineLocation = ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasCoarseLocation = ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (hasFineLocation || hasCoarseLocation) {
             try {
-                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 5f, locationListener)
+                if (hasFineLocation) {
+                    locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 5f, locationListener)
+                }
                 locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000L, 5f, locationListener)
             } catch (e: Exception) { AppLogger.w(TAG_NEAR_EMITTERS, "Location updates could not start", e) }
         }
@@ -290,32 +321,68 @@ fun NearEmittersScreen(
     }
 
     // ✅ 3. RECHERCHE LOCALE ET GLOBALE (Base de données, Coordonnées, Ville, Adresse, Code Postal)
-    LaunchedEffect(sites, searchQuery, maxItemsToShow, searchRadiusMultiplier) {
+    // Recherche locale instantanee; les resultats globaux arrivent ensuite depuis un cache separe.
+    LaunchedEffect(sites, searchQuery, maxItemsToShow, remoteSearchQuery, remoteSearchSites) {
         val query = searchQuery.trim()
         if (query.isEmpty()) {
             filteredSites = sites.take(maxItemsToShow)
+            return@LaunchedEffect
+        }
+
+        val searchSpec = parseNearbySearchQuery(query)
+        val localMatches = withContext(Dispatchers.Default) {
+            sites.filter { siteMatchesSearch(it, searchSpec) }
+        }
+        val matchingRemoteSites = if (remoteSearchQuery == query) remoteSearchSites else emptyList()
+        filteredSites = (localMatches + matchingRemoteSites)
+            .distinctBy { it.id }
+            .sortedBy { it.distance }
+            .take(maxItemsToShow)
+    }
+
+    // Recherche globale differee (base de donnees, coordonnees, ville, adresse, code postal).
+    LaunchedEffect(searchCenter, searchQuery, searchRadiusMultiplier) {
+        val query = searchQuery.trim()
+        if (query.isEmpty()) {
+            remoteSearchQuery = ""
+            remoteSearchSites = emptyList()
             isSearchingRemote = false
             return@LaunchedEffect
         }
 
+        remoteSearchQuery = ""
+        remoteSearchSites = emptyList()
+
         // A. RECHERCHE LOCALE (Rapide, filtre immédiat de ce qui est autour de l'utilisateur)
         val searchSpec = parseNearbySearchQuery(query)
         val searchValue = searchSpec.value.trim()
-        val localMatches = sites.filter { siteMatchesSearch(it, searchSpec) }
 
         // On affiche immédiatement ce qu'on a trouvé localement pour éviter un écran vide
-        filteredSites = localMatches.take(maxItemsToShow)
 
         // B. RECHERCHE DISTANTE INTELLIGENTE
         // On vérifie si c'est juste le nom d'un opérateur (auquel cas on ne déclenche pas le GPS)
-        val shouldSearchRemote = searchSpec.latitude != null ||
-                searchSpec.field != NearbySearchField.All ||
-                searchValue.length >= 3
+        val fieldSearchesCurrentArea = searchSpec.field in setOf(
+            NearbySearchField.Operator,
+            NearbySearchField.Technology,
+            NearbySearchField.SupportType
+        )
+        val shouldSearchRemote = !fieldSearchesCurrentArea && (
+            searchSpec.latitude != null ||
+                searchSpec.field in setOf(
+                    NearbySearchField.AnfrId,
+                    NearbySearchField.SupportId,
+                    NearbySearchField.Address,
+                    NearbySearchField.City,
+                    NearbySearchField.PostalCode,
+                    NearbySearchField.Gps
+                ) ||
+                (searchSpec.field == NearbySearchField.All && searchValue.length >= 3)
+            )
 
         // On ne lance le scan distant que si ce n'est pas un opérateur ET qu'il y a au moins 3 caractères
         if (shouldSearchRemote) {
 
-            delay(800) // Petit délai pour ne pas spammer la recherche pendant la frappe
+            delay(NEARBY_REMOTE_SEARCH_DEBOUNCE_MS) // Petit delai pour ne pas spammer la recherche pendant la frappe
             isSearchingRemote = true
 
             val referenceLocation = searchCenter ?: userLocation
@@ -324,19 +391,15 @@ fun NearEmittersScreen(
                     val globalAntennas = mutableListOf<LocalisationEntity>()
                     var targetLat: Double? = null
                     var targetLon: Double? = null
+                    var resultSortLat: Double? = referenceLocation?.latitude
+                    var resultSortLon: Double? = referenceLocation?.longitude
 
                     val isNumeric = searchValue.all { it.isDigit() }
                     val isPostalCode = searchSpec.field == NearbySearchField.PostalCode || (isNumeric && searchValue.length == 5)
                     val isGps = searchSpec.latitude != null && searchSpec.longitude != null
                     val filtersOnWholeAddress = shouldFilterOnWholeAddress(searchSpec, searchValue, isPostalCode)
-                    val textSearchLimit = if (filtersOnWholeAddress) 2000 else 200
                     val cityAreaIds = mutableSetOf<String>()
                     var hasCityAreaSearch = false
-                    val fieldSearchesCurrentArea = searchSpec.field in setOf(
-                        NearbySearchField.Operator,
-                        NearbySearchField.Technology,
-                        NearbySearchField.SupportType
-                    )
 
                     // --- 1. RECHERCHE PAR ID (Base de données) ---
                     // ⚠️ CORRECTION ICI : On ne cherche un ID que si ce n'est PAS un code postal,
@@ -350,13 +413,14 @@ fun NearEmittersScreen(
                         globalAntennas.addAll(idResults)
                     }
 
-                    if (searchValue.length >= 2 && !fieldSearchesCurrentArea && !isGps) {
+                    if (searchSpec.field == NearbySearchField.Address && searchValue.length >= 2 && !isGps) {
                         nearbyDatabaseSearchVariants(searchValue).forEach { variant ->
-                            if (filtersOnWholeAddress) {
-                                globalAntennas.addAll(repository.searchAntennasByAddress(variant, limit = 5000))
-                            } else {
-                                globalAntennas.addAll(repository.searchAntennasByText(variant, limit = textSearchLimit))
-                            }
+                            globalAntennas.addAll(
+                                repository.searchAntennasByAddress(
+                                    query = variant,
+                                    limit = NEARBY_ADDRESS_SEARCH_LIMIT
+                                )
+                            )
                         }
                     }
 
@@ -373,6 +437,8 @@ fun NearEmittersScreen(
 
                         if (nominatimArea != null) {
                             hasCityAreaSearch = true
+                            resultSortLat = (nominatimArea.latNorth + nominatimArea.latSouth) / 2.0
+                            resultSortLon = (nominatimArea.lonEast + nominatimArea.lonWest) / 2.0
                             val boxResults = repository.getAntennasInBox(
                                 latNorth = nominatimArea.latNorth,
                                 lonEast = nominatimArea.lonEast,
@@ -397,6 +463,8 @@ fun NearEmittersScreen(
                             if (!addresses.isNullOrEmpty()) {
                                 targetLat = addresses[0].latitude
                                 targetLon = addresses[0].longitude
+                                resultSortLat = targetLat
+                                resultSortLon = targetLon
                             }
                         }
                     }
@@ -415,6 +483,8 @@ fun NearEmittersScreen(
                     }
 
                     if (targetLat != null && targetLon != null) {
+                        resultSortLat = targetLat
+                        resultSortLon = targetLon
                         val offset = 0.05 * searchRadiusMultiplier
                         val boxResults = repository.getAntennasInBox(
                             latNorth = targetLat + offset,
@@ -426,7 +496,19 @@ fun NearEmittersScreen(
                     }
 
                     // On supprime les doublons éventuels
-                    val uniqueGlobalAntennas = globalAntennas.distinctBy { it.idAnfr }
+                    val uniqueGlobalAntennas = globalAntennas
+                        .distinctBy { it.idAnfr }
+                        .let { antennas ->
+                            val sortLat = resultSortLat
+                            val sortLon = resultSortLon
+                            if (antennas.size > NEARBY_GLOBAL_MAPPING_LIMIT && sortLat != null && sortLon != null) {
+                                antennas
+                                    .sortedBy { calculateDistance(sortLat, sortLon, it.latitude, it.longitude) }
+                                    .take(NEARBY_GLOBAL_MAPPING_LIMIT)
+                            } else {
+                                antennas.take(NEARBY_GLOBAL_MAPPING_LIMIT)
+                            }
+                        }
 
                     // --- FORMATAGE DES RÉSULTATS POUR L'UI ---
                     if (uniqueGlobalAntennas.isNotEmpty()) {
@@ -462,23 +544,26 @@ fun NearEmittersScreen(
 
                         // ✅ On combine les antennes locales filtrées AVEC les antennes lointaines trouvées,
                         // on retire les doublons et on trie tout ça par distance !
-                        val combined = (localMatches + filteredGlobal).distinctBy { it.id }.sortedBy { it.distance }
-
                         withContext(Dispatchers.Main) {
-                            filteredSites = combined.take(maxItemsToShow)
+                            remoteSearchSites = filteredGlobal
+                            remoteSearchQuery = query
                             isSearchingRemote = false
                         }
                     } else {
                         // Rien trouvé à distance, on se contente des résultats locaux
                         withContext(Dispatchers.Main) {
-                            filteredSites = localMatches.take(maxItemsToShow)
+                            remoteSearchSites = emptyList()
+                            remoteSearchQuery = query
                             isSearchingRemote = false
                         }
                     }
+                } catch (e: CancellationException) {
+                    throw e
                 } catch (e: Exception) {
                     AppLogger.w(TAG_NEAR_EMITTERS, "Remote nearby search failed", e)
                     withContext(Dispatchers.Main) {
-                        filteredSites = localMatches.take(maxItemsToShow)
+                        remoteSearchSites = emptyList()
+                        remoteSearchQuery = query
                         isSearchingRemote = false
                     }
                 }
@@ -507,7 +592,7 @@ fun NearEmittersScreen(
         containerColor = mainBgColor,
         topBar = {
             GeoTowerBackTopBar(
-                title = AppStrings.nearEmittersTitle,
+                title = stringResource(R.string.appstrings_near_emitters_title),
                 onBack = { safeBackNavigation.navigateBack() },
                 backgroundColor = mainBgColor,
                 backEnabled = !safeBackNavigation.isLocked,
@@ -515,7 +600,7 @@ fun NearEmittersScreen(
                     IconButton(onClick = { safeClick { navController.navigate("settings?section=nearby") } }) {
                         Icon(
                             Icons.Default.Settings,
-                            contentDescription = AppStrings.settingsTitle,
+                            contentDescription = stringResource(R.string.appstrings_settings_title),
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -537,7 +622,7 @@ fun NearEmittersScreen(
                                         maxItemsToShow = 100
                                     },
                                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                                    placeholder = { Text(AppStrings.searchCityOrId) },
+                                    placeholder = { Text(stringResource(R.string.appstrings_search_city_or_id)) },
                                     leadingIcon = { Icon(Icons.Default.Search, null) },
                                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                                         imeAction = androidx.compose.ui.text.input.ImeAction.Search
@@ -549,7 +634,7 @@ fun NearEmittersScreen(
                                         if (isSearchingRemote) {
                                             LoadingIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.primary)
                                         } else if (searchQuery.isNotEmpty()) {
-                                            IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, AppStrings.clear) }
+                                            IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, stringResource(R.string.appstrings_clear)) }
                                         }
                                     },
                                     singleLine = true,
@@ -574,7 +659,7 @@ fun NearEmittersScreen(
 
                                 if (!isLoading && filteredSites.isNotEmpty()) {
                                     Text(
-                                        text = AppStrings.sitesFound(filteredSites.size),
+                                        text = pluralStringResource(R.plurals.sites_found, filteredSites.size, filteredSites.size),
                                         style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.secondary,
                                         modifier = Modifier.padding(start = 32.dp, top = 8.dp)
@@ -591,14 +676,14 @@ fun NearEmittersScreen(
                                         Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                                             LoadingIndicator()
                                             Spacer(modifier = Modifier.height(8.dp))
-                                            Text(AppStrings.searchGps, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                                            Text(stringResource(R.string.appstrings_search_gps), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                                         }
                                     }
                                     isLoading -> {
                                         LoadingIndicator(modifier = Modifier.align(Alignment.Center))
                                     }
                                     filteredSites.isEmpty() -> {
-                                        Text(AppStrings.noSitesFound, modifier = Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.secondary)
+                                        Text(stringResource(R.string.appstrings_no_sites_found), modifier = Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.secondary)
                                     }
                                     else -> {
                                         LazyColumn(
@@ -644,7 +729,7 @@ fun NearEmittersScreen(
                                                         shape = RoundedCornerShape(16.dp),
                                                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                                                     ) {
-                                                        Text(AppStrings.loadMoreSites, fontWeight = FontWeight.Bold)
+                                                        Text(stringResource(R.string.appstrings_load_more_sites), fontWeight = FontWeight.Bold)
                                                     }
                                                 } else if (searchCenter != null && searchQuery.isEmpty()) {
                                                     OutlinedButton(
@@ -660,7 +745,7 @@ fun NearEmittersScreen(
                                                     ) {
                                                         Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
                                                         Spacer(modifier = Modifier.width(8.dp))
-                                                        Text(AppStrings.showMoreSites, fontWeight = FontWeight.Bold)
+                                                        Text(stringResource(R.string.appstrings_show_more_sites), fontWeight = FontWeight.Bold)
                                                     }
                                                 }
                                             }
@@ -700,7 +785,7 @@ fun NearEmittersScreen(
                                                     }) {
                                                         Icon(
                                                             imageVector = Icons.Default.KeyboardArrowUp,
-                                                            contentDescription = AppStrings.top,
+                                                            contentDescription = stringResource(R.string.appstrings_top),
                                                             tint = iconColor
                                                         )
                                                     }
@@ -713,7 +798,7 @@ fun NearEmittersScreen(
                                                     }) {
                                                         Icon(
                                                             imageVector = Icons.Default.KeyboardArrowDown,
-                                                            contentDescription = AppStrings.bottom,
+                                                            contentDescription = stringResource(R.string.appstrings_bottom),
                                                             tint = iconColor
                                                         )
                                                     }
@@ -798,18 +883,18 @@ private fun NearbyQuickSearchSuggestions(
 ) {
     var showSearchHelp by remember { mutableStateOf(false) }
     val suggestions = listOf(
-        NearbySearchSuggestion(AppStrings.nearbySearchSuggestionCity, "ville:"),
+        NearbySearchSuggestion(stringResource(R.string.appstrings_nearby_search_suggestion_city), "ville:"),
         NearbySearchSuggestion("Orange", "op:Orange"),
         NearbySearchSuggestion("SFR", "op:SFR"),
         NearbySearchSuggestion("Bouygues", "op:Bouygues"),
         NearbySearchSuggestion("Free", "op:Free"),
         NearbySearchSuggestion("5G", "tech:5G"),
         NearbySearchSuggestion("4G", "tech:4G"),
-        NearbySearchSuggestion(AppStrings.nearbySearchSuggestionPylon, "type:pylone"),
-        NearbySearchSuggestion(AppStrings.nearbySearchSuggestionRoof, "type:toit"),
+        NearbySearchSuggestion(stringResource(R.string.appstrings_nearby_search_suggestion_pylon), "type:pylone"),
+        NearbySearchSuggestion(stringResource(R.string.appstrings_nearby_search_suggestion_roof), "type:toit"),
         NearbySearchSuggestion("ID ANFR", "anfr:"),
         NearbySearchSuggestion("Support", "support:"),
-        NearbySearchSuggestion(AppStrings.nearbySearchSuggestionPostalCode, "cp:"),
+        NearbySearchSuggestion(stringResource(R.string.appstrings_nearby_search_suggestion_postal_code), "cp:"),
         NearbySearchSuggestion("GPS", "gps:")
     )
 
@@ -835,7 +920,7 @@ private fun NearbyQuickSearchSuggestions(
         ) {
             Icon(
                 imageVector = Icons.Default.Info,
-                contentDescription = AppStrings.nearbySearchHelpContentDescription,
+                contentDescription = stringResource(R.string.appstrings_nearby_search_help_content_description),
                 modifier = Modifier.size(16.dp)
             )
         }
@@ -872,26 +957,26 @@ private fun NearbySearchHelpDialog(onDismiss: () -> Unit) {
         },
         title = {
             Text(
-                text = AppStrings.nearbySearchHelpTitle,
+                text = stringResource(R.string.appstrings_nearby_search_help_title),
                 fontWeight = FontWeight.Bold
             )
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                NearbySearchHelpLine("ville:Lyon", AppStrings.nearbySearchHelpCityDesc)
-                NearbySearchHelpLine("adresse:rue de Paris", AppStrings.nearbySearchHelpAddressDesc)
-                NearbySearchHelpLine("cp:75001", AppStrings.nearbySearchHelpPostalDesc)
-                NearbySearchHelpLine("gps:48.8566,2.3522", AppStrings.nearbySearchHelpGpsDesc)
-                NearbySearchHelpLine("anfr:123456", AppStrings.nearbySearchHelpAnfrDesc)
-                NearbySearchHelpLine("support:123456", AppStrings.nearbySearchHelpSupportDesc)
-                NearbySearchHelpLine("op:Orange", AppStrings.nearbySearchHelpOperatorDesc)
-                NearbySearchHelpLine("tech:5G", AppStrings.nearbySearchHelpTechDesc)
-                NearbySearchHelpLine("type:pylone", AppStrings.nearbySearchHelpTypeDesc)
+                NearbySearchHelpLine("ville:Lyon", stringResource(R.string.appstrings_nearby_search_help_city_desc))
+                NearbySearchHelpLine("adresse:rue de Paris", stringResource(R.string.appstrings_nearby_search_help_address_desc))
+                NearbySearchHelpLine("cp:75001", stringResource(R.string.appstrings_nearby_search_help_postal_desc))
+                NearbySearchHelpLine("gps:48.8566,2.3522", stringResource(R.string.appstrings_nearby_search_help_gps_desc))
+                NearbySearchHelpLine("anfr:123456", stringResource(R.string.appstrings_nearby_search_help_anfr_desc))
+                NearbySearchHelpLine("support:123456", stringResource(R.string.appstrings_nearby_search_help_support_desc))
+                NearbySearchHelpLine("op:Orange", stringResource(R.string.appstrings_nearby_search_help_operator_desc))
+                NearbySearchHelpLine("tech:5G", stringResource(R.string.appstrings_nearby_search_help_tech_desc))
+                NearbySearchHelpLine("type:pylone", stringResource(R.string.appstrings_nearby_search_help_type_desc))
             }
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(AppStrings.nearbySearchHelpOk)
+                Text(stringResource(R.string.appstrings_nearby_search_help_ok))
             }
         }
     )
@@ -927,17 +1012,7 @@ fun EmitterCard(
     onClick: () -> Unit
 ) {
     val isMi = AppConfig.distanceUnit.intValue == 1
-
-    val distanceStr = if (isMi) {
-        val distMiles = site.distance / 1609.34f
-        if (distMiles < 0.1f) {
-            "${(site.distance * 3.28084f).toInt()} ft"
-        } else {
-            String.format(java.util.Locale.US, "%.2f mi", distMiles)
-        }
-    } else {
-        if (site.distance >= 1000) String.format(java.util.Locale.US, "%.2f km", site.distance / 1000f) else "${site.distance} m"
-    }
+    val distanceLabel = formatNearbyDistanceLabel(site.distance, isMi)
 
     Card(
         onClick = onClick,
@@ -966,11 +1041,25 @@ fun EmitterCard(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 Text(
-                    text = distanceStr,
+                    text = distanceLabel.primaryText,
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.ExtraBold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MaterialTheme.colorScheme.primary,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    modifier = Modifier.fillMaxWidth()
                 )
+                distanceLabel.secondaryText?.let { secondaryText ->
+                    Text(
+                        text = secondaryText,
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = MaterialTheme.colorScheme.primary,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.width(12.dp))
@@ -986,6 +1075,35 @@ fun EmitterCard(
 
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
+    }
+}
+
+private data class NearbyDistanceLabel(
+    val primaryText: String,
+    val secondaryText: String? = null
+)
+
+private fun formatNearbyDistanceLabel(distanceMeters: Int, useMiles: Boolean): NearbyDistanceLabel {
+    return if (useMiles) {
+        val distanceMiles = distanceMeters / 1609.34f
+        if (distanceMiles < 0.1f) {
+            NearbyDistanceLabel(
+                primaryText = "${(distanceMeters * 3.28084f).toInt()} ft"
+            )
+        } else {
+            NearbyDistanceLabel(
+                primaryText = String.format(Locale.US, "%.2f mi", distanceMiles)
+            )
+        }
+    } else if (distanceMeters >= 1000) {
+        NearbyDistanceLabel(
+            primaryText = String.format(Locale.FRANCE, "%.2f", distanceMeters / 1000f),
+            secondaryText = "km"
+        )
+    } else {
+        NearbyDistanceLabel(
+            primaryText = "$distanceMeters m"
+        )
     }
 }
 
@@ -1403,5 +1521,17 @@ private fun extractNearbyTechnologies(values: List<String>): List<String> {
 @SuppressLint("MissingPermission")
 private fun getLastKnownLocation(context: Context): Location? {
     val locManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-    return locManager.getProviders(true).mapNotNull { locManager.getLastKnownLocation(it) }.maxByOrNull { it.time }
+    return try {
+        locManager.getProviders(true)
+            .mapNotNull { provider -> runCatching { locManager.getLastKnownLocation(provider) }.getOrNull() }
+            .maxByOrNull { it.time }
+    } catch (e: Exception) {
+        AppLogger.w(TAG_NEAR_EMITTERS, "Last known location unavailable", e)
+        null
+    }
+}
+
+private fun hasNearbyLocationPermission(context: Context): Boolean {
+    return ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+        ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
 }

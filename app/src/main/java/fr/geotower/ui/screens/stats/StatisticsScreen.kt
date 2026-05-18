@@ -22,9 +22,10 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColors
 import kotlinx.coroutines.launch
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -91,7 +92,7 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
         containerColor = mainBgColor,
         topBar = {
             GeoTowerBackTopBar(
-                title = AppStrings.statsTitle,
+                title = stringResource(R.string.appstrings_stats_title),
                 onBack = { safeBackNavigation.navigateBack() },
                 backgroundColor = mainBgColor,
                 backEnabled = !safeBackNavigation.isLocked
@@ -104,17 +105,17 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
             Spacer(modifier = Modifier.height(16.dp))
 
             // Graphique 1 : TOTAL
-            StatCard(AppStrings.statsSupportsTitle, AppStrings.statsSupportsDesc, supportCounts, isLoading, cardBgColor)
+            StatCard(stringResource(R.string.appstrings_stats_supports_title), stringResource(R.string.appstrings_stats_supports_desc), supportCounts, isLoading, cardBgColor)
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // Graphique 2 : 5G
-            StatCard(AppStrings.stats5GTitle, AppStrings.stats5GDesc, support5GCounts, isLoading, cardBgColor)
+            StatCard(stringResource(R.string.appstrings_stats5_g_title), stringResource(R.string.appstrings_stats5_g_desc), support5GCounts, isLoading, cardBgColor)
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // ✅ Graphique 3 : 4G
-            StatCard(AppStrings.stats4GTitle, AppStrings.stats4GDesc, support4GCounts, isLoading, cardBgColor)
+            StatCard(stringResource(R.string.appstrings_stats4_g_title), stringResource(R.string.appstrings_stats4_g_desc), support4GCounts, isLoading, cardBgColor)
 
             Spacer(modifier = Modifier.height(32.dp))
         }

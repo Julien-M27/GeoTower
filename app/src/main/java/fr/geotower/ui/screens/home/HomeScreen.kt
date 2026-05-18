@@ -49,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -57,7 +58,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppIconManager
-import fr.geotower.utils.AppStrings
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.ui.zIndex
 import fr.geotower.R
@@ -173,7 +173,7 @@ fun HomeScreen(navController: NavController) {
     LaunchedEffect(isSyncing) {
         if (!isSyncing && (AppConfig.localDatabaseState.value == null || wasSyncing)) {
             AppConfig.localDatabaseState.value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                GeoTowerDatabaseValidator.getInstalledDatabaseFileStatus(context).state
+                GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context).state
             }
         }
         wasSyncing = isSyncing
@@ -226,7 +226,7 @@ fun HomeScreen(navController: NavController) {
         }
     }
     // 2. On récupère le mot "Version" traduit
-    val versionText = AppStrings.version
+    val versionText = stringResource(R.string.common_version)
     // 3. On assemble les deux !
     val appVersion = "$versionText $rawVersion"
 
@@ -263,7 +263,7 @@ fun HomeScreen(navController: NavController) {
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = AppStrings.offlineMessage,
+                            text = stringResource(R.string.appstrings_offline_message),
                             color = MaterialTheme.colorScheme.onErrorContainer,
                             fontWeight = FontWeight.Bold
                         )
@@ -432,7 +432,7 @@ fun HomeScreen(navController: NavController) {
                                 .then(if (isHelpButtonAtBottom) Modifier else Modifier.navigationBarsPadding())
                                 .zIndex(2f)
                         ) {
-                            Icon(Icons.AutoMirrored.Filled.Help, contentDescription = AppStrings.homeHelpSettings)
+                            Icon(Icons.AutoMirrored.Filled.Help, contentDescription = stringResource(R.string.appstrings_home_help_settings))
                         }
                     }
                 }
@@ -472,6 +472,11 @@ fun MenuButtonsList(
         prefs.edit().putString("pages_order", savedOrderString).apply()
     }
     val pagesOrder = savedOrderString.split(",")
+    val nearAntennasLabel = stringResource(R.string.nav_near_antennas)
+    val mapLabel = stringResource(R.string.nav_map)
+    val compassLabel = stringResource(R.string.nav_compass)
+    val statsLabel = stringResource(R.string.nav_statistics)
+    val settingsLabel = stringResource(R.string.nav_settings)
 
     val buttons = mutableListOf<@Composable () -> Unit>()
 
@@ -490,19 +495,19 @@ fun MenuButtonsList(
             "nearby" -> {
                 if (showNearby) {
                     // ✅ On bloque avec isDbReady
-                    buttons.add { MenuButton(AppStrings.nearAntennas, Icons.Default.MyLocation, paleColor, onPaleColor, useOneUi, menuSize, isGrid, enabled = isDbReady) { navController.navigate("emitters") } }
+                    buttons.add { MenuButton(nearAntennasLabel, Icons.Default.MyLocation, paleColor, onPaleColor, useOneUi, menuSize, isGrid, enabled = isDbReady) { navController.navigate("emitters") } }
                 }
             }
             "map" -> {
                 if (showMap) {
                     // ✅ On bloque avec isDbReady
-                    buttons.add { MenuButton(AppStrings.mapTitle, Icons.Default.Map, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, enabled = isDbReady) { navController.navigate("map") } }
+                    buttons.add { MenuButton(mapLabel, Icons.Default.Map, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, enabled = isDbReady) { navController.navigate("map") } }
                 }
             }
             "compass" -> {
                 if (showCompass && AppConfig.hasCompass.value) {
                     // ✅ On bloque avec isDbReady
-                    buttons.add { MenuButton(AppStrings.pageCompass, Icons.Default.Explore, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, enabled = isDbReady) { navController.navigate("compass") } }
+                    buttons.add { MenuButton(compassLabel, Icons.Default.Explore, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, enabled = isDbReady) { navController.navigate("compass") } }
                 }
             }
             "stats" -> {
@@ -512,7 +517,7 @@ fun MenuButtonsList(
 
                     buttons.add {
                         MenuButton(
-                            text = AppStrings.statsTitle,
+                            text = statsLabel,
                             icon = Icons.Default.BarChart,
                             color = buttonBgColor.copy(alpha = alpha),
                             contentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
@@ -527,7 +532,7 @@ fun MenuButtonsList(
             }
             "settings" -> {
                 // ✅ PARAMÈTRES RESTE TOUJOURS CLIQUABLE (enabled = true)
-                buttons.add { MenuButton(AppStrings.settingsTitle, Icons.Default.Settings, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, enabled = true) { navController.navigate("settings") } }
+                buttons.add { MenuButton(settingsLabel, Icons.Default.Settings, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, enabled = true) { navController.navigate("settings") } }
             }
         }
     }
@@ -573,7 +578,7 @@ fun AboutSection(
                 // Utilise primary pour l'icône au lieu de paleColor
                 Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(text = AppStrings.about, color = MaterialTheme.colorScheme.onSurface, fontSize = 18.sp)
+                Text(text = stringResource(R.string.nav_about), color = MaterialTheme.colorScheme.onSurface, fontSize = 18.sp)
             }
             Text(text = version, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
         }
@@ -590,7 +595,7 @@ fun AboutSection(
                     .align(if (alignHelpStart) Alignment.TopStart else Alignment.TopEnd)
                     .padding(top = 12.dp)
             ) {
-                Icon(Icons.AutoMirrored.Filled.Help, contentDescription = AppStrings.homeHelpSettings)
+                Icon(Icons.AutoMirrored.Filled.Help, contentDescription = stringResource(R.string.appstrings_home_help_settings))
             }
         }
     }
@@ -705,9 +710,9 @@ fun DatabaseWarningBanner(
                 androidx.compose.foundation.layout.Column(modifier = androidx.compose.ui.Modifier.weight(1f)) {
                     androidx.compose.material3.Text(
                         text = when {
-                            isInvalid -> fr.geotower.utils.AppStrings.invalidDbBannerTitle
-                            isMissing -> fr.geotower.utils.AppStrings.missingDbBannerTitle
-                            else -> fr.geotower.utils.AppStrings.updateDbBannerTitle
+                            isInvalid -> stringResource(R.string.appstrings_invalid_db_banner_title)
+                            isMissing -> stringResource(R.string.appstrings_missing_db_banner_title)
+                            else -> stringResource(R.string.appstrings_update_db_banner_title)
                         },
                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                         color = contentColor,
@@ -716,9 +721,9 @@ fun DatabaseWarningBanner(
                     if (isMissing || isInvalid) {
                         androidx.compose.material3.Text(
                             text = if (isInvalid) {
-                                fr.geotower.utils.AppStrings.invalidDbBannerDesc
+                                stringResource(R.string.appstrings_invalid_db_banner_desc)
                             } else {
-                                fr.geotower.utils.AppStrings.missingDbBannerDesc
+                                stringResource(R.string.appstrings_missing_db_banner_desc)
                             },
                             color = contentColor,
                             style = androidx.compose.material3.MaterialTheme.typography.bodySmall
@@ -758,7 +763,7 @@ fun DatabaseWarningBanner(
                         modifier = androidx.compose.ui.Modifier.height(36.dp)
                     ) {
                         androidx.compose.material3.Text(
-                            text = fr.geotower.utils.AppStrings.btnDownloadBanner,
+                            text = stringResource(R.string.appstrings_btn_download_banner),
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                             fontSize = 12.sp
                         )

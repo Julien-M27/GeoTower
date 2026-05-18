@@ -22,10 +22,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.TechniqueEntity
-import fr.geotower.utils.AppStrings
+import fr.geotower.utils.AnfrDisplayText
 import fr.geotower.utils.AppConfig
 import fr.geotower.ui.screens.emitters.formatDateToFrench
 import kotlin.math.roundToInt
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
+import fr.geotower.utils.ThroughputDisplayText
 
 @Composable
 fun SiteFrequenciesBlock(
@@ -35,61 +38,48 @@ fun SiteFrequenciesBlock(
     cardBgColor: Color,
     blockShape: Shape
 ) {
-    val txtFrequenciesTitle = AppStrings.frequenciesTitle
-    val txtBandsNotSpecified = AppStrings.bandsNotSpecified
-    val txtInService = AppStrings.inService
-    val txtTechnically = AppStrings.technically
-    val txtUnknownStatus = AppStrings.unknownStatus
-    val txtProjectApproved = AppStrings.projectApproved
-    val txtMicrowaveLinks = AppStrings.throughputBackhaulLabel("radio")
+    val txtFrequenciesTitle = stringResource(R.string.appstrings_frequencies_title)
+    val txtBandsNotSpecified = stringResource(R.string.appstrings_bands_not_specified)
+    val txtInService = stringResource(R.string.appstrings_in_service)
+    val txtTechnically = stringResource(R.string.appstrings_technically)
+    val txtUnknownStatus = stringResource(R.string.appstrings_unknown_status)
+    val txtProjectApproved = stringResource(R.string.appstrings_project_approved)
+    val txtMicrowaveLinks = ThroughputDisplayText.backhaulLabel("radio")
 
     // ✅ NOUVELLES TRADUCTIONS RÉCUPÉRÉES
-    val txtUnknown = AppStrings.unknown
-    val txtActivatedOn = AppStrings.activatedOn
-    val txtDateNotSpecifiedAnfr = AppStrings.dateNotSpecifiedAnfr
-    val txtAzimuthNotSpecified = AppStrings.azimuthNotSpecified
+    val txtUnknown = stringResource(R.string.appstrings_unknown)
+    val txtActivatedOn = stringResource(R.string.appstrings_activated_on)
+    val txtDateNotSpecifiedAnfr = stringResource(R.string.appstrings_date_not_specified_anfr)
+    val txtAzimuthNotSpecified = stringResource(R.string.appstrings_azimuth_not_specified)
 
     val rawFreqs = technique?.detailsFrequences ?: info.frequences
 
     // ✅ ON INTÈGRE NOS NOUVEAUX FILTRES DYNAMIQUES
     val parsedBands = remember(
         rawFreqs,
+        info.azimutsFh,
+        info.techMask,
+        info.bandMask,
+        info.statut,
+        technique?.technologies,
+        technique?.statut,
+        technique?.dateService,
+        technique?.dateImplantation,
+        technique?.dateModif,
         AppConfig.siteShowTechno2G.value, AppConfig.siteF2G_900.value, AppConfig.siteF2G_1800.value,
         AppConfig.siteShowTechno3G.value, AppConfig.siteF3G_900.value, AppConfig.siteF3G_2100.value,
         AppConfig.siteShowTechno4G.value, AppConfig.siteF4G_700.value, AppConfig.siteF4G_800.value, AppConfig.siteF4G_900.value, AppConfig.siteF4G_1800.value, AppConfig.siteF4G_2100.value, AppConfig.siteF4G_2600.value,
         AppConfig.siteShowTechno5G.value, AppConfig.siteF5G_700.value, AppConfig.siteF5G_2100.value, AppConfig.siteF5G_3500.value, AppConfig.siteF5G_26000.value,
         AppConfig.siteShowTechnoFH.value
     ) {
-        parseAndSortFrequencies(rawFreqs, txtUnknown, txtAzimuthNotSpecified).filter { band ->
-            when (band.gen) {
-                5 -> AppConfig.siteShowTechno5G.value && when (band.value) {
-                    700 -> AppConfig.siteF5G_700.value
-                    2100 -> AppConfig.siteF5G_2100.value
-                    3500 -> AppConfig.siteF5G_3500.value
-                    26000 -> AppConfig.siteF5G_26000.value
-                    else -> true
-                }
-                4 -> AppConfig.siteShowTechno4G.value && when (band.value) {
-                    700 -> AppConfig.siteF4G_700.value
-                    800 -> AppConfig.siteF4G_800.value
-                    900 -> AppConfig.siteF4G_900.value
-                    1800 -> AppConfig.siteF4G_1800.value
-                    2100 -> AppConfig.siteF4G_2100.value
-                    2600 -> AppConfig.siteF4G_2600.value
-                    else -> true
-                }
-                3 -> AppConfig.siteShowTechno3G.value && when (band.value) {
-                    900 -> AppConfig.siteF3G_900.value
-                    2100 -> AppConfig.siteF3G_2100.value
-                    else -> true
-                }
-                2 -> AppConfig.siteShowTechno2G.value && when (band.value) {
-                    900 -> AppConfig.siteF2G_900.value
-                    1800 -> AppConfig.siteF2G_1800.value
-                    else -> true
-                }
-                else -> AppConfig.siteShowTechnoFH.value
-            }
+        addMicrowaveFallbackBands(
+            bands = parseAndSortFrequencies(rawFreqs, txtUnknown, txtAzimuthNotSpecified),
+            info = info,
+            technique = technique,
+            rawFreqs = rawFreqs,
+            txtUnknown = txtUnknown
+        ).filter { band ->
+            shouldDisplayFrequencyBand(band)
         }
     }
 
@@ -262,7 +252,7 @@ fun SiteFrequenciesBlock(
                                     // ✅ ÉTAPE 2 : On affiche le détail par bande uniquement si son switch est actif
                                     if (AppConfig.siteShowSpectrumBand.value) {
                                         Text(
-                                            text = "${AppStrings.spectrumByBand} :\n\n$detailedFreqs",
+                                            text = "${stringResource(R.string.appstrings_spectrum_by_band)} :\n\n$detailedFreqs",
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Medium,
@@ -279,10 +269,10 @@ fun SiteFrequenciesBlock(
                                             Spacer(modifier = Modifier.height(2.dp))
                                         }
 
-                                        Text(text = "${AppStrings.totalspectrum} : $totalStr $detectedUnit", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                        Text(text = "${stringResource(R.string.appstrings_totalspectrum)} : $totalStr $detectedUnit", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
-                                            text = AppStrings.totalSpectrumWarning,
+                                            text = stringResource(R.string.appstrings_total_spectrum_warning),
                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
                                             fontSize = 11.sp,
                                             lineHeight = 13.sp
@@ -324,7 +314,7 @@ fun SiteFrequenciesBlock(
                                                 ).trim() else ""
 
                                             val translatedType =
-                                                AppStrings.translateAntennaType(typePart)
+                                                AnfrDisplayText.antennaType(typePart)
                                             // ✅ SÉCURITÉ : Si la traduction renvoie du vide, on force l'affichage du mot original (ex: "Panneau")
                                             val safeType =
                                                 if (translatedType.isNotBlank()) translatedType else typePart
@@ -414,7 +404,7 @@ fun parseAndSortFrequencies(freqStr: String?, txtUnknown: String, txtAzimuthNotS
 
     // ✅ TRI SELON L'ORDRE PERSONNALISÉ
     // ✅ APPLICATION DE L'ORDRE PERSONNALISÉ
-    return tempMap.values.map { accumulator ->
+    return sortFrequencyBandsForDisplay(tempMap.values.map { accumulator ->
         accumulator.band.copy(
             physDetails = accumulator.physDetails.toList().sorted(),
             spectrumLines = accumulator.spectrumLines.toList().sortedWith(compareBy(
@@ -422,7 +412,11 @@ fun parseAndSortFrequencies(freqStr: String?, txtUnknown: String, txtAzimuthNotS
                 { it }
             ))
         )
-    }.sortedWith(compareBy(
+    })
+}
+
+private fun sortFrequencyBandsForDisplay(bands: List<FreqBand>): List<FreqBand> {
+    return bands.sortedWith(compareBy(
         // 1. On trie par Technologie (selon ton ordre personnalisé)
         { AppConfig.siteTechnoOrder.value.indexOf(if(it.gen == 5) "5G" else if(it.gen == 4) "4G" else if(it.gen == 3) "3G" else if(it.gen == 2) "2G" else "FH") },
         // 2. On trie par Fréquence à l'intérieur de la technologie
@@ -442,10 +436,111 @@ fun parseAndSortFrequencies(freqStr: String?, txtUnknown: String, txtAzimuthNotS
     ))
 }
 
+internal fun addMicrowaveFallbackBands(
+    bands: List<FreqBand>,
+    info: LocalisationEntity,
+    technique: TechniqueEntity?,
+    rawFreqs: String?,
+    txtUnknown: String
+): List<FreqBand> {
+    val fallbackPhysDetails = microwavePhysicalDetailsFromAzimuths(info.azimutsFh)
+    val enrichedBands = bands.map { band ->
+        if (band.isMicrowaveBand() && band.physDetails.isEmpty() && fallbackPhysDetails.isNotEmpty()) {
+            band.copy(physDetails = fallbackPhysDetails)
+        } else {
+            band
+        }
+    }
+
+    if (enrichedBands.any { it.isMicrowaveBand() } || !hasDeclaredMicrowave(info, technique, rawFreqs)) {
+        return enrichedBands
+    }
+
+    val fallbackStatus = technique?.statut?.takeIf { it.isNotBlank() }
+        ?: info.statut?.takeIf { it.isNotBlank() }
+        ?: txtUnknown
+    val fallbackDate = listOfNotNull(
+        technique?.dateService,
+        technique?.dateImplantation,
+        technique?.dateModif
+    ).firstOrNull { it.isNotBlank() }.orEmpty()
+
+    return sortFrequencyBandsForDisplay(enrichedBands + FreqBand(
+        rawFreq = "FH",
+        status = fallbackStatus,
+        date = fallbackDate,
+        physDetails = fallbackPhysDetails,
+        gen = 0,
+        value = 0
+    ))
+}
+
+private fun shouldDisplayFrequencyBand(band: FreqBand): Boolean {
+    return when (band.gen) {
+        5 -> AppConfig.siteShowTechno5G.value && when (band.value) {
+            700 -> AppConfig.siteF5G_700.value
+            2100 -> AppConfig.siteF5G_2100.value
+            3500 -> AppConfig.siteF5G_3500.value
+            26000 -> AppConfig.siteF5G_26000.value
+            else -> true
+        }
+        4 -> AppConfig.siteShowTechno4G.value && when (band.value) {
+            700 -> AppConfig.siteF4G_700.value
+            800 -> AppConfig.siteF4G_800.value
+            900 -> AppConfig.siteF4G_900.value
+            1800 -> AppConfig.siteF4G_1800.value
+            2100 -> AppConfig.siteF4G_2100.value
+            2600 -> AppConfig.siteF4G_2600.value
+            else -> true
+        }
+        3 -> AppConfig.siteShowTechno3G.value && when (band.value) {
+            900 -> AppConfig.siteF3G_900.value
+            2100 -> AppConfig.siteF3G_2100.value
+            else -> true
+        }
+        2 -> AppConfig.siteShowTechno2G.value && when (band.value) {
+            900 -> AppConfig.siteF2G_900.value
+            1800 -> AppConfig.siteF2G_1800.value
+            else -> true
+        }
+        else -> AppConfig.siteShowTechnoFH.value
+    }
+}
+
+private fun hasDeclaredMicrowave(
+    info: LocalisationEntity,
+    technique: TechniqueEntity?,
+    rawFreqs: String?
+): Boolean {
+    return !info.azimutsFh.isNullOrBlank() ||
+        info.filtres?.contains("FH", ignoreCase = true) == true ||
+        technique?.technologies?.contains("FH", ignoreCase = true) == true ||
+        rawFreqs?.let { isMicrowaveSystem(it) } == true
+}
+
+private fun microwavePhysicalDetailsFromAzimuths(rawAzimuths: String?): List<String> {
+    return rawAzimuths
+        ?.split(",")
+        ?.mapNotNull { value ->
+            value.substringBefore("\u00B0")
+                .trim()
+                .toIntOrNull()
+                ?.let { if (it == 360) 0 else it }
+        }
+        ?.distinct()
+        ?.sorted()
+        ?.map { azimuth -> "FH : $azimuth\u00B0 (-)" }
+        .orEmpty()
+}
+
 private fun isMicrowaveSystem(systemName: String): Boolean {
     return systemName.contains("FH", ignoreCase = true) ||
         systemName.contains("FAISCEAU", ignoreCase = true) ||
         systemName.contains("HERTZIEN", ignoreCase = true)
+}
+
+private fun FreqBand.isMicrowaveBand(): Boolean {
+    return gen == 0 && isMicrowaveSystem(rawFreq.substringBefore(":").trim())
 }
 
 private fun frequencyGroupingKey(
@@ -577,7 +672,7 @@ fun FrequenciesGridView(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    AppStrings.emittersTableTitle,
+                    stringResource(R.string.appstrings_emitters_table_title),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -590,7 +685,7 @@ fun FrequenciesGridView(
                     .background(subHeaderBgColor), verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    AppStrings.colTechno,
+                    stringResource(R.string.appstrings_col_techno),
                     modifier = Modifier.weight(1.3f).padding(8.dp),
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
@@ -598,7 +693,7 @@ fun FrequenciesGridView(
                 )
                 VerticalDivider(color = borderColor)
                 Text(
-                    AppStrings.colService,
+                    stringResource(R.string.appstrings_col_service),
                     modifier = Modifier.weight(1f).padding(8.dp),
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
@@ -606,7 +701,7 @@ fun FrequenciesGridView(
                 )
                 VerticalDivider(color = borderColor)
                 Text(
-                    AppStrings.colState,
+                    stringResource(R.string.appstrings_col_state),
                     modifier = Modifier.weight(1.1f).padding(8.dp),
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
@@ -756,7 +851,7 @@ fun FrequenciesGridView(
                 contentAlignment = Alignment.Center
             ) {
                 Text(
-                    AppStrings.antennasTableTitle,
+                    stringResource(R.string.appstrings_antennas_table_title),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -769,7 +864,7 @@ fun FrequenciesGridView(
                     .background(subHeaderBgColor), verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    AppStrings.colAzimuth,
+                    stringResource(R.string.appstrings_col_azimuth),
                     modifier = Modifier.weight(0.8f).padding(6.dp),
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
@@ -778,7 +873,7 @@ fun FrequenciesGridView(
                 )
                 VerticalDivider(color = borderColor)
                 Text(
-                    AppStrings.colHeight,
+                    stringResource(R.string.appstrings_col_height),
                     modifier = Modifier.weight(1f).padding(6.dp),
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
@@ -787,7 +882,7 @@ fun FrequenciesGridView(
                 )
                 VerticalDivider(color = borderColor)
                 Text(
-                    AppStrings.colBand,
+                    stringResource(R.string.appstrings_col_band),
                     modifier = Modifier.weight(1f).padding(6.dp),
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,
@@ -795,7 +890,7 @@ fun FrequenciesGridView(
                 )
                 VerticalDivider(color = borderColor)
                 Text(
-                    AppStrings.colFreqs,
+                    stringResource(R.string.appstrings_col_freqs),
                     modifier = Modifier.weight(1.6f).padding(6.dp),
                     fontWeight = FontWeight.Bold,
                     fontSize = 12.sp,

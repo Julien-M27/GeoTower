@@ -40,14 +40,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import fr.geotower.R
 import fr.geotower.ui.components.rememberReorderableDragState
 import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SharePreferencesSheet(
@@ -123,7 +123,7 @@ fun SharePreferencesSheet(
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(
-                    text = AppStrings.defaultShareContentTitle,
+                    text = stringResource(R.string.settings_default_share_content_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -131,7 +131,7 @@ fun SharePreferencesSheet(
                 )
                 Spacer(Modifier.width(48.dp)) // Pour équilibrer le bouton
             }
-            Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
+            Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
 
             val cardHeight = 64.dp
             val spacing = 12.dp
@@ -148,16 +148,16 @@ fun SharePreferencesSheet(
                         val dragOffset = reorderState.offsetFor(pageId)
 
                         when (pageId) {
-                            "map" -> DraggableSwitchCard(AppStrings.shareMapOption, mapEnabled, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "elevation_profile" -> DraggableSwitchCard(AppStrings.shareElevationProfileOption, elevationProfileEnabled, onElevationProfileChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "support" -> DraggableSwitchCard(AppStrings.shareSupportOption, supportEnabled, onSupportChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "ids" -> DraggableSwitchCard(AppStrings.shareIdsOption, idsEnabled, onIdsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "dates" -> DraggableSwitchCard(AppStrings.shareDatesOption, datesEnabled, onDatesChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "address" -> DraggableSwitchCard(AppStrings.shareAddressOption, addressEnabled, onAddressChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "speedtest" -> DraggableSwitchCard(AppStrings.shareSpeedtestOption, speedtestEnabled, onSpeedtestChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "throughput" -> DraggableSwitchCard(AppStrings.shareThroughputOption, throughputEnabled, onThroughputChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "status" -> DraggableSwitchCard(AppStrings.shareStatusOption, statusEnabled, onStatusChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "freq" -> DraggableSwitchCard(AppStrings.shareFreqOption, freqEnabled, onFreqChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "map" -> DraggableSwitchCard(stringResource(R.string.appstrings_share_map_option), mapEnabled, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "elevation_profile" -> DraggableSwitchCard(stringResource(R.string.appstrings_share_elevation_profile_option), elevationProfileEnabled, onElevationProfileChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "support" -> DraggableSwitchCard(stringResource(R.string.appstrings_share_support_option), supportEnabled, onSupportChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "ids" -> DraggableSwitchCard(stringResource(R.string.appstrings_share_ids_option), idsEnabled, onIdsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "dates" -> DraggableSwitchCard(stringResource(R.string.appstrings_share_dates_option), datesEnabled, onDatesChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "address" -> DraggableSwitchCard(stringResource(R.string.appstrings_share_address_option), addressEnabled, onAddressChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "speedtest" -> DraggableSwitchCard(stringResource(R.string.appstrings_share_speedtest_option), speedtestEnabled, onSpeedtestChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "throughput" -> DraggableSwitchCard(stringResource(R.string.appstrings_share_throughput_option), throughputEnabled, onThroughputChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "status" -> DraggableSwitchCard(stringResource(R.string.appstrings_share_status_option), statusEnabled, onStatusChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "freq" -> DraggableSwitchCard(stringResource(R.string.appstrings_share_freq_option), freqEnabled, onFreqChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                         }
                     }
                 }
@@ -185,7 +185,7 @@ fun SharePreferencesSheet(
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
-                Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(24.dp).navigationBarsPadding())
 
@@ -196,8 +196,8 @@ fun SharePreferencesSheet(
             // ✅ INTERRUPTEUR : SCINDER L'IMAGE (Juste au-dessus du QR Code)
             if (freqEnabled) {
                 SimpleSwitchCardWithDesc(
-                    title = AppStrings.splitShareImage,
-                    desc = AppStrings.splitShareImageDesc,
+                    title = stringResource(R.string.appstrings_split_share_image),
+                    desc = stringResource(R.string.appstrings_split_share_image_desc),
                     checked = splitImageEnabled,
                     onCheckedChange = onSplitImageChange,
                     shape = shape,
@@ -213,7 +213,7 @@ fun SharePreferencesSheet(
             Spacer(modifier = Modifier.height(8.dp))
 
             // --- LE BOUTON CONFIDENTIEL (Fixé en bas) ---
-            SimpleSwitchCardWithDesc(AppStrings.shareConfidentialOption, AppStrings.shareConfidentialDesc, confidentialEnabled, onConfidentialChange, shape, border, bubbleColor, useOneUi)
+            SimpleSwitchCardWithDesc(stringResource(R.string.appstrings_share_confidential_option), stringResource(R.string.appstrings_share_confidential_desc), confidentialEnabled, onConfidentialChange, shape, border, bubbleColor, useOneUi)
         }
     }
 }
@@ -271,7 +271,7 @@ fun SupportSharePreferencesSheet(
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(
-                    text = AppStrings.supportShareTitle, // <-- MODIFIÉ ICI (Le bon titre)
+                    text = stringResource(R.string.appstrings_support_share_title), // <-- MODIFIÉ ICI (Le bon titre)
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -279,7 +279,7 @@ fun SupportSharePreferencesSheet(
                 )
                 Spacer(Modifier.width(48.dp)) // Pour équilibrer le bouton
             }
-            Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
+            Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
 
             val cardHeight = 64.dp
             val spacing = 12.dp
@@ -296,9 +296,9 @@ fun SupportSharePreferencesSheet(
                         val dragOffset = reorderState.offsetFor(pageId)
 
                         when (pageId) {
-                            "map" -> DraggableSwitchCard(AppStrings.shareMapOption, mapEnabled, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "support" -> DraggableSwitchCard(AppStrings.shareSupportOption, supportEnabled, onSupportChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "operators" -> DraggableSwitchCard(AppStrings.operatorsTitle, operatorsEnabled, onOperatorsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "map" -> DraggableSwitchCard(stringResource(R.string.appstrings_share_map_option), mapEnabled, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "support" -> DraggableSwitchCard(stringResource(R.string.appstrings_share_support_option), supportEnabled, onSupportChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "operators" -> DraggableSwitchCard(stringResource(R.string.appstrings_operators_title), operatorsEnabled, onOperatorsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                         }
                     }
                 }
@@ -316,7 +316,7 @@ fun SupportSharePreferencesSheet(
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
-                Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(24.dp).navigationBarsPadding())
 
@@ -328,7 +328,7 @@ fun SupportSharePreferencesSheet(
             SimpleSwitchCard("QR Code", qrEnabled, onQrChange, shape, border, bubbleColor, useOneUi)
             Spacer(modifier = Modifier.height(8.dp))
 
-            SimpleSwitchCardWithDesc(AppStrings.shareConfidentialOption, AppStrings.shareConfidentialDesc, confidentialEnabled, onConfidentialChange, shape, border, bubbleColor, useOneUi)
+            SimpleSwitchCardWithDesc(stringResource(R.string.appstrings_share_confidential_option), stringResource(R.string.appstrings_share_confidential_desc), confidentialEnabled, onConfidentialChange, shape, border, bubbleColor, useOneUi)
         }
     }
 }
@@ -400,7 +400,7 @@ fun MapSharePreferencesSheet(
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(
-                    text = AppStrings.shareMapDetailsTitle, // "Carte"
+                    text = stringResource(R.string.appstrings_share_map_details_title), // "Carte"
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -414,11 +414,11 @@ fun MapSharePreferencesSheet(
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
             Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
-                SimpleSwitchCard(AppStrings.shareMapAzimuthsOption, azimuthsEnabled, onAzimuthsChange, shape, border, bubbleColor, useOneUi)
-                SimpleSwitchCard(AppStrings.shareStatusOption, statusEnabled, onStatusChange, shape, border, bubbleColor, useOneUi) // 🚨 AJOUT
-                SimpleSwitchCard(AppStrings.shareMapSpeedometerOption, speedometerEnabled, onSpeedometerChange, shape, border, bubbleColor, useOneUi)
-                SimpleSwitchCard(AppStrings.shareMapScaleOption, scaleEnabled, onScaleChange, shape, border, bubbleColor, useOneUi)
-                SimpleSwitchCard(AppStrings.shareMapAttributionOption, attributionEnabled, onAttributionChange, shape, border, bubbleColor, useOneUi)
+                SimpleSwitchCard(stringResource(R.string.appstrings_share_map_azimuths_option), azimuthsEnabled, onAzimuthsChange, shape, border, bubbleColor, useOneUi)
+                SimpleSwitchCard(stringResource(R.string.appstrings_share_status_option), statusEnabled, onStatusChange, shape, border, bubbleColor, useOneUi) // 🚨 AJOUT
+                SimpleSwitchCard(stringResource(R.string.appstrings_share_map_speedometer_option), speedometerEnabled, onSpeedometerChange, shape, border, bubbleColor, useOneUi)
+                SimpleSwitchCard(stringResource(R.string.appstrings_share_map_scale_option), scaleEnabled, onScaleChange, shape, border, bubbleColor, useOneUi)
+                SimpleSwitchCard(stringResource(R.string.appstrings_share_map_attribution_option), attributionEnabled, onAttributionChange, shape, border, bubbleColor, useOneUi)
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -434,13 +434,13 @@ fun MapSharePreferencesSheet(
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
-                Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(24.dp).navigationBarsPadding())
 
             // Bouton mode confidentiel séparé
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-            SimpleSwitchCardWithDesc(AppStrings.shareConfidentialOption, AppStrings.shareConfidentialDesc, confidentialEnabled, onConfidentialChange, shape, border, bubbleColor, useOneUi)
+            SimpleSwitchCardWithDesc(stringResource(R.string.appstrings_share_confidential_option), stringResource(R.string.appstrings_share_confidential_desc), confidentialEnabled, onConfidentialChange, shape, border, bubbleColor, useOneUi)
         }
     }
 }

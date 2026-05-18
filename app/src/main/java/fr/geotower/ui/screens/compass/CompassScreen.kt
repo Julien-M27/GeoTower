@@ -87,11 +87,12 @@ import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.map.MapViewModel
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -141,8 +142,8 @@ fun CompassScreen(
     var displayAzimuth by remember { mutableIntStateOf(0) }
 
     // --- LECTURE DES TRADUCTIONS (Dans le contexte sécurisé) ---
-    val txtSearching = AppStrings.searching
-    val txtUnknown = AppStrings.unknown
+    val txtSearching = stringResource(R.string.appstrings_searching)
+    val txtUnknown = stringResource(R.string.appstrings_unknown)
 
     // --- VARIABLES LOCALISATION ---
     var latitude by remember { mutableDoubleStateOf(0.0) }
@@ -343,7 +344,7 @@ fun CompassScreen(
     Scaffold(
         topBar = {
             GeoTowerBackTopBar(
-                title = AppStrings.compassTitle,
+                title = stringResource(R.string.appstrings_compass_title),
                 onBack = { safeBackNavigation.navigateBack() },
                 backgroundColor = compassBg,
                 contentColor = oncompassBg,
@@ -352,7 +353,7 @@ fun CompassScreen(
                     IconButton(onClick = { navController.navigate("settings?section=compass") }) {
                         Icon(
                             Icons.Default.Settings,
-                            contentDescription = AppStrings.settingsTitle,
+                            contentDescription = stringResource(R.string.appstrings_settings_title),
                             tint = oncompassBg
                         )
                     }
@@ -418,7 +419,7 @@ fun CompassScreen(
             if (selectedClusterSites.isNotEmpty()) {
                 ModalBottomSheet(onDismissRequest = { selectedClusterSites = emptyList() }, sheetState = sheetState) {
                     Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 48.dp)) {
-                        Text(text = AppStrings.nearbyAntennasAzimuth, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(text = stringResource(R.string.appstrings_nearby_antennas_azimuth), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
                         LazyColumn {
@@ -447,7 +448,7 @@ fun CompassScreen(
                                                 ?: op.lowercase().replaceFirstChar { it.titlecase() }
                                         }
                                         Text(
-                                            text = "${AppStrings.supportPrefix} $opsText",
+                                            text = "${stringResource(R.string.appstrings_support_prefix)} $opsText",
                                             color = MaterialTheme.colorScheme.onSurface,
                                             fontWeight = FontWeight.SemiBold,
                                             fontSize = 16.sp
@@ -497,11 +498,11 @@ fun CompassScreen(
                                 // J'ai réorganisé les coordonnées côte à côte pour que ça reste centré et harmonieux peu importe l'ordre !
                                 Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(text = AppStrings.latShort, fontSize = 12.sp, color = compassTextGray, fontWeight = FontWeight.Bold)
+                                        Text(text = stringResource(R.string.appstrings_lat_short), fontSize = 12.sp, color = compassTextGray, fontWeight = FontWeight.Bold)
                                         Text(text = formatCoordinate(latitude, isLat = true), fontSize = 18.sp, color = oncompassBg)
                                     }
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(text = AppStrings.lonShort, fontSize = 12.sp, color = compassTextGray, fontWeight = FontWeight.Bold)
+                                        Text(text = stringResource(R.string.appstrings_lon_short), fontSize = 12.sp, color = compassTextGray, fontWeight = FontWeight.Bold)
                                         Text(text = formatCoordinate(longitude, isLat = false), fontSize = 18.sp, color = oncompassBg)
                                     }
                                 }
@@ -510,7 +511,7 @@ fun CompassScreen(
                         "accuracy" -> {
                             if (showAccuracy) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(text = AppStrings.accuracy, fontSize = 12.sp, color = compassTextGray, fontWeight = FontWeight.Bold)
+                                    Text(text = stringResource(R.string.appstrings_accuracy), fontSize = 12.sp, color = compassTextGray, fontWeight = FontWeight.Bold)
                                     // ✅ On utilise la même logique d'unité pour la précision
                                     val isMi = AppConfig.distanceUnit.intValue == 1
                                     Text(text = "± ${formatCompassDistance(accuracy, isMi)}", fontSize = 18.sp, color = oncompassBg)

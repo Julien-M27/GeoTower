@@ -12,6 +12,8 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -45,11 +47,12 @@ import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
-import fr.geotower.utils.AppStrings
 import java.io.File
 import java.io.FileOutputStream
 import androidx.compose.foundation.Image
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 private const val TAG_MAP_SHARE = "GeoTowerMap"
 
@@ -226,31 +229,31 @@ fun MapShareMenu(
         }
     }
 
-    val txtTitle = AppStrings.mapTitle
-    val txtGeneratedBy = AppStrings.generatedBy
-    val txtShareSiteVia = AppStrings.shareSiteVia
-    val txtThemeLight = AppStrings.themeLight
-    val txtLightModeDesc = AppStrings.lightModeDesc
-    val txtThemeDark = AppStrings.themeDark
-    val txtDarkModeDesc = AppStrings.darkModeDesc
-    val txtShareAs = AppStrings.shareAs
-    val txtImageContent = AppStrings.imageContent
-    val txtShareConfidentialOption = AppStrings.shareConfidentialOption
-    val txtShareConfidentialDesc = AppStrings.shareConfidentialDesc
-    val txtGenerateImage = AppStrings.generateImage
-    val txtInitError = AppStrings.initError
+    val txtTitle = stringResource(R.string.appstrings_map_title)
+    val txtGeneratedBy = stringResource(R.string.appstrings_generated_by)
+    val txtShareSiteVia = stringResource(R.string.appstrings_share_site_via)
+    val txtThemeLight = stringResource(R.string.appstrings_theme_light)
+    val txtLightModeDesc = stringResource(R.string.appstrings_light_mode_desc)
+    val txtThemeDark = stringResource(R.string.appstrings_theme_dark)
+    val txtDarkModeDesc = stringResource(R.string.appstrings_dark_mode_desc)
+    val txtShareAs = stringResource(R.string.appstrings_share_as)
+    val txtImageContent = stringResource(R.string.appstrings_image_content)
+    val txtShareConfidentialOption = stringResource(R.string.appstrings_share_confidential_option)
+    val txtShareConfidentialDesc = stringResource(R.string.appstrings_share_confidential_desc)
+    val txtGenerateImage = stringResource(R.string.appstrings_generate_image)
+    val txtInitError = stringResource(R.string.appstrings_init_error)
 
-    val txtAzimuths = AppStrings.shareMapAzimuthsOption
-    val txtSpeedometer = AppStrings.shareMapSpeedometerOption
-    val txtScale = AppStrings.shareMapScaleOption
-    val txtAttributionOption = AppStrings.shareMapAttributionOption
+    val txtAzimuths = stringResource(R.string.appstrings_share_map_azimuths_option)
+    val txtSpeedometer = stringResource(R.string.appstrings_share_map_speedometer_option)
+    val txtScale = stringResource(R.string.appstrings_share_map_scale_option)
+    val txtAttributionOption = stringResource(R.string.appstrings_share_map_attribution_option)
 
     val txtAttributionDesc = when(AppConfig.mapProvider.intValue) {
-        0 -> AppStrings.srcIgnDesc
-        1 -> AppStrings.srcOsmDesc
+        0 -> stringResource(R.string.appstrings_src_ign_desc)
+        1 -> stringResource(R.string.appstrings_src_osm_desc)
         2 -> "© MapLibre"
         3 -> "© OpenTopoMap"
-        else -> AppStrings.srcOsmDesc
+        else -> stringResource(R.string.appstrings_src_osm_desc)
     }
 
     Surface(
@@ -279,7 +282,17 @@ fun MapShareMenu(
 
     if (showSelectionSheet) {
         ModalBottomSheet(onDismissRequest = { showSelectionSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
-            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp, start = 24.dp, end = 24.dp)) {
+            Box(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(
+                            start = 24.dp,
+                            end = 24.dp,
+                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 112.dp
+                        )
+                ) {
                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { safeClick { showSelectionSheet = false; showShareSheet = true } }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }
                     Text(text = txtImageContent, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
@@ -318,9 +331,10 @@ fun MapShareMenu(
                         }
                         GeoTowerSwitch(checked = incConfidential, onCheckedChange = { incConfidential = it }, useOneUi = useOneUi)
                     }
+                }
+            }
 
-                    Spacer(modifier = Modifier.height(24.dp))
-                    Button(
+            Button(
                         onClick = {
                             showSelectionSheet = false
 
@@ -383,12 +397,22 @@ fun MapShareMenu(
                                 )
                             }, 300)
                         },
-                        modifier = Modifier.fillMaxWidth().height(56.dp),
-                        shape = oneUiActionButtonShape(useOneUi)
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .padding(
+                                start = 24.dp,
+                                end = 24.dp,
+                                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
+                            )
+                            .fillMaxWidth()
+                            .widthIn(max = 420.dp)
+                            .height(56.dp),
+                        shape = CircleShape
                     ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
                         Text(txtGenerateImage, fontWeight = FontWeight.Bold)
                     }
-                }
             }
         }
     }

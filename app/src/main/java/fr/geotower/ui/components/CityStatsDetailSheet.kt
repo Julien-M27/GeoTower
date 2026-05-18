@@ -31,11 +31,13 @@ import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.models.isDeclaredActive
 import fr.geotower.data.models.physicalSiteKey
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 // ✅ CLASSE DE DONNÉES COMPLÈTE
 data class OperatorStat(
@@ -92,7 +94,7 @@ fun CityStatsDetailSheet(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = AppStrings.operatorDetailsTitle,
+                text = stringResource(R.string.appstrings_operator_details_title),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -117,7 +119,7 @@ fun CityStatsDetailSheet(
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
-                                text = AppStrings.loadingOperatorStats,
+                                text = stringResource(R.string.appstrings_loading_operator_stats),
                                 style = MaterialTheme.typography.labelLarge,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -176,7 +178,7 @@ fun CityStatsDetailSheet(
                                 Spacer(modifier = Modifier.width(16.dp))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(text = stat.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                    Text(text = AppStrings.sitesCount(stat.totalCount), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(text = pluralStringResource(R.plurals.sites_count, stat.totalCount, stat.totalCount), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                                 Box(modifier = Modifier.background(stat.color, CircleShape).padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
                                     Text(text = "${stat.activeCount}/${stat.totalCount}", fontSize = 24.sp, fontWeight = FontWeight.Black, color = Color.White)
@@ -201,7 +203,7 @@ fun CityStatsDetailSheet(
                                                 color = stat.color
                                             )
                                             Text(
-                                                text = AppStrings.loadingFrequencies,
+                                                text = stringResource(R.string.appstrings_loading_frequencies),
                                                 style = MaterialTheme.typography.labelLarge,
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -459,7 +461,7 @@ fun CartoradioGroupedTable(
 
     if (groupedData.isEmpty()) {
         Box(modifier = Modifier.fillMaxWidth().background(tableBgColor).padding(16.dp), contentAlignment = Alignment.Center) {
-            Text(AppStrings.technicalDataUnavailable, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.appstrings_technical_data_unavailable), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         return
     }
@@ -472,8 +474,8 @@ fun CartoradioGroupedTable(
             modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)).padding(12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(AppStrings.frequenciesAndTechs, fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.weight(1f))
-            Text(AppStrings.sitesLabel, fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text(stringResource(R.string.appstrings_frequencies_and_techs), fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.appstrings_sites_label), fontWeight = FontWeight.Bold, fontSize = 13.sp)
         }
 
         groupedData.forEach { (tech, items) ->

@@ -30,6 +30,7 @@ object CommunityDataPreferences {
 
     private const val LEGACY_CELLULARFR_PHOTOS_KEY = "site_show_cellularfr_photos"
     private const val LEGACY_SIGNALQUEST_PHOTOS_KEY = "site_show_signalquest_photos"
+    private const val SITE_PHOTO_FAVORITE_KEY_PREFIX = "site_photo_favorite_"
 
     private val signalQuestPhotos = CommunityDataSource(
         id = SOURCE_SIGNALQUEST,
@@ -99,6 +100,10 @@ object CommunityDataPreferences {
         return "community_${operatorKey.lowercase(Locale.US)}_${featureId}_${sourceId}_fallback"
     }
 
+    fun sitePhotoFavoritePrefKey(siteId: String, sourceId: String): String {
+        return "$SITE_PHOTO_FAVORITE_KEY_PREFIX${siteId.trim()}_${sourceId.lowercase(Locale.US)}"
+    }
+
     fun operatorKeyFor(rawOperator: String?): String? {
         val key = OperatorColors.keyFor(rawOperator)
         return key?.takeIf { candidate -> operators.any { it.key == candidate } }
@@ -164,6 +169,34 @@ object CommunityDataPreferences {
         prefs.edit()
             .putBoolean(sourceFallbackPrefKey(operatorKey, featureId, sourceId), fallbackOnly)
             .apply()
+    }
+
+    fun favoritePhotoIdForSource(
+        prefs: SharedPreferences,
+        siteId: String?,
+        sourceId: String
+    ): String? {
+        val normalizedSiteId = siteId?.trim()?.takeIf { it.isNotBlank() } ?: return null
+        return prefs.getString(sitePhotoFavoritePrefKey(normalizedSiteId, sourceId), null)
+            ?.takeIf { it.isNotBlank() }
+    }
+
+    fun setFavoritePhotoIdForSource(
+        prefs: SharedPreferences,
+        siteId: String,
+        sourceId: String,
+        photoId: String?
+    ) {
+        val normalizedSiteId = siteId.trim()
+        if (normalizedSiteId.isBlank()) return
+
+        val editor = prefs.edit()
+        if (photoId.isNullOrBlank()) {
+            editor.remove(sitePhotoFavoritePrefKey(normalizedSiteId, sourceId))
+        } else {
+            editor.putString(sitePhotoFavoritePrefKey(normalizedSiteId, sourceId), photoId)
+        }
+        editor.apply()
     }
 
     fun orderedPhotoSourceIdsForOperatorKeys(
@@ -237,6 +270,9 @@ object CommunityDataPreferences {
 
     fun reset(prefs: SharedPreferences) {
         val editor = prefs.edit()
+        prefs.all.keys
+            .filter { it.startsWith(SITE_PHOTO_FAVORITE_KEY_PREFIX) }
+            .forEach { editor.remove(it) }
         operators.forEach { operator ->
             editor.putBoolean(photosEnabledPrefKey(operator.key), true)
             operator.features.forEach { feature ->

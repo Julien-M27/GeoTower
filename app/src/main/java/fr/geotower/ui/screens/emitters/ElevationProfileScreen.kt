@@ -80,7 +80,6 @@ import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
-import fr.geotower.utils.AppStrings
 import fr.geotower.utils.isNetworkAvailable
 import fr.geotower.utils.rememberNetworkAvailableState
 import java.text.SimpleDateFormat
@@ -95,6 +94,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 private const val TAG_ELEVATION_PROFILE = "GeoTowerLocation"
 
@@ -298,7 +299,7 @@ fun ElevationProfileScreen(
         containerColor = mainBgColor,
         topBar = {
             GeoTowerBackTopBar(
-                title = AppStrings.elevationProfileTitle,
+                title = stringResource(R.string.appstrings_elevation_profile_title),
                 onBack = { handleBackNavigation() },
                 backgroundColor = mainBgColor,
                 backEnabled = isSplitScreen || !safeBackNavigation.isLocked
@@ -320,8 +321,8 @@ fun ElevationProfileScreen(
         when {
             isSiteLoading || isProfileLoading -> {
                 ProfileLoadingCard(
-                    message = AppStrings.elevationProfileLoading,
-                    detail = AppStrings.elevationProfileCalculationInProgress,
+                    message = stringResource(R.string.appstrings_elevation_profile_loading),
+                    detail = stringResource(R.string.appstrings_elevation_profile_calculation_in_progress),
                     bgColor = cardBgColor,
                     shape = blockShape,
                     modifier = contentModifier
@@ -329,7 +330,7 @@ fun ElevationProfileScreen(
             }
             site == null -> {
                 ProfileMessageCard(
-                    message = AppStrings.elevationProfileNoSite,
+                    message = stringResource(R.string.appstrings_elevation_profile_no_site),
                     bgColor = cardBgColor,
                     shape = blockShape,
                     modifier = contentModifier,
@@ -338,17 +339,17 @@ fun ElevationProfileScreen(
             }
             isOfflineProfileError || isPendingProfileError -> {
                 ProfileMessageCard(
-                    message = if (isPendingProfileError) AppStrings.elevationProfilePendingSavedTitle else AppStrings.elevationProfileOfflineTitle,
+                    message = if (isPendingProfileError) stringResource(R.string.appstrings_elevation_profile_pending_saved_title) else stringResource(R.string.appstrings_elevation_profile_offline_title),
                     bgColor = cardBgColor,
                     shape = blockShape,
                     modifier = contentModifier,
                     detail = when {
-                        isPendingProfileError -> AppStrings.elevationProfilePendingSavedDetail
-                        canSaveProfileForLater -> AppStrings.elevationProfileOfflineSaveDetail
-                        else -> AppStrings.elevationProfileOfflineDetail
+                        isPendingProfileError -> stringResource(R.string.appstrings_elevation_profile_pending_saved_detail)
+                        canSaveProfileForLater -> stringResource(R.string.appstrings_elevation_profile_offline_save_detail)
+                        else -> stringResource(R.string.appstrings_elevation_profile_offline_detail)
                     },
                     icon = Icons.Default.CloudOff,
-                    actionLabel = if (canSaveProfileForLater) AppStrings.elevationProfileSaveForLater else null,
+                    actionLabel = if (canSaveProfileForLater) stringResource(R.string.appstrings_elevation_profile_save_for_later) else null,
                     onActionClick = if (canSaveProfileForLater) {
                         {
                             val currentLocation = userLocation
@@ -368,7 +369,7 @@ fun ElevationProfileScreen(
             }
             !hasLocationPermission || userLocation == null -> {
                 ProfileMessageCard(
-                    message = AppStrings.elevationProfileNoLocation,
+                    message = stringResource(R.string.appstrings_elevation_profile_no_location),
                     bgColor = cardBgColor,
                     shape = blockShape,
                     modifier = contentModifier,
@@ -377,7 +378,7 @@ fun ElevationProfileScreen(
             }
             profileError != null -> {
                 ProfileMessageCard(
-                    message = AppStrings.elevationProfileError,
+                    message = stringResource(R.string.appstrings_elevation_profile_error),
                     bgColor = cardBgColor,
                     shape = blockShape,
                     modifier = contentModifier,
@@ -410,7 +411,7 @@ fun ElevationProfileScreen(
                                 Icon(Icons.Default.Terrain, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                                 Spacer(Modifier.width(12.dp))
                                 Text(
-                                    text = "${AppStrings.elevationProfileDistance} ${formatElevationProfileDistance(profile!!.distanceMeters)}",
+                                    text = "${stringResource(R.string.appstrings_elevation_profile_distance)} ${formatElevationProfileDistance(profile!!.distanceMeters)}",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
@@ -446,7 +447,7 @@ fun ElevationProfileScreen(
             }
             else -> {
                 ProfileMessageCard(
-                    message = AppStrings.elevationProfileError,
+                    message = stringResource(R.string.appstrings_elevation_profile_error),
                     bgColor = cardBgColor,
                     shape = blockShape,
                     modifier = contentModifier,
@@ -465,8 +466,8 @@ fun ElevationProfileScreen(
                 profileCalculationInfo = null
                 profileError = if (pendingProfilePoint != null) PROFILE_ERROR_OFFLINE_PENDING else PROFILE_ERROR_OFFLINE
             },
-            title = { Text(AppStrings.elevationProfileSavedDialogTitle) },
-            text = { Text(AppStrings.elevationProfileSavedDialogMessage) },
+            title = { Text(stringResource(R.string.appstrings_elevation_profile_saved_dialog_title)) },
+            text = { Text(stringResource(R.string.appstrings_elevation_profile_saved_dialog_message)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -478,7 +479,7 @@ fun ElevationProfileScreen(
                         savedProfilePrompt = null
                     }
                 ) {
-                    Text(AppStrings.elevationProfileSavedDialogShow)
+                    Text(stringResource(R.string.appstrings_elevation_profile_saved_dialog_show))
                 }
             },
             dismissButton = {
@@ -492,7 +493,7 @@ fun ElevationProfileScreen(
                         savedProfilePrompt = null
                     }
                 ) {
-                    Text(AppStrings.elevationProfileSavedDialogHide)
+                    Text(stringResource(R.string.appstrings_elevation_profile_saved_dialog_hide))
                 }
             }
         )
@@ -604,8 +605,8 @@ private fun ProfileStatsCard(
     blockShape: RoundedCornerShape
 ) {
     val context = LocalContext.current
-    val gpsCopyLabel = AppStrings.gpsCoordsCopy
-    val coordsCopied = AppStrings.coordsCopied
+    val gpsCopyLabel = stringResource(R.string.appstrings_gps_coords_copy)
+    val coordsCopied = stringResource(R.string.appstrings_coords_copied)
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -616,26 +617,26 @@ private fun ProfileStatsCard(
             val startHeightMeters = profile.points.first().elevation + USER_EYE_HEIGHT_METERS
             val arrivalHeightMeters = supportHeight?.let { profile.points.last().elevation + it }
             ProfileInfoRow(
-                label = AppStrings.elevationProfileSupportHeight,
+                label = stringResource(R.string.appstrings_elevation_profile_support_height),
                 value = supportHeight?.let { "${it.roundToInt()} m" } ?: "--",
-                detail = AppStrings.elevationProfileSupportHeightDetail
+                detail = stringResource(R.string.appstrings_elevation_profile_support_height_detail)
             )
             ProfileInfoRow(
-                label = AppStrings.elevationProfileStartAltitude,
+                label = stringResource(R.string.appstrings_elevation_profile_start_altitude),
                 value = "${startHeightMeters.roundToInt()} m",
-                detail = AppStrings.elevationProfileStartAltitudeDetail
+                detail = stringResource(R.string.appstrings_elevation_profile_start_altitude_detail)
             )
             ProfileInfoRow(
-                label = AppStrings.elevationProfileSiteAltitude,
+                label = stringResource(R.string.appstrings_elevation_profile_site_altitude),
                 value = arrivalHeightMeters?.let { "${it.roundToInt()} m" } ?: "--",
-                detail = AppStrings.elevationProfileSiteAltitudeDetail
+                detail = stringResource(R.string.appstrings_elevation_profile_site_altitude_detail)
             )
-            ProfileInfoRow(AppStrings.elevationProfileFrequency, "$frequencyMHz MHz")
+            ProfileInfoRow(stringResource(R.string.appstrings_elevation_profile_frequency), "$frequencyMHz MHz")
             calculationInfo?.let { info ->
                 val gpsValue = formatProfileGps(info.fromLatitude, info.fromLongitude)
-                ProfileInfoRow(AppStrings.elevationProfileCalculatedAt, formatProfileCalculationTime(info.calculatedAtMillis))
+                ProfileInfoRow(stringResource(R.string.appstrings_elevation_profile_calculated_at), formatProfileCalculationTime(info.calculatedAtMillis))
                 ProfileInfoColumn(
-                    label = AppStrings.elevationProfileUsedGps,
+                    label = stringResource(R.string.appstrings_elevation_profile_used_gps),
                     value = gpsValue,
                     onCopy = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -646,26 +647,26 @@ private fun ProfileStatsCard(
             }
 
             val lineStatus = if (obstructionMeters <= 0.0) {
-                AppStrings.elevationProfileLineClear
+                stringResource(R.string.appstrings_elevation_profile_line_clear)
             } else {
-                "${AppStrings.elevationProfileLineBlocked} (+${String.format(Locale.US, "%.1f", obstructionMeters)} m)"
+                "${stringResource(R.string.appstrings_elevation_profile_line_blocked)} (+${String.format(Locale.US, "%.1f", obstructionMeters)} m)"
             }
-            ProfileInfoColumn(AppStrings.elevationProfileDirectLineLabel, lineStatus)
+            ProfileInfoColumn(stringResource(R.string.appstrings_elevation_profile_direct_line_label), lineStatus)
 
             val fresnelStatus = if (fresnelObstructionMeters <= 0.0) {
-                AppStrings.elevationProfileFresnelClear
+                stringResource(R.string.appstrings_elevation_profile_fresnel_clear)
             } else {
-                "${AppStrings.elevationProfileFresnelBlocked} (+${String.format(Locale.US, "%.1f", fresnelObstructionMeters)} m)"
+                "${stringResource(R.string.appstrings_elevation_profile_fresnel_blocked)} (+${String.format(Locale.US, "%.1f", fresnelObstructionMeters)} m)"
             }
-            ProfileInfoColumn(AppStrings.elevationProfileFresnelLabel, fresnelStatus)
+            ProfileInfoColumn(stringResource(R.string.appstrings_elevation_profile_fresnel_label), fresnelStatus)
             Text(
-                text = AppStrings.elevationProfileIgnSource,
+                text = stringResource(R.string.appstrings_elevation_profile_ign_source),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 6.dp)
             )
             Text(
-                text = AppStrings.elevationProfileFresnelExplanation,
+                text = stringResource(R.string.appstrings_elevation_profile_fresnel_explanation),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(top = 2.dp)
@@ -714,7 +715,7 @@ private fun ProfileInfoColumn(label: String, value: String, onCopy: (() -> Unit)
             IconButton(onClick = onCopy, modifier = Modifier.size(32.dp)) {
                 Icon(
                     imageVector = Icons.Default.ContentCopy,
-                    contentDescription = AppStrings.copy,
+                    contentDescription = stringResource(R.string.appstrings_copy),
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp)
                 )

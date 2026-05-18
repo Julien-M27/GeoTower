@@ -18,10 +18,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import fr.geotower.utils.AppStrings
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 // 1. Structure pour gérer l'état de chaque case de la grille
 data class ServiceStatus(
@@ -59,7 +60,7 @@ fun SiteStatusCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = AppStrings.statusTitle,
+                    text = stringResource(R.string.appstrings_status_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
@@ -81,9 +82,9 @@ fun SiteStatusCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = when {
-                            isProjectSite -> AppStrings.statusProject
-                            isOutage -> AppStrings.statusOutage
-                            else -> AppStrings.statusFunctional
+                            isProjectSite -> stringResource(R.string.appstrings_status_project)
+                            isOutage -> stringResource(R.string.appstrings_status_outage)
+                            else -> stringResource(R.string.appstrings_status_functional)
                         },
                         fontWeight = FontWeight.Bold,
                         fontSize = 14.sp,
@@ -134,11 +135,11 @@ fun SiteStatusCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            ServiceRow(AppStrings.serviceVoice, technologies, techStatus) { _, it -> it.isVoixOk }
+            ServiceRow(stringResource(R.string.appstrings_service_voice), technologies, techStatus) { _, it -> it.isVoixOk }
             Spacer(modifier = Modifier.height(10.dp))
-            ServiceRow(AppStrings.serviceSms, technologies, techStatus) { _, it -> it.isSmsOk }
+            ServiceRow(stringResource(R.string.appstrings_service_sms), technologies, techStatus) { _, it -> it.isSmsOk }
             Spacer(modifier = Modifier.height(10.dp))
-            ServiceRow(AppStrings.serviceInternet, technologies, techStatus) { tech, it ->
+            ServiceRow(stringResource(R.string.appstrings_service_internet), technologies, techStatus) { tech, it ->
                 if (tech == "2G") null else it.isInternetOk
             }
 
@@ -149,7 +150,7 @@ fun SiteStatusCard(
             // --- SECTION 3 : PIED DE PAGE ---
             val currentTime = SimpleDateFormat("HH:mm", Locale.ROOT).format(Date())
             Text(
-                text = "${AppStrings.lastUpdatedText} $currentTime",
+                text = "${stringResource(R.string.appstrings_last_updated_text)} $currentTime",
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),

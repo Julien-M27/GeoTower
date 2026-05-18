@@ -6,9 +6,9 @@ import androidx.car.app.ScreenManager
 import androidx.car.app.model.Action
 import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Template
+import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.utils.AppLogger
-import fr.geotower.utils.AppStrings
 
 class CarHomeScreen(
     carContext: CarContext,
@@ -18,12 +18,12 @@ class CarHomeScreen(
     override fun onGetTemplate(): Template {
         AppLogger.i(TAG, "Rendering Android Auto home template")
         val screenManager = carContext.getCarService(ScreenManager::class.java)
-        return MessageTemplate.Builder(AppStrings.carConnected(carContext))
-            .setTitle("GeoTower")
+        return MessageTemplate.Builder(carContext.getString(R.string.car_connected))
+            .setTitle(carContext.getString(R.string.app_name))
             .setHeaderAction(Action.APP_ICON)
             .addAction(
                 Action.Builder()
-                    .setTitle(AppStrings.carNearbySites(carContext))
+                    .setTitle(carContext.getString(R.string.car_nearby_sites))
                     .setOnClickListener {
                         screenManager.push(CarNearbySitesScreen(carContext, repository))
                     }

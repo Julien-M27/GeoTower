@@ -46,10 +46,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import fr.geotower.R
 import fr.geotower.ui.components.SiteExternalLinkDefinitions
 import fr.geotower.ui.components.readSiteExternalLinkOrder
 import fr.geotower.ui.components.rememberReorderableDragState
@@ -58,8 +60,6 @@ import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.ui.components.siteExternalLinkById
 import fr.geotower.ui.components.writeSiteExternalLinkOrder
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExternalLinksSettingsSheet(
@@ -115,7 +115,7 @@ fun ExternalLinksSettingsSheet(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                 }
                 Text(
-                    text = AppStrings.externalLinksSettingsTitle,
+                    text = stringResource(R.string.settings_external_links_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -211,7 +211,7 @@ fun ExternalLinksSettingsSheet(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = AppStrings.resetToDefault,
+                    text = stringResource(R.string.appstrings_reset_to_default),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )

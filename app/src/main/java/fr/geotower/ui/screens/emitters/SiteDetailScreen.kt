@@ -117,14 +117,15 @@ import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
-import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
+import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.roundToInt
 import fr.geotower.ui.components.SpeedtestCard
+import androidx.compose.ui.res.stringResource
 
 private const val TAG_SITE_DETAIL = "GeoTower"
 private const val TAG_SPEEDTEST = "GeoTowerUpload"
@@ -234,7 +235,7 @@ fun SiteDetailScreen(
     val completedWorkIds = remember { mutableSetOf<UUID>() }
 
     val currentUploadSiteId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: antenna?.idAnfr.orEmpty()
-    val unknownText = AppStrings.unknown
+    val unknownText = stringResource(R.string.appstrings_unknown)
 
     fun navigateToUploadWithUris(uris: List<Uri>) {
         val selectedUris = uris.take(SignalQuestUploadRules.MAX_PHOTOS)
@@ -459,13 +460,24 @@ fun SiteDetailScreen(
             // ✅ CORRECTION MAJEURE : On utilise le numéro de support physique universel
             val supportSiteId = physique?.idSupport ?: localData.idAnfr
             val signalQuestOperator = SignalQuestOperators.operatorParamFor(opName)
+            val signalQuestOperatorKey = signalQuestOperator?.let { OperatorColors.keyFor(it) }
+            val signalQuestOperatorLabel = OperatorColors.specForKey(signalQuestOperatorKey)?.label
 
             val photosTemp = mutableListOf<CommunityPhoto>()
 
             // ✅ Séparation en deux blocs `if` distincts (Plus de `else if`)
             if (CommunityDataPreferences.isCellularFrPhotosEnabled(prefs, opName)) {
                 CellularFrApi.getCellularFrPhotos(supportSiteId).forEach { photo ->
-                    photosTemp.add(CommunityPhoto(photo.url, "CellularFR", photo.author, photo.uploadedAt))
+                    photosTemp.add(
+                        CommunityPhoto(
+                            url = photo.url,
+                            communityName = "CellularFR",
+                            author = photo.author,
+                            date = photo.uploadedAt,
+                            sourceId = CommunityDataPreferences.SOURCE_CELLULARFR,
+                            stableId = photo.url
+                        )
+                    )
                 }
             }
 
@@ -484,7 +496,19 @@ fun SiteDetailScreen(
                                     SignalQuestOperators.operatorParamFor(photoOperator).equals(signalQuestOperator, ignoreCase = true)
                             }
                             ?.forEach {
-                                photosTemp.add(CommunityPhoto(it.imageUrl, "Signal Quest", it.authorName, it.uploadedAt, it.publicMetadata))
+                                photosTemp.add(
+                                    CommunityPhoto(
+                                        url = it.imageUrl,
+                                        communityName = "Signal Quest",
+                                        author = it.authorName,
+                                        date = it.uploadedAt,
+                                        exifMetadata = it.publicMetadata,
+                                        sourceId = CommunityDataPreferences.SOURCE_SIGNALQUEST,
+                                        stableId = it.id ?: it.imageUrl,
+                                        operatorKey = signalQuestOperatorKey,
+                                        operatorLabel = signalQuestOperatorLabel
+                                    )
+                                )
                             }
                     }
                 } catch (e: Exception) { AppLogger.w(TAG_SITE_DETAIL, "SignalQuest photos request failed", e) }
@@ -579,20 +603,20 @@ fun SiteDetailScreen(
     val bearingStr = locationData.second
     val distanceMeters = locationData.third
 
-    val txtSiteDetailsTitle = AppStrings.siteDetailTitle
-    val txtIdCopied = AppStrings.idCopied
-    AppStrings.distanceLabel
-    AppStrings.fromMyPosition
-    val txtBearingLabel = AppStrings.bearingLabel
-    val txtSupportHeight = AppStrings.supportHeight
-    val txtNavToSite = AppStrings.navToSite
-    val txtOpen = AppStrings.open
-    val txtInstallApp = AppStrings.installApp
-    val txtMap4G = AppStrings.map4G
-    val txtMap5G = AppStrings.map5G
-    val txtUnavailable = AppStrings.unavailable
-    val txtWhichMap = AppStrings.whichMap
-    val txtIdSupportCopy = AppStrings.idSupportCopy
+    val txtSiteDetailsTitle = stringResource(R.string.appstrings_site_detail_title)
+    val txtIdCopied = stringResource(R.string.appstrings_id_copied)
+    stringResource(R.string.appstrings_distance_label)
+    stringResource(R.string.appstrings_from_my_position)
+    val txtBearingLabel = stringResource(R.string.appstrings_bearing_label)
+    val txtSupportHeight = stringResource(R.string.appstrings_support_height)
+    val txtNavToSite = stringResource(R.string.appstrings_nav_to_site)
+    val txtOpen = stringResource(R.string.appstrings_open)
+    val txtInstallApp = stringResource(R.string.appstrings_install_app)
+    val txtMap4G = stringResource(R.string.appstrings_map4_g)
+    val txtMap5G = stringResource(R.string.appstrings_map5_g)
+    val txtUnavailable = stringResource(R.string.appstrings_unavailable)
+    val txtWhichMap = stringResource(R.string.appstrings_which_map)
+    val txtIdSupportCopy = stringResource(R.string.appstrings_id_support_copy)
 
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "support_detail/$antennaId")
 
@@ -621,7 +645,7 @@ fun SiteDetailScreen(
                     IconButton(onClick = { safeClick { navController.navigate("settings?section=site") } }) {
                         Icon(
                             Icons.Default.Settings,
-                            contentDescription = AppStrings.settingsTitle,
+                            contentDescription = stringResource(R.string.appstrings_settings_title),
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -690,10 +714,10 @@ fun SiteDetailScreen(
                 ModalBottomSheet(onDismissRequest = { showCellularFrSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
                     Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("CellularFR", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(AppStrings.openOn, style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.appstrings_open_on), style = MaterialTheme.typography.bodyMedium)
                         Spacer(modifier = Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            CommunityCard(title = AppStrings.website, txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_cellularfr, isEnabled = supportId.isNotEmpty(), modifier = Modifier.weight(1f)) {
+                            CommunityCard(title = stringResource(R.string.appstrings_website), txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_cellularfr, isEnabled = supportId.isNotEmpty(), modifier = Modifier.weight(1f)) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress); showCellularFrSheet = false; uriHandler.openUri("https://cellularfr.fr/site-details.html?siteId=$supportId")
                             }
                         }
@@ -709,10 +733,10 @@ fun SiteDetailScreen(
                 ModalBottomSheet(onDismissRequest = { showRncSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
                     Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                         Text("RNC Mobile", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(AppStrings.openOn, style = MaterialTheme.typography.bodyMedium)
+                        Text(stringResource(R.string.appstrings_open_on), style = MaterialTheme.typography.bodyMedium)
                         Spacer(modifier = Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            CommunityCard(title = AppStrings.website, txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_rncmobile, modifier = Modifier.weight(1f)) {
+                            CommunityCard(title = stringResource(R.string.appstrings_website), txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_rncmobile, modifier = Modifier.weight(1f)) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress); showRncSheet = false; uriHandler.openUri("https://rncmobile.net/site/${info.latitude},${info.longitude}")
                             }
                         }
@@ -824,7 +848,7 @@ fun SiteDetailScreen(
                             if (showOperator) {
                                 Card(modifier = Modifier.fillMaxWidth(), shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
                                     Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-                                        val opNameDisplay = info.operateur ?: AppStrings.unknown
+                                        val opNameDisplay = info.operateur ?: stringResource(R.string.appstrings_unknown)
                                         val logoRes = getDetailLogoRes(opNameDisplay)
 
                                         if (logoRes != null) { Image(painter = painterResource(id = logoRes), contentDescription = null, modifier = Modifier.size(72.dp).clip(RoundedCornerShape(8.dp))) }
@@ -834,7 +858,7 @@ fun SiteDetailScreen(
                                             Text(text = opNameDisplay, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                             Spacer(modifier = Modifier.height(4.dp))
                                             val rawTechs = technique?.technologies?.takeIf { it.isNotBlank() } ?: info.frequences
-                                            val realTechs = formatTechnologies(rawTechs, AppStrings.unknown)
+                                            val realTechs = formatTechnologies(rawTechs, stringResource(R.string.appstrings_unknown))
                                             Text(text = realTechs, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                     }
@@ -905,7 +929,9 @@ fun SiteDetailScreen(
                                     supportOwner = physique?.proprietaire,
                                     bgColor = cardBgColor,
                                     shape = blockShape,
-                                    onAddPhotoClick = { safeClick { showImageSourceDialog = true } }
+                                    onAddPhotoClick = { safeClick { showImageSourceDialog = true } },
+                                    favoriteScopeId = physique?.idSupport ?: info.idAnfr,
+                                    favoriteSelectionEnabled = true
                                 )
                             }
                         }
@@ -944,7 +970,7 @@ fun SiteDetailScreen(
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(24.dp))
                                         Spacer(modifier = Modifier.width(12.dp))
-                                        Text(AppStrings.openMap, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        Text(stringResource(R.string.appstrings_open_map), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                     }
                                 }
                             }
@@ -963,7 +989,7 @@ fun SiteDetailScreen(
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(Icons.Default.Terrain, contentDescription = null, modifier = Modifier.size(24.dp))
                                         Spacer(modifier = Modifier.width(12.dp))
-                                        Text(AppStrings.elevationProfileButton, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        Text(stringResource(R.string.appstrings_elevation_profile_button), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                     }
                                 }
                             }
@@ -982,7 +1008,7 @@ fun SiteDetailScreen(
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(24.dp))
                                         Spacer(modifier = Modifier.width(12.dp))
-                                        Text(AppStrings.throughputCalculatorButton, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        Text(stringResource(R.string.appstrings_throughput_calculator_button), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                     }
                                 }
                             }
@@ -1062,7 +1088,7 @@ fun SiteDetailScreen(
                     onDismissRequest = { showImageSourceDialog = false },
                     shape = blockShape,
                     containerColor = sheetBgColor,
-                    title = { Text(AppStrings.addPhotos, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
+                    title = { Text(stringResource(R.string.appstrings_add_photos), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                     text = {
                         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                             Button(
@@ -1078,7 +1104,7 @@ fun SiteDetailScreen(
                             ) {
                                 Icon(Icons.Default.PhotoCamera, null)
                                 Spacer(Modifier.width(8.dp))
-                                Text(AppStrings.camera, fontWeight = FontWeight.Bold)
+                                Text(stringResource(R.string.appstrings_camera), fontWeight = FontWeight.Bold)
                             }
                             OutlinedButton(
                                 onClick = {
@@ -1094,7 +1120,7 @@ fun SiteDetailScreen(
                             ) {
                                 Icon(Icons.Default.PhotoLibrary, null)
                                 Spacer(Modifier.width(8.dp))
-                                Text(AppStrings.gallery, fontWeight = FontWeight.Bold)
+                                Text(stringResource(R.string.appstrings_gallery), fontWeight = FontWeight.Bold)
                             }
                             OutlinedButton(
                                 onClick = {
@@ -1110,7 +1136,7 @@ fun SiteDetailScreen(
                             ) {
                                 Icon(Icons.Default.FolderOpen, null)
                                 Spacer(Modifier.width(8.dp))
-                                Text(AppStrings.externalPhotoFiles, fontWeight = FontWeight.Bold)
+                                Text(stringResource(R.string.appstrings_external_photo_files), fontWeight = FontWeight.Bold)
                             }
                         }
                     },
@@ -1185,7 +1211,7 @@ fun formatDateToFrench(dateStr: String?): String {
     return try {
         val cleanDate = dateStr.take(10)
         val inputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        val outputFormat = SimpleDateFormat("dd/MM/yyyy", Locale.FRANCE)
+        val outputFormat = DateFormat.getDateInstance(DateFormat.SHORT, Locale.getDefault())
         val date = inputFormat.parse(cleanDate)
         if (date != null) outputFormat.format(date) else dateStr
     } catch (e: Exception) {

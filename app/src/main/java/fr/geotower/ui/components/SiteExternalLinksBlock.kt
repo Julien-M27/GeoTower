@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import fr.geotower.R
 import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.models.LocalisationEntity
-import fr.geotower.utils.AppStrings
+import androidx.compose.ui.res.stringResource
 
 @Composable
 fun SiteExternalLinksBlock(
@@ -38,8 +38,8 @@ fun SiteExternalLinksBlock(
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-    val txtExternalLinks = AppStrings.externalLinks
-    val txtOpenApp = AppStrings.open
+    val txtExternalLinks = stringResource(R.string.appstrings_external_links)
+    val txtOpenApp = stringResource(R.string.appstrings_open)
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
     val safeClick = rememberSafeClick()

@@ -17,7 +17,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fr.geotower.data.models.LocalisationEntity // ✅ NOUVEL IMPORT
-import fr.geotower.utils.AppStrings
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 @Composable
 fun SiteIdentifiersBlock(
@@ -28,13 +29,13 @@ fun SiteIdentifiersBlock(
 ) {
     val context = LocalContext.current
 
-    val txtIdentifiers = AppStrings.identifiers
-    val txtIdSupportLabel = AppStrings.idSupportLabel
-    val txtAnfrStationNumber = AppStrings.anfrStationNumber
-    val txtNotSpecified = AppStrings.notSpecified
-    val txtIdSupportCopy = AppStrings.idSupportCopy
-    val txtIdCopied = AppStrings.idCopied
-    val txtIdUnavailable = AppStrings.idUnavailable
+    val txtIdentifiers = stringResource(R.string.appstrings_identifiers)
+    val txtIdSupportLabel = stringResource(R.string.appstrings_id_support_label)
+    val txtAnfrStationNumber = stringResource(R.string.appstrings_anfr_station_number)
+    val txtNotSpecified = stringResource(R.string.appstrings_not_specified)
+    val txtIdSupportCopy = stringResource(R.string.appstrings_id_support_copy)
+    val txtIdCopied = stringResource(R.string.appstrings_id_copied)
+    val txtIdUnavailable = stringResource(R.string.appstrings_id_unavailable)
 
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor), elevation = CardDefaults.cardElevation(0.dp), modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {

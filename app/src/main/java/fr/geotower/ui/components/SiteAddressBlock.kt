@@ -18,10 +18,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.data.models.LocalisationEntity // ✅ NOUVEL IMPORT
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
 import java.util.Locale
 import fr.geotower.data.models.TechniqueEntity
 import kotlin.math.roundToInt
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 @Composable
 fun SiteAddressBlock(
@@ -33,14 +34,14 @@ fun SiteAddressBlock(
 ) {
     val context = LocalContext.current
 
-    val txtAddressLabel = AppStrings.addressLabel
-    val txtAddressCopy = AppStrings.addressCopy
-    val txtAddressCopied = AppStrings.addressCopied
-    val txtGpsLabel = AppStrings.gpsLabel
-    val txtGpsCoordsCopy = AppStrings.gpsCoordsCopy
-    val txtCoordsCopied = AppStrings.coordsCopied
-    val txtDistanceLabel = AppStrings.distanceLabel
-    val txtFromMyPosition = AppStrings.fromMyPosition
+    val txtAddressLabel = stringResource(R.string.appstrings_address_label)
+    val txtAddressCopy = stringResource(R.string.appstrings_address_copy)
+    val txtAddressCopied = stringResource(R.string.appstrings_address_copied)
+    val txtGpsLabel = stringResource(R.string.appstrings_gps_label)
+    val txtGpsCoordsCopy = stringResource(R.string.appstrings_gps_coords_copy)
+    val txtCoordsCopied = stringResource(R.string.appstrings_coords_copied)
+    val txtDistanceLabel = stringResource(R.string.appstrings_distance_label)
+    val txtFromMyPosition = stringResource(R.string.appstrings_from_my_position)
 
     Card(
         shape = blockShape,
@@ -56,7 +57,7 @@ fun SiteAddressBlock(
             }
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-            val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: AppStrings.notSpecified
+            val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: stringResource(R.string.appstrings_not_specified)
             val gpsCoords = String.format(Locale.US, "%.5f, %.5f", info.latitude, info.longitude)
 
             InfoLine(

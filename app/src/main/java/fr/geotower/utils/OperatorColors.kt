@@ -52,7 +52,7 @@ object OperatorColors {
 
     val all: List<OperatorColorSpec> = listOf(
         OperatorColorSpec(ORANGE_KEY, "Orange", ORANGE_HEX, ORANGE_ARGB, listOf("ORANGE", "ORANGE FRANCE")),
-        OperatorColorSpec(BOUYGUES_KEY, "Bouygues Telecom", BOUYGUES_HEX, BOUYGUES_ARGB, listOf("BOUYGUES", "BOUYGUES TELECOM")),
+        OperatorColorSpec(BOUYGUES_KEY, "Bouygues Telecom", BOUYGUES_HEX, BOUYGUES_ARGB, listOf("BOUYGUES", "BOUYGUES TELECOM", "BYTEL")),
         OperatorColorSpec(SFR_KEY, "SFR", SFR_HEX, SFR_ARGB, listOf("SFR", "SOCIETE FRANCAISE DU RADIOTELEPHONE")),
         OperatorColorSpec(FREE_KEY, "Free Mobile", FREE_HEX, FREE_ARGB, listOf("FREE", "FREE MOBILE")),
         OperatorColorSpec(DIGICEL_KEY, "Digicel", "#F4DA95", 0xFFF4DA95, listOf("DIGICEL", "DIGICEL AFG"), OperatorRegion.OVERSEAS),

@@ -12,7 +12,6 @@ import fr.geotower.BuildConfig
 import fr.geotower.R
 import fr.geotower.data.api.AppReleaseInfo
 import fr.geotower.data.api.AppUpdateChecker
-import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.sync.Mutex
 
 object AppUpdateNotifier {
@@ -67,7 +66,7 @@ object AppUpdateNotifier {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 APP_UPDATE_ALERTS_CHANNEL_ID,
-                AppStrings.newAppChannelName(context),
+                context.getString(R.string.notification_app_updates_channel_name),
                 NotificationManager.IMPORTANCE_DEFAULT
             )
             notificationManager.createNotificationChannel(channel)
@@ -83,13 +82,13 @@ object AppUpdateNotifier {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val contentText = AppStrings.newAppNotifDesc(context, latestRelease.versionName)
+        val contentText = context.getString(R.string.notification_app_update_available_desc, latestRelease.versionName)
         val expandedText = listOfNotNull(contentText, latestRelease.notes)
             .joinToString(separator = "\n\n")
 
         val notification = NotificationCompat.Builder(context, APP_UPDATE_ALERTS_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher_geotower)
-            .setContentTitle(AppStrings.newAppNotifTitle(context))
+            .setContentTitle(context.getString(R.string.notification_app_update_available_title))
             .setContentText(contentText)
             .setStyle(NotificationCompat.BigTextStyle().bigText(expandedText))
             .setContentIntent(pendingIntent)

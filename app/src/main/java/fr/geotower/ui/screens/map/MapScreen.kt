@@ -122,7 +122,6 @@ import fr.geotower.data.models.physicalSiteKey
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.MapUtils
 import fr.geotower.utils.OperatorColors
@@ -154,6 +153,8 @@ import java.util.Locale
 import android.os.Environment
 import kotlin.math.log2
 import kotlin.math.roundToInt
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 private const val HS_OPERATOR_WILDCARD = "*"
 private const val INITIAL_LOCATION_ZOOM = 16.0
@@ -599,26 +600,26 @@ fun MapScreen(
     var isTrackingActive by remember { mutableStateOf(false) }
     var hasCenteredOnLocation by remember { mutableStateOf(false) }
 
-    val txtMapTitle = AppStrings.mapTitle
-    val txtSearchCityOrId = AppStrings.searchCityOrId
-    val txtLocationNotFound = AppStrings.locationNotFound
-    val txtNetworkErrorSearch = AppStrings.networkErrorSearch
-    val txtDeleteTraces = AppStrings.deleteTraces
-    val txtClosestSite = AppStrings.closestSite
-    val txtFilter = AppStrings.filter
-    val txtMapIgnLayer = AppStrings.mapIgnLayer
-    val txtMapOsmLayer = AppStrings.mapOsmLayer
-    val txtMapLight = AppStrings.mapLight
-    val txtMapDark = AppStrings.mapDark
-    val txtMapSatellite = AppStrings.mapSatellite
-    val txtMapMapLibre = AppStrings.mapMapLibre
-    val txtMapTopo = AppStrings.mapTopo
-    val txtMapOfflineLayer = AppStrings.mapOfflineLayer
+    val txtMapTitle = stringResource(R.string.appstrings_map_title)
+    val txtSearchCityOrId = stringResource(R.string.appstrings_search_city_or_id)
+    val txtLocationNotFound = stringResource(R.string.appstrings_location_not_found)
+    val txtNetworkErrorSearch = stringResource(R.string.appstrings_network_error_search)
+    val txtDeleteTraces = stringResource(R.string.appstrings_delete_traces)
+    val txtClosestSite = stringResource(R.string.appstrings_closest_site)
+    val txtFilter = stringResource(R.string.appstrings_filter)
+    val txtMapIgnLayer = stringResource(R.string.appstrings_map_ign_layer)
+    val txtMapOsmLayer = stringResource(R.string.appstrings_map_osm_layer)
+    val txtMapLight = stringResource(R.string.appstrings_map_light)
+    val txtMapDark = stringResource(R.string.appstrings_map_dark)
+    val txtMapSatellite = stringResource(R.string.appstrings_map_satellite)
+    val txtMapMapLibre = stringResource(R.string.appstrings_map_map_libre)
+    val txtMapTopo = stringResource(R.string.appstrings_map_topo)
+    val txtMapOfflineLayer = stringResource(R.string.appstrings_map_offline_layer)
 
-    val txtWarningTitle = AppStrings.warningTitle
-    val txtLightColorWarning = AppStrings.lightColorWarning
-    val txtDoNotShowAgain = AppStrings.doNotShowAgain
-    val txtUnderstood = AppStrings.understood
+    val txtWarningTitle = stringResource(R.string.appstrings_warning_title)
+    val txtLightColorWarning = stringResource(R.string.appstrings_light_color_warning)
+    val txtDoNotShowAgain = stringResource(R.string.appstrings_do_not_show_again)
+    val txtUnderstood = stringResource(R.string.appstrings_understood)
 
     var hideColorWarning by remember { mutableStateOf(prefs.getBoolean("hide_light_color_warning", false)) }
     var showColorWarningDialog by remember { mutableStateOf(false) }
@@ -1373,7 +1374,7 @@ fun MapScreen(
                         // Si l'utilisateur n'a tapé QUE des chiffres et qu'on n'a rien trouvé en base,
                         // inutile d'aller chercher sur internet (Nominatim).
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                            Toast.makeText(context, AppStrings.mapSiteNotInArea(context, cleanQuery), Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, context.getString(R.string.map_site_not_in_area, cleanQuery), Toast.LENGTH_LONG).show()
                         }
                         return@launch
                     }
@@ -1588,7 +1589,7 @@ fun MapScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.Search,
-                            contentDescription = AppStrings.search,
+                            contentDescription = stringResource(R.string.appstrings_search),
                             tint = MaterialTheme.colorScheme.onPrimary
                         )
                     }
@@ -1786,7 +1787,7 @@ fun MapScreen(
                             Icon(Icons.Default.NearMe, null, modifier = Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = if (trackNearestAll) AppStrings.trackGlobalActive else txtClosestSite,
+                                text = if (trackNearestAll) stringResource(R.string.appstrings_track_global_active) else txtClosestSite,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
                             )
@@ -1828,7 +1829,7 @@ fun MapScreen(
                                 Icon(Icons.Default.WifiTethering, null, modifier = Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    text = if (trackNearestFav) AppStrings.trackOpActive(defaultOp) else "$txtClosestSite $defaultOp",
+                                    text = if (trackNearestFav) stringResource(R.string.track_operator_active, defaultOp) else "$txtClosestSite $defaultOp",
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.Bold
                                 )                            }
@@ -1843,7 +1844,7 @@ fun MapScreen(
             Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
                 SmallFloatingButton(
                     icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    desc = AppStrings.back,
+                    desc = stringResource(R.string.appstrings_back),
                     modifier = Modifier.align(Alignment.CenterStart)
                 ) {
                     restoreOperatorSearchSelection()
@@ -2056,7 +2057,7 @@ fun MapScreen(
                     ) {
                         Icon(
                             imageVector = if (isTrackingActive) Icons.Default.MyLocation else Icons.Outlined.MyLocation, // Change l'icône (plein/vide) pour plus de clarté si tu veux, ou garde Icons.Default.MyLocation
-                            contentDescription = AppStrings.locate,
+                            contentDescription = stringResource(R.string.appstrings_locate),
                             tint = if (isTrackingActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
@@ -2158,7 +2159,7 @@ fun MapScreen(
                 !mapFiles.isNullOrEmpty()
             }
 
-            val txtOfflineMessage = AppStrings.offlineMessage
+            val txtOfflineMessage = stringResource(R.string.appstrings_offline_message)
 
             ModalBottomSheet(
                 onDismissRequest = { showLayerSheet = false },
@@ -2211,7 +2212,7 @@ fun MapScreen(
                         } else if (!isOnline) {
                             // Optionnel : un petit message pour dire qu'aucune carte n'est dispo si on est hors ligne
                             Text(
-                                text = AppStrings.noOfflineMapsInstalled,
+                                text = stringResource(R.string.appstrings_no_offline_maps_installed),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 fontSize = 12.sp,
                                 modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp)
@@ -2314,7 +2315,7 @@ fun MapScreen(
                     val cityStats = if (isLoading) null else declaredSiteStats(filteredAntennas)
 
                     Text(
-                        text = AppStrings.cityStatsTitle,
+                        text = stringResource(R.string.appstrings_city_stats_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
@@ -2340,7 +2341,7 @@ fun MapScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = AppStrings.mobileTelephony,
+                                    text = stringResource(R.string.appstrings_mobile_telephony),
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
@@ -2377,7 +2378,7 @@ fun MapScreen(
                                 )
                                 if (stats.totalCount > 0) {
                                     Text(
-                                        text = AppStrings.activeDeclaredSitesLabel,
+                                        text = stringResource(R.string.appstrings_active_declared_sites_label),
                                         style = MaterialTheme.typography.labelLarge,
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f)
@@ -2396,14 +2397,14 @@ fun MapScreen(
                                         contentColor = MaterialTheme.colorScheme.onPrimary
                                     )
                                 ) {
-                                    Text(AppStrings.details, fontWeight = FontWeight.Bold)
+                                    Text(stringResource(R.string.appstrings_details), fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
                     }
 
                     TextButton(onClick = { showCityStatsPopup = false }) {
-                        Text(AppStrings.close, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.appstrings_close), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }

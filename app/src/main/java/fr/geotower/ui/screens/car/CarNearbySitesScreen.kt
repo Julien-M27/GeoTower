@@ -18,9 +18,9 @@ import androidx.car.app.model.Template
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
+import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.models.LocalisationEntity
-import fr.geotower.utils.AppStrings
 import fr.geotower.utils.LocationHelper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -51,15 +51,15 @@ class CarNearbySitesScreen(
             NearbySitesState.Loading -> loadingTemplate()
             NearbySitesState.MissingLocationPermission -> missingPermissionTemplate()
             NearbySitesState.Empty -> messageTemplate(
-                title = AppStrings.carNearbySites(carContext),
-                message = AppStrings.carNoSitesNearby(carContext),
-                actionTitle = AppStrings.carRetry(carContext),
+                title = carContext.getString(R.string.car_nearby_sites),
+                message = carContext.getString(R.string.car_no_sites_nearby),
+                actionTitle = carContext.getString(R.string.common_try_again),
                 action = ::loadNearbySites
             )
             is NearbySitesState.Error -> messageTemplate(
-                title = AppStrings.carNearbySites(carContext),
+                title = carContext.getString(R.string.car_nearby_sites),
                 message = currentState.message,
-                actionTitle = AppStrings.carRetry(carContext),
+                actionTitle = carContext.getString(R.string.common_try_again),
                 action = ::loadNearbySites
             )
             is NearbySitesState.Loaded -> loadedTemplate(currentState.sites)
@@ -79,7 +79,7 @@ class CarNearbySitesScreen(
 
             val location = getCarLocation()
             if (location == null) {
-                state = NearbySitesState.Error(AppStrings.carLocationUnavailable(carContext))
+                state = NearbySitesState.Error(carContext.getString(R.string.car_location_unavailable))
                 invalidate()
                 return@launch
             }
@@ -102,7 +102,13 @@ class CarNearbySitesScreen(
             itemListBuilder.addItem(
                 Row.Builder()
                     .setTitle(site.title)
-                    .addText("${formatCarDistance(site.distanceMeters)} - ${site.operators}")
+                    .addText(
+                        carContext.getString(
+                            R.string.car_site_distance_operators,
+                            formatCarDistance(site.distanceMeters),
+                            site.operators
+                        )
+                    )
                     .addText(site.subtitle)
                     .setOnClickListener {
                         screenManager.push(CarSiteDetailScreen(carContext, site))
@@ -113,27 +119,27 @@ class CarNearbySitesScreen(
 
         return ListTemplate.Builder()
             .setSingleList(itemListBuilder.build())
-            .setTitle(AppStrings.carSitesAroundMe(carContext))
+            .setTitle(carContext.getString(R.string.car_sites_around_me))
             .setHeaderAction(Action.BACK)
             .build()
     }
 
     private fun loadingTemplate(): Template {
         return messageTemplate(
-            title = AppStrings.carSitesAroundMe(carContext),
-            message = AppStrings.carSearchNearby(carContext),
+            title = carContext.getString(R.string.car_sites_around_me),
+            message = carContext.getString(R.string.car_search_nearby),
             actionTitle = null,
             action = null
         )
     }
 
     private fun missingPermissionTemplate(): Template {
-        return MessageTemplate.Builder(AppStrings.carLocationPermissionMessage(carContext))
-            .setTitle(AppStrings.carLocationRequired(carContext))
+        return MessageTemplate.Builder(carContext.getString(R.string.car_location_permission_message))
+            .setTitle(carContext.getString(R.string.car_location_required))
             .setHeaderAction(Action.BACK)
             .addAction(
                 Action.Builder()
-                    .setTitle(AppStrings.carOpenApp(carContext))
+                    .setTitle(carContext.getString(R.string.car_open_app))
                     .setOnClickListener {
                         carContext.getCarService(ScreenManager::class.java)
                             .push(CarPermissionScreen(carContext))
@@ -196,10 +202,11 @@ class CarNearbySitesScreen(
                     main.longitude
                 )
                 val technique = repository.getTechniqueDetails(main.idAnfr)
-                val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: AppStrings.siteAnfrTitle(carContext, main.idAnfr)
+                val siteTitle = carContext.getString(R.string.site_anfr_title, main.idAnfr)
+                val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: siteTitle
                 val splitIndex = fullAddress.lastIndexOf(",")
                 val title = if (splitIndex > 0) fullAddress.substring(0, splitIndex).trim() else fullAddress
-                val subtitle = if (splitIndex > 0) fullAddress.substring(splitIndex + 1).trim() else AppStrings.siteAnfrTitle(carContext, main.idAnfr)
+                val subtitle = if (splitIndex > 0) fullAddress.substring(splitIndex + 1).trim() else siteTitle
                 val operators = antennas
                     .flatMap { it.operatorSummary().split(", ") }
                     .distinct()

@@ -100,7 +100,6 @@ import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadRules
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
 import fr.geotower.utils.MapUtils
 import fr.geotower.utils.isNetworkAvailable
 import org.osmdroid.util.GeoPoint
@@ -114,6 +113,9 @@ import org.osmdroid.tileprovider.MapTileProviderBasic
 import kotlinx.coroutines.delay
 import kotlin.math.abs
 import kotlin.math.roundToInt
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -342,7 +344,7 @@ fun SignalQuestUploadScreen(
         containerColor = backgroundColor,
         topBar = {
             GeoTowerBackTopBar(
-                title = AppStrings.uploadSqTitle,
+                title = stringResource(R.string.appstrings_upload_sq_title),
                 onBack = { handleBackNavigation() },
                 backgroundColor = backgroundColor,
                 contentColor = textColor,
@@ -377,7 +379,7 @@ fun SignalQuestUploadScreen(
                         Icon(Icons.Default.PhotoCamera, null, modifier = Modifier.size(48.dp), tint = activeColor)
                         Spacer(modifier = Modifier.height(16.dp))
                         Text(
-                            text = AppStrings.addPhotos,
+                            text = stringResource(R.string.appstrings_add_photos),
                             color = textColor,
                             fontWeight = FontWeight.Bold
                         )
@@ -733,7 +735,7 @@ fun SignalQuestUploadScreen(
                     )
                     Spacer(Modifier.width(16.dp))
                     Text(
-                        text = AppStrings.uploadSqStripExif,
+                        text = stringResource(R.string.appstrings_upload_sq_strip_exif),
                         modifier = Modifier.weight(1f),
                         fontWeight = FontWeight.SemiBold,
                         color = textColor
@@ -754,7 +756,7 @@ fun SignalQuestUploadScreen(
                 value = description,
                 onValueChange = { description = it },
                 modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text(AppStrings.uploadSqDescPlaceholder, color = textColor.copy(alpha = 0.5f)) },
+                placeholder = { Text(stringResource(R.string.appstrings_upload_sq_desc_placeholder), color = textColor.copy(alpha = 0.5f)) },
                 minLines = 3, shape = blockShape,
                 colors = OutlinedTextFieldDefaults.colors(unfocusedContainerColor = surfaceColor, focusedContainerColor = surfaceColor, unfocusedTextColor = textColor, focusedTextColor = textColor)
             )
@@ -767,8 +769,8 @@ fun SignalQuestUploadScreen(
                     Icon(Icons.Default.Info, null, tint = activeColor)
                     Spacer(Modifier.width(16.dp))
                     Column {
-                        Text("${AppStrings.uploadSqTargetSite} $siteId", fontWeight = FontWeight.Bold, color = textColor)
-                        Text("${AppStrings.uploadSqTargetOperator} $operatorName", fontSize = 14.sp, color = textColor.copy(alpha = 0.7f))
+                        Text("${stringResource(R.string.appstrings_upload_sq_target_site)} $siteId", fontWeight = FontWeight.Bold, color = textColor)
+                        Text("${stringResource(R.string.appstrings_upload_sq_target_operator)} $operatorName", fontSize = 14.sp, color = textColor.copy(alpha = 0.7f))
                     }
                 }
             }
@@ -791,11 +793,11 @@ fun SignalQuestUploadScreen(
             ) {
                 Icon(Icons.Default.CloudUpload, null)
                 Spacer(Modifier.width(8.dp))
-                Text(AppStrings.uploadSqButton(currentUris.size), fontWeight = FontWeight.Bold)
+                Text(pluralStringResource(R.plurals.upload_sq_button, currentUris.size, currentUris.size), fontWeight = FontWeight.Bold)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
-            Text(AppStrings.uploadSqLimit, fontSize = 12.sp, color = textColor.copy(alpha = 0.5f))
+            Text(stringResource(R.string.appstrings_upload_sq_limit), fontSize = 12.sp, color = textColor.copy(alpha = 0.5f))
         }
 
         if (showImageSourceDialog) {
@@ -806,7 +808,7 @@ fun SignalQuestUploadScreen(
                 },
                 shape = blockShape,
                 containerColor = dialogContainerColor,
-                title = { Text(AppStrings.addPhotos, fontWeight = FontWeight.Bold, color = textColor) },
+                title = { Text(stringResource(R.string.appstrings_add_photos), fontWeight = FontWeight.Bold, color = textColor) },
                 text = {
                     Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                         Button(
@@ -823,7 +825,7 @@ fun SignalQuestUploadScreen(
                         ) {
                             Icon(Icons.Default.PhotoCamera, null)
                             Spacer(Modifier.width(8.dp))
-                            Text(AppStrings.camera, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.appstrings_camera), fontWeight = FontWeight.Bold)
                         }
                         OutlinedButton(
                             onClick = {
@@ -840,7 +842,7 @@ fun SignalQuestUploadScreen(
                         ) {
                             Icon(Icons.Default.PhotoLibrary, null)
                             Spacer(Modifier.width(8.dp))
-                            Text(AppStrings.gallery, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.appstrings_gallery), fontWeight = FontWeight.Bold)
                         }
                         OutlinedButton(
                             onClick = {
@@ -857,7 +859,7 @@ fun SignalQuestUploadScreen(
                         ) {
                             Icon(Icons.Default.FolderOpen, null)
                             Spacer(Modifier.width(8.dp))
-                            Text(AppStrings.externalPhotoFiles, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.appstrings_external_photo_files), fontWeight = FontWeight.Bold)
                         }
                     }
                 },
@@ -870,14 +872,14 @@ fun SignalQuestUploadScreen(
             AlertDialog(
                 onDismissRequest = { showConfirmDialog = false },
                 shape = blockShape,
-                title = { Text(text = AppStrings.uploadConfirmTitle, fontWeight = FontWeight.Bold) },
+                title = { Text(text = stringResource(R.string.appstrings_upload_confirm_title), fontWeight = FontWeight.Bold) },
                 text = {
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        Text(text = AppStrings.uploadConfirmMessage(currentUris.size))
+                        Text(text = pluralStringResource(R.plurals.upload_confirm_message, currentUris.size, currentUris.size))
 
                         // NOUVEAU : LA MINI-CARTE DANS LE POP-UP
                         Box(
@@ -1012,12 +1014,12 @@ fun SignalQuestUploadScreen(
                         shape = buttonShape,
                         colors = ButtonDefaults.buttonColors(containerColor = activeColor)
                     ) {
-                        Text(AppStrings.validate, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.appstrings_validate), fontWeight = FontWeight.Bold)
                     }
                 },
                 dismissButton = {
                     TextButton(onClick = { safeClick { showConfirmDialog = false } }) {
-                        Text(AppStrings.cancel, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(stringResource(R.string.appstrings_cancel), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             )

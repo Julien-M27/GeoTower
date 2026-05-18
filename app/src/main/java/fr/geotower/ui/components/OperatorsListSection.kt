@@ -26,11 +26,11 @@ import androidx.compose.ui.unit.sp
 import fr.geotower.R
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.TechniqueEntity // ✅ NOUVEL IMPORT
-import fr.geotower.ui.screens.emitters.formatDateToFrench // ✅ IMPORT DU FORMATAGE DES DATES
-import fr.geotower.utils.AppStrings
+import fr.geotower.ui.screens.emitters.formatDateToFrench // ✅ Formatage localisé des dates
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
+import androidx.compose.ui.res.stringResource
 
 @Composable
 fun OperatorsListSection(
@@ -88,7 +88,7 @@ fun OperatorsListSection(
 
     Column(modifier = Modifier.padding(top = 8.dp)) {
         Text(
-            text = AppStrings.operatorCount(filteredAntennas.size), // ✅ Utilise la taille filtrée
+            text = stringResource(R.string.operator_count, filteredAntennas.size), // ✅ Utilise la taille filtrée
             color = MaterialTheme.colorScheme.primary,
             fontSize = 13.sp,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
@@ -134,7 +134,7 @@ fun OperatorDetailItem(
 
     Column(modifier = modifier.alpha(if (isMuted) 0.42f else 1f)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            val opName = antenna.operateur ?: AppStrings.unknown
+            val opName = antenna.operateur ?: stringResource(R.string.appstrings_unknown)
             val logoRes = getLocalLogoRes(opName)
 
             if (logoRes != null) {
@@ -156,7 +156,7 @@ fun OperatorDetailItem(
                 // ✅ AFFICHAGE DES VRAIES TECHNOLOGIES FILTRÉES
                 val rawTechs = technique?.technologies?.takeIf { it.isNotBlank() } ?: antenna.frequences
                 // ✅ On envoie les filtres au formateur
-                val realTechs = formatSiteTechnologies(rawTechs, AppStrings.unknown, s2G, s3G, s4G, s5G, sFh)
+                val realTechs = formatSiteTechnologies(rawTechs, stringResource(R.string.appstrings_unknown), s2G, s3G, s4G, s5G, sFh)
                 Text(text = realTechs, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             } // <-- Fin de la Column(weight = 1f)
@@ -173,7 +173,7 @@ fun OperatorDetailItem(
             ) {
                 Icon(
                     imageVector = androidx.compose.material.icons.Icons.Default.Warning,
-                    contentDescription = AppStrings.outageAttentionDesc,
+                    contentDescription = stringResource(R.string.appstrings_outage_attention_desc),
                     tint = Color(0xFFE53935),
                     modifier = Modifier.size(16.dp).padding(end = 6.dp)
                 )
@@ -194,12 +194,12 @@ fun OperatorDetailItem(
         val dateSer = technique?.dateService?.let { formatDateToFrench(it) } ?: "-"
         val dateMod = technique?.dateModif?.let { formatDateToFrench(it) } ?: "-"
 
-        // ✅ On utilise la traduction officielle d'AppStrings
-        val txtModif = AppStrings.lastModification
+        // ✅ On utilise la ressource Android officielle
+        val txtModif = stringResource(R.string.appstrings_last_modification)
 
         // ✅ PLUS DE " : " EN TROP !
-        DateLine(AppStrings.implementation, dateImp)
-        DateLine(AppStrings.activatedOn, dateSer)
+        DateLine(stringResource(R.string.appstrings_implementation), dateImp)
+        DateLine(stringResource(R.string.appstrings_activated_on), dateSer)
 
         if (dateMod != "-") {
             DateLine(txtModif, dateMod)
@@ -239,7 +239,7 @@ private fun formatSiteTechnologies(
     }
 
     // Si tout a été masqué par les filtres, on affiche "Non spécifié"
-    if (filtered.isEmpty()) return AppStrings.notSpecified
+    if (filtered.isEmpty()) return stringResource(R.string.appstrings_not_specified)
 
     return filtered.sortedDescending().joinToString(" - ")
 }
@@ -252,17 +252,17 @@ private fun getLocalLogoRes(opName: String): Int? {
 fun formatOutageDetails(hsData: fr.geotower.data.models.SiteHsEntity): String {
     // 1. Traduction du texte détaillé de l'API (ex: "Incident en cours")
     val detailTranslated = when (hsData.detail?.lowercase()) {
-        "incident en cours" -> AppStrings.apiDetailIncident
-        "travaux de maintenance" -> AppStrings.apiDetailMaintenance
-        "intervention technique" -> AppStrings.outageReasonTechnical
+        "incident en cours" -> stringResource(R.string.appstrings_api_detail_incident)
+        "travaux de maintenance" -> stringResource(R.string.appstrings_api_detail_maintenance)
+        "intervention technique" -> stringResource(R.string.appstrings_outage_reason_technical)
         "null" -> null // 🚨 ON INTERCEPTE ET ON DÉTRUIT LE FAUX TEXTE "null"
         else -> hsData.detail
     }
 
     // 2. Traduction du code court ("INT", "MAINT")
     val reasonTranslated = when (hsData.raison?.uppercase()) {
-        "MAINT" -> AppStrings.outageReasonMaintenance
-        "INT" -> AppStrings.outageReasonIncident
+        "MAINT" -> stringResource(R.string.appstrings_outage_reason_maintenance)
+        "INT" -> stringResource(R.string.appstrings_outage_reason_incident)
         "NULL" -> null // 🚨 PAREIL ICI
         else -> hsData.raison
     }
@@ -270,12 +270,12 @@ fun formatOutageDetails(hsData: fr.geotower.data.models.SiteHsEntity): String {
     // 3. On choisit le détail en priorité, sinon le code court, sinon "Inconnu"
     val displayReason = detailTranslated?.takeIf { it.isNotBlank() && it.lowercase() != "null" }
         ?: reasonTranslated?.takeIf { it.isNotBlank() && it.lowercase() != "null" }
-        ?: AppStrings.unknownOutageReason
+        ?: stringResource(R.string.appstrings_unknown_outage_reason)
 
-    val statusDegraded = AppStrings.outageStatusDegraded
-    val statusHs = AppStrings.outageStatusHs
-    val voiceLabel = AppStrings.outageVoice
-    val dataLabel = AppStrings.outageData
+    val statusDegraded = stringResource(R.string.appstrings_outage_status_degraded)
+    val statusHs = stringResource(R.string.appstrings_outage_status_hs)
+    val voiceLabel = stringResource(R.string.appstrings_outage_voice)
+    val dataLabel = stringResource(R.string.appstrings_outage_data)
 
     // 2. Traduction simple (Uniquement pour ce qui est en panne)
     fun getStatusText(code: String?): String {

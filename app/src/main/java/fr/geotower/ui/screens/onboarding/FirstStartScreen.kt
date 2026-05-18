@@ -65,6 +65,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
@@ -83,8 +84,8 @@ import fr.geotower.ui.components.colorPaletteFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.services.LiveTrackingController
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppLocale
 import fr.geotower.utils.AppUiMode
-import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorLogos
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -209,7 +210,7 @@ fun FirstStartScreen(
         wasSyncing = isSyncing
     }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    var appLanguage by remember { mutableStateOf(prefs.getString("app_language", AppStrings.LANGUAGE_SYSTEM) ?: AppStrings.LANGUAGE_SYSTEM) }
+    var appLanguage by remember { mutableStateOf(prefs.getString("app_language", AppLocale.LANGUAGE_SYSTEM) ?: AppLocale.LANGUAGE_SYSTEM) }
     var showLanguageSheet by remember { mutableStateOf(false) }
 
     // --- LECTURE RÉACTIVE DU THÈME ---
@@ -306,11 +307,11 @@ fun FirstStartScreen(
             val isNotificationStepReady = hasNotificationPermission || isNotificationPermissionHandled
 
             val buttonText = when(currentStep) {
-                0 -> AppStrings.btnStartConfiguration
-                1 -> if (isLocationStepReady) AppStrings.btnNext else AppStrings.btnAuthorize
-                2 -> if (isNotificationStepReady) AppStrings.btnNext else AppStrings.btnAuthorize
-                totalSteps - 1 -> AppStrings.btnLetsGo
-                else -> AppStrings.btnNext
+                0 -> stringResource(R.string.onboarding_start_configuration)
+                1 -> if (isLocationStepReady) stringResource(R.string.common_next) else stringResource(R.string.common_authorize)
+                2 -> if (isNotificationStepReady) stringResource(R.string.common_next) else stringResource(R.string.common_authorize)
+                totalSteps - 1 -> stringResource(R.string.onboarding_lets_go)
+                else -> stringResource(R.string.common_next)
             }
             Button(
                 onClick = {
@@ -404,8 +405,8 @@ fun FirstStartScreen(
     // --- POP-UP D'AVERTISSEMENT SI UNE AUTORISATION EST REFUSÉE ---
     if (showLocationPermissionDialog) {
         OnboardingPermissionDeniedDialog(
-            title = { Text(text = AppStrings.onboardingLocationDisabledTitle, fontWeight = FontWeight.Bold) },
-            text = { Text(AppStrings.onboardingLocationDisabledDesc) },
+            title = { Text(text = stringResource(R.string.onboarding_location_denied_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.onboarding_location_denied_desc)) },
             shape = cardShape,
             onContinue = {
                 showLocationPermissionDialog = false
@@ -425,8 +426,8 @@ fun FirstStartScreen(
 
     if (showNotificationPermissionDialog) {
         OnboardingPermissionDeniedDialog(
-            title = { Text(text = AppStrings.onboardingNotificationsDisabledTitle, fontWeight = FontWeight.Bold) },
-            text = { Text(AppStrings.onboardingNotificationsDisabledDesc) },
+            title = { Text(text = stringResource(R.string.onboarding_notifications_denied_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.onboarding_notifications_denied_desc)) },
             shape = cardShape,
             onContinue = {
                 showNotificationPermissionDialog = false
@@ -442,17 +443,17 @@ fun FirstStartScreen(
     if (showWarningDialog) {
         AlertDialog(
             onDismissRequest = { showWarningDialog = false },
-            title = { Text(text = AppStrings.warningNoOpTitle, fontWeight = FontWeight.Bold) },
+            title = { Text(text = stringResource(R.string.onboarding_warning_no_operator_title), fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    Text(AppStrings.warningNoOpDesc)
+                    Text(stringResource(R.string.onboarding_warning_no_operator_desc))
                     if (liveNotifsEnabled) {
                         Spacer(Modifier.height(8.dp))
-                        val liveWarningLead = AppStrings.warningNoOpLiveNotificationsLead
-                        val liveWarningLabel = AppStrings.warningNoOpLiveNotificationsLabel
-                        val liveWarningMiddle = AppStrings.warningNoOpLiveNotificationsMiddle
-                        val liveWarningHighlight = AppStrings.warningNoOpLiveNotificationsHighlight
-                        val liveWarningSuffix = AppStrings.warningNoOpLiveNotificationsSuffix
+                        val liveWarningLead = stringResource(R.string.onboarding_warning_live_notifications_lead)
+                        val liveWarningLabel = stringResource(R.string.onboarding_warning_live_notifications_label)
+                        val liveWarningMiddle = stringResource(R.string.onboarding_warning_live_notifications_middle)
+                        val liveWarningHighlight = stringResource(R.string.onboarding_warning_live_notifications_highlight)
+                        val liveWarningSuffix = stringResource(R.string.onboarding_warning_live_notifications_suffix)
                         Text(
                             buildAnnotatedString {
                                 append(liveWarningLead)
@@ -493,7 +494,7 @@ fun FirstStartScreen(
                         onFinished() // L'utilisateur force la continuation
                     }
                 ) {
-                    Text(AppStrings.warningContinue, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.common_continue_anyway), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             },
             dismissButton = {
@@ -504,7 +505,7 @@ fun FirstStartScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text(AppStrings.warningChooseOp, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.onboarding_choose_operator), fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -514,12 +515,12 @@ fun FirstStartScreen(
     if (showDbWarning) {
         AlertDialog(
             onDismissRequest = { showDbWarning = false },
-            title = { Text(text = AppStrings.dbWarningTitle, fontWeight = FontWeight.Bold) },
+            title = { Text(text = stringResource(R.string.onboarding_database_warning_title), fontWeight = FontWeight.Bold) },
             text = {
                 Column {
-                    Text(AppStrings.dbWarningDesc)
+                    Text(stringResource(R.string.onboarding_database_warning_desc))
                     Spacer(Modifier.height(8.dp))
-                    Text(AppStrings.dbWarningQuestion)
+                    Text(stringResource(R.string.onboarding_database_warning_question))
                 }
             },
             shape = cardShape,
@@ -532,7 +533,7 @@ fun FirstStartScreen(
                         goToNextStep()
                     }
                 ) {
-                    Text(AppStrings.continueAnyway, color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.common_continue_anyway), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
@@ -540,7 +541,7 @@ fun FirstStartScreen(
                     onClick = { showDbWarning = false },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text(AppStrings.cancel, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.common_cancel), fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -553,8 +554,8 @@ fun FirstStartScreen(
                 // ✅ NOUVEAU : On désactive aussi le pop-up global si l'utilisateur clique à côté
                 fr.geotower.AppGlobalState.showDbSuccessPopup.value = false
             },
-            title = { Text(text = AppStrings.dbSuccessTitle, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) },
-            text = { Text(AppStrings.dbSuccessDesc) },
+            title = { Text(text = stringResource(R.string.onboarding_database_success_title), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary) },
+            text = { Text(stringResource(R.string.onboarding_database_success_desc)) },
             shape = cardShape,
             containerColor = MaterialTheme.colorScheme.surface,
             confirmButton = {
@@ -569,7 +570,7 @@ fun FirstStartScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
-                    Text(AppStrings.btnContinue, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.common_continue), fontWeight = FontWeight.Bold)
                 }
             }
         )
@@ -605,6 +606,7 @@ fun FirstStartScreen(
             onSelect = { nouvelleLangue ->
                 appLanguage = nouvelleLangue
                 AppConfig.appLanguage.value = nouvelleLangue
+                AppLocale.applyApplicationLocale(context, nouvelleLangue)
                 prefs.edit().putString("app_language", nouvelleLangue).apply()
             },
             onDismiss = { showLanguageSheet = false },
@@ -648,9 +650,9 @@ fun StepPreferencesDesign(
         Icon(Icons.Outlined.Tune, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text(AppStrings.preferences, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.settings_section_preferences), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
-        Text(AppStrings.prefDesc, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.onboarding_preferences_desc), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -658,13 +660,13 @@ fun StepPreferencesDesign(
         Surface(onClick = { onSafeClick("onboarding_operator") { onOpenOperatorSheet() } }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(AppStrings.defaultOperator, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(if (defaultOperator == "Aucun") AppStrings.selectOperator else AppStrings.current(defaultOperator), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.settings_default_operator), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(if (defaultOperator == "Aucun") stringResource(R.string.common_select) else stringResource(R.string.common_current_value, defaultOperator), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 val operatorLogoRes = OperatorLogos.drawableRes(defaultOperator)
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     if (operatorLogoRes != null) { Image(painter = painterResource(id = operatorLogoRes), contentDescription = null, modifier = Modifier.size(32.dp).clip(RoundedCornerShape(6.dp))); Spacer(modifier = Modifier.width(12.dp)) }
-                    Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = AppStrings.select, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.common_select), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -672,23 +674,14 @@ fun StepPreferencesDesign(
         Spacer(modifier = Modifier.height(16.dp))
 
         // --- CARTE LANGUE ---
-        val flag = when (appLanguage) {
-            AppStrings.LANGUAGE_FRENCH -> "🇫🇷"
-            AppStrings.LANGUAGE_ENGLISH -> "🇬🇧"
-            AppStrings.LANGUAGE_PORTUGUESE -> "🇵🇹"
-            AppStrings.LANGUAGE_ITALIAN -> "🇮🇹"
-            AppStrings.LANGUAGE_GERMAN -> "🇩🇪"
-            AppStrings.LANGUAGE_SPANISH -> "🇪🇸"
-            AppStrings.LANGUAGE_SYSTEM -> "📱"
-            else -> "🌐"
-        }
-        val displayLanguage = AppStrings.languageDisplayName(appLanguage)
+        val flag = AppLocale.languageFlag(appLanguage)
+        val displayLanguage = stringResource(AppLocale.languageDisplayNameRes(appLanguage))
 
         Surface(onClick = { onSafeClick("onboarding_language") { onOpenLanguageSheet() } }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(AppStrings.appLanguageLabel, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(AppStrings.current(displayLanguage), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.settings_app_language), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.common_current_value, displayLanguage), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) { Text(text = flag, fontSize = 24.sp) }
@@ -702,7 +695,7 @@ fun StepPreferencesDesign(
         Surface(onClick = { onSafeClick("onboarding_unit") { onOpenUnitSheet() } }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(AppStrings.unitSettingsTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.settings_units_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     val unitDesc = if(AppConfig.distanceUnit.intValue == 0) "km, km/h" else "mi, mph"
                     Text(unitDesc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
@@ -735,12 +728,12 @@ private fun OnboardingPermissionDeniedDialog(
                 onClick = onRetry,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
-                Text(AppStrings.retry, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.common_try_again), fontWeight = FontWeight.Bold)
             }
         },
         dismissButton = {
             TextButton(onClick = onContinue) {
-                Text(AppStrings.permissionContinueAnyway, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.common_continue_anyway), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     )
@@ -761,10 +754,10 @@ fun StepWelcomeDesign() {
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text(AppStrings.onboardingWelcomeTitle, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Text(stringResource(R.string.brand_geotower), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = AppStrings.onboardingWelcomeDesc,
+            text = stringResource(R.string.onboarding_welcome_desc),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -778,18 +771,18 @@ fun StepWelcomeDesign() {
         ) {
             PermissionDetailItem(
                 icon = Icons.Default.LocationOn,
-                title = AppStrings.onboardingWelcomeNearbyTitle,
-                description = AppStrings.onboardingWelcomeNearbyDesc
+                title = stringResource(R.string.onboarding_welcome_nearby_title),
+                description = stringResource(R.string.onboarding_welcome_nearby_desc)
             )
             PermissionDetailItem(
                 icon = Icons.Default.Map,
-                title = AppStrings.onboardingWelcomeMapTitle,
-                description = AppStrings.onboardingWelcomeMapDesc
+                title = stringResource(R.string.onboarding_welcome_map_title),
+                description = stringResource(R.string.onboarding_welcome_map_desc)
             )
             PermissionDetailItem(
                 icon = Icons.Default.Check,
-                title = AppStrings.onboardingWelcomeToolsTitle,
-                description = AppStrings.onboardingWelcomeToolsDesc
+                title = stringResource(R.string.onboarding_welcome_tools_title),
+                description = stringResource(R.string.onboarding_welcome_tools_desc)
             )
         }
     }
@@ -802,10 +795,10 @@ fun StepLocationPermissionDesign() {
         Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text(AppStrings.onboardingLocationTitle, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.onboarding_location_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = AppStrings.onboardingLocationDesc,
+            text = stringResource(R.string.onboarding_location_desc),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -819,18 +812,18 @@ fun StepLocationPermissionDesign() {
         ) {
             PermissionDetailItem(
                 icon = Icons.Default.LocationOn,
-                title = AppStrings.onboardingLocationNearbyTitle,
-                description = AppStrings.onboardingLocationNearbyDesc
+                title = stringResource(R.string.onboarding_location_nearby_title),
+                description = stringResource(R.string.onboarding_location_nearby_desc)
             )
             PermissionDetailItem(
                 icon = Icons.Default.Map,
-                title = AppStrings.onboardingLocationMapTitle,
-                description = AppStrings.onboardingLocationMapDesc
+                title = stringResource(R.string.onboarding_location_map_title),
+                description = stringResource(R.string.onboarding_location_map_desc)
             )
             PermissionDetailItem(
                 icon = Icons.Default.Check,
-                title = AppStrings.onboardingLocationPrivacyTitle,
-                description = AppStrings.onboardingLocationPrivacyDesc
+                title = stringResource(R.string.onboarding_location_privacy_title),
+                description = stringResource(R.string.onboarding_location_privacy_desc)
             )
         }
     }
@@ -843,10 +836,10 @@ fun StepNotificationsPermissionDesign() {
         Icon(Icons.Default.Notifications, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text(AppStrings.onboardingNotificationsTitle, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.onboarding_notifications_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = AppStrings.onboardingNotificationsDesc,
+            text = stringResource(R.string.onboarding_notifications_desc),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -860,18 +853,18 @@ fun StepNotificationsPermissionDesign() {
         ) {
             PermissionDetailItem(
                 icon = Icons.Default.Notifications,
-                title = AppStrings.onboardingNotificationsDownloadTitle,
-                description = AppStrings.onboardingNotificationsDownloadDesc
+                title = stringResource(R.string.onboarding_notifications_download_title),
+                description = stringResource(R.string.onboarding_notifications_download_desc)
             )
             PermissionDetailItem(
                 icon = Icons.Default.Map,
-                title = AppStrings.onboardingNotificationsUpdateTitle,
-                description = AppStrings.onboardingNotificationsUpdateDesc
+                title = stringResource(R.string.onboarding_notifications_update_title),
+                description = stringResource(R.string.onboarding_notifications_update_desc)
             )
             PermissionDetailItem(
                 icon = Icons.Default.Check,
-                title = AppStrings.onboardingNotificationsControlTitle,
-                description = AppStrings.onboardingNotificationsControlDesc
+                title = stringResource(R.string.onboarding_notifications_control_title),
+                description = stringResource(R.string.onboarding_notifications_control_desc)
             )
         }
     }
@@ -896,10 +889,10 @@ fun StepLiveNotificationsDesign(
         Icon(Icons.Default.Notifications, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text(AppStrings.onboardingLiveNotificationsTitle, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.onboarding_live_notifications_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            text = AppStrings.onboardingLiveNotificationsDesc,
+            text = stringResource(R.string.onboarding_live_notifications_desc),
             textAlign = TextAlign.Center,
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -908,7 +901,7 @@ fun StepLiveNotificationsDesign(
         if (!hasOperator) {
             Spacer(Modifier.height(12.dp))
             Text(
-                text = AppStrings.liveNotificationRequiresOp,
+                text = stringResource(R.string.onboarding_live_notifications_requires_operator),
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error
@@ -923,29 +916,29 @@ fun StepLiveNotificationsDesign(
         ) {
             PermissionDetailItem(
                 icon = Icons.Default.Notifications,
-                title = AppStrings.onboardingLiveNotificationsOperatorTitle,
-                description = AppStrings.onboardingLiveNotificationsOperatorDesc
+                title = stringResource(R.string.onboarding_live_notifications_operator_title),
+                description = stringResource(R.string.onboarding_live_notifications_operator_desc)
             )
             PermissionDetailItem(
                 icon = Icons.Default.LocationOn,
-                title = AppStrings.onboardingLiveNotificationsNearestTitle,
-                description = AppStrings.onboardingLiveNotificationsNearestDesc
+                title = stringResource(R.string.onboarding_live_notifications_nearest_title),
+                description = stringResource(R.string.onboarding_live_notifications_nearest_desc)
             )
             PermissionDetailItem(
                 icon = Icons.Default.Check,
-                title = AppStrings.onboardingLiveNotificationsControlTitle,
-                description = AppStrings.onboardingLiveNotificationsControlDesc
+                title = stringResource(R.string.onboarding_live_notifications_control_title),
+                description = stringResource(R.string.onboarding_live_notifications_control_desc)
             )
         }
 
         Spacer(Modifier.height(16.dp))
 
         fr.geotower.ui.components.LiveNotificationCard(
-            title = AppStrings.onboardingLiveNotificationsTitle,
+            title = stringResource(R.string.onboarding_live_notifications_title),
             desc = if (hasOperator) {
-                "${AppStrings.onboardingLiveNotificationsSelectedOperator} : $defaultOperator"
+                stringResource(R.string.onboarding_live_notifications_selected_operator, defaultOperator)
             } else {
-                AppStrings.liveNotificationRequiresOp
+                stringResource(R.string.onboarding_live_notifications_requires_operator)
             },
             checked = liveNotifsEnabled,
             onCheckedChange = { isChecked ->
@@ -1017,9 +1010,9 @@ fun StepThemeDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStrok
         Icon(Icons.Outlined.Smartphone, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text(AppStrings.appearance, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.settings_section_appearance), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
-        Text(AppStrings.themeDesc, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.onboarding_theme_desc), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -1066,9 +1059,9 @@ fun StepMapDesign(useOneUi: Boolean, bubbleColor: Color, onSafeClick: SafeClick)
         Icon(Icons.Default.Map, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text(AppStrings.mapping, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.settings_section_mapping), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
-        Text(AppStrings.mapDesc, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.onboarding_mapping_desc), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         Spacer(modifier = Modifier.height(32.dp))
 
@@ -1101,9 +1094,9 @@ fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderSt
         )
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text(AppStrings.database, style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
+        Text(stringResource(R.string.settings_section_database), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(8.dp))
-        Text(AppStrings.offlineDesc, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.onboarding_offline_desc), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
         Spacer(modifier = Modifier.height(32.dp))
 

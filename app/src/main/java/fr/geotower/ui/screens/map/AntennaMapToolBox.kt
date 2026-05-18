@@ -18,7 +18,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import fr.geotower.utils.AppStrings
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 @Composable
 fun AntennaMapToolBox(
@@ -63,7 +64,7 @@ fun AntennaMapToolBox(
                     ) {
                         Icon(
                             Icons.Default.Search,
-                            contentDescription = AppStrings.search,
+                            contentDescription = stringResource(R.string.appstrings_search),
                             tint = if (isSearchActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(22.dp)
                         )
@@ -76,16 +77,16 @@ fun AntennaMapToolBox(
                     ) {
                         Icon(
                             Icons.Default.Straighten,
-                            contentDescription = AppStrings.ruler,
+                            contentDescription = stringResource(R.string.appstrings_ruler),
                             tint = if (isMeasuringMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.size(22.dp)
                         )
                     }
                     IconButton(onClick = onOpenLayers, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Default.Layers, contentDescription = AppStrings.layers, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+                        Icon(Icons.Default.Layers, contentDescription = stringResource(R.string.appstrings_layers), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
                     }
                     IconButton(onClick = onOpenSettings, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Default.Settings, contentDescription = AppStrings.settingsTitle, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.appstrings_settings_title), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
                     }
                     HorizontalDivider(modifier = Modifier.width(32.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                 }
@@ -98,7 +99,7 @@ fun AntennaMapToolBox(
             ) {
                 Icon(
                     if (isToolboxExpanded) Icons.Default.Close else Icons.Default.Build,
-                    contentDescription = AppStrings.tools,
+                    contentDescription = stringResource(R.string.appstrings_tools),
                     modifier = Modifier.size(24.dp).rotate(toolboxRotation)
                 )
             }

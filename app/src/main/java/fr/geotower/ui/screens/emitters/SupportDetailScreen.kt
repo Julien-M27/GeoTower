@@ -72,12 +72,13 @@ import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
-import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColors
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 private const val TAG_SUPPORT_DETAIL = "GeoTower"
 
@@ -256,7 +257,16 @@ fun SupportDetailScreen(
                 if (!trueSupportId.isNullOrBlank()) {
                     if (hasCellularFrPhotos) {
                         CellularFrApi.getCellularFrPhotos(trueSupportId).forEach { photo ->
-                            photosTemp.add(CommunityPhoto(photo.url, "CellularFR", photo.author, photo.uploadedAt))
+                            photosTemp.add(
+                                CommunityPhoto(
+                                    url = photo.url,
+                                    communityName = "CellularFR",
+                                    author = photo.author,
+                                    date = photo.uploadedAt,
+                                    sourceId = CommunityDataPreferences.SOURCE_CELLULARFR,
+                                    stableId = photo.url
+                                )
+                            )
                         }
                     }
 
@@ -268,7 +278,21 @@ fun SupportDetailScreen(
                             )
                             if (response.isSuccessful) {
                                 response.body()?.data?.forEach { photo ->
-                                    photosTemp.add(CommunityPhoto(photo.imageUrl, "Signal Quest", photo.authorName, photo.uploadedAt, photo.publicMetadata))
+                                    val photoOperatorKey = OperatorColors.keyFor(photo.operator)
+                                    val photoOperatorLabel = OperatorColors.specForKey(photoOperatorKey)?.label
+                                    photosTemp.add(
+                                        CommunityPhoto(
+                                            url = photo.imageUrl,
+                                            communityName = "Signal Quest",
+                                            author = photo.authorName,
+                                            date = photo.uploadedAt,
+                                            exifMetadata = photo.publicMetadata,
+                                            sourceId = CommunityDataPreferences.SOURCE_SIGNALQUEST,
+                                            stableId = photo.id ?: photo.imageUrl,
+                                            operatorKey = photoOperatorKey,
+                                            operatorLabel = photoOperatorLabel ?: photo.operator
+                                        )
+                                    )
                                 }
                             }
                         } catch (e: Exception) { AppLogger.w(TAG_SUPPORT_DETAIL, "SignalQuest photos request failed", e) }
@@ -337,38 +361,38 @@ fun SupportDetailScreen(
     val bearingStr = locationData.second
     val distanceMeters = locationData.third
 
-    val txtIdCopied = AppStrings.idCopied
-    val txtIdUnavailable = AppStrings.idUnavailable
-    val txtAddressCopied = AppStrings.addressCopied
-    val txtCoordsCopied = AppStrings.coordsCopied
-    val txtNoGpsApp = AppStrings.noGpsApp
+    val txtIdCopied = stringResource(R.string.appstrings_id_copied)
+    val txtIdUnavailable = stringResource(R.string.appstrings_id_unavailable)
+    val txtAddressCopied = stringResource(R.string.appstrings_address_copied)
+    val txtCoordsCopied = stringResource(R.string.appstrings_coords_copied)
+    val txtNoGpsApp = stringResource(R.string.appstrings_no_gps_app)
 
-    val txtSupportDetailTitle = AppStrings.supportDetailTitle
-    val txtAddressLabel = AppStrings.addressLabel
-    val txtNotSpecified = AppStrings.notSpecified
-    val txtGpsLabel = AppStrings.gpsLabel
-    val txtSupportHeight = AppStrings.supportHeight
-    val txtDistanceLabel = AppStrings.distanceLabel
-    val txtFromMyPosition = AppStrings.fromMyPosition
-    val txtBearingLabel = AppStrings.bearingLabel
-    val txtOperatorsTitle = AppStrings.operatorsTitle
-    val txtGeneratedBy = AppStrings.generatedBy
-    val txtShareSiteVia = AppStrings.shareSiteVia
+    val txtSupportDetailTitle = stringResource(R.string.appstrings_support_detail_title)
+    val txtAddressLabel = stringResource(R.string.appstrings_address_label)
+    val txtNotSpecified = stringResource(R.string.appstrings_not_specified)
+    val txtGpsLabel = stringResource(R.string.appstrings_gps_label)
+    val txtSupportHeight = stringResource(R.string.appstrings_support_height)
+    val txtDistanceLabel = stringResource(R.string.appstrings_distance_label)
+    val txtFromMyPosition = stringResource(R.string.appstrings_from_my_position)
+    val txtBearingLabel = stringResource(R.string.appstrings_bearing_label)
+    val txtOperatorsTitle = stringResource(R.string.appstrings_operators_title)
+    val txtGeneratedBy = stringResource(R.string.appstrings_generated_by)
+    val txtShareSiteVia = stringResource(R.string.appstrings_share_site_via)
 
-    val txtThemeLight = AppStrings.themeLight
-    val txtLightModeDesc = AppStrings.lightModeDesc
-    val txtThemeDark = AppStrings.themeDark
-    val txtDarkModeDesc = AppStrings.darkModeDesc
-    val txtIdNumber = AppStrings.idNumber
-    val txtSupportNature = AppStrings.supportNature
-    val txtIdSupportCopy = AppStrings.idSupportCopy
-    val txtAddressCopy = AppStrings.addressCopy
-    val txtGpsCoordsCopy = AppStrings.gpsCoordsCopy
-    val txtMove = AppStrings.move
-    val txtShareConfidentialOption = AppStrings.shareConfidentialOption
-    val txtShareConfidentialDesc = AppStrings.shareConfidentialDesc
-    val txtGenerateImage = AppStrings.generateImage
-    val txtUnknown = AppStrings.unknown
+    val txtThemeLight = stringResource(R.string.appstrings_theme_light)
+    val txtLightModeDesc = stringResource(R.string.appstrings_light_mode_desc)
+    val txtThemeDark = stringResource(R.string.appstrings_theme_dark)
+    val txtDarkModeDesc = stringResource(R.string.appstrings_dark_mode_desc)
+    val txtIdNumber = stringResource(R.string.appstrings_id_number)
+    val txtSupportNature = stringResource(R.string.appstrings_support_nature)
+    val txtIdSupportCopy = stringResource(R.string.appstrings_id_support_copy)
+    val txtAddressCopy = stringResource(R.string.appstrings_address_copy)
+    val txtGpsCoordsCopy = stringResource(R.string.appstrings_gps_coords_copy)
+    val txtMove = stringResource(R.string.appstrings_move)
+    val txtShareConfidentialOption = stringResource(R.string.appstrings_share_confidential_option)
+    val txtShareConfidentialDesc = stringResource(R.string.appstrings_share_confidential_desc)
+    val txtGenerateImage = stringResource(R.string.appstrings_generate_image)
+    val txtUnknown = stringResource(R.string.appstrings_unknown)
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
@@ -404,7 +428,7 @@ fun SupportDetailScreen(
         containerColor = mainBgColor,
         topBar = {
             GeoTowerBackTopBar(
-                title = AppStrings.supportDetailTitle,
+                title = stringResource(R.string.appstrings_support_detail_title),
                 onBack = {
                     if (isSplitScreen) {
                         onCloseSplitScreen()
@@ -420,7 +444,7 @@ fun SupportDetailScreen(
                     ) {
                         Icon(
                             Icons.Default.Settings,
-                            contentDescription = AppStrings.settingsTitle,
+                            contentDescription = stringResource(R.string.appstrings_settings_title),
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -433,7 +457,7 @@ fun SupportDetailScreen(
             if (isLoading) {
                 LoadingIndicator(modifier = Modifier.align(Alignment.Center))
             } else if (antennas.isEmpty()) {
-                Text(AppStrings.noDataFound, modifier = Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.onSurface)
+                Text(stringResource(R.string.appstrings_no_data_found), modifier = Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.onSurface)
             } else {
                 val mainInfo = antennas.first()
                 Column(
@@ -489,7 +513,9 @@ fun SupportDetailScreen(
                                             supportOwner = physique?.proprietaire,
                                             bgColor = cardBgColor,
                                             shape = blockShape,
-                                            onAddPhotoClick = null
+                                            onAddPhotoClick = null,
+                                            favoriteScopeId = physique?.idSupport ?: mainInfo.idAnfr,
+                                            favoriteSelectionEnabled = true
                                         )
                                     }
                                 }
@@ -509,7 +535,7 @@ fun SupportDetailScreen(
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(24.dp))
                                                 Spacer(modifier = Modifier.width(12.dp))
-                                                Text(AppStrings.openMap, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                                Text(stringResource(R.string.appstrings_open_map), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                             }
                                         }
                                     }
@@ -530,7 +556,7 @@ fun SupportDetailScreen(
                                             Row(verticalAlignment = Alignment.CenterVertically) {
                                                 Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(24.dp))
                                                 Spacer(modifier = Modifier.width(12.dp))
-                                                Text(AppStrings.navToSite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                                Text(stringResource(R.string.appstrings_nav_to_site), fontWeight = FontWeight.Bold, fontSize = 16.sp)
                                             }
                                         }
                                     }

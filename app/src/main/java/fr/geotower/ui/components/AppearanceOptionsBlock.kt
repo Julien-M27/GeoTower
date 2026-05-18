@@ -22,10 +22,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView // <-- AJOUT POUR L'ICÔNE
-import fr.geotower.utils.AppStrings
+import fr.geotower.R
 import android.os.Build
 
 // Import des cartes depuis SettingsScreen
@@ -53,10 +54,10 @@ fun AppearanceOptionsBlock(
     // 1. Thème
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         if (showSystemTheme) {
-            SettingsOptionCard(AppStrings.system, Icons.Default.SettingsSuggest, themeMode == 0, { safeClick("appearance_theme_system") { onThemeChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+            SettingsOptionCard(stringResource(R.string.appearance_theme_system), Icons.Default.SettingsSuggest, themeMode == 0, { safeClick("appearance_theme_system") { onThemeChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
         }
-        SettingsOptionCard(AppStrings.themeLight, Icons.Default.LightMode, themeMode == 1 || (!showSystemTheme && themeMode == 0), { safeClick("appearance_theme_light") { onThemeChange(1) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
-        SettingsOptionCard(AppStrings.themeDark, Icons.Default.DarkMode, themeMode == 2, { safeClick("appearance_theme_dark") { onThemeChange(2) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+        SettingsOptionCard(stringResource(R.string.appearance_theme_light), Icons.Default.LightMode, themeMode == 1 || (!showSystemTheme && themeMode == 0), { safeClick("appearance_theme_light") { onThemeChange(1) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+        SettingsOptionCard(stringResource(R.string.appearance_theme_dark), Icons.Default.DarkMode, themeMode == 2, { safeClick("appearance_theme_dark") { onThemeChange(2) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
     }
     Spacer(modifier = Modifier.height(12.dp))
 
@@ -74,17 +75,17 @@ fun AppearanceOptionsBlock(
     // 2. Mode OLED
     AnimatedVisibility(visible = themeMode == 2 || (themeMode == 0 && isSystemInDarkTheme())) {
         Column {
-            PreferenceSwitchCard(AppStrings.oledTitle, AppStrings.oledSubtitle, isOled, onOledChange, shape, border, bubbleColor, useOneUi)
+            PreferenceSwitchCard(stringResource(R.string.appearance_oled_title), stringResource(R.string.appearance_oled_desc), isOled, onOledChange, shape, border, bubbleColor, useOneUi)
             Spacer(modifier = Modifier.height(12.dp))
         }
     }
 
     // 3. Mode One UI
-    PreferenceSwitchCard(AppStrings.oneUiInterface, AppStrings.oneUiSubtitle, useOneUi, onOneUiChange, shape, border, bubbleColor, useOneUi)
+    PreferenceSwitchCard(stringResource(R.string.appearance_one_ui_title), stringResource(R.string.appearance_one_ui_desc), useOneUi, onOneUiChange, shape, border, bubbleColor, useOneUi)
     Spacer(modifier = Modifier.height(12.dp))
 
     // 4. Flou de navigation
-    PreferenceSwitchCard(AppStrings.blurTitle, AppStrings.blurSubtitle, isBlur, onBlurChange, shape, border, bubbleColor, useOneUi)
+    PreferenceSwitchCard(stringResource(R.string.appearance_scroll_blur_title), stringResource(R.string.appearance_scroll_blur_desc), isBlur, onBlurChange, shape, border, bubbleColor, useOneUi)
     Spacer(modifier = Modifier.height(12.dp))
 
     // 5. Icône de l'application
@@ -94,7 +95,7 @@ fun AppearanceOptionsBlock(
 
                 // Le texte prend tout l'espace, plus d'icône ni de sous-titre !
                 Text(
-                    text = AppStrings.appIcon,
+                    text = stringResource(R.string.appearance_app_icon_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f)
@@ -129,13 +130,13 @@ fun AppearanceOptionsBlock(
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = AppStrings.appLogoDrawingTitle,
+                        text = stringResource(R.string.appearance_in_app_logo_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = AppStrings.logoDrawingChoiceName(appLogoDrawingChoice),
+                        text = appLogoDrawingChoiceName(appLogoDrawingChoice),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -176,7 +177,7 @@ private fun MenuSizeSelector(currentSize: String, onMenuSizeChange: (String) -> 
 
     Surface(shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(AppStrings.menuSizeTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(stringResource(R.string.appearance_menu_size_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Spacer(modifier = Modifier.height(8.dp))
 
             if (useOneUi) {
@@ -200,9 +201,9 @@ private fun MenuSizeSelector(currentSize: String, onMenuSizeChange: (String) -> 
                 )
             }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(AppStrings.menuSizeSmall, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(AppStrings.menuSizeNormal, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                Text(AppStrings.menuSizeLarge, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.appearance_menu_size_small), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.appearance_menu_size_normal), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.appearance_menu_size_large), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

@@ -7,18 +7,18 @@ import androidx.car.app.model.Action
 import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Template
 import fr.geotower.MainActivity
-import fr.geotower.utils.AppStrings
+import fr.geotower.R
 
 class CarPermissionScreen(carContext: CarContext) : Screen(carContext) {
     override fun onGetTemplate(): Template {
         return MessageTemplate.Builder(
-            AppStrings.carPermissionExplanation(carContext)
+            carContext.getString(R.string.car_permission_explanation)
         )
-            .setTitle(AppStrings.carLocationRequired(carContext))
+            .setTitle(carContext.getString(R.string.car_location_required))
             .setHeaderAction(Action.BACK)
             .addAction(
                 Action.Builder()
-                    .setTitle(AppStrings.carOpenApp(carContext))
+                    .setTitle(carContext.getString(R.string.car_open_app))
                     .setOnClickListener { openPhoneApp() }
                     .build()
             )

@@ -17,7 +17,7 @@ import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.api.RetrofitClient
 import fr.geotower.utils.AppLogger
-import fr.geotower.utils.AppStrings
+import fr.geotower.utils.OfflineMapDisplayNames
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -39,7 +39,7 @@ class MapDownloadWorker(
         val mapFilename = inputData.getString("map_filename") ?: return@withContext Result.failure()
         val mapDisplayName = inputData.getString("map_name")
             ?.takeIf { it.isNotBlank() }
-            ?: AppStrings.formatMapName(mapFilename)
+            ?: OfflineMapDisplayNames.formatMapName(mapFilename)
         val expectedSha256 = inputData.getString("map_sha256")?.takeIf { it.isNotBlank() }
         val estimatedSizeMb = inputData.getInt("estimated_size_mb", 2000)
 
@@ -192,8 +192,8 @@ class MapDownloadWorker(
         ensureNotificationChannel()
 
         val pendingIntent = createOfflineMapsPendingIntent(notifId)
-        val title = AppStrings.mapDownloadTitle(applicationContext, mapName)
-        val content = AppStrings.mapDownloadProgress(applicationContext, progress)
+        val title = applicationContext.getString(R.string.notification_map_download_title, mapName)
+        val content = applicationContext.getString(R.string.notification_map_download_progress, progress)
 
         val builder = NotificationCompat.Builder(applicationContext, channelId)
             .setContentTitle(title)
@@ -246,8 +246,8 @@ class MapDownloadWorker(
         notificationManager.cancel(progressNotifId)
 
         val notification = NotificationCompat.Builder(applicationContext, channelId)
-            .setContentTitle(AppStrings.mapDownloadedTitle(applicationContext))
-            .setContentText(AppStrings.mapDownloadedContent(applicationContext, mapDisplayName))
+            .setContentTitle(applicationContext.getString(R.string.notification_map_downloaded_title))
+            .setContentText(applicationContext.getString(R.string.notification_map_downloaded_content, mapDisplayName))
             .setSmallIcon(R.mipmap.ic_launcher_geotower)
             .setContentIntent(createOfflineMapsPendingIntent(resultNotifId, mapFilename))
             .setAutoCancel(true)
@@ -261,7 +261,7 @@ class MapDownloadWorker(
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
-                AppStrings.mapDownloadChannelName(applicationContext),
+                applicationContext.getString(R.string.notification_map_channel_name),
                 NotificationManager.IMPORTANCE_LOW
             )
             notificationManager.createNotificationChannel(channel)

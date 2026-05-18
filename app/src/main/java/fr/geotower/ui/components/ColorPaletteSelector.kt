@@ -44,7 +44,8 @@ import fr.geotower.ui.theme.AppColorPalette
 import fr.geotower.ui.theme.AppColorPaletteOptions
 import fr.geotower.ui.theme.appPalettePreviewColors
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 fun saveColorPalette(context: Context, palette: AppColorPalette) {
     AppConfig.colorPalette.value = palette.storageKey
@@ -57,7 +58,7 @@ fun saveColorPalette(context: Context, palette: AppColorPalette) {
 @Composable
 fun ColorPaletteTopBar(onBack: () -> Unit) {
     GeoTowerBackTopBar(
-        title = AppStrings.colorPaletteTitle,
+        title = stringResource(R.string.appstrings_color_palette_title),
         onBack = onBack,
         backgroundColor = MaterialTheme.colorScheme.background
     )
@@ -92,12 +93,12 @@ fun ColorPaletteActionCard(
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
-                    text = AppStrings.colorPaletteTitle,
+                    text = stringResource(R.string.appstrings_color_palette_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = AppStrings.current(AppStrings.colorPaletteName(selectedPalette.storageKey)),
+                    text = stringResource(R.string.common_current_value, colorPaletteName(selectedPalette)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -145,14 +146,14 @@ fun ColorPalettePickerContent(
     ) {
         if (showHeader) {
             Text(
-                text = AppStrings.colorSourceTitle,
+                text = stringResource(R.string.appstrings_color_source_title),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Spacer(Modifier.height(12.dp))
             Text(
-                text = AppStrings.colorSourceDesc,
+                text = stringResource(R.string.appstrings_color_source_desc),
                 style = MaterialTheme.typography.bodyLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -228,13 +229,13 @@ private fun ColorPaletteOptionCard(
 
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = AppStrings.colorPaletteName(palette.storageKey),
+                        text = colorPaletteName(palette),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = AppStrings.colorPaletteDescription(palette.storageKey),
+                        text = colorPaletteDescription(palette),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -261,6 +262,36 @@ private fun ColorPaletteOptionCard(
 
         }
     }
+}
+
+@Composable
+private fun colorPaletteName(palette: AppColorPalette): String = when (palette) {
+    AppColorPalette.Dynamic -> stringResource(R.string.appstrings_color_palette_dynamic_title)
+    AppColorPalette.Baseline -> stringResource(R.string.appstrings_color_palette_baseline_title)
+    AppColorPalette.Red -> stringResource(R.string.appstrings_color_palette_red_title)
+    AppColorPalette.Green -> stringResource(R.string.appstrings_color_palette_green_title)
+    AppColorPalette.Blue -> stringResource(R.string.appstrings_color_palette_blue_title)
+    AppColorPalette.Cyan -> stringResource(R.string.appstrings_color_palette_cyan_title)
+    AppColorPalette.Teal -> stringResource(R.string.appstrings_color_palette_teal_title)
+    AppColorPalette.Indigo -> stringResource(R.string.appstrings_color_palette_indigo_title)
+    AppColorPalette.Rose -> stringResource(R.string.appstrings_color_palette_rose_title)
+    AppColorPalette.Amber -> stringResource(R.string.appstrings_color_palette_amber_title)
+    AppColorPalette.Graphite -> stringResource(R.string.appstrings_color_palette_graphite_title)
+}
+
+@Composable
+private fun colorPaletteDescription(palette: AppColorPalette): String = when (palette) {
+    AppColorPalette.Dynamic -> stringResource(R.string.appstrings_color_palette_dynamic_desc)
+    AppColorPalette.Baseline -> stringResource(R.string.appstrings_color_palette_baseline_desc)
+    AppColorPalette.Red -> stringResource(R.string.appstrings_color_palette_red_desc)
+    AppColorPalette.Green -> stringResource(R.string.appstrings_color_palette_green_desc)
+    AppColorPalette.Blue -> stringResource(R.string.appstrings_color_palette_blue_desc)
+    AppColorPalette.Cyan -> stringResource(R.string.appstrings_color_palette_cyan_desc)
+    AppColorPalette.Teal -> stringResource(R.string.appstrings_color_palette_teal_desc)
+    AppColorPalette.Indigo -> stringResource(R.string.appstrings_color_palette_indigo_desc)
+    AppColorPalette.Rose -> stringResource(R.string.appstrings_color_palette_rose_desc)
+    AppColorPalette.Amber -> stringResource(R.string.appstrings_color_palette_amber_desc)
+    AppColorPalette.Graphite -> stringResource(R.string.appstrings_color_palette_graphite_desc)
 }
 
 @Composable

@@ -70,9 +70,12 @@ import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.geoTowerLazyListFadingEdge
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
+import fr.geotower.utils.HelpDisplayText
 import kotlinx.coroutines.launch
 import java.text.Normalizer
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 private data class HelpAction(
     val id: String,
@@ -257,7 +260,7 @@ private fun HelpTopBar(
     backgroundColor: Color
 ) {
     GeoTowerBackTopBar(
-        title = AppStrings.helpTitle,
+        title = stringResource(R.string.appstrings_help_title),
         onBack = onBack,
         backgroundColor = backgroundColor,
         backEnabled = backEnabled
@@ -304,12 +307,12 @@ private fun HelpSummary(
                     Spacer(Modifier.width(14.dp))
                     Column {
                         Text(
-                            text = AppStrings.helpCenterTitle,
+                            text = stringResource(R.string.appstrings_help_center_title),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = AppStrings.helpCenterIntro,
+                            text = stringResource(R.string.appstrings_help_center_intro),
                             style = MaterialTheme.typography.bodyMedium
                         )
                     }
@@ -328,7 +331,7 @@ private fun HelpSummary(
 
         item {
             Text(
-                text = if (query.isBlank()) AppStrings.helpContents else AppStrings.helpResults,
+                text = if (query.isBlank()) stringResource(R.string.appstrings_help_contents) else stringResource(R.string.appstrings_help_results),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
@@ -337,7 +340,7 @@ private fun HelpSummary(
         if (topics.isEmpty()) {
             item {
                 Text(
-                    text = AppStrings.helpNoResults,
+                    text = stringResource(R.string.appstrings_help_no_results),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -382,11 +385,11 @@ private fun HelpSearchField(
         trailingIcon = {
             if (query.isNotEmpty()) {
                 IconButton(onClick = onClearQuery) {
-                    Icon(Icons.Default.Close, contentDescription = AppStrings.helpClearSearch)
+                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_help_clear_search))
                 }
             }
         },
-        placeholder = { Text(AppStrings.helpSearchPlaceholder, style = MaterialTheme.typography.bodyLarge) }
+        placeholder = { Text(stringResource(R.string.appstrings_help_search_placeholder), style = MaterialTheme.typography.bodyLarge) }
     )
 }
 
@@ -417,7 +420,7 @@ private fun HelpTopicCard(
             AssistChip(
                 onClick = { safeClick { onClick() } },
                 shape = style.chipShape,
-                label = { Text(AppStrings.helpSectionCount(topic.sections.size)) }
+                label = { Text(pluralStringResource(R.plurals.help_section_count, topic.sections.size, topic.sections.size)) }
             )
         }
     }
@@ -463,7 +466,7 @@ private fun HelpTopicDetail(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(AppStrings.helpLocalContents, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.appstrings_help_local_contents), fontWeight = FontWeight.Bold)
                     topic.sections.forEachIndexed { index, section ->
                         TextButton(
                             onClick = {
@@ -490,7 +493,7 @@ private fun HelpTopicDetail(
 
         item {
             OutlinedButton(onClick = onBackToSummary, modifier = Modifier.fillMaxWidth(), shape = style.softShape) {
-                Text(AppStrings.helpBackToContents)
+                Text(stringResource(R.string.appstrings_help_back_to_contents))
             }
         }
     }
@@ -544,14 +547,14 @@ private fun HelpVisualCard(visual: HelpVisual, style: HelpUiStyle) {
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                text = AppStrings.helpVisualTitle(visual.id),
+                text = HelpDisplayText.visualTitle(visual.id),
                 style = MaterialTheme.typography.titleSmall,
                 fontWeight = FontWeight.Bold
             )
             HelpVisualMockup(visual = visual, style = style)
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 (1..3).forEach { index ->
-                    HelpVisualLegendRow(index, AppStrings.helpVisualLabel(visual.id, index))
+                    HelpVisualLegendRow(index, HelpDisplayText.visualLabel(visual.id, index))
                 }
             }
         }
@@ -834,19 +837,19 @@ private fun helpTopics(): List<HelpTopic> {
     return helpTopicSpecs().map { topicSpec ->
         HelpTopic(
             id = topicSpec.id,
-            title = AppStrings.helpTopicTitle(topicSpec.id),
-            subtitle = AppStrings.helpTopicSubtitle(topicSpec.id),
+            title = HelpDisplayText.topicTitle(topicSpec.id),
+            subtitle = HelpDisplayText.topicSubtitle(topicSpec.id),
             keywords = topicSpec.keywords,
             sections = topicSpec.sections.map { sectionSpec ->
                 HelpSection(
                     id = sectionSpec.id,
-                    title = AppStrings.helpSectionTitle(sectionSpec.id),
-                    body = AppStrings.helpSectionBody(sectionSpec.id),
+                    title = HelpDisplayText.sectionTitle(sectionSpec.id),
+                    body = HelpDisplayText.sectionBody(sectionSpec.id),
                     actions = sectionSpec.actionIds.map { actionId ->
                         HelpAction(
                             id = actionId,
-                            title = AppStrings.helpActionTitle(actionId),
-                            description = AppStrings.helpActionDesc(actionId)
+                            title = HelpDisplayText.actionTitle(actionId),
+                            description = HelpDisplayText.actionDescription(actionId)
                         )
                     },
                     visual = sectionSpec.visual

@@ -26,10 +26,12 @@ import androidx.compose.ui.unit.sp
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
+import fr.geotower.utils.AnfrDisplayText
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
 import java.util.Locale
 import kotlin.math.roundToInt
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 private val ORANGE_NOKIA_DEPARTMENTS = setOf(
     "01", "03", "04", "05", "06", "07", "13", "14", "15", "18",
@@ -60,25 +62,25 @@ fun SupportDetailsSection(
     val context = LocalContext.current
     val isMi = AppConfig.distanceUnit.intValue == 1
 
-    val txtNotSpecified = AppStrings.notSpecified
-    val txtIdNumber = AppStrings.idNumber
-    val txtIdSupportCopy = AppStrings.idSupportCopy
-    val txtIdCopied = AppStrings.idCopied
-    val txtIdUnavailable = AppStrings.idUnavailable
+    val txtNotSpecified = stringResource(R.string.appstrings_not_specified)
+    val txtIdNumber = stringResource(R.string.appstrings_id_number)
+    val txtIdSupportCopy = stringResource(R.string.appstrings_id_support_copy)
+    val txtIdCopied = stringResource(R.string.appstrings_id_copied)
+    val txtIdUnavailable = stringResource(R.string.appstrings_id_unavailable)
 
-    val txtAddressLabel = AppStrings.addressLabel
-    val txtAddressCopy = AppStrings.addressCopy
-    val txtAddressCopied = AppStrings.addressCopied
+    val txtAddressLabel = stringResource(R.string.appstrings_address_label)
+    val txtAddressCopy = stringResource(R.string.appstrings_address_copy)
+    val txtAddressCopied = stringResource(R.string.appstrings_address_copied)
 
-    val txtGpsLabel = AppStrings.gpsLabel
-    val txtGpsCoordsCopy = AppStrings.gpsCoordsCopy
-    val txtCoordsCopied = AppStrings.coordsCopied
+    val txtGpsLabel = stringResource(R.string.appstrings_gps_label)
+    val txtGpsCoordsCopy = stringResource(R.string.appstrings_gps_coords_copy)
+    val txtCoordsCopied = stringResource(R.string.appstrings_coords_copied)
 
-    val txtSupportHeight = AppStrings.supportHeight
-    val txtSupportNature = AppStrings.supportNature
-    val txtDistanceLabel = AppStrings.distanceLabel
-    val txtFromMyPosition = AppStrings.fromMyPosition
-    val txtBearingLabel = AppStrings.bearingLabel
+    val txtSupportHeight = stringResource(R.string.appstrings_support_height)
+    val txtSupportNature = stringResource(R.string.appstrings_support_nature)
+    val txtDistanceLabel = stringResource(R.string.appstrings_distance_label)
+    val txtFromMyPosition = stringResource(R.string.appstrings_from_my_position)
+    val txtBearingLabel = stringResource(R.string.appstrings_bearing_label)
 
     Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
         Column(
@@ -88,7 +90,7 @@ fun SupportDetailsSection(
                 .background(cardBgColor)
                 .padding(16.dp)
         ) {
-            val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: AppStrings.notSpecified
+            val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: stringResource(R.string.appstrings_not_specified)
             val gpsCoords = String.format(Locale.US, "%.5f°, %.5f°", mainInfo.latitude, mainInfo.longitude)
             val cleanGpsCoords = String.format(Locale.US, "%.5f, %.5f", mainInfo.latitude, mainInfo.longitude)
 
@@ -129,7 +131,7 @@ fun SupportDetailsSection(
                 }
             )
 
-            val nature = AppStrings.translateNature(physique?.natureSupport)
+            val nature = AnfrDisplayText.nature(physique?.natureSupport)
 
             // ✅ CALCUL HAUTEUR (ft/in ou m)
             val hauteurMeters = physique?.hauteur?.toString()?.toFloatOrNull()
@@ -173,7 +175,7 @@ fun InfoLine(label: String, value: String, onCopy: (() -> Unit)? = null) {
         }, fontSize = 14.sp, modifier = Modifier.weight(1f))
         if (onCopy != null) {
             IconButton(onClick = onCopy, modifier = Modifier.size(24.dp)) {
-                Icon(imageVector = Icons.Default.ContentCopy, contentDescription = AppStrings.copy, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+                Icon(imageVector = Icons.Default.ContentCopy, contentDescription = stringResource(R.string.appstrings_copy), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
             }
         }
     }
@@ -188,14 +190,14 @@ fun SiteSupportDetailsBlock(
     cardBgColor: Color,
     blockShape: Shape
 ) {
-    val txtSupportDetailsTitle = AppStrings.supportDetailsTitle
-    val txtSupportNature = AppStrings.supportNature
-    val txtOwner = AppStrings.owner
-    val txtLikelyNetworkVendor = AppStrings.likelyNetworkVendor
-    val txtNotSpecified = AppStrings.notSpecified
-    val txtDistanceLabel = AppStrings.distanceLabel
-    val txtFromMyPosition = AppStrings.fromMyPosition
-    val txtBearingLabel = AppStrings.bearingLabel
+    val txtSupportDetailsTitle = stringResource(R.string.appstrings_support_details_title)
+    val txtSupportNature = stringResource(R.string.appstrings_support_nature)
+    val txtOwner = stringResource(R.string.appstrings_owner)
+    val txtLikelyNetworkVendor = stringResource(R.string.appstrings_likely_network_vendor)
+    val txtNotSpecified = stringResource(R.string.appstrings_not_specified)
+    val txtDistanceLabel = stringResource(R.string.appstrings_distance_label)
+    val txtFromMyPosition = stringResource(R.string.appstrings_from_my_position)
+    val txtBearingLabel = stringResource(R.string.appstrings_bearing_label)
 
     // ✅ LECTURE DE L'UNITÉ
     val isMi = AppConfig.distanceUnit.intValue == 1
@@ -229,8 +231,8 @@ fun SiteSupportDetailsBlock(
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             )
 
-            val nature = AppStrings.translateNature(physique?.natureSupport)
-            val proprietaire = AppStrings.translateOwner(physique?.proprietaire)
+            val nature = AnfrDisplayText.nature(physique?.natureSupport)
+            val proprietaire = AnfrDisplayText.owner(physique?.proprietaire)
             val likelyOrangeVendor = resolveLikelyOrangeVendor(info)
 
             InfoLine(label = "$txtSupportNature : ", value = nature)

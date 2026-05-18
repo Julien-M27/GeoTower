@@ -29,9 +29,11 @@ import fr.geotower.data.api.RetrofitClient
 import fr.geotower.data.models.OfflineMapDto
 import fr.geotower.data.workers.DownloadNotificationCenter
 import fr.geotower.data.workers.OfflineMapDownloadValidator
-import fr.geotower.utils.AppStrings
+import fr.geotower.utils.OfflineMapDisplayNames
 import java.io.File
 import kotlin.math.abs
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 private data class MapRowViewportBounds(
     val top: Float = Float.NaN,
@@ -67,7 +69,7 @@ private fun isMapRowAtBestViewportPosition(
 }
 
 private fun mapDisplayName(map: OfflineMapDto): String {
-    return map.name.takeIf { it.isNotBlank() } ?: AppStrings.formatMapName(map.mapFilename)
+    return map.name.takeIf { it.isNotBlank() } ?: OfflineMapDisplayNames.formatMapName(map.mapFilename)
 }
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
@@ -131,8 +133,8 @@ fun MapDownloadCard(
                 Icon(Icons.Default.Map, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(12.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(text = AppStrings.offlineMapsTitle, fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    Text(text = AppStrings.offlineMapsDesc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(text = stringResource(R.string.appstrings_offline_maps_title), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                    Text(text = stringResource(R.string.appstrings_offline_maps_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
                 // 🚀 BOUTON : TOUT TÉLÉCHARGER
@@ -167,7 +169,7 @@ fun MapDownloadCard(
                             }
                         }
                     ) {
-                        Icon(Icons.Default.CloudDownload, contentDescription = AppStrings.downloadAll, tint = MaterialTheme.colorScheme.primary)
+                        Icon(Icons.Default.CloudDownload, contentDescription = stringResource(R.string.appstrings_download_all), tint = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
@@ -177,7 +179,7 @@ fun MapDownloadCard(
             if (isLoading) {
                 LoadingIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
             } else if (isError) {
-                Text(AppStrings.networkErrorSearch, color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.CenterHorizontally))
+                Text(stringResource(R.string.appstrings_network_error_search), color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.CenterHorizontally))
             } else {
                 catalog.forEachIndexed { index, map ->
                     val displayName = mapDisplayName(map)
@@ -218,16 +220,16 @@ fun MapDownloadCard(
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp
                                 )
-                                Text(text = AppStrings.fileSizeMb(map.estimatedSizeMb), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(text = stringResource(R.string.map_file_size_mb, map.estimatedSizeMb), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
 
                             if (isSyncing) {
                                 IconButton(onClick = { safeClick("map_cancel_${map.id}") { workManager.cancelUniqueWork("map_dl_${map.id}") } }) {
-                                    Icon(Icons.Default.Close, contentDescription = AppStrings.cancel, tint = MaterialTheme.colorScheme.error)
+                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_cancel), tint = MaterialTheme.colorScheme.error)
                                 }
                             } else if (isDownloaded) {
                                 IconButton(onClick = { safeClick("map_delete_${map.id}") { mapToDelete = map } }) {
-                                    Icon(Icons.Default.Delete, contentDescription = AppStrings.delete, tint = MaterialTheme.colorScheme.error)
+                                    Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.appstrings_delete), tint = MaterialTheme.colorScheme.error)
                                 }
                             } else {
                                 IconButton(
@@ -246,7 +248,7 @@ fun MapDownloadCard(
                                         }
                                     }
                                 ) {
-                                    Icon(Icons.Default.CloudDownload, contentDescription = AppStrings.download, tint = MaterialTheme.colorScheme.primary)
+                                    Icon(Icons.Default.CloudDownload, contentDescription = stringResource(R.string.appstrings_download), tint = MaterialTheme.colorScheme.primary)
                                 }
                             }
                         }
@@ -260,7 +262,7 @@ fun MapDownloadCard(
                                 trackColor = MaterialTheme.colorScheme.surfaceVariant
                             )
                             // 🚨 L'extraction n'existe plus, on affiche juste la progression !
-                            val statusText = AppStrings.downloadProgress(progressValue)
+                            val statusText = stringResource(R.string.map_download_progress_inline, progressValue)
                             Text(text = statusText, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         }
                     }
@@ -284,7 +286,7 @@ fun MapDownloadCard(
                     ) {
                         Icon(Icons.Default.Close, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text(text = AppStrings.cancelDownload, fontWeight = FontWeight.Bold)
+                        Text(text = stringResource(R.string.appstrings_cancel_download), fontWeight = FontWeight.Bold)
                     }
                 }
 
@@ -300,7 +302,7 @@ fun MapDownloadCard(
                     ) {
                         Icon(Icons.Default.Delete, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text(text = AppStrings.deleteAllMaps, fontWeight = FontWeight.Bold)
+                        Text(text = stringResource(R.string.appstrings_delete_all_maps), fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -311,18 +313,18 @@ fun MapDownloadCard(
     if (mapToDelete != null) {
         AlertDialog(
             onDismissRequest = { mapToDelete = null },
-            title = { Text(text = AppStrings.mapDeleteWarningTitle, fontWeight = FontWeight.Bold) },
-            text = { Text(AppStrings.mapDeleteWarningDesc) },
+            title = { Text(text = stringResource(R.string.appstrings_map_delete_warning_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.appstrings_map_delete_warning_desc)) },
             shape = shape,
             containerColor = MaterialTheme.colorScheme.surface,
             dismissButton = {
-                DialogDestructiveButton(text = AppStrings.yes, onClick = {
+                DialogDestructiveButton(text = stringResource(R.string.appstrings_yes), onClick = {
                     OfflineMapDownloadValidator.safeMapFile(mapsDir, mapToDelete!!.mapFilename)?.delete()
                     fileRefreshTrigger++
                     mapToDelete = null
                 })
             },
-            confirmButton = { DialogNeutralButton(text = AppStrings.no, onClick = { mapToDelete = null }) }
+            confirmButton = { DialogNeutralButton(text = stringResource(R.string.appstrings_no), onClick = { mapToDelete = null }) }
         )
     }
 
@@ -330,18 +332,18 @@ fun MapDownloadCard(
     if (showDeleteAllDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteAllDialog = false },
-            title = { Text(text = AppStrings.deleteAllMapsWarningTitle, fontWeight = FontWeight.Bold) },
-            text = { Text(AppStrings.deleteAllMapsWarningDesc) },
+            title = { Text(text = stringResource(R.string.appstrings_delete_all_maps_warning_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.appstrings_delete_all_maps_warning_desc)) },
             shape = shape,
             containerColor = MaterialTheme.colorScheme.surface,
             dismissButton = {
-                DialogDestructiveButton(text = AppStrings.yes, onClick = {
+                DialogDestructiveButton(text = stringResource(R.string.appstrings_yes), onClick = {
                     OfflineMapDownloadValidator.deleteAllSafeMapFiles(mapsDir)
                     fileRefreshTrigger++
                     showDeleteAllDialog = false
                 })
             },
-            confirmButton = { DialogNeutralButton(text = AppStrings.no, onClick = { showDeleteAllDialog = false }) }
+            confirmButton = { DialogNeutralButton(text = stringResource(R.string.appstrings_no), onClick = { showDeleteAllDialog = false }) }
         )
     }
 }

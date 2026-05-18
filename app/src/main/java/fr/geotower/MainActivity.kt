@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
@@ -25,7 +26,7 @@ import fr.geotower.data.upload.SignalQuestUploadDraftStore
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadQueueException
 import fr.geotower.data.workers.DatabaseDownloadWorker
-import fr.geotower.data.workers.SignalQuestUploadWorker
+import fr.geotower.data.workers.SignalQuestUploadScheduler
 import fr.geotower.data.workers.UpdateCheckScheduler
 import fr.geotower.widget.AntennaWidgetWorker
 import android.content.Intent
@@ -38,8 +39,9 @@ import kotlinx.coroutines.withContext
 // --- DONNÉES ---
 import fr.geotower.data.AnfrRepository
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppLocale
 import fr.geotower.utils.AppUiMode
-import fr.geotower.utils.AppStrings
+import fr.geotower.utils.GeoTowerLocaleProvider
 import fr.geotower.utils.OperatorColors
 import fr.geotower.data.api.RetrofitClient
 import fr.geotower.data.api.SignalQuestOperators
@@ -263,12 +265,13 @@ class MainActivity : ComponentActivity() {
 
         if (!appPrefs.contains("app_language")) {
             // Premier lancement : On définit le choix sur "Système" par défaut
-            appPrefs.edit().putString("app_language", AppStrings.LANGUAGE_SYSTEM).apply()
-            AppConfig.appLanguage.value = AppStrings.LANGUAGE_SYSTEM
+            appPrefs.edit().putString("app_language", AppLocale.LANGUAGE_SYSTEM).apply()
+            AppConfig.appLanguage.value = AppLocale.LANGUAGE_SYSTEM
         } else {
             // L'utilisateur a déjà une langue sauvegardée (ou "Système")
-            AppConfig.appLanguage.value = appPrefs.getString("app_language", AppStrings.LANGUAGE_SYSTEM) ?: AppStrings.LANGUAGE_SYSTEM
+            AppConfig.appLanguage.value = appPrefs.getString("app_language", AppLocale.LANGUAGE_SYSTEM) ?: AppLocale.LANGUAGE_SYSTEM
         }
+        AppLocale.applyApplicationLocale(this, AppConfig.appLanguage.value)
 
         // ========================================================
         // NOUVEAU : CHARGEMENT DE TOUS LES AUTRES PARAMÈTRES
@@ -313,7 +316,7 @@ class MainActivity : ComponentActivity() {
             val isOled by AppConfig.isOledMode
             val selectedPaletteKey by AppConfig.colorPalette
             val context = LocalContext.current
-            val txtPhotoPrepareError = AppStrings.photoPrepareError
+            val txtPhotoPrepareError = stringResource(R.string.signalquest_prepare_photos_failed)
 
             // ✅ NOUVEAU : On écoute la fin du téléchargement globalement
             val workManager = remember { androidx.work.WorkManager.getInstance(context) }
@@ -356,6 +359,7 @@ class MainActivity : ComponentActivity() {
                 baseColorScheme
             }
 
+            GeoTowerLocaleProvider {
             MaterialTheme(colorScheme = colorScheme) {
                 GeoTowerUiStyleProvider {
                 val navController = rememberNavController()
@@ -626,26 +630,7 @@ class MainActivity : ComponentActivity() {
                                                         )
                                                     }
 
-                                                    val uploadData = workDataOf(
-                                                        SignalQuestUploadQueue.INPUT_UPLOAD_ID to manifest.uploadId
-                                                    )
-
-                                                    val uploadRequest = OneTimeWorkRequestBuilder<SignalQuestUploadWorker>()
-                                                        .setInputData(uploadData)
-                                                        .addTag("sq_upload_${siteId}")
-                                                        .addTag("sq_upload_global")
-                                                        .setConstraints(
-                                                            Constraints.Builder()
-                                                                .setRequiredNetworkType(NetworkType.CONNECTED)
-                                                                .build()
-                                                        )
-                                                        .build()
-
-                                                    WorkManager.getInstance(applicationContext).enqueueUniqueWork(
-                                                        "upload_sq_${manifest.uploadId}",
-                                                        ExistingWorkPolicy.APPEND_OR_REPLACE,
-                                                        uploadRequest
-                                                    )
+                                                    SignalQuestUploadScheduler.enqueue(applicationContext, manifest)
 
                                                     navController.popBackStack()
                                                 } catch (e: SignalQuestUploadQueueException) {
@@ -682,17 +667,17 @@ class MainActivity : ComponentActivity() {
                                 },
                                 title = {
                                     Text(
-                                        text = fr.geotower.utils.AppStrings.notifDbDownloadSuccess,
+                                        text = stringResource(R.string.database_download_success_title),
                                         fontWeight = androidx.compose.ui.text.font.FontWeight.Bold
                                     )
                                 },
-                                text = { Text(fr.geotower.utils.AppStrings.dbDownloadSuccessDesc) },
+                                text = { Text(stringResource(R.string.database_download_success_desc)) },
                                 confirmButton = {
                                     Button(onClick = {
                                         // On ferme simplement le pop-up en douceur !
                                         AppGlobalState.showDbSuccessPopup.value = false
                                     }) {
-                                        Text(fr.geotower.utils.AppStrings.dbDownloadTermine)
+                                        Text(stringResource(R.string.common_finish))
                                     }
                                 }
                             )
@@ -700,6 +685,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
                 }
+            }
             }
         }
     }

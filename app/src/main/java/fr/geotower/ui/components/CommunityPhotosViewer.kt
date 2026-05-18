@@ -43,6 +43,8 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Outbox
 import androidx.compose.material.icons.filled.PhotoCamera
@@ -84,7 +86,8 @@ import coil.compose.AsyncImage
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.ui.components.SharedMiniMapCard
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
+import fr.geotower.utils.LocalizedDateLabels
+import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.isNetworkAvailable
 import fr.geotower.data.api.SignalQuestOperators
 import kotlinx.coroutines.launch
@@ -96,6 +99,9 @@ import androidx.compose.foundation.Image
 import java.text.Normalizer
 import java.text.NumberFormat
 import java.util.Locale
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import kotlin.math.roundToInt
 
 // Modèle de données unifié
 data class CommunityPhoto(
@@ -103,8 +109,91 @@ data class CommunityPhoto(
     val communityName: String,
     val author: String? = null,
     val date: String? = null,
-    val exifMetadata: Map<String, Any?>? = null
+    val exifMetadata: Map<String, Any?>? = null,
+    val sourceId: String? = null,
+    val stableId: String = url,
+    val operatorKey: String? = null,
+    val operatorLabel: String? = null
 )
+
+private val favoritePhotoColor = Color(0xFFE53935)
+
+private fun CommunityPhoto.resolvedSourceId(): String? {
+    return sourceId ?: CommunityDataPreferences.sourceIdForCommunityName(communityName)
+}
+
+private fun CommunityPhoto.favoriteBucketId(): String? {
+    val resolvedSourceId = resolvedSourceId() ?: return null
+    return if (resolvedSourceId == CommunityDataPreferences.SOURCE_SIGNALQUEST) {
+        val key = operatorKey?.takeIf { it.isNotBlank() } ?: return resolvedSourceId
+        "${CommunityDataPreferences.SOURCE_SIGNALQUEST}_$key"
+    } else {
+        resolvedSourceId
+    }
+}
+
+private fun signalQuestOperatorOrder(defaultOperator: String?): List<String> {
+    val defaultSignalQuestKey = SignalQuestOperators.operatorParamFor(defaultOperator)
+        ?.let { OperatorColors.keyFor(it) }
+        ?: OperatorColors.keyFor(defaultOperator)
+
+    return (listOfNotNull(defaultSignalQuestKey) + listOf(
+        OperatorColors.ORANGE_KEY,
+        OperatorColors.BOUYGUES_KEY,
+        OperatorColors.SFR_KEY,
+        OperatorColors.FREE_KEY
+    )).distinct()
+}
+
+private fun signalQuestOperatorRank(operatorKey: String?, order: List<String>): Int {
+    val key = operatorKey ?: return 99
+    val index = order.indexOf(key)
+    return if (index >= 0) index else 99
+}
+
+private fun communityPhotoSourceLabel(sourceId: String): String? {
+    return when (sourceId) {
+        CommunityDataPreferences.SOURCE_CELLULARFR -> "CellularFR"
+        CommunityDataPreferences.SOURCE_SIGNALQUEST -> "Signal Quest"
+        else -> null
+    }
+}
+
+private fun CommunityPhoto.operatorDisplayLabel(): String? {
+    return operatorLabel
+        ?.takeIf { it.isNotBlank() }
+        ?: operatorKey?.let { key -> OperatorColors.specForKey(key)?.label ?: key }
+}
+
+private fun CommunityPhoto.displaySourceLabel(photoSourceOrder: List<String>): String {
+    val resolvedSourceId = resolvedSourceId()
+    val sourceLabel = resolvedSourceId
+        ?.let(::communityPhotoSourceLabel)
+        ?: communityName.takeIf { it.isNotBlank() }
+        ?: communityPhotoSourcesLabel(listOf(this), photoSourceOrder)
+
+    return if (resolvedSourceId == CommunityDataPreferences.SOURCE_SIGNALQUEST) {
+        operatorDisplayLabel()?.let { label -> "$sourceLabel - $label" } ?: sourceLabel
+    } else {
+        sourceLabel
+    }
+}
+
+private fun communityPhotoSourcesLabel(
+    photos: List<CommunityPhoto>,
+    photoSourceOrder: List<String>
+): String {
+    val sourceIds = photos
+        .mapNotNull { photo -> photo.resolvedSourceId() }
+        .distinct()
+    val orderedSourceIds = photoSourceOrder.filter { sourceId -> sourceId in sourceIds } +
+        sourceIds.filterNot { sourceId -> sourceId in photoSourceOrder }
+    val sourceLabels = orderedSourceIds.mapNotNull(::communityPhotoSourceLabel)
+    return sourceLabels
+        .takeIf { it.isNotEmpty() }
+        ?.joinToString(" + ")
+        ?: photos.firstOrNull()?.communityName.orEmpty()
+}
 
 private data class PhotoExifCoordinate(
     val latitude: Double,
@@ -116,7 +205,7 @@ private data class PhotoExifDisplayItem(
     val value: String
 )
 
-private val hiddenExifDisplayKeys = setOf(
+private val alwaysHiddenExifDisplayKeys = setOf(
     "takenMonth",
     "orientationDegrees"
 )
@@ -124,6 +213,8 @@ private val hiddenExifDisplayKeys = setOf(
 private val exifPreferredDisplayOrder = listOf(
     "cameraModel",
     "distanceToSiteMeters",
+    "takenDate",
+    "takenDateLabel",
     "takenMonthLabel",
     "gpsImgDirectionDegrees",
     "gpsLatitude",
@@ -219,11 +310,20 @@ private fun CommunityPhoto.hasExifInfo(): Boolean {
 
 private fun exifDisplayKeys(metadata: Map<String, Any?>?): List<String> {
     if (metadata.isNullOrEmpty()) return emptyList()
+    val hiddenKeys = alwaysHiddenExifDisplayKeys + when {
+        metadata.hasVisibleExifValue("takenDate") -> setOf("takenDateLabel", "takenMonthLabel")
+        metadata.hasVisibleExifValue("takenDateLabel") -> setOf("takenMonthLabel")
+        else -> emptySet()
+    }
     return exifPreferredDisplayOrder
-        .filter { it in metadata && it !in hiddenExifDisplayKeys } +
+        .filter { it in metadata && it !in hiddenKeys } +
         metadata.keys
-            .filterNot { it in exifPreferredDisplayOrder || it in hiddenExifDisplayKeys }
+            .filterNot { it in exifPreferredDisplayOrder || it in hiddenKeys }
             .sorted()
+}
+
+private fun Map<String, Any?>.hasVisibleExifValue(key: String): Boolean {
+    return this[key].hasVisibleExifValue()
 }
 
 private fun Any?.hasVisibleExifValue(): Boolean {
@@ -287,12 +387,15 @@ private fun Any?.asDoubleOrNull(): Double? {
 
 @Composable
 private fun formatExifValue(key: String, value: Any?): String? {
+    val context = LocalContext.current
     val cleanValue = value?.toString()?.trim()?.takeIf { it.isNotBlank() && it != "null" } ?: return null
     val number = value.asDoubleOrNull()
     return when (key) {
         "cameraModel" -> formatCameraModel(cleanValue)
-        "takenMonthLabel" -> AppStrings.formatPhotoExifMonth(cleanValue)
-        "distanceToSiteMeters" -> number?.let { "${formatDecimal(it, maximumFractionDigits = 1)} m" } ?: cleanValue
+        "takenDate",
+        "takenDateLabel" -> LocalizedDateLabels.formatPhotoExifDate(context, cleanValue)
+        "takenMonthLabel" -> LocalizedDateLabels.formatPhotoExifMonth(context, cleanValue)
+        "distanceToSiteMeters" -> number?.let { formatExifDistanceMeters(it) } ?: cleanValue
         "gpsImgDirectionDegrees",
         "orientationDegrees" -> number?.let { "${formatDecimal(it, maximumFractionDigits = 0)} deg" } ?: cleanValue
         "gpsLatitude",
@@ -304,6 +407,19 @@ private fun formatExifValue(key: String, value: Any?): String? {
         "lng" -> number?.let { formatDecimal(it, maximumFractionDigits = 6) } ?: cleanValue
         else -> cleanValue
     }
+}
+
+@Composable
+private fun photoExifLabel(key: String): String = when (key) {
+    "cameraModel" -> stringResource(R.string.photo_exif_label_camera_model)
+    "distanceToSiteMeters" -> stringResource(R.string.photo_exif_label_distance_to_site)
+    "takenDate", "takenDateLabel", "takenMonthLabel" -> stringResource(R.string.photo_exif_label_capture_date)
+    "takenMonth" -> stringResource(R.string.photo_exif_label_month)
+    "gpsImgDirectionDegrees" -> stringResource(R.string.photo_exif_label_gps_direction)
+    "orientationDegrees" -> stringResource(R.string.photo_exif_label_orientation)
+    "gpsLatitude", "latitude", "lat" -> stringResource(R.string.photo_exif_label_gps_latitude)
+    "gpsLongitude", "longitude", "lng", "lon" -> stringResource(R.string.photo_exif_label_gps_longitude)
+    else -> key.replace(Regex("(?<=[a-z])(?=[A-Z])"), " ").replaceFirstChar { it.uppercase() }
 }
 
 private fun formatCameraModel(value: String): String {
@@ -329,6 +445,23 @@ private fun formatDecimal(value: Double, maximumFractionDigits: Int): String {
     }.format(value)
 }
 
+private fun formatExifDistanceMeters(valueMeters: Double): String {
+    return if (AppConfig.distanceUnit.intValue == 1) {
+        val miles = valueMeters / 1609.344
+        if (miles >= 0.1) {
+            String.format(Locale.US, "%.2f mi", miles)
+        } else {
+            "${(valueMeters * 3.28084).roundToInt()} ft"
+        }
+    } else {
+        if (valueMeters >= 1000.0) {
+            "${formatDecimal(valueMeters / 1000.0, maximumFractionDigits = 2)} km"
+        } else {
+            "${formatDecimal(valueMeters, maximumFractionDigits = 1)} m"
+        }
+    }
+}
+
 @Composable
 fun CommunityPhotosSectionShared(
     photos: List<CommunityPhoto>,
@@ -338,7 +471,9 @@ fun CommunityPhotosSectionShared(
     supportOwner: String? = null,
     bgColor: Color,
     shape: Shape,
-    onAddPhotoClick: (() -> Unit)? = null
+    onAddPhotoClick: (() -> Unit)? = null,
+    favoriteScopeId: String? = null,
+    favoriteSelectionEnabled: Boolean = false
 ) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
@@ -365,12 +500,74 @@ fun CommunityPhotosSectionShared(
     )
     val photoSourceOrder = CommunityDataPreferences.orderedPhotoSourceIdsForOperatorKeys(prefs, dataOperatorKeys)
     val photoSourceRank = photoSourceOrder.withIndex().associate { (index, sourceId) -> sourceId to index }
+    val signalQuestOperatorOrder = signalQuestOperatorOrder(AppConfig.defaultOperator.value)
+    val canSelectFavoritePhoto = favoriteSelectionEnabled && !favoriteScopeId.isNullOrBlank()
+    fun loadFavoritePhotoIdsByBucket(): Map<String, String> {
+        if (!canSelectFavoritePhoto) return emptyMap()
+        val favoritesByBucket = photos
+            .mapNotNull { photo -> photo.favoriteBucketId() }
+            .distinct()
+            .mapNotNull { bucketId ->
+                CommunityDataPreferences.favoritePhotoIdForSource(prefs, favoriteScopeId, bucketId)
+                    ?.let { favoritePhotoId -> bucketId to favoritePhotoId }
+            }
+            .toMap()
+
+        val legacySignalQuestFavorite = CommunityDataPreferences.favoritePhotoIdForSource(
+            prefs,
+            favoriteScopeId,
+            CommunityDataPreferences.SOURCE_SIGNALQUEST
+        )
+        val legacySignalQuestBucket = legacySignalQuestFavorite?.let { favoritePhotoId ->
+            photos.firstOrNull { photo ->
+                photo.resolvedSourceId() == CommunityDataPreferences.SOURCE_SIGNALQUEST &&
+                    photo.stableId == favoritePhotoId
+            }?.favoriteBucketId()
+        }
+
+        return if (
+            legacySignalQuestFavorite != null &&
+            legacySignalQuestBucket != null &&
+            legacySignalQuestBucket !in favoritesByBucket
+        ) {
+            favoritesByBucket + (legacySignalQuestBucket to legacySignalQuestFavorite)
+        } else {
+            favoritesByBucket
+        }
+    }
+    var favoritePhotoIdsByBucket by remember(favoriteScopeId, favoriteSelectionEnabled, photoSourceOrder, photos) {
+        mutableStateOf(loadFavoritePhotoIdsByBucket())
+    }
+    LaunchedEffect(favoriteScopeId, favoriteSelectionEnabled, photoSourceOrder, photos) {
+        favoritePhotoIdsByBucket = loadFavoritePhotoIdsByBucket()
+    }
+    fun isFavoritePhoto(photo: CommunityPhoto): Boolean {
+        val bucketId = photo.favoriteBucketId() ?: return false
+        return favoritePhotoIdsByBucket[bucketId] == photo.stableId
+    }
+    fun toggleFavoritePhoto(photo: CommunityPhoto) {
+        val scopeId = favoriteScopeId?.trim()?.takeIf { it.isNotBlank() } ?: return
+        val bucketId = photo.favoriteBucketId() ?: return
+        val nextFavoriteId = if (favoritePhotoIdsByBucket[bucketId] == photo.stableId) null else photo.stableId
+
+        CommunityDataPreferences.setFavoritePhotoIdForSource(
+            prefs = prefs,
+            siteId = scopeId,
+            sourceId = bucketId,
+            photoId = nextFavoriteId
+        )
+        favoritePhotoIdsByBucket = if (nextFavoriteId == null) {
+            favoritePhotoIdsByBucket - bucketId
+        } else {
+            favoritePhotoIdsByBucket + (bucketId to nextFavoriteId)
+        }
+    }
     val sourceEnabledById = mapOf(
         CommunityDataPreferences.SOURCE_CELLULARFR to showCellularFr,
         CommunityDataPreferences.SOURCE_SIGNALQUEST to showSignalQuest
     )
     val availablePhotoSourceIds = remember(photos) {
-        photos.mapNotNull { photo -> CommunityDataPreferences.sourceIdForCommunityName(photo.communityName) }.toSet()
+        photos.mapNotNull { photo -> photo.resolvedSourceId() }.toSet()
     }
     val fallbackOnlyBySource = photoSourceOrder.associateWith { sourceId ->
         CommunityDataPreferences.isPhotoSourceFallbackOnlyForOperatorKeys(prefs, dataOperatorKeys, sourceId)
@@ -393,14 +590,36 @@ fun CommunityPhotosSectionShared(
     }.toSet()
 
     // FILTRAGE
-    val filteredPhotos = remember(photos, visiblePhotoSourceIds, photoSourceOrder) {
+    val filteredPhotos = remember(
+        photos,
+        visiblePhotoSourceIds,
+        photoSourceOrder,
+        favoritePhotoIdsByBucket,
+        canSelectFavoritePhoto,
+        signalQuestOperatorOrder
+    ) {
         photos.filter { photo ->
-            CommunityDataPreferences.sourceIdForCommunityName(photo.communityName)
+            photo.resolvedSourceId()
                 ?.let { it in visiblePhotoSourceIds }
                 ?: true
-        }.sortedBy { photo ->
-            photoSourceRank[CommunityDataPreferences.sourceIdForCommunityName(photo.communityName)] ?: 99
-        }
+        }.sortedWith(
+            compareBy<CommunityPhoto>(
+                { photo ->
+                    val sourceId = photo.resolvedSourceId()
+                    if (sourceId != null && canSelectFavoritePhoto && isFavoritePhoto(photo)) 0 else 1
+                },
+                { photo ->
+                    photoSourceRank[photo.resolvedSourceId()] ?: 99
+                },
+                { photo ->
+                    if (photo.resolvedSourceId() == CommunityDataPreferences.SOURCE_SIGNALQUEST) {
+                        signalQuestOperatorRank(photo.operatorKey, signalQuestOperatorOrder)
+                    } else {
+                        0
+                    }
+                }
+            )
+        )
     }
 
     // --- SÉCURITÉ : On vérifie bien la liste FILTRÉE ---
@@ -445,6 +664,7 @@ fun CommunityPhotosSectionShared(
     val overlayButtonBg = if (isDark) Color.Black.copy(alpha = 0.5f) else Color.White.copy(alpha = 0.7f)
 
     var selectedPhotoIndex by remember { mutableStateOf<Int?>(null) }
+    var selectedPhotosSnapshot by remember { mutableStateOf<List<CommunityPhoto>>(emptyList()) }
     var exifDialogPhoto by remember { mutableStateOf<CommunityPhoto?>(null) }
     val showPhotoExif = AppConfig.siteShowPhotoExif.value
     LaunchedEffect(showPhotoExif) {
@@ -457,9 +677,9 @@ fun CommunityPhotosSectionShared(
     val showSchemaTitle = filteredPhotos.isEmpty() && placeholderRes != null
 
     val sectionTitle = if (showSchemaTitle) {
-        AppStrings.supportDiagram
+        stringResource(R.string.appstrings_support_diagram)
     } else {
-        AppStrings.sitePhotosAndSchemesOption
+        stringResource(R.string.appstrings_site_photos_and_schemes_option)
     }
 
     // 🚨 NOUVEAU : Si on n'a ni photos, ni schéma, ET qu'on ne peut pas uploader, on masque TOUT !
@@ -497,7 +717,7 @@ fun CommunityPhotosSectionShared(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        text = AppStrings.communityPhotosOffline,
+                        text = stringResource(R.string.appstrings_community_photos_offline),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         fontWeight = FontWeight.Medium,
@@ -514,7 +734,7 @@ fun CommunityPhotosSectionShared(
                         item {
                             Image(
                                 painter = painterResource(id = placeholderRes),
-                                contentDescription = AppStrings.supportImageDesc,
+                                contentDescription = stringResource(R.string.appstrings_support_image_desc),
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
                                     .size(120.dp)
@@ -538,11 +758,14 @@ fun CommunityPhotosSectionShared(
                                     modifier = Modifier
                                         .size(120.dp)
                                         .clip(thumbnailShape)
-                                        .clickable { selectedPhotoIndex = index }
+                                        .clickable {
+                                            selectedPhotosSnapshot = filteredPhotos
+                                            selectedPhotoIndex = index
+                                        }
                                 ) {
                                     AsyncImage(
                                         model = photo.url,
-                                        contentDescription = AppStrings.sitePhotoDesc,
+                                        contentDescription = stringResource(R.string.appstrings_site_photo_desc),
                                         contentScale = ContentScale.Crop,
                                         error = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
                                         fallback = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
@@ -574,7 +797,7 @@ fun CommunityPhotosSectionShared(
                             item {
                                 Image(
                                     painter = painterResource(id = placeholderRes), // 🪄 L'image s'adapte toute seule !
-                                    contentDescription = AppStrings.supportImageDesc,
+                                    contentDescription = stringResource(R.string.appstrings_support_image_desc),
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
                                         .size(120.dp)
@@ -608,7 +831,7 @@ fun CommunityPhotosSectionShared(
                                         )
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text(
-                                            text = AppStrings.uploadPhotosPrompt,
+                                            text = stringResource(R.string.appstrings_upload_photos_prompt),
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary,
                                             style = MaterialTheme.typography.bodySmall,
@@ -629,11 +852,14 @@ fun CommunityPhotosSectionShared(
                                     modifier = Modifier
                                         .size(120.dp)
                                         .clip(thumbnailShape)
-                                        .clickable { selectedPhotoIndex = index }
+                                        .clickable {
+                                            selectedPhotosSnapshot = filteredPhotos
+                                            selectedPhotoIndex = index
+                                        }
                                 ) {
                                     AsyncImage(
                                         model = photo.url,
-                                        contentDescription = AppStrings.sitePhotoDesc,
+                                        contentDescription = stringResource(R.string.appstrings_site_photo_desc),
                                         contentScale = ContentScale.Crop,
                                         error = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
                                         fallback = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
@@ -667,7 +893,7 @@ fun CommunityPhotosSectionShared(
                             item {
                                 Image(
                                     painter = painterResource(id = placeholderRes), // 🪄 L'image s'adapte toute seule !
-                                    contentDescription = AppStrings.supportImageDesc,
+                                    contentDescription = stringResource(R.string.appstrings_support_image_desc),
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
                                         .size(120.dp)
@@ -703,7 +929,7 @@ fun CommunityPhotosSectionShared(
                                         )
                                         Spacer(modifier = Modifier.height(8.dp))
                                         Text(
-                                            text = AppStrings.uploadPhotosPrompt,
+                                            text = stringResource(R.string.appstrings_upload_photos_prompt),
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary,
                                             style = MaterialTheme.typography.bodySmall,
@@ -732,7 +958,7 @@ fun CommunityPhotosSectionShared(
                     // L'image au centre
                     Image(
                         painter = painterResource(id = placeholderRes), // 🪄 L'image en plein écran s'adapte !
-                        contentDescription = AppStrings.supportImageFullScreenDesc,
+                        contentDescription = stringResource(R.string.appstrings_support_image_full_screen_desc),
                         contentScale = ContentScale.Fit,
                         modifier = Modifier
                             .fillMaxSize()
@@ -749,7 +975,7 @@ fun CommunityPhotosSectionShared(
                             .padding(top = 20.dp, end = 4.dp)
                             .background(overlayButtonBg, shape = CircleShape)
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = AppStrings.close, tint = viewerContentColor)
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_close), tint = viewerContentColor)
                     }
                 }
             }
@@ -757,19 +983,36 @@ fun CommunityPhotosSectionShared(
     }
 
     if (selectedPhotoIndex != null) {
+        val viewerPhotos = selectedPhotosSnapshot.ifEmpty { filteredPhotos }
+        if (viewerPhotos.isEmpty()) {
+            LaunchedEffect(Unit) {
+                selectedPhotoIndex = null
+                selectedPhotosSnapshot = emptyList()
+            }
+        } else {
         // --- On utilise filteredPhotos ---
-        val pagerState = rememberPagerState(initialPage = selectedPhotoIndex!!, pageCount = { filteredPhotos.size })
-        val currentPhoto = filteredPhotos[pagerState.currentPage]
-        val fullScreenTitle = AppStrings.communityPhotosTitle(filteredPhotos.size, currentPhoto.communityName)
+        val initialPhotoIndex = selectedPhotoIndex!!.coerceIn(0, viewerPhotos.lastIndex)
+        val pagerState = rememberPagerState(initialPage = initialPhotoIndex, pageCount = { viewerPhotos.size })
+        val currentPhoto = viewerPhotos[pagerState.currentPage]
+        val currentPhotoSourceId = currentPhoto.resolvedSourceId()
+        val currentPhotoSourceLabel = currentPhoto.displaySourceLabel(photoSourceOrder)
+        val fullScreenTitle = pluralStringResource(
+            R.plurals.community_photos_title,
+            viewerPhotos.size,
+            currentPhotoSourceLabel.replace(" ", "\u00A0")
+        )
+        val canFavoriteCurrentPhoto = canSelectFavoritePhoto && currentPhotoSourceId != null
+        val isCurrentPhotoFavorite = canSelectFavoritePhoto && isFavoritePhoto(currentPhoto)
 
         val dismissOffset = remember { Animatable(0f) }
         val coroutineScope = rememberCoroutineScope()
         var viewerContainerSize by remember { mutableStateOf(IntSize.Zero) }
-        var photoSourceSizes by remember(filteredPhotos) { mutableStateOf<Map<Int, IntSize>>(emptyMap()) }
+        var photoSourceSizes by remember(viewerPhotos) { mutableStateOf<Map<Int, IntSize>>(emptyMap()) }
 
         Dialog(
             onDismissRequest = {
                 selectedPhotoIndex = null
+                selectedPhotosSnapshot = emptyList()
                 coroutineScope.launch { dismissOffset.snapTo(0f) }
             },
             properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -865,6 +1108,7 @@ fun CommunityPhotosSectionShared(
                                             onDragEnd = {
                                                 if (dismissOffset.value > 250f) {
                                                     selectedPhotoIndex = null
+                                                    selectedPhotosSnapshot = emptyList()
                                                     coroutineScope.launch { dismissOffset.snapTo(0f) }
                                                 } else {
                                                     coroutineScope.launch { dismissOffset.animateTo(0f) }
@@ -884,8 +1128,8 @@ fun CommunityPhotosSectionShared(
                         ) {
                             // --- On utilise filteredPhotos ---
                             AsyncImage(
-                                model = filteredPhotos[page].url,
-                                contentDescription = AppStrings.fullScreenPhotoDesc,
+                                model = viewerPhotos[page].url,
+                                contentDescription = stringResource(R.string.appstrings_full_screen_photo_desc),
                                 contentScale = ContentScale.Fit,
                                 onSuccess = { state ->
                                     val drawable = state.result.drawable
@@ -911,17 +1155,17 @@ fun CommunityPhotosSectionShared(
                             onClick = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
                             modifier = Modifier.align(Alignment.CenterStart).padding(start = photoStartPadding).size(28.dp).background(overlayButtonBg, CircleShape)
                         ) {
-                            Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = AppStrings.previous, tint = viewerContentColor, modifier = Modifier.size(20.dp))
+                            Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.appstrings_previous), tint = viewerContentColor, modifier = Modifier.size(20.dp))
                         }
                     }
 
                     // --- FLÈCHE DROITE (On utilise filteredPhotos.size) ---
-                    if (pagerState.currentPage < filteredPhotos.size - 1) {
+                    if (pagerState.currentPage < viewerPhotos.size - 1) {
                         IconButton(
                             onClick = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
                             modifier = Modifier.align(Alignment.CenterEnd).padding(end = photoEndPadding).size(28.dp).background(overlayButtonBg, CircleShape)
                         ) {
-                            Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = AppStrings.next, tint = viewerContentColor, modifier = Modifier.size(20.dp))
+                            Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.appstrings_next), tint = viewerContentColor, modifier = Modifier.size(20.dp))
                         }
                     }
 
@@ -948,11 +1192,25 @@ fun CommunityPhotosSectionShared(
                         )
                     }
 
+                    if (canFavoriteCurrentPhoto) {
+                        PhotoFavoriteButton(
+                            isFavorite = isCurrentPhotoFavorite,
+                            modifier = Modifier.align(Alignment.TopStart).padding(top = photoTopPadding, start = photoStartPadding),
+                            backgroundColor = overlayButtonBg,
+                            contentColor = viewerContentColor,
+                            onClick = { toggleFavoritePhoto(currentPhoto) }
+                        )
+                    }
+
                     IconButton(
-                        onClick = { selectedPhotoIndex = null; coroutineScope.launch { dismissOffset.snapTo(0f) } },
+                        onClick = {
+                            selectedPhotoIndex = null
+                            selectedPhotosSnapshot = emptyList()
+                            coroutineScope.launch { dismissOffset.snapTo(0f) }
+                        },
                         modifier = Modifier.align(Alignment.TopEnd).padding(top = 20.dp, end = 4.dp).background(overlayButtonBg, shape = CircleShape)
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = AppStrings.close, tint = viewerContentColor)
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_close), tint = viewerContentColor)
                     }
 
                     // --- AUTEUR ET DATE ---
@@ -962,17 +1220,17 @@ fun CommunityPhotosSectionShared(
                             horizontalAlignment = Alignment.Start
                         ) {
                             if (!currentPhoto.author.isNullOrBlank() && currentPhoto.author != "null") {
-                                Text(text = AppStrings.photoByAuthor(currentPhoto.author), color = viewerContentColor, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                Text(text = stringResource(R.string.photo_by_author, currentPhoto.author), color = viewerContentColor, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
                             }
                             val formattedDate = formatPhotoDate(currentPhoto.date)
                             if (formattedDate.isNotEmpty()) {
-                                Text(text = AppStrings.photoOnDate(formattedDate), color = viewerContentColor.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall)
+                                Text(text = stringResource(R.string.photo_on_date, formattedDate), color = viewerContentColor.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall)
                             }
                         }
                     }
 
                     // --- COMPTEUR (On utilise filteredPhotos.size) ---
-                    if (filteredPhotos.size > 1) {
+                    if (viewerPhotos.size > 1) {
                         Column(
                             modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = photoBottomPadding, end = photoEndPadding).background(overlayButtonBg, pillButtonShape).padding(horizontal = 12.dp, vertical = 6.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
@@ -980,12 +1238,12 @@ fun CommunityPhotosSectionShared(
                         ) {
                             Icon(imageVector = Icons.Default.Collections, contentDescription = null, tint = viewerContentColor, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.height(2.dp))
-                            Text(text = "${pagerState.currentPage + 1} / ${filteredPhotos.size}", color = viewerContentColor, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            Text(text = "${pagerState.currentPage + 1} / ${viewerPhotos.size}", color = viewerContentColor, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
                         }
                     }
 
                     // --- INDICATEURS "PILULE" (On utilise filteredPhotos.size) ---
-                    if (filteredPhotos.size > 1) {
+                    if (viewerPhotos.size > 1) {
                         var containerWidth by remember { mutableStateOf(0) }
 
                         Box(
@@ -995,12 +1253,12 @@ fun CommunityPhotosSectionShared(
                                 .onSizeChanged { containerWidth = it.width }
                                 .background(color = if (isDark) Color(0xFF2C2C2C) else Color(0xFFF0F0F0), shape = CircleShape)
                                 .padding(horizontal = 12.dp, vertical = 6.dp)
-                                .pointerInput(filteredPhotos.size) {
+                                .pointerInput(viewerPhotos.size) {
                                     detectDragGestures { change, _ ->
                                         if (containerWidth > 0) {
                                             val positionX = change.position.x.coerceIn(0f, containerWidth.toFloat())
                                             val progress = positionX / containerWidth.toFloat()
-                                            val targetPage = (progress * (filteredPhotos.size - 1)).toInt()
+                                            val targetPage = (progress * (viewerPhotos.size - 1)).toInt()
                                             if (targetPage != pagerState.currentPage) {
                                                 coroutineScope.launch { pagerState.animateScrollToPage(targetPage) }
                                             }
@@ -1012,8 +1270,8 @@ fun CommunityPhotosSectionShared(
                         ) {
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                                 val maxDots = 5
-                                val startDot = (pagerState.currentPage - maxDots / 2).coerceIn(0, maxOf(0, filteredPhotos.size - maxDots))
-                                val endDot = minOf(startDot + maxDots, filteredPhotos.size)
+                                val startDot = (pagerState.currentPage - maxDots / 2).coerceIn(0, maxOf(0, viewerPhotos.size - maxDots))
+                                val endDot = minOf(startDot + maxDots, viewerPhotos.size)
 
                                 (startDot until endDot).forEach { iteration ->
                                     val isActive = pagerState.currentPage == iteration
@@ -1042,11 +1300,41 @@ fun CommunityPhotosSectionShared(
             }
         }
     }
+    }
 
     exifDialogPhoto?.let { photo ->
         PhotoExifDialog(
             photo = photo,
             onDismiss = { exifDialogPhoto = null }
+        )
+    }
+}
+
+@Composable
+private fun PhotoFavoriteButton(
+    isFavorite: Boolean,
+    modifier: Modifier,
+    backgroundColor: Color,
+    contentColor: Color,
+    onClick: () -> Unit
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = modifier
+            .size(32.dp)
+            .background(backgroundColor, CircleShape)
+    ) {
+        Icon(
+            imageVector = if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+            contentDescription = stringResource(
+                if (isFavorite) {
+                    R.string.appstrings_photo_favorite_remove_desc
+                } else {
+                    R.string.appstrings_photo_favorite_set_desc
+                }
+            ),
+            tint = if (isFavorite) favoritePhotoColor else contentColor,
+            modifier = Modifier.size(18.dp)
         )
     }
 }
@@ -1066,7 +1354,7 @@ private fun PhotoInfoButton(
     ) {
         Icon(
             imageVector = Icons.Default.Info,
-            contentDescription = AppStrings.photoExifInfoDesc,
+            contentDescription = stringResource(R.string.appstrings_photo_exif_info_desc),
             tint = contentColor,
             modifier = Modifier.size(18.dp)
         )
@@ -1101,13 +1389,13 @@ private fun PhotoExifDialog(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = AppStrings.photoExifMetadataTitle,
+                        text = stringResource(R.string.appstrings_photo_exif_metadata_title),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = AppStrings.close)
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_close))
                     }
                 }
 
@@ -1119,7 +1407,7 @@ private fun PhotoExifDialog(
                     coordinate?.let { point ->
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = AppStrings.photoExifGpsPosition,
+                            text = stringResource(R.string.appstrings_photo_exif_gps_position),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -1148,7 +1436,7 @@ private fun PhotoExifDialog(
                                     verticalAlignment = Alignment.Top
                                 ) {
                                     Text(
-                                        text = AppStrings.photoExifLabel(item.key),
+                                        text = photoExifLabel(item.key),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.weight(1f)

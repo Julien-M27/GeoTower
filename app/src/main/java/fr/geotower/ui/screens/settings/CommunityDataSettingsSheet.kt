@@ -43,15 +43,16 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import fr.geotower.R
 import fr.geotower.data.community.CommunityDataFeature
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.ui.components.GeoTowerSwitch
 import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColors
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -174,7 +175,7 @@ fun CommunityDataSettingsSheet(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                 }
                 Text(
-                    text = AppStrings.communityDataSettingsTitle,
+                    text = stringResource(R.string.settings_community_data_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -184,7 +185,7 @@ fun CommunityDataSettingsSheet(
             }
 
             Text(
-                text = AppStrings.communityDataSettingsDesc,
+                text = stringResource(R.string.settings_community_data_desc),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 16.dp)
@@ -215,8 +216,8 @@ fun CommunityDataSettingsSheet(
                             )
                             Text(
                                 text = when (feature.id) {
-                                    CommunityDataPreferences.FEATURE_PHOTOS -> AppStrings.communityDataPhotos
-                                    CommunityDataPreferences.FEATURE_SPEEDTEST -> AppStrings.communityDataSpeedtest
+                                    CommunityDataPreferences.FEATURE_PHOTOS -> stringResource(R.string.appstrings_community_data_photos)
+                                    CommunityDataPreferences.FEATURE_SPEEDTEST -> stringResource(R.string.appstrings_community_data_speedtest)
                                     else -> feature.label
                                 },
                                 style = MaterialTheme.typography.labelLarge,
@@ -231,7 +232,7 @@ fun CommunityDataSettingsSheet(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = AppStrings.communityDataShowOperatorPhotos,
+                                        text = stringResource(R.string.appstrings_community_data_show_operator_photos),
                                         modifier = Modifier.weight(1f),
                                         style = MaterialTheme.typography.bodyMedium
                                     )
@@ -244,7 +245,7 @@ fun CommunityDataSettingsSheet(
                                 }
                                 if (photosChecked && feature.sources.size > 1) {
                                     Text(
-                                        text = AppStrings.communityDataPhotoSourceOrder,
+                                        text = stringResource(R.string.appstrings_community_data_photo_source_order),
                                         style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
@@ -306,7 +307,7 @@ fun CommunityDataSettingsSheet(
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
-                                            text = AppStrings.communityDataPhotoSourceFallbackOnly,
+                                            text = stringResource(R.string.appstrings_community_data_photo_source_fallback_only),
                                             modifier = Modifier.weight(1f),
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -352,7 +353,7 @@ fun CommunityDataSettingsSheet(
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
-                Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
         }
     }

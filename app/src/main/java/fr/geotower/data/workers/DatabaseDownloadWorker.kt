@@ -22,7 +22,6 @@ import fr.geotower.R
 import fr.geotower.data.api.DatabaseDownloader
 import android.content.pm.ServiceInfo
 import fr.geotower.utils.AppLogger
-import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.CancellationException
 import java.util.concurrent.TimeUnit
 
@@ -92,7 +91,7 @@ class DatabaseDownloadWorker(
 
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channelName = AppStrings.dbDownloadChannelName(context)
+            val channelName = context.getString(R.string.notification_database_channel_name)
             val channel = NotificationChannel(
                 channelId,
                 channelName,
@@ -117,8 +116,8 @@ class DatabaseDownloadWorker(
     }
 
     private fun createNotification(progress: Int): android.app.Notification {
-        val title = AppStrings.dbDownloadTitle(context)
-        val content = AppStrings.dbDownloadProgress(context, progress)
+        val title = context.getString(R.string.notification_database_download_title)
+        val content = context.getString(R.string.notification_database_download_progress, progress)
 
         // ✅ AJOUT : Intent pour ouvrir les paramètres DB au clic
         val intent = Intent(context, MainActivity::class.java).apply {
@@ -192,8 +191,8 @@ class DatabaseDownloadWorker(
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val title = AppStrings.dbDownloadedTitle(context)
-        val content = AppStrings.dbDownloadedContent(context)
+        val title = context.getString(R.string.notification_database_downloaded_title)
+        val content = context.getString(R.string.notification_database_downloaded_content)
 
         val notification = NotificationCompat.Builder(context, channelId)
             .setContentTitle(title)
@@ -207,8 +206,8 @@ class DatabaseDownloadWorker(
     }
 
     private fun showErrorNotification() {
-        val title = AppStrings.errorForService(context)
-        val content = AppStrings.dbDownloadFailed(context)
+        val title = context.getString(R.string.notification_database_download_failed_title)
+        val content = context.getString(R.string.notification_database_download_failed_content)
 
         val notification = NotificationCompat.Builder(context, channelId)
             .setContentTitle(title)

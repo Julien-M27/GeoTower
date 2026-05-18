@@ -65,13 +65,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import fr.geotower.R
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
 import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.filled.Settings
@@ -92,6 +93,7 @@ import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.rememberReorderableDragState
 import fr.geotower.ui.components.settingsPopupFadingEdge
 import kotlin.math.roundToInt
+import fr.geotower.utils.ThroughputDisplayText
 
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -128,7 +130,7 @@ fun PagesCustomizationSheet(
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(
-                    text = AppStrings.pagesCustomizationTitle,
+                    text = stringResource(R.string.settings_pages_customization_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -138,7 +140,7 @@ fun PagesCustomizationSheet(
             }
 
             Text(
-                text = AppStrings.pagesCustomizationDesc,
+                text = stringResource(R.string.settings_pages_customization_desc),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
@@ -146,21 +148,21 @@ fun PagesCustomizationSheet(
             )
 
             // 1. La page de démarrage
-            NavigationMenuItem(title = AppStrings.startupPageSettings, icon = Icons.AutoMirrored.Filled.Launch, isSelected = false, isDark = isDark) { onStartupPageClick() }
+            NavigationMenuItem(title = stringResource(R.string.appstrings_startup_page_settings), icon = Icons.AutoMirrored.Filled.Launch, isSelected = false, isDark = isDark) { onStartupPageClick() }
             Spacer(Modifier.height(12.dp))
 
             // 2. Les menus individuels des pages
-            NavigationMenuItem(title = AppStrings.pageHomeSettings, icon = Icons.Default.Home, isSelected = false, isDark = isDark) { onHomeClick() }
-            NavigationMenuItem(title = AppStrings.pageNearbySettings, icon = Icons.Default.NearMe, isSelected = false, isDark = isDark) { onNearbyClick() }
-            NavigationMenuItem(title = AppStrings.pageMapSettings, icon = Icons.Default.Map, isSelected = false, isDark = isDark) { onMapClick() }
+            NavigationMenuItem(title = stringResource(R.string.appstrings_page_home_settings), icon = Icons.Default.Home, isSelected = false, isDark = isDark) { onHomeClick() }
+            NavigationMenuItem(title = stringResource(R.string.appstrings_page_nearby_settings), icon = Icons.Default.NearMe, isSelected = false, isDark = isDark) { onNearbyClick() }
+            NavigationMenuItem(title = stringResource(R.string.appstrings_page_map_settings), icon = Icons.Default.Map, isSelected = false, isDark = isDark) { onMapClick() }
             if (AppConfig.hasCompass.value) {
-                NavigationMenuItem(title = AppStrings.pageCompassSettings, icon = Icons.Default.Explore, isSelected = false, isDark = isDark) { onCompassClick() }
+                NavigationMenuItem(title = stringResource(R.string.appstrings_page_compass_settings), icon = Icons.Default.Explore, isSelected = false, isDark = isDark) { onCompassClick() }
             }
 
             // --- NOUVELLES SECTIONS ---
-            NavigationMenuItem(title = AppStrings.pageSupportSettings, icon = Icons.Default.VerticalAlignTop, isSelected = false, isDark = isDark) { onSupportClick() }
-            NavigationMenuItem(title = AppStrings.pageSiteSettings, icon = Icons.Default.WifiTethering, isSelected = false, isDark = isDark) { onSiteClick() }
-            NavigationMenuItem(title = AppStrings.throughputCalculatorTitle, icon = Icons.Default.Speed, isSelected = false, isDark = isDark) { onThroughputCalculatorClick() }
+            NavigationMenuItem(title = stringResource(R.string.appstrings_page_support_settings), icon = Icons.Default.VerticalAlignTop, isSelected = false, isDark = isDark) { onSupportClick() }
+            NavigationMenuItem(title = stringResource(R.string.appstrings_page_site_settings), icon = Icons.Default.WifiTethering, isSelected = false, isDark = isDark) { onSiteClick() }
+            NavigationMenuItem(title = stringResource(R.string.appstrings_throughput_calculator_title), icon = Icons.Default.Speed, isSelected = false, isDark = isDark) { onThroughputCalculatorClick() }
         }
     }
 }
@@ -196,17 +198,17 @@ fun StartupPageSelectionSheet(
         ) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text(AppStrings.startupPageSettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Text(stringResource(R.string.appstrings_startup_page_settings), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Spacer(Modifier.width(48.dp))
             }
             Spacer(Modifier.height(24.dp))
 
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                SettingsRadioItem(AppStrings.pageHomeSettings, tempPage == "home", useOneUi, bubbleColor) { tempPage = "home" }
-                SettingsRadioItem(AppStrings.pageNearbySettings, tempPage == "nearby", useOneUi, bubbleColor) { tempPage = "nearby" }
-                SettingsRadioItem(AppStrings.pageMapSettings, tempPage == "map", useOneUi, bubbleColor) { tempPage = "map" }
+                SettingsRadioItem(stringResource(R.string.appstrings_page_home_settings), tempPage == "home", useOneUi, bubbleColor) { tempPage = "home" }
+                SettingsRadioItem(stringResource(R.string.appstrings_page_nearby_settings), tempPage == "nearby", useOneUi, bubbleColor) { tempPage = "nearby" }
+                SettingsRadioItem(stringResource(R.string.appstrings_page_map_settings), tempPage == "map", useOneUi, bubbleColor) { tempPage = "map" }
                 if (AppConfig.hasCompass.value) {
-                    SettingsRadioItem(AppStrings.pageCompassSettings, tempPage == "compass", useOneUi, bubbleColor) { tempPage = "compass" }
+                    SettingsRadioItem(stringResource(R.string.appstrings_page_compass_settings), tempPage == "compass", useOneUi, bubbleColor) { tempPage = "compass" }
                 }
 
                 // --- NOUVEAU BOUTON RÉINITIALISER ---
@@ -221,7 +223,7 @@ fun StartupPageSelectionSheet(
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(8.dp))
-                    Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
                 Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
 
@@ -231,7 +233,7 @@ fun StartupPageSelectionSheet(
                     modifier = Modifier.fillMaxWidth().height(50.dp).padding(top = 8.dp),
                     shape = oneUiActionButtonShape(useOneUi, RoundedCornerShape(25.dp))
                 ) {
-                    Text(AppStrings.validate, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.appstrings_validate), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -317,7 +319,7 @@ fun HomeSettingsSheet(
             if (showLogoSettings) {
                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { showLogoSettings = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                    Text(AppStrings.pageHomeLogoSettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                    Text(stringResource(R.string.appstrings_page_home_logo_settings), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                     Spacer(Modifier.width(48.dp))
                 }
 
@@ -336,14 +338,14 @@ fun HomeSettingsSheet(
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                     Spacer(Modifier.width(8.dp))
-                    Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
 
                 Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
             } else if (showHelpPositionSettings) {
                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = { showHelpPositionSettings = false }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                    Text(AppStrings.homeHelpPositionSettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                    Text(stringResource(R.string.appstrings_home_help_position_settings), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                     Spacer(Modifier.width(48.dp))
                 }
 
@@ -353,20 +355,20 @@ fun HomeSettingsSheet(
                         prefs.edit().putString("home_help_position", position).apply()
                     }
 
-                    SettingsRadioItem(AppStrings.positionTopLeft, helpButtonPosition == "top_start", useOneUi, bubbleColor) { savePosition("top_start") }
-                    SettingsRadioItem(AppStrings.positionTopRight, helpButtonPosition == "top_end", useOneUi, bubbleColor) { savePosition("top_end") }
-                    SettingsRadioItem(AppStrings.positionBottomLeft, helpButtonPosition == "bottom_start", useOneUi, bubbleColor) { savePosition("bottom_start") }
-                    SettingsRadioItem(AppStrings.positionBottomRight, helpButtonPosition == "bottom_end", useOneUi, bubbleColor) { savePosition("bottom_end") }
+                    SettingsRadioItem(stringResource(R.string.appstrings_position_top_left), helpButtonPosition == "top_start", useOneUi, bubbleColor) { savePosition("top_start") }
+                    SettingsRadioItem(stringResource(R.string.appstrings_position_top_right), helpButtonPosition == "top_end", useOneUi, bubbleColor) { savePosition("top_end") }
+                    SettingsRadioItem(stringResource(R.string.appstrings_position_bottom_left), helpButtonPosition == "bottom_start", useOneUi, bubbleColor) { savePosition("bottom_start") }
+                    SettingsRadioItem(stringResource(R.string.appstrings_position_bottom_right), helpButtonPosition == "bottom_end", useOneUi, bubbleColor) { savePosition("bottom_end") }
                 }
 
                 Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
             } else {
                 Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                    Text(AppStrings.pageHomeSettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                    Text(stringResource(R.string.appstrings_page_home_settings), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                     Spacer(Modifier.width(48.dp))
                 }
-                Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
+                Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
 
                 val cardHeight = 64.dp
                 val spacing = 12.dp
@@ -386,31 +388,31 @@ fun HomeSettingsSheet(
                         when (pageId) {
                             // ---> 3. AJOUT DU BLOC LOGO <---
                             "logo" -> DraggableSwitchCard(
-                                AppStrings.pageHomeLogoSettings, showLogo,
+                                stringResource(R.string.appstrings_page_home_logo_settings), showLogo,
                                 { showLogo = it; prefs.edit().putBoolean("show_home_logo", it).apply() },
                                 shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight,
                                 onSettingsClick = { showLogoSettings = true }
                             )
-                            "nearby" -> DraggableSwitchCard(AppStrings.pageNearbySettings, showNearby, onNearbyChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "map" -> DraggableSwitchCard(AppStrings.pageMapSettings, showMap, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "nearby" -> DraggableSwitchCard(stringResource(R.string.appstrings_page_nearby_settings), showNearby, onNearbyChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "map" -> DraggableSwitchCard(stringResource(R.string.appstrings_page_map_settings), showMap, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                             "compass" -> {
                                 if (AppConfig.hasCompass.value) {
                                     DraggableSwitchCard(
-                                        AppStrings.pageCompassSettings, showCompass, onCompassChange,
+                                        stringResource(R.string.appstrings_page_compass_settings), showCompass, onCompassChange,
                                         shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
                                     )
                                 }
                             }
-                            "stats" -> DraggableSwitchCard(AppStrings.statsGroupTitle, showStats, onStatsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "stats" -> DraggableSwitchCard(stringResource(R.string.appstrings_stats_group_title), showStats, onStatsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
 
                             // --- NOUVEAU : AJOUT DE LA CARTE PARAMÈTRES ---
-                            "settings" -> DraggableSwitchCard(AppStrings.settingsTitle, true, {}, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, hideSwitch = true)
+                            "settings" -> DraggableSwitchCard(stringResource(R.string.appstrings_settings_title), true, {}, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, hideSwitch = true)
                         }
                     }
                 }
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                     ConfigurableSwitchCard(
-                        title = AppStrings.homeHelpSettings,
+                        title = stringResource(R.string.appstrings_home_help_settings),
                         checked = showHelpButton,
                         onCheckedChange = {
                             showHelpButton = it
@@ -451,7 +453,7 @@ fun HomeSettingsSheet(
             }) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
-                Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
@@ -493,7 +495,7 @@ fun DraggableSwitchCard(
             .then(dragModifier)
     ) {
         Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.DragHandle, contentDescription = AppStrings.move, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.Default.DragHandle, contentDescription = stringResource(R.string.appstrings_move), tint = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(modifier = Modifier.width(16.dp))
             Text(
                 text = title,
@@ -509,7 +511,7 @@ fun DraggableSwitchCard(
                 IconButton(onClick = onSettingsClick) {
                     Icon(
                         imageVector = Icons.Default.Settings,
-                        contentDescription = AppStrings.settingsTitle,
+                        contentDescription = stringResource(R.string.appstrings_settings_title),
                         tint = MaterialTheme.colorScheme.primary
                     )
                 }
@@ -565,7 +567,7 @@ fun ConfigurableSwitchCard(
             IconButton(onClick = onSettingsClick) {
                 Icon(
                     imageVector = Icons.Default.Settings,
-                    contentDescription = AppStrings.settingsTitle,
+                    contentDescription = stringResource(R.string.appstrings_settings_title),
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
@@ -610,10 +612,10 @@ fun NearbySettingsSheet(
         ) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text(AppStrings.pageNearbySettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Text(stringResource(R.string.appstrings_page_nearby_settings), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Spacer(Modifier.width(48.dp))
             }
-            Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
+            Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
 
             val cardHeight = 64.dp
             val spacing = 12.dp
@@ -631,8 +633,8 @@ fun NearbySettingsSheet(
                         val dragOffset = reorderState.offsetFor(blockId)
 
                         when (blockId) {
-                            "search" -> DraggableSwitchCard(AppStrings.nearbySearchOption, showSearch, onSearchChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "sites" -> DraggableSwitchCard(AppStrings.nearbySitesOption, showSites, onSitesChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "search" -> DraggableSwitchCard(stringResource(R.string.appstrings_nearby_search_option), showSearch, onSearchChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "sites" -> DraggableSwitchCard(stringResource(R.string.appstrings_nearby_sites_option), showSites, onSitesChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                         }
                     }
                 }
@@ -642,7 +644,7 @@ fun NearbySettingsSheet(
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
             Spacer(modifier = Modifier.height(8.dp))
             SimpleSwitchCard(
-                title = AppStrings.nearbySearchSuggestionsOption,
+                title = stringResource(R.string.appstrings_nearby_search_suggestions_option),
                 showMapLocation = showSuggestions,
                 onLocationChange = onSuggestionsChange,
                 shape = shape,
@@ -668,7 +670,7 @@ fun NearbySettingsSheet(
                 )
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = AppStrings.resetToDefault,
+                    text = stringResource(R.string.appstrings_reset_to_default),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -710,7 +712,7 @@ fun SearchRadiusCard(
         Surface(shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(AppStrings.searchRadiusTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.appstrings_search_radius_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                     Text(labels[currentIndex.toInt()], style = MaterialTheme.typography.titleMedium, color = accentColor, fontWeight = FontWeight.Bold)
                 }
 
@@ -787,10 +789,10 @@ fun CompassSettingsSheet(
         ) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text(AppStrings.pageCompassSettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Text(stringResource(R.string.appstrings_page_compass_settings), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Spacer(Modifier.width(48.dp))
             }
-            Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
+            Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
 
             val cardHeight = 64.dp
             val spacing = 12.dp
@@ -807,9 +809,9 @@ fun CompassSettingsSheet(
                         val dragOffset = reorderState.offsetFor(blockId)
 
                         when (blockId) {
-                            "location" -> DraggableSwitchCard(AppStrings.compassLocationOption, showLocation, onLocationChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "gps" -> DraggableSwitchCard(AppStrings.compassGpsOption, showGps, onGpsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "accuracy" -> DraggableSwitchCard(AppStrings.compassAccuracyOption, showAccuracy, onAccuracyChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "location" -> DraggableSwitchCard(stringResource(R.string.appstrings_compass_location_option), showLocation, onLocationChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "gps" -> DraggableSwitchCard(stringResource(R.string.appstrings_compass_gps_option), showGps, onGpsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "accuracy" -> DraggableSwitchCard(stringResource(R.string.appstrings_compass_accuracy_option), showAccuracy, onAccuracyChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                         }
                     }
                 }
@@ -824,7 +826,7 @@ fun CompassSettingsSheet(
             }) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
-                Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
@@ -881,7 +883,7 @@ fun MapSettingsSheet(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
                 }
                 Text(
-                    if (showAzimuthSettings) AppStrings.mapAzimuthsOption else AppStrings.pageMapSettings,
+                    if (showAzimuthSettings) stringResource(R.string.appstrings_map_azimuths_option) else stringResource(R.string.appstrings_page_map_settings),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -895,22 +897,22 @@ fun MapSettingsSheet(
 
             if (showAzimuthSettings) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SimpleSwitchCard(AppStrings.mapAzimuthLinesOption, showMapLocation = showAzimuths, onLocationChange = onAzimuthsChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
-                    SimpleSwitchCard(AppStrings.mapAzimuthConesOption, showMapLocation = showAzimuthsCone, onLocationChange = onAzimuthsConeChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    SimpleSwitchCard(stringResource(R.string.appstrings_map_azimuth_lines_option), showMapLocation = showAzimuths, onLocationChange = onAzimuthsChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    SimpleSwitchCard(stringResource(R.string.appstrings_map_azimuth_cones_option), showMapLocation = showAzimuthsCone, onLocationChange = onAzimuthsConeChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                 }
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SimpleSwitchCard(AppStrings.mapLocationOption, showMapLocation = showLocation, onLocationChange = onLocationChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
-                    SimpleSwitchCard(AppStrings.mapLocationMarkerOption, showMapLocation = showLocationMarker, onLocationChange = onLocationMarkerChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
-                    ConfigurableSwitchCard(AppStrings.mapAzimuthsOption, showAnyAzimuths, ::setAzimuthsVisible, { showAzimuthSettings = true }, shape, border, bubbleColor, useOneUi)
-                    SimpleSwitchCard(AppStrings.mapZoomOption, showMapLocation = showZoom, onLocationChange = onZoomChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
-                    SimpleSwitchCard(AppStrings.mapToolboxOption, showMapLocation = showToolbox, onLocationChange = onToolboxChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    SimpleSwitchCard(stringResource(R.string.appstrings_map_location_option), showMapLocation = showLocation, onLocationChange = onLocationChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    SimpleSwitchCard(stringResource(R.string.appstrings_map_location_marker_option), showMapLocation = showLocationMarker, onLocationChange = onLocationMarkerChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    ConfigurableSwitchCard(stringResource(R.string.appstrings_map_azimuths_option), showAnyAzimuths, ::setAzimuthsVisible, { showAzimuthSettings = true }, shape, border, bubbleColor, useOneUi)
+                    SimpleSwitchCard(stringResource(R.string.appstrings_map_zoom_option), showMapLocation = showZoom, onLocationChange = onZoomChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    SimpleSwitchCard(stringResource(R.string.appstrings_map_toolbox_option), showMapLocation = showToolbox, onLocationChange = onToolboxChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     if (AppConfig.hasCompass.value) {
-                        SimpleSwitchCard(AppStrings.mapCompassOption, showMapLocation = showCompass, onLocationChange = onCompassChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                        SimpleSwitchCard(stringResource(R.string.appstrings_map_compass_option), showMapLocation = showCompass, onLocationChange = onCompassChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     }
-                    SimpleSwitchCard(AppStrings.showSpeedometer, showMapLocation = showSpeedometer, onLocationChange = onSpeedometerChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
-                    SimpleSwitchCard(AppStrings.mapScaleOption, showMapLocation = showScale, onLocationChange = onScaleChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
-                    SimpleSwitchCard(AppStrings.mapAttributionOption, showMapLocation = showAttribution, onLocationChange = onAttributionChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    SimpleSwitchCard(stringResource(R.string.appstrings_show_speedometer), showMapLocation = showSpeedometer, onLocationChange = onSpeedometerChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    SimpleSwitchCard(stringResource(R.string.appstrings_map_scale_option), showMapLocation = showScale, onLocationChange = onScaleChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    SimpleSwitchCard(stringResource(R.string.appstrings_map_attribution_option), showMapLocation = showAttribution, onLocationChange = onAttributionChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                 }
             }
 
@@ -934,7 +936,7 @@ fun MapSettingsSheet(
             }) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
-                Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
@@ -979,7 +981,7 @@ private fun normalizeThroughputBlockOrder(order: List<String>): List<String> {
 
 @Composable
 private fun throughputBlockTitle(blockId: String): String {
-    return AppStrings.throughputBlockTitle(blockId)
+    return ThroughputDisplayText.blockTitle(blockId)
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1033,12 +1035,12 @@ fun ThroughputCalculatorSettingsSheet(
         ) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text(AppStrings.throughputCalculatorTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Text(stringResource(R.string.appstrings_throughput_calculator_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Spacer(Modifier.width(48.dp))
             }
 
             SimpleSwitchCard(
-                title = AppStrings.siteThroughputCalculatorOption,
+                title = stringResource(R.string.appstrings_site_throughput_calculator_option),
                 showMapLocation = showThroughputCalculator,
                 onLocationChange = onThroughputCalculatorChange,
                 shape = shape,
@@ -1050,7 +1052,7 @@ fun ThroughputCalculatorSettingsSheet(
             Spacer(modifier = Modifier.height(20.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
             Spacer(modifier = Modifier.height(16.dp))
-            Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 16.dp), textAlign = TextAlign.Center)
+            Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 16.dp), textAlign = TextAlign.Center)
 
             Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
                 currentOrder.forEach { blockId ->
@@ -1114,7 +1116,7 @@ fun ThroughputCalculatorSettingsSheet(
             }) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
-                Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
@@ -1190,7 +1192,7 @@ fun ThroughputCalculationDefaultsSheet(
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(
-                    AppStrings.throughputCalculationSettingsTitle,
+                    stringResource(R.string.appstrings_throughput_calculation_settings_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -1200,7 +1202,7 @@ fun ThroughputCalculationDefaultsSheet(
             }
 
             Text(
-                AppStrings.throughputDefaultModeTitle,
+                stringResource(R.string.appstrings_throughput_default_mode_title),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
@@ -1224,20 +1226,20 @@ fun ThroughputCalculationDefaultsSheet(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        AppStrings.throughputCustomModulationTitle,
+                        stringResource(R.string.appstrings_throughput_custom_modulation_title),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold
                     )
-                    ThroughputDefaultModulationSlider(AppStrings.throughput4gDownloadLabel, lteDownIndex, useOneUi) {
+                    ThroughputDefaultModulationSlider(stringResource(R.string.appstrings_throughput4g_download_label), lteDownIndex, useOneUi) {
                         saveInt("throughput_custom_lte_down", it) { value -> lteDownIndex = value }
                     }
-                    ThroughputDefaultModulationSlider(AppStrings.throughput4gUploadLabel, lteUpIndex, useOneUi) {
+                    ThroughputDefaultModulationSlider(stringResource(R.string.appstrings_throughput4g_upload_label), lteUpIndex, useOneUi) {
                         saveInt("throughput_custom_lte_up", it) { value -> lteUpIndex = value }
                     }
-                    ThroughputDefaultModulationSlider(AppStrings.throughput5gDownloadLabel, nrDownIndex, useOneUi) {
+                    ThroughputDefaultModulationSlider(stringResource(R.string.appstrings_throughput5g_download_label), nrDownIndex, useOneUi) {
                         saveInt("throughput_custom_nr_down", it) { value -> nrDownIndex = value }
                     }
-                    ThroughputDefaultModulationSlider(AppStrings.throughput5gUploadLabel, nrUpIndex, useOneUi) {
+                    ThroughputDefaultModulationSlider(stringResource(R.string.appstrings_throughput5g_upload_label), nrUpIndex, useOneUi) {
                         saveInt("throughput_custom_nr_up", it) { value -> nrUpIndex = value }
                     }
                 }
@@ -1247,15 +1249,15 @@ fun ThroughputCalculationDefaultsSheet(
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
             Spacer(Modifier.height(12.dp))
 
-            SimpleSwitchCard(AppStrings.throughputInclude4g, include4G, { saveBool("throughput_include_4g", it) { value -> include4G = value } }, shape, border, bubbleColor, useOneUi)
+            SimpleSwitchCard(stringResource(R.string.appstrings_throughput_include4g), include4G, { saveBool("throughput_include_4g", it) { value -> include4G = value } }, shape, border, bubbleColor, useOneUi)
             Spacer(Modifier.height(8.dp))
-            SimpleSwitchCard(AppStrings.throughputInclude5g, include5G, { saveBool("throughput_include_5g", it) { value -> include5G = value } }, shape, border, bubbleColor, useOneUi)
+            SimpleSwitchCard(stringResource(R.string.appstrings_throughput_include5g), include5G, { saveBool("throughput_include_5g", it) { value -> include5G = value } }, shape, border, bubbleColor, useOneUi)
             Spacer(Modifier.height(8.dp))
-            SimpleSwitchCard(AppStrings.throughputIncludePlanned, includePlanned, { saveBool("throughput_include_planned", it) { value -> includePlanned = value } }, shape, border, bubbleColor, useOneUi)
+            SimpleSwitchCard(stringResource(R.string.appstrings_throughput_include_planned), includePlanned, { saveBool("throughput_include_planned", it) { value -> includePlanned = value } }, shape, border, bubbleColor, useOneUi)
 
             Spacer(Modifier.height(20.dp))
             Text(
-                AppStrings.throughputDefaultFrequencyBandsTitle,
+                stringResource(R.string.appstrings_throughput_default_frequency_bands_title),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
@@ -1309,7 +1311,7 @@ fun ThroughputCalculationDefaultsSheet(
             }) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
-                Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
@@ -1397,10 +1399,10 @@ private data class ThroughputBandDefault(
 private val throughputModulationLabels = listOf("QPSK", "16-QAM", "64-QAM", "256-QAM")
 
 private val throughputPresetDefaults = listOf(
-    ThroughputPresetDefault("conservative") { AppStrings.throughputPresetLabel("conservative") },
-    ThroughputPresetDefault("standard") { AppStrings.throughputPresetLabel("standard") },
-    ThroughputPresetDefault("ideal") { AppStrings.throughputPresetLabel("ideal") },
-    ThroughputPresetDefault("custom") { AppStrings.throughputPresetLabel("custom") }
+    ThroughputPresetDefault("conservative") { ThroughputDisplayText.presetLabel("conservative") },
+    ThroughputPresetDefault("standard") { ThroughputDisplayText.presetLabel("standard") },
+    ThroughputPresetDefault("ideal") { ThroughputDisplayText.presetLabel("ideal") },
+    ThroughputPresetDefault("custom") { ThroughputDisplayText.presetLabel("custom") }
 )
 
 private val throughputBandDefaults = listOf(
@@ -1470,10 +1472,10 @@ fun SupportSettingsSheet(
         ) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text(AppStrings.pageSupportSettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Text(stringResource(R.string.appstrings_page_support_settings), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Spacer(Modifier.width(48.dp))
             }
-            Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
+            Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
 
             val cardHeight = 64.dp
             val spacing = 12.dp
@@ -1490,13 +1492,13 @@ fun SupportSettingsSheet(
                         val dragOffset = reorderState.offsetFor(blockId)
 
                         when (blockId) {
-                            "map" -> DraggableSwitchCard(AppStrings.supportMapOption, showMap, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "details" -> DraggableSwitchCard(AppStrings.supportDetailsOption, showDetails, onDetailsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "photos" -> DraggableSwitchCard(AppStrings.supportPhotosOption, showPhotos, onPhotosChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "open_map" -> DraggableSwitchCard(AppStrings.supportOpenMapOption, showOpenMap, onOpenMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "nav" -> DraggableSwitchCard(AppStrings.supportNavOption, showNav, onNavChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "share" -> DraggableSwitchCard(AppStrings.supportShareOption, showShare, onShareChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "operators" -> DraggableSwitchCard(AppStrings.supportOperatorsOption, showOperators, onOperatorsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "map" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_map_option), showMap, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "details" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_details_option), showDetails, onDetailsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "photos" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_photos_option), showPhotos, onPhotosChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "open_map" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_open_map_option), showOpenMap, onOpenMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "nav" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_nav_option), showNav, onNavChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "share" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_share_option), showShare, onShareChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "operators" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_operators_option), showOperators, onOperatorsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                         }
                     }
                 }
@@ -1515,7 +1517,7 @@ fun SupportSettingsSheet(
             }) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
-                Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
@@ -1584,10 +1586,10 @@ fun SiteSettingsSheet(
         ) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text(AppStrings.pageSiteSettings, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Text(stringResource(R.string.appstrings_page_site_settings), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Spacer(Modifier.width(48.dp))
             }
-            Text(AppStrings.dragToReorderHint, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
+            Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
 
             val cardHeight = 64.dp
             val spacing = 12.dp
@@ -1604,29 +1606,29 @@ fun SiteSettingsSheet(
                         val dragOffset = reorderState.offsetFor(blockId)
 
                         when (blockId) {
-                            "operator" -> DraggableSwitchCard(AppStrings.siteOperatorOption, showOperator, onOperatorChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "bearing_height" -> if (AppConfig.hasCompass.value) DraggableSwitchCard(AppStrings.siteBearingHeightOption, showBearingHeight, onBearingHeightChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "map" -> DraggableSwitchCard(AppStrings.siteMapOption, showMap, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "support_details" -> DraggableSwitchCard(AppStrings.siteSupportDetailsOption, showSupportDetails, onSupportDetailsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "photos" -> DraggableSwitchCard(AppStrings.sitePhotosAndSchemesOption, showPhotos, onPhotosChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = {
+                            "operator" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_operator_option), showOperator, onOperatorChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "bearing_height" -> if (AppConfig.hasCompass.value) DraggableSwitchCard(stringResource(R.string.appstrings_site_bearing_height_option), showBearingHeight, onBearingHeightChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "map" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_map_option), showMap, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "support_details" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_support_details_option), showSupportDetails, onSupportDetailsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "photos" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_photos_and_schemes_option), showPhotos, onPhotosChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = {
                                 onDismiss()
                                 onOpenPhotosSettings()
                             })
-                            "ids" -> DraggableSwitchCard(AppStrings.siteIdsOption, showIds, onIdsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "open_map" -> DraggableSwitchCard(AppStrings.siteOpenMapOption, showOpenMap, onOpenMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "elevation_profile" -> DraggableSwitchCard(AppStrings.siteElevationProfileOption, showElevationProfile, onElevationProfileChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "throughput_calculator" -> DraggableSwitchCard(AppStrings.siteThroughputCalculatorOption, showThroughputCalculator, onThroughputCalculatorChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "nav" -> DraggableSwitchCard(AppStrings.siteNavOption, showNav, onNavChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "share" -> DraggableSwitchCard(AppStrings.siteShareOption, showShare, onShareChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "dates" -> DraggableSwitchCard(AppStrings.siteDatesOption, showDates, onDatesChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "address" -> DraggableSwitchCard(AppStrings.siteAddressOption, showAddress, onAddressChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "status" -> DraggableSwitchCard(AppStrings.showStatusOption, showStatus, onStatusChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "speedtest" -> DraggableSwitchCard(AppStrings.showSpeedtestLabel, showSpeedtest, onSpeedtestChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "freqs" -> DraggableSwitchCard(AppStrings.siteFreqsOption, showFreqs, onFreqsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = {
+                            "ids" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_ids_option), showIds, onIdsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "open_map" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_open_map_option), showOpenMap, onOpenMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "elevation_profile" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_elevation_profile_option), showElevationProfile, onElevationProfileChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "throughput_calculator" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_throughput_calculator_option), showThroughputCalculator, onThroughputCalculatorChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "nav" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_nav_option), showNav, onNavChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "share" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_share_option), showShare, onShareChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "dates" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_dates_option), showDates, onDatesChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "address" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_address_option), showAddress, onAddressChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "status" -> DraggableSwitchCard(stringResource(R.string.appstrings_show_status_option), showStatus, onStatusChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "speedtest" -> DraggableSwitchCard(stringResource(R.string.appstrings_show_speedtest_label), showSpeedtest, onSpeedtestChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "freqs" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_freqs_option), showFreqs, onFreqsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = {
                                 onDismiss()
                                 onOpenFrequencies()
                             })
-                            "links" -> DraggableSwitchCard(AppStrings.siteLinksOption, showLinks, onLinksChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
+                            "links" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_links_option), showLinks, onLinksChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
                         }
                     }
                 }
@@ -1656,7 +1658,7 @@ fun SiteSettingsSheet(
             }) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
-                Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
@@ -1684,8 +1686,8 @@ fun SiteFreqFiltersSheet(
     val emptyFreqOrderState = remember { mutableStateOf(emptyList<String>()) }
     val scrollState = rememberScrollState()
 
-    val txtMinOneTechno = AppStrings.minOneTechnoWarning
-    val txtMinOneFreq = AppStrings.minOneFreqWarning
+    val txtMinOneTechno = stringResource(R.string.appstrings_min_one_techno_warning)
+    val txtMinOneFreq = stringResource(R.string.appstrings_min_one_freq_warning)
 
     fun saveBool(key: String, state: MutableState<Boolean>, value: Boolean) {
         state.value = value
@@ -1728,7 +1730,7 @@ fun SiteFreqFiltersSheet(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                 }
                 Text(
-                    text = AppStrings.siteFreqFiltersTitle,
+                    text = stringResource(R.string.appstrings_site_freq_filters_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -1749,7 +1751,7 @@ fun SiteFreqFiltersSheet(
                     Icon(Icons.Default.GridView, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(12.dp))
                     Text(
-                        text = AppStrings.freqGridDisplayOption,
+                        text = stringResource(R.string.appstrings_freq_grid_display_option),
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.weight(1f),
                         fontSize = 16.sp
@@ -1888,7 +1890,7 @@ fun SiteFreqFiltersSheet(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(AppStrings.spectrumTitle, fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                        Text(stringResource(R.string.appstrings_spectrum_title), fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.weight(1f))
                         val onSpectrumChange = { newValue: Boolean ->
                             saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, newValue)
                             saveBool("site_show_spectrum_band", AppConfig.siteShowSpectrumBand, newValue)
@@ -1905,7 +1907,7 @@ fun SiteFreqFiltersSheet(
                         Column {
                             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(AppStrings.spectrumByBand, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                                Text(stringResource(R.string.appstrings_spectrum_by_band), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                                 val onBandChange = { newValue: Boolean ->
                                     saveBool("site_show_spectrum_band", AppConfig.siteShowSpectrumBand, newValue)
                                     if (!newValue && !AppConfig.siteShowSpectrumTotal.value) saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, false)
@@ -1920,7 +1922,7 @@ fun SiteFreqFiltersSheet(
                                 )
                             }
                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(AppStrings.totalspectrum, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                                Text(stringResource(R.string.appstrings_totalspectrum), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                                 val onTotalChange = { newValue: Boolean ->
                                     saveBool("site_show_spectrum_total", AppConfig.siteShowSpectrumTotal, newValue)
                                     if (!newValue && !AppConfig.siteShowSpectrumBand.value) saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, false)
@@ -1980,7 +1982,7 @@ fun SiteFreqFiltersSheet(
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
-                Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
@@ -2022,7 +2024,7 @@ fun SitePhotosSettingsSheet(
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
                 }
                 Text(
-                    text = AppStrings.sitePhotosSettingsTitle,
+                    text = stringResource(R.string.appstrings_site_photos_settings_title),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
@@ -2037,7 +2039,7 @@ fun SitePhotosSettingsSheet(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(AppStrings.sitePhotosAndSchemesOption, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), fontSize = 16.sp)
+                        Text(stringResource(R.string.appstrings_site_photos_and_schemes_option), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), fontSize = 16.sp)
                         val onMasterChange = { newValue: Boolean ->
                             saveBool("page_site_photos", AppConfig.siteShowPhotos, newValue)
                         }
@@ -2055,7 +2057,7 @@ fun SitePhotosSettingsSheet(
                             
                             // Schematics
                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(AppStrings.showSchemesLabel, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                                Text(stringResource(R.string.appstrings_show_schemes_label), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                                 fr.geotower.ui.components.GeoTowerSwitch(
                                     checked = AppConfig.siteShowSchemes.value,
                                     onCheckedChange = { saveBool("site_show_schemes", AppConfig.siteShowSchemes, it) },
@@ -2066,7 +2068,7 @@ fun SitePhotosSettingsSheet(
                             }
 
                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(AppStrings.showExifLabel, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                                Text(stringResource(R.string.appstrings_show_exif_label), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                                 fr.geotower.ui.components.GeoTowerSwitch(
                                     checked = AppConfig.siteShowPhotoExif.value,
                                     onCheckedChange = { saveBool("site_show_photo_exif", AppConfig.siteShowPhotoExif, it) },
@@ -2091,7 +2093,7 @@ fun SitePhotosSettingsSheet(
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
-                Text(AppStrings.resetToDefault, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
             Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }

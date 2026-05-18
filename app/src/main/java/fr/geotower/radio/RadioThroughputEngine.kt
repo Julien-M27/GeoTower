@@ -1,8 +1,8 @@
 package fr.geotower.radio
 
-import fr.geotower.utils.AppStrings
 import kotlin.math.pow
 import kotlin.math.abs
+import fr.geotower.utils.ThroughputTextKey
 
 object RadioThroughputEngine {
     private const val NR_RMAX = 948.0 / 1024.0
@@ -31,8 +31,8 @@ object RadioThroughputEngine {
         allocations: List<SpectrumAllocation> = SpectrumAllocationsFrMetro.allocations
     ): ThroughputEngineResult {
         val warnings = mutableListOf(
-            AppStrings.THROUGHPUT_WARNING_NETWORK_UNKNOWN,
-            "${AppStrings.THROUGHPUT_WARNING_PROFILE_PREFIX}${profile.label}${AppStrings.THROUGHPUT_WARNING_PROFILE_SUFFIX}"
+            ThroughputTextKey.THROUGHPUT_WARNING_NETWORK_UNKNOWN,
+            "${ThroughputTextKey.THROUGHPUT_WARNING_PROFILE_PREFIX}${profile.label}${ThroughputTextKey.THROUGHPUT_WARNING_PROFILE_SUFFIX}"
         )
         val assumptions = mutableListOf(profile.description)
         val excluded = mutableListOf<ExcludedCarrier>()
@@ -57,9 +57,9 @@ object RadioThroughputEngine {
                     sourceKey = system.sourceKey,
                     technology = system.technology,
                     bandLabel = system.bandLabel,
-                    reason = AppStrings.THROUGHPUT_REASON_NO_METROPOLITAN_ARCEP_ALLOCATION
+                    reason = ThroughputTextKey.THROUGHPUT_REASON_NO_METROPOLITAN_ARCEP_ALLOCATION
                 )
-                warnings += "${AppStrings.THROUGHPUT_WARNING_ALLOCATION_PREFIX}${system.bandLabel} ${system.technology.labelForUi()}${AppStrings.THROUGHPUT_WARNING_ALLOCATION_SUFFIX}"
+                warnings += "${ThroughputTextKey.THROUGHPUT_WARNING_ALLOCATION_PREFIX}${system.bandLabel} ${system.technology.labelForUi()}${ThroughputTextKey.THROUGHPUT_WARNING_ALLOCATION_SUFFIX}"
                 return@mapNotNull null
             }
 
@@ -83,7 +83,7 @@ object RadioThroughputEngine {
             warnings = warnings.distinct(),
             assumptions = assumptions.distinct(),
             confidenceScore = confidence,
-            sourceSummary = AppStrings.THROUGHPUT_SOURCE_SUMMARY_ENGINE
+            sourceSummary = ThroughputTextKey.THROUGHPUT_SOURCE_SUMMARY_ENGINE
         )
     }
 
@@ -241,14 +241,14 @@ object RadioThroughputEngine {
             .forEach { dssGroup ->
                 val winner = dssGroup.maxBy { it.dlMbps }
                 dssGroup.filter { it.sourceKey != winner.sourceKey }.forEach { loser ->
-                    val reason = AppStrings.THROUGHPUT_REASON_DSS_SHARED
+                    val reason = ThroughputTextKey.THROUGHPUT_REASON_DSS_SHARED
                     val index = mutableResults.indexOfFirst { it.sourceKey == loser.sourceKey }
                     if (index >= 0) {
                         mutableResults[index] = loser.copy(included = false, excludedReason = reason, warnings = loser.warnings + reason)
                     }
                     excluded += ExcludedCarrier(loser.sourceKey, loser.technology, loser.bandLabel, reason)
                 }
-                warnings += "${AppStrings.THROUGHPUT_WARNING_DSS_PREFIX}${winner.bandLabel}${AppStrings.THROUGHPUT_WARNING_DSS_SUFFIX}"
+                warnings += "${ThroughputTextKey.THROUGHPUT_WARNING_DSS_PREFIX}${winner.bandLabel}${ThroughputTextKey.THROUGHPUT_WARNING_DSS_SUFFIX}"
             }
 
         return mutableResults
@@ -268,7 +268,7 @@ object ThroughputProfiles {
     val prudent = ThroughputProfile(
         id = "PRUDENT",
         label = "Prudent",
-        description = AppStrings.THROUGHPUT_PROFILE_PRUDENT_DESC,
+        description = ThroughputTextKey.THROUGHPUT_PROFILE_PRUDENT_DESC,
         lte = RatAssumptions(dlModulationOrder = 6, ulModulationOrder = 4, dlMimoLayers = 2, ulMimoLayers = 1, maxCaComponents = 3),
         nr = RatAssumptions(dlModulationOrder = 6, ulModulationOrder = 6, dlMimoLayers = 4, ulMimoLayers = 1, maxCaComponents = 1, scsKHz = 30, tddDlRatio = 0.70, tddUlRatio = 0.20, overheadDl = 0.14, overheadUl = 0.08),
         defaultDeviceCategory = DeviceCategory.AVERAGE_PHONE
@@ -277,7 +277,7 @@ object ThroughputProfiles {
     val standard = ThroughputProfile(
         id = "STANDARD",
         label = "Standard",
-        description = AppStrings.THROUGHPUT_PROFILE_STANDARD_DESC,
+        description = ThroughputTextKey.THROUGHPUT_PROFILE_STANDARD_DESC,
         lte = RatAssumptions(dlModulationOrder = 8, ulModulationOrder = 6, dlMimoLayers = 2, ulMimoLayers = 1, maxCaComponents = 5),
         nr = RatAssumptions(dlModulationOrder = 8, ulModulationOrder = 6, dlMimoLayers = 4, ulMimoLayers = 2, maxCaComponents = 1, scsKHz = 30, tddDlRatio = 0.70, tddUlRatio = 0.20, overheadDl = 0.14, overheadUl = 0.08),
         defaultDeviceCategory = DeviceCategory.RECENT_PHONE
@@ -285,8 +285,8 @@ object ThroughputProfiles {
 
     val ideal = ThroughputProfile(
         id = "IDEAL",
-        label = AppStrings.THROUGHPUT_PROFILE_IDEAL_LABEL,
-        description = AppStrings.THROUGHPUT_PROFILE_IDEAL_DESC,
+        label = ThroughputTextKey.THROUGHPUT_PROFILE_IDEAL_LABEL,
+        description = ThroughputTextKey.THROUGHPUT_PROFILE_IDEAL_DESC,
         lte = RatAssumptions(dlModulationOrder = 8, ulModulationOrder = 6, dlMimoLayers = 4, ulMimoLayers = 1, maxCaComponents = 5),
         nr = RatAssumptions(dlModulationOrder = 8, ulModulationOrder = 8, dlMimoLayers = 4, ulMimoLayers = 2, maxCaComponents = 2, scsKHz = 30, tddDlRatio = 0.70, tddUlRatio = 0.20, overheadDl = 0.14, overheadUl = 0.08),
         defaultDeviceCategory = DeviceCategory.FLAGSHIP

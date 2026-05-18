@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -29,7 +30,6 @@ import fr.geotower.data.db.DatabaseVersionPolicy
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.workers.DatabaseDownloadWorker
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -52,15 +52,13 @@ fun DatabaseDownloadCard(
     val isSyncing = currentWork?.state == androidx.work.WorkInfo.State.RUNNING || currentWork?.state == androidx.work.WorkInfo.State.ENQUEUED
     val downloadProgress = currentWork?.progress?.getInt(DatabaseDownloadWorker.KEY_PROGRESS, 0)?.div(100f) ?: 0f
 
-    val txtSearching = AppStrings.searching
-    val txtUnknown = AppStrings.unknownFeminine
-    val txtNoDb = AppStrings.noDatabaseInstalled
-    val txtInvalidDb = AppStrings.invalidLocalDatabase
-    val txtOldDb = AppStrings.oldUndatedDatabase
-    val txtLatestDb = AppStrings.latestDatabaseAvailable
-    val txtDownloadedDb = AppStrings.currentlyDownloadedDatabase
-
-    val txtAnfrDatabaseFrom = AppStrings.anfrDatabaseFrom
+    val txtSearching = stringResource(R.string.database_searching)
+    val txtUnknown = stringResource(R.string.database_unknown)
+    val txtNoDb = stringResource(R.string.database_not_installed)
+    val txtInvalidDb = stringResource(R.string.database_invalid_local)
+    val txtOldDb = stringResource(R.string.database_old_undated)
+    val txtLatestDb = stringResource(R.string.database_latest_available)
+    val txtDownloadedDb = stringResource(R.string.database_currently_downloaded)
 
     var dbSizeMb by remember { mutableDoubleStateOf(-1.0) }
     var localDbVersion by remember { mutableStateOf(txtSearching) }
@@ -74,7 +72,7 @@ fun DatabaseDownloadCard(
     var dbRefreshTrigger by remember { mutableIntStateOf(0) } // Déclenche le re-scan local
 
     // ✅ ON AJOUTE dbRefreshTrigger AUX CLÉS DE L'EFFET
-    LaunchedEffect(isSyncing, dbRefreshTrigger) {
+    LaunchedEffect(isSyncing, dbRefreshTrigger, txtSearching, txtUnknown, txtNoDb, txtInvalidDb, txtOldDb) {
         withContext(Dispatchers.IO) {
             fun formatVersion(raw: String?): String {
                 if (raw != null && raw.length == 13) {
@@ -285,9 +283,9 @@ fun DatabaseDownloadCard(
             }
 
             val sizeText = when {
-                dbSizeMb < 0.0 -> AppStrings.calcDbSize
-                dbSizeMb == 0.0 -> AppStrings.unknownSize
-                else -> AppStrings.dbSizeWarning(dbSizeMb)
+                dbSizeMb < 0.0 -> stringResource(R.string.database_calculating_size)
+                dbSizeMb == 0.0 -> stringResource(R.string.database_unknown_size)
+                else -> stringResource(R.string.database_size_warning, dbSizeMb)
             }
 
             Text(
@@ -309,7 +307,7 @@ fun DatabaseDownloadCard(
                         trackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = AppStrings.downloadProgress((downloadProgress * 100).toInt()), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                    Text(text = stringResource(R.string.database_download_progress, (downloadProgress * 100).toInt()), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
 
                     Spacer(modifier = Modifier.height(16.dp))
 
@@ -327,7 +325,7 @@ fun DatabaseDownloadCard(
                     ) {
                         Icon(Icons.Default.Close, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
-                        Text(text = AppStrings.cancelDownload, fontWeight = FontWeight.Bold)
+                        Text(text = stringResource(R.string.database_cancel_download), fontWeight = FontWeight.Bold)
                     }
                 }
             } else {
@@ -359,7 +357,7 @@ fun DatabaseDownloadCard(
                     }
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = if (isUpToDate) AppStrings.upToDate else AppStrings.downloadAntennas,
+                        text = if (isUpToDate) stringResource(R.string.database_up_to_date) else stringResource(R.string.database_download_antennas),
                         fontWeight = FontWeight.Bold
                     )
                 }
@@ -369,7 +367,7 @@ fun DatabaseDownloadCard(
             if (localAnfrDate.isNotEmpty() && localAnfrDate != txtUnknown) {
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
-                    text = "$txtAnfrDatabaseFrom $localAnfrDate",
+                    text = stringResource(R.string.database_weekly_downloaded_from, localAnfrDate),
                     modifier = Modifier.fillMaxWidth(),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium,
@@ -390,7 +388,7 @@ fun DatabaseDownloadCard(
                 ) {
                     Icon(Icons.Default.Delete, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text(text = AppStrings.deleteData, fontWeight = FontWeight.Bold)
+                    Text(text = stringResource(R.string.database_delete_data), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -400,12 +398,12 @@ fun DatabaseDownloadCard(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text(text = AppStrings.deleteDbWarningTitle, fontWeight = FontWeight.Bold) },
-            text = { Text(AppStrings.deleteDbWarningDesc) },
+            title = { Text(text = stringResource(R.string.database_delete_warning_title), fontWeight = FontWeight.Bold) },
+            text = { Text(stringResource(R.string.database_delete_warning_desc)) },
             shape = shape,
             containerColor = MaterialTheme.colorScheme.surface,
             dismissButton = {
-                DialogDestructiveButton(text = AppStrings.yes, onClick = {
+                DialogDestructiveButton(text = stringResource(R.string.common_yes), onClick = {
                     showDeleteDialog = false
 
                     // 1. Fermer proprement la connexion à la BDD
@@ -421,7 +419,7 @@ fun DatabaseDownloadCard(
                 })
             },
             confirmButton = {
-                DialogNeutralButton(text = AppStrings.no, onClick = { showDeleteDialog = false })
+                DialogNeutralButton(text = stringResource(R.string.common_no), onClick = { showDeleteDialog = false })
             }
         )
     }

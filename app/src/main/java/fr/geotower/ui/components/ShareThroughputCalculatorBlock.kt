@@ -42,8 +42,11 @@ import fr.geotower.radio.RatAssumptions
 import fr.geotower.radio.SiteRadioSystem
 import fr.geotower.radio.ThroughputProfile
 import fr.geotower.radio.ThroughputProfiles
-import fr.geotower.utils.AppStrings
 import java.util.Locale
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
+import fr.geotower.utils.ThroughputDisplayText
+import fr.geotower.utils.ThroughputTextKey
 
 private const val MAX_SHARE_FR_UPLINK_AGGREGATED_CARRIERS = 2
 
@@ -56,8 +59,8 @@ fun ShareThroughputCalculatorBlock(
     cardBgColor: Color = MaterialTheme.colorScheme.surfaceVariant,
     blockShape: Shape = RoundedCornerShape(12.dp)
 ) {
-    val txtUnknown = AppStrings.unknown
-    val txtAzimuthNotSpecified = AppStrings.azimuthNotSpecified
+    val txtUnknown = stringResource(R.string.appstrings_unknown)
+    val txtAzimuthNotSpecified = stringResource(R.string.appstrings_azimuth_not_specified)
     val rawFrequencies = technique?.detailsFrequences?.takeIf { it.isNotBlank() } ?: info.frequences
     val parsedBands = remember(rawFrequencies, txtUnknown, txtAzimuthNotSpecified) {
         parseAndSortFrequencies(rawFrequencies, txtUnknown, txtAzimuthNotSpecified)
@@ -121,7 +124,7 @@ fun ShareThroughputCalculatorBlock(
                 Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = AppStrings.shareThroughputTitle,
+                    text = stringResource(R.string.appstrings_share_throughput_title),
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp,
                     color = MaterialTheme.colorScheme.onSurface
@@ -130,14 +133,14 @@ fun ShareThroughputCalculatorBlock(
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
                 ShareThroughputMetric(
-                    label = AppStrings.throughputDownloadLabel,
+                    label = stringResource(R.string.appstrings_throughput_download_label),
                     value = formatThroughputMbps(result.totalDownMbps),
                     iconColor = Color(0xFF4CAF50),
                     isDownload = true,
                     modifier = Modifier.weight(1f)
                 )
                 ShareThroughputMetric(
-                    label = AppStrings.shareThroughputPhoneUploadLabel,
+                    label = stringResource(R.string.appstrings_share_throughput_phone_upload_label),
                     value = formatThroughputMbps(result.totalUpMbps),
                     iconColor = Color(0xFF2196F3),
                     isDownload = false,
@@ -153,12 +156,12 @@ fun ShareThroughputCalculatorBlock(
                     Spacer(Modifier.width(8.dp))
                     Column {
                         Text(
-                            text = AppStrings.shareThroughputOptimalDistance(formatThroughputDistanceMeters(coneDistance.centerMeters)),
+                            text = ThroughputDisplayText.shareOptimalDistance(formatThroughputDistanceMeters(coneDistance.centerMeters)),
                             fontWeight = FontWeight.SemiBold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
                         Text(
-                            text = AppStrings.shareThroughputZone(
+                            text = ThroughputDisplayText.shareZone(
                                 formatThroughputDistanceMeters(coneDistance.nearMeters),
                                 formatThroughputDistanceMeters(coneDistance.farMeters)
                             ),
@@ -171,7 +174,7 @@ fun ShareThroughputCalculatorBlock(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
             Text(
-                text = AppStrings.shareThroughputBandsSummary(
+                text = ThroughputDisplayText.shareBandsSummary(
                     shareThroughputPresetLabel(preset),
                     result.includedBands.size,
                     result.bands.size
@@ -182,7 +185,7 @@ fun ShareThroughputCalculatorBlock(
 
             if (result.includedBands.isEmpty()) {
                 Text(
-                    text = AppStrings.throughputNoBands,
+                    text = stringResource(R.string.appstrings_throughput_no_bands),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     fontSize = 13.sp
                 )
@@ -196,7 +199,7 @@ fun ShareThroughputCalculatorBlock(
             }
 
             Text(
-                text = AppStrings.shareThroughputDisclaimer,
+                text = stringResource(R.string.appstrings_share_throughput_disclaimer),
                 fontSize = 11.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -317,12 +320,12 @@ private fun calculateShareThroughput(
             val isIncluded = generationAllowed && bandAllowed && engineIncluded && (includePlanned || !isPlanned)
             val panelHeightMeters = extractThroughputPanelHeightMeters(band, supportHeightMeters)
             val excludedReason = when {
-                !generationAllowed -> if (band.gen == 5) AppStrings.THROUGHPUT_REASON_5G_DISABLED else AppStrings.THROUGHPUT_REASON_4G_DISABLED
-                !bandAllowed -> AppStrings.THROUGHPUT_REASON_BAND_EXCLUDED
-                operator == null -> AppStrings.THROUGHPUT_REASON_OPERATOR_NOT_RECOGNIZED
-                carrierResult == null -> excludedByKey[key]?.reason ?: AppStrings.THROUGHPUT_REASON_ALLOCATION_NOT_FOUND
+                !generationAllowed -> if (band.gen == 5) ThroughputTextKey.THROUGHPUT_REASON_5G_DISABLED else ThroughputTextKey.THROUGHPUT_REASON_4G_DISABLED
+                !bandAllowed -> ThroughputTextKey.THROUGHPUT_REASON_BAND_EXCLUDED
+                operator == null -> ThroughputTextKey.THROUGHPUT_REASON_OPERATOR_NOT_RECOGNIZED
+                carrierResult == null -> excludedByKey[key]?.reason ?: ThroughputTextKey.THROUGHPUT_REASON_ALLOCATION_NOT_FOUND
                 !carrierResult.included -> carrierResult.excludedReason
-                isPlanned && !includePlanned -> AppStrings.THROUGHPUT_REASON_PLANNED_BAND
+                isPlanned && !includePlanned -> ThroughputTextKey.THROUGHPUT_REASON_PLANNED_BAND
                 else -> null
             }
 
@@ -358,10 +361,10 @@ private fun shareThroughputPresetFromPreference(raw: String?): ShareThroughputPr
 @Composable
 private fun shareThroughputPresetLabel(preset: ShareThroughputPreset): String {
     return when (preset) {
-        ShareThroughputPreset.Conservative -> AppStrings.throughputPresetLabel("conservative")
-        ShareThroughputPreset.Standard -> AppStrings.throughputPresetLabel("standard")
-        ShareThroughputPreset.Maximum -> AppStrings.throughputPresetLabel("ideal")
-        ShareThroughputPreset.Custom -> AppStrings.throughputPresetLabel("custom")
+        ShareThroughputPreset.Conservative -> ThroughputDisplayText.presetLabel("conservative")
+        ShareThroughputPreset.Standard -> ThroughputDisplayText.presetLabel("standard")
+        ShareThroughputPreset.Maximum -> ThroughputDisplayText.presetLabel("ideal")
+        ShareThroughputPreset.Custom -> ThroughputDisplayText.presetLabel("custom")
     }
 }
 
@@ -433,8 +436,8 @@ private fun shareCustomProfile(customSettings: ShareCustomModulationSettings): T
 
     return ThroughputProfile(
         id = "CUSTOM",
-        label = AppStrings.THROUGHPUT_PROFILE_CUSTOM_LABEL,
-        description = AppStrings.THROUGHPUT_PROFILE_CUSTOM_SHORT_DESC,
+        label = ThroughputTextKey.THROUGHPUT_PROFILE_CUSTOM_LABEL,
+        description = ThroughputTextKey.THROUGHPUT_PROFILE_CUSTOM_SHORT_DESC,
         lte = RatAssumptions(
             dlModulationOrder = lteDown.modulationOrder,
             ulModulationOrder = lteUp.modulationOrder,

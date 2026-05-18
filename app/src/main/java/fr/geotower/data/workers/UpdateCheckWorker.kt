@@ -14,7 +14,6 @@ import fr.geotower.R
 import fr.geotower.data.api.DatabaseDownloader
 import fr.geotower.data.db.DatabaseVersionPolicy
 import fr.geotower.data.db.GeoTowerDatabaseValidator
-import fr.geotower.utils.AppStrings
 
 class UpdateCheckWorker(private val context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     private companion object {
@@ -72,7 +71,7 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(UPDATE_ALERTS_CHANNEL_ID, AppStrings.newDbChannelName(context), NotificationManager.IMPORTANCE_DEFAULT)
+            val channel = NotificationChannel(UPDATE_ALERTS_CHANNEL_ID, context.getString(R.string.notification_db_updates_channel_name), NotificationManager.IMPORTANCE_DEFAULT)
             notificationManager.createNotificationChannel(channel)
         }
 
@@ -89,8 +88,8 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
 
         val notification = NotificationCompat.Builder(context, UPDATE_ALERTS_CHANNEL_ID)
             .setSmallIcon(R.mipmap.ic_launcher_geotower)
-            .setContentTitle(AppStrings.newDbNotifTitle(context))
-            .setContentText(AppStrings.newDbNotifDesc(context))
+            .setContentTitle(context.getString(R.string.notification_db_update_available_title))
+            .setContentText(context.getString(R.string.notification_db_update_available_desc))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .build()

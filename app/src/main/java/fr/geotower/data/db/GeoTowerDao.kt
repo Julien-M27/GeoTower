@@ -77,12 +77,10 @@ interface GeoTowerDao {
             l.azimuts_fh,
             l.tech_mask,
             l.band_mask,
-            COALESCE(st.libelle, '') AS statut,
-            COALESCE(t.has_active, 0) AS has_active
+            NULL AS statut,
+            0 AS has_active
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
-        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
-        LEFT JOIN ref_statut st ON t.statut_id = st.id
         ORDER BY ((l.latitude - :lat) * (l.latitude - :lat) + (l.longitude - :lon) * (l.longitude - :lon)) ASC
         LIMIT 100
     """)
@@ -99,12 +97,10 @@ interface GeoTowerDao {
             l.azimuts_fh,
             l.tech_mask,
             l.band_mask,
-            COALESCE(st.libelle, '') AS statut,
-            COALESCE(t.has_active, 0) AS has_active
+            NULL AS statut,
+            0 AS has_active
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
-        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
-        LEFT JOIN ref_statut st ON t.statut_id = st.id
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
         AND ((l.latitude - :lat) * (l.latitude - :lat) + (l.longitude - :lon) * (l.longitude - :lon)) <= :maxDistanceSquared

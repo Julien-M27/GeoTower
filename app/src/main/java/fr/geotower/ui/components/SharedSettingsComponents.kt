@@ -17,13 +17,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.R
+import fr.geotower.utils.AppLocale
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColors
 
 fun oneUiActionButtonShape(
@@ -154,7 +156,7 @@ fun OperatorSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
                 .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(AppStrings.defaultOperator, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 24.dp))
+            Text(stringResource(R.string.settings_default_operator), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 24.dp))
             Column(
                 modifier = Modifier
                     .weight(1f)
@@ -163,8 +165,8 @@ fun OperatorSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
                     .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                OperatorItem(AppStrings.none, null, Color.Gray, tempOp == "Aucun", useOneUi, bubbleColor, showSimFallback = true) { tempOp = "Aucun" }
-                OperatorGroupTitle(AppStrings.operatorRegionMetro)
+                OperatorItem(stringResource(R.string.common_none), null, Color.Gray, tempOp == "Aucun", useOneUi, bubbleColor, showSimFallback = true) { tempOp = "Aucun" }
+                OperatorGroupTitle(stringResource(R.string.operator_region_metro))
                 OperatorColors.metro.forEach { operator ->
                     OperatorItem(
                         name = operator.label,
@@ -176,7 +178,7 @@ fun OperatorSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
                     ) { tempOp = operator.label }
                 }
 
-                OperatorGroupTitle(AppStrings.operatorRegionOverseas)
+                OperatorGroupTitle(stringResource(R.string.operator_region_overseas))
                 OperatorColors.overseas.forEach { operator ->
                     OperatorItem(
                         name = operator.label,
@@ -193,7 +195,7 @@ fun OperatorSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
                 onClick = { onSelect(tempOp); onDismiss() },
                 modifier = Modifier.padding(top = 16.dp).fillMaxWidth().height(56.dp),
                 shape = RoundedCornerShape(28.dp)
-            ) { Text(AppStrings.validate, fontWeight = FontWeight.Bold) }
+            ) { Text(stringResource(R.string.common_validate), fontWeight = FontWeight.Bold) }
         }
     }
 }
@@ -258,6 +260,7 @@ fun LanguageSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
     val activeColor = MaterialTheme.colorScheme.primary
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         Column(
@@ -268,15 +271,15 @@ fun LanguageSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
                 .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(AppStrings.appLanguageLabel, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 24.dp))
+            Text(stringResource(R.string.settings_app_language), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 24.dp))
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                LanguageItem(AppStrings.systemLanguage, "📱", tempLang == AppStrings.LANGUAGE_SYSTEM, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_SYSTEM }
-                LanguageItem(AppStrings.languageFrenchName, "🇫🇷", tempLang == AppStrings.LANGUAGE_FRENCH, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_FRENCH }
-                LanguageItem(AppStrings.languageEnglishName, "🇬🇧", tempLang == AppStrings.LANGUAGE_ENGLISH, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_ENGLISH }
-                LanguageItem(AppStrings.languagePortugueseName, "🇵🇹", tempLang == AppStrings.LANGUAGE_PORTUGUESE, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_PORTUGUESE }
-                LanguageItem(AppStrings.languageItalianName, "🇮🇹", tempLang == AppStrings.LANGUAGE_ITALIAN, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_ITALIAN }
-                LanguageItem(AppStrings.languageGermanName, "🇩🇪", tempLang == AppStrings.LANGUAGE_GERMAN, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_GERMAN }
-                LanguageItem(AppStrings.languageSpanishName, "🇪🇸", tempLang == AppStrings.LANGUAGE_SPANISH, useOneUi, bubbleColor, activeColor) { tempLang = AppStrings.LANGUAGE_SPANISH }
+                LanguageItem(stringResource(R.string.language_system), AppLocale.languageFlag(AppLocale.LANGUAGE_SYSTEM), tempLang == AppLocale.LANGUAGE_SYSTEM, useOneUi, bubbleColor, activeColor) { tempLang = AppLocale.LANGUAGE_SYSTEM }
+                LanguageItem(stringResource(R.string.language_french_name), AppLocale.languageFlag(AppLocale.LANGUAGE_FRENCH), tempLang == AppLocale.LANGUAGE_FRENCH, useOneUi, bubbleColor, activeColor) { tempLang = AppLocale.LANGUAGE_FRENCH }
+                LanguageItem(stringResource(R.string.language_english_name), AppLocale.languageFlag(AppLocale.LANGUAGE_ENGLISH), tempLang == AppLocale.LANGUAGE_ENGLISH, useOneUi, bubbleColor, activeColor) { tempLang = AppLocale.LANGUAGE_ENGLISH }
+                LanguageItem(stringResource(R.string.language_portuguese_name), AppLocale.languageFlag(AppLocale.LANGUAGE_PORTUGUESE), tempLang == AppLocale.LANGUAGE_PORTUGUESE, useOneUi, bubbleColor, activeColor) { tempLang = AppLocale.LANGUAGE_PORTUGUESE }
+                LanguageItem(stringResource(R.string.language_italian_name), AppLocale.languageFlag(AppLocale.LANGUAGE_ITALIAN), tempLang == AppLocale.LANGUAGE_ITALIAN, useOneUi, bubbleColor, activeColor) { tempLang = AppLocale.LANGUAGE_ITALIAN }
+                LanguageItem(stringResource(R.string.language_german_name), AppLocale.languageFlag(AppLocale.LANGUAGE_GERMAN), tempLang == AppLocale.LANGUAGE_GERMAN, useOneUi, bubbleColor, activeColor) { tempLang = AppLocale.LANGUAGE_GERMAN }
+                LanguageItem(stringResource(R.string.language_spanish_name), AppLocale.languageFlag(AppLocale.LANGUAGE_SPANISH), tempLang == AppLocale.LANGUAGE_SPANISH, useOneUi, bubbleColor, activeColor) { tempLang = AppLocale.LANGUAGE_SPANISH }
 
                 Button(
                     onClick = { onSelect(tempLang); onDismiss() },
@@ -284,7 +287,7 @@ fun LanguageSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
                     shape = RoundedCornerShape(28.dp),
                     // ✅ MODIFICATION : On s'assure que le texte du bouton utilise "onPrimary" (généralement blanc) pour contraster avec la couleur vive
                     colors = ButtonDefaults.buttonColors(containerColor = activeColor, contentColor = MaterialTheme.colorScheme.onPrimary)
-                ) { Text(AppStrings.validateForLanguage(tempLang), fontWeight = FontWeight.Bold) }
+                ) { Text(AppLocale.getString(context, tempLang, R.string.common_validate), fontWeight = FontWeight.Bold) }
             }
         }
     }

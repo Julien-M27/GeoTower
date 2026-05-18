@@ -11,15 +11,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
+import fr.geotower.R
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.AppLogoDrawingResources
-import fr.geotower.utils.AppStrings
 import fr.geotower.utils.AppConfig
 import kotlinx.coroutines.*
 
@@ -32,7 +33,7 @@ fun SplashScreen(
     nextDestination: String
 ) {
     val context = LocalContext.current
-    val appTitle = "GeoTower"
+    val appTitle = stringResource(R.string.brand_geotower)
     val logoResId by AppIconManager.currentIconRes
     val themeMode by AppConfig.themeMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
@@ -86,7 +87,7 @@ fun SplashScreen(
         ) {
             DrawableImage(
                 resId = displayLogoResId,
-                contentDescription = "Logo",
+                contentDescription = stringResource(R.string.common_logo),
                 modifier = Modifier.size(150.dp)
             )
 
@@ -111,7 +112,7 @@ fun SplashScreen(
             Spacer(modifier = Modifier.height(24.dp))
 
             Text(
-                text = AppStrings.loadingApp,
+                text = stringResource(R.string.loading_app),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )

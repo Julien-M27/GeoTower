@@ -9,7 +9,7 @@ import androidx.car.app.model.Pane
 import androidx.car.app.model.PaneTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
-import fr.geotower.utils.AppStrings
+import fr.geotower.R
 import java.util.Locale
 
 class CarSiteDetailScreen(
@@ -19,20 +19,20 @@ class CarSiteDetailScreen(
 
     override fun onGetTemplate(): Template {
         val pane = Pane.Builder()
-            .addRow(Row.Builder().setTitle(AppStrings.carOperators(carContext)).addText(site.operators).build())
-            .addRow(Row.Builder().setTitle(AppStrings.carDistance(carContext)).addText(formatCarDistance(site.distanceMeters)).build())
-            .addRow(Row.Builder().setTitle(AppStrings.carAddress(carContext)).addText(site.title).addText(site.subtitle).build())
-            .addRow(Row.Builder().setTitle(AppStrings.carCoordinates(carContext)).addText(formatCoordinates()).build())
+            .addRow(Row.Builder().setTitle(carContext.getString(R.string.car_operators)).addText(site.operators).build())
+            .addRow(Row.Builder().setTitle(carContext.getString(R.string.car_distance)).addText(formatCarDistance(site.distanceMeters)).build())
+            .addRow(Row.Builder().setTitle(carContext.getString(R.string.car_address)).addText(site.title).addText(site.subtitle).build())
+            .addRow(Row.Builder().setTitle(carContext.getString(R.string.car_coordinates)).addText(formatCoordinates()).build())
             .addAction(
                 Action.Builder()
-                    .setTitle(AppStrings.carNavigate(carContext))
+                    .setTitle(carContext.getString(R.string.car_navigate))
                     .setOnClickListener { startNavigation() }
                     .build()
             )
             .build()
 
         return PaneTemplate.Builder(pane)
-            .setTitle(AppStrings.siteAnfrTitle(carContext, site.idAnfr))
+            .setTitle(carContext.getString(R.string.site_anfr_title, site.idAnfr))
             .setHeaderAction(Action.BACK)
             .build()
     }

@@ -72,6 +72,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -83,6 +84,7 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
+import fr.geotower.R
 import fr.geotower.radio.MobileOperator
 import fr.geotower.radio.RadioTechnology
 import fr.geotower.radio.RadioThroughputEngine
@@ -110,7 +112,6 @@ import fr.geotower.ui.components.throughputBandLabel
 import fr.geotower.ui.components.ThroughputConeDistance as ConeDistance
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
 import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.asin
@@ -125,6 +126,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import fr.geotower.utils.ThroughputDisplayText
+import fr.geotower.utils.ThroughputTextKey
 
 private const val PANEL_AZIMUTH_HALF_BEAM_DEGREES = 45.0
 private const val MAX_FR_UPLINK_AGGREGATED_CARRIERS = 2
@@ -252,8 +255,8 @@ fun ThroughputCalculatorScreen(
         isLoading = false
     }
 
-    val txtUnknown = AppStrings.unknown
-    val txtAzimuthNotSpecified = AppStrings.azimuthNotSpecified
+    val txtUnknown = stringResource(R.string.appstrings_unknown)
+    val txtAzimuthNotSpecified = stringResource(R.string.appstrings_azimuth_not_specified)
     val rawFrequencies = remember(site, technique) {
         technique?.detailsFrequences?.takeIf { it.isNotBlank() } ?: site?.frequences
     }
@@ -303,7 +306,7 @@ fun ThroughputCalculatorScreen(
         containerColor = mainBgColor,
         topBar = {
             GeoTowerBackTopBar(
-                title = AppStrings.throughputCalculatorTitle,
+                title = stringResource(R.string.appstrings_throughput_calculator_title),
                 onBack = { handleBackNavigation() },
                 backgroundColor = mainBgColor,
                 backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
@@ -311,7 +314,7 @@ fun ThroughputCalculatorScreen(
                     IconButton(onClick = { navController.navigate("settings?section=throughput") }) {
                         Icon(
                             Icons.Default.Settings,
-                            contentDescription = AppStrings.pagesCustomizationTitle,
+                            contentDescription = stringResource(R.string.settings_pages_customization_title),
                             tint = MaterialTheme.colorScheme.onSurface
                         )
                     }
@@ -324,7 +327,7 @@ fun ThroughputCalculatorScreen(
             site == null -> MessagePane(
                 padding = padding,
                 mainBgColor = mainBgColor,
-                message = AppStrings.throughputNoSite
+                message = stringResource(R.string.appstrings_throughput_no_site)
             )
             else -> ThroughputContent(
                 padding = padding,
@@ -464,7 +467,7 @@ private fun ThroughputContent(
                     if (result.bands.isEmpty()) {
                         Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
                             Text(
-                                text = AppStrings.throughputNoBands,
+                                text = stringResource(R.string.appstrings_throughput_no_bands),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(16.dp)
                             )
@@ -502,13 +505,13 @@ private fun ThroughputHeaderCard(
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = site.operateur ?: AppStrings.unknown,
+                    text = site.operateur ?: stringResource(R.string.appstrings_unknown),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Text(
-                    text = AppStrings.throughputHeaderSite(site.idAnfr, supportHeightLabel),
+                    text = ThroughputDisplayText.headerSite(site.idAnfr, supportHeightLabel),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -551,7 +554,7 @@ private fun ThroughputSummaryCard(result: ThroughputResult, cardBgColor: Color, 
                 Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
                 Text(
-                    text = AppStrings.throughputEstimatedRadioTitle,
+                    text = stringResource(R.string.appstrings_throughput_estimated_radio_title),
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -559,23 +562,23 @@ private fun ThroughputSummaryCard(result: ThroughputResult, cardBgColor: Color, 
             }
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
                 ThroughputMetric(
-                    label = AppStrings.throughputDownloadLabel,
+                    label = stringResource(R.string.appstrings_throughput_download_label),
                     value = formatThroughputMbps(result.totalDownMbps),
                     modifier = Modifier.weight(1f)
                 )
                 ThroughputMetric(
-                    label = AppStrings.throughputPhoneUploadLabel,
+                    label = stringResource(R.string.appstrings_throughput_phone_upload_label),
                     value = formatThroughputMbps(result.totalUpMbps),
                     modifier = Modifier.weight(1f)
                 )
             }
             Text(
-                text = AppStrings.throughputSummaryUploadNote,
+                text = stringResource(R.string.appstrings_throughput_summary_upload_note),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
-                text = AppStrings.throughputIncludedBandsCount(result.includedBands.size, result.bands.size),
+                text = ThroughputDisplayText.includedBandsCount(result.includedBands.size, result.bands.size),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -622,13 +625,13 @@ private fun ThroughputConeCard(
     var isResolvingPosition by remember { mutableStateOf(false) }
     var positionStatusMessage by remember { mutableStateOf<String?>(null) }
     var mapFitRequest by remember { mutableStateOf(0) }
-    val currentPositionAppliedText = AppStrings.throughputPositionCurrentApplied
-    val mapPointAppliedText = AppStrings.throughputPositionMapPointApplied
-    val permissionDeniedText = AppStrings.throughputPositionPermissionDenied
-    val unavailableText = AppStrings.throughputPositionUnavailable
-    val tapMapText = AppStrings.throughputTapMapToChoose
-    val locatingText = AppStrings.throughputPositionLocating
-    val pureTheoreticalText = AppStrings.throughputPositionCleared
+    val currentPositionAppliedText = stringResource(R.string.appstrings_throughput_position_current_applied)
+    val mapPointAppliedText = stringResource(R.string.appstrings_throughput_position_map_point_applied)
+    val permissionDeniedText = stringResource(R.string.appstrings_throughput_position_permission_denied)
+    val unavailableText = stringResource(R.string.appstrings_throughput_position_unavailable)
+    val tapMapText = stringResource(R.string.appstrings_throughput_tap_map_to_choose)
+    val locatingText = stringResource(R.string.appstrings_throughput_position_locating)
+    val pureTheoreticalText = stringResource(R.string.appstrings_throughput_position_cleared)
 
     fun applySelectedPosition(
         latitude: Double,
@@ -709,14 +712,14 @@ private fun ThroughputConeCard(
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text = AppStrings.throughputEstimatedOptimalDistanceTitle,
+                text = stringResource(R.string.appstrings_throughput_estimated_optimal_distance_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             if (coneDistance == null) {
                 Text(
-                    text = AppStrings.throughputConeHeightUnavailable,
+                    text = stringResource(R.string.appstrings_throughput_cone_height_unavailable),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -728,7 +731,7 @@ private fun ThroughputConeCard(
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = AppStrings.throughputMainZoneEstimated(
+                    text = ThroughputDisplayText.mainZoneEstimated(
                         formatThroughputDistanceMeters(coneDistance.nearMeters),
                         formatThroughputDistanceMeters(coneDistance.farMeters)
                     ),
@@ -736,7 +739,7 @@ private fun ThroughputConeCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = AppStrings.throughputConeAssumption,
+                    text = stringResource(R.string.appstrings_throughput_cone_assumption),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -745,7 +748,7 @@ private fun ThroughputConeCard(
                     if (customSettings != null && onCustomSettingsChange != null) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                         Text(
-                            text = AppStrings.throughputCustomPositionTitle,
+                            text = stringResource(R.string.appstrings_throughput_custom_position_title),
                             style = MaterialTheme.typography.labelLarge,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -762,7 +765,7 @@ private fun ThroughputConeCard(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(Modifier.width(8.dp))
-                                Text(if (isResolvingPosition) locatingText else AppStrings.throughputUseCurrentPosition)
+                                Text(if (isResolvingPosition) locatingText else stringResource(R.string.appstrings_throughput_use_current_position))
                             }
                             OutlinedButton(
                                 modifier = Modifier.fillMaxWidth(),
@@ -777,7 +780,7 @@ private fun ThroughputConeCard(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(Modifier.width(8.dp))
-                                Text(AppStrings.throughputChooseMapPoint)
+                                Text(stringResource(R.string.appstrings_throughput_choose_map_point))
                             }
                             if (hasPositionCorrection) {
                                 OutlinedButton(
@@ -790,7 +793,7 @@ private fun ThroughputConeCard(
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Spacer(Modifier.width(8.dp))
-                                    Text(AppStrings.throughputClearPosition)
+                                    Text(stringResource(R.string.appstrings_throughput_clear_position))
                                 }
                             }
                         }
@@ -838,7 +841,7 @@ private fun ThroughputConeCard(
                         fitSelectedPointRequest = mapFitRequest
                     )
                     Text(
-                        text = AppStrings.throughputConeMapExplanation,
+                        text = stringResource(R.string.appstrings_throughput_cone_map_explanation),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -855,13 +858,13 @@ private fun PositionAnalysisSummary(
 ) {
     if (analysis == null) {
         Text(
-            text = AppStrings.throughputPositionNoSelection,
+            text = stringResource(R.string.appstrings_throughput_position_no_selection),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
-            text = AppStrings.throughputCustomSelectedPosition(
-                AppStrings.throughputPositionScenarioLabel(scenario.id)
+            text = ThroughputDisplayText.customSelectedPosition(
+                ThroughputDisplayText.positionScenarioLabel(scenario.id)
             ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -872,28 +875,28 @@ private fun PositionAnalysisSummary(
     val nearestAzimuth = analysis.nearestAzimuthDegrees?.let { formatDegrees(it) }
     val deltaDegrees = analysis.azimuthDeltaDegrees?.roundToInt()
     val azimuthText = when (analysis.isInsideAzimuth) {
-        true -> AppStrings.throughputPositionAzimuthInside(
+        true -> ThroughputDisplayText.positionAzimuthInside(
             nearestAzimuth.orEmpty(),
             deltaDegrees ?: 0
         )
-        false -> AppStrings.throughputPositionAzimuthOutside(
+        false -> ThroughputDisplayText.positionAzimuthOutside(
             nearestAzimuth.orEmpty(),
             deltaDegrees ?: 0
         )
-        null -> AppStrings.throughputPositionAzimuthUnknown
+        null -> stringResource(R.string.appstrings_throughput_position_azimuth_unknown)
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(
-            text = AppStrings.throughputCustomSelectedPosition(
-                AppStrings.throughputPositionScenarioLabel(analysis.scenario.id)
+            text = ThroughputDisplayText.customSelectedPosition(
+                ThroughputDisplayText.positionScenarioLabel(analysis.scenario.id)
             ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold
         )
         Text(
-            text = AppStrings.throughputPositionDistance(formatThroughputDistanceMeters(analysis.distanceMeters)),
+            text = ThroughputDisplayText.positionDistance(formatThroughputDistanceMeters(analysis.distanceMeters)),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -908,12 +911,12 @@ private fun PositionAnalysisSummary(
         )
         Text(
             text = analysis.coneDistance?.let { cone ->
-                AppStrings.throughputPositionCone(
+                ThroughputDisplayText.positionCone(
                     center = formatThroughputDistanceMeters(cone.centerMeters),
                     near = formatThroughputDistanceMeters(cone.nearMeters),
                     far = formatThroughputDistanceMeters(cone.farMeters)
                 )
-            } ?: AppStrings.throughputPositionConeUnavailable,
+            } ?: stringResource(R.string.appstrings_throughput_position_cone_unavailable),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -942,7 +945,7 @@ private fun ThroughputControlsCard(
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
-                text = AppStrings.throughputRadioAssumption,
+                text = stringResource(R.string.appstrings_throughput_radio_assumption),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -979,13 +982,13 @@ private fun ThroughputControlsCard(
                 FilterChip(
                     selected = includePlanned,
                     onClick = { onIncludePlannedChange(!includePlanned) },
-                    label = { Text(AppStrings.throughputIncludePlanned) }
+                    label = { Text(stringResource(R.string.appstrings_throughput_include_planned)) }
                 )
             }
             if (bands.isNotEmpty()) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                 Text(
-                    text = AppStrings.throughputIncludedBandsTitle,
+                    text = stringResource(R.string.appstrings_throughput_included_bands_title),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -1012,34 +1015,34 @@ private fun CustomModulationControls(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(
-            text = AppStrings.throughputCustomModulationTitle,
+            text = stringResource(R.string.appstrings_throughput_custom_modulation_title),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
         ModulationSlider(
-            label = AppStrings.throughput4gDownloadLabel,
+            label = stringResource(R.string.appstrings_throughput4g_download_label),
             options = lteDownModulationOptions,
             selectedIndex = settings.lteDownIndex,
             onSelectedIndexChange = { onSettingsChange(settings.copy(lteDownIndex = it)) },
             useOneUi = useOneUi
         )
         ModulationSlider(
-            label = AppStrings.throughput4gUploadLabel,
+            label = stringResource(R.string.appstrings_throughput4g_upload_label),
             options = lteUpModulationOptions,
             selectedIndex = settings.lteUpIndex,
             onSelectedIndexChange = { onSettingsChange(settings.copy(lteUpIndex = it)) },
             useOneUi = useOneUi
         )
         ModulationSlider(
-            label = AppStrings.throughput5gDownloadLabel,
+            label = stringResource(R.string.appstrings_throughput5g_download_label),
             options = nrDownModulationOptions,
             selectedIndex = settings.nrDownIndex,
             onSelectedIndexChange = { onSettingsChange(settings.copy(nrDownIndex = it)) },
             useOneUi = useOneUi
         )
         ModulationSlider(
-            label = AppStrings.throughput5gUploadLabel,
+            label = stringResource(R.string.appstrings_throughput5g_upload_label),
             options = nrUpModulationOptions,
             selectedIndex = settings.nrUpIndex,
             onSelectedIndexChange = { onSettingsChange(settings.copy(nrUpIndex = it)) },
@@ -1049,13 +1052,13 @@ private fun CustomModulationControls(
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
 
         Text(
-            text = AppStrings.throughputCustomSignalTitle,
+            text = stringResource(R.string.appstrings_throughput_custom_signal_title),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
-            text = AppStrings.throughputCustomSignalDesc,
+            text = stringResource(R.string.appstrings_throughput_custom_signal_desc),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -1097,52 +1100,52 @@ private fun CustomModulationControls(
         )
 
         CustomChoiceRow(
-            title = AppStrings.throughputCustomEnvironmentTitle,
+            title = stringResource(R.string.appstrings_throughput_custom_environment_title),
             selectedId = settings.environment.id,
             options = RadioEnvironment.entries.map { it.id },
-            optionLabel = { AppStrings.throughputEnvironmentLabel(it) },
+            optionLabel = { ThroughputDisplayText.environmentLabel(it) },
             onSelect = { onSettingsChange(settings.copy(environment = radioEnvironmentFromPreference(it))) }
         )
 
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
 
         Text(
-            text = AppStrings.throughputCustomTerminalTitle,
+            text = stringResource(R.string.appstrings_throughput_custom_terminal_title),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
-            text = AppStrings.throughputCustomTerminalDesc,
+            text = stringResource(R.string.appstrings_throughput_custom_terminal_desc),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         CustomChoiceRow(
-            title = AppStrings.throughputCustomNetworkLoadTitle,
+            title = stringResource(R.string.appstrings_throughput_custom_network_load_title),
             selectedId = settings.networkLoad.id,
             options = NetworkLoad.entries.map { it.id },
-            optionLabel = { AppStrings.throughputNetworkLoadLabel(it) },
+            optionLabel = { ThroughputDisplayText.networkLoadLabel(it) },
             onSelect = { onSettingsChange(settings.copy(networkLoad = networkLoadFromPreference(it))) }
         )
         CustomChoiceRow(
-            title = AppStrings.throughputCustomBackhaulTitle,
+            title = stringResource(R.string.appstrings_throughput_custom_backhaul_title),
             selectedId = settings.backhaul.id,
             options = BackhaulQuality.entries.map { it.id },
-            optionLabel = { AppStrings.throughputBackhaulLabel(it) },
+            optionLabel = { ThroughputDisplayText.backhaulLabel(it) },
             onSelect = { onSettingsChange(settings.copy(backhaul = backhaulQualityFromPreference(it))) }
         )
         CustomChoiceRow(
-            title = AppStrings.throughputCustomAggregationTitle,
+            title = stringResource(R.string.appstrings_throughput_custom_aggregation_title),
             selectedId = settings.lteAggregation.id,
             options = LteAggregationMode.entries.map { it.id },
-            optionLabel = { AppStrings.throughputLteAggregationLabel(it) },
+            optionLabel = { ThroughputDisplayText.lteAggregationLabel(it) },
             onSelect = { onSettingsChange(settings.copy(lteAggregation = lteAggregationModeFromPreference(it))) }
         )
 
         val lteImpact = (customThroughputMultipliers(4, settings).down * 100).roundToInt()
         val nrImpact = (customThroughputMultipliers(5, settings).down * 100).roundToInt()
         Text(
-            text = AppStrings.throughputCustomImpact(lteImpact, nrImpact),
+            text = ThroughputDisplayText.customImpact(lteImpact, nrImpact),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold
@@ -1166,38 +1169,38 @@ private fun CustomCalculationExplanation(
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(
-            text = AppStrings.throughputCustomExplanationTitle,
+            text = stringResource(R.string.appstrings_throughput_custom_explanation_title),
             style = MaterialTheme.typography.labelLarge,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
         CustomExplanationLine(
-            title = AppStrings.throughputCustomExplanationModulationTitle,
-            description = AppStrings.throughputCustomExplanationModulationDesc
+            title = stringResource(R.string.appstrings_throughput_custom_explanation_modulation_title),
+            description = stringResource(R.string.appstrings_throughput_custom_explanation_modulation_desc)
         )
         CustomExplanationLine(
-            title = AppStrings.throughputCustomSignalTitle,
-            description = AppStrings.throughputCustomExplanationSignalDesc(lteImpactPercent, nrImpactPercent)
+            title = stringResource(R.string.appstrings_throughput_custom_signal_title),
+            description = ThroughputDisplayText.customExplanationSignalDesc(lteImpactPercent, nrImpactPercent)
         )
         CustomExplanationLine(
-            title = AppStrings.throughputCustomEnvironmentTitle,
-            description = AppStrings.throughputCustomExplanationEnvironmentDesc
+            title = stringResource(R.string.appstrings_throughput_custom_environment_title),
+            description = stringResource(R.string.appstrings_throughput_custom_explanation_environment_desc)
         )
         CustomExplanationLine(
-            title = AppStrings.throughputCustomPositionTitle,
-            description = AppStrings.throughputCustomExplanationPositionDesc
+            title = stringResource(R.string.appstrings_throughput_custom_position_title),
+            description = stringResource(R.string.appstrings_throughput_custom_explanation_position_desc)
         )
         CustomExplanationLine(
-            title = AppStrings.throughputCustomNetworkLoadTitle,
-            description = AppStrings.throughputCustomExplanationNetworkLoadDesc
+            title = stringResource(R.string.appstrings_throughput_custom_network_load_title),
+            description = stringResource(R.string.appstrings_throughput_custom_explanation_network_load_desc)
         )
         CustomExplanationLine(
-            title = AppStrings.throughputCustomBackhaulTitle,
-            description = AppStrings.throughputCustomExplanationBackhaulDesc
+            title = stringResource(R.string.appstrings_throughput_custom_backhaul_title),
+            description = stringResource(R.string.appstrings_throughput_custom_explanation_backhaul_desc)
         )
         CustomExplanationLine(
-            title = AppStrings.throughputCustomAggregationTitle,
-            description = AppStrings.throughputCustomExplanationAggregationDesc(maxLteCarriers)
+            title = stringResource(R.string.appstrings_throughput_custom_aggregation_title),
+            description = ThroughputDisplayText.customExplanationAggregationDesc(maxLteCarriers)
         )
     }
 }
@@ -1432,7 +1435,7 @@ private fun ThroughputBandsCard(result: ThroughputResult, cardBgColor: Color, bl
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
-                text = AppStrings.throughputFrequenciesAndModulationTitle,
+                text = stringResource(R.string.appstrings_throughput_frequencies_and_modulation_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
@@ -1448,14 +1451,14 @@ private fun ThroughputBandsCard(result: ThroughputResult, cardBgColor: Color, bl
 private fun ThroughputBandRow(band: ThroughputBandResult) {
     val contentColor = if (band.isIncluded) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
     val metricColor = if (band.isIncluded && band.downAggregationExcludedReason == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
-    val estimatedText = AppStrings.throughputEstimatedSuffix
+    val estimatedText = stringResource(R.string.appstrings_throughput_estimated_suffix)
     val bandDetail = buildString {
         append(formatBandwidth(band.bandwidthMHz))
         if (band.bandwidthIsEstimated) append(" ").append(estimatedText)
         if (band.status.isNotBlank()) append(" - ").append(band.status)
     }
     val coneLabel = band.coneDistance?.let {
-        AppStrings.throughputEstimatedCone(
+        ThroughputDisplayText.estimatedCone(
             formatThroughputDistanceMeters(it.centerMeters),
             formatThroughputDistanceMeters(it.nearMeters),
             formatThroughputDistanceMeters(it.farMeters)
@@ -1466,12 +1469,12 @@ private fun ThroughputBandRow(band: ThroughputBandResult) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(band.label, fontWeight = FontWeight.Bold, color = contentColor)
             ThroughputDetailLine(
-                label = AppStrings.throughputFrequenciesLabel,
+                label = stringResource(R.string.appstrings_throughput_frequencies_label),
                 value = band.frequencyDetails,
                 color = contentColor
             )
             ThroughputDetailLine(
-                label = AppStrings.throughputModulationAndAntennasLabel,
+                label = stringResource(R.string.appstrings_throughput_modulation_and_antennas_label),
                 value = band.modulationLabel,
                 color = contentColor
             )
@@ -1489,14 +1492,14 @@ private fun ThroughputBandRow(band: ThroughputBandResult) {
             }
             if (!band.isIncluded && band.excludedReason != null) {
                 Text(
-                    text = AppStrings.translateThroughputExcludedReason(band.excludedReason),
+                    text = ThroughputDisplayText.translateExcludedReason(band.excludedReason),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )
             }
             if (band.isIncluded && band.downAggregationExcludedReason != null) {
                 Text(
-                    text = AppStrings.translateThroughputExcludedReason(band.downAggregationExcludedReason),
+                    text = ThroughputDisplayText.translateExcludedReason(band.downAggregationExcludedReason),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -1528,13 +1531,13 @@ private fun ThroughputAssumptionsCard(
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
-                text = AppStrings.throughputReadAsEstimateTitle,
+                text = stringResource(R.string.appstrings_throughput_read_as_estimate_title),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
-                text = AppStrings.throughputDisclaimer,
+                text = stringResource(R.string.appstrings_throughput_disclaimer),
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -1545,14 +1548,14 @@ private fun ThroughputAssumptionsCard(
             )
             if (result.warnings.isNotEmpty()) {
                 Text(
-                    text = AppStrings.throughputAttentionTitle,
+                    text = stringResource(R.string.appstrings_throughput_attention_title),
                     style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 result.warnings.take(4).forEach { warning ->
                     Text(
-                        text = "- ${AppStrings.translateThroughputWarning(warning)}",
+                        text = "- ${ThroughputDisplayText.translateWarning(warning)}",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1560,13 +1563,13 @@ private fun ThroughputAssumptionsCard(
             }
             if (result.assumptions.isNotEmpty()) {
                 Text(
-                    text = AppStrings.throughputCalculationAssumptions(localizedThroughputAssumptions(result.assumptions)),
+                    text = ThroughputDisplayText.calculationAssumptions(localizedThroughputAssumptions(result.assumptions)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
-                text = AppStrings.throughputSources(AppStrings.translateThroughputSourceSummary(result.sourceSummary)),
+                text = ThroughputDisplayText.sources(ThroughputDisplayText.translateSourceSummary(result.sourceSummary)),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -1578,7 +1581,7 @@ private fun ThroughputAssumptionsCard(
 private fun localizedThroughputAssumptions(assumptions: List<String>): String {
     val translated = mutableListOf<String>()
     for (assumption in assumptions) {
-        translated += AppStrings.translateThroughputAssumption(assumption)
+        translated += ThroughputDisplayText.translateAssumption(assumption)
     }
     return translated.joinToString(" | ")
 }
@@ -1586,20 +1589,20 @@ private fun localizedThroughputAssumptions(assumptions: List<String>): String {
 @Composable
 private fun presetLabel(preset: ThroughputPreset): String {
     return when (preset) {
-        ThroughputPreset.Conservative -> AppStrings.throughputPresetLabel("conservative")
-        ThroughputPreset.Standard -> AppStrings.throughputPresetLabel("standard")
-        ThroughputPreset.Maximum -> AppStrings.throughputPresetLabel("ideal")
-        ThroughputPreset.Custom -> AppStrings.throughputPresetLabel("custom")
+        ThroughputPreset.Conservative -> ThroughputDisplayText.presetLabel("conservative")
+        ThroughputPreset.Standard -> ThroughputDisplayText.presetLabel("standard")
+        ThroughputPreset.Maximum -> ThroughputDisplayText.presetLabel("ideal")
+        ThroughputPreset.Custom -> ThroughputDisplayText.presetLabel("custom")
     }
 }
 
 @Composable
 private fun presetDescription(preset: ThroughputPreset): String {
     return when (preset) {
-        ThroughputPreset.Conservative -> AppStrings.throughputPresetDescription("conservative")
-        ThroughputPreset.Standard -> AppStrings.throughputPresetDescription("standard")
-        ThroughputPreset.Maximum -> AppStrings.throughputPresetDescription("ideal")
-        ThroughputPreset.Custom -> AppStrings.throughputPresetDescription("custom")
+        ThroughputPreset.Conservative -> ThroughputDisplayText.presetDescription("conservative")
+        ThroughputPreset.Standard -> ThroughputDisplayText.presetDescription("standard")
+        ThroughputPreset.Maximum -> ThroughputDisplayText.presetDescription("ideal")
+        ThroughputPreset.Custom -> ThroughputDisplayText.presetDescription("custom")
     }
 }
 
@@ -1691,12 +1694,12 @@ private fun calculateThroughput(
             val azimuths = extractThroughputAzimuths(band)
             val customMultipliers = throughputMultipliersFor(preset, band.gen, customSettings)
             val excludedReason = when {
-                !generationAllowed -> if (band.gen == 5) AppStrings.THROUGHPUT_REASON_5G_DISABLED else AppStrings.THROUGHPUT_REASON_4G_DISABLED
-                !bandAllowed -> AppStrings.THROUGHPUT_REASON_BAND_EXCLUDED
-                operator == null -> AppStrings.THROUGHPUT_REASON_OPERATOR_NOT_RECOGNIZED_ARCEP
-                carrierResult == null -> excludedByKey[key]?.reason ?: AppStrings.THROUGHPUT_REASON_ARCEP_ALLOCATION_NOT_FOUND
+                !generationAllowed -> if (band.gen == 5) ThroughputTextKey.THROUGHPUT_REASON_5G_DISABLED else ThroughputTextKey.THROUGHPUT_REASON_4G_DISABLED
+                !bandAllowed -> ThroughputTextKey.THROUGHPUT_REASON_BAND_EXCLUDED
+                operator == null -> ThroughputTextKey.THROUGHPUT_REASON_OPERATOR_NOT_RECOGNIZED_ARCEP
+                carrierResult == null -> excludedByKey[key]?.reason ?: ThroughputTextKey.THROUGHPUT_REASON_ARCEP_ALLOCATION_NOT_FOUND
                 !carrierResult.included -> carrierResult.excludedReason
-                isPlanned && !includePlanned -> AppStrings.THROUGHPUT_REASON_PLANNED_BAND
+                isPlanned && !includePlanned -> ThroughputTextKey.THROUGHPUT_REASON_PLANNED_BAND
                 else -> null
             }
 
@@ -1725,7 +1728,7 @@ private fun calculateThroughput(
         .mapNotNull { it.downAggregationExcludedReason }
         .distinct()
     val uplinkAggregationWarning = if (aggregationAwareBands.count { it.isIncluded && it.downAggregationExcludedReason == null && it.upMbps > 0.0 } > MAX_FR_UPLINK_AGGREGATED_CARRIERS) {
-        listOf(AppStrings.THROUGHPUT_WARNING_UPLINK_AGGREGATION)
+        listOf(ThroughputTextKey.THROUGHPUT_WARNING_UPLINK_AGGREGATION)
     } else {
         emptyList()
     }
@@ -1736,7 +1739,7 @@ private fun calculateThroughput(
         assumptions = engineResult?.assumptions.orEmpty(),
         confidenceScore = engineResult?.confidenceScore ?: 35,
         calculationVersion = engineResult?.calculationVersion ?: fr.geotower.radio.THROUGHPUT_CALCULATION_VERSION,
-        sourceSummary = engineResult?.sourceSummary ?: AppStrings.THROUGHPUT_SOURCE_SUMMARY_DEFAULT
+        sourceSummary = engineResult?.sourceSummary ?: ThroughputTextKey.THROUGHPUT_SOURCE_SUMMARY_DEFAULT
     )
 }
 
@@ -1820,8 +1823,8 @@ private fun customProfile(customSettings: CustomModulationSettings): ThroughputP
 
     return ThroughputProfile(
         id = "CUSTOM",
-        label = AppStrings.THROUGHPUT_PROFILE_CUSTOM_LABEL,
-        description = AppStrings.THROUGHPUT_PROFILE_CUSTOM_DESC,
+        label = ThroughputTextKey.THROUGHPUT_PROFILE_CUSTOM_LABEL,
+        description = ThroughputTextKey.THROUGHPUT_PROFILE_CUSTOM_DESC,
         lte = RatAssumptions(
             dlModulationOrder = lteDown.modulationOrder,
             ulModulationOrder = lteUp.modulationOrder,
@@ -1911,7 +1914,7 @@ private fun applyLteLowBandAggregationPolicy(
         .filterNot { it.key == keptBand.key }
         .map { it.key }
         .toSet()
-    val reason = AppStrings.THROUGHPUT_WARNING_LOW_BAND_AGGREGATION
+    val reason = ThroughputTextKey.THROUGHPUT_WARNING_LOW_BAND_AGGREGATION
 
     return bands.map { band ->
         if (band.key in excludedKeys) {
@@ -1934,12 +1937,12 @@ private fun applyCarrierAggregationPolicy(
         .limitAggregatedCarriers(
             generation = 4,
             maxCarriers = maxLteCarriers,
-            reason = AppStrings.THROUGHPUT_WARNING_LTE_AGGREGATION_LIMIT
+            reason = ThroughputTextKey.THROUGHPUT_WARNING_LTE_AGGREGATION_LIMIT
         )
         .limitAggregatedCarriers(
             generation = 5,
             maxCarriers = maxNrCarriers,
-            reason = AppStrings.THROUGHPUT_WARNING_NR_AGGREGATION_LIMIT
+            reason = ThroughputTextKey.THROUGHPUT_WARNING_NR_AGGREGATION_LIMIT
         )
 }
 

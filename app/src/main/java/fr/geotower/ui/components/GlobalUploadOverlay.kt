@@ -21,9 +21,12 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import fr.geotower.AppGlobalState
+import fr.geotower.data.workers.SignalQuestUploadScheduler
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
 import java.util.UUID
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -43,7 +46,7 @@ fun GlobalUploadOverlay(
 
     // Écoute TOUS les envois ayant le tag "sq_upload_global"
     val workInfos by remember {
-        WorkManager.getInstance(context).getWorkInfosByTagFlow("sq_upload_global")
+        WorkManager.getInstance(context).getWorkInfosByTagFlow(SignalQuestUploadScheduler.GLOBAL_TAG)
     }.collectAsState(initial = emptyList())
 
     var isUploadPopupHidden by remember { mutableStateOf(false) }
@@ -62,7 +65,8 @@ fun GlobalUploadOverlay(
     // NOUVEAU : Mémoire des états pour détecter les vraies transitions
     val previousStates = remember { mutableMapOf<UUID, WorkInfo.State>() }
 
-    val activeWork = workInfos.firstOrNull { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED }
+    val activeWork = workInfos.firstOrNull { it.state == WorkInfo.State.RUNNING }
+        ?: workInfos.firstOrNull { it.state == WorkInfo.State.ENQUEUED }
     val isUploading = activeWork != null
 
     LaunchedEffect(workInfos) {
@@ -134,18 +138,22 @@ fun GlobalUploadOverlay(
         ) {
             Surface(shape = blockShape, color = sheetBgColor, shadowElevation = 8.dp, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                 Column(modifier = Modifier.padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    Text(AppStrings.uploadingTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Text(stringResource(R.string.appstrings_uploading_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
 
                     CircularWavyProgressIndicator(
                         modifier = Modifier.size(56.dp),
                         color = MaterialTheme.colorScheme.primary
                     )
 
-                    val textProgress = if (totalPhotos > 0) AppStrings.uploadProgressText(currentProgress, totalPhotos) else AppStrings.uploadPreparing
+                    val textProgress = if (totalPhotos > 0) {
+                        stringResource(R.string.upload_progress_text, currentProgress, totalPhotos)
+                    } else {
+                        stringResource(R.string.appstrings_upload_preparing)
+                    }
                     Text(textProgress, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                     Button(onClick = { isUploadPopupHidden = true }, shape = CircleShape, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) {
-                        Text(AppStrings.hide, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.appstrings_hide), fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -166,10 +174,10 @@ fun GlobalUploadOverlay(
                 Column(modifier = Modifier.padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Icon(finalIcon, contentDescription = null, tint = iconColor, modifier = Modifier.size(64.dp))
 
-                    Text(AppStrings.uploadFinishedTitle, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Text(stringResource(R.string.appstrings_upload_finished_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
 
                     Text(
-                        text = finishedDialogMessageOverride ?: AppStrings.uploadResultText(finalSuccessCount, totalPhotos),
+                        text = finishedDialogMessageOverride ?: stringResource(R.string.upload_result_text, finalSuccessCount, totalPhotos),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center
@@ -177,7 +185,7 @@ fun GlobalUploadOverlay(
 
                     if (hasErrors) {
                         Text(
-                            text = AppStrings.uploadErrorWarning,
+                            text = stringResource(R.string.appstrings_upload_error_warning),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.error,
                             textAlign = TextAlign.Center
@@ -187,7 +195,11 @@ fun GlobalUploadOverlay(
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
                     Text(
-                        text = AppStrings.uploadLifetimeScore(lifetimeScore + finalSuccessCount),
+                        text = pluralStringResource(
+                            R.plurals.upload_lifetime_score,
+                            lifetimeScore + finalSuccessCount,
+                            lifetimeScore + finalSuccessCount
+                        ),
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.primary,
@@ -204,7 +216,7 @@ fun GlobalUploadOverlay(
                         shape = CircleShape,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(AppStrings.uploadHistoryTitle, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.appstrings_upload_history_title), fontWeight = FontWeight.Bold)
                     }
 
                     Button(
@@ -213,7 +225,7 @@ fun GlobalUploadOverlay(
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                     ) {
-                        Text(AppStrings.dbDownloadTermine, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.appstrings_db_download_termine), fontWeight = FontWeight.Bold)
                     }
                 }
             }

@@ -9,6 +9,8 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.content.pm.ServiceInfo
 import android.location.Location
 import android.net.Uri
@@ -29,24 +31,28 @@ import com.google.android.gms.location.Priority
 import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.api.RetrofitClient
 import fr.geotower.data.db.AppDatabase
 import fr.geotower.data.db.GeoTowerDao
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.utils.AppLogger
-import fr.geotower.utils.AppStrings
 import fr.geotower.utils.DeviceProfile
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
+import kotlin.math.min
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import okhttp3.Request
 
 class LiveTrackingService : Service() {
 
@@ -65,6 +71,11 @@ class LiveTrackingService : Service() {
     private var lockedOperator: String? = null
     private var lockedAntennaId: String? = null
     private var initialDistance: Float? = null
+    private val liveSitePhotoCacheLock = Any()
+    private val liveSitePhotoCache = LinkedHashMap<String, Bitmap?>()
+    @Volatile
+    private var liveSitePhotoLoadingKey: String? = null
+    private var liveSitePhotoJob: Job? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -99,15 +110,16 @@ class LiveTrackingService : Service() {
 
         val initialNotification = if (supportsProgressStyle()) {
             buildLiveNotification(
-                contentText = AppStrings.searchInProgress(this),
+                contentText = getString(R.string.live_tracking_searching),
                 progress = 0,
                 operator = defaultOp,
                 antLoc = null,
-                address = ""
+                address = "",
+                sitePhotoBitmap = null
             )
         } else {
             buildNotification(
-                contentText = AppStrings.searchInProgress(this),
+                contentText = getString(R.string.live_tracking_searching),
                 userLoc = null,
                 antLoc = null,
                 operator = defaultOp,
@@ -175,7 +187,7 @@ class LiveTrackingService : Service() {
 
                 if (opAntennas.isEmpty()) {
                     updateNotification(
-                        text = AppStrings.noAntennaFound(applicationContext, defaultOp),
+                        text = applicationContext.getString(R.string.live_tracking_no_antenna_found, defaultOp),
                         userLoc = null,
                         antLoc = null,
                         operator = defaultOp,
@@ -229,13 +241,37 @@ class LiveTrackingService : Service() {
                 val distanceWithDirectionStr = "$baseDistanceStr • $directionStr ($degreeStr)"
 
                 val technique = repository.getTechniqueDetails(closestAntenna.idAnfr)
+                val sitePhotoId = repository.getPhysiqueDetails(closestAntenna.idAnfr)
+                    .firstOrNull()
+                    ?.idSupport
+                    ?.takeIf { it.isNotBlank() }
+                    ?: closestAntenna.idAnfr
                 val fullAddress = technique?.adresse ?: ""
+                val notificationText = applicationContext.getString(
+                    R.string.live_tracking_antenna_distance,
+                    defaultOp,
+                    distanceWithDirectionStr
+                )
+                val photoCacheKey = liveSitePhotoCacheKey(defaultOp, sitePhotoId)
+                val liveSitePhotoBitmap = cachedLiveSitePhotoBitmap(photoCacheKey)
 
                 updateNotification(
-                    text = AppStrings.antennaDistance(applicationContext, defaultOp, distanceWithDirectionStr),
+                    text = notificationText,
                     userLoc = location,
                     antLoc = closestAntenna,
                     operator = defaultOp,
+                    progress = progress,
+                    address = fullAddress,
+                    sitePhotoBitmap = liveSitePhotoBitmap
+                )
+
+                requestLiveSitePhotoBitmapIfNeeded(
+                    cacheKey = photoCacheKey,
+                    siteId = sitePhotoId,
+                    operator = defaultOp,
+                    text = notificationText,
+                    userLoc = location,
+                    antLoc = closestAntenna,
                     progress = progress,
                     address = fullAddress
                 )
@@ -297,7 +333,8 @@ class LiveTrackingService : Service() {
         antLoc: LocalisationEntity?,
         operator: String,
         progress: Int = 0,
-        address: String = ""
+        address: String = "",
+        sitePhotoBitmap: Bitmap? = null
     ) {
         if (!LiveTrackingController.hasPostNotificationsPermission(this)) {
             stopTrackingAndSelf()
@@ -306,12 +343,187 @@ class LiveTrackingService : Service() {
 
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val notification = if (supportsProgressStyle()) {
-            buildLiveNotification(text, progress, operator, antLoc, address)
+            buildLiveNotification(text, progress, operator, antLoc, address, sitePhotoBitmap)
         } else {
             buildNotification(text, userLoc, antLoc, operator, progress, address)
         }
 
         manager.notify(notificationId, notification)
+    }
+
+    private fun requestLiveSitePhotoBitmapIfNeeded(
+        cacheKey: String,
+        siteId: String,
+        operator: String,
+        text: String,
+        userLoc: Location?,
+        antLoc: LocalisationEntity,
+        progress: Int,
+        address: String
+    ) {
+        if (!supportsProgressStyle() || siteId.isBlank() || hasLiveSitePhotoCacheEntry(cacheKey)) return
+        if (liveSitePhotoLoadingKey == cacheKey) return
+
+        liveSitePhotoJob?.cancel()
+        liveSitePhotoLoadingKey = cacheKey
+        liveSitePhotoJob = serviceScope.launch {
+            try {
+                val bitmap = loadLiveSitePhotoBitmap(siteId, operator)
+                putLiveSitePhotoBitmap(cacheKey, bitmap)
+
+                if (
+                    bitmap != null &&
+                    lockedAntennaId == antLoc.idAnfr &&
+                    currentOperator == operator
+                ) {
+                    updateNotification(
+                        text = text,
+                        userLoc = userLoc,
+                        antLoc = antLoc,
+                        operator = operator,
+                        progress = progress,
+                        address = address,
+                        sitePhotoBitmap = bitmap
+                    )
+                }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                putLiveSitePhotoBitmap(cacheKey, null)
+                AppLogger.w(TAG_LOCATION, "Live site photo request failed", e)
+            } finally {
+                if (liveSitePhotoLoadingKey == cacheKey) {
+                    liveSitePhotoLoadingKey = null
+                }
+            }
+        }
+    }
+
+    private suspend fun loadLiveSitePhotoBitmap(siteId: String, operator: String): Bitmap? {
+        val candidate = LiveSitePhotoSelector.firstCandidate(applicationContext, siteId, operator) ?: return null
+        return downloadLiveSitePhotoBitmap(candidate.url, candidate.maxBytes)
+    }
+
+    private fun downloadLiveSitePhotoBitmap(url: String, maxBytes: Int): Bitmap? {
+        val request = Request.Builder()
+            .url(url)
+            .get()
+            .build()
+
+        return RetrofitClient.currentClient.newCall(request).execute().use { response ->
+            if (!response.isSuccessful) return@use null
+            val body = response.body ?: return@use null
+            val contentLength = body.contentLength()
+            if (contentLength > maxBytes) return@use null
+
+            val bytes = body.byteStream().use { stream ->
+                readLimitedBytes(stream, maxBytes)
+            }
+            decodeLiveSitePhotoBitmap(bytes)
+        }
+    }
+
+    private fun readLimitedBytes(input: InputStream, maxBytes: Int): ByteArray? {
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        val output = ByteArrayOutputStream()
+        var total = 0
+
+        while (true) {
+            val read = input.read(buffer)
+            if (read == -1) break
+            total += read
+            if (total > maxBytes) return null
+            output.write(buffer, 0, read)
+        }
+
+        return output.toByteArray()
+    }
+
+    private fun decodeLiveSitePhotoBitmap(bytes: ByteArray?): Bitmap? {
+        if (bytes == null || bytes.isEmpty()) return null
+
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        val targetSize = liveSitePhotoIconSizePx()
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = liveSitePhotoInSampleSize(bounds.outWidth, bounds.outHeight, targetSize)
+            inPreferredConfig = Bitmap.Config.ARGB_8888
+        }
+        val decoded = BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options) ?: return null
+        return centerCropLiveSitePhoto(decoded, targetSize)
+    }
+
+    private fun liveSitePhotoInSampleSize(width: Int, height: Int, targetSize: Int): Int {
+        var inSampleSize = 1
+        while (width / inSampleSize > targetSize * 2 || height / inSampleSize > targetSize * 2) {
+            inSampleSize *= 2
+        }
+        return inSampleSize
+    }
+
+    private fun centerCropLiveSitePhoto(source: Bitmap, targetSize: Int): Bitmap {
+        val side = min(source.width, source.height)
+        val left = (source.width - side) / 2
+        val top = (source.height - side) / 2
+        val cropped = Bitmap.createBitmap(source, left, top, side, side)
+        val scaled = if (cropped.width == targetSize && cropped.height == targetSize) {
+            cropped
+        } else {
+            Bitmap.createScaledBitmap(cropped, targetSize, targetSize, true)
+        }
+
+        if (scaled !== cropped) cropped.recycle()
+        if (cropped !== source && !source.isRecycled) source.recycle()
+        return scaled
+    }
+
+    private fun liveSitePhotoIconSizePx(): Int {
+        return (resources.displayMetrics.density * LIVE_SITE_PHOTO_ICON_DP)
+            .toInt()
+            .coerceAtLeast(MIN_LIVE_SITE_PHOTO_ICON_PX)
+    }
+
+    private fun liveSitePhotoCacheKey(operator: String, siteId: String): String {
+        return LiveSitePhotoSelector.cacheKey(applicationContext, operator, siteId)
+    }
+
+    private fun hasLiveSitePhotoCacheEntry(cacheKey: String): Boolean {
+        return synchronized(liveSitePhotoCacheLock) {
+            liveSitePhotoCache.containsKey(cacheKey)
+        }
+    }
+
+    private fun cachedLiveSitePhotoBitmap(cacheKey: String): Bitmap? {
+        return synchronized(liveSitePhotoCacheLock) {
+            liveSitePhotoCache[cacheKey]
+        }
+    }
+
+    private fun putLiveSitePhotoBitmap(cacheKey: String, bitmap: Bitmap?) {
+        synchronized(liveSitePhotoCacheLock) {
+            if (!liveSitePhotoCache.containsKey(cacheKey) &&
+                liveSitePhotoCache.size >= MAX_LIVE_SITE_PHOTO_CACHE_ENTRIES
+            ) {
+                liveSitePhotoCache.entries.iterator().let { iterator ->
+                    if (iterator.hasNext()) {
+                        iterator.next()
+                        iterator.remove()
+                    }
+                }
+            }
+            liveSitePhotoCache[cacheKey] = bitmap
+        }
+    }
+
+    private fun clearLiveSitePhotoCache() {
+        synchronized(liveSitePhotoCacheLock) {
+            liveSitePhotoCache.values.filterNotNull().forEach { bitmap ->
+                if (!bitmap.isRecycled) bitmap.recycle()
+            }
+            liveSitePhotoCache.clear()
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.BAKLAVA)
@@ -320,7 +532,8 @@ class LiveTrackingService : Service() {
         progress: Int,
         operator: String,
         antLoc: LocalisationEntity?,
-        address: String
+        address: String,
+        sitePhotoBitmap: Bitmap?
     ): Notification {
         val pendingIntent = PendingIntent.getActivity(
             this,
@@ -345,12 +558,10 @@ class LiveTrackingService : Service() {
                 listOf(Notification.ProgressStyle.Segment(100).setColor(operatorColor(operator)))
             )
 
-        operatorLogo(operator)?.let { logoResId ->
-            progressStyle.setProgressEndIcon(IconCompat.createWithResource(this, logoResId).toIcon(this))
-        }
+        progressEndIcon(operator, sitePhotoBitmap)?.let(progressStyle::setProgressEndIcon)
 
         val hasAddress = address.isNotBlank()
-        val liveTitle = if (hasAddress) contentText else AppStrings.nearestAntennaTitle(this)
+        val liveTitle = if (hasAddress) contentText else getString(R.string.live_tracking_title)
         val liveContentText = if (hasAddress) notificationAddressText(address) else contentText
         val shortCriticalText = extractShortCriticalText(contentText)
         val builder = Notification.Builder(this, liveTrackingChannelV3)
@@ -367,8 +578,8 @@ class LiveTrackingService : Service() {
             .setStyle(progressStyle)
             .addAction(
                 Notification.Action.Builder(
-                    IconCompat.createWithResource(this, R.drawable.ic_launcher_monochrome).toIcon(this),
-                    AppStrings.quitAction(this),
+                    IconCompat.createWithResource(this, R.drawable.ic_notification_action_transparent).toIcon(this),
+                    getString(R.string.live_tracking_stop_action),
                     stopPendingIntent
                 ).build()
             )
@@ -400,7 +611,8 @@ class LiveTrackingService : Service() {
                     progress = progress,
                     primaryInfo = liveTitle,
                     secondaryInfo = liveContentText,
-                    shortCriticalText = shortCriticalText
+                    shortCriticalText = shortCriticalText,
+                    sitePhotoBitmap = sitePhotoBitmap
                 )
             )
         }
@@ -431,7 +643,7 @@ class LiveTrackingService : Service() {
         val expandedText = notificationContentText(contentText, address)
 
         val builder = NotificationCompat.Builder(this, liveTrackingChannelV3)
-            .setContentTitle(AppStrings.nearestAntennaTitle(this))
+            .setContentTitle(getString(R.string.live_tracking_title))
             .setContentText(contentText)
             .setSmallIcon(R.drawable.geotower_logo)
             .setContentIntent(pendingIntent)
@@ -443,7 +655,7 @@ class LiveTrackingService : Service() {
             .setUsesChronometer(true)
             .setColor(operatorColor(operator))
             .setProgress(100, progress, false)
-            .addAction(0, AppStrings.quitAction(this), stopPendingIntent)
+            .addAction(0, getString(R.string.live_tracking_stop_action), stopPendingIntent)
             .setStyle(NotificationCompat.BigTextStyle().bigText(expandedText))
 
         return builder.build().apply {
@@ -453,7 +665,8 @@ class LiveTrackingService : Service() {
                     progress = progress,
                     primaryInfo = contentText,
                     secondaryInfo = expandedText,
-                    shortCriticalText = extractShortCriticalText(contentText)
+                    shortCriticalText = extractShortCriticalText(contentText),
+                    sitePhotoBitmap = null
                 )
             )
         }
@@ -503,7 +716,8 @@ class LiveTrackingService : Service() {
         progress: Int,
         primaryInfo: String,
         secondaryInfo: String,
-        shortCriticalText: String?
+        shortCriticalText: String?,
+        sitePhotoBitmap: Bitmap?
     ): Bundle {
         if (!DeviceProfile.supportsSamsungOngoingActivity) return Bundle.EMPTY
 
@@ -517,6 +731,9 @@ class LiveTrackingService : Service() {
         val operatorIcon = operatorLogo(operator)?.let { logoResId ->
             IconCompat.createWithResource(this, logoResId).toIcon(this)
         }
+        val expandedIcon = sitePhotoBitmap?.let { bitmap ->
+            IconCompat.createWithBitmap(bitmap).toIcon(this)
+        } ?: operatorIcon
         val trackerIcon = IconCompat.createWithResource(this, R.drawable.ic_live_user_tracker).toIcon(this)
         val progressSegment = Bundle().apply {
             putFloat("android.ongoingActivityNoti.progressSegments.segmentStart", 0.0f)
@@ -541,6 +758,8 @@ class LiveTrackingService : Service() {
             operatorIcon?.let { icon ->
                 putParcelable("android.ongoingActivityNoti.chipIcon", icon)
                 putParcelable("android.ongoingActivityNoti.nowbarIcon", icon)
+            }
+            expandedIcon?.let { icon ->
                 putParcelable("android.ongoingActivityNoti.secondIcon", icon)
             }
         }
@@ -556,7 +775,7 @@ class LiveTrackingService : Service() {
     }
 
     private fun samsungDrawerPrimaryInfo(chipText: String): String {
-        return "${AppStrings.nearestAntennaTitle(this)} • $chipText"
+        return getString(R.string.live_tracking_drawer_primary, getString(R.string.live_tracking_title), chipText)
             .take(MAX_SAMSUNG_DRAWER_TITLE_LENGTH)
     }
 
@@ -564,7 +783,7 @@ class LiveTrackingService : Service() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 liveTrackingChannelV3,
-                AppStrings.liveTrackingChannelDesc(this),
+                getString(R.string.live_tracking_channel_name),
                 NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 setSound(null, null)
@@ -607,6 +826,8 @@ class LiveTrackingService : Service() {
 
     private fun stopTrackingAndSelf(): Int {
         processingJob?.cancel()
+        liveSitePhotoJob?.cancel()
+        liveSitePhotoLoadingKey = null
         stopLocationUpdates()
         runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
         stopSelf()
@@ -616,6 +837,8 @@ class LiveTrackingService : Service() {
     private fun resetIfOperatorChanged(operator: String) {
         if (lockedOperator != null && lockedOperator != operator) {
             processingJob?.cancel()
+            liveSitePhotoJob?.cancel()
+            liveSitePhotoLoadingKey = null
             lastProcessedLocation = null
             lastProcessedAt = 0L
             lockedOperator = null
@@ -662,6 +885,12 @@ class LiveTrackingService : Service() {
         return OperatorColors.colorInt(operator)
     }
 
+    private fun progressEndIcon(operator: String, sitePhotoBitmap: Bitmap?) =
+        sitePhotoBitmap?.let { IconCompat.createWithBitmap(it).toIcon(this) }
+            ?: operatorLogo(operator)?.let { logoResId ->
+                IconCompat.createWithResource(this, logoResId).toIcon(this)
+            }
+
     private fun operatorLogo(operator: String): Int? {
         return OperatorLogos.drawableRes(operator)
     }
@@ -670,8 +899,11 @@ class LiveTrackingService : Service() {
         super.onDestroy()
         isRunning = false
         processingJob?.cancel()
+        liveSitePhotoJob?.cancel()
+        liveSitePhotoLoadingKey = null
         runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
         stopLocationUpdates()
+        clearLiveSitePhotoCache()
         serviceScope.cancel()
     }
 
@@ -689,6 +921,9 @@ class LiveTrackingService : Service() {
         private const val MAX_SAMSUNG_NOW_BAR_TEXT_LENGTH = 80
         private const val MAX_SAMSUNG_CHIP_TEXT_LENGTH = 24
         private const val MAX_SAMSUNG_DRAWER_TITLE_LENGTH = 36
+        private const val LIVE_SITE_PHOTO_ICON_DP = 64
+        private const val MIN_LIVE_SITE_PHOTO_ICON_PX = 96
+        private const val MAX_LIVE_SITE_PHOTO_CACHE_ENTRIES = 12
         private const val TAG_LOCATION = "GeoTowerLocation"
         private val SEARCH_RADII_KM = doubleArrayOf(5.0, 10.0, 25.0, 50.0, 100.0)
     }

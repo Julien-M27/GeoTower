@@ -45,7 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.R
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
+import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -67,8 +67,8 @@ fun NavigationBottomSheet(
     var expandWebOptions by remember { mutableStateOf(false) }
 
     // --- NOUVEAU : On lit les textes @Composable ici, en dehors des clics ---
-    val txtOpenRouteWith = AppStrings.openRouteWith
-    val txtNoGpsApp = AppStrings.noGpsApp
+    val txtOpenRouteWith = stringResource(R.string.appstrings_open_route_with)
+    val txtNoGpsApp = stringResource(R.string.appstrings_no_gps_app)
 
     val safeClick = rememberSafeClick()
 
@@ -83,7 +83,7 @@ fun NavigationBottomSheet(
                 .padding(bottom = 32.dp, start = 16.dp, end = 16.dp)
         ) {
             Text(
-                text = AppStrings.openRouteWith,
+                text = stringResource(R.string.appstrings_open_route_with),
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 16.dp)
@@ -91,8 +91,8 @@ fun NavigationBottomSheet(
 
             NavOptionItem(
                 iconVector = Icons.Default.Smartphone,
-                label = AppStrings.installedApp,
-                subLabel = AppStrings.installedAppDesc,
+                label = stringResource(R.string.appstrings_installed_app),
+                subLabel = stringResource(R.string.appstrings_installed_app_desc),
                 useOneUi = useOneUi,
                 onClick = {
                     safeClick {
@@ -116,8 +116,8 @@ fun NavigationBottomSheet(
 
             NavOptionItem(
                 iconVector = Icons.Default.Language,
-                label = AppStrings.onInternet,
-                subLabel = AppStrings.onInternetDesc,
+                label = stringResource(R.string.appstrings_on_internet),
+                subLabel = stringResource(R.string.appstrings_on_internet_desc),
                 trailingIcon = if (expandWebOptions) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
                 useOneUi = useOneUi,
                 onClick = { safeClick { expandWebOptions = !expandWebOptions } }
@@ -189,7 +189,7 @@ fun NavigationBottomSheet(
                     // --- 5. GÉOPORTAIL IGN ---
                     NavOptionItem(
                         iconRes = R.drawable.logo_cartesign,
-                        label = AppStrings.geoportailIgn,
+                        label = stringResource(R.string.appstrings_geoportail_ign),
                         isSubItem = true,
                         useOneUi = useOneUi,
                         onClick = {

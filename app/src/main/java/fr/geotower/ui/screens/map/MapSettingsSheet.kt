@@ -37,13 +37,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import fr.geotower.R
 import fr.geotower.utils.AppConfig
-import fr.geotower.utils.AppStrings
 import fr.geotower.utils.OperatorColorSpec
 import fr.geotower.utils.OperatorColors
 import android.content.SharedPreferences
@@ -117,7 +118,7 @@ fun MapSettingsSheet(
         ) {
 
             // 1. OPÉRATEURS
-            SectionTitle(AppStrings.operatorsTitle)
+            SectionTitle(stringResource(R.string.appstrings_operators_title))
             fun saveOperatorSelection(next: Set<String>) {
                 AppConfig.saveSelectedOperatorKeys(prefs, next)
                 selectedOperatorKeys = AppConfig.selectedOperatorKeys.value
@@ -135,7 +136,7 @@ fun MapSettingsSheet(
             var isOverseasExpanded by remember(defaultOperatorKey) { mutableStateOf(defaultOperatorIsOverseas) }
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OperatorFilterGroup(
-                    title = AppStrings.operatorRegionMetro,
+                    title = stringResource(R.string.operator_region_metro),
                     operators = metroOperators,
                     selectedKeys = selectedOperatorKeys,
                     isExpanded = isMetroExpanded,
@@ -144,7 +145,7 @@ fun MapSettingsSheet(
                 )
 
                 OperatorFilterGroup(
-                    title = AppStrings.operatorRegionOverseas,
+                    title = stringResource(R.string.operator_region_overseas),
                     operators = OperatorColors.overseas,
                     selectedKeys = selectedOperatorKeys,
                     isExpanded = isOverseasExpanded,
@@ -158,14 +159,14 @@ fun MapSettingsSheet(
             // ==========================================
             // 2. AZIMUTS
             // ==========================================
-            SectionTitle(AppStrings.azimuthsTitle)
+            SectionTitle(stringResource(R.string.appstrings_azimuths_title))
 
             // On récupère la nouvelle variable
             var showAzimuthsCone by AppConfig.showAzimuthsCone
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 SelectableButton(
-                    label = AppStrings.showAzimuthsLabel.replace(" (", "\n("),
+                    label = stringResource(R.string.appstrings_show_azimuths_label).replace(" (", "\n("),
                     isSelected = showAzimuths,
                     modifier = Modifier.weight(1f),
                     minHeight = 116.dp,
@@ -176,7 +177,7 @@ fun MapSettingsSheet(
                 }
 
                 SelectableButton(
-                    label = AppStrings.showAzimuthsConeLabel.replace(" (", "\n("),
+                    label = stringResource(R.string.appstrings_show_azimuths_cone_label).replace(" (", "\n("),
                     isSelected = showAzimuthsCone,
                     modifier = Modifier.weight(1f),
                     minHeight = 116.dp,
@@ -190,7 +191,7 @@ fun MapSettingsSheet(
             Spacer(modifier = Modifier.height(32.dp))
 
             // 2. TECHNOLOGIES
-            SectionTitle(AppStrings.technologiesTitle)
+            SectionTitle(stringResource(R.string.appstrings_technologies_title))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 SelectableButton("2G", show2G, Modifier.weight(1f)) {
                     show2G = it; prefs.edit().putBoolean("show_techno_2g", it).apply()
@@ -212,7 +213,7 @@ fun MapSettingsSheet(
             Spacer(modifier = Modifier.height(32.dp))
 
             // 3. FRÉQUENCES
-            SectionTitle(AppStrings.frequenciesTitle)
+            SectionTitle(stringResource(R.string.appstrings_frequencies_title))
 
             // Ligne 2G
             AnimatedVisibility(visible = show2G) {
@@ -265,9 +266,9 @@ fun MapSettingsSheet(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            SectionTitle(AppStrings.mapLocationSectionTitle)
+            SectionTitle(stringResource(R.string.appstrings_map_location_section_title))
             SelectableButton(
-                label = AppStrings.mapLocationMarkerOption,
+                label = stringResource(R.string.appstrings_map_location_marker_option),
                 isSelected = showMapLocationMarker,
                 modifier = Modifier.fillMaxWidth()
             ) {
@@ -277,10 +278,10 @@ fun MapSettingsSheet(
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            SectionTitle(AppStrings.siteDisplayTitle)
+            SectionTitle(stringResource(R.string.appstrings_site_display_title))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 SelectableButton(
-                    label = AppStrings.sitesInServiceLabel,
+                    label = stringResource(R.string.appstrings_sites_in_service_label),
                     isSelected = showSitesInService,
                     modifier = Modifier.weight(1f)
                 ) {
@@ -289,7 +290,7 @@ fun MapSettingsSheet(
                 }
 
                 SelectableButton(
-                    label = AppStrings.sitesOutOfServiceLabel,
+                    label = stringResource(R.string.appstrings_sites_out_of_service_label),
                     isSelected = showSitesOutOfService,
                     modifier = Modifier.weight(1f),
                     selectedColor = MaterialTheme.colorScheme.error

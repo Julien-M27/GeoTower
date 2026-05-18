@@ -79,7 +79,7 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.AppLogoDrawingResources
 import fr.geotower.utils.AppLogger
-import fr.geotower.utils.AppStrings
+import fr.geotower.utils.LocalizedDateLabels
 import kotlinx.coroutines.launch
 import androidx.compose.material.icons.filled.NewReleases as FilledNewReleases
 import android.database.sqlite.SQLiteDatabase
@@ -92,6 +92,8 @@ import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import kotlin.math.roundToInt
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 
 private const val TAG_ABOUT = "GeoTower"
 
@@ -139,8 +141,8 @@ fun AboutScreen(navController: NavController) {
     // --- LECTURE DU MODE DE NAVIGATION DEPUIS AppConfig ---
     val navMode = AppConfig.navMode.intValue
 
-    val txtVersion = AppStrings.version
-    val txtUnknown = AppStrings.unknown
+    val txtVersion = stringResource(R.string.appstrings_version)
+    val txtUnknown = stringResource(R.string.appstrings_unknown)
 
     // --- RÉCUPÉRATION DE VERSION ---
     val appVersion = remember(txtVersion, txtUnknown) {
@@ -162,12 +164,12 @@ fun AboutScreen(navController: NavController) {
     var activeSectionIndex by remember { mutableIntStateOf(0) }
 
     val menuItems = listOf(
-        Triple(AppStrings.aboutPresentation, Icons.Outlined.Info, 0),
-        Triple(AppStrings.aboutNew, Icons.Outlined.NewReleases, 1),
-        Triple(AppStrings.privacyCategory, Icons.Outlined.Lock, 2),
-        Triple(AppStrings.aboutSources, Icons.Outlined.Folder, 3),
-        Triple(AppStrings.aboutVersionsTitle, Icons.Outlined.Storage, 4),
-        Triple(AppStrings.aboutDev, Icons.Default.EditNote, 5)
+        Triple(stringResource(R.string.appstrings_about_presentation), Icons.Outlined.Info, 0),
+        Triple(stringResource(R.string.appstrings_about_new), Icons.Outlined.NewReleases, 1),
+        Triple(stringResource(R.string.appstrings_privacy_category), Icons.Outlined.Lock, 2),
+        Triple(stringResource(R.string.appstrings_about_sources), Icons.Outlined.Folder, 3),
+        Triple(stringResource(R.string.appstrings_about_versions_title), Icons.Outlined.Storage, 4),
+        Triple(stringResource(R.string.appstrings_about_dev), Icons.Default.EditNote, 5)
     )
 
     suspend fun alignAnchorToViewportTop(anchorContentY: Float?) {
@@ -293,11 +295,11 @@ fun AboutScreen(navController: NavController) {
                                 enabled = !safeBackNavigation.isLocked,
                                 modifier = Modifier.padding(start = 8.dp)
                             ) {
-                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = AppStrings.back, tint = MaterialTheme.colorScheme.onSurface)
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.appstrings_back), tint = MaterialTheme.colorScheme.onSurface)
                             }
                             // ✅ RETOUR DU BOUTON MENU
                             IconButton(onClick = onCloseSidebar, modifier = Modifier.padding(end = 8.dp)) {
-                                Icon(Icons.Default.Menu, contentDescription = AppStrings.closeMenu, tint = MaterialTheme.colorScheme.onSurface)
+                                Icon(Icons.Default.Menu, contentDescription = stringResource(R.string.appstrings_close_menu), tint = MaterialTheme.colorScheme.onSurface)
                             }
                         }
 
@@ -329,7 +331,7 @@ fun AboutScreen(navController: NavController) {
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                         )
                         AboutNavigationMenuItem(
-                            title = AppStrings.settingsTitle,
+                            title = stringResource(R.string.appstrings_settings_title),
                             icon = Icons.Outlined.Settings,
                             isSelected = false,
                             isDark = isDark,
@@ -385,12 +387,12 @@ fun AboutScreen(navController: NavController) {
                                     onClick = onToggleSidebar,
                                     modifier = Modifier.padding(start = 8.dp)
                                 ) {
-                                    Icon(Icons.Default.Menu, contentDescription = AppStrings.openMenu, tint = MaterialTheme.colorScheme.onSurface)
+                                    Icon(Icons.Default.Menu, contentDescription = stringResource(R.string.appstrings_open_menu), tint = MaterialTheme.colorScheme.onSurface)
                                 }
                             }
 
                             Text(
-                                text = AppStrings.about,
+                                text = stringResource(R.string.appstrings_about),
                                 style = MaterialTheme.typography.headlineMedium,
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.weight(1f),
@@ -503,7 +505,7 @@ fun AboutNavigationMenuItem(title: String, icon: ImageVector, isSelected: Boolea
 
 @Composable
 fun AboutTopBar(onBack: () -> Unit) {
-    GeoTowerBackTopBar(title = AppStrings.about, onBack = onBack)
+    GeoTowerBackTopBar(title = stringResource(R.string.appstrings_about), onBack = onBack)
 }
 
 // ============================================================
@@ -580,7 +582,7 @@ fun SectionPresentation(appTitle: String, appVersion: String, logoResId: Int) {
     Text(appVersion, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
     Spacer(modifier = Modifier.height(32.dp))
     Text(
-        text = AppStrings.aboutIntro,
+        text = stringResource(R.string.appstrings_about_intro),
         textAlign = TextAlign.Center,
         style = MaterialTheme.typography.bodyLarge
     )
@@ -590,7 +592,7 @@ fun SectionPresentation(appTitle: String, appVersion: String, logoResId: Int) {
 fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) {
     val releaseNotes = currentReleaseNotes()
 
-    SectionTitle(AppStrings.aboutNewForVersion(appVersion))
+    SectionTitle(stringResource(R.string.about_new_for_version, appVersion))
     Card(
         colors = CardDefaults.cardColors(containerColor = if (bubbleColor == Color.Transparent) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f) else bubbleColor),
         shape = cardShape,
@@ -600,7 +602,7 @@ fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.FilledNewReleases, null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(AppStrings.latestChanges, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.appstrings_latest_changes), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             }
             Spacer(modifier = Modifier.height(12.dp))
 
@@ -626,7 +628,7 @@ fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) 
 
 @Composable
 fun SectionSources(cardShape: Shape, bubbleColor: Color) {
-    SectionTitle(AppStrings.aboutSources)
+    SectionTitle(stringResource(R.string.appstrings_about_sources))
     val cardColor = if (bubbleColor == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else bubbleColor
 
     // ✅ On initialise le gestionnaire de liens
@@ -639,7 +641,7 @@ fun SectionSources(cardShape: Shape, bubbleColor: Color) {
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             // 1. ANFR (Données)
-            CreditItem(AppStrings.srcAntennas, AppStrings.srcAntennasDesc)
+            CreditItem(stringResource(R.string.appstrings_src_antennas), stringResource(R.string.appstrings_src_antennas_desc))
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
@@ -649,7 +651,7 @@ fun SectionSources(cardShape: Shape, bubbleColor: Color) {
                     .fillMaxWidth()
                     .clickable { uriHandler.openUri("https://geoservices.ign.fr/") }
             ) {
-                CreditItem(AppStrings.srcIgn, AppStrings.srcIgnDesc)
+                CreditItem(stringResource(R.string.appstrings_src_ign), stringResource(R.string.appstrings_src_ign_desc))
                 Text("geoservices.ign.fr", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
 
@@ -661,7 +663,7 @@ fun SectionSources(cardShape: Shape, bubbleColor: Color) {
                     .fillMaxWidth()
                     .clickable { uriHandler.openUri("https://www.openstreetmap.org/copyright") }
             ) {
-                CreditItem(AppStrings.srcOsm, AppStrings.srcOsmDesc)
+                CreditItem(stringResource(R.string.appstrings_src_osm), stringResource(R.string.appstrings_src_osm_desc))
                 Text("www.openstreetmap.org", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
 
@@ -673,23 +675,23 @@ fun SectionSources(cardShape: Shape, bubbleColor: Color) {
                     .fillMaxWidth()
                     .clickable { uriHandler.openUri("https://mapsforge.org") }
             ) {
-                CreditItem(AppStrings.mapsForgesTitle, AppStrings.mapsForgesDesc)
+                CreditItem(stringResource(R.string.appstrings_maps_forges_title), stringResource(R.string.appstrings_maps_forges_desc))
                 Text("www.mapsforge.org", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
             }
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
             // 5. Inspiration
-            CreditItem(AppStrings.srcInspo, AppStrings.srcInspoDesc)
+            CreditItem(stringResource(R.string.appstrings_src_inspo), stringResource(R.string.appstrings_src_inspo_desc))
         }
     }
 }
 
 @Composable
 fun SectionDeveloppement() {
-    SectionTitle(AppStrings.aboutDev) // <-- MODIFIÉ
+    SectionTitle(stringResource(R.string.appstrings_about_dev)) // <-- MODIFIÉ
     ListItem(
-        headlineContent = { Text(AppStrings.devCredit) }, // <-- MODIFIÉ
+        headlineContent = { Text(stringResource(R.string.appstrings_dev_credit)) }, // <-- MODIFIÉ
         leadingContent = { Icon(imageVector = Icons.Default.EditNote, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
         colors = ListItemDefaults.colors(containerColor = Color.Transparent)
     )
@@ -732,10 +734,10 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
     var anfrDate by remember { mutableStateOf("-") }
     var rawMonthlyVersion by remember { mutableStateOf("-") } // ✅ Changé en "rawMonthlyVersion"
     var hsDate by remember { mutableStateOf("-") }
-    val txtDownloadNewBase = AppStrings.aboutDownloadNewDatabase
-    val txtInvalidLocalDatabase = AppStrings.invalidLocalDatabase
-    val txtNotInstalled = AppStrings.aboutDatabaseNotInstalled
-    val txtVersionTimeAt = AppStrings.versionTimeAt
+    val txtDownloadNewBase = stringResource(R.string.appstrings_about_download_new_database)
+    val txtInvalidLocalDatabase = stringResource(R.string.appstrings_invalid_local_database)
+    val txtNotInstalled = stringResource(R.string.appstrings_about_database_not_installed)
+    val txtVersionTimeAt = stringResource(R.string.appstrings_version_time_at)
 
     LaunchedEffect(txtDownloadNewBase, txtInvalidLocalDatabase, txtNotInstalled, txtVersionTimeAt) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -819,7 +821,7 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
         }
     }
 
-    SectionTitle(AppStrings.aboutVersionsTitle)
+    SectionTitle(stringResource(R.string.appstrings_about_versions_title))
     val cardColor = if (bubbleColor == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else bubbleColor
 
     Card(
@@ -829,11 +831,11 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
     ) {
         Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
             val versionRows = listOf(
-                AppStrings.versionAppLabel to appVersion,
-                AppStrings.versionDbLabel to dbVersion,
-                AppStrings.versionWeeklyLabel to AppStrings.formatWeeklyVersionWithWeekNumber(anfrDate),
-                AppStrings.versionMonthlyLabel to AppStrings.formatMonthlyVersion(rawMonthlyVersion),
-                AppStrings.versionHsLabel to hsDate
+                stringResource(R.string.appstrings_version_app_label) to appVersion,
+                stringResource(R.string.appstrings_version_db_label) to dbVersion,
+                stringResource(R.string.appstrings_version_weekly_label) to LocalizedDateLabels.formatWeeklyVersionWithWeekNumber(context, anfrDate),
+                stringResource(R.string.appstrings_version_monthly_label) to LocalizedDateLabels.formatMonthlyVersion(context, rawMonthlyVersion),
+                stringResource(R.string.appstrings_version_hs_label) to hsDate
             )
 
             versionRows.forEachIndexed { index, row ->
@@ -882,7 +884,7 @@ fun SectionConfidentialite(
     bubbleColor: Color,
     onOpenPhotoUploadHistory: () -> Unit = {}
 ) {
-    SectionTitle(AppStrings.privacyCategory)
+    SectionTitle(stringResource(R.string.appstrings_privacy_category))
     val cardColor = if (bubbleColor == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else bubbleColor
 
     Card(
@@ -894,10 +896,10 @@ fun SectionConfidentialite(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Storage, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(AppStrings.yourDataTitle, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.appstrings_your_data_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Text(AppStrings.yourDataDesc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(stringResource(R.string.appstrings_your_data_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 
