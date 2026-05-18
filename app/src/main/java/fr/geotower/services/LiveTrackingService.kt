@@ -11,6 +11,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.BitmapShader
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.Shader
 import android.content.pm.ServiceInfo
 import android.location.Location
 import android.net.Uri
@@ -476,7 +481,33 @@ class LiveTrackingService : Service() {
 
         if (scaled !== cropped) cropped.recycle()
         if (cropped !== source && !source.isRecycled) source.recycle()
-        return scaled
+        return roundLiveIconCorners(scaled)
+    }
+
+    private fun roundedDrawableBitmap(resId: Int): Bitmap? {
+        val drawable = ContextCompat.getDrawable(this, resId)?.mutate() ?: return null
+        val targetSize = liveSitePhotoIconSizePx()
+        val bitmap = Bitmap.createBitmap(targetSize, targetSize, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        drawable.setBounds(0, 0, targetSize, targetSize)
+        drawable.draw(canvas)
+        return roundLiveIconCorners(bitmap)
+    }
+
+    private fun roundLiveIconCorners(source: Bitmap): Bitmap {
+        val rounded = Bitmap.createBitmap(source.width, source.height, Bitmap.Config.ARGB_8888)
+        val radius = resources.displayMetrics.density * LIVE_SITE_PHOTO_CORNER_RADIUS_DP
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            shader = BitmapShader(source, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP)
+        }
+        Canvas(rounded).drawRoundRect(
+            RectF(0f, 0f, source.width.toFloat(), source.height.toFloat()),
+            radius,
+            radius,
+            paint
+        )
+        if (!source.isRecycled) source.recycle()
+        return rounded
     }
 
     private fun liveSitePhotoIconSizePx(): Int {
@@ -728,9 +759,7 @@ class LiveTrackingService : Service() {
             .replace(Regex("\\s+"), " ")
             .trim()
             .take(MAX_SAMSUNG_NOW_BAR_TEXT_LENGTH)
-        val operatorIcon = operatorLogo(operator)?.let { logoResId ->
-            IconCompat.createWithResource(this, logoResId).toIcon(this)
-        }
+        val operatorIcon = roundedOperatorLogoIcon(operator)
         val expandedIcon = sitePhotoBitmap?.let { bitmap ->
             IconCompat.createWithBitmap(bitmap).toIcon(this)
         } ?: operatorIcon
@@ -887,9 +916,12 @@ class LiveTrackingService : Service() {
 
     private fun progressEndIcon(operator: String, sitePhotoBitmap: Bitmap?) =
         sitePhotoBitmap?.let { IconCompat.createWithBitmap(it).toIcon(this) }
-            ?: operatorLogo(operator)?.let { logoResId ->
-                IconCompat.createWithResource(this, logoResId).toIcon(this)
-            }
+            ?: roundedOperatorLogoIcon(operator)
+
+    private fun roundedOperatorLogoIcon(operator: String) =
+        operatorLogo(operator)
+            ?.let(::roundedDrawableBitmap)
+            ?.let { bitmap -> IconCompat.createWithBitmap(bitmap).toIcon(this) }
 
     private fun operatorLogo(operator: String): Int? {
         return OperatorLogos.drawableRes(operator)
@@ -922,6 +954,7 @@ class LiveTrackingService : Service() {
         private const val MAX_SAMSUNG_CHIP_TEXT_LENGTH = 24
         private const val MAX_SAMSUNG_DRAWER_TITLE_LENGTH = 36
         private const val LIVE_SITE_PHOTO_ICON_DP = 64
+        private const val LIVE_SITE_PHOTO_CORNER_RADIUS_DP = 10
         private const val MIN_LIVE_SITE_PHOTO_ICON_PX = 96
         private const val MAX_LIVE_SITE_PHOTO_CACHE_ENTRIES = 12
         private const val TAG_LOCATION = "GeoTowerLocation"
