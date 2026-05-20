@@ -1,12 +1,22 @@
 package fr.geotower.data.db
 
 import androidx.room.Dao
+import androidx.room.ColumnInfo
 import androidx.room.Query
 import fr.geotower.data.models.DbCluster
 import fr.geotower.data.models.FaisceauxEntity
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
+
+data class SupportRadioStatsRow(
+    @ColumnInfo(name = "id_support") val idSupport: String,
+    @ColumnInfo(name = "tech_mask") val techMask: Int,
+    @ColumnInfo(name = "band_mask") val bandMask: Int,
+    @ColumnInfo(name = "statut") val statut: String?,
+    @ColumnInfo(name = "has_active") val hasActive: Int,
+    @ColumnInfo(name = "details_frequences") val encodedDetailsFrequences: String?
+)
 
 @Dao
 interface GeoTowerDao {
@@ -443,38 +453,76 @@ interface GeoTowerDao {
         FROM support s
         INNER JOIN localisation l ON s.id_anfr = l.id_anfr
         INNER JOIN ref_operateur o ON l.operateur_id = o.id
-        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
-        LEFT JOIN ref_statut st ON t.statut_id = st.id
-        WHERE o.libelle LIKE '%' || :operatorName || '%'
-        AND COALESCE(st.libelle, '') IN ('En service', 'Techniquement opérationnel', 'Techniquement operationnel')
+        WHERE UPPER(TRIM(o.libelle)) IN (:operatorNames)
     """)
-    suspend fun getUniqueSupportCountByOperator(operatorName: String): Int
+    suspend fun getUniqueSupportCountByOperator(operatorNames: List<String>): Int
 
     @Query("""
         SELECT COUNT(DISTINCT s.id_support)
         FROM support s
         INNER JOIN localisation l ON s.id_anfr = l.id_anfr
         INNER JOIN ref_operateur o ON l.operateur_id = o.id
-        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
-        LEFT JOIN ref_statut st ON t.statut_id = st.id
-        WHERE o.libelle LIKE '%' || :operatorName || '%'
-        AND (l.band_mask & 1008) != 0
-        AND COALESCE(st.libelle, '') IN ('En service', 'Techniquement opérationnel', 'Techniquement operationnel')
+        WHERE UPPER(TRIM(o.libelle)) IN (:operatorNames)
+        AND (l.tech_mask & 1) != 0
     """)
-    suspend fun get4GSupportCountByOperator(operatorName: String): Int
+    suspend fun get2GSupportCountByOperator(operatorNames: List<String>): Int
 
     @Query("""
         SELECT COUNT(DISTINCT s.id_support)
         FROM support s
         INNER JOIN localisation l ON s.id_anfr = l.id_anfr
         INNER JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE UPPER(TRIM(o.libelle)) IN (:operatorNames)
+        AND (l.tech_mask & 2) != 0
+    """)
+    suspend fun get3GSupportCountByOperator(operatorNames: List<String>): Int
+
+    @Query("""
+        SELECT COUNT(DISTINCT s.id_support)
+        FROM support s
+        INNER JOIN localisation l ON s.id_anfr = l.id_anfr
+        INNER JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE UPPER(TRIM(o.libelle)) IN (:operatorNames)
+        AND (l.tech_mask & 4) != 0
+    """)
+    suspend fun get4GSupportCountByOperator(operatorNames: List<String>): Int
+
+    @Query("""
+        SELECT COUNT(DISTINCT s.id_support)
+        FROM support s
+        INNER JOIN localisation l ON s.id_anfr = l.id_anfr
+        INNER JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE UPPER(TRIM(o.libelle)) IN (:operatorNames)
+        AND (l.tech_mask & 8) != 0
+    """)
+    suspend fun get5GSupportCountByOperator(operatorNames: List<String>): Int
+
+    @Query("""
+        SELECT COUNT(DISTINCT s.id_support)
+        FROM support s
+        INNER JOIN localisation l ON s.id_anfr = l.id_anfr
+        INNER JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE UPPER(TRIM(o.libelle)) IN (:operatorNames)
+        AND (l.band_mask & :bandMask) != 0
+    """)
+    suspend fun getSupportCountByOperatorAndBand(operatorNames: List<String>, bandMask: Int): Int
+
+    @Query("""
+        SELECT DISTINCT
+            s.id_support,
+            l.tech_mask,
+            l.band_mask,
+            COALESCE(st.libelle, '') AS statut,
+            COALESCE(t.has_active, 0) AS has_active,
+            t.details_frequences AS details_frequences
+        FROM support s
+        INNER JOIN localisation l ON s.id_anfr = l.id_anfr
+        INNER JOIN ref_operateur o ON l.operateur_id = o.id
         LEFT JOIN technique t ON l.id_anfr = t.id_anfr
         LEFT JOIN ref_statut st ON t.statut_id = st.id
-        WHERE o.libelle LIKE '%' || :operatorName || '%'
-        AND (l.band_mask & 15360) != 0
-        AND COALESCE(st.libelle, '') IN ('En service', 'Techniquement opérationnel', 'Techniquement operationnel')
+        WHERE UPPER(TRIM(o.libelle)) IN (:operatorNames)
     """)
-    suspend fun get5GSupportCountByOperator(operatorName: String): Int
+    suspend fun getSupportRadioStatsRowsByOperator(operatorNames: List<String>): List<SupportRadioStatsRow>
 
     @Query("""
         SELECT

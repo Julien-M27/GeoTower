@@ -8,10 +8,13 @@ import fr.geotower.data.db.AppDatabase
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.db.GeoTowerDao
 import fr.geotower.data.db.InvalidGeoTowerDatabaseException
+import fr.geotower.data.db.SupportRadioStatsRow
 import fr.geotower.data.models.DbCluster
 import fr.geotower.data.models.FaisceauxEntity
+import fr.geotower.data.models.FrequencyDetailsCodec
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
+import fr.geotower.data.models.RadioFilterMasks
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.models.SiteHsEntity
@@ -21,6 +24,204 @@ import kotlinx.coroutines.CancellationException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+data class ActiveSupportRadioCounts(
+    val techCounts: Map<String, Int>,
+    val bandCounts: Map<String, Int>
+)
+
+private data class ActiveRadioKeys(
+    val techKeys: Set<String>,
+    val bandKeys: Set<String>
+)
+
+private val activeStatsFrequencyRangeRegex =
+    Regex("""(\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)\s*(kHz|MHz|GHz|Hz)?""", RegexOption.IGNORE_CASE)
+
+private fun buildActiveSupportRadioCounts(rows: List<SupportRadioStatsRow>): ActiveSupportRadioCounts {
+    val techSupportIds = mutableMapOf<String, MutableSet<String>>()
+    val bandSupportIds = mutableMapOf<String, MutableSet<String>>()
+
+    rows.forEach { row ->
+        val decodedDetails = FrequencyDetailsCodec.decode(row.encodedDetailsFrequences)
+        val detailedKeys = activeRadioKeysFromDetails(decodedDetails)
+        val hasDetailedActiveKeys = detailedKeys.techKeys.isNotEmpty() || detailedKeys.bandKeys.isNotEmpty()
+        val techKeys = if (hasDetailedActiveKeys) {
+            detailedKeys.techKeys
+        } else if (row.isActiveGlobally()) {
+            techKeysFromMask(row.techMask)
+        } else {
+            emptySet()
+        }
+        val bandKeys = if (hasDetailedActiveKeys) {
+            detailedKeys.bandKeys
+        } else if (row.isActiveGlobally()) {
+            bandKeysFromMask(row.bandMask)
+        } else {
+            emptySet()
+        }
+
+        techKeys.forEach { techKey ->
+            techSupportIds.getOrPut(techKey) { mutableSetOf() }.add(row.idSupport)
+        }
+        bandKeys.forEach { bandKey ->
+            bandSupportIds.getOrPut(bandKey) { mutableSetOf() }.add(row.idSupport)
+        }
+    }
+
+    return ActiveSupportRadioCounts(
+        techCounts = techSupportIds.mapValues { it.value.size },
+        bandCounts = bandSupportIds.mapValues { it.value.size }
+    )
+}
+
+private fun SupportRadioStatsRow.isActiveGlobally(): Boolean {
+    if (hasActive == 1) return true
+
+    val normalizedStatus = statut.orEmpty().lowercase(Locale.ROOT)
+    return normalizedStatus.contains("en service") || normalizedStatus.contains("techniquement")
+}
+
+private fun activeRadioKeysFromDetails(details: String?): ActiveRadioKeys {
+    if (details.isNullOrBlank()) return ActiveRadioKeys(emptySet(), emptySet())
+
+    val techKeys = mutableSetOf<String>()
+    val bandKeys = mutableSetOf<String>()
+    details.lineSequence()
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .forEach { line ->
+            val parts = line.split("|").map { it.trim() }
+            val rawFrequency = parts.getOrNull(0).orEmpty()
+            val status = parts.getOrNull(1).orEmpty()
+            if (isActiveFrequencyStatus(status)) {
+                rawFrequencyToTechKey(rawFrequency)?.let { techKeys.add(it) }
+                bandKeys.addAll(frequencyKeysFromRawDetails(rawFrequency))
+            }
+        }
+
+    return ActiveRadioKeys(techKeys, bandKeys)
+}
+
+private fun isActiveFrequencyStatus(status: String): Boolean {
+    val normalized = status.lowercase(Locale.ROOT)
+    return normalized.contains("en service") || normalized.contains("techniquement")
+}
+
+private fun rawFrequencyToTechKey(rawFrequency: String): String? {
+    val systemName = rawFrequency.substringBefore(":").trim().uppercase(Locale.ROOT)
+    val gen = when {
+        systemName.contains("5G") || systemName.contains("NR") -> 5
+        systemName.contains("4G") || systemName.contains("LTE") -> 4
+        systemName.contains("3G") || systemName.contains("UMTS") -> 3
+        systemName.contains("2G") || systemName.contains("GSM") -> 2
+        else -> 0
+    }
+    return gen.takeIf { it in 2..5 }?.let { "${it}G" }
+}
+
+private fun frequencyKeysFromRawDetails(rawFrequency: String): Set<String> {
+    val techKey = rawFrequencyToTechKey(rawFrequency) ?: return emptySet()
+    val gen = techKey.removeSuffix("G").toIntOrNull() ?: return emptySet()
+    val systemName = rawFrequency.substringBefore(":").trim().uppercase(Locale.ROOT)
+    val systemValue = Regex("\\d+").findAll(systemName)
+        .mapNotNull { it.value.toIntOrNull() }
+        .lastOrNull()
+        ?.takeIf { it in mobileFrequencyValuesForGeneration(gen) }
+
+    if (systemValue != null) return setOf("$techKey|$systemValue")
+
+    val preciseFrequencies = rawFrequency.substringAfter(":", "")
+    return mobileFrequencyValuesFromRanges(gen, preciseFrequencies).map { "$techKey|$it" }.toSet()
+}
+
+private fun mobileFrequencyValuesForGeneration(gen: Int): Set<Int> = when (gen) {
+    5 -> setOf(700, 2100, 3500, 26000)
+    4 -> setOf(700, 800, 900, 1800, 2100, 2600)
+    3 -> setOf(900, 2100)
+    2 -> setOf(900, 1800)
+    else -> emptySet()
+}
+
+private fun mobileFrequencyValuesFromRanges(gen: Int, rawRanges: String): Set<Int> {
+    return activeStatsFrequencyRangeRegex.findAll(rawRanges)
+        .flatMap { match ->
+            val start = normalizeFrequencyToMhz(match.groupValues[1], match.groupValues[3])
+            val end = normalizeFrequencyToMhz(match.groupValues[2], match.groupValues[3])
+            frequencyValuesForRange(gen, start, end).asSequence()
+        }
+        .toSet()
+}
+
+private fun normalizeFrequencyToMhz(value: String, unit: String): Double? {
+    val number = value.replace(',', '.').toDoubleOrNull() ?: return null
+    val normalizedUnit = unit.lowercase(Locale.ROOT)
+    return when {
+        normalizedUnit.contains("ghz") -> number * 1000.0
+        normalizedUnit.contains("khz") -> number / 1000.0
+        normalizedUnit.contains("hz") && !normalizedUnit.contains("mhz") -> number / 1_000_000.0
+        else -> number
+    }
+}
+
+private fun frequencyValuesForRange(gen: Int, start: Double?, end: Double?): Set<Int> {
+    if (start == null || end == null) return emptySet()
+    return when (gen) {
+        5 -> buildSet {
+            if (frequencyRangeOverlaps(start, end, 700.0, 790.0)) add(700)
+            if (frequencyRangeOverlaps(start, end, 1920.0, 2170.0)) add(2100)
+            if (frequencyRangeOverlaps(start, end, 3300.0, 3800.0)) add(3500)
+            if (frequencyRangeOverlaps(start, end, 24000.0, 27500.0)) add(26000)
+        }
+        4 -> buildSet {
+            if (frequencyRangeOverlaps(start, end, 700.0, 790.0)) add(700)
+            if (frequencyRangeOverlaps(start, end, 791.0, 862.0)) add(800)
+            if (frequencyRangeOverlaps(start, end, 880.0, 960.0)) add(900)
+            if (frequencyRangeOverlaps(start, end, 1710.0, 1880.0)) add(1800)
+            if (frequencyRangeOverlaps(start, end, 1920.0, 2170.0)) add(2100)
+            if (frequencyRangeOverlaps(start, end, 2500.0, 2690.0)) add(2600)
+        }
+        3 -> buildSet {
+            if (frequencyRangeOverlaps(start, end, 880.0, 960.0)) add(900)
+            if (frequencyRangeOverlaps(start, end, 1920.0, 2170.0)) add(2100)
+        }
+        2 -> buildSet {
+            if (frequencyRangeOverlaps(start, end, 880.0, 960.0)) add(900)
+            if (frequencyRangeOverlaps(start, end, 1710.0, 1880.0)) add(1800)
+        }
+        else -> emptySet()
+    }
+}
+
+private fun frequencyRangeOverlaps(start: Double, end: Double, low: Double, high: Double): Boolean {
+    val min = minOf(start, end)
+    val max = maxOf(start, end)
+    return min <= high && max >= low
+}
+
+private fun techKeysFromMask(mask: Int): Set<String> = buildSet {
+    if ((mask and RadioFilterMasks.TECH_2G) != 0) add("2G")
+    if ((mask and RadioFilterMasks.TECH_3G) != 0) add("3G")
+    if ((mask and RadioFilterMasks.TECH_4G) != 0) add("4G")
+    if ((mask and RadioFilterMasks.TECH_5G) != 0) add("5G")
+}
+
+private fun bandKeysFromMask(mask: Int): Set<String> = buildSet {
+    if ((mask and RadioFilterMasks.BAND_2G_900) != 0) add("2G|900")
+    if ((mask and RadioFilterMasks.BAND_2G_1800) != 0) add("2G|1800")
+    if ((mask and RadioFilterMasks.BAND_3G_900) != 0) add("3G|900")
+    if ((mask and RadioFilterMasks.BAND_3G_2100) != 0) add("3G|2100")
+    if ((mask and RadioFilterMasks.BAND_4G_700) != 0) add("4G|700")
+    if ((mask and RadioFilterMasks.BAND_4G_800) != 0) add("4G|800")
+    if ((mask and RadioFilterMasks.BAND_4G_900) != 0) add("4G|900")
+    if ((mask and RadioFilterMasks.BAND_4G_1800) != 0) add("4G|1800")
+    if ((mask and RadioFilterMasks.BAND_4G_2100) != 0) add("4G|2100")
+    if ((mask and RadioFilterMasks.BAND_4G_2600) != 0) add("4G|2600")
+    if ((mask and RadioFilterMasks.BAND_5G_700) != 0) add("5G|700")
+    if ((mask and RadioFilterMasks.BAND_5G_2100) != 0) add("5G|2100")
+    if ((mask and RadioFilterMasks.BAND_5G_3500) != 0) add("5G|3500")
+    if ((mask and RadioFilterMasks.BAND_5G_26000) != 0) add("5G|26000")
+}
 
 class AnfrRepository(
     private val api: AnfrService,
@@ -302,22 +503,75 @@ class AnfrRepository(
         }
     }
 
-    suspend fun getUniqueSupportCountByOperator(operatorName: String): Int {
+    private fun normalizeOperatorNames(operatorNames: List<String>): List<String> {
+        return operatorNames
+            .map { it.trim().uppercase(Locale.ROOT) }
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+
+    suspend fun getUniqueSupportCountByOperator(operatorNames: List<String>): Int {
+        val normalizedNames = normalizeOperatorNames(operatorNames)
+        if (normalizedNames.isEmpty()) return 0
+
         return queryLocalDatabase(0) {
-            getUniqueSupportCountByOperator(operatorName)
+            getUniqueSupportCountByOperator(normalizedNames)
         }
     }
 
-    suspend fun get4GSupportCountByOperator(operatorName: String): Int {
+    suspend fun get2GSupportCountByOperator(operatorNames: List<String>): Int {
+        val normalizedNames = normalizeOperatorNames(operatorNames)
+        if (normalizedNames.isEmpty()) return 0
+
         return queryLocalDatabase(0) {
-            get4GSupportCountByOperator(operatorName)
+            get2GSupportCountByOperator(normalizedNames)
         }
     }
 
-    suspend fun get5GSupportCountByOperator(operatorName: String): Int {
+    suspend fun get3GSupportCountByOperator(operatorNames: List<String>): Int {
+        val normalizedNames = normalizeOperatorNames(operatorNames)
+        if (normalizedNames.isEmpty()) return 0
+
         return queryLocalDatabase(0) {
-            get5GSupportCountByOperator(operatorName)
+            get3GSupportCountByOperator(normalizedNames)
         }
+    }
+
+    suspend fun get4GSupportCountByOperator(operatorNames: List<String>): Int {
+        val normalizedNames = normalizeOperatorNames(operatorNames)
+        if (normalizedNames.isEmpty()) return 0
+
+        return queryLocalDatabase(0) {
+            get4GSupportCountByOperator(normalizedNames)
+        }
+    }
+
+    suspend fun get5GSupportCountByOperator(operatorNames: List<String>): Int {
+        val normalizedNames = normalizeOperatorNames(operatorNames)
+        if (normalizedNames.isEmpty()) return 0
+
+        return queryLocalDatabase(0) {
+            get5GSupportCountByOperator(normalizedNames)
+        }
+    }
+
+    suspend fun getSupportCountByOperatorAndBand(operatorNames: List<String>, bandMask: Int): Int {
+        val normalizedNames = normalizeOperatorNames(operatorNames)
+        if (normalizedNames.isEmpty() || bandMask == 0) return 0
+
+        return queryLocalDatabase(0) {
+            getSupportCountByOperatorAndBand(normalizedNames, bandMask)
+        }
+    }
+
+    suspend fun getActiveSupportRadioCountsByOperator(operatorNames: List<String>): ActiveSupportRadioCounts {
+        val normalizedNames = normalizeOperatorNames(operatorNames)
+        if (normalizedNames.isEmpty()) return ActiveSupportRadioCounts(emptyMap(), emptyMap())
+
+        val rows = queryLocalDatabase<List<SupportRadioStatsRow>>(emptyList()) {
+            getSupportRadioStatsRowsByOperator(normalizedNames)
+        }
+        return buildActiveSupportRadioCounts(rows)
     }
 
     // =================================================================

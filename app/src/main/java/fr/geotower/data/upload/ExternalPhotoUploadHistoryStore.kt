@@ -39,7 +39,6 @@ object ExternalPhotoUploadHistoryStore {
 
     private const val HISTORY_FILE_NAME = "external_photo_upload_history.json"
     private const val THUMB_DIR_NAME = "external_photo_upload_history_thumbs"
-    private const val MAX_HISTORY_ITEMS = 200
     private const val THUMB_MAX_DIMENSION_PX = 144
     private const val THUMB_QUALITY = 42
 
@@ -71,7 +70,6 @@ object ExternalPhotoUploadHistoryStore {
 
         val nextEntries = (readInternal(context) + entry)
             .sortedByDescending { it.createdAtMillis }
-            .take(MAX_HISTORY_ITEMS)
         saveInternal(context, nextEntries)
         cleanupOrphanThumbnails(context, nextEntries)
         return id

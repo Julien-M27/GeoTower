@@ -1,7 +1,10 @@
 package fr.geotower.ui.screens.stats
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -14,20 +17,162 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.models.RadioFilterMasks
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColors
-import kotlinx.coroutines.launch
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
+import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
+private const val STATS_FREQUENCIES_ROUTE = "stats/frequencies"
+
+private data class StatisticsData(
+    val supports: List<Pair<String, Int>>,
+    val supports2G: List<Pair<String, Int>>,
+    val supports3G: List<Pair<String, Int>>,
+    val supports4G: List<Pair<String, Int>>,
+    val supports5G: List<Pair<String, Int>>
+)
+
+private data class FrequencyBandSpec(
+    val label: String,
+    val mask: Int
+)
+
+private data class FrequencyBandStats(
+    val title: String,
+    val description: String,
+    val data: List<Pair<String, Int>>
+)
+
+private object StatisticsScreenCache {
+    var data: StatisticsData? = null
+}
+
+private object FrequencyStatsScreenCache {
+    val dataByTech = mutableMapOf<String, List<FrequencyBandStats>>()
+}
+
+private fun statsFrequenciesRoute(tech: String): String = "$STATS_FREQUENCIES_ROUTE/$tech"
+
+private fun normalizeTech(tech: String): String = tech.trim().uppercase(Locale.ROOT)
+
+private fun operatorDisplayOrder(defaultOp: String): List<String> {
+    val displayOrder = mutableListOf<String>()
+    OperatorColors.keyFor(defaultOp)?.let { displayOrder.add(it) }
+    OperatorColors.orderedKeys.forEach { if (!displayOrder.contains(it)) displayOrder.add(it) }
+    return displayOrder
+}
+
+private fun formatOperatorData(map: Map<String, Int>, displayOrder: List<String>): List<Pair<String, Int>> {
+    val rows = displayOrder.map { op ->
+        val name = OperatorColors.specForKey(op)?.label ?: op
+        Pair(name, map[op] ?: 0)
+    }
+    return rows.filter { it.second > 0 }.ifEmpty { rows }
+}
+
+private fun frequencyBandsForTech(tech: String): List<FrequencyBandSpec> {
+    return when (normalizeTech(tech)) {
+        "2G" -> listOf(
+            FrequencyBandSpec("900 MHz", RadioFilterMasks.BAND_2G_900),
+            FrequencyBandSpec("1800 MHz", RadioFilterMasks.BAND_2G_1800)
+        )
+        "3G" -> listOf(
+            FrequencyBandSpec("900 MHz", RadioFilterMasks.BAND_3G_900),
+            FrequencyBandSpec("2100 MHz", RadioFilterMasks.BAND_3G_2100)
+        )
+        "4G" -> listOf(
+            FrequencyBandSpec("700 MHz", RadioFilterMasks.BAND_4G_700),
+            FrequencyBandSpec("800 MHz", RadioFilterMasks.BAND_4G_800),
+            FrequencyBandSpec("900 MHz", RadioFilterMasks.BAND_4G_900),
+            FrequencyBandSpec("1800 MHz", RadioFilterMasks.BAND_4G_1800),
+            FrequencyBandSpec("2100 MHz", RadioFilterMasks.BAND_4G_2100),
+            FrequencyBandSpec("2600 MHz", RadioFilterMasks.BAND_4G_2600)
+        )
+        "5G" -> listOf(
+            FrequencyBandSpec("700 MHz", RadioFilterMasks.BAND_5G_700),
+            FrequencyBandSpec("2100 MHz", RadioFilterMasks.BAND_5G_2100),
+            FrequencyBandSpec("3500 MHz", RadioFilterMasks.BAND_5G_3500),
+            FrequencyBandSpec("26 GHz", RadioFilterMasks.BAND_5G_26000)
+        )
+        else -> emptyList()
+    }
+}
+
+private fun frequencyDetailTitle(tech: String): String {
+    val normalizedTech = normalizeTech(tech)
+    return if (frequencyBandsForTech(normalizedTech).isEmpty()) {
+        "Détail des fréquences"
+    } else {
+        "Détail $normalizedTech"
+    }
+}
+
+private suspend fun loadStatisticsData(
+    repository: AnfrRepository,
+    defaultOp: String
+): StatisticsData {
+    val totalMap = mutableMapOf<String, Int>()
+    val counts2GMap = mutableMapOf<String, Int>()
+    val counts3GMap = mutableMapOf<String, Int>()
+    val counts4GMap = mutableMapOf<String, Int>()
+    val counts5GMap = mutableMapOf<String, Int>()
+
+    for (operator in OperatorColors.all) {
+        val queryNames = operator.aliases.ifEmpty { listOf(operator.key) }
+        totalMap[operator.key] = repository.getUniqueSupportCountByOperator(queryNames)
+        counts2GMap[operator.key] = repository.get2GSupportCountByOperator(queryNames)
+        counts3GMap[operator.key] = repository.get3GSupportCountByOperator(queryNames)
+        counts4GMap[operator.key] = repository.get4GSupportCountByOperator(queryNames)
+        counts5GMap[operator.key] = repository.get5GSupportCountByOperator(queryNames)
+    }
+
+    val displayOrder = operatorDisplayOrder(defaultOp)
+
+    return StatisticsData(
+        supports = formatOperatorData(totalMap, displayOrder),
+        supports2G = formatOperatorData(counts2GMap, displayOrder),
+        supports3G = formatOperatorData(counts3GMap, displayOrder),
+        supports4G = formatOperatorData(counts4GMap, displayOrder),
+        supports5G = formatOperatorData(counts5GMap, displayOrder)
+    )
+}
+
+private suspend fun loadFrequencyStatsData(
+    repository: AnfrRepository,
+    defaultOp: String,
+    tech: String
+): List<FrequencyBandStats> {
+    val normalizedTech = normalizeTech(tech)
+    val displayOrder = operatorDisplayOrder(defaultOp)
+    val bands = frequencyBandsForTech(normalizedTech)
+    val stats = bands.map { band ->
+        val countsMap = mutableMapOf<String, Int>()
+
+        for (operator in OperatorColors.all) {
+            val queryNames = operator.aliases.ifEmpty { listOf(operator.key) }
+            countsMap[operator.key] = repository.getSupportCountByOperatorAndBand(queryNames, band.mask)
+        }
+
+        FrequencyBandStats(
+            title = "$normalizedTech ${band.label}",
+            description = "Supports déclarés par opérateur",
+            data = formatOperatorData(countsMap, displayOrder)
+        )
+    }
+
+    return stats.filter { band -> band.data.any { it.second > 0 } }.ifEmpty { stats }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
     val themeMode by AppConfig.themeMode
@@ -38,54 +183,37 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
 
     val mainBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.background
     val cardBgColor = MaterialTheme.colorScheme.surfaceVariant
+    val cachedStats = StatisticsScreenCache.data
 
     // --- ÉTAT DES DONNÉES ---
-    var supportCounts by remember { mutableStateOf<List<Pair<String, Int>>>(emptyList()) }
-    var support4GCounts by remember { mutableStateOf<List<Pair<String, Int>>>(emptyList()) }
-    var support5GCounts by remember { mutableStateOf<List<Pair<String, Int>>>(emptyList()) } // ✅ NOUVEAU
-    var isLoading by remember { mutableStateOf(true) }
-    val coroutineScope = rememberCoroutineScope()
+    var supportCounts by remember { mutableStateOf(cachedStats?.supports ?: emptyList()) }
+    var support2GCounts by remember { mutableStateOf(cachedStats?.supports2G ?: emptyList()) }
+    var support3GCounts by remember { mutableStateOf(cachedStats?.supports3G ?: emptyList()) }
+    var support4GCounts by remember { mutableStateOf(cachedStats?.supports4G ?: emptyList()) }
+    var support5GCounts by remember { mutableStateOf(cachedStats?.supports5G ?: emptyList()) }
+    var isLoading by remember { mutableStateOf(cachedStats == null) }
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
+    val scrollState = rememberScrollState()
 
     BackHandler(enabled = !safeBackNavigation.isLocked) {
         safeBackNavigation.navigateBack()
     }
 
-    LaunchedEffect(Unit) {
-        coroutineScope.launch {
+    LaunchedEffect(defaultOp) {
+        if (StatisticsScreenCache.data == null) {
             isLoading = true
-            val totalMap = mutableMapOf<String, Int>()
-            val counts4GMap = mutableMapOf<String, Int>()
-            val counts5GMap = mutableMapOf<String, Int>() // ✅ NOUVEAU
-
-            val operatorsToFetch = OperatorColors.all
-
-            for (operator in operatorsToFetch) {
-                val queryName = operator.aliases.firstOrNull() ?: operator.key
-                totalMap[operator.key] = repository.getUniqueSupportCountByOperator(queryName)
-                counts4GMap[operator.key] = repository.get4GSupportCountByOperator(queryName)
-                counts5GMap[operator.key] = repository.get5GSupportCountByOperator(queryName) // ✅ NOUVEAU
-            }
-
-            val baseOrder = OperatorColors.orderedKeys
-            val displayOrder = mutableListOf<String>()
-            OperatorColors.keyFor(defaultOp)?.let { displayOrder.add(it) }
-            baseOrder.forEach { if (!displayOrder.contains(it)) displayOrder.add(it) }
-
-            // Fonction utilitaire pour transformer les Maps en listes triées
-            fun formatData(map: Map<String, Int>): List<Pair<String, Int>> {
-                val rows = displayOrder.map { op ->
-                    val name = OperatorColors.specForKey(op)?.label ?: op
-                    Pair(name, map[op] ?: 0)
-                }
-                return rows.filter { it.second > 0 }.ifEmpty { rows }
-            }
-
-            supportCounts = formatData(totalMap)
-            support4GCounts = formatData(counts4GMap)
-            support5GCounts = formatData(counts5GMap) // ✅ NOUVEAU
-            isLoading = false
         }
+
+        val refreshedStats = loadStatisticsData(repository, defaultOp)
+        if (refreshedStats != StatisticsScreenCache.data) {
+            StatisticsScreenCache.data = refreshedStats
+            supportCounts = refreshedStats.supports
+            support2GCounts = refreshedStats.supports2G
+            support3GCounts = refreshedStats.supports3G
+            support4GCounts = refreshedStats.supports4G
+            support5GCounts = refreshedStats.supports5G
+        }
+        isLoading = false
     }
 
     Scaffold(
@@ -100,7 +228,12 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
         }
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).background(mainBgColor).verticalScroll(rememberScrollState())
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(mainBgColor)
+                .geoTowerFadingEdge(scrollState)
+                .verticalScroll(scrollState)
         ) {
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -110,12 +243,152 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
             Spacer(modifier = Modifier.height(16.dp))
 
             // Graphique 2 : 5G
-            StatCard(stringResource(R.string.appstrings_stats5_g_title), stringResource(R.string.appstrings_stats5_g_desc), support5GCounts, isLoading, cardBgColor)
+            StatCard(
+                title = stringResource(R.string.appstrings_stats5_g_title),
+                desc = stringResource(R.string.appstrings_stats5_g_desc),
+                data = support5GCounts,
+                isLoading = isLoading,
+                bgColor = cardBgColor,
+                onClick = { navController.navigate(statsFrequenciesRoute("5G")) }
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // ✅ Graphique 3 : 4G
-            StatCard(stringResource(R.string.appstrings_stats4_g_title), stringResource(R.string.appstrings_stats4_g_desc), support4GCounts, isLoading, cardBgColor)
+            StatCard(
+                title = stringResource(R.string.appstrings_stats4_g_title),
+                desc = stringResource(R.string.appstrings_stats4_g_desc),
+                data = support4GCounts,
+                isLoading = isLoading,
+                bgColor = cardBgColor,
+                onClick = { navController.navigate(statsFrequenciesRoute("4G")) }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            StatCard(
+                title = stringResource(R.string.appstrings_stats3_g_title),
+                desc = stringResource(R.string.appstrings_stats3_g_desc),
+                data = support3GCounts,
+                isLoading = isLoading,
+                bgColor = cardBgColor,
+                onClick = { navController.navigate(statsFrequenciesRoute("3G")) }
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            StatCard(
+                title = stringResource(R.string.appstrings_stats2_g_title),
+                desc = stringResource(R.string.appstrings_stats2_g_desc),
+                data = support2GCounts,
+                isLoading = isLoading,
+                bgColor = cardBgColor,
+                onClick = { navController.navigate(statsFrequenciesRoute("2G")) }
+            )
+
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRepository, tech: String) {
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isSystemDark = isSystemInDarkTheme()
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemDark)
+    val defaultOp = AppConfig.defaultOperator.value
+    val normalizedTech = remember(tech) { normalizeTech(tech) }
+
+    val mainBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.background
+    val cardBgColor = MaterialTheme.colorScheme.surfaceVariant
+    val cachedStats = FrequencyStatsScreenCache.dataByTech[normalizedTech]
+
+    var frequencyStats by remember(normalizedTech) { mutableStateOf(cachedStats ?: emptyList()) }
+    var isLoading by remember(normalizedTech) { mutableStateOf(cachedStats == null) }
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "stats")
+    val scrollState = rememberScrollState()
+
+    BackHandler(enabled = !safeBackNavigation.isLocked) {
+        safeBackNavigation.navigateBack()
+    }
+
+    LaunchedEffect(defaultOp, normalizedTech) {
+        if (FrequencyStatsScreenCache.dataByTech[normalizedTech] == null) {
+            isLoading = true
+        }
+
+        val refreshedStats = loadFrequencyStatsData(repository, defaultOp, normalizedTech)
+        if (refreshedStats != FrequencyStatsScreenCache.dataByTech[normalizedTech]) {
+            FrequencyStatsScreenCache.dataByTech[normalizedTech] = refreshedStats
+            frequencyStats = refreshedStats
+        }
+        isLoading = false
+    }
+
+    Scaffold(
+        containerColor = mainBgColor,
+        topBar = {
+            GeoTowerBackTopBar(
+                title = frequencyDetailTitle(normalizedTech),
+                onBack = { safeBackNavigation.navigateBack() },
+                backgroundColor = mainBgColor,
+                backEnabled = !safeBackNavigation.isLocked
+            )
+        }
+    ) { padding ->
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .background(mainBgColor)
+                .geoTowerFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+        ) {
+            Spacer(modifier = Modifier.height(16.dp))
+
+            when {
+                isLoading && frequencyStats.isEmpty() -> {
+                    StatCard(
+                        title = frequencyDetailTitle(normalizedTech),
+                        desc = "Chargement du détail par fréquence",
+                        data = emptyList(),
+                        isLoading = true,
+                        bgColor = cardBgColor
+                    )
+                }
+                frequencyStats.isEmpty() -> {
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = cardBgColor.copy(alpha = 0.58f)),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp)
+                    ) {
+                        Text(
+                            text = "Aucune fréquence disponible pour $normalizedTech",
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(16.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+                else -> {
+                    frequencyStats.forEachIndexed { index, band ->
+                        if (index > 0) {
+                            Spacer(modifier = Modifier.height(16.dp))
+                        }
+                        StatCard(
+                            title = band.title,
+                            desc = band.description,
+                            data = band.data,
+                            isLoading = false,
+                            bgColor = cardBgColor
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(32.dp))
         }
@@ -123,19 +396,37 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
 }
 
 @Composable
-fun StatCard(title: String, desc: String, data: List<Pair<String, Int>>, isLoading: Boolean, bgColor: Color) {
+fun StatCard(
+    title: String,
+    desc: String,
+    data: List<Pair<String, Int>>,
+    isLoading: Boolean,
+    bgColor: Color,
+    onClick: (() -> Unit)? = null
+) {
+    val cardModifier = Modifier
+        .fillMaxWidth()
+        .padding(horizontal = 16.dp)
+        .then(
+            if (onClick != null && !isLoading) {
+                Modifier.clickable(onClick = onClick)
+            } else {
+                Modifier
+            }
+        )
+
     Card(
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(containerColor = bgColor.copy(alpha = 0.5f)),
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = bgColor.copy(alpha = 0.58f)),
+        modifier = cardModifier
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
             Text(text = desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(18.dp))
             if (isLoading) {
-                Box(modifier = Modifier.fillMaxWidth().height(250.dp), contentAlignment = Alignment.Center) {
-                    CircularProgressIndicator()
+                Box(modifier = Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
+                    CircularWavyProgressIndicator(color = MaterialTheme.colorScheme.primary)
                 }
             } else {
                 SupportBarChart(data = data)
@@ -144,131 +435,117 @@ fun StatCard(title: String, desc: String, data: List<Pair<String, Int>>, isLoadi
     }
 }
 
-// ==========================================
-// 📊 COMPOSANT GRAPHIQUE À BARRES SUR MESURE
-// ==========================================
 @Composable
 fun SupportBarChart(data: List<Pair<String, Int>>) {
-    val maxCount = data.maxOfOrNull { it.second } ?: 0
-    val yMax = if (maxCount > 0) ((maxCount / 5000) + 1) * 5000 else 5000
-    val ySteps = (0..yMax step 5000).toList().reversed()
+    val maxCount = (data.maxOfOrNull { it.second } ?: 0).coerceAtLeast(1)
+    val rows = data.sortedWith(compareByDescending<Pair<String, Int>> { it.second }.thenBy { it.first })
+    val chartScrollState = rememberScrollState()
 
-    val xLabelAreaHeight = 24.dp
-    val barWidth = 36.dp
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(chartScrollState)
+            .padding(top = 4.dp, bottom = 2.dp),
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        rows.forEach { (opName, count) ->
+            val barColor = OperatorColors.keyFor(opName)
+                ?.let { Color(OperatorColors.colorArgbForKey(it)) }
+                ?: Color.Gray
+            val targetFraction = (count.toFloat() / maxCount.toFloat()).coerceIn(0f, 1f)
+            val animatedFraction by animateFloatAsState(targetValue = targetFraction, label = "statsBar")
 
-    Row(modifier = Modifier.height(250.dp).fillMaxWidth()) {
+            OperatorStatBar(
+                operatorName = opName,
+                count = count,
+                fraction = animatedFraction,
+                color = barColor
+            )
+        }
+    }
+}
 
-        // COLONNE DE GAUCHE : L'Axe Y
-        Column(
-            modifier = Modifier.fillMaxHeight().padding(bottom = xLabelAreaHeight),
-            verticalArrangement = Arrangement.SpaceBetween,
-            horizontalAlignment = Alignment.End
+@Composable
+private fun OperatorStatBar(
+    operatorName: String,
+    count: Int,
+    fraction: Float,
+    color: Color
+) {
+    val chartHeight = 174.dp
+    val visibleBarHeight = when {
+        count <= 0 -> 0.dp
+        else -> (chartHeight * fraction).coerceAtLeast(8.dp)
+    }
+
+    Column(
+        modifier = Modifier.width(176.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier
+                .height(chartHeight)
+                .fillMaxWidth(),
+            contentAlignment = Alignment.BottomCenter
         ) {
-            ySteps.forEach { step ->
-                Box(
-                    modifier = Modifier.height(1.dp).width(35.dp),
-                    contentAlignment = Alignment.CenterEnd
-                ) {
-                    Text(
-                        text = if (step == 0) "0" else "${step / 1000}k",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        softWrap = false,
-                        modifier = Modifier.wrapContentHeight(unbounded = true)
-                    )
-                }
-            }
+            Box(
+                modifier = Modifier
+                    .width(46.dp)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(50))
+                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.24f))
+            )
+            Box(
+                modifier = Modifier
+                    .width(46.dp)
+                    .height(visibleBarHeight)
+                    .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 6.dp, bottomEnd = 6.dp))
+                    .background(color)
+            )
         }
 
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.height(10.dp))
 
-        // ZONE DU GRAPHIQUE
-        Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
-
-            // Lignes horizontales
-            Column(
-                modifier = Modifier.fillMaxSize().padding(bottom = xLabelAreaHeight),
-                verticalArrangement = Arrangement.SpaceBetween
-            ) {
-                ySteps.forEach { _ ->
-                    HorizontalDivider(
-                        color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f),
-                        thickness = 1.dp
-                    )
-                }
-            }
-
-            // Barres et Noms
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
+            tonalElevation = 1.dp,
+            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)
+        ) {
             Row(
-                modifier = Modifier.fillMaxSize(),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.Bottom
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                data.forEach { (opName, count) ->
-                    val barColor = OperatorColors.keyFor(opName)
-                        ?.let { Color(OperatorColors.colorArgbForKey(it)) }
-                        ?: Color.Gray
-
-                    val fraction = if (yMax > 0) count.toFloat() / yMax.toFloat() else 0f
-
-                    Column(
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.width(barWidth + 8.dp).fillMaxHeight()
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .fillMaxWidth(),
-                            contentAlignment = Alignment.BottomCenter
-                        ) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                if (count > 0) {
-                                    Text(
-                                        text = count.toString(),
-                                        fontSize = 10.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(bottom = 2.dp),
-                                        softWrap = false
-                                    )
-                                }
-
-                                if (fraction > 0f) {
-                                    Box(
-                                        modifier = Modifier
-                                            .fillMaxHeight(fraction)
-                                            .width(barWidth)
-                                            .clip(RoundedCornerShape(topStart = 6.dp, topEnd = 6.dp))
-                                            .background(barColor)
-                                    )
-                                } else {
-                                    Box(modifier = Modifier.height(0.dp).width(barWidth))
-                                }
-                            }
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .height(xLabelAreaHeight)
-                                .fillMaxWidth(),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = opName,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 12.sp,
-                                color = MaterialTheme.colorScheme.onSurface,
-                                softWrap = false,
-                                maxLines = 1,
-                                onTextLayout = { textLayoutResult ->
-                                    if (textLayoutResult.hasVisualOverflow) {
-                                        // Ignore overflow graphique
-                                    }
-                                }
-                            )
-                        }
-                    }
+                Box(
+                    modifier = Modifier
+                        .size(10.dp)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(color)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = operatorName,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.width(6.dp))
+                Surface(
+                    shape = RoundedCornerShape(50),
+                    color = color.copy(alpha = 0.14f),
+                    contentColor = color
+                ) {
+                    Text(
+                        text = count.toString(),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.Black,
+                        softWrap = false
+                    )
                 }
             }
         }

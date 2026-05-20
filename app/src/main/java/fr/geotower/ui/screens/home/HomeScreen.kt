@@ -512,8 +512,8 @@ fun MenuButtonsList(
             }
             "stats" -> {
                 if (showStats) {
-                    val isStatsEnabledInDev = false
-                    val alpha = if (isStatsEnabledInDev && isDbReady) 1f else 0.5f
+                    val isStatsEnabled = isDbReady
+                    val alpha = if (isStatsEnabled) 1f else 0.5f
 
                     buttons.add {
                         MenuButton(
@@ -524,7 +524,7 @@ fun MenuButtonsList(
                             useOneUi = useOneUi,
                             menuSize = menuSize,
                             fillWidth = isGrid,
-                            enabled = isStatsEnabledInDev && isDbReady, // ✅ On bloque avec isDbReady
+                            enabled = isStatsEnabled,
                             onClick = { navController.navigate("stats") }
                         )
                     }

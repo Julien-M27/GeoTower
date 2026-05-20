@@ -58,6 +58,7 @@ import fr.geotower.ui.screens.emitters.ElevationProfileScreen
 import fr.geotower.ui.screens.emitters.NearEmittersSupportWrapperScreen
 import fr.geotower.ui.screens.emitters.SiteDetailToolWrapperScreen
 import fr.geotower.ui.screens.emitters.ThroughputCalculatorScreen
+import fr.geotower.ui.screens.stats.FrequencyStatsDetailScreen
 import fr.geotower.ui.screens.stats.StatisticsScreen
 import fr.geotower.ui.screens.about.AboutScreen
 import fr.geotower.ui.screens.about.PhotoUploadHistoryScreen
@@ -472,6 +473,21 @@ class MainActivity : ComponentActivity() {
                                 val targetMapFilename = backStackEntry.arguments?.getString("targetMapFilename")
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     SettingsScreen(navController, repository, section, targetMapFilename)
+                                }
+                            }
+
+                            // Detail des frequences des statistiques
+                            composable(
+                                route = "stats/frequencies/{tech}",
+                                arguments = listOf(navArgument("tech") { type = NavType.StringType })
+                            ) { backStackEntry ->
+                                val tech = backStackEntry.arguments?.getString("tech").orEmpty()
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    FrequencyStatsDetailScreen(
+                                        navController = navController,
+                                        repository = repository,
+                                        tech = tech
+                                    )
                                 }
                             }
 
