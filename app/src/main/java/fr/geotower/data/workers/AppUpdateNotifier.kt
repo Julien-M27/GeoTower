@@ -12,6 +12,7 @@ import fr.geotower.BuildConfig
 import fr.geotower.R
 import fr.geotower.data.api.AppReleaseInfo
 import fr.geotower.data.api.AppUpdateChecker
+import fr.geotower.utils.NotificationIconResources
 import kotlinx.coroutines.sync.Mutex
 
 object AppUpdateNotifier {
@@ -87,12 +88,12 @@ object AppUpdateNotifier {
             .joinToString(separator = "\n\n")
 
         val notification = NotificationCompat.Builder(context, APP_UPDATE_ALERTS_CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher_geotower)
             .setContentTitle(context.getString(R.string.notification_app_update_available_title))
             .setContentText(contentText)
             .setStyle(NotificationCompat.BigTextStyle().bigText(expandedText))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .let { NotificationIconResources.applyTo(it, context) }
             .build()
 
         notificationManager.notify(DownloadNotificationCenter.APP_UPDATE_AVAILABLE_NOTIFICATION_ID, notification)

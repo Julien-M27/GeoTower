@@ -14,6 +14,7 @@ import fr.geotower.R
 import fr.geotower.data.api.DatabaseDownloader
 import fr.geotower.data.db.DatabaseVersionPolicy
 import fr.geotower.data.db.GeoTowerDatabaseValidator
+import fr.geotower.utils.NotificationIconResources
 
 class UpdateCheckWorker(private val context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     private companion object {
@@ -87,11 +88,11 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
         )
 
         val notification = NotificationCompat.Builder(context, UPDATE_ALERTS_CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher_geotower)
             .setContentTitle(context.getString(R.string.notification_db_update_available_title))
             .setContentText(context.getString(R.string.notification_db_update_available_desc))
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .let { NotificationIconResources.applyTo(it, context) }
             .build()
 
         notificationManager.notify(DownloadNotificationCenter.DB_UPDATE_AVAILABLE_NOTIFICATION_ID, notification)

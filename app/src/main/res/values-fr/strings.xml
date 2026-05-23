@@ -780,7 +780,8 @@
     <string name="appstrings_share_throughput_title">Débit théorique</string>
     <string name="appstrings_show_azimuths_cone_label">Afficher les azimuts (représentation en cône)</string>
     <string name="appstrings_show_azimuths_label">Afficher les azimuts (direction de l\'antenne)</string>
-    <string name="appstrings_show_cellular_fr_photos_label">Afficher les photos de CellularFR</string>
+    <!-- CellularFR masqué — voir CellularFrApi.ENABLED -->
+    <!-- <string name="appstrings_show_cellular_fr_photos_label">Afficher les photos de CellularFR</string> -->
     <string name="appstrings_show_exif_label">Afficher les EXIF</string>
     <string name="appstrings_show_more_sites">Afficher plus de sites</string>
     <string name="appstrings_show_schemes_label">Afficher les schémas du support</string>
@@ -832,7 +833,9 @@
     <string name="appstrings_src_ign">Fond de carte IGN</string>
     <string name="appstrings_src_ign_desc">© IGN - Institut National de l\'Information Géographique et Forestière.</string>
     <string name="appstrings_src_inspo">Inspiration &amp; Sources Externes</string>
-    <string name="appstrings_src_inspo_desc">• © CellularFR développé par Luis Baker\n• © Signal Quest développé par Alexandre Germain\n• © RNC Mobile développé par Cédric\n• © eNB-Analytics développé par Tristan\n• © GeoRadio - L\'icône alternative provient de l\'application GéoRadio sur iOS développée par Hugo Martin.\n• Concept original basé sur l\'application GéoRadio\n• Icône fun dessinée par Johan</string>
+    <!-- CellularFR masqué — voir CellularFrApi.ENABLED. Valeur originale :
+         "• © CellularFR développé par Luis Baker\n• © Signal Quest développé par Alexandre Germain\n• © RNC Mobile développé par Cédric\n• © eNB-Analytics développé par Tristan\n• © GeoRadio - L'icône alternative provient de l'application GéoRadio sur iOS développée par Hugo Martin.\n• Concept original basé sur l'application GéoRadio\n• Icône fun dessinée par Johan" -->
+    <string name="appstrings_src_inspo_desc">• © Signal Quest développé par Alexandre Germain\n• © RNC Mobile développé par Cédric\n• © eNB-Analytics développé par Tristan\n• © GeoRadio - L\'icône alternative provient de l\'application GéoRadio sur iOS développée par Hugo Martin.\n• Concept original basé sur l\'application GéoRadio\n• Icône fun dessinée par Johan</string>
     <string name="appstrings_src_osm">Fond de carte OSM</string>
     <string name="appstrings_src_osm_desc">© les contributeurs d\'OpenStreetMap.</string>
     <string name="appstrings_startup_page_settings">Page de démarrage</string>

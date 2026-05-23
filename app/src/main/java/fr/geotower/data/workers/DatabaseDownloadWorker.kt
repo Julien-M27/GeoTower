@@ -22,6 +22,7 @@ import fr.geotower.R
 import fr.geotower.data.api.DatabaseDownloader
 import android.content.pm.ServiceInfo
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.NotificationIconResources
 import kotlinx.coroutines.CancellationException
 import java.util.concurrent.TimeUnit
 
@@ -134,12 +135,12 @@ class DatabaseDownloadWorker(
         val builder = NotificationCompat.Builder(context, channelId)
             .setContentTitle(title)
             .setContentText(content)
-            .setSmallIcon(R.mipmap.ic_launcher_geotower)
             .setContentIntent(pendingIntent) // ✅ On ajoute le clic !
             .setProgress(100, progress, false)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+        NotificationIconResources.applyTo(builder, context)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
             val progressStyle = android.app.Notification.ProgressStyle()
@@ -149,12 +150,12 @@ class DatabaseDownloadWorker(
             val nativeBuilder = android.app.Notification.Builder(context, channelId)
                 .setContentTitle(title)
                 .setContentText(content)
-                .setSmallIcon(R.drawable.geotower_logo)
                 .setContentIntent(pendingIntent) // ✅ On ajoute le clic ici aussi !
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setCategory(android.app.Notification.CATEGORY_PROGRESS)
                 .setStyle(progressStyle)
+            NotificationIconResources.applyTo(nativeBuilder, context)
 
             // ✅ Utilisation de la réflexion pour compatibilité A16
             runCatching {
@@ -197,9 +198,9 @@ class DatabaseDownloadWorker(
         val notification = NotificationCompat.Builder(context, channelId)
             .setContentTitle(title)
             .setContentText(content)
-            .setSmallIcon(R.mipmap.ic_launcher_geotower)
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
+            .let { NotificationIconResources.applyTo(it, context) }
             .build()
 
         notifySafely(DownloadNotificationCenter.DB_DOWNLOAD_RESULT_NOTIFICATION_ID, notification)
@@ -212,8 +213,8 @@ class DatabaseDownloadWorker(
         val notification = NotificationCompat.Builder(context, channelId)
             .setContentTitle(title)
             .setContentText(content)
-            .setSmallIcon(R.mipmap.ic_launcher_geotower)
             .setAutoCancel(true)
+            .let { NotificationIconResources.applyTo(it, context) }
             .build()
         notifySafely(DownloadNotificationCenter.DB_DOWNLOAD_RESULT_NOTIFICATION_ID, notification)
     }

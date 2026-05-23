@@ -42,6 +42,7 @@ import fr.geotower.data.db.GeoTowerDao
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.DeviceProfile
+import fr.geotower.utils.NotificationIconResources
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
 import java.io.ByteArrayOutputStream
@@ -598,7 +599,6 @@ class LiveTrackingService : Service() {
         val builder = Notification.Builder(this, liveTrackingChannelV3)
             .setContentTitle(liveTitle)
             .setContentText(liveContentText)
-            .setSmallIcon(R.drawable.geotower_logo)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -614,6 +614,7 @@ class LiveTrackingService : Service() {
                     stopPendingIntent
                 ).build()
             )
+        NotificationIconResources.applyTo(builder, this)
 
         runCatching {
             Notification.Builder::class.java
@@ -676,7 +677,6 @@ class LiveTrackingService : Service() {
         val builder = NotificationCompat.Builder(this, liveTrackingChannelV3)
             .setContentTitle(getString(R.string.live_tracking_title))
             .setContentText(contentText)
-            .setSmallIcon(R.drawable.geotower_logo)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
@@ -688,6 +688,7 @@ class LiveTrackingService : Service() {
             .setProgress(100, progress, false)
             .addAction(0, getString(R.string.live_tracking_stop_action), stopPendingIntent)
             .setStyle(NotificationCompat.BigTextStyle().bigText(expandedText))
+        NotificationIconResources.applyTo(builder, this)
 
         return builder.build().apply {
             extras.putAll(

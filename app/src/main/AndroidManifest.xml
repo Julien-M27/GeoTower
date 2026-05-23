@@ -21,7 +21,8 @@
     <queries>
         <package android:name="fr.enb_analytics.enb4g" />
         <package android:name="com.sfrmap.android" />
-        <package android:name="com.luisbaker.cellularfr" />
+        <!-- CellularFR masqué — voir CellularFrApi.ENABLED -->
+        <!-- <package android:name="com.luisbaker.cellularfr" /> -->
     </queries>
 
     <application

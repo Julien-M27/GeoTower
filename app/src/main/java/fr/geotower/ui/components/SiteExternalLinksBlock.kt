@@ -2,42 +2,57 @@ package fr.geotower.ui.components
 
 import android.content.Context
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Public
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.geotower.R
 import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.models.LocalisationEntity
-import androidx.compose.ui.res.stringResource
 
 @Composable
 fun SiteExternalLinksBlock(
     info: LocalisationEntity,
-    idSupport: String?,
     cardBgColor: Color,
     blockShape: Shape,
     buttonShape: Shape,
-    isSignalQuestInstalled: Boolean,
+    onShowCartoradio: () -> Unit,
     onShowCellularFr: () -> Unit,
+    onShowSignalQuest: () -> Unit,
     onShowRnc: () -> Unit,
-    onShowEnb: () -> Unit
+    onShowEnb: () -> Unit,
+    onShowAnfr: () -> Unit
 ) {
     val context = LocalContext.current
-    val uriHandler = LocalUriHandler.current
     val txtExternalLinks = stringResource(R.string.appstrings_external_links)
     val txtOpenApp = stringResource(R.string.appstrings_open)
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
@@ -68,10 +83,7 @@ fun SiteExternalLinksBlock(
                         "cartoradio" -> {
                             if (showCartoradio) {
                                 CommunityLinkRow(siteExternalLinkById(block)?.label ?: "Cartoradio", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_cartoradio, buttonShape) {
-                                    safeClick {
-                                        // ✅ Lien Cartoradio avec les coordonnées (Longitude d'abord, puis Latitude)
-                                        uriHandler.openUri("https://cartoradio.fr/index.html#/cartographie/lonlat/${info.longitude}/${info.latitude}")
-                                    }
+                                    safeClick { onShowCartoradio() }
                                 }
                             }
                         }
@@ -88,28 +100,7 @@ fun SiteExternalLinksBlock(
                         "signalquest" -> {
                             val signalQuestOperator = SignalQuestOperators.operatorParamFor(info.operateur)
                             if (showSignalQuest && signalQuestOperator != null) {
-                                CommunityLinkRow(siteExternalLinkById(block)?.label ?: "Signal Quest", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_signalquest, buttonShape) {
-                                    safeClick {
-                                        // 1. Construction de l'URL avec l'opérateur normalisé
-                                        val deeplinkUrl = "https://signalquest.fr/site?siteId=${idSupport ?: ""}&operator=$signalQuestOperator&lat=${info.latitude}&lng=${info.longitude}&open=antenna&autoOpen=0"
-
-                                        if (isSignalQuestInstalled) {
-                                            // 3. Création de l'Intent pour ouvrir le deeplink dans l'application
-                                            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(deeplinkUrl)).apply {
-                                                setPackage("com.sfrmap.android")
-                                            }
-                                            try {
-                                                context.startActivity(intent)
-                                            } catch (e: Exception) {
-                                                // Fallback : si l'application crash ou ne gère pas l'intent, on ouvre dans le navigateur
-                                                uriHandler.openUri(deeplinkUrl)
-                                            }
-                                        } else {
-                                            // 4. Si non installée, on garde la redirection vers le Play Store
-                                            uriHandler.openUri("https://play.google.com/store/apps/details?id=com.sfrmap.android")
-                                        }
-                                    }
-                                }
+                                CommunityLinkRow(siteExternalLinkById(block)?.label ?: "Signal Quest", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_signalquest, buttonShape) { safeClick { onShowSignalQuest() } }
                             }
                         }
                         "enbanalytics" -> {
@@ -120,10 +111,7 @@ fun SiteExternalLinksBlock(
                         "anfr" -> {
                             if (showAnfr) {
                                 CommunityLinkRow(siteExternalLinkById(block)?.label ?: "data.gouv.fr", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_anfr, buttonShape) {
-                                    safeClick {
-                                        // ✅ Lien data.gouv.fr (ANFR) avec zoom 17, Latitude puis Longitude
-                                        uriHandler.openUri("https://data.anfr.fr/visualisation/map/?id=observatoire_2g_3g_4g&location=17,${info.latitude},${info.longitude}")
-                                    }
+                                    safeClick { onShowAnfr() }
                                 }
                             }
                         }

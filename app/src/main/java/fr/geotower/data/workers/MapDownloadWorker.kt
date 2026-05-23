@@ -17,6 +17,7 @@ import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.api.RetrofitClient
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.NotificationIconResources
 import fr.geotower.utils.OfflineMapDisplayNames
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -198,12 +199,12 @@ class MapDownloadWorker(
         val builder = NotificationCompat.Builder(applicationContext, channelId)
             .setContentTitle(title)
             .setContentText(content)
-            .setSmallIcon(R.mipmap.ic_launcher_geotower)
             .setContentIntent(pendingIntent)
             .setProgress(100, progress, false)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+        NotificationIconResources.applyTo(builder, applicationContext)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
             val progressStyle = Notification.ProgressStyle()
@@ -213,12 +214,12 @@ class MapDownloadWorker(
             val nativeBuilder = Notification.Builder(applicationContext, channelId)
                 .setContentTitle(title)
                 .setContentText(content)
-                .setSmallIcon(R.drawable.geotower_logo)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setCategory(Notification.CATEGORY_PROGRESS)
                 .setStyle(progressStyle)
+            NotificationIconResources.applyTo(nativeBuilder, applicationContext)
 
             runCatching {
                 Notification.Builder::class.java
@@ -248,10 +249,10 @@ class MapDownloadWorker(
         val notification = NotificationCompat.Builder(applicationContext, channelId)
             .setContentTitle(applicationContext.getString(R.string.notification_map_downloaded_title))
             .setContentText(applicationContext.getString(R.string.notification_map_downloaded_content, mapDisplayName))
-            .setSmallIcon(R.mipmap.ic_launcher_geotower)
             .setContentIntent(createOfflineMapsPendingIntent(resultNotifId, mapFilename))
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .let { NotificationIconResources.applyTo(it, applicationContext) }
             .build()
 
         notificationManager.notify(resultNotifId, notification)

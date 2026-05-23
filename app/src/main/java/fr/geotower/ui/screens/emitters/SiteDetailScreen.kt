@@ -130,6 +130,8 @@ import androidx.compose.ui.res.stringResource
 
 private const val TAG_SITE_DETAIL = "GeoTower"
 private const val TAG_SPEEDTEST = "GeoTowerUpload"
+private const val SIGNAL_QUEST_PACKAGE_NAME = "com.sfrmap.android"
+private const val SIGNAL_QUEST_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.sfrmap.android"
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -195,6 +197,12 @@ fun SiteDetailScreen(
     rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
     LocalView.current
+
+    fun openWebsiteUrl(url: String) {
+        openUrlInBrowser(context, url) {
+            uriHandler.openUri(url)
+        }
+    }
 
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
@@ -268,10 +276,13 @@ fun SiteDetailScreen(
         }
     }
 
+    var showCartoradioSheet by remember { mutableStateOf(false) }
     var showEnbSheet by remember { mutableStateOf(false) }
     var showCellularFrSheet by remember { mutableStateOf(false) }
+    var showSignalQuestSheet by remember { mutableStateOf(false) }
     var showNavigationSheet by remember { mutableStateOf(false) }
     var showRncSheet by remember { mutableStateOf(false) }
+    var showAnfrSheet by remember { mutableStateOf(false) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult<PickVisualMediaRequest, List<Uri>>(
         contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = SignalQuestUploadRules.MAX_PHOTOS),
@@ -422,7 +433,7 @@ fun SiteDetailScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     val isEnbAppInstalled = remember { isPackageInstalled(context, "fr.enb_analytics.enb4g") }
-    val isSignalQuestInstalled = remember { isPackageInstalled(context, "com.sfrmap.android") }
+    val isSignalQuestInstalled = remember { isPackageInstalled(context, SIGNAL_QUEST_PACKAGE_NAME) }
     val isCellularFrInstalled = remember { isPackageInstalled(context, "com.luisbaker.cellularfr") }
     val isRncMobileInstalled = remember { isPackageInstalled(context, "org.rncteam.rncfreemobile") }
 
@@ -470,7 +481,8 @@ fun SiteDetailScreen(
             val photosTemp = mutableListOf<CommunityPhoto>()
 
             // ✅ Séparation en deux blocs `if` distincts (Plus de `else if`)
-            if (CommunityDataPreferences.isCellularFrPhotosEnabled(prefs, opName)) {
+            // CellularFR masqué — voir CellularFrApi.ENABLED
+            if (false && CommunityDataPreferences.isCellularFrPhotosEnabled(prefs, opName)) {
                 CellularFrApi.getCellularFrPhotos(supportSiteId).forEach { photo ->
                     photosTemp.add(
                         CommunityPhoto(
@@ -686,6 +698,23 @@ fun SiteDetailScreen(
                 else -> ""
             }
 
+            if (showCartoradioSheet) {
+                ModalBottomSheet(onDismissRequest = { showCartoradioSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Cartoradio", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.appstrings_open_on), style = MaterialTheme.typography.bodyMedium)
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            CommunityCard(title = stringResource(R.string.appstrings_website), txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_cartoradio, modifier = Modifier.weight(1f)) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showCartoradioSheet = false
+                                openWebsiteUrl("https://cartoradio.fr/index.html#/cartographie/lonlat/${info.longitude}/${info.latitude}")
+                            }
+                        }
+                    }
+                }
+            }
+
             if (showEnbSheet && opNameUrl.isNotEmpty()) {
                 ModalBottomSheet(onDismissRequest = { showEnbSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
                     Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -696,7 +725,7 @@ fun SiteDetailScreen(
                             CommunityCard(title = txtMap4G, txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_enbanalytics, modifier = Modifier.weight(1f)) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 showEnbSheet = false
-                                uriHandler.openUri("https://enb-analytics.fr/analytics_${opNameUrl}.html")
+                                openWebsiteUrl("https://enb-analytics.fr/analytics_${opNameUrl}.html")
                             }
                             val has5G = listOfNotNull(
                                 technique?.technologies,
@@ -704,7 +733,7 @@ fun SiteDetailScreen(
                                 info.frequences
                             ).any { it.contains("5G", ignoreCase = true) }
                             CommunityCard(title = txtMap5G, txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_enbanalytics, isEnabled = has5G, modifier = Modifier.weight(1f)) {
-                                if (has5G) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); showEnbSheet = false; uriHandler.openUri("https://enb-analytics.fr/analytics_nr_${opNameUrl}.html") }
+                                if (has5G) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); showEnbSheet = false; openWebsiteUrl("https://enb-analytics.fr/analytics_nr_${opNameUrl}.html") }
                             }
                         }
                         Spacer(modifier = Modifier.height(24.dp))
@@ -713,7 +742,8 @@ fun SiteDetailScreen(
                 }
             }
 
-            if (showCellularFrSheet) {
+            // CellularFR masqué — voir CellularFrApi.ENABLED
+            if (false && showCellularFrSheet) {
                 val supportId = physique?.idSupport ?: info.idAnfr // ✅ VRAI ID
                 ModalBottomSheet(onDismissRequest = { showCellularFrSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
                     Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -722,12 +752,57 @@ fun SiteDetailScreen(
                         Spacer(modifier = Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             CommunityCard(title = stringResource(R.string.appstrings_website), txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_cellularfr, isEnabled = supportId.isNotEmpty(), modifier = Modifier.weight(1f)) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress); showCellularFrSheet = false; uriHandler.openUri("https://cellularfr.fr/site-details.html?siteId=$supportId")
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress); showCellularFrSheet = false; openWebsiteUrl("https://cellularfr.fr/site-details.html?siteId=$supportId")
                             }
                         }
                         Spacer(modifier = Modifier.height(24.dp))
                         AppLauncherButton(isInstalled = isCellularFrInstalled, appName = "CellularFR", txtOpen = txtOpen, txtInstall = txtInstallApp, useOneUi = useOneUi) {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress); showCellularFrSheet = false; if (isCellularFrInstalled) launchApp(context, "com.luisbaker.cellularfr") else uriHandler.openUri("https://play.google.com/store/apps/details?id=com.luisbaker.cellularfr")
+                        }
+                    }
+                }
+            }
+
+            if (showSignalQuestSheet) {
+                val signalQuestOperator = SignalQuestOperators.operatorParamFor(info.operateur)
+                if (signalQuestOperator != null) {
+                    val websiteUrl = signalQuestWebsiteUrl(
+                        anfrCode = info.idAnfr,
+                        operator = signalQuestOperator,
+                        latitude = info.latitude,
+                        longitude = info.longitude
+                    )
+                    val appDeeplinkUrl = signalQuestAppDeeplinkUrl(
+                        siteId = physique?.idSupport,
+                        operator = signalQuestOperator,
+                        latitude = info.latitude,
+                        longitude = info.longitude
+                    )
+
+                    ModalBottomSheet(onDismissRequest = { showSignalQuestSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Signal Quest", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.appstrings_open_on), style = MaterialTheme.typography.bodyMedium)
+                            Spacer(modifier = Modifier.height(24.dp))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                CommunityCard(title = stringResource(R.string.appstrings_website), txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_signalquest, isEnabled = info.idAnfr.isNotBlank(), modifier = Modifier.weight(1f)) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    showSignalQuestSheet = false
+                                    openWebsiteUrl(websiteUrl)
+                                }
+                            }
+                            Spacer(modifier = Modifier.height(24.dp))
+                            AppLauncherButton(isInstalled = isSignalQuestInstalled, appName = "Signal Quest", txtOpen = txtOpen, txtInstall = txtInstallApp, useOneUi = useOneUi) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showSignalQuestSheet = false
+                                if (isSignalQuestInstalled) {
+                                    openSignalQuestApp(context, appDeeplinkUrl) {
+                                        uriHandler.openUri(appDeeplinkUrl)
+                                    }
+                                } else {
+                                    uriHandler.openUri(SIGNAL_QUEST_PLAY_STORE_URL)
+                                }
+                            }
                         }
                     }
                 }
@@ -741,12 +816,29 @@ fun SiteDetailScreen(
                         Spacer(modifier = Modifier.height(24.dp))
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                             CommunityCard(title = stringResource(R.string.appstrings_website), txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_rncmobile, modifier = Modifier.weight(1f)) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress); showRncSheet = false; uriHandler.openUri("https://rncmobile.net/site/${info.latitude},${info.longitude}")
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress); showRncSheet = false; openWebsiteUrl("https://rncmobile.net/site/${info.latitude},${info.longitude}")
                             }
                         }
                         Spacer(modifier = Modifier.height(24.dp))
                         AppLauncherButton(isInstalled = isRncMobileInstalled, appName = "RNC Mobile", txtOpen = txtOpen, txtInstall = txtInstallApp, useOneUi = useOneUi) {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress); showRncSheet = false; if (isRncMobileInstalled) launchApp(context, "org.rncteam.rncfreemobile") else uriHandler.openUri("https://play.google.com/store/apps/details?id=org.rncteam.rncfreemobile")
+                        }
+                    }
+                }
+            }
+
+            if (showAnfrSheet) {
+                ModalBottomSheet(onDismissRequest = { showAnfrSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("data.gouv.fr", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.appstrings_open_on), style = MaterialTheme.typography.bodyMedium)
+                        Spacer(modifier = Modifier.height(24.dp))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            CommunityCard(title = stringResource(R.string.appstrings_website), txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_anfr, modifier = Modifier.weight(1f)) {
+                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                showAnfrSheet = false
+                                openWebsiteUrl("https://data.anfr.fr/visualisation/map/?id=observatoire_2g_3g_4g&location=17,${info.latitude},${info.longitude}")
+                            }
                         }
                     }
                 }
@@ -1074,14 +1166,15 @@ fun SiteDetailScreen(
                             if (showLinks && opNameUrl.isNotEmpty()) {
                                 fr.geotower.ui.components.SiteExternalLinksBlock(
                                     info = info,
-                                    idSupport = physique?.idSupport,
                                     cardBgColor = cardBgColor,
                                     blockShape = blockShape,
                                     buttonShape = buttonShape,
-                                    isSignalQuestInstalled = isSignalQuestInstalled,
+                                    onShowCartoradio = { showCartoradioSheet = true },
                                     onShowCellularFr = { showCellularFrSheet = true },
+                                    onShowSignalQuest = { showSignalQuestSheet = true },
                                     onShowRnc = { showRncSheet = true },
-                                    onShowEnb = { showEnbSheet = true }
+                                    onShowEnb = { showEnbSheet = true },
+                                    onShowAnfr = { showAnfrSheet = true }
                                 )
                             }
                         }
@@ -1163,6 +1256,60 @@ private fun AppLauncherButton(isInstalled: Boolean, appName: String, txtOpen: St
 
 private fun isPackageInstalled(context: Context, pkg: String): Boolean = try { context.packageManager.getPackageInfo(pkg, 0); true } catch (e: Exception) { false }
 private fun launchApp(context: Context, pkg: String) { context.packageManager.getLaunchIntentForPackage(pkg)?.let { context.startActivity(it) } }
+
+private fun openUrlInBrowser(context: Context, url: String, fallback: () -> Unit) {
+    val browserIntent = android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url)).apply {
+        addCategory(android.content.Intent.CATEGORY_BROWSABLE)
+        selector = android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
+            addCategory(android.content.Intent.CATEGORY_APP_BROWSER)
+        }
+    }
+    try {
+        context.startActivity(browserIntent)
+    } catch (e: Exception) {
+        fallback()
+    }
+}
+
+private fun signalQuestWebsiteUrl(anfrCode: String, operator: String, latitude: Double, longitude: Double): String {
+    return Uri.Builder()
+        .scheme("https")
+        .authority("signalquest.fr")
+        .path("site")
+        .appendQueryParameter("anfrCode", anfrCode)
+        .appendQueryParameter("operator", operator)
+        .appendQueryParameter("lat", latitude.toString())
+        .appendQueryParameter("lng", longitude.toString())
+        .appendQueryParameter("open", "antenna")
+        .build()
+        .toString()
+}
+
+private fun signalQuestAppDeeplinkUrl(siteId: String?, operator: String, latitude: Double, longitude: Double): String {
+    return Uri.Builder()
+        .scheme("https")
+        .authority("signalquest.fr")
+        .path("site")
+        .appendQueryParameter("siteId", siteId.orEmpty())
+        .appendQueryParameter("operator", operator)
+        .appendQueryParameter("lat", latitude.toString())
+        .appendQueryParameter("lng", longitude.toString())
+        .appendQueryParameter("open", "antenna")
+        .appendQueryParameter("autoOpen", "0")
+        .build()
+        .toString()
+}
+
+private fun openSignalQuestApp(context: Context, deeplinkUrl: String, fallback: () -> Unit) {
+    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(deeplinkUrl)).apply {
+        setPackage(SIGNAL_QUEST_PACKAGE_NAME)
+    }
+    try {
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        fallback()
+    }
+}
 
 private fun formatSiteDistanceMeters(distanceMeters: Double, distanceUnit: Int = AppConfig.distanceUnit.intValue): String {
     return if (distanceUnit == 1) {

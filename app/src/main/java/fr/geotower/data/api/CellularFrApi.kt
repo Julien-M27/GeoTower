@@ -16,11 +16,16 @@ data class CellularFrPhoto(
 )
 
 object CellularFrApi {
+    // CellularFR masqué — voir CellularFrApi.ENABLED
+    const val ENABLED = false
+
     private const val TAG = "GeoTowerCellularFR"
     private const val BASE_URL = "https://cellularfr.fr/"
     private const val HOST = "cellularfr.fr"
 
     suspend fun getCellularFrPhotos(siteId: String): List<CellularFrPhoto> = withContext(Dispatchers.IO) {
+        // CellularFR masqué — voir CellularFrApi.ENABLED
+        if (!ENABLED) return@withContext emptyList()
         if (siteId.isBlank()) return@withContext emptyList()
 
         val url = BASE_URL.toHttpUrl().newBuilder()

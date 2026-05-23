@@ -63,7 +63,8 @@ object CommunityDataPreferences {
         communityOperator(
             key = OperatorColors.ORANGE_KEY,
             label = "Orange (tous Orange)",
-            photoSources = listOf(cellularFrPhotos, signalQuestPhotos)
+            // CellularFR masqué — voir CellularFrApi.ENABLED
+            photoSources = listOf(/* cellularFrPhotos, */ signalQuestPhotos)
         ),
         communityOperator(OperatorColors.BOUYGUES_KEY),
         communityOperator(OperatorColors.SFR_KEY),

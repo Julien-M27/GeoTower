@@ -120,7 +120,8 @@ internal object LiveSitePhotoSelector {
     ): List<SourcePhoto> {
         return when (sourceId) {
             CommunityDataPreferences.SOURCE_SIGNALQUEST -> signalQuestPhotos(siteId, operator, favoriteId)
-            CommunityDataPreferences.SOURCE_CELLULARFR -> cellularFrPhotos(siteId)
+            // CellularFR masqué — voir CellularFrApi.ENABLED
+            CommunityDataPreferences.SOURCE_CELLULARFR -> emptyList() /* cellularFrPhotos(siteId) */
             else -> emptyList()
         }
     }

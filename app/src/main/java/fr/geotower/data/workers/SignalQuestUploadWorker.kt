@@ -27,6 +27,7 @@ import fr.geotower.data.upload.SignalQuestUploadManifest
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadQueueException
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.NotificationIconResources
 import kotlinx.coroutines.CancellationException
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
@@ -314,7 +315,6 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         val builder = NotificationCompat.Builder(applicationContext, channelId)
             .setContentTitle(title)
             .setContentText(message)
-            .setSmallIcon(R.mipmap.ic_launcher_geotower)
             .setContentIntent(pendingIntent)
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setOngoing(true)
@@ -322,6 +322,7 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setProgress(100, progressPercent, false)
+        NotificationIconResources.applyTo(builder, applicationContext)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             builder.setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
@@ -335,13 +336,13 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
             val nativeBuilder = Notification.Builder(applicationContext, channelId)
                 .setContentTitle(title)
                 .setContentText(message)
-                .setSmallIcon(R.drawable.geotower_logo)
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setCategory(Notification.CATEGORY_PROGRESS)
                 .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .setStyle(progressStyle)
+            NotificationIconResources.applyTo(nativeBuilder, applicationContext)
 
             runCatching {
                 Notification.Builder::class.java
@@ -379,12 +380,12 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         return NotificationCompat.Builder(applicationContext, channelId)
             .setContentTitle(APP_NOTIFICATION_TITLE)
             .setContentText(message)
-            .setSmallIcon(R.mipmap.ic_launcher_geotower)
             .setContentIntent(createUploadResultPendingIntent(message, successCount, total, hasErrors, requestCode))
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .let { NotificationIconResources.applyTo(it, applicationContext) }
             .build()
     }
 

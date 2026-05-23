@@ -256,7 +256,8 @@ fun SupportDetailScreen(
                 val trueSupportId = physique?.idSupport ?: antennas.firstOrNull()?.idAnfr
 
                 if (!trueSupportId.isNullOrBlank()) {
-                    if (hasCellularFrPhotos) {
+                    // CellularFR masqué — voir CellularFrApi.ENABLED
+                    if (false && hasCellularFrPhotos) {
                         CellularFrApi.getCellularFrPhotos(trueSupportId).forEach { photo ->
                             photosTemp.add(
                                 CommunityPhoto(

@@ -776,7 +776,8 @@
     <string name="appstrings_share_throughput_title">Velocidad teórica</string>
     <string name="appstrings_show_azimuths_cone_label">Mostrar azimuts (representación en cono)</string>
     <string name="appstrings_show_azimuths_label">Mostrar azimuts (dirección de la antena)</string>
-    <string name="appstrings_show_cellular_fr_photos_label">Mostrar fotos de CellularFR</string>
+    <!-- CellularFR masqué — voir CellularFrApi.ENABLED -->
+    <!-- <string name="appstrings_show_cellular_fr_photos_label">Mostrar fotos de CellularFR</string> -->
     <string name="appstrings_show_exif_label">Mostrar EXIF</string>
     <string name="appstrings_show_more_sites">Mostrar más sitios</string>
     <string name="appstrings_show_schemes_label">Mostrar esquemas del soporte</string>
@@ -828,7 +829,9 @@
     <string name="appstrings_src_ign">Mapa base IGN</string>
     <string name="appstrings_src_ign_desc">© IGN - Instituto Nacional de Información Geográfica y Forestal.</string>
     <string name="appstrings_src_inspo">Inspiración y fuentes externas</string>
-    <string name="appstrings_src_inspo_desc">• © CellularFR desarrollado por Luis Baker\n• © Signal Quest desarrollado por Alexandre Germain\n• © RNC Mobile desarrollado por Cédric\n• © eNB-Analytics desarrollado por Tristan\n• © GeoRadio - El icono alternativo proviene de la app GéoRadio para iOS desarrollada por Hugo Martin.\n• Concepto original basado en la app GéoRadio\n• Icono fun diseñado por Johan</string>
+    <!-- CellularFR masqué — voir CellularFrApi.ENABLED. Valeur originale :
+         "• © CellularFR desarrollado por Luis Baker\n• © Signal Quest desarrollado por Alexandre Germain\n• © RNC Mobile desarrollado por Cédric\n• © eNB-Analytics desarrollado por Tristan\n• © GeoRadio - El icono alternativo proviene de la app GéoRadio para iOS desarrollada por Hugo Martin.\n• Concepto original basado en la app GéoRadio\n• Icono fun diseñado por Johan" -->
+    <string name="appstrings_src_inspo_desc">• © Signal Quest desarrollado por Alexandre Germain\n• © RNC Mobile desarrollado por Cédric\n• © eNB-Analytics desarrollado por Tristan\n• © GeoRadio - El icono alternativo proviene de la app GéoRadio para iOS desarrollada por Hugo Martin.\n• Concepto original basado en la app GéoRadio\n• Icono fun diseñado por Johan</string>
     <string name="appstrings_src_osm">Mapa base OSM</string>
     <string name="appstrings_src_osm_desc">© colaboradores de OpenStreetMap.</string>
     <string name="appstrings_startup_page_settings">Página de inicio</string>
