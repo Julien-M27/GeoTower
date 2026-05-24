@@ -5,7 +5,6 @@ import okhttp3.RequestBody
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
-import retrofit2.http.Header
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
@@ -55,9 +54,8 @@ data class SqSpeedtestData(
 )
 
 interface SignalQuestApiService {
-    @GET("api/external/v1/sites/{siteId}/photos")
+    @GET("api/v2/signalquest/sites/{siteId}/photos")
     suspend fun getSitePhotos(
-        @Header("Authorization") authHeader: String,
         @Path("siteId") siteId: String,
         @Query("operator") operator: String? = null,
         @Query("limit") limit: Int? = null,
@@ -65,9 +63,8 @@ interface SignalQuestApiService {
     ): retrofit2.Response<SqPhotosResponse>
 
     @Multipart
-    @POST("api/external/v1/sites/{siteId}/photos")
+    @POST("api/v2/signalquest/sites/{siteId}/photos")
     suspend fun uploadSitePhoto(
-        @Header("Authorization") authHeader: String,
         @Path("siteId") siteId: String,
         @Part file: MultipartBody.Part,
         @Part("description") description: RequestBody?,
@@ -78,9 +75,8 @@ interface SignalQuestApiService {
         @Part("exifMetadata") exifMetadata: RequestBody?
     ): retrofit2.Response<SqPhotoUploadResponse>
 
-    @GET("api/external/v1/speedtests/site")
+    @GET("api/v2/signalquest/speedtests/site")
     suspend fun getSiteSpeedtests(
-        @Header("Authorization") authHeader: String,
         @Query("siteId") siteId: String? = null,
         @Query("anfrCode") anfrCode: String? = null,
         @Query("enb") enb: String? = null,
@@ -93,7 +89,7 @@ interface SignalQuestApiService {
 object SignalQuestClient {
     val api: SignalQuestApiService by lazy {
         Retrofit.Builder()
-            .baseUrl("https://signalquest.fr/")
+            .baseUrl(RetrofitClient.BASE_URL)
             .client(RetrofitClient.currentClient)
             .addConverterFactory(GsonConverterFactory.create())
             .build()

@@ -275,7 +275,6 @@ fun SupportDetailScreen(
                     if (hasSignalQuestPhotos) {
                         try {
                             val response = fr.geotower.data.api.SignalQuestClient.api.getSitePhotos(
-                                authHeader = "Bearer ${fr.geotower.BuildConfig.SQ_API_KEY}",
                                 siteId = trueSupportId
                             )
                             if (response.isSuccessful) {

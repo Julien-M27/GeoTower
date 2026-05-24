@@ -154,7 +154,6 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
                 ?.toRequestBody("application/json".toMediaTypeOrNull())
 
             val response = SignalQuestClient.api.uploadSitePhoto(
-                authHeader = "Bearer ${BuildConfig.SQ_API_KEY}",
                 siteId = manifest.siteId,
                 file = body,
                 description = descBody,

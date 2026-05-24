@@ -1,20 +1,9 @@
-import java.util.Properties
-import java.io.FileInputStream
-
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
-// --- BLOC UNIQUE DE LECTURE ---
-val properties = Properties()
-val localPropertiesFile = rootProject.file("local.properties")
-if (localPropertiesFile.exists()) {
-    properties.load(FileInputStream(localPropertiesFile))
-}
-val sqApiKey: String = properties.getProperty("SQ_API_KEY") ?: ""
-// ------------------------------
 android {
     namespace = "fr.geotower"
     compileSdk = 36
@@ -27,9 +16,6 @@ android {
         versionName = "1.9.9.3.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-
-        // 2. Créer la variable accessible dans le code Kotlin [cite: 2]
-        buildConfigField("String", "SQ_API_KEY", "\"$sqApiKey\"")
     }
 
     buildFeatures {

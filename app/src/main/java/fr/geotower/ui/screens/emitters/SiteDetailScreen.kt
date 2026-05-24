@@ -501,7 +501,6 @@ fun SiteDetailScreen(
                 try {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                         val response = fr.geotower.data.api.SignalQuestClient.api.getSitePhotos(
-                            authHeader = "Bearer ${fr.geotower.BuildConfig.SQ_API_KEY}",
                             siteId = supportSiteId
                         )
                         response.body()?.data
@@ -554,7 +553,6 @@ fun SiteDetailScreen(
                 AppLogger.d(TAG_SPEEDTEST, "Speedtest request anfr=$anfrCodeToSend operator=$apiOperator")
 
                 val response = fr.geotower.data.api.SignalQuestClient.api.getSiteSpeedtests(
-                    authHeader = "Bearer ${fr.geotower.BuildConfig.SQ_API_KEY}",
                     anfrCode = anfrCodeToSend,
                     operator = apiOperator,
                     bestOnly = true

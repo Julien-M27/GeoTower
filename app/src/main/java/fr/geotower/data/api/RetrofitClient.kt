@@ -7,7 +7,7 @@ import retrofit2.converter.gson.GsonConverterFactory
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    private const val BASE_URL = "https://api.cajejuma.fr/"
+    const val BASE_URL = "https://api.cajejuma.fr/"
 
     private val gson = GsonBuilder()
         .setLenient()

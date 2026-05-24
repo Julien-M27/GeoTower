@@ -2,7 +2,6 @@ package fr.geotower.services
 
 import android.content.Context
 import android.content.SharedPreferences
-import fr.geotower.BuildConfig
 import fr.geotower.data.api.CellularFrApi
 import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.api.SignalQuestOperators
@@ -132,10 +131,8 @@ internal object LiveSitePhotoSelector {
         favoriteId: String?
     ): List<SourcePhoto> {
         val signalQuestOperator = SignalQuestOperators.operatorParamFor(operator) ?: return emptyList()
-        if (BuildConfig.SQ_API_KEY.isBlank()) return emptyList()
 
         val response = SignalQuestClient.api.getSitePhotos(
-            authHeader = "Bearer ${BuildConfig.SQ_API_KEY}",
             siteId = siteId,
             limit = if (favoriteId.isNullOrBlank()) DEFAULT_QUERY_LIMIT else FAVORITE_QUERY_LIMIT
         )

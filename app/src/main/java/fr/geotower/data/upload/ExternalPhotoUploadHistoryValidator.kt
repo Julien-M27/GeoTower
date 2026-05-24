@@ -1,7 +1,6 @@
 package fr.geotower.data.upload
 
 import android.content.Context
-import fr.geotower.BuildConfig
 import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.api.SqPhotoData
 import fr.geotower.utils.AppLogger
@@ -62,7 +61,6 @@ object ExternalPhotoUploadHistoryValidator {
     private suspend fun fetchApprovedPhotos(group: ValidationGroup): List<SqPhotoData>? {
         return runCatching {
             val response = SignalQuestClient.api.getSitePhotos(
-                authHeader = "Bearer ${BuildConfig.SQ_API_KEY}",
                 siteId = group.supportId,
                 operator = group.operator,
                 limit = VALIDATION_LOOKUP_LIMIT
