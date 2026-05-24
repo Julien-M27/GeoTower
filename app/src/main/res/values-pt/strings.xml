@@ -712,6 +712,9 @@
     <string name="appstrings_release_community_photo_filters">Fotos filtradas pela operadora e fontes ativadas</string>
     <string name="appstrings_release_signalquest_photo_order">Melhoria da ordem de envio das fotos</string>
     <string name="appstrings_release_signalquest_upload_checks">Adição de verificações para tornar o envio mais fiável</string>
+    <string name="appstrings_release_signalquest_connection_simplified">Ligação SignalQuest simplificada e melhor integrada na aplicação</string>
+    <string name="appstrings_release_signalquest_features_accessible">Fotos, envios e speedtests SignalQuest mais acessíveis</string>
+    <string name="appstrings_release_signalquest_live_photos_available">Fotos live disponíveis sem configuração local específica</string>
     <string name="appstrings_release_languages_complete_management">Melhoria completa da gestão de idiomas em toda a aplicação</string>
     <string name="appstrings_release_languages_expanded_translations">Traduções enriquecidas em francês, inglês, português, italiano, alemão e espanhol</string>
     <string name="appstrings_release_interface_better_translation">Melhor tradução dos ecrãs, widgets, notificações, Android Auto, ajuda, mapas e partilha</string>

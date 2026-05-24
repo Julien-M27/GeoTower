@@ -26,16 +26,10 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_statistics)) {
-        item(stringResource(R.string.appstrings_release_statistics_ready))
-        item(stringResource(R.string.appstrings_release_statistics_by_operator))
-        item(stringResource(R.string.appstrings_release_statistics_frequency_details))
-        item(stringResource(R.string.appstrings_release_statistics_readable_charts))
-        item(stringResource(R.string.appstrings_release_statistics_translations))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_photos)) {
-        item(stringResource(R.string.appstrings_release_external_photo_history_complete))
+    section(stringResource(R.string.appstrings_release_section_signalquest)) {
+        item(stringResource(R.string.appstrings_release_signalquest_connection_simplified))
+        item(stringResource(R.string.appstrings_release_signalquest_features_accessible))
+        item(stringResource(R.string.appstrings_release_signalquest_live_photos_available))
     }
 }
 
