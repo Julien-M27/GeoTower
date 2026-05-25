@@ -1,6 +1,7 @@
 package fr.geotower.data.community
 
 import android.content.SharedPreferences
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.utils.OperatorColors
 import java.util.Locale
 
@@ -64,7 +65,7 @@ object CommunityDataPreferences {
             key = OperatorColors.ORANGE_KEY,
             label = "Orange (tous Orange)",
             // CellularFR masqué — voir CellularFrApi.ENABLED
-            photoSources = listOf(/* cellularFrPhotos, */ signalQuestPhotos)
+            photoSources = listOf(cellularFrPhotos, signalQuestPhotos)
         ),
         communityOperator(OperatorColors.BOUYGUES_KEY),
         communityOperator(OperatorColors.SFR_KEY),
@@ -129,14 +130,17 @@ object CommunityDataPreferences {
         operatorKey: String,
         feature: CommunityDataFeature
     ): List<CommunityDataSource> {
-        val sourcesById = feature.sources.associateBy { it.id }
+        val availableSources = feature.sources.filter { source ->
+            RemoteFeatureFlags.config.value.isCommunitySourceEnabled(feature.id, source.id)
+        }
+        val sourcesById = availableSources.associateBy { it.id }
         val savedIds = prefs.getString(sourceOrderPrefKey(operatorKey, feature.id), null)
             ?.split(",")
             ?.map { it.trim() }
             ?.filter { it in sourcesById }
             ?.distinct()
             .orEmpty()
-        val orderedIds = savedIds + feature.sources.map { it.id }.filterNot { it in savedIds }
+        val orderedIds = savedIds + availableSources.map { it.id }.filterNot { it in savedIds }
         return orderedIds.mapNotNull { sourcesById[it] }
     }
 
@@ -250,6 +254,7 @@ object CommunityDataPreferences {
         sourceId: String
     ): Boolean {
         val source = sourceFor(operatorKey, featureId, sourceId) ?: return false
+        if (!RemoteFeatureFlags.config.value.isCommunitySourceEnabled(featureId, sourceId)) return false
         if (featureId == FEATURE_PHOTOS && !isPhotosEnabled(prefs, operatorKey)) return false
         val key = prefKey(operatorKey, featureId, sourceId)
         return if (prefs.contains(key)) {
@@ -324,6 +329,7 @@ object CommunityDataPreferences {
         featureId: String,
         sourceId: String
     ): CommunityDataSource? {
+        if (!RemoteFeatureFlags.config.value.isCommunitySourceEnabled(featureId, sourceId)) return null
         return operators
             .firstOrNull { it.key == operatorKey }
             ?.features

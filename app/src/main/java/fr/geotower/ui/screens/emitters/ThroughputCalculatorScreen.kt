@@ -56,6 +56,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -111,6 +112,9 @@ import fr.geotower.ui.components.throughputBandKey
 import fr.geotower.ui.components.throughputBandLabel
 import fr.geotower.ui.components.ThroughputConeDistance as ConeDistance
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
+import fr.geotower.ui.screens.settings.ThroughputCalculationDefaultsSheet
+import fr.geotower.ui.screens.settings.ThroughputCalculatorSettingsSheet
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import java.util.Locale
 import kotlin.math.PI
@@ -135,7 +139,7 @@ private val LTE_LOW_BAND_MHZ = setOf(700, 800, 900)
 private const val THROUGHPUT_BLOCK_ORDER_PREF = "page_throughput_order"
 private const val DEFAULT_THROUGHPUT_BLOCK_ORDER = "header,summary,cone,controls,bands,assumptions"
 
-@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ThroughputCalculatorScreen(
     navController: NavController,
@@ -157,6 +161,7 @@ fun ThroughputCalculatorScreen(
     } else {
         MaterialTheme.colorScheme.surfaceContainerLow
     }
+    val uiStyle = LocalGeoTowerUiStyle.current
     val blockShape = if (useOneUiDesign) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "site_detail/$antennaId")
 
@@ -227,17 +232,26 @@ fun ThroughputCalculatorScreen(
     var include4G by remember { mutableStateOf(prefs.getBoolean("throughput_include_4g", true)) }
     var include5G by remember { mutableStateOf(prefs.getBoolean("throughput_include_5g", true)) }
     var includePlanned by remember { mutableStateOf(prefs.getBoolean("throughput_include_planned", false)) }
-    val throughputBlockOrder = remember(prefs) {
+    var pageSiteThroughputCalculator by remember { mutableStateOf(prefs.getBoolean("page_site_throughput_calculator", true)) }
+    var showThroughputSettingsSheet by remember { mutableStateOf(false) }
+    var showThroughputDefaultsSheet by remember { mutableStateOf(false) }
+    var throughputDefaultsVersion by remember { mutableStateOf(0) }
+    val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var throughputBlockOrder by remember(prefs) {
+        mutableStateOf(
         normalizeThroughputBlockOrder(
             prefs.getString(THROUGHPUT_BLOCK_ORDER_PREF, DEFAULT_THROUGHPUT_BLOCK_ORDER)
                 ?.split(",")
                 .orEmpty()
         )
+        )
     }
-    val visibleThroughputBlocks = remember(prefs) {
-        ThroughputBlock.entries.associateWith { block ->
-            prefs.getBoolean(block.prefKey, true)
-        }
+    var visibleThroughputBlocks by remember(prefs) {
+        mutableStateOf(
+            ThroughputBlock.entries.associateWith { block ->
+                prefs.getBoolean(block.prefKey, true)
+            }
+        )
     }
 
     BackHandler(enabled = isSplitScreen || !safeBackNavigation.isLocked) {
@@ -270,7 +284,7 @@ fun ThroughputCalculatorScreen(
             .map { throughputBandKey(it) }
             .toSet()
     }
-    val defaultEnabledBandKeys = remember(parsedBands, prefs) {
+    val defaultEnabledBandKeys = remember(parsedBands, prefs, throughputDefaultsVersion) {
         parsedBands
             .filter { it.gen == 4 || it.gen == 5 }
             .filterNot { isHiddenThroughputBand(it) }
@@ -311,7 +325,7 @@ fun ThroughputCalculatorScreen(
                 backgroundColor = mainBgColor,
                 backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
                 actions = {
-                    IconButton(onClick = { navController.navigate("settings?section=throughput") }) {
+                    IconButton(onClick = { showThroughputSettingsSheet = true }) {
                         Icon(
                             Icons.Default.Settings,
                             contentDescription = stringResource(R.string.settings_pages_customization_title),
@@ -358,6 +372,104 @@ fun ThroughputCalculatorScreen(
                 visibleBlocks = visibleThroughputBlocks
             )
         }
+    }
+
+    fun refreshThroughputDefaultsFromPrefs() {
+        selectedPreset = presetFromPreference(prefs.getString("throughput_default_preset", "conservative"))
+        customSettings = CustomModulationSettings(
+            lteDownIndex = prefs.getInt("throughput_custom_lte_down", 3).coerceIn(0, lteDownModulationOptions.lastIndex),
+            lteUpIndex = prefs.getInt("throughput_custom_lte_up", 2).coerceIn(0, lteUpModulationOptions.lastIndex),
+            nrDownIndex = prefs.getInt("throughput_custom_nr_down", 3).coerceIn(0, nrDownModulationOptions.lastIndex),
+            nrUpIndex = prefs.getInt("throughput_custom_nr_up", 2).coerceIn(0, nrUpModulationOptions.lastIndex),
+            lteRsrpDbm = prefs.getFloat("throughput_custom_lte_rsrp", -95f),
+            lteSinrDb = prefs.getFloat("throughput_custom_lte_sinr", 15f),
+            nrRsrpDbm = prefs.getFloat("throughput_custom_nr_rsrp", -92f),
+            nrSinrDb = prefs.getFloat("throughput_custom_nr_sinr", 18f),
+            environment = radioEnvironmentFromPreference(prefs.getString("throughput_custom_environment", null)),
+            positionScenario = positionScenarioFromPreference(prefs.getString("throughput_custom_position", null)),
+            networkLoad = networkLoadFromPreference(prefs.getString("throughput_custom_network_load", null)),
+            backhaul = backhaulQualityFromPreference(prefs.getString("throughput_custom_backhaul", null)),
+            lteAggregation = lteAggregationModeFromPreference(prefs.getString("throughput_custom_lte_aggregation", null)),
+            selectedLatitude = prefs.getString("throughput_custom_selected_lat", null)?.toDoubleOrNull(),
+            selectedLongitude = prefs.getString("throughput_custom_selected_lon", null)?.toDoubleOrNull()
+        )
+        include4G = prefs.getBoolean("throughput_include_4g", true)
+        include5G = prefs.getBoolean("throughput_include_5g", true)
+        includePlanned = prefs.getBoolean("throughput_include_planned", false)
+        bandKeysInitialized = false
+        throughputDefaultsVersion++
+    }
+
+    if (showThroughputSettingsSheet) {
+        ThroughputCalculatorSettingsSheet(
+            showThroughputCalculator = pageSiteThroughputCalculator,
+            onThroughputCalculatorChange = {
+                pageSiteThroughputCalculator = it
+                prefs.edit().putBoolean("page_site_throughput_calculator", it).apply()
+            },
+            throughputOrder = throughputBlockOrder.map { it.id },
+            onThroughputOrderChange = { newOrder ->
+                val normalized = normalizeThroughputBlockOrder(newOrder)
+                throughputBlockOrder = normalized
+                prefs.edit().putString(THROUGHPUT_BLOCK_ORDER_PREF, normalized.joinToString(",") { it.id }).apply()
+            },
+            showHeader = visibleThroughputBlocks[ThroughputBlock.Header] ?: true,
+            onHeaderChange = {
+                visibleThroughputBlocks = visibleThroughputBlocks + (ThroughputBlock.Header to it)
+                prefs.edit().putBoolean(ThroughputBlock.Header.prefKey, it).apply()
+            },
+            showSummary = visibleThroughputBlocks[ThroughputBlock.Summary] ?: true,
+            onSummaryChange = {
+                visibleThroughputBlocks = visibleThroughputBlocks + (ThroughputBlock.Summary to it)
+                prefs.edit().putBoolean(ThroughputBlock.Summary.prefKey, it).apply()
+            },
+            showCone = visibleThroughputBlocks[ThroughputBlock.Cone] ?: true,
+            onConeChange = {
+                visibleThroughputBlocks = visibleThroughputBlocks + (ThroughputBlock.Cone to it)
+                prefs.edit().putBoolean(ThroughputBlock.Cone.prefKey, it).apply()
+            },
+            showControls = visibleThroughputBlocks[ThroughputBlock.Controls] ?: true,
+            onControlsChange = {
+                visibleThroughputBlocks = visibleThroughputBlocks + (ThroughputBlock.Controls to it)
+                prefs.edit().putBoolean(ThroughputBlock.Controls.prefKey, it).apply()
+            },
+            showBands = visibleThroughputBlocks[ThroughputBlock.Bands] ?: true,
+            onBandsChange = {
+                visibleThroughputBlocks = visibleThroughputBlocks + (ThroughputBlock.Bands to it)
+                prefs.edit().putBoolean(ThroughputBlock.Bands.prefKey, it).apply()
+            },
+            showAssumptions = visibleThroughputBlocks[ThroughputBlock.Assumptions] ?: true,
+            onAssumptionsChange = {
+                visibleThroughputBlocks = visibleThroughputBlocks + (ThroughputBlock.Assumptions to it)
+                prefs.edit().putBoolean(ThroughputBlock.Assumptions.prefKey, it).apply()
+            },
+            onOpenCalculationDefaults = {
+                showThroughputSettingsSheet = false
+                showThroughputDefaultsSheet = true
+            },
+            onDismiss = { showThroughputSettingsSheet = false },
+            onBack = { showThroughputSettingsSheet = false },
+            sheetState = settingsSheetState,
+            useOneUi = uiStyle.useOneUi,
+            bubbleColor = uiStyle.bubbleColor
+        )
+    }
+
+    if (showThroughputDefaultsSheet) {
+        ThroughputCalculationDefaultsSheet(
+            onDismiss = {
+                showThroughputDefaultsSheet = false
+                refreshThroughputDefaultsFromPrefs()
+            },
+            onBack = {
+                showThroughputDefaultsSheet = false
+                refreshThroughputDefaultsFromPrefs()
+                showThroughputSettingsSheet = true
+            },
+            sheetState = settingsSheetState,
+            useOneUi = uiStyle.useOneUi,
+            bubbleColor = uiStyle.bubbleColor
+        )
     }
 }
 
@@ -2379,4 +2491,3 @@ private data class ThroughputBandResult(
     val excludedReason: String?,
     val downAggregationExcludedReason: String? = null
 )
-

@@ -85,6 +85,8 @@ import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
+import fr.geotower.ui.screens.settings.CompassSettingsSheet
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.ui.screens.map.MapViewModel
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColors
@@ -102,10 +104,12 @@ fun CompassScreen(
 ) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-    val showLocation by remember { mutableStateOf(prefs.getBoolean("show_compass_location", true)) }
-    val showGps by remember { mutableStateOf(prefs.getBoolean("show_compass_gps", true)) }
-    val showAccuracy by remember { mutableStateOf(prefs.getBoolean("show_compass_accuracy", true)) }
-    val compassOrder by remember { mutableStateOf(prefs.getString("compass_order", "location,gps,accuracy")!!.split(",")) }
+    val uiStyle = LocalGeoTowerUiStyle.current
+    var showLocation by remember { mutableStateOf(prefs.getBoolean("show_compass_location", true)) }
+    var showGps by remember { mutableStateOf(prefs.getBoolean("show_compass_gps", true)) }
+    var showAccuracy by remember { mutableStateOf(prefs.getBoolean("show_compass_accuracy", true)) }
+    var compassOrder by remember { mutableStateOf(prefs.getString("compass_order", "location,gps,accuracy")!!.split(",")) }
+    var showCompassSettingsSheet by remember { mutableStateOf(false) }
     val haptic = LocalHapticFeedback.current
     val antennasList by viewModel.antennas.collectAsState()
 
@@ -155,6 +159,7 @@ fun CompassScreen(
     // --- NOUVELLES VARIABLES POUR LE REGROUPEMENT (CLUSTERING) ---
     var selectedClusterSites by remember { mutableStateOf<List<RadarSite>>(emptyList()) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // --- GESTION DES CAPTEURS (Boussole) ---
     DisposableEffect(Unit) {
@@ -350,7 +355,7 @@ fun CompassScreen(
                 contentColor = oncompassBg,
                 backEnabled = !safeBackNavigation.isLocked,
                 actions = {
-                    IconButton(onClick = { navController.navigate("settings?section=compass") }) {
+                    IconButton(onClick = { showCompassSettingsSheet = true }) {
                         Icon(
                             Icons.Default.Settings,
                             contentDescription = stringResource(R.string.appstrings_settings_title),
@@ -523,6 +528,36 @@ fun CompassScreen(
             }
             Spacer(modifier = Modifier.height(32.dp))
         }
+    }
+
+    if (showCompassSettingsSheet) {
+        CompassSettingsSheet(
+            compassOrder = compassOrder,
+            onOrderChange = { newOrder ->
+                compassOrder = newOrder
+                prefs.edit().putString("compass_order", newOrder.joinToString(",")).apply()
+            },
+            showLocation = showLocation,
+            onLocationChange = {
+                showLocation = it
+                prefs.edit().putBoolean("show_compass_location", it).apply()
+            },
+            showGps = showGps,
+            onGpsChange = {
+                showGps = it
+                prefs.edit().putBoolean("show_compass_gps", it).apply()
+            },
+            showAccuracy = showAccuracy,
+            onAccuracyChange = {
+                showAccuracy = it
+                prefs.edit().putBoolean("show_compass_accuracy", it).apply()
+            },
+            onDismiss = { showCompassSettingsSheet = false },
+            onBack = { showCompassSettingsSheet = false },
+            sheetState = settingsSheetState,
+            useOneUi = uiStyle.useOneUi,
+            bubbleColor = uiStyle.bubbleColor
+        )
     }
 }
 

@@ -35,6 +35,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -48,6 +49,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.geotower.R
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.community.CommunityDataFeature
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.ui.components.GeoTowerSwitch
@@ -66,6 +68,7 @@ fun CommunityDataSettingsSheet(
     val context = LocalContext.current
     val configuration = LocalConfiguration.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val featureFlags by RemoteFeatureFlags.config
 
     val themeMode = AppConfig.themeMode.value
     val isOledMode = AppConfig.isOledMode.value
@@ -92,11 +95,13 @@ fun CommunityDataSettingsSheet(
         else -> stringResource(R.string.settings_community_data_desc)
     }
 
-    val enabledStates = remember {
+    val enabledStates = remember(featureFlags) {
         mutableStateMapOf<String, Boolean>().apply {
             CommunityDataPreferences.operators.forEach { operator ->
                 operator.features.forEach { feature ->
-                    feature.sources.forEach { source ->
+                    feature.sources
+                        .filter { source -> featureFlags.isCommunitySourceEnabled(feature.id, source.id) }
+                        .forEach { source ->
                         val key = CommunityDataPreferences.prefKey(operator.key, feature.id, source.id)
                         this[key] = CommunityDataPreferences.isEnabled(prefs, operator.key, feature.id, source.id)
                     }
@@ -104,14 +109,14 @@ fun CommunityDataSettingsSheet(
             }
         }
     }
-    val photosEnabledStates = remember {
+    val photosEnabledStates = remember(featureFlags) {
         mutableStateMapOf<String, Boolean>().apply {
             CommunityDataPreferences.operators.forEach { operator ->
                 this[operator.key] = CommunityDataPreferences.isPhotosEnabled(prefs, operator.key)
             }
         }
     }
-    val sourceOrderStates = remember {
+    val sourceOrderStates = remember(featureFlags) {
         mutableStateMapOf<String, List<String>>().apply {
             CommunityDataPreferences.operators.forEach { operator ->
                 operator.features.forEach { feature ->
@@ -121,11 +126,13 @@ fun CommunityDataSettingsSheet(
             }
         }
     }
-    val fallbackOnlyStates = remember {
+    val fallbackOnlyStates = remember(featureFlags) {
         mutableStateMapOf<String, Boolean>().apply {
             CommunityDataPreferences.operators.forEach { operator ->
                 operator.features.forEach { feature ->
-                    feature.sources.forEach { source ->
+                    feature.sources
+                        .filter { source -> featureFlags.isCommunitySourceEnabled(feature.id, source.id) }
+                        .forEach { source ->
                         val key = CommunityDataPreferences.sourceFallbackPrefKey(operator.key, feature.id, source.id)
                         this[key] = CommunityDataPreferences.isSourceFallbackOnly(prefs, operator.key, feature.id, source.id)
                     }
@@ -178,8 +185,12 @@ fun CommunityDataSettingsSheet(
                 photosEnabledStates[operator.key] = true
                 operator.features.forEach { feature ->
                     sourceOrderStates[CommunityDataPreferences.sourceOrderPrefKey(operator.key, feature.id)] =
-                        feature.sources.map { it.id }
-                    feature.sources.forEach { source ->
+                        feature.sources
+                            .filter { source -> featureFlags.isCommunitySourceEnabled(feature.id, source.id) }
+                            .map { it.id }
+                    feature.sources
+                        .filter { source -> featureFlags.isCommunitySourceEnabled(feature.id, source.id) }
+                        .forEach { source ->
                         enabledStates[CommunityDataPreferences.prefKey(operator.key, feature.id, source.id)] = true
                         fallbackOnlyStates[CommunityDataPreferences.sourceFallbackPrefKey(operator.key, feature.id, source.id)] = false
                     }
@@ -196,10 +207,13 @@ fun CommunityDataSettingsSheet(
             operator.features
                 .filter { feature -> feature.id == featureId }
                 .forEach { feature ->
-                    val defaultOrder = feature.sources.map { it.id }
+                    val availableSources = feature.sources.filter { source ->
+                        featureFlags.isCommunitySourceEnabled(feature.id, source.id)
+                    }
+                    val defaultOrder = availableSources.map { it.id }
                     sourceOrderStates[CommunityDataPreferences.sourceOrderPrefKey(operator.key, feature.id)] = defaultOrder
                     CommunityDataPreferences.setSourceOrder(prefs, operator.key, feature.id, defaultOrder)
-                    feature.sources.forEach { source ->
+                    availableSources.forEach { source ->
                         val enabledKey = CommunityDataPreferences.prefKey(operator.key, feature.id, source.id)
                         val fallbackKey = CommunityDataPreferences.sourceFallbackPrefKey(operator.key, feature.id, source.id)
                         enabledStates[enabledKey] = true
@@ -282,6 +296,9 @@ fun CommunityDataSettingsSheet(
                                 fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.padding(bottom = 4.dp)
                             )
+                            val availableSources = feature.sources.filter { source ->
+                                featureFlags.isCommunitySourceEnabled(feature.id, source.id)
+                            }
                             if (feature.id == CommunityDataPreferences.FEATURE_PHOTOS) {
                                 val photosChecked = photosEnabledStates[operator.key] ?: true
                                 Row(
@@ -300,7 +317,7 @@ fun CommunityDataSettingsSheet(
                                         useOneUi = useOneUi
                                     )
                                 }
-                                if (photosChecked && feature.sources.size > 1) {
+                                if (photosChecked && availableSources.size > 1) {
                                     Text(
                                         text = stringResource(R.string.appstrings_community_data_photo_source_order),
                                         style = MaterialTheme.typography.labelMedium,
@@ -312,9 +329,9 @@ fun CommunityDataSettingsSheet(
                             val sourceOrderKey = CommunityDataPreferences.sourceOrderPrefKey(operator.key, feature.id)
                             val sourceOrder = sourceOrderStates[sourceOrderKey]
                                 ?: CommunityDataPreferences.orderedSources(prefs, operator.key, feature).map { it.id }
-                            val sourcesById = feature.sources.associateBy { it.id }
+                            val sourcesById = availableSources.associateBy { it.id }
                             val orderedSources = sourceOrder.mapNotNull { sourcesById[it] } +
-                                feature.sources.filterNot { it.id in sourceOrder }
+                                availableSources.filterNot { it.id in sourceOrder }
                             val showSources = feature.id != CommunityDataPreferences.FEATURE_PHOTOS ||
                                 (photosEnabledStates[operator.key] ?: true)
                             if (showSources) orderedSources.forEachIndexed { index, source ->

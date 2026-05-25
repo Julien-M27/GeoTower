@@ -26,10 +26,26 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_signalquest)) {
-        item(stringResource(R.string.appstrings_release_signalquest_connection_simplified))
-        item(stringResource(R.string.appstrings_release_signalquest_features_accessible))
-        item(stringResource(R.string.appstrings_release_signalquest_live_photos_available))
+    section(stringResource(R.string.appstrings_release_section_global)) {
+        item(stringResource(R.string.appstrings_release_global_flexible_features))
+        item(stringResource(R.string.appstrings_release_global_home_announcement))
+        item(stringResource(R.string.appstrings_release_global_unavailable_pages))
+        item(stringResource(R.string.appstrings_release_global_localized_update_notes))
+        item(stringResource(R.string.appstrings_release_global_database_version_check))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_statistics)) {
+        item(stringResource(R.string.appstrings_release_statistics_declared_active_sites))
+        item(stringResource(R.string.appstrings_release_statistics_weekly_trends))
+        item(stringResource(R.string.appstrings_release_statistics_custom_frequency_display))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_settings)) {
+        item(stringResource(R.string.appstrings_release_settings_shortcuts_across_screens))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_community_services)) {
+        item(stringResource(R.string.appstrings_release_community_cellularfr_availability))
     }
 }
 

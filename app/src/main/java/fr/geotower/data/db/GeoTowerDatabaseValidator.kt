@@ -8,7 +8,7 @@ import java.util.Locale
 object GeoTowerDatabaseValidator {
     const val DB_NAME = "geotower_fr.db"
     const val EXPECTED_COUNTRY_CODE = "FR"
-    const val EXPECTED_SCHEMA_VERSION = 4
+    const val EXPECTED_SCHEMA_VERSION = 5
 
     private const val LEGACY_DB_NAME = "geotower.db"
     private const val PREFS_NAME = "GeoTowerPrefs"
@@ -136,6 +136,25 @@ object GeoTowerDatabaseValidator {
             "source",
             "date_maj_anfr",
             "zip_version"
+        ),
+        "radio_stat_current" to setOf(
+            "operator_name",
+            "category",
+            "item_key",
+            "label",
+            "total_count",
+            "active_count"
+        ),
+        "radio_stat_weekly" to setOf(
+            "week_key",
+            "week_start",
+            "source_date",
+            "operator_name",
+            "category",
+            "item_key",
+            "label",
+            "total_count",
+            "active_count"
         )
     )
 
@@ -146,7 +165,8 @@ object GeoTowerDatabaseValidator {
         "metadata",
         "ref_operateur",
         "ref_systeme",
-        "ref_statut"
+        "ref_statut",
+        "radio_stat_current"
     )
 
     private val expectedAffinities = mapOf(
@@ -184,6 +204,23 @@ object GeoTowerDatabaseValidator {
             "schema_version" to SQLiteAffinity.INTEGER,
             "country_code" to SQLiteAffinity.TEXT,
             "source" to SQLiteAffinity.TEXT
+        ),
+        "radio_stat_current" to mapOf(
+            "operator_name" to SQLiteAffinity.TEXT,
+            "category" to SQLiteAffinity.TEXT,
+            "item_key" to SQLiteAffinity.TEXT,
+            "total_count" to SQLiteAffinity.INTEGER,
+            "active_count" to SQLiteAffinity.INTEGER
+        ),
+        "radio_stat_weekly" to mapOf(
+            "week_key" to SQLiteAffinity.TEXT,
+            "week_start" to SQLiteAffinity.TEXT,
+            "source_date" to SQLiteAffinity.TEXT,
+            "operator_name" to SQLiteAffinity.TEXT,
+            "category" to SQLiteAffinity.TEXT,
+            "item_key" to SQLiteAffinity.TEXT,
+            "total_count" to SQLiteAffinity.INTEGER,
+            "active_count" to SQLiteAffinity.INTEGER
         )
     )
 
@@ -199,7 +236,9 @@ object GeoTowerDatabaseValidator {
         "ref_systeme" to listOf("id"),
         "ref_statut" to listOf("id"),
         "ref_commune" to listOf("code_insee"),
-        "metadata" to listOf("version")
+        "metadata" to listOf("version"),
+        "radio_stat_current" to listOf("operator_name", "category", "item_key"),
+        "radio_stat_weekly" to listOf("week_key", "operator_name", "category", "item_key")
     )
 
     private val requiredNotNullColumns = mapOf(
@@ -214,7 +253,9 @@ object GeoTowerDatabaseValidator {
         "ref_systeme" to listOf("id", "libelle"),
         "ref_statut" to listOf("id", "libelle"),
         "ref_commune" to listOf("code_insee", "nom"),
-        "metadata" to listOf("version", "schema_version", "country_code", "source")
+        "metadata" to listOf("version", "schema_version", "country_code", "source"),
+        "radio_stat_current" to listOf("operator_name", "category", "item_key", "total_count", "active_count"),
+        "radio_stat_weekly" to listOf("week_key", "operator_name", "category", "item_key", "total_count", "active_count")
     )
 
     fun getInstalledDatabaseStatus(context: Context): LocalDatabaseStatus {

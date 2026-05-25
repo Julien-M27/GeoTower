@@ -126,6 +126,7 @@ import androidx.compose.material.icons.filled.Place
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.components.GeoTowerBackTopBar
@@ -245,6 +246,7 @@ fun SettingsScreen(
     var themeMode by AppConfig.themeMode
     var isOledMode by AppConfig.isOledMode
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val featureFlags by RemoteFeatureFlags.config
     val uiStyle = LocalGeoTowerUiStyle.current
     var showUnitSheet by remember { mutableStateOf(false) }
     var showColorPalettePage by remember { mutableStateOf(false) }
@@ -427,6 +429,7 @@ fun SettingsScreen(
     var showMapToolbox by remember { mutableStateOf(prefs.getBoolean("show_map_toolbox", true)) }
     var showMapCompass by remember { mutableStateOf(prefs.getBoolean("show_map_compass", true)) }
 
+    var showStatsSettingsSheet by remember { mutableStateOf(false) }
     var showCompassSettingsSheet by remember { mutableStateOf(false) }
     var compassOrder by remember { mutableStateOf(prefs.getString("compass_order", "location,gps,accuracy")!!.split(",")) }
     var showCompassLocation by remember { mutableStateOf(prefs.getBoolean("show_compass_location", true)) }
@@ -918,7 +921,7 @@ fun SettingsScreen(
             )
         }
         // --- NOUVEAU MENU DE PERSONNALISATION DES PAGES ---
-        if (showPagesCustomizationSheet) {
+        if (showPagesCustomizationSheet && featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.PAGES_CUSTOMIZATION)) {
             PagesCustomizationSheet(
                 onDismiss = { showPagesCustomizationSheet = false },
                 sheetState = sheetState,
@@ -928,6 +931,7 @@ fun SettingsScreen(
                 onNearbyClick = { safeClick { showPagesCustomizationSheet = false; showNearbySettingsSheet = true } },
                 onMapClick = { safeClick { showPagesCustomizationSheet = false; showMapSettingsSheet = true } },
                 onCompassClick = { safeClick { showPagesCustomizationSheet = false; showCompassSettingsSheet = true } },
+                onStatsClick = { safeClick { showPagesCustomizationSheet = false; showStatsSettingsSheet = true } },
                 onSupportClick = { safeClick { showPagesCustomizationSheet = false; showSupportSettingsSheet = true } },
                 onSiteClick = { safeClick { showPagesCustomizationSheet = false; showSiteSettingsSheet = true } },
                 onThroughputCalculatorClick = { safeClick { showPagesCustomizationSheet = false; showThroughputCalculatorSettingsSheet = true } },
@@ -962,7 +966,7 @@ fun SettingsScreen(
         }
 
         // ✅ AJOUT : Fenêtre des Photos & Schémas
-        if (showPhotosSettingsSheet) {
+        if (showPhotosSettingsSheet && featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.PHOTO_SETTINGS)) {
             fr.geotower.ui.screens.settings.SitePhotosSettingsSheet(
                 onDismiss = { showPhotosSettingsSheet = false },
                 onBack = {
@@ -1242,6 +1246,16 @@ fun SettingsScreen(
             )
         }
         // --- NOUVELLES FENÊTRES ---
+        if (showStatsSettingsSheet) {
+            StatsSettingsSheet(
+                onDismiss = { showStatsSettingsSheet = false },
+                onBack = { safeClick { showStatsSettingsSheet = false; showPagesCustomizationSheet = true } },
+                sheetState = sheetState,
+                useOneUi = useOneUi,
+                bubbleColor = bubbleBaseColor
+            )
+        }
+
         if (showSupportSettingsSheet) {
             SupportSettingsSheet(
                 supportOrder = pageSupportOrder, onOrderChange = { pageSupportOrder = it; prefs.edit().putString("page_support_order", it.joinToString(",")).apply() },
@@ -1359,7 +1373,7 @@ fun SettingsScreen(
 
         // --- MENU DES PRÉFÉRENCES DE PARTAGE ---
         // --- SOUS-MENU DE SÉLECTION DU PARTAGE ---
-        if (showShareSelectorSheet) {
+        if (showShareSelectorSheet && featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.SHARE_SETTINGS)) {
             val sheetBgColor2 =
                 if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
             val shareSelectorScrollState = rememberScrollState()
@@ -1425,7 +1439,7 @@ fun SettingsScreen(
         }
 
         // --- MENU PRÉFÉRENCES PARTAGE PYLÔNE (SUPPORT) ---
-        if (showSupportSharePrefsSheet) {
+        if (showSupportSharePrefsSheet && featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.SHARE_SETTINGS)) {
             SupportSharePreferencesSheet(
                 shareOrder = shareSupOrder,
                 onOrderChange = { newOrder ->
@@ -1465,7 +1479,7 @@ fun SettingsScreen(
                 bubbleColor = bubbleBaseColor
             )
         }
-        if (showCommunityDataSheet) {
+        if (showCommunityDataSheet && featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.COMMUNITY_DATA_SETTINGS)) {
             CommunityDataSettingsSheet(
                 onDismiss = {
                     showCommunityDataSheet = false
@@ -1482,14 +1496,14 @@ fun SettingsScreen(
                 featureId = communityDataSettingsFeatureId
             )
         }
-        if (showExternalLinksSheet) {
+        if (showExternalLinksSheet && featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.EXTERNAL_LINKS_SETTINGS)) {
             ExternalLinksSettingsSheet(
                 onDismiss = { showExternalLinksSheet = false },
                 sheetState = sheetState,
                 useOneUi = useOneUi
             )
         }
-        if (showSharePrefsSheet) {
+        if (showSharePrefsSheet && featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.SHARE_SETTINGS)) {
             SharePreferencesSheet(
                 shareOrder = shareOrder,
                 onOrderChange = { newOrder ->
@@ -1565,7 +1579,7 @@ fun SettingsScreen(
         }
     }
     // ✅ AJOUT : FENÊTRE DES PRÉFÉRENCES DE PARTAGE DE LA CARTE
-    if (showMapSharePrefsSheet) {
+    if (showMapSharePrefsSheet && featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.SHARE_SETTINGS)) {
         MapSharePreferencesSheet(
             // ✅ On change 'compass' par 'azimuths'
             azimuthsEnabled = shareMapAzimuths,
@@ -1789,6 +1803,8 @@ fun SectionPreferences(
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
     // ✅ NOUVEAU : Le lanceur magique qui déclenche le menu Android spécifique !
+    val featureFlags by RemoteFeatureFlags.config
+
     val bgLocationLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
         onResult = { /* L'interface de Jetpack Compose se mettra à jour toute seule */ }
@@ -2020,43 +2036,49 @@ fun SectionPreferences(
     )
     Spacer(Modifier.height(12.dp))
 
-    PreferenceActionCard(
-        title = stringResource(R.string.settings_pages_customization_title),
-        desc = stringResource(R.string.settings_pages_customization_desc),
-        onClick = onPages,
-        shape = shape,
-        border = border,
-        bubbleColor = bubbleColor,
-        useOneUi = useOneUi,
-        safeClick = safeClick,
-        icon = Icons.Default.Edit
-    )
-    Spacer(Modifier.height(12.dp))
-    PreferenceActionCard(
-        title = stringResource(R.string.settings_external_links_title),
-        desc = stringResource(R.string.settings_external_links_desc),
-        onClick = onExternalLinks,
-        shape = shape,
-        border = border,
-        bubbleColor = bubbleColor,
-        useOneUi = useOneUi,
-        safeClick = safeClick,
-        icon = Icons.Default.Language
-    )
-    Spacer(Modifier.height(12.dp))
+    if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.PAGES_CUSTOMIZATION)) {
+        PreferenceActionCard(
+            title = stringResource(R.string.settings_pages_customization_title),
+            desc = stringResource(R.string.settings_pages_customization_desc),
+            onClick = onPages,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick,
+            icon = Icons.Default.Edit
+        )
+        Spacer(Modifier.height(12.dp))
+    }
+    if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.EXTERNAL_LINKS_SETTINGS)) {
+        PreferenceActionCard(
+            title = stringResource(R.string.settings_external_links_title),
+            desc = stringResource(R.string.settings_external_links_desc),
+            onClick = onExternalLinks,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick,
+            icon = Icons.Default.Language
+        )
+        Spacer(Modifier.height(12.dp))
+    }
 
-    PreferenceActionCard(
-        title = stringResource(R.string.settings_default_share_content_title),
-        desc = stringResource(R.string.settings_default_share_content_desc),
-        onClick = onSharePrefs,
-        shape = shape,
-        border = border,
-        bubbleColor = bubbleColor,
-        useOneUi = useOneUi,
-        safeClick = safeClick,
-        icon = Icons.Default.Share
-    )
-    Spacer(Modifier.height(12.dp))
+    if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.SHARE_SETTINGS)) {
+        PreferenceActionCard(
+            title = stringResource(R.string.settings_default_share_content_title),
+            desc = stringResource(R.string.settings_default_share_content_desc),
+            onClick = onSharePrefs,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick,
+            icon = Icons.Default.Share
+        )
+        Spacer(Modifier.height(12.dp))
+    }
 
     // --- NOUVEAU : BOUTON D'AUTORISATION ARRIÈRE-PLAN ---
     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {

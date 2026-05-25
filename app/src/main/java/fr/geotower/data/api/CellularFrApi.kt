@@ -3,6 +3,7 @@ package fr.geotower.data.api
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.utils.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -17,7 +18,8 @@ data class CellularFrPhoto(
 
 object CellularFrApi {
     // CellularFR masqué — voir CellularFrApi.ENABLED
-    const val ENABLED = false
+    val isEnabled: Boolean
+        get() = RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.CELLULARFR_PHOTOS)
 
     private const val TAG = "GeoTowerCellularFR"
     private const val BASE_URL = "https://cellularfr.fr/"
@@ -25,7 +27,7 @@ object CellularFrApi {
 
     suspend fun getCellularFrPhotos(siteId: String): List<CellularFrPhoto> = withContext(Dispatchers.IO) {
         // CellularFR masqué — voir CellularFrApi.ENABLED
-        if (!ENABLED) return@withContext emptyList()
+        if (!isEnabled) return@withContext emptyList()
         if (siteId.isBlank()) return@withContext emptyList()
 
         val url = BASE_URL.toHttpUrl().newBuilder()

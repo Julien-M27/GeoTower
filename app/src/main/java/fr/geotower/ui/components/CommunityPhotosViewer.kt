@@ -101,6 +101,7 @@ import java.text.NumberFormat
 import java.util.Locale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import fr.geotower.data.config.RemoteFeatureFlags
 import kotlin.math.roundToInt
 
 // Modèle de données unifié
@@ -477,6 +478,7 @@ fun CommunityPhotosSectionShared(
 ) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val featureFlags by RemoteFeatureFlags.config
 
     val dataOperators = operatorNames.ifEmpty { listOf(operatorName) }
     val dataOperatorKeys = remember(dataOperators, AppConfig.defaultOperator.value) {
@@ -639,6 +641,7 @@ fun CommunityPhotosSectionShared(
     // --- SÉCURITÉ : On vérifie bien la liste FILTRÉE ---
     // --- NOUVEAU : On vérifie si l'opérateur est supporté par SignalQuest ---
     val canUpload = SignalQuestOperators.supports(operatorName) &&
+            featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD) &&
             CommunityDataPreferences.isSignalQuestPhotosEnabled(prefs, operatorName)
 
     // ✅ NOUVEAU : On vérifie si on est en ligne en réutilisant ta fonction MapScreen

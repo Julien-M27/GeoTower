@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.*
 import androidx.navigation.navArgument
@@ -45,6 +46,7 @@ import fr.geotower.utils.GeoTowerLocaleProvider
 import fr.geotower.utils.OperatorColors
 import fr.geotower.data.api.RetrofitClient
 import fr.geotower.data.api.SignalQuestOperators
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.services.LiveTrackingController
 
 
@@ -94,6 +96,18 @@ object AppGlobalState {
     const val EXTRA_UPLOAD_RESULT_HAS_ERRORS = "SQ_UPLOAD_RESULT_HAS_ERRORS"
 }
 
+@Composable
+private fun DisabledFeatureRoute(navController: NavHostController, message: String) {
+    val context = LocalContext.current
+    LaunchedEffect(message) {
+        Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+        navController.navigate("home") {
+            launchSingleTop = true
+            popUpTo("home") { inclusive = false }
+        }
+    }
+}
+
 class MainActivity : ComponentActivity() {
 
     // 🌟 1. LE CANAL POUR LA NOTIFICATION
@@ -105,6 +119,9 @@ class MainActivity : ComponentActivity() {
     // 🌟 2. ATTRAPER LE CLIC QUAND L'APP EST EN ARRIÈRE-PLAN
     override fun onResume() {
         super.onResume()
+        lifecycleScope.launch {
+            RemoteFeatureFlags.refreshIfNeeded(this@MainActivity, force = true)
+        }
         val prefs = getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("isFirstRun", true)) {
             LiveTrackingController.startOnAppLaunchIfEnabled(this)
@@ -318,6 +335,8 @@ class MainActivity : ComponentActivity() {
             val selectedPaletteKey by AppConfig.colorPalette
             val context = LocalContext.current
             val txtPhotoPrepareError = stringResource(R.string.signalquest_prepare_photos_failed)
+            val txtUnavailable = stringResource(R.string.appstrings_unavailable)
+            val featureFlags by RemoteFeatureFlags.config
 
             // ✅ NOUVEAU : On écoute la fin du téléchargement globalement
             val workManager = remember { androidx.work.WorkManager.getInstance(context) }
@@ -433,19 +452,27 @@ class MainActivity : ComponentActivity() {
 
                             // Carte
                             composable("map") {
-                                MapScreen(
-                                    navController = navController,
-                                    viewModel = sharedMapViewModel
-                                )
+                                if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
+                                    MapScreen(
+                                        navController = navController,
+                                        viewModel = sharedMapViewModel
+                                    )
+                                } else {
+                                    DisabledFeatureRoute(navController, txtUnavailable)
+                                }
                             }
 
                             // Boussole
                             composable("compass") {
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    CompassScreen(
-                                        navController = navController,
-                                        viewModel = sharedMapViewModel
-                                    )
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)) {
+                                        CompassScreen(
+                                            navController = navController,
+                                            viewModel = sharedMapViewModel
+                                        )
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
                                 }
                             }
 
@@ -453,7 +480,11 @@ class MainActivity : ComponentActivity() {
                             composable("stats") {
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     // ✅ AJOUT DU REPOSITORY ICI 👇
-                                    StatisticsScreen(navController = navController, repository = repository)
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
+                                        StatisticsScreen(navController = navController, repository = repository)
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
                                 }
                             }
 
@@ -483,18 +514,26 @@ class MainActivity : ComponentActivity() {
                             ) { backStackEntry ->
                                 val tech = backStackEntry.arguments?.getString("tech").orEmpty()
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    FrequencyStatsDetailScreen(
-                                        navController = navController,
-                                        repository = repository,
-                                        tech = tech
-                                    )
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
+                                        FrequencyStatsDetailScreen(
+                                            navController = navController,
+                                            repository = repository,
+                                            tech = tech
+                                        )
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
                                 }
                             }
 
                             // Emetteurs
                             composable("emitters") {
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    NearEmittersSupportWrapperScreen(navController, repository)
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)) {
+                                        NearEmittersSupportWrapperScreen(navController, repository)
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
                                 }
                             }
 
@@ -559,7 +598,11 @@ class MainActivity : ComponentActivity() {
                                 // Convertir en Long si ta BDD utilise un Long, ou adapter la query
                                 val idLong = id.toLongOrNull() ?: 0L
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    fr.geotower.ui.screens.emitters.SupportSiteWrapperScreen(navController, repository, idLong, highlightedOperatorKey = highlightedOperatorKey)
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SUPPORT_DETAIL)) {
+                                        fr.geotower.ui.screens.emitters.SupportSiteWrapperScreen(navController, repository, idLong, highlightedOperatorKey = highlightedOperatorKey)
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
                                 }
                             }
 
@@ -572,7 +615,11 @@ class MainActivity : ComponentActivity() {
                                 val id = backStackEntry.arguments?.getString("id") ?: ""
                                 val idLong = id.toLongOrNull() ?: 0L
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    SiteDetailToolWrapperScreen(navController, repository, idLong)
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)) {
+                                        SiteDetailToolWrapperScreen(navController, repository, idLong)
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
                                 }
                             }
                             composable(
@@ -590,7 +637,11 @@ class MainActivity : ComponentActivity() {
                             ) { backStackEntry ->
                                 val id = backStackEntry.arguments?.getString("id") ?: ""
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    ThroughputCalculatorScreen(navController, repository, id)
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THROUGHPUT_CALCULATOR)) {
+                                        ThroughputCalculatorScreen(navController, repository, id)
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
                                 }
                             }
 
@@ -624,6 +675,13 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 Box(modifier = Modifier.padding(innerPadding)) {
+                                    if (!featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD)) {
+                                        LaunchedEffect(Unit) {
+                                            Toast.makeText(context, txtUnavailable, Toast.LENGTH_SHORT).show()
+                                            navController.popBackStack()
+                                        }
+                                        return@Box
+                                    }
                                     SignalQuestUploadScreen(
                                         imageUris = uris,
                                         siteId = siteId,
@@ -633,6 +691,10 @@ class MainActivity : ComponentActivity() {
                                         azimuts = decodedAzimuts,
                                         onNavigateBack = { navController.popBackStack() },
                                         onStartUpload = { finalUris, description, stripExifBeforeUpload ->
+                                            if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD)) {
+                                                Toast.makeText(context, txtUnavailable, Toast.LENGTH_SHORT).show()
+                                                return@SignalQuestUploadScreen
+                                            }
                                             lifecycleScope.launch {
                                                 try {
                                                     val manifest = withContext(Dispatchers.IO) {

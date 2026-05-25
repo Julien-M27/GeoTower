@@ -60,6 +60,7 @@ import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.CellularFrApi
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
@@ -71,6 +72,11 @@ import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
+import fr.geotower.ui.screens.settings.CommunityDataSettingsSheet
+import fr.geotower.ui.screens.settings.MiniMapSettingsSheet
+import fr.geotower.ui.screens.settings.SitePhotosSettingsSheet
+import fr.geotower.ui.screens.settings.SupportSettingsSheet
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.OperatorColors
@@ -97,6 +103,7 @@ fun SupportDetailScreen(
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val currentView = LocalView.current
+    val uiStyle = LocalGeoTowerUiStyle.current
 
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
@@ -115,6 +122,7 @@ fun SupportDetailScreen(
 
     val safeClick = rememberSafeClick()
     val effectiveHighlightedOperatorKey = OperatorColors.keyFor(highlightedOperatorKey)
+    val featureFlags by RemoteFeatureFlags.config
 
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "emitters")
 
@@ -136,9 +144,14 @@ fun SupportDetailScreen(
 
     var showNavigationSheet by remember { mutableStateOf(false) }
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val pageSettingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showSupportSettingsSheet by remember { mutableStateOf(false) }
+    var showSupportMiniMapSettingsSheet by remember { mutableStateOf(false) }
+    var showSupportPhotosSettingsSheet by remember { mutableStateOf(false) }
+    var showCommunityDataSettingsSheet by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
-    LaunchedEffect(siteId, effectiveHighlightedOperatorKey) {
+    LaunchedEffect(siteId, effectiveHighlightedOperatorKey, featureFlags) {
         // 1️⃣ CHARGEMENT RAPIDE (Base de données) -> Bloque l'écran une fraction de seconde
         try {
             isLoading = true
@@ -257,7 +270,7 @@ fun SupportDetailScreen(
 
                 if (!trueSupportId.isNullOrBlank()) {
                     // CellularFR masqué — voir CellularFrApi.ENABLED
-                    if (false && hasCellularFrPhotos) {
+                    if (hasCellularFrPhotos) {
                         CellularFrApi.getCellularFrPhotos(trueSupportId).forEach { photo ->
                             photosTemp.add(
                                 CommunityPhoto(
@@ -396,8 +409,8 @@ fun SupportDetailScreen(
     val txtUnknown = stringResource(R.string.appstrings_unknown)
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-    val miniMapDefaultMode = remember {
-        MiniMapViewMode.fromStorageKey(prefs.getString("page_support_mini_map_mode", null))
+    var miniMapDefaultMode by remember {
+        mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString("page_support_mini_map_mode", null)))
     }
 
     fun normalizeSupportOrder(order: List<String>): List<String> {
@@ -419,14 +432,14 @@ fun SupportDetailScreen(
         navController.navigate("map")
     }
 
-    val pageSupportOrder by remember { mutableStateOf(normalizeSupportOrder(prefs.getString("page_support_order", "map,details,photos,open_map,nav,share,operators")!!.split(","))) }
-    val showMap by remember { mutableStateOf(prefs.getBoolean("page_support_map", true)) }
-    val showDetails by remember { mutableStateOf(prefs.getBoolean("page_support_details", true)) }
+    var pageSupportOrder by remember { mutableStateOf(normalizeSupportOrder(prefs.getString("page_support_order", "map,details,photos,open_map,nav,share,operators")!!.split(","))) }
+    var showMap by remember { mutableStateOf(prefs.getBoolean("page_support_map", true)) }
+    var showDetails by remember { mutableStateOf(prefs.getBoolean("page_support_details", true)) }
     val showPhotos by AppConfig.siteShowPhotos
-    val showOpenMap by remember { mutableStateOf(prefs.getBoolean("page_support_open_map", true)) }
-    val showNav by remember { mutableStateOf(prefs.getBoolean("page_support_nav", true)) }
-    val showShare by remember { mutableStateOf(prefs.getBoolean("page_support_share", true)) }
-    val showOperators by remember { mutableStateOf(prefs.getBoolean("page_support_operators", true)) }
+    var showOpenMap by remember { mutableStateOf(prefs.getBoolean("page_support_open_map", true)) }
+    var showNav by remember { mutableStateOf(prefs.getBoolean("page_support_nav", true)) }
+    var showShare by remember { mutableStateOf(prefs.getBoolean("page_support_share", true)) }
+    var showOperators by remember { mutableStateOf(prefs.getBoolean("page_support_operators", true)) }
 
     Scaffold(
         containerColor = mainBgColor,
@@ -444,7 +457,7 @@ fun SupportDetailScreen(
                 backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
                 actions = {
                     IconButton(
-                        onClick = { safeClick { navController.navigate("settings?section=support") } }
+                        onClick = { safeClick { showSupportSettingsSheet = true } }
                     ) {
                         Icon(
                             Icons.Default.Settings,
@@ -620,6 +633,110 @@ fun SupportDetailScreen(
                 onDismiss = { showNavigationSheet = false },
                 sheetState = sheetState,
                 useOneUi = useOneUi
+            )
+        }
+
+        if (showSupportSettingsSheet) {
+            SupportSettingsSheet(
+                supportOrder = pageSupportOrder,
+                onOrderChange = {
+                    pageSupportOrder = normalizeSupportOrder(it)
+                    prefs.edit().putString("page_support_order", pageSupportOrder.joinToString(",")).apply()
+                },
+                showMap = showMap,
+                onMapChange = {
+                    showMap = it
+                    prefs.edit().putBoolean("page_support_map", it).apply()
+                },
+                showDetails = showDetails,
+                onDetailsChange = {
+                    showDetails = it
+                    prefs.edit().putBoolean("page_support_details", it).apply()
+                },
+                showPhotos = showPhotos,
+                onPhotosChange = {
+                    AppConfig.siteShowPhotos.value = it
+                    prefs.edit().putBoolean("site_show_photos", it).apply()
+                },
+                showOpenMap = showOpenMap,
+                onOpenMapChange = {
+                    showOpenMap = it
+                    prefs.edit().putBoolean("page_support_open_map", it).apply()
+                },
+                showNav = showNav,
+                onNavChange = {
+                    showNav = it
+                    prefs.edit().putBoolean("page_support_nav", it).apply()
+                },
+                showShare = showShare,
+                onShareChange = {
+                    showShare = it
+                    prefs.edit().putBoolean("page_support_share", it).apply()
+                },
+                showOperators = showOperators,
+                onOperatorsChange = {
+                    showOperators = it
+                    prefs.edit().putBoolean("page_support_operators", it).apply()
+                },
+                onOpenMiniMapSettings = {
+                    showSupportSettingsSheet = false
+                    showSupportMiniMapSettingsSheet = true
+                },
+                onOpenPhotosSettings = {
+                    showSupportSettingsSheet = false
+                    showSupportPhotosSettingsSheet = true
+                },
+                onDismiss = { showSupportSettingsSheet = false },
+                onBack = { showSupportSettingsSheet = false },
+                sheetState = pageSettingsSheetState,
+                useOneUi = uiStyle.useOneUi,
+                bubbleColor = uiStyle.bubbleColor
+            )
+        }
+
+        if (showSupportMiniMapSettingsSheet) {
+            MiniMapSettingsSheet(
+                selectedMode = miniMapDefaultMode,
+                onModeChange = {
+                    miniMapDefaultMode = it
+                    prefs.edit().putString("page_support_mini_map_mode", it.storageKey).apply()
+                },
+                onDismiss = { showSupportMiniMapSettingsSheet = false },
+                onBack = {
+                    showSupportMiniMapSettingsSheet = false
+                    showSupportSettingsSheet = true
+                },
+                sheetState = pageSettingsSheetState,
+                useOneUi = uiStyle.useOneUi,
+                bubbleColor = uiStyle.bubbleColor
+            )
+        }
+
+        if (showSupportPhotosSettingsSheet) {
+            SitePhotosSettingsSheet(
+                onDismiss = { showSupportPhotosSettingsSheet = false },
+                onBack = {
+                    showSupportPhotosSettingsSheet = false
+                    showSupportSettingsSheet = true
+                },
+                photosVisible = showPhotos,
+                onPhotosVisibilityChange = {
+                    AppConfig.siteShowPhotos.value = it
+                    prefs.edit().putBoolean("site_show_photos", it).apply()
+                },
+                onOpenCommunityDataSettings = {
+                    showSupportPhotosSettingsSheet = false
+                    showCommunityDataSettingsSheet = true
+                }
+            )
+        }
+
+        if (showCommunityDataSettingsSheet) {
+            CommunityDataSettingsSheet(
+                onDismiss = { showCommunityDataSettingsSheet = false },
+                sheetState = pageSettingsSheetState,
+                useOneUi = uiStyle.useOneUi,
+                featureId = CommunityDataPreferences.FEATURE_PHOTOS
             )
         }
     }

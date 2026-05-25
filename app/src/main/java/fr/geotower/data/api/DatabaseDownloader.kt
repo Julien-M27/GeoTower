@@ -21,7 +21,7 @@ object DatabaseDownloader {
 
     private const val DB_URL = "https://api.cajejuma.fr/api/v2/download/db"
     private const val DB_INFO_URL = "https://api.cajejuma.fr/api/v2/db/info"
-    private const val DB_VERSION_URL = "https://api.cajejuma.fr/api/v2/download/version"
+    private const val DB_VERSION_URL = "https://api.cajejuma.fr/api/v2/download/version_fr"
     private const val DB_NAME = GeoTowerDatabaseValidator.DB_NAME
     private val downloadClient: OkHttpClient by lazy {
         RetrofitClient.currentClient.newBuilder()

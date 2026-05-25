@@ -58,6 +58,7 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -88,6 +89,8 @@ import fr.geotower.data.api.NominatimApi
 import fr.geotower.data.api.NominatimGeoPoint
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
+import fr.geotower.ui.screens.settings.NearbySettingsSheet
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.LocationHelper
@@ -184,6 +187,7 @@ fun NearEmittersScreen(
     } else {
         MaterialTheme.colorScheme.surfaceContainer
     }
+    val uiStyle = LocalGeoTowerUiStyle.current
 
     val safeClick = rememberSafeClick()
 
@@ -210,10 +214,13 @@ fun NearEmittersScreen(
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-    val showSearchBar by remember { mutableStateOf(prefs.getBoolean("show_search_bar", true)) }
-    val showSearchSuggestions by remember { mutableStateOf(prefs.getBoolean("show_search_suggestions", true)) }
-    val showNearbySites by remember { mutableStateOf(prefs.getBoolean("show_nearby_sites", true)) }
-    val nearbyOrder by remember { mutableStateOf(prefs.getString("nearby_order", "search,sites")!!.split(",")) }
+    var showSearchBar by remember { mutableStateOf(prefs.getBoolean("show_search_bar", true)) }
+    var showSearchSuggestions by remember { mutableStateOf(prefs.getBoolean("show_search_suggestions", true)) }
+    var showNearbySites by remember { mutableStateOf(prefs.getBoolean("show_nearby_sites", true)) }
+    var nearbyOrder by remember { mutableStateOf(prefs.getString("nearby_order", "search,sites")!!.split(",")) }
+    var nearbySearchRadius by remember { mutableIntStateOf(prefs.getInt("nearby_search_radius", 5)) }
+    var showNearbySettingsSheet by remember { mutableStateOf(false) }
+    val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val searchedOperatorKey = remember(searchQuery) {
         val spec = parseNearbySearchQuery(searchQuery)
         if (spec.field == NearbySearchField.Operator) {
@@ -597,7 +604,7 @@ fun NearEmittersScreen(
                 backgroundColor = mainBgColor,
                 backEnabled = !safeBackNavigation.isLocked,
                 actions = {
-                    IconButton(onClick = { safeClick { navController.navigate("settings?section=nearby") } }) {
+                    IconButton(onClick = { safeClick { showNearbySettingsSheet = true } }) {
                         Icon(
                             Icons.Default.Settings,
                             contentDescription = stringResource(R.string.appstrings_settings_title),
@@ -813,6 +820,41 @@ fun NearEmittersScreen(
                 }
             }
         }
+    }
+
+    if (showNearbySettingsSheet) {
+        NearbySettingsSheet(
+            nearbyOrder = nearbyOrder,
+            onOrderChange = { newOrder ->
+                nearbyOrder = newOrder
+                prefs.edit().putString("nearby_order", newOrder.joinToString(",")).apply()
+            },
+            showSearch = showSearchBar,
+            onSearchChange = {
+                showSearchBar = it
+                prefs.edit().putBoolean("show_search_bar", it).apply()
+            },
+            showSuggestions = showSearchSuggestions,
+            onSuggestionsChange = {
+                showSearchSuggestions = it
+                prefs.edit().putBoolean("show_search_suggestions", it).apply()
+            },
+            showSites = showNearbySites,
+            onSitesChange = {
+                showNearbySites = it
+                prefs.edit().putBoolean("show_nearby_sites", it).apply()
+            },
+            searchRadius = nearbySearchRadius,
+            onRadiusChange = {
+                nearbySearchRadius = it
+                prefs.edit().putInt("nearby_search_radius", it).apply()
+            },
+            onDismiss = { showNearbySettingsSheet = false },
+            onBack = { showNearbySettingsSheet = false },
+            sheetState = settingsSheetState,
+            useOneUi = uiStyle.useOneUi,
+            bubbleColor = uiStyle.bubbleColor
+        )
     }
 }
 

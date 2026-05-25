@@ -7,6 +7,8 @@ import androidx.room.RoomDatabase
 import fr.geotower.data.models.AntenneDbEntity
 import fr.geotower.data.models.LocalisationDbEntity
 import fr.geotower.data.models.MetadataDbEntity
+import fr.geotower.data.models.RadioStatCurrentDbEntity
+import fr.geotower.data.models.RadioStatWeeklyDbEntity
 import fr.geotower.data.models.RefCommuneDbEntity
 import fr.geotower.data.models.RefNatureDbEntity
 import fr.geotower.data.models.RefOperateurDbEntity
@@ -30,7 +32,9 @@ import fr.geotower.data.models.TechniqueDbEntity
         RefSystemeDbEntity::class,
         RefStatutDbEntity::class,
         RefCommuneDbEntity::class,
-        MetadataDbEntity::class
+        MetadataDbEntity::class,
+        RadioStatCurrentDbEntity::class,
+        RadioStatWeeklyDbEntity::class
     ],
     version = GeoTowerDatabaseValidator.EXPECTED_SCHEMA_VERSION,
     exportSchema = true

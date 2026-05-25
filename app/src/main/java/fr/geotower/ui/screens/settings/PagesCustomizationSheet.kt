@@ -26,6 +26,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Launch
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Home
@@ -85,15 +86,19 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.rememberReorderableDragState
 import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.ui.components.MiniMapViewMode
 import kotlin.math.roundToInt
+import fr.geotower.utils.StatsDisplayMode
+import fr.geotower.utils.StatsPreferences
 import fr.geotower.utils.ThroughputDisplayText
 
 
@@ -108,6 +113,7 @@ fun PagesCustomizationSheet(
     onNearbyClick: () -> Unit,
     onMapClick: () -> Unit,
     onCompassClick: () -> Unit,
+    onStatsClick: () -> Unit,
     // --- NOUVEAUX PARAMÈTRES ---
     onSupportClick: () -> Unit,
     onSiteClick: () -> Unit,
@@ -119,6 +125,7 @@ fun PagesCustomizationSheet(
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
     val scrollState = rememberScrollState()
+    val featureFlags by RemoteFeatureFlags.config
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         Column(
@@ -154,16 +161,29 @@ fun PagesCustomizationSheet(
 
             // 2. Les menus individuels des pages
             NavigationMenuItem(title = stringResource(R.string.appstrings_page_home_settings), icon = Icons.Default.Home, isSelected = false, isDark = isDark) { onHomeClick() }
-            NavigationMenuItem(title = stringResource(R.string.appstrings_page_nearby_settings), icon = Icons.Default.NearMe, isSelected = false, isDark = isDark) { onNearbyClick() }
-            NavigationMenuItem(title = stringResource(R.string.appstrings_page_map_settings), icon = Icons.Default.Map, isSelected = false, isDark = isDark) { onMapClick() }
-            if (AppConfig.hasCompass.value) {
+            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)) {
+                NavigationMenuItem(title = stringResource(R.string.appstrings_page_nearby_settings), icon = Icons.Default.NearMe, isSelected = false, isDark = isDark) { onNearbyClick() }
+            }
+            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
+                NavigationMenuItem(title = stringResource(R.string.appstrings_page_map_settings), icon = Icons.Default.Map, isSelected = false, isDark = isDark) { onMapClick() }
+            }
+            if (AppConfig.hasCompass.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)) {
                 NavigationMenuItem(title = stringResource(R.string.appstrings_page_compass_settings), icon = Icons.Default.Explore, isSelected = false, isDark = isDark) { onCompassClick() }
+            }
+            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
+                NavigationMenuItem(title = stringResource(R.string.appstrings_stats_title), icon = Icons.Default.BarChart, isSelected = false, isDark = isDark) { onStatsClick() }
             }
 
             // --- NOUVELLES SECTIONS ---
-            NavigationMenuItem(title = stringResource(R.string.appstrings_page_support_settings), icon = Icons.Default.VerticalAlignTop, isSelected = false, isDark = isDark) { onSupportClick() }
-            NavigationMenuItem(title = stringResource(R.string.appstrings_page_site_settings), icon = Icons.Default.WifiTethering, isSelected = false, isDark = isDark) { onSiteClick() }
-            NavigationMenuItem(title = stringResource(R.string.appstrings_throughput_calculator_title), icon = Icons.Default.Speed, isSelected = false, isDark = isDark) { onThroughputCalculatorClick() }
+            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SUPPORT_DETAIL)) {
+                NavigationMenuItem(title = stringResource(R.string.appstrings_page_support_settings), icon = Icons.Default.VerticalAlignTop, isSelected = false, isDark = isDark) { onSupportClick() }
+            }
+            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)) {
+                NavigationMenuItem(title = stringResource(R.string.appstrings_page_site_settings), icon = Icons.Default.WifiTethering, isSelected = false, isDark = isDark) { onSiteClick() }
+            }
+            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THROUGHPUT_CALCULATOR)) {
+                NavigationMenuItem(title = stringResource(R.string.appstrings_throughput_calculator_title), icon = Icons.Default.Speed, isSelected = false, isDark = isDark) { onThroughputCalculatorClick() }
+            }
         }
     }
 }
@@ -180,7 +200,17 @@ fun StartupPageSelectionSheet(
     useOneUi: Boolean,
     bubbleColor: Color
 ) {
-    var tempPage by remember { mutableStateOf(currentStartupPage) }
+    val featureFlags by RemoteFeatureFlags.config
+    val safeStartupPage = remember(currentStartupPage, featureFlags) {
+        when {
+            currentStartupPage == "nearby" && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY) -> currentStartupPage
+            currentStartupPage == "map" && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP) -> currentStartupPage
+            currentStartupPage == "compass" && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS) -> currentStartupPage
+            currentStartupPage == "home" -> currentStartupPage
+            else -> "home"
+        }
+    }
+    var tempPage by remember(safeStartupPage) { mutableStateOf(safeStartupPage) }
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
@@ -206,9 +236,13 @@ fun StartupPageSelectionSheet(
 
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SettingsRadioItem(stringResource(R.string.appstrings_page_home_settings), tempPage == "home", useOneUi, bubbleColor) { tempPage = "home" }
-                SettingsRadioItem(stringResource(R.string.appstrings_page_nearby_settings), tempPage == "nearby", useOneUi, bubbleColor) { tempPage = "nearby" }
-                SettingsRadioItem(stringResource(R.string.appstrings_page_map_settings), tempPage == "map", useOneUi, bubbleColor) { tempPage = "map" }
-                if (AppConfig.hasCompass.value) {
+                if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)) {
+                    SettingsRadioItem(stringResource(R.string.appstrings_page_nearby_settings), tempPage == "nearby", useOneUi, bubbleColor) { tempPage = "nearby" }
+                }
+                if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
+                    SettingsRadioItem(stringResource(R.string.appstrings_page_map_settings), tempPage == "map", useOneUi, bubbleColor) { tempPage = "map" }
+                }
+                if (AppConfig.hasCompass.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)) {
                     SettingsRadioItem(stringResource(R.string.appstrings_page_compass_settings), tempPage == "compass", useOneUi, bubbleColor) { tempPage = "compass" }
                 }
 
@@ -287,10 +321,20 @@ fun HomeSettingsSheet(
     var logoSelectorResetKey by remember { mutableStateOf(0) }
     var showHelpPositionSettings by remember { mutableStateOf(false) }
     val safeClick = rememberSafeClick()
+    val featureFlags by RemoteFeatureFlags.config
 
     // ---> 2. SÉCURITÉ ET RÉACTIVITÉ : Assure que le logo est dans la liste <---
-    val safeOrder = remember(pagesOrder) {
-        if (!pagesOrder.contains("logo")) pagesOrder + listOf("logo") else pagesOrder
+    val safeOrder = remember(pagesOrder, featureFlags) {
+        val withLogo = if (!pagesOrder.contains("logo")) pagesOrder + listOf("logo") else pagesOrder
+        withLogo.filter { pageId ->
+            when (pageId) {
+                "nearby" -> featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)
+                "map" -> featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)
+                "compass" -> featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)
+                "stats" -> featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)
+                else -> true
+            }
+        }
     }
     // On mémorise la liste sécurisée en temps réel pour le glisser-déposer
     val currentOrder by rememberUpdatedState(safeOrder)
@@ -513,7 +557,8 @@ fun DraggableSwitchCard(
                     Icon(
                         imageVector = Icons.Default.Settings,
                         contentDescription = stringResource(R.string.appstrings_settings_title),
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(20.dp)
                     )
                 }
             }
@@ -1787,6 +1832,349 @@ private fun MiniMapModeOption(
     }
 }
 
+@Composable
+private fun statsSettingsBlockTitle(blockId: String): String {
+    return when (blockId) {
+        "supports" -> stringResource(R.string.appstrings_stats_supports_title)
+        "5G" -> stringResource(R.string.appstrings_stats5_g_title)
+        "4G" -> stringResource(R.string.appstrings_stats4_g_title)
+        "3G" -> stringResource(R.string.appstrings_stats3_g_title)
+        "2G" -> stringResource(R.string.appstrings_stats2_g_title)
+        else -> blockId
+    }
+}
+
+@Composable
+private fun statsDisplayModeTitle(mode: StatsDisplayMode): String {
+    return when (mode) {
+        StatsDisplayMode.Sites -> stringResource(R.string.appstrings_sites_label)
+        StatsDisplayMode.Active -> stringResource(R.string.appstrings_active_sites_label)
+        StatsDisplayMode.Both -> stringResource(R.string.appstrings_active_declared_sites_label)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun StatsSettingsSheet(
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    bubbleColor: Color
+) {
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val shape = oneUiActionButtonShape(useOneUi)
+    val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+    val scrollState = rememberScrollState()
+
+    var selectedFrequencyTech by remember { mutableStateOf<String?>(null) }
+    var displayMode by remember { mutableStateOf(StatsPreferences.displayMode(prefs)) }
+    var statsOrder by remember { mutableStateOf(StatsPreferences.statsBlockOrder(prefs)) }
+    var statsFreqOrder5G by remember { mutableStateOf(StatsPreferences.statsFrequencyOrder(prefs, "5G")) }
+    var statsFreqOrder4G by remember { mutableStateOf(StatsPreferences.statsFrequencyOrder(prefs, "4G")) }
+    var statsFreqOrder3G by remember { mutableStateOf(StatsPreferences.statsFrequencyOrder(prefs, "3G")) }
+    var statsFreqOrder2G by remember { mutableStateOf(StatsPreferences.statsFrequencyOrder(prefs, "2G")) }
+
+    val blockVisibility = remember {
+        mutableStateMapOf<String, Boolean>().apply {
+            StatsPreferences.defaultStatsBlockOrder.forEach { blockId ->
+                put(blockId, StatsPreferences.isStatsBlockVisible(prefs, blockId))
+            }
+        }
+    }
+    val frequencyVisibility = remember {
+        mutableStateMapOf<String, Boolean>().apply {
+            StatsPreferences.defaultTechOrder.forEach { tech ->
+                StatsPreferences.defaultFrequencyOrder(tech).forEach { frequencyId ->
+                    put("$tech|$frequencyId", StatsPreferences.isStatsFrequencyVisible(prefs, tech, frequencyId))
+                }
+            }
+        }
+    }
+
+    fun saveDisplayMode(newMode: StatsDisplayMode) {
+        displayMode = newMode
+        AppConfig.statsDisplayMode.value = newMode
+        prefs.edit().putString(StatsPreferences.PREF_DISPLAY_MODE, newMode.storageKey).apply()
+    }
+
+    fun saveStatsOrder(newOrder: List<String>) {
+        val normalized = StatsPreferences.normalizeStatsBlockOrder(newOrder)
+        statsOrder = normalized
+        prefs.edit().putString(StatsPreferences.PREF_STATS_ORDER, normalized.joinToString(",")).apply()
+    }
+
+    fun saveStatsBlockVisibility(blockId: String, visible: Boolean) {
+        blockVisibility[blockId] = visible
+        prefs.edit().putBoolean(StatsPreferences.statsBlockVisiblePrefKey(blockId), visible).apply()
+    }
+
+    fun frequencyOrderFor(tech: String): List<String> {
+        return when (tech) {
+            "5G" -> statsFreqOrder5G
+            "4G" -> statsFreqOrder4G
+            "3G" -> statsFreqOrder3G
+            "2G" -> statsFreqOrder2G
+            else -> emptyList()
+        }
+    }
+
+    fun setFrequencyOrder(tech: String, newOrder: List<String>) {
+        when (tech) {
+            "5G" -> statsFreqOrder5G = newOrder
+            "4G" -> statsFreqOrder4G = newOrder
+            "3G" -> statsFreqOrder3G = newOrder
+            "2G" -> statsFreqOrder2G = newOrder
+        }
+    }
+
+    fun saveFrequencyOrder(tech: String, newOrder: List<String>) {
+        val normalized = StatsPreferences.normalizeFrequencyOrder(tech, newOrder)
+        setFrequencyOrder(tech, normalized)
+        prefs.edit().putString(StatsPreferences.statsFrequencyOrderPrefKey(tech), normalized.joinToString(",")).apply()
+    }
+
+    fun saveFrequencyVisibility(tech: String, frequencyId: String, visible: Boolean) {
+        frequencyVisibility["$tech|$frequencyId"] = visible
+        prefs.edit().putBoolean(StatsPreferences.statsFrequencyVisiblePrefKey(tech, frequencyId), visible).apply()
+    }
+
+    fun resetFrequencySettings(tech: String) {
+        val normalizedTech = StatsPreferences.normalizeTech(tech)
+        val defaultOrder = StatsPreferences.defaultFrequencyOrder(normalizedTech)
+        setFrequencyOrder(normalizedTech, defaultOrder)
+        val editor = prefs.edit()
+            .putString(StatsPreferences.statsFrequencyOrderPrefKey(normalizedTech), defaultOrder.joinToString(","))
+        defaultOrder.forEach { frequencyId ->
+            frequencyVisibility["$normalizedTech|$frequencyId"] = true
+            editor.putBoolean(StatsPreferences.statsFrequencyVisiblePrefKey(normalizedTech, frequencyId), true)
+        }
+        editor.apply()
+    }
+
+    fun resetStatsSettings() {
+        val editor = prefs.edit()
+            .putString(StatsPreferences.PREF_DISPLAY_MODE, StatsDisplayMode.Both.storageKey)
+            .putString(StatsPreferences.PREF_STATS_ORDER, StatsPreferences.defaultStatsBlockOrder.joinToString(","))
+
+        displayMode = StatsDisplayMode.Both
+        AppConfig.statsDisplayMode.value = StatsDisplayMode.Both
+        statsOrder = StatsPreferences.defaultStatsBlockOrder
+        StatsPreferences.defaultStatsBlockOrder.forEach { blockId ->
+            blockVisibility[blockId] = true
+            editor.putBoolean(StatsPreferences.statsBlockVisiblePrefKey(blockId), true)
+        }
+
+        StatsPreferences.defaultTechOrder.forEach { tech ->
+            val defaultOrder = StatsPreferences.defaultFrequencyOrder(tech)
+            setFrequencyOrder(tech, defaultOrder)
+            editor.putString(StatsPreferences.statsFrequencyOrderPrefKey(tech), defaultOrder.joinToString(","))
+            defaultOrder.forEach { frequencyId ->
+                frequencyVisibility["$tech|$frequencyId"] = true
+                editor.putBoolean(StatsPreferences.statsFrequencyVisiblePrefKey(tech, frequencyId), true)
+            }
+        }
+        editor.apply()
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        BackHandler {
+            if (selectedFrequencyTech != null) {
+                selectedFrequencyTech = null
+            } else {
+                onBack()
+            }
+        }
+        Column(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = {
+                        if (selectedFrequencyTech != null) {
+                            selectedFrequencyTech = null
+                        } else {
+                            onBack()
+                        }
+                    }
+                ) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                Text(
+                    text = selectedFrequencyTech?.let { "${stringResource(R.string.appstrings_frequencies_title)} $it" }
+                        ?: stringResource(R.string.appstrings_stats_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.width(48.dp))
+            }
+
+            val frequencyTech = selectedFrequencyTech
+            if (frequencyTech == null) {
+                Text(
+                    text = stringResource(R.string.appstrings_stats_display_mode_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    StatsDisplayMode.values().forEach { mode ->
+                        SettingsRadioItem(statsDisplayModeTitle(mode), displayMode == mode, useOneUi, bubbleColor) {
+                            saveDisplayMode(mode)
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                Spacer(modifier = Modifier.height(16.dp))
+                Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 16.dp), textAlign = TextAlign.Center)
+
+                val cardHeight = 64.dp
+                val spacing = 12.dp
+                val currentStatsOrder by rememberUpdatedState(statsOrder)
+                val statsReorderState = rememberReorderableDragState(currentStatsOrder, cardHeight, spacing, ::saveStatsOrder)
+
+                Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
+                    currentStatsOrder.forEach { blockId ->
+                        key(blockId) {
+                            val isDragged = statsReorderState.isDragged(blockId)
+                            DraggableSwitchCard(
+                                title = statsSettingsBlockTitle(blockId),
+                                checked = blockVisibility[blockId] ?: true,
+                                onCheckedChange = { saveStatsBlockVisibility(blockId, it) },
+                                shape = shape,
+                                border = border,
+                                bubbleColor = bubbleColor,
+                                useOneUi = useOneUi,
+                                dragModifier = statsReorderState.dragModifier(blockId),
+                                isDragged = isDragged,
+                                dragOffset = statsReorderState.offsetFor(blockId),
+                                height = cardHeight,
+                                onSettingsClick = if (blockId in StatsPreferences.defaultTechOrder) {
+                                    { selectedFrequencyTech = blockId }
+                                } else {
+                                    null
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+                TextButton(onClick = ::resetStatsSettings) {
+                    Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                }
+            } else {
+                StatsFrequencySettingsContent(
+                    tech = frequencyTech,
+                    frequencyOrder = frequencyOrderFor(frequencyTech),
+                    frequencyVisibility = frequencyVisibility,
+                    useOneUi = useOneUi,
+                    onOrderChange = { saveFrequencyOrder(frequencyTech, it) },
+                    onVisibilityChange = { frequencyId, visible -> saveFrequencyVisibility(frequencyTech, frequencyId, visible) },
+                    onReset = { resetFrequencySettings(frequencyTech) }
+                )
+            }
+            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
+        }
+    }
+}
+
+@Composable
+private fun StatsFrequencySettingsContent(
+    tech: String,
+    frequencyOrder: List<String>,
+    frequencyVisibility: Map<String, Boolean>,
+    useOneUi: Boolean,
+    onOrderChange: (List<String>) -> Unit,
+    onVisibilityChange: (String, Boolean) -> Unit,
+    onReset: () -> Unit
+) {
+    Text(
+        text = stringResource(R.string.appstrings_drag_to_reorder_hint),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 16.dp),
+        textAlign = TextAlign.Center
+    )
+
+    val freqDragState = rememberReorderableDragState(
+        items = frequencyOrder,
+        itemHeight = 48.dp,
+        onOrderChange = onOrderChange
+    )
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            frequencyOrder.forEach { frequencyId ->
+                key("$tech-$frequencyId") {
+                    val isDragged = freqDragState.isDragged(frequencyId)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .zIndex(if (isDragged) 1f else 0f)
+                            .graphicsLayer {
+                                translationY = if (isDragged) freqDragState.offsetFor(frequencyId) else 0f
+                                scaleX = if (isDragged) 1.02f else 1f
+                                scaleY = if (isDragged) 1.02f else 1f
+                            }
+                            .background(
+                                if (isDragged) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+                                RoundedCornerShape(8.dp)
+                            )
+                            .then(freqDragState.dragModifier(frequencyId))
+                            .padding(vertical = 4.dp, horizontal = 4.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.DragHandle,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                        Text(
+                            text = StatsPreferences.frequencyLabel(frequencyId),
+                            modifier = Modifier.weight(1f).padding(start = 12.dp),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = if (isDragged) FontWeight.Bold else FontWeight.Normal
+                        )
+                        fr.geotower.ui.components.GeoTowerSwitch(
+                            checked = frequencyVisibility["$tech|$frequencyId"] ?: true,
+                            onCheckedChange = { onVisibilityChange(frequencyId, it) },
+                            modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                            useOneUi = useOneUi,
+                            checkedColor = MaterialTheme.colorScheme.primary
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(16.dp))
+    TextButton(onClick = onReset) {
+        Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(Modifier.width(8.dp))
+        Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SiteFreqFiltersSheet(
@@ -2125,6 +2513,7 @@ fun SitePhotosSettingsSheet(
     val switchColor = MaterialTheme.colorScheme.primary
     val useOneUi = AppConfig.useOneUiDesign
     val scrollState = rememberScrollState()
+    val featureFlags by RemoteFeatureFlags.config
 
     fun saveBool(key: String, state: androidx.compose.runtime.MutableState<Boolean>, value: Boolean) {
         state.value = value
@@ -2207,34 +2596,36 @@ fun SitePhotosSettingsSheet(
                 }
             }
 
-            Card(
-                onClick = onOpenCommunityDataSettings,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
+            if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.COMMUNITY_DATA_SETTINGS)) {
+                Card(
+                    onClick = onOpenCommunityDataSettings,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = stringResource(R.string.appstrings_photo_sources_settings_title),
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 16.sp
-                        )
-                        Text(
-                            text = stringResource(R.string.appstrings_photo_sources_settings_desc),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 4.dp)
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = stringResource(R.string.appstrings_photo_sources_settings_title),
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                            Text(
+                                text = stringResource(R.string.appstrings_photo_sources_settings_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(top = 4.dp)
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.Settings,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.padding(start = 12.dp).size(28.dp)
                         )
                     }
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.padding(start = 12.dp).size(28.dp)
-                    )
                 }
             }
 

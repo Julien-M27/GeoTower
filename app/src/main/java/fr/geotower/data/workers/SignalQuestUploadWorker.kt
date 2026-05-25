@@ -19,6 +19,7 @@ import fr.geotower.BuildConfig
 import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.api.SignalQuestClient
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.upload.ExternalPhotoUploadHistoryStore
 import fr.geotower.data.upload.SignalQuestInvalidPhotoException
 import fr.geotower.data.upload.SignalQuestUploadFile
@@ -51,6 +52,11 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
             SignalQuestUploadQueue.loadManifest(applicationContext, uploadId)
         } catch (e: SignalQuestUploadQueueException) {
             logUploadIssue("invalid_manifest", e)
+            return Result.failure()
+        }
+
+        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD)) {
+            SignalQuestUploadQueue.cleanupUpload(applicationContext, uploadId)
             return Result.failure()
         }
 

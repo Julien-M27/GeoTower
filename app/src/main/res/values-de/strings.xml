@@ -260,6 +260,7 @@
     <string name="appstrings_accuracy">GENAUIGKEIT</string>
     <string name="appstrings_activated_on">Aktiviert am:\u0020</string>
     <string name="appstrings_active_declared_sites_label">Aktiv / gemeldet</string>
+    <string name="appstrings_active_sites_label">Aktive Standorte</string>
     <string name="appstrings_add_photos">Fotos hinzufügen</string>
     <string name="appstrings_address_copied">Adresse kopiert</string>
     <string name="appstrings_address_copy">Adresse</string>
@@ -339,6 +340,10 @@
     <string name="appstrings_community_data_photo_source_fallback_only">Nur anzeigen, wenn die Quellen darüber keine Fotos haben</string>
     <string name="appstrings_community_data_photo_source_order">Quellenreihenfolge</string>
     <string name="appstrings_community_data_photos">Fotos</string>
+    <string name="appstrings_photo_sources_settings_desc">Wähle Betreiber, Fotoquellen und Anzeigereihenfolge.</string>
+    <string name="appstrings_photo_sources_settings_title">Fotoquellen</string>
+    <string name="appstrings_speedtest_sources_settings_desc">Wähle Betreiber und Quellen für die besten Speedtests.</string>
+    <string name="appstrings_speedtest_sources_settings_title">Speedtest-Quellen</string>
     <string name="appstrings_community_data_settings_desc">Wähle Betreiber, Quellen und Anzeigereihenfolge für Fotos und Speedtests.</string>
     <string name="appstrings_community_data_settings_title">Community-Daten</string>
     <string name="appstrings_community_data_show_operator_photos">Fotos für diesen Betreiber anzeigen</string>
@@ -699,6 +704,9 @@
     <string name="appstrings_release_section_live_tracking">Live-Tracking</string>
     <string name="appstrings_release_section_statistics">Statistiken</string>
     <string name="appstrings_release_section_photos">Fotos</string>
+    <string name="appstrings_release_section_global">Allgemein</string>
+    <string name="appstrings_release_section_settings">Einstellungen</string>
+    <string name="appstrings_release_section_community_services">Community-Dienste</string>
     <string name="appstrings_release_live_site_photos_rounded">Standortfotos werden mit abgerundeten Ecken angezeigt</string>
     <string name="appstrings_release_live_operator_fallback_logos">Bessere Darstellung der Betreiberlogos, wenn kein Standortfoto verfügbar ist</string>
     <string name="appstrings_release_statistics_ready">Statistiken verfügbar, sobald die lokalen Daten bereit sind</string>
@@ -707,6 +715,16 @@
     <string name="appstrings_release_statistics_readable_charts">Diagramme sind lesbarer, animiert und leichter zu durchstöbern</string>
     <string name="appstrings_release_statistics_translations">Übersetzungen der Statistiktexte verbessert</string>
     <string name="appstrings_release_external_photo_history_complete">Vollständigere Historie externer Foto-Uploads</string>
+    <string name="appstrings_release_global_flexible_features">Flexiblere Verwaltung einiger App-Funktionen</string>
+    <string name="appstrings_release_global_home_announcement">Ankündigungsbanner auf der Startseite in der gewählten Sprache hinzugefügt</string>
+    <string name="appstrings_release_global_unavailable_pages">Bessere Behandlung vorübergehend nicht verfügbarer Seiten</string>
+    <string name="appstrings_release_global_localized_update_notes">Versionshinweise und Update-Benachrichtigungen besser lokalisiert</string>
+    <string name="appstrings_release_global_database_version_check">Verbesserte Prüfung der Datenbankversionen</string>
+    <string name="appstrings_release_statistics_declared_active_sites">Statistiken mit gemeldeten und aktiven Standorten überarbeitet</string>
+    <string name="appstrings_release_statistics_weekly_trends">Wöchentliche Trends hinzugefügt</string>
+    <string name="appstrings_release_statistics_custom_frequency_display">Anpassbarere Anzeige mit Details nach Frequenz</string>
+    <string name="appstrings_release_settings_shortcuts_across_screens">Schneller Zugriff auf Einstellungen aus mehreren App-Bildschirmen hinzugefügt</string>
+    <string name="appstrings_release_community_cellularfr_availability">Bessere Verwaltung von CellularFR-Fotos und Links je nach Verfügbarkeit</string>
     <string name="appstrings_release_community_source_settings">Neue Einstellungen für Foto- und Speedtest-Quellen hinzugefügt</string>
     <string name="appstrings_release_photo_visibility_sync">Fotoanzeige zwischen Support- und Standortseiten besser synchronisiert</string>
     <string name="appstrings_release_community_photo_filters">Fotos werden nach aktivem Betreiber und aktivierten Quellen gefiltert</string>
@@ -847,6 +865,7 @@
     <string name="appstrings_stats5_g_desc">Anzahl deklarierter 5G-Standorte pro Betreiber</string>
     <string name="appstrings_stats5_g_title">5G-Standorte</string>
     <string name="appstrings_stats_group_title">Statistiken</string>
+    <string name="appstrings_stats_display_mode_title">Statistikanzeige</string>
     <string name="appstrings_stats_supports_desc">Anzahl deklarierter physischer Standorte pro Betreiber</string>
     <string name="appstrings_stats_supports_title">Supports (Masten)</string>
     <string name="appstrings_stats_title">Statistiken</string>

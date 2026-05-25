@@ -37,6 +37,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.geotower.R
 import fr.geotower.data.api.SignalQuestOperators
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.models.LocalisationEntity
 
 @Composable
@@ -56,10 +57,11 @@ fun SiteExternalLinksBlock(
     val txtExternalLinks = stringResource(R.string.appstrings_external_links)
     val txtOpenApp = stringResource(R.string.appstrings_open)
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val featureFlags by RemoteFeatureFlags.config
 
     val safeClick = rememberSafeClick()
 
-    val externalLinksOrder by remember { mutableStateOf(readSiteExternalLinkOrder(prefs)) }
+    val externalLinksOrder by remember(featureFlags) { mutableStateOf(readSiteExternalLinkOrder(prefs)) }
 
     val showCartoradio by remember { mutableStateOf(prefs.getBoolean("link_cartoradio", true)) }
     val showAnfr by remember { mutableStateOf(prefs.getBoolean("show_anfr", true)) }
@@ -88,7 +90,7 @@ fun SiteExternalLinksBlock(
                             }
                         }
                         "cellularfr" -> {
-                            if (showCellularFr && info.operateur?.contains("ORANGE", true) == true) {
+                            if (showCellularFr && featureFlags.isSiteExternalLinkEnabled("cellularfr") && info.operateur?.contains("ORANGE", true) == true) {
                                 CommunityLinkRow(siteExternalLinkById(block)?.label ?: "CellularFR", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_cellularfr, buttonShape) { safeClick { onShowCellularFr() } }
                             }
                         }
@@ -99,7 +101,7 @@ fun SiteExternalLinksBlock(
                         }
                         "signalquest" -> {
                             val signalQuestOperator = SignalQuestOperators.operatorParamFor(info.operateur)
-                            if (showSignalQuest && signalQuestOperator != null) {
+                            if (showSignalQuest && featureFlags.isSiteExternalLinkEnabled("signalquest") && signalQuestOperator != null) {
                                 CommunityLinkRow(siteExternalLinkById(block)?.label ?: "Signal Quest", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_signalquest, buttonShape) { safeClick { onShowSignalQuest() } }
                             }
                         }

@@ -224,6 +224,29 @@ data class MetadataDbEntity(
     @ColumnInfo(name = "zip_version") val zipVersion: String?
 )
 
+@Entity(tableName = "radio_stat_current", primaryKeys = ["operator_name", "category", "item_key"])
+data class RadioStatCurrentDbEntity(
+    @ColumnInfo(name = "operator_name") val operatorName: String,
+    @ColumnInfo(name = "category") val category: String,
+    @ColumnInfo(name = "item_key") val itemKey: String,
+    @ColumnInfo(name = "label") val label: String?,
+    @ColumnInfo(name = "total_count") val totalCount: Int,
+    @ColumnInfo(name = "active_count") val activeCount: Int
+)
+
+@Entity(tableName = "radio_stat_weekly", primaryKeys = ["week_key", "operator_name", "category", "item_key"])
+data class RadioStatWeeklyDbEntity(
+    @ColumnInfo(name = "week_key") val weekKey: String,
+    @ColumnInfo(name = "week_start") val weekStart: String?,
+    @ColumnInfo(name = "source_date") val sourceDate: String?,
+    @ColumnInfo(name = "operator_name") val operatorName: String,
+    @ColumnInfo(name = "category") val category: String,
+    @ColumnInfo(name = "item_key") val itemKey: String,
+    @ColumnInfo(name = "label") val label: String?,
+    @ColumnInfo(name = "total_count") val totalCount: Int,
+    @ColumnInfo(name = "active_count") val activeCount: Int
+)
+
 data class LocalisationEntity(
     @ColumnInfo(name = "id_anfr") val idAnfr: String,
     @ColumnInfo(name = "operateur") val operateur: String?,

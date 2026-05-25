@@ -103,6 +103,7 @@ import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.CellularFrApi
 import fr.geotower.data.api.SignalQuestOperators
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
@@ -116,6 +117,12 @@ import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
+import fr.geotower.ui.screens.settings.CommunityDataSettingsSheet
+import fr.geotower.ui.screens.settings.MiniMapSettingsSheet
+import fr.geotower.ui.screens.settings.SiteFreqFiltersSheet
+import fr.geotower.ui.screens.settings.SitePhotosSettingsSheet
+import fr.geotower.ui.screens.settings.SiteSettingsSheet
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.OperatorColors
@@ -194,6 +201,7 @@ fun SiteDetailScreen(
         return
     }
     val haptic = LocalHapticFeedback.current
+    val uiStyle = LocalGeoTowerUiStyle.current
     rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
     LocalView.current
@@ -343,8 +351,9 @@ fun SiteDetailScreen(
     }
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-    val miniMapDefaultMode = remember {
-        MiniMapViewMode.fromStorageKey(prefs.getString("page_site_mini_map_mode", null))
+    val featureFlags by RemoteFeatureFlags.config
+    var miniMapDefaultMode by remember {
+        mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString("page_site_mini_map_mode", null)))
     }
 
     fun normalizeSiteOrder(order: List<String>): List<String> {
@@ -405,7 +414,7 @@ fun SiteDetailScreen(
     }
 
     // 🚨 MODIFICATION : L'ordre par défaut (photos, speedtest, nav, share...)
-    val pageSiteOrder by remember {
+    var pageSiteOrder by remember {
         mutableStateOf(
             normalizeSiteOrder(
                 (prefs.getString("page_site_order", "operator,bearing_height,map,support_details,elevation_profile,throughput_calculator,open_map,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links") ?: "operator,bearing_height,map,support_details,elevation_profile,throughput_calculator,open_map,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links")
@@ -413,31 +422,38 @@ fun SiteDetailScreen(
             )
         )
     }
-    val showOperator by remember { mutableStateOf(prefs.getBoolean("page_site_operator", true)) }
-    val showBearingHeight by remember { mutableStateOf(prefs.getBoolean("page_site_bearing_height", true)) }
-    val showMap by remember { mutableStateOf(prefs.getBoolean("page_site_map", true)) }
-    val showSupportDetails by remember { mutableStateOf(prefs.getBoolean("page_site_support_details", true)) }
+    var showOperator by remember { mutableStateOf(prefs.getBoolean("page_site_operator", true)) }
+    var showBearingHeight by remember { mutableStateOf(prefs.getBoolean("page_site_bearing_height", true)) }
+    var showMap by remember { mutableStateOf(prefs.getBoolean("page_site_map", true)) }
+    var showSupportDetails by remember { mutableStateOf(prefs.getBoolean("page_site_support_details", true)) }
     val showPhotos by AppConfig.siteShowPhotos
-    val showPanelHeights by remember { mutableStateOf(prefs.getBoolean("page_site_panel_heights", true)) }
-    val showIds by remember { mutableStateOf(prefs.getBoolean("page_site_ids", true)) }
-    val showOpenMap by remember { mutableStateOf(prefs.getBoolean("page_site_open_map", true)) }
-    val showElevationProfile by remember { mutableStateOf(prefs.getBoolean("page_site_elevation_profile", true)) }
-    val showThroughputCalculator by remember { mutableStateOf(prefs.getBoolean("page_site_throughput_calculator", true)) }
-    val showNav by remember { mutableStateOf(prefs.getBoolean("page_site_nav", true)) }
-    val showShare by remember { mutableStateOf(prefs.getBoolean("page_site_share", true)) }
-    val showDates by remember { mutableStateOf(prefs.getBoolean("page_site_dates", true)) }
-    val showAddress by remember { mutableStateOf(prefs.getBoolean("page_site_address", true)) }
-    val showFreqs by remember { mutableStateOf(prefs.getBoolean("page_site_freqs", true)) }
-    val showLinks by remember { mutableStateOf(prefs.getBoolean("page_site_links", true)) }
+    var showPanelHeights by remember { mutableStateOf(prefs.getBoolean("page_site_panel_heights", true)) }
+    var showIds by remember { mutableStateOf(prefs.getBoolean("page_site_ids", true)) }
+    var showOpenMap by remember { mutableStateOf(prefs.getBoolean("page_site_open_map", true)) }
+    var showElevationProfile by remember { mutableStateOf(prefs.getBoolean("page_site_elevation_profile", true)) }
+    var showThroughputCalculator by remember { mutableStateOf(prefs.getBoolean("page_site_throughput_calculator", true)) }
+    var showNav by remember { mutableStateOf(prefs.getBoolean("page_site_nav", true)) }
+    var showShare by remember { mutableStateOf(prefs.getBoolean("page_site_share", true)) }
+    var showDates by remember { mutableStateOf(prefs.getBoolean("page_site_dates", true)) }
+    var showAddress by remember { mutableStateOf(prefs.getBoolean("page_site_address", true)) }
+    var showFreqs by remember { mutableStateOf(prefs.getBoolean("page_site_freqs", true)) }
+    var showLinks by remember { mutableStateOf(prefs.getBoolean("page_site_links", true)) }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val pageSettingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showSiteSettingsSheet by remember { mutableStateOf(false) }
+    var showSiteMiniMapSettingsSheet by remember { mutableStateOf(false) }
+    var showSiteFreqSettingsSheet by remember { mutableStateOf(false) }
+    var showSitePhotosSettingsSheet by remember { mutableStateOf(false) }
+    var showCommunityDataSettingsSheet by remember { mutableStateOf(false) }
+    var communityDataSettingsFeatureId by remember { mutableStateOf<String?>(null) }
 
     val isEnbAppInstalled = remember { isPackageInstalled(context, "fr.enb_analytics.enb4g") }
     val isSignalQuestInstalled = remember { isPackageInstalled(context, SIGNAL_QUEST_PACKAGE_NAME) }
     val isCellularFrInstalled = remember { isPackageInstalled(context, "com.luisbaker.cellularfr") }
     val isRncMobileInstalled = remember { isPackageInstalled(context, "org.rncteam.rncfreemobile") }
 
-    LaunchedEffect(antennaId, refreshPhotosTrigger) {
+    LaunchedEffect(antennaId, refreshPhotosTrigger, featureFlags) {
         val lat = prefs.getFloat("clicked_lat", 0f).toDouble()
         val lon = prefs.getFloat("clicked_lon", 0f).toDouble()
 
@@ -482,7 +498,7 @@ fun SiteDetailScreen(
 
             // ✅ Séparation en deux blocs `if` distincts (Plus de `else if`)
             // CellularFR masqué — voir CellularFrApi.ENABLED
-            if (false && CommunityDataPreferences.isCellularFrPhotosEnabled(prefs, opName)) {
+            if (CommunityDataPreferences.isCellularFrPhotosEnabled(prefs, opName)) {
                 CellularFrApi.getCellularFrPhotos(supportSiteId).forEach { photo ->
                     photosTemp.add(
                         CommunityPhoto(
@@ -534,7 +550,7 @@ fun SiteDetailScreen(
     }
 
     // 🚀 CHARGEMENT DU SPEEDTEST (Signal Quest) - Séparé pour plus de stabilité
-    LaunchedEffect(antenna?.idAnfr, antenna?.operateur) {
+    LaunchedEffect(antenna?.idAnfr, antenna?.operateur, featureFlags) {
         val currentAntenna = antenna
         if (currentAntenna == null || currentAntenna.idAnfr.isBlank()) return@LaunchedEffect
 
@@ -574,6 +590,9 @@ fun SiteDetailScreen(
             } finally {
                 isSpeedtestLoading = false
             }
+        } else {
+            speedtestData = null
+            isSpeedtestLoading = false
         }
     }
 
@@ -656,7 +675,7 @@ fun SiteDetailScreen(
                 backgroundColor = mainBgColor,
                 backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
                 actions = {
-                    IconButton(onClick = { safeClick { navController.navigate("settings?section=site") } }) {
+                    IconButton(onClick = { safeClick { showSiteSettingsSheet = true } }) {
                         Icon(
                             Icons.Default.Settings,
                             contentDescription = stringResource(R.string.appstrings_settings_title),
@@ -741,7 +760,7 @@ fun SiteDetailScreen(
             }
 
             // CellularFR masqué — voir CellularFrApi.ENABLED
-            if (false && showCellularFrSheet) {
+            if (showCellularFrSheet) {
                 val supportId = physique?.idSupport ?: info.idAnfr // ✅ VRAI ID
                 ModalBottomSheet(onDismissRequest = { showCellularFrSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
                     Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -1179,6 +1198,185 @@ fun SiteDetailScreen(
                     }
                 }
                 Spacer(modifier = Modifier.height(24.dp).navigationBarsPadding())
+            }
+
+            if (showSiteSettingsSheet) {
+                SiteSettingsSheet(
+                    siteOrder = pageSiteOrder,
+                    onOrderChange = {
+                        pageSiteOrder = normalizeSiteOrder(it)
+                        prefs.edit().putString("page_site_order", pageSiteOrder.joinToString(",")).apply()
+                    },
+                    showOperator = showOperator,
+                    onOperatorChange = {
+                        showOperator = it
+                        prefs.edit().putBoolean("page_site_operator", it).apply()
+                    },
+                    showBearingHeight = showBearingHeight,
+                    onBearingHeightChange = {
+                        showBearingHeight = it
+                        prefs.edit().putBoolean("page_site_bearing_height", it).apply()
+                    },
+                    showMap = showMap,
+                    onMapChange = {
+                        showMap = it
+                        prefs.edit().putBoolean("page_site_map", it).apply()
+                    },
+                    showSupportDetails = showSupportDetails,
+                    onSupportDetailsChange = {
+                        showSupportDetails = it
+                        prefs.edit().putBoolean("page_site_support_details", it).apply()
+                    },
+                    showPhotos = showPhotos,
+                    onPhotosChange = {
+                        AppConfig.siteShowPhotos.value = it
+                        prefs.edit().putBoolean("site_show_photos", it).apply()
+                    },
+                    showPanelHeights = showPanelHeights,
+                    onPanelHeightsChange = {
+                        showPanelHeights = it
+                        prefs.edit().putBoolean("page_site_panel_heights", it).apply()
+                    },
+                    showIds = showIds,
+                    onIdsChange = {
+                        showIds = it
+                        prefs.edit().putBoolean("page_site_ids", it).apply()
+                    },
+                    showOpenMap = showOpenMap,
+                    onOpenMapChange = {
+                        showOpenMap = it
+                        prefs.edit().putBoolean("page_site_open_map", it).apply()
+                    },
+                    showElevationProfile = showElevationProfile,
+                    onElevationProfileChange = {
+                        showElevationProfile = it
+                        prefs.edit().putBoolean("page_site_elevation_profile", it).apply()
+                    },
+                    showThroughputCalculator = showThroughputCalculator,
+                    onThroughputCalculatorChange = {
+                        showThroughputCalculator = it
+                        prefs.edit().putBoolean("page_site_throughput_calculator", it).apply()
+                    },
+                    showNav = showNav,
+                    onNavChange = {
+                        showNav = it
+                        prefs.edit().putBoolean("page_site_nav", it).apply()
+                    },
+                    showShare = showShare,
+                    onShareChange = {
+                        showShare = it
+                        prefs.edit().putBoolean("page_site_share", it).apply()
+                    },
+                    showDates = showDates,
+                    onDatesChange = {
+                        showDates = it
+                        prefs.edit().putBoolean("page_site_dates", it).apply()
+                    },
+                    showAddress = showAddress,
+                    onAddressChange = {
+                        showAddress = it
+                        prefs.edit().putBoolean("page_site_address", it).apply()
+                    },
+                    showStatus = AppConfig.siteShowStatus.value,
+                    onStatusChange = {
+                        AppConfig.siteShowStatus.value = it
+                        prefs.edit().putBoolean("site_show_status", it).apply()
+                    },
+                    showSpeedtest = AppConfig.siteShowSpeedtest.value,
+                    onSpeedtestChange = {
+                        AppConfig.siteShowSpeedtest.value = it
+                        prefs.edit().putBoolean("site_show_speedtest", it).apply()
+                    },
+                    showFreqs = showFreqs,
+                    onFreqsChange = {
+                        showFreqs = it
+                        prefs.edit().putBoolean("page_site_freqs", it).apply()
+                    },
+                    showLinks = showLinks,
+                    onLinksChange = {
+                        showLinks = it
+                        prefs.edit().putBoolean("page_site_links", it).apply()
+                    },
+                    onOpenMiniMapSettings = {
+                        showSiteSettingsSheet = false
+                        showSiteMiniMapSettingsSheet = true
+                    },
+                    onOpenFrequencies = {
+                        showSiteSettingsSheet = false
+                        showSiteFreqSettingsSheet = true
+                    },
+                    onOpenPhotosSettings = {
+                        showSiteSettingsSheet = false
+                        showSitePhotosSettingsSheet = true
+                    },
+                    onOpenSpeedtestSettings = {
+                        communityDataSettingsFeatureId = CommunityDataPreferences.FEATURE_SPEEDTEST
+                        showSiteSettingsSheet = false
+                        showCommunityDataSettingsSheet = true
+                    },
+                    onDismiss = { showSiteSettingsSheet = false },
+                    onBack = { showSiteSettingsSheet = false },
+                    sheetState = pageSettingsSheetState,
+                    useOneUi = uiStyle.useOneUi,
+                    bubbleColor = uiStyle.bubbleColor
+                )
+            }
+
+            if (showSiteMiniMapSettingsSheet) {
+                MiniMapSettingsSheet(
+                    selectedMode = miniMapDefaultMode,
+                    onModeChange = {
+                        miniMapDefaultMode = it
+                        prefs.edit().putString("page_site_mini_map_mode", it.storageKey).apply()
+                    },
+                    onDismiss = { showSiteMiniMapSettingsSheet = false },
+                    onBack = {
+                        showSiteMiniMapSettingsSheet = false
+                        showSiteSettingsSheet = true
+                    },
+                    sheetState = pageSettingsSheetState,
+                    useOneUi = uiStyle.useOneUi,
+                    bubbleColor = uiStyle.bubbleColor
+                )
+            }
+
+            if (showSiteFreqSettingsSheet) {
+                SiteFreqFiltersSheet(
+                    onDismiss = { showSiteFreqSettingsSheet = false },
+                    onBack = {
+                        showSiteFreqSettingsSheet = false
+                        showSiteSettingsSheet = true
+                    }
+                )
+            }
+
+            if (showSitePhotosSettingsSheet) {
+                SitePhotosSettingsSheet(
+                    onDismiss = { showSitePhotosSettingsSheet = false },
+                    onBack = {
+                        showSitePhotosSettingsSheet = false
+                        showSiteSettingsSheet = true
+                    },
+                    photosVisible = showPhotos,
+                    onPhotosVisibilityChange = {
+                        AppConfig.siteShowPhotos.value = it
+                        prefs.edit().putBoolean("site_show_photos", it).apply()
+                    },
+                    onOpenCommunityDataSettings = {
+                        communityDataSettingsFeatureId = CommunityDataPreferences.FEATURE_PHOTOS
+                        showSitePhotosSettingsSheet = false
+                        showCommunityDataSettingsSheet = true
+                    }
+                )
+            }
+
+            if (showCommunityDataSettingsSheet) {
+                CommunityDataSettingsSheet(
+                    onDismiss = { showCommunityDataSettingsSheet = false },
+                    sheetState = pageSettingsSheetState,
+                    useOneUi = uiStyle.useOneUi,
+                    featureId = communityDataSettingsFeatureId
+                )
             }
 
             if (showImageSourceDialog) {

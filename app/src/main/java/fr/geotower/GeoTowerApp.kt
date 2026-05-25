@@ -3,11 +3,17 @@ package fr.geotower
 import android.app.Application
 import androidx.preference.PreferenceManager
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.api.RetrofitClient
 import fr.geotower.data.upload.SignalQuestUploadQueue
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
 
 class GeoTowerApp : Application() {
+    private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     val repository by lazy {
         AnfrRepository(
@@ -23,6 +29,10 @@ class GeoTowerApp : Application() {
             PreferenceManager.getDefaultSharedPreferences(applicationContext)
         )
         Configuration.getInstance().userAgentValue = packageName
+        RemoteFeatureFlags.loadCached(applicationContext)
+        appScope.launch {
+            RemoteFeatureFlags.refreshIfNeeded(applicationContext, force = true)
+        }
         SignalQuestUploadQueue.cleanupStaleFiles(applicationContext)
     }
 }

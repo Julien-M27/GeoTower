@@ -5,6 +5,7 @@ import com.google.gson.JsonParser
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
+import java.util.Locale
 
 data class AppReleaseInfo(
     val releaseId: String,
@@ -12,8 +13,24 @@ data class AppReleaseInfo(
     val publishedAt: String?,
     val downloadUrl: String,
     val fileName: String?,
-    val notes: String?
-)
+    val notes: String?,
+    val notesTranslations: Map<String, String> = emptyMap()
+) {
+    fun localizedNotes(languageTag: String?): String? {
+        val normalizedTag = languageTag
+            ?.trim()
+            ?.lowercase(Locale.ROOT)
+            ?.replace("_", "-")
+            .orEmpty()
+        val languageOnly = normalizedTag.substringBefore("-")
+        return notesTranslations[normalizedTag]
+            ?: notesTranslations[languageOnly]
+            ?: notesTranslations["fr"]
+            ?: notesTranslations["en"]
+            ?: notesTranslations.values.firstOrNull { it.isNotBlank() }
+            ?: notes
+    }
+}
 
 object AppUpdateChecker {
     private const val LATEST_APP_RELEASE_URL = "https://api.cajejuma.fr/api/v2/app/latest"
@@ -55,7 +72,8 @@ object AppUpdateChecker {
             publishedAt = json.stringOrBlank("publishedAt").takeIf { it.isNotBlank() },
             downloadUrl = downloadUrl,
             fileName = json.stringOrBlank("fileName").takeIf { it.isNotBlank() },
-            notes = json.stringOrBlank("notes").takeIf { it.isNotBlank() }
+            notes = json.stringOrBlank("notes").takeIf { it.isNotBlank() },
+            notesTranslations = json.stringMap("notesTranslations")
         )
     }
 
@@ -82,6 +100,26 @@ object AppUpdateChecker {
             .orEmpty()
     }
 
+    private fun JsonObject.stringMap(memberName: String): Map<String, String> {
+        val obj = get(memberName)
+            ?.takeIf { !it.isJsonNull && it.isJsonObject }
+            ?.asJsonObject
+            ?: return emptyMap()
+
+        return obj.entrySet().mapNotNull { (rawKey, rawValue) ->
+            val key = rawKey.normalizeLanguageKey()
+            val value = rawValue
+                ?.takeIf { !it.isJsonNull && it.isJsonPrimitive }
+                ?.let { runCatching { it.asString.trim().take(2000) }.getOrNull() }
+                .orEmpty()
+            if (key.isBlank() || value.isBlank()) {
+                null
+            } else {
+                key to value
+            }
+        }.toMap()
+    }
+
     private fun String.isWebUrl(): Boolean {
         return startsWith("https://", ignoreCase = true) || startsWith("http://", ignoreCase = true)
     }
@@ -90,5 +128,15 @@ object AppUpdateChecker {
         return VERSION_NUMBER_REGEX.findAll(this)
             .mapNotNull { it.value.toIntOrNull() }
             .toList()
+    }
+
+    private fun String.normalizeLanguageKey(): String {
+        val normalized = trim()
+            .lowercase(Locale.ROOT)
+            .replace("_", "-")
+            .take(20)
+        return normalized.takeIf { key ->
+            key.isNotBlank() && key.all { it.isLetterOrDigit() || it == '-' }
+        }.orEmpty()
     }
 }

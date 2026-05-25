@@ -74,6 +74,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -121,6 +122,7 @@ import fr.geotower.data.models.isDeclaredActive
 import fr.geotower.data.models.physicalSiteKey
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.MapUtils
@@ -417,6 +419,7 @@ fun MapScreen(
     var currentCityPolygons by remember { mutableStateOf<List<List<GeoPoint>>?>(null) }
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val uiStyle = LocalGeoTowerUiStyle.current
 
     LaunchedEffect(Unit) {
         AppConfig.loadMapDisplayPreferences(prefs)
@@ -425,7 +428,9 @@ fun MapScreen(
     val safeClick = rememberSafeClick()
 
     var showSettingsSheet by remember { mutableStateOf(false) }
+    var showMapPageSettingsSheet by remember { mutableStateOf(false) }
     var showLayerSheet by remember { mutableStateOf(false) }
+    val pageSettingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var mapViewRef by remember { mutableStateOf<MapView?>(null) }
     var locationOverlayRef by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
 
@@ -452,12 +457,12 @@ fun MapScreen(
     // ✅ LE CALQUE MACRO POUR LA VUE DÉZOOMÉE
     val macroOverlay = remember { FolderOverlay() }
 
-    val showLocationBtn by remember { mutableStateOf(prefs.getBoolean("show_map_location", true)) }
-    val showZoomBtns by remember { mutableStateOf(prefs.getBoolean("show_map_zoom", true)) }
-    val showToolbox by remember { mutableStateOf(prefs.getBoolean("show_map_toolbox", true)) }
-    val showCompass by remember { mutableStateOf(prefs.getBoolean("show_map_compass", true)) }
-    val showScale by remember { mutableStateOf(prefs.getBoolean("show_map_scale", true)) }
-    val showAttribution by remember { mutableStateOf(prefs.getBoolean("show_map_attribution", true)) }
+    var showLocationBtn by remember { mutableStateOf(prefs.getBoolean("show_map_location", true)) }
+    var showZoomBtns by remember { mutableStateOf(prefs.getBoolean("show_map_zoom", true)) }
+    var showToolbox by remember { mutableStateOf(prefs.getBoolean("show_map_toolbox", true)) }
+    var showCompass by remember { mutableStateOf(prefs.getBoolean("show_map_compass", true)) }
+    var showScale by remember { mutableStateOf(prefs.getBoolean("show_map_scale", true)) }
+    var showAttribution by remember { mutableStateOf(prefs.getBoolean("show_map_attribution", true)) }
     val showLocationMarker by AppConfig.showMapLocationMarker
 
     var myCurrentLoc by remember { mutableStateOf<GeoPoint?>(null) }
@@ -1934,7 +1939,7 @@ fun MapScreen(
                         }
                     },
                     onOpenLayers = { safeClick { showLayerSheet = true } },
-                    onOpenSettings = { safeClick { navController.navigate("settings?section=map") } }
+                    onOpenSettings = { safeClick { showMapPageSettingsSheet = true } }
                 )
             }
 
@@ -2232,6 +2237,65 @@ fun MapScreen(
             }
         }
         if (showSettingsSheet) { MapSettingsSheet(onDismiss = { showSettingsSheet = false }) }
+        if (showMapPageSettingsSheet) {
+            fr.geotower.ui.screens.settings.MapSettingsSheet(
+                showLocation = showLocationBtn,
+                onLocationChange = {
+                    showLocationBtn = it
+                    prefs.edit().putBoolean("show_map_location", it).apply()
+                },
+                showLocationMarker = showLocationMarker,
+                onLocationMarkerChange = {
+                    AppConfig.showMapLocationMarker.value = it
+                    prefs.edit().putBoolean(AppConfig.PREF_SHOW_MAP_LOCATION_MARKER, it).apply()
+                },
+                showAzimuths = AppConfig.showAzimuths.value,
+                onAzimuthsChange = {
+                    AppConfig.showAzimuths.value = it
+                    prefs.edit().putBoolean(AppConfig.PREF_SHOW_AZIMUTH_LINES, it).apply()
+                },
+                showAzimuthsCone = AppConfig.showAzimuthsCone.value,
+                onAzimuthsConeChange = {
+                    AppConfig.showAzimuthsCone.value = it
+                    prefs.edit().putBoolean(AppConfig.PREF_SHOW_AZIMUTH_CONES, it).apply()
+                },
+                showZoom = showZoomBtns,
+                onZoomChange = {
+                    showZoomBtns = it
+                    prefs.edit().putBoolean("show_map_zoom", it).apply()
+                },
+                showToolbox = showToolbox,
+                onToolboxChange = {
+                    showToolbox = it
+                    prefs.edit().putBoolean("show_map_toolbox", it).apply()
+                },
+                showCompass = showCompass,
+                onCompassChange = {
+                    showCompass = it
+                    prefs.edit().putBoolean("show_map_compass", it).apply()
+                },
+                showScale = showScale,
+                onScaleChange = {
+                    showScale = it
+                    prefs.edit().putBoolean("show_map_scale", it).apply()
+                },
+                showAttribution = showAttribution,
+                onAttributionChange = {
+                    showAttribution = it
+                    prefs.edit().putBoolean("show_map_attribution", it).apply()
+                },
+                showSpeedometer = AppConfig.showSpeedometer.value,
+                onSpeedometerChange = {
+                    AppConfig.showSpeedometer.value = it
+                    prefs.edit().putBoolean("show_speedometer", it).apply()
+                },
+                onDismiss = { showMapPageSettingsSheet = false },
+                onBack = { showMapPageSettingsSheet = false },
+                sheetState = pageSettingsSheetState,
+                useOneUi = uiStyle.useOneUi,
+                bubbleColor = uiStyle.bubbleColor
+            )
+        }
     }
     if (showColorWarningDialog) {
         AlertDialog(

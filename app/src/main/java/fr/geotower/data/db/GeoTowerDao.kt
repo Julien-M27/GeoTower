@@ -18,6 +18,25 @@ data class SupportRadioStatsRow(
     @ColumnInfo(name = "details_frequences") val encodedDetailsFrequences: String?
 )
 
+data class RadioStatRow(
+    @ColumnInfo(name = "category") val category: String,
+    @ColumnInfo(name = "item_key") val itemKey: String,
+    @ColumnInfo(name = "label") val label: String?,
+    @ColumnInfo(name = "total_count") val totalCount: Int,
+    @ColumnInfo(name = "active_count") val activeCount: Int
+)
+
+data class WeeklyRadioStatRow(
+    @ColumnInfo(name = "week_key") val weekKey: String,
+    @ColumnInfo(name = "week_start") val weekStart: String?,
+    @ColumnInfo(name = "source_date") val sourceDate: String?,
+    @ColumnInfo(name = "category") val category: String,
+    @ColumnInfo(name = "item_key") val itemKey: String,
+    @ColumnInfo(name = "label") val label: String?,
+    @ColumnInfo(name = "total_count") val totalCount: Int,
+    @ColumnInfo(name = "active_count") val activeCount: Int
+)
+
 @Dao
 interface GeoTowerDao {
 
@@ -462,6 +481,21 @@ interface GeoTowerDao {
         FROM support s
         INNER JOIN localisation l ON s.id_anfr = l.id_anfr
         INNER JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
+        LEFT JOIN ref_statut st ON t.statut_id = st.id
+        WHERE UPPER(TRIM(o.libelle)) IN (:operatorNames)
+        AND (
+            COALESCE(t.has_active, 0) = 1
+            OR COALESCE(st.libelle, '') IN ('En service', 'Techniquement opÃ©rationnel', 'Techniquement operationnel')
+        )
+    """)
+    suspend fun getActiveUniqueSupportCountByOperator(operatorNames: List<String>): Int
+
+    @Query("""
+        SELECT COUNT(DISTINCT s.id_support)
+        FROM support s
+        INNER JOIN localisation l ON s.id_anfr = l.id_anfr
+        INNER JOIN ref_operateur o ON l.operateur_id = o.id
         WHERE UPPER(TRIM(o.libelle)) IN (:operatorNames)
         AND (l.tech_mask & 1) != 0
     """)
@@ -523,6 +557,36 @@ interface GeoTowerDao {
         WHERE UPPER(TRIM(o.libelle)) IN (:operatorNames)
     """)
     suspend fun getSupportRadioStatsRowsByOperator(operatorNames: List<String>): List<SupportRadioStatsRow>
+
+    @Query("""
+        SELECT
+            category,
+            item_key,
+            COALESCE(MAX(label), '') AS label,
+            CAST(SUM(total_count) AS INTEGER) AS total_count,
+            CAST(SUM(active_count) AS INTEGER) AS active_count
+        FROM radio_stat_current
+        WHERE operator_name IN (:operatorNames)
+        GROUP BY category, item_key
+    """)
+    suspend fun getCurrentRadioStatsByOperator(operatorNames: List<String>): List<RadioStatRow>
+
+    @Query("""
+        SELECT
+            week_key,
+            week_start,
+            source_date,
+            category,
+            item_key,
+            COALESCE(MAX(label), '') AS label,
+            CAST(SUM(total_count) AS INTEGER) AS total_count,
+            CAST(SUM(active_count) AS INTEGER) AS active_count
+        FROM radio_stat_weekly
+        WHERE operator_name IN (:operatorNames)
+        GROUP BY week_key, week_start, source_date, category, item_key
+        ORDER BY COALESCE(week_start, source_date, week_key) ASC, week_key ASC
+    """)
+    suspend fun getWeeklyRadioStatsByOperator(operatorNames: List<String>): List<WeeklyRadioStatRow>
 
     @Query("""
         SELECT

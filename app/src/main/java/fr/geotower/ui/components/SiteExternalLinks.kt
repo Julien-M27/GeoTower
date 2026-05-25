@@ -2,6 +2,7 @@ package fr.geotower.ui.components
 
 import android.content.SharedPreferences
 import fr.geotower.R
+import fr.geotower.data.config.RemoteFeatureFlags
 
 const val SITE_EXTERNAL_LINK_ORDER_PREF_KEY = "external_links_order"
 private const val LEGACY_SITE_EXTERNAL_LINK_ORDER_PREF_KEY = "page_site_external_links_order"
@@ -17,7 +18,7 @@ data class SiteExternalLinkDefinition(
 val SiteExternalLinkDefinitions = listOf(
     SiteExternalLinkDefinition("cartoradio", "Cartoradio", R.drawable.logo_cartoradio, "link_cartoradio"),
     // CellularFR masqué — voir CellularFrApi.ENABLED
-    // SiteExternalLinkDefinition("cellularfr", "CellularFR", R.drawable.logo_cellularfr, "link_cellularfr"),
+    SiteExternalLinkDefinition("cellularfr", "CellularFR", R.drawable.logo_cellularfr, "link_cellularfr"),
     SiteExternalLinkDefinition("signalquest", "Signal Quest", R.drawable.logo_signalquest, "link_signalquest"),
     SiteExternalLinkDefinition("rncmobile", "RNC Mobile", R.drawable.logo_rncmobile, "link_rncmobile"),
     SiteExternalLinkDefinition("enbanalytics", "eNB-Analytics", R.drawable.logo_enbanalytics, "link_enbanalytics"),
@@ -29,7 +30,7 @@ fun siteExternalLinkById(id: String): SiteExternalLinkDefinition? {
 }
 
 fun defaultSiteExternalLinkOrder(): List<String> {
-    return SiteExternalLinkDefinitions.map { it.id }
+    return availableSiteExternalLinks().map { it.id }
 }
 
 fun readSiteExternalLinkOrder(prefs: SharedPreferences): List<String> {
@@ -61,9 +62,14 @@ fun resetSiteExternalLinks(prefs: SharedPreferences) {
 }
 
 private fun normalizeSiteExternalLinkOrder(order: List<String>): List<String> {
-    val knownIds = SiteExternalLinkDefinitions.map { it.id }
+    val knownIds = availableSiteExternalLinks().map { it.id }
     val cleaned = order.map { it.trim() }
         .filter { it in knownIds }
         .distinct()
     return cleaned + knownIds.filterNot { it in cleaned }
+}
+
+private fun availableSiteExternalLinks(): List<SiteExternalLinkDefinition> {
+    val flags = RemoteFeatureFlags.config.value
+    return SiteExternalLinkDefinitions.filter { link -> flags.isSiteExternalLinkEnabled(link.id) }
 }

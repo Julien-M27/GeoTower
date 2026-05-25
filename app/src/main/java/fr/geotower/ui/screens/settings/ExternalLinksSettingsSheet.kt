@@ -52,6 +52,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import fr.geotower.R
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.ui.components.SiteExternalLinkDefinitions
 import fr.geotower.ui.components.readSiteExternalLinkOrder
 import fr.geotower.ui.components.rememberReorderableDragState
@@ -69,6 +70,7 @@ fun ExternalLinksSettingsSheet(
 ) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val featureFlags by RemoteFeatureFlags.config
 
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
@@ -84,7 +86,7 @@ fun ExternalLinksSettingsSheet(
         MaterialTheme.colorScheme.surface
     }
 
-    var linkEnabled by remember {
+    var linkEnabled by remember(featureFlags) {
         mutableStateOf(
             SiteExternalLinkDefinitions.associate { link ->
                 link.id to prefs.getBoolean(link.prefKey, link.defaultEnabled)
@@ -92,7 +94,7 @@ fun ExternalLinksSettingsSheet(
         )
     }
 
-    var linksOrder by remember {
+    var linksOrder by remember(featureFlags) {
         mutableStateOf(readSiteExternalLinkOrder(prefs))
     }
     val scrollState = rememberScrollState()

@@ -24,18 +24,23 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Help
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -48,7 +53,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -61,6 +68,8 @@ import fr.geotower.utils.AppIconManager
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.ui.zIndex
 import fr.geotower.R
+import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.config.RemoteHomeAnnouncement
 import fr.geotower.data.db.DatabaseVersionPolicy
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import androidx.compose.ui.draw.clip
@@ -84,6 +93,7 @@ import fr.geotower.utils.OperatorLogos
 import kotlinx.coroutines.launch
 
 private const val TAG_HOME = "GeoTowerDb"
+private const val PREF_HOME_ANNOUNCEMENT_DISMISSED = "home_announcement_dismissed_key"
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @SuppressLint("UnusedBoxWithConstraintsScope")
@@ -97,6 +107,10 @@ fun HomeScreen(navController: NavController) {
     // ---> 1. LECTURE DU CHOIX DU LOGO D'ACCUEIL <---
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val homeLogoChoice = prefs.getString("home_logo_choice", "app") ?: "app"
+    val featureFlags by RemoteFeatureFlags.config
+    var dismissedHomeAnnouncementKey by remember {
+        mutableStateOf(prefs.getString(PREF_HOME_ANNOUNCEMENT_DISMISSED, "") ?: "")
+    }
 
 
     // --- 1. LECTURE RÉACTIVE DU THÈME ET DESIGN ---
@@ -236,6 +250,14 @@ fun HomeScreen(navController: NavController) {
     ) {
         // NOUVEAU : Une colonne principale qui contient le bandeau EN HAUT, puis le reste
         Column(modifier = Modifier.fillMaxSize()) {
+            HomeAnnouncementBanner(
+                announcement = featureFlags.homeAnnouncement,
+                dismissedKey = dismissedHomeAnnouncementKey,
+                onDismiss = { dismissKey ->
+                    dismissedHomeAnnouncementKey = dismissKey
+                    prefs.edit().putString(PREF_HOME_ANNOUNCEMENT_DISMISSED, dismissKey).apply()
+                }
+            )
 
             // ---> 1. LE BANDEAU HORS-LIGNE (Pousse le contenu vers le bas au lieu de le cacher) <---
             androidx.compose.animation.AnimatedVisibility(
@@ -444,6 +466,111 @@ fun HomeScreen(navController: NavController) {
 // --- SOUS-COMPOSANTS ---
 
 @Composable
+private fun HomeAnnouncementBanner(
+    announcement: RemoteHomeAnnouncement,
+    dismissedKey: String,
+    onDismiss: (String) -> Unit
+) {
+    val languageTag = LocalConfiguration.current.locales[0]?.toLanguageTag()
+    val localizedText = announcement.localizedText(languageTag)
+    val currentDismissKey = announcement.dismissKey()
+    val isVisible = announcement.enabled &&
+        localizedText.hasContent() &&
+        (!announcement.dismissible || dismissedKey != currentDismissKey)
+    val actionUrl = announcement.httpActionUrlOrNull()
+    val uriHandler = LocalUriHandler.current
+    val closeLabel = stringResource(R.string.appstrings_close)
+    val openLabel = localizedText.actionLabel.ifBlank { stringResource(R.string.appstrings_open) }
+
+    androidx.compose.animation.AnimatedVisibility(
+        visible = isVisible,
+        enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+        exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp, start = 16.dp, end = 16.dp)
+    ) {
+        val containerColor = when (announcement.severity) {
+            "error" -> MaterialTheme.colorScheme.errorContainer
+            "warning" -> MaterialTheme.colorScheme.tertiaryContainer
+            "success" -> MaterialTheme.colorScheme.primaryContainer
+            else -> MaterialTheme.colorScheme.primaryContainer
+        }
+        val contentColor = when (announcement.severity) {
+            "error" -> MaterialTheme.colorScheme.onErrorContainer
+            "warning" -> MaterialTheme.colorScheme.onTertiaryContainer
+            "success" -> MaterialTheme.colorScheme.onPrimaryContainer
+            else -> MaterialTheme.colorScheme.onPrimaryContainer
+        }
+        val icon = when (announcement.severity) {
+            "error" -> Icons.Default.Error
+            "warning" -> Icons.Default.Warning
+            "success" -> Icons.Default.CheckCircle
+            else -> Icons.Default.Info
+        }
+
+        Surface(
+            color = containerColor,
+            shape = RoundedCornerShape(16.dp),
+            shadowElevation = 2.dp,
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = contentColor,
+                    modifier = Modifier.size(24.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    if (localizedText.title.isNotBlank()) {
+                        Text(
+                            text = localizedText.title,
+                            color = contentColor,
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                    }
+                    if (localizedText.message.isNotBlank()) {
+                        Text(
+                            text = localizedText.message,
+                            color = contentColor,
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+                    if (actionUrl != null) {
+                        TextButton(
+                            onClick = { uriHandler.openUri(actionUrl) },
+                            colors = ButtonDefaults.textButtonColors(contentColor = contentColor),
+                            contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp)
+                        ) {
+                            Text(openLabel, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.OpenInNew,
+                                contentDescription = null,
+                                modifier = Modifier.size(16.dp)
+                            )
+                        }
+                    }
+                }
+                if (announcement.dismissible) {
+                    IconButton(onClick = { onDismiss(currentDismissKey) }) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = closeLabel,
+                            tint = contentColor
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun MenuButtonsList(
     navController: NavController,
     useOneUi: Boolean,
@@ -460,11 +587,12 @@ fun MenuButtonsList(
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val menuSize = prefs.getString("menuSize", "normal") ?: "normal"
     val showLogo = prefs.getBoolean("show_home_logo", true)
+    val featureFlags by RemoteFeatureFlags.config
 
-    val showNearby by AppConfig.showNearbyPage
-    val showMap by AppConfig.showMapPage
-    val showCompass by AppConfig.showCompassPage
-    val showStats by AppConfig.showStatsPage
+    val showNearby = AppConfig.showNearbyPage.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)
+    val showMap = AppConfig.showMapPage.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)
+    val showCompass = AppConfig.showCompassPage.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)
+    val showStats = AppConfig.showStatsPage.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)
 
     var savedOrderString = prefs.getString("pages_order", "nearby,map,compass,stats,settings,logo") ?: "nearby,map,compass,stats,settings,logo"
     if (!savedOrderString.contains("logo")) {

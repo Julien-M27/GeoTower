@@ -8,7 +8,9 @@ import fr.geotower.data.db.AppDatabase
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.db.GeoTowerDao
 import fr.geotower.data.db.InvalidGeoTowerDatabaseException
+import fr.geotower.data.db.RadioStatRow
 import fr.geotower.data.db.SupportRadioStatsRow
+import fr.geotower.data.db.WeeklyRadioStatRow
 import fr.geotower.data.models.DbCluster
 import fr.geotower.data.models.FaisceauxEntity
 import fr.geotower.data.models.FrequencyDetailsCodec
@@ -519,6 +521,15 @@ class AnfrRepository(
         }
     }
 
+    suspend fun getActiveUniqueSupportCountByOperator(operatorNames: List<String>): Int {
+        val normalizedNames = normalizeOperatorNames(operatorNames)
+        if (normalizedNames.isEmpty()) return 0
+
+        return queryLocalDatabase(0) {
+            getActiveUniqueSupportCountByOperator(normalizedNames)
+        }
+    }
+
     suspend fun get2GSupportCountByOperator(operatorNames: List<String>): Int {
         val normalizedNames = normalizeOperatorNames(operatorNames)
         if (normalizedNames.isEmpty()) return 0
@@ -572,6 +583,24 @@ class AnfrRepository(
             getSupportRadioStatsRowsByOperator(normalizedNames)
         }
         return buildActiveSupportRadioCounts(rows)
+    }
+
+    suspend fun getCurrentRadioStatsByOperator(operatorNames: List<String>): List<RadioStatRow> {
+        val normalizedNames = normalizeOperatorNames(operatorNames)
+        if (normalizedNames.isEmpty()) return emptyList()
+
+        return queryLocalDatabase(emptyList()) {
+            getCurrentRadioStatsByOperator(normalizedNames)
+        }
+    }
+
+    suspend fun getWeeklyRadioStatsByOperator(operatorNames: List<String>): List<WeeklyRadioStatRow> {
+        val normalizedNames = normalizeOperatorNames(operatorNames)
+        if (normalizedNames.isEmpty()) return emptyList()
+
+        return queryLocalDatabase(emptyList()) {
+            getWeeklyRadioStatsByOperator(normalizedNames)
+        }
     }
 
     // =================================================================

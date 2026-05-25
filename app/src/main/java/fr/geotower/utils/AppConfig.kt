@@ -166,6 +166,7 @@ object AppConfig {
     val showMapPage = mutableStateOf(true)
     val showCompassPage = mutableStateOf(true)
     val showStatsPage = mutableStateOf(true)
+    var statsDisplayMode = mutableStateOf(StatsDisplayMode.Both)
 
     // --- Capteurs matériels ---
     var hasCompass = mutableStateOf(true) // Vrai par défaut, vérifié au lancement
@@ -253,6 +254,7 @@ object AppConfig {
         speedUnit.intValue = prefs.getInt("speed_unit", 0)
 
         loadMapDisplayPreferences(prefs)
+        statsDisplayMode.value = StatsPreferences.displayMode(prefs)
 
         siteShowTechno2G.value = prefs.getBoolean("site_show_techno_2g", true)
         siteShowTechno3G.value = prefs.getBoolean("site_show_techno_3g", true)
