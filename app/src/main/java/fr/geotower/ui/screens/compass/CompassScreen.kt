@@ -213,14 +213,20 @@ fun CompassScreen(
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
         }
 
-        sensorManager.registerListener(listener, rotationSensor, SensorManager.SENSOR_DELAY_GAME)
+        if (rotationSensor != null) {
+            sensorManager.registerListener(listener, rotationSensor, SensorManager.SENSOR_DELAY_GAME)
+        }
         onDispose { sensorManager.unregisterListener(listener) }
     }
 
     // --- GESTION DU GPS (Localisation) ---
     DisposableEffect(Unit) {
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
-        val hasPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasFinePermission = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasCoarsePermission = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val enabledProviders = runCatching {
+            locationManager.getProviders(true).toSet()
+        }.getOrDefault(emptySet())
 
         val locationListener = object : LocationListener {
             override fun onLocationChanged(loc: Location) {
@@ -233,21 +239,38 @@ fun CompassScreen(
             override fun onProviderDisabled(p0: String) {}
         }
 
-        if (hasPermission) {
+        if (hasFinePermission || hasCoarsePermission) {
+            val candidateProviders = buildList {
+                if (hasFinePermission && LocationManager.GPS_PROVIDER in enabledProviders) {
+                    add(LocationManager.GPS_PROVIDER)
+                }
+                if (LocationManager.NETWORK_PROVIDER in enabledProviders) {
+                    add(LocationManager.NETWORK_PROVIDER)
+                }
+            }
             // On récupère d'abord la dernière position connue pour un affichage immédiat
-            val lastLoc = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER)
-                ?: locationManager.getLastKnownLocation(LocationManager.NETWORK_PROVIDER)
+            val lastLoc = candidateProviders.firstNotNullOfOrNull { provider ->
+                runCatching { locationManager.getLastKnownLocation(provider) }.getOrNull()
+            }
             if (lastLoc != null) {
                 latitude = lastLoc.latitude
                 longitude = lastLoc.longitude
                 accuracy = lastLoc.accuracy
             }
             // Puis on s'abonne aux mises à jour
-            locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 2f, locationListener)
-            locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000L, 2f, locationListener)
+            if (hasFinePermission && LocationManager.GPS_PROVIDER in enabledProviders) {
+                runCatching {
+                    locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 2000L, 2f, locationListener)
+                }
+            }
+            if (LocationManager.NETWORK_PROVIDER in enabledProviders) {
+                runCatching {
+                    locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 2000L, 2f, locationListener)
+                }
+            }
         }
 
-        onDispose { locationManager.removeUpdates(locationListener) }
+        onDispose { runCatching { locationManager.removeUpdates(locationListener) } }
     }
 
     // --- RÉCUPÉRATION DE LA VILLE (Reverse Geocoding) ---

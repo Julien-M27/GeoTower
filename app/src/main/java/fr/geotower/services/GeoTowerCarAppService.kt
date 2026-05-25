@@ -4,6 +4,7 @@ import androidx.car.app.CarAppService
 import androidx.car.app.Session
 import androidx.car.app.SessionInfo
 import androidx.car.app.validation.HostValidator
+import fr.geotower.BuildConfig
 import fr.geotower.utils.AppLogger
 
 class GeoTowerCarAppService : CarAppService() {
@@ -14,7 +15,14 @@ class GeoTowerCarAppService : CarAppService() {
 
     override fun createHostValidator(): HostValidator {
         AppLogger.i(TAG, "Creating Android Auto host validator")
-        return HostValidator.ALLOW_ALL_HOSTS_VALIDATOR
+        // Debug keeps local/test hosts flexible; release only accepts Android Auto hosts.
+        return if (BuildConfig.DEBUG) {
+            HostValidator.ALLOW_ALL_HOSTS_VALIDATOR
+        } else {
+            HostValidator.Builder(this)
+                .addAllowedHosts(androidx.car.app.R.array.hosts_allowlist_sample)
+                .build()
+        }
     }
 
     override fun onCreateSession(sessionInfo: SessionInfo): Session {

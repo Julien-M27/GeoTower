@@ -20,6 +20,7 @@ import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.NotificationIconResources
 import fr.geotower.utils.OfflineMapDisplayNames
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -62,10 +63,9 @@ class MapDownloadWorker(
         val resultNotifId = DownloadNotificationCenter.mapDownloadResultNotificationId(mapFilename)
         DownloadNotificationCenter.rememberMapDownloadNotification(applicationContext, mapFilename)
 
-        try {
-            setForeground(createForegroundInfo(0, mapDisplayName, progressNotifId))
-        } catch (e: Exception) {
-            AppLogger.w(TAG, "Map download foreground setup failed", e)
+        if (!startForegroundOrRetry(mapDisplayName, progressNotifId)) {
+            setProgress(workDataOf("error" to "foreground_unavailable"))
+            return@withContext Result.retry()
         }
 
         if (!hasEnoughSpace(estimatedSizeMb)) {
@@ -182,6 +182,18 @@ class MapDownloadWorker(
         val stat = StatFs(applicationContext.getExternalFilesDir(null)?.path ?: return false)
         val availableBytes = stat.availableBlocksLong * stat.blockSizeLong
         return availableBytes > requiredBytes
+    }
+
+    private suspend fun startForegroundOrRetry(mapDisplayName: String, progressNotifId: Int): Boolean {
+        return try {
+            setForeground(createForegroundInfo(0, mapDisplayName, progressNotifId))
+            true
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "Map download foreground setup failed", e)
+            false
+        }
     }
 
     private fun createForegroundInfo(progress: Int, mapName: String, notifId: Int): ForegroundInfo {

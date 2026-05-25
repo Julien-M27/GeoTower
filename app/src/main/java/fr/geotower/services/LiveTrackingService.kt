@@ -950,6 +950,10 @@ class LiveTrackingService : Service() {
             AppLogger.w(TAG_LOCATION, "Live tracking foreground service failed", e)
             stopTrackingAndSelf()
             false
+        } catch (e: IllegalStateException) {
+            AppLogger.w(TAG_LOCATION, "Live tracking foreground service could not enter foreground", e)
+            stopTrackingAndSelf()
+            false
         }
     }
 

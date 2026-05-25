@@ -33,7 +33,7 @@ fun rememberNetworkConnectivityState(context: Context): State<Boolean> {
             }
 
             override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-                isOnlineState.value = hasInternetTransport(networkCapabilities)
+                isOnlineState.value = hasValidatedInternetTransport(networkCapabilities)
             }
         }
 
@@ -65,11 +65,12 @@ fun isNetworkAvailable(context: Context): Boolean {
     val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
     val network = connectivityManager.activeNetwork ?: return false
     val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return false
-    return hasInternetTransport(capabilities)
+    return hasValidatedInternetTransport(capabilities)
 }
 
-private fun hasInternetTransport(capabilities: NetworkCapabilities): Boolean {
+private fun hasValidatedInternetTransport(capabilities: NetworkCapabilities): Boolean {
     return capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+        capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) &&
         (
             capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
                 capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) ||

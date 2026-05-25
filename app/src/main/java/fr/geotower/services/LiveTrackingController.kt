@@ -9,6 +9,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.utils.AppLogger
 import fr.geotower.utils.OperatorColors
 
 object LiveTrackingController {
@@ -34,12 +35,7 @@ object LiveTrackingController {
         }
 
         val serviceIntent = Intent(appContext, LiveTrackingService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            appContext.startForegroundService(serviceIntent)
-        } else {
-            appContext.startService(serviceIntent)
-        }
-        return StartResult.Started
+        return startLiveTrackingService(appContext, serviceIntent)
     }
 
     fun startOnAppLaunchIfEnabled(context: Context): StartResult {
@@ -113,4 +109,21 @@ object LiveTrackingController {
         val rawOp = prefs.getString("default_operator", "Aucun") ?: "Aucun"
         return OperatorColors.keyFor(rawOp) ?: "AUCUN"
     }
+
+    private fun startLiveTrackingService(context: Context, serviceIntent: Intent): StartResult {
+        return try {
+            ContextCompat.startForegroundService(context, serviceIntent)
+            StartResult.Started
+        } catch (e: SecurityException) {
+            AppLogger.w(TAG, "Live tracking foreground service start blocked by permissions", e)
+            stop(context)
+            StartResult.Stopped
+        } catch (e: IllegalStateException) {
+            AppLogger.w(TAG, "Live tracking foreground service start blocked by app state", e)
+            stop(context)
+            StartResult.Stopped
+        }
+    }
+
+    private const val TAG = "LiveTracking"
 }

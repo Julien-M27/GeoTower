@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.work.ExistingWorkPolicy
+import androidx.work.Constraints
+import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.workDataOf
@@ -172,6 +174,11 @@ fun MapDownloadCard(
                                         )
                                         val request = OneTimeWorkRequestBuilder<fr.geotower.data.workers.MapDownloadWorker>()
                                             .setInputData(data)
+                                            .setConstraints(
+                                                Constraints.Builder()
+                                                    .setRequiredNetworkType(NetworkType.CONNECTED)
+                                                    .build()
+                                            )
                                             .addTag("map_download")
                                             .addTag("map_id_${map.id}")
                                             .build()
@@ -256,7 +263,15 @@ fun MapDownloadCard(
                                                 "map_sha256" to map.sha256.orEmpty()
                                             )
                                             val request = OneTimeWorkRequestBuilder<fr.geotower.data.workers.MapDownloadWorker>()
-                                                .setInputData(data).addTag("map_download").addTag("map_id_${map.id}").build()
+                                                .setInputData(data)
+                                                .setConstraints(
+                                                    Constraints.Builder()
+                                                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                                                        .build()
+                                                )
+                                                .addTag("map_download")
+                                                .addTag("map_id_${map.id}")
+                                                .build()
                                             workManager.enqueueUniqueWork("map_dl_${map.id}", ExistingWorkPolicy.REPLACE, request)
                                         }
                                     }

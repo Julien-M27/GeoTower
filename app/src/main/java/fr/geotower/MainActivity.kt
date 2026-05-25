@@ -680,7 +680,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             composable(
-                                route = "site_speedtests?siteId={siteId}&anfrCode={anfrCode}&operator={operator}&market={market}",
+                                route = "site_speedtests?siteId={siteId}&anfrCode={anfrCode}&operator={operator}&market={market}&mcc={mcc}&mnc={mnc}",
                                 arguments = listOf(
                                     navArgument("siteId") {
                                         type = NavType.StringType
@@ -700,6 +700,16 @@ class MainActivity : ComponentActivity() {
                                     navArgument("market") {
                                         type = NavType.StringType
                                         defaultValue = "FR"
+                                    },
+                                    navArgument("mcc") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    },
+                                    navArgument("mnc") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
                                     }
                                 )
                             ) { backStackEntry ->
@@ -707,6 +717,8 @@ class MainActivity : ComponentActivity() {
                                 val anfrCode = backStackEntry.arguments?.getString("anfrCode")
                                 val operator = backStackEntry.arguments?.getString("operator")
                                 val market = backStackEntry.arguments?.getString("market") ?: "FR"
+                                val mcc = backStackEntry.arguments?.getString("mcc")?.toIntOrNull()
+                                val mnc = backStackEntry.arguments?.getString("mnc")?.toIntOrNull()
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     if (
                                         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_SPEEDTESTS) &&
@@ -718,7 +730,9 @@ class MainActivity : ComponentActivity() {
                                             siteId = siteId,
                                             anfrCode = anfrCode,
                                             operator = operator,
-                                            market = market
+                                            market = market,
+                                            mcc = mcc,
+                                            mnc = mnc
                                         )
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)

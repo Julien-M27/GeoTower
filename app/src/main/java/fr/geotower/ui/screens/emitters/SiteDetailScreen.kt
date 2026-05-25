@@ -106,6 +106,7 @@ import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.api.SignalQuestSpeedtestSortMetric
 import fr.geotower.data.api.SqSpeedtestData
 import fr.geotower.data.api.bestSignalQuestSpeedtestByMetric
+import fr.geotower.data.api.filterBySignalQuestPlmn
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.data.models.LocalisationEntity
@@ -520,6 +521,7 @@ fun SiteDetailScreen(
     }
     fun openSiteSpeedtests(site: LocalisationEntity, sitePhysique: PhysiqueEntity?) {
         if (!canUseSiteSpeedtests) return
+        val plmn = SignalQuestOperators.speedtestPlmnFor(site.operateur)
         val params = buildList {
             sitePhysique?.idSupport?.trim()?.takeIf { it.isNotEmpty() }?.let {
                 add("siteId=${Uri.encode(it)}")
@@ -529,6 +531,12 @@ fun SiteDetailScreen(
             }
             SignalQuestOperators.operatorParamFor(site.operateur)?.let {
                 add("operator=${Uri.encode(it)}")
+            }
+            plmn?.mcc?.let {
+                add("mcc=$it")
+            }
+            plmn?.let {
+                add("mnc=${it.mnc}")
             }
             add("market=FR")
         }
@@ -682,12 +690,14 @@ fun SiteDetailScreen(
         val currentPhysique = physique
         if (currentAntenna == null || currentAntenna.idAnfr.isBlank()) return@LaunchedEffect
 
+        val plmn = SignalQuestOperators.speedtestPlmnFor(currentAntenna.operateur)
         val apiOperator = SignalQuestOperators.operatorParamFor(currentAntenna.operateur)
+        val fallbackOperator = apiOperator.takeIf { plmn == null }
 
         if (
             fr.geotower.utils.AppConfig.siteShowSpeedtest.value &&
             canUseSiteSpeedtests &&
-            apiOperator != null &&
+            (plmn != null || fallbackOperator != null) &&
             CommunityDataPreferences.isSignalQuestSpeedtestEnabled(prefs, currentAntenna.operateur)
         ) {
             speedtestData = null
@@ -696,7 +706,7 @@ fun SiteDetailScreen(
                 val supportSiteId = currentPhysique?.idSupport?.trim()?.takeIf { it.isNotEmpty() }
                 val anfrCodeToSend = currentAntenna.idAnfr.trim().takeIf { it.isNotEmpty() }
 
-                AppLogger.d(TAG_SPEEDTEST, "Speedtest request siteId=$supportSiteId anfr=$anfrCodeToSend operator=$apiOperator")
+                AppLogger.d(TAG_SPEEDTEST, "Speedtest request siteId=$supportSiteId anfr=$anfrCodeToSend operator=$fallbackOperator mcc=${plmn?.mcc} mnc=${plmn?.mnc}")
 
                 val allSpeedtests = mutableListOf<SqSpeedtestData>()
                 var offset = 0
@@ -708,7 +718,9 @@ fun SiteDetailScreen(
                             anfrCode = anfrCodeToSend,
                             nationalSiteCode = anfrCodeToSend,
                             sourceCode = anfrCodeToSend,
-                            operator = apiOperator,
+                            operator = fallbackOperator,
+                            mcc = plmn?.mcc,
+                            mnc = plmn?.mnc,
                             bestOnly = false,
                             limit = SIGNALQUEST_SPEEDTEST_PAGE_SIZE,
                             offset = offset
@@ -719,18 +731,23 @@ fun SiteDetailScreen(
 
                     if (response.isSuccessful) {
                         val body = response.body()
-                        val page = body?.data.orEmpty()
+                        val rawPage = body?.data.orEmpty()
+                        val page = rawPage.filterBySignalQuestPlmn(plmn)
                         allSpeedtests += page
                         total = body?.meta?.total ?: total
+                        val totalValue = total
+                        val fetchedCount = offset + rawPage.size
+
+                        AppLogger.d(TAG_SPEEDTEST, "Speedtest page raw=${rawPage.size} filtered=${page.size} mcc=${plmn?.mcc} mnc=${plmn?.mnc}")
 
                         if (
-                            page.size < SIGNALQUEST_SPEEDTEST_PAGE_SIZE ||
-                            page.isEmpty() ||
-                            (total != null && allSpeedtests.size >= total!!)
+                            rawPage.size < SIGNALQUEST_SPEEDTEST_PAGE_SIZE ||
+                            rawPage.isEmpty() ||
+                            (totalValue != null && fetchedCount >= totalValue)
                         ) {
                             break
                         }
-                        offset += page.size
+                        offset = fetchedCount
                     } else {
                         response.errorBody()?.close()
                         AppLogger.d(TAG_SPEEDTEST, "Speedtest API failure code=${response.code()}")

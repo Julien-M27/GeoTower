@@ -75,7 +75,10 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
             ensureNotificationChannel()
             val initialProgress = finishedCount(manifest)
             setProgress(workDataOf("current" to initialProgress, "total" to total))
-            startForegroundSafely(manifest, current = initialProgress, total = total, notificationId = progressNotificationId)
+            if (!startForegroundSafely(manifest, current = initialProgress, total = total, notificationId = progressNotificationId)) {
+                setProgress(workDataOf("error" to "foreground_unavailable"))
+                return Result.retry()
+            }
 
             for (uploadFile in SignalQuestUploadQueue.filesInUploadOrder(manifest.files)) {
                 if (!SignalQuestUploadFileStatus.shouldUpload(uploadFile.status)) {
@@ -218,14 +221,15 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         current: Int,
         total: Int,
         notificationId: Int
-    ) {
+    ): Boolean {
         try {
             setForeground(createForegroundInfo(manifest, current, total, notificationId))
+            return true
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             AppLogger.w(TAG, "SignalQuest upload foreground notification failed", e)
-            showProgressNotification(manifest, current, total, notificationId)
+            return false
         }
     }
 

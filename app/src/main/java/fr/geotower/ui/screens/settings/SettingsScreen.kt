@@ -144,11 +144,11 @@ import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.services.LiveTrackingController
 import fr.geotower.utils.OperatorLogos
+import fr.geotower.widget.WidgetUpdateScheduler
 import kotlin.math.roundToInt
 
 private const val DEFAULT_SITE_SHARE_ORDER = "map,elevation_profile,support,ids,dates,address,speedtest,throughput,status,freq"
-private const val DEFAULT_WIDGET_SYNC_MINUTES = 60L
-private const val WIDGET_PERIODIC_WORK_NAME = "WidgetPeriodicUpdate"
+private const val DEFAULT_WIDGET_SYNC_MINUTES = 60
 
 private data class SettingsSectionBounds(
     val top: Float = Float.NaN,
@@ -177,17 +177,7 @@ private fun resetSettingsToDefaultsAndRestart(context: Context, prefs: SharedPre
 
     UpdateCheckScheduler.reconcile(appContext)
 
-    val widgetRefreshWork =
-        androidx.work.PeriodicWorkRequestBuilder<fr.geotower.widget.AntennaWidgetWorker>(
-            DEFAULT_WIDGET_SYNC_MINUTES,
-            java.util.concurrent.TimeUnit.MINUTES
-        ).build()
-
-    androidx.work.WorkManager.getInstance(appContext).enqueueUniquePeriodicWork(
-        WIDGET_PERIODIC_WORK_NAME,
-        androidx.work.ExistingPeriodicWorkPolicy.UPDATE,
-        widgetRefreshWork
-    )
+    WidgetUpdateScheduler.schedulePeriodicUpdate(appContext, DEFAULT_WIDGET_SYNC_MINUTES)
 
     val intent = appContext.packageManager.getLaunchIntentForPackage(appContext.packageName)
     intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -2176,6 +2166,11 @@ fun SectionPreferences(
 
     // --- NOUVEAU : BOUTON D'AUTORISATION ARRIÈRE-PLAN ---
     if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+        val backgroundPermissionLabel = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            runCatching { context.packageManager.backgroundPermissionOptionLabel.toString() }.getOrNull()
+        } else {
+            null
+        }
 
         // ✅ 1. L'état qui permet à l'interface de se mettre à jour toute seule
         var isBgLocationGranted by remember {
@@ -2205,7 +2200,13 @@ fun SectionPreferences(
             Column {
                 PreferenceActionCard(
                     title = stringResource(R.string.appstrings_bg_location_perm_title),
-                    desc = stringResource(R.string.appstrings_bg_location_perm_desc),
+                    desc = buildString {
+                        append(stringResource(R.string.appstrings_bg_location_perm_desc))
+                        if (!backgroundPermissionLabel.isNullOrBlank()) {
+                            append('\n')
+                            append(backgroundPermissionLabel)
+                        }
+                    },
                     onClick = {
                         // ✅ 4. Trouver la VRAIE activité (On déballe le contexte de Compose pour réparer le bug de redirection)
                         var currentContext = context
@@ -2213,6 +2214,33 @@ fun SectionPreferences(
                             currentContext = currentContext.baseContext
                         }
                         val activity = currentContext as? android.app.Activity
+                        val hasFineLocation = androidx.core.content.ContextCompat.checkSelfPermission(
+                            context,
+                            android.Manifest.permission.ACCESS_FINE_LOCATION
+                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                        val hasCoarseLocation = androidx.core.content.ContextCompat.checkSelfPermission(
+                            context,
+                            android.Manifest.permission.ACCESS_COARSE_LOCATION
+                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+                        if (!hasFineLocation && !hasCoarseLocation) {
+                            activity?.requestPermissions(
+                                arrayOf(
+                                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                    android.Manifest.permission.ACCESS_COARSE_LOCATION
+                                ),
+                                1005
+                            )
+                            return@PreferenceActionCard
+                        }
+
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", context.packageName, null)
+                            }
+                            runCatching { context.startActivity(intent) }
+                            return@PreferenceActionCard
+                        }
 
                         // ✅ 5. Analyser l'état de la permission
                         val shouldShowRationale = activity?.shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) ?: false
@@ -2252,15 +2280,7 @@ fun SectionPreferences(
             prefs.edit().putInt("widget_sync_freq", newFreq).apply()
 
             // Mettre à jour le WorkManager instantanément avec la nouvelle fréquence
-            val periodicWork = androidx.work.PeriodicWorkRequestBuilder<fr.geotower.widget.AntennaWidgetWorker>(
-                newFreq.toLong(), java.util.concurrent.TimeUnit.MINUTES
-            ).build()
-
-            androidx.work.WorkManager.getInstance(context).enqueueUniquePeriodicWork(
-                "WidgetPeriodicUpdate",
-                androidx.work.ExistingPeriodicWorkPolicy.UPDATE, // IMPORTANT : Update au lieu de Keep
-                periodicWork
-            )
+            WidgetUpdateScheduler.schedulePeriodicUpdate(context, newFreq)
         },
         shape = shape,
         border = border,

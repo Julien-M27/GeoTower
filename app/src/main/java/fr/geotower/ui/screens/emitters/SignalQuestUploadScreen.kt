@@ -150,7 +150,7 @@ fun SignalQuestUploadScreen(
     // --- 1. ÉTATS ---
     val currentUris = remember { mutableStateListOf<String>().apply { addAll(imageUris) } }
     var description by remember { mutableStateOf("") }
-    var stripExifBeforeUpload by rememberSaveable { mutableStateOf(false) }
+    var stripExifBeforeUpload by rememberSaveable { mutableStateOf(true) }
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showImageSourceDialog by remember { mutableStateOf(false) }
 

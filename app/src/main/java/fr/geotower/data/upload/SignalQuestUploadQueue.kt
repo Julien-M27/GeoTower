@@ -113,7 +113,7 @@ data class SignalQuestUploadManifest(
     val description: String,
     val createdAtMillis: Long,
     val files: List<SignalQuestUploadFile>,
-    val stripExifBeforeUpload: Boolean = false,
+    val stripExifBeforeUpload: Boolean = true,
     val anfrCode: String? = null,
     val nationalSiteCode: String? = null,
     val sourceCode: String? = null
@@ -195,7 +195,7 @@ object SignalQuestUploadQueue {
         operator: String,
         description: String,
         uriStrings: List<String>,
-        stripExifBeforeUpload: Boolean = false
+        stripExifBeforeUpload: Boolean = true
     ): SignalQuestUploadManifest {
         cleanupStaleFiles(context)
 

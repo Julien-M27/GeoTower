@@ -26,28 +26,27 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_speedtests)) {
-        item(stringResource(R.string.appstrings_release_speedtests_all_page))
-        item(stringResource(R.string.appstrings_release_speedtests_sort_filters_details))
-        item(stringResource(R.string.appstrings_release_speedtests_best_card_clickable))
-        item(stringResource(R.string.appstrings_release_speedtests_best_metric_setting))
+    section(stringResource(R.string.appstrings_release_section_global)) {
+        item(stringResource(R.string.appstrings_release_global_internal_stability_update))
+        item(stringResource(R.string.appstrings_release_global_reliable_network_background_services))
+        item(stringResource(R.string.appstrings_release_global_permissions_gps_compass_adjusted))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_signalquest)) {
+        item(stringResource(R.string.appstrings_release_signalquest_private_photo_data_removed))
+        item(stringResource(R.string.appstrings_release_signalquest_speedtest_filtering_improved))
+        item(stringResource(R.string.appstrings_release_signalquest_pagination_fixed))
+        item(stringResource(R.string.appstrings_release_signalquest_network_display_clearer))
     }
 
     section(stringResource(R.string.appstrings_release_section_widgets)) {
-        item(stringResource(R.string.appstrings_release_widgets_mini_map))
-        item(stringResource(R.string.appstrings_release_widgets_nearby_antennas))
-        item(stringResource(R.string.appstrings_release_widgets_open_map))
-        item(stringResource(R.string.appstrings_release_widgets_previews_improved))
+        item(stringResource(R.string.appstrings_release_widgets_refresh_more_reliable))
     }
 
-    section(stringResource(R.string.appstrings_release_section_live_tracking)) {
-        item(stringResource(R.string.appstrings_release_live_tracking_compact_display))
-        item(stringResource(R.string.appstrings_release_live_tracking_tracker_icon))
-        item(stringResource(R.string.appstrings_release_live_tracking_site_photo_focus))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_global)) {
-        item(stringResource(R.string.appstrings_release_global_feature_availability))
+    section(stringResource(R.string.appstrings_release_section_interface)) {
+        item(stringResource(R.string.appstrings_release_interface_speedtest_translations_completed))
+        item(stringResource(R.string.appstrings_release_interface_plurals_fixed))
+        item(stringResource(R.string.appstrings_release_interface_map_share_improvements))
     }
 }
 

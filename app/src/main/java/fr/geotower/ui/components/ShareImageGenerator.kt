@@ -2077,7 +2077,7 @@ fun AntennaShareMenu(
     val txtSupportNature = stringResource(R.string.appstrings_support_nature)
     val txtOwner = stringResource(R.string.appstrings_owner)
     val txtAntennaType = stringResource(R.string.appstrings_antenna_type)
-    val txtCommunityPhotosTitle = pluralStringResource(R.plurals.community_photos_title_short, communityPhotosSize)
+    val txtCommunityPhotosTitle = pluralStringResource(R.plurals.community_photos_title_short, communityPhotosSize, communityPhotosSize)
     val txtThemeLight = stringResource(R.string.appstrings_theme_light)
     val txtLightModeDesc = stringResource(R.string.appstrings_light_mode_desc)
     val txtThemeDark = stringResource(R.string.appstrings_theme_dark)

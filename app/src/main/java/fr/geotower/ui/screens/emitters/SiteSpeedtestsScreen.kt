@@ -72,8 +72,10 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import fr.geotower.R
 import fr.geotower.data.api.SignalQuestClient
+import fr.geotower.data.api.SignalQuestPlmnFilter
 import fr.geotower.data.api.SignalQuestSpeedtestSortMetric
 import fr.geotower.data.api.SqSpeedtestData
+import fr.geotower.data.api.filterBySignalQuestPlmn
 import fr.geotower.data.api.sortedBySignalQuestMetric
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.geoTowerLazyListFadingEdge
@@ -103,7 +105,9 @@ fun SiteSpeedtestsScreen(
     siteId: String?,
     anfrCode: String?,
     operator: String?,
-    market: String = "FR"
+    market: String = "FR",
+    mcc: Int? = null,
+    mnc: Int? = null
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -121,11 +125,18 @@ fun SiteSpeedtestsScreen(
     }
     val blockShape = if (useOneUi) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
     val buttonShape = oneUiActionButtonShape(useOneUi)
+    val speedtestsErrorMessage = stringResource(R.string.appstrings_speedtests_error)
 
     val cleanSiteId = remember(siteId) { siteId?.trim()?.takeIf { it.isNotEmpty() } }
     val cleanAnfrCode = remember(anfrCode) { anfrCode?.trim()?.takeIf { it.isNotEmpty() } }
     val cleanOperator = remember(operator) { operator?.trim()?.takeIf { it.isNotEmpty() } }
     val cleanMarket = remember(market) { market.trim().ifEmpty { "FR" } }
+    val requestMcc = remember(mcc, mnc) { mcc.takeIf { mnc != null } }
+    val requestMnc = mnc
+    val requestPlmn = remember(requestMcc, requestMnc) {
+        requestMnc?.let { SignalQuestPlmnFilter(mcc = requestMcc, mnc = it) }
+    }
+    val requestOperator = remember(cleanOperator, requestMnc) { cleanOperator.takeIf { requestMnc == null } }
     val fallbackRoute = cleanAnfrCode?.let { "site_detail/$it" } ?: "emitters"
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = fallbackRoute)
 
@@ -196,19 +207,25 @@ fun SiteSpeedtestsScreen(
         sortDescending = SiteSpeedtestsPagePreferences.DEFAULT_SORT_DESCENDING
     }
 
-    var speedtests by remember(cleanSiteId, cleanAnfrCode, cleanOperator, cleanMarket) {
+    var speedtests by remember(cleanSiteId, cleanAnfrCode, cleanOperator, cleanMarket, mcc, mnc) {
         mutableStateOf<List<SqSpeedtestData>>(emptyList())
     }
-    var totalCount by remember(cleanSiteId, cleanAnfrCode, cleanOperator, cleanMarket) {
+    var totalCount by remember(cleanSiteId, cleanAnfrCode, cleanOperator, cleanMarket, mcc, mnc) {
         mutableStateOf<Int?>(null)
     }
-    var isInitialLoading by remember(cleanSiteId, cleanAnfrCode, cleanOperator, cleanMarket) {
+    var nextOffset by remember(cleanSiteId, cleanAnfrCode, cleanOperator, cleanMarket, mcc, mnc) {
+        mutableIntStateOf(0)
+    }
+    var lastRawPageSize by remember(cleanSiteId, cleanAnfrCode, cleanOperator, cleanMarket, mcc, mnc) {
+        mutableIntStateOf(0)
+    }
+    var isInitialLoading by remember(cleanSiteId, cleanAnfrCode, cleanOperator, cleanMarket, mcc, mnc) {
         mutableStateOf(true)
     }
-    var isLoadingMore by remember(cleanSiteId, cleanAnfrCode, cleanOperator, cleanMarket) {
+    var isLoadingMore by remember(cleanSiteId, cleanAnfrCode, cleanOperator, cleanMarket, mcc, mnc) {
         mutableStateOf(false)
     }
-    var errorMessage by remember(cleanSiteId, cleanAnfrCode, cleanOperator, cleanMarket) {
+    var errorMessage by remember(cleanSiteId, cleanAnfrCode, cleanOperator, cleanMarket, mcc, mnc) {
         mutableStateOf<String?>(null)
     }
     var reloadNonce by remember { mutableIntStateOf(0) }
@@ -216,7 +233,7 @@ fun SiteSpeedtestsScreen(
 
     suspend fun loadSpeedtests(reset: Boolean) {
         if (cleanSiteId == null && cleanAnfrCode == null) {
-            errorMessage = context.getString(R.string.appstrings_speedtests_error)
+            errorMessage = speedtestsErrorMessage
             isInitialLoading = false
             isLoadingMore = false
             return
@@ -226,12 +243,14 @@ fun SiteSpeedtestsScreen(
             isInitialLoading = true
             speedtests = emptyList()
             totalCount = null
+            nextOffset = 0
+            lastRawPageSize = 0
         } else {
             isLoadingMore = true
         }
         errorMessage = null
 
-        val offset = if (reset) 0 else speedtests.size
+        val offset = if (reset) 0 else nextOffset
         try {
             val response = withContext(Dispatchers.IO) {
                 SignalQuestClient.api.getSiteSpeedtests(
@@ -239,7 +258,9 @@ fun SiteSpeedtestsScreen(
                     anfrCode = cleanAnfrCode,
                     nationalSiteCode = cleanAnfrCode,
                     sourceCode = cleanAnfrCode,
-                    operator = cleanOperator,
+                    operator = requestOperator,
+                    mcc = requestMcc,
+                    mnc = requestMnc,
                     market = cleanMarket,
                     bestOnly = false,
                     limit = SPEEDTESTS_PAGE_SIZE,
@@ -249,33 +270,37 @@ fun SiteSpeedtestsScreen(
 
             if (response.isSuccessful) {
                 val body = response.body()
-                val page = body?.data.orEmpty()
+                val rawPage = body?.data.orEmpty()
+                val page = rawPage.filterBySignalQuestPlmn(requestPlmn)
                 speedtests = if (reset) page else speedtests + page
                 totalCount = body?.meta?.total
+                nextOffset = offset + rawPage.size
+                lastRawPageSize = rawPage.size
             } else {
                 response.errorBody()?.close()
                 AppLogger.w(TAG_SITE_SPEEDTESTS, "SignalQuest speedtests list failure code=${response.code()}")
-                errorMessage = context.getString(R.string.appstrings_speedtests_error)
+                errorMessage = speedtestsErrorMessage
             }
         } catch (e: CancellationException) {
             throw e
         } catch (e: IOException) {
             AppLogger.w(TAG_SITE_SPEEDTESTS, "SignalQuest speedtests network failure", e)
-            errorMessage = context.getString(R.string.appstrings_speedtests_error)
+            errorMessage = speedtestsErrorMessage
         } catch (e: Exception) {
             AppLogger.w(TAG_SITE_SPEEDTESTS, "SignalQuest speedtests request failed", e)
-            errorMessage = context.getString(R.string.appstrings_speedtests_error)
+            errorMessage = speedtestsErrorMessage
         } finally {
             isInitialLoading = false
             isLoadingMore = false
         }
     }
 
-    LaunchedEffect(cleanSiteId, cleanAnfrCode, cleanOperator, cleanMarket, reloadNonce) {
+    LaunchedEffect(cleanSiteId, cleanAnfrCode, cleanOperator, cleanMarket, mcc, mnc, reloadNonce) {
         loadSpeedtests(reset = true)
     }
 
-    val hasMore = totalCount?.let { speedtests.size < it } ?: (speedtests.size >= SPEEDTESTS_PAGE_SIZE)
+    val hasMore = lastRawPageSize >= SPEEDTESTS_PAGE_SIZE &&
+        (totalCount?.let { nextOffset < it } ?: true)
     val displayedSpeedtests = remember(speedtests, filterMajorEnb, includeMissingEnb, sortMetric, sortDescending) {
         speedtests.filteredByMajorityEnb(
             enabled = filterMajorEnb,
@@ -964,14 +989,22 @@ private fun formatSpeedtestTimestamp(context: android.content.Context, timestamp
 
 private fun SqSpeedtestData.networkLine(): String? {
     return listOfNotNull(
-        mobileOperator?.takeIf { it.isNotBlank() },
-        networkType?.takeIf { it.isNotBlank() },
-        deviceType?.takeIf { it.isNotBlank() },
+        speedtestNetworkValue(mobileOperator),
+        speedtestNetworkValue(networkType),
+        speedtestNetworkValue(deviceType),
         mcc?.let { mnc?.let { pairedMnc -> "$it/$pairedMnc" } }
     )
         .distinct()
         .takeIf { it.isNotEmpty() }
         ?.joinToString("  •  ")
+}
+
+private fun speedtestNetworkValue(value: String?): String? {
+    val cleanValue = value?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+    return cleanValue.takeUnless {
+        it.equals("CELLULAR", ignoreCase = true) ||
+            it.equals("Android", ignoreCase = true)
+    }
 }
 
 private fun SqSpeedtestData.radioLine(): String? {

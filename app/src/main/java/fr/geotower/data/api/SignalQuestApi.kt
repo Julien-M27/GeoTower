@@ -119,6 +119,8 @@ interface SignalQuestApiService {
         @Query("sourceCode") sourceCode: String? = null,
         @Query("enb") enb: String? = null,
         @Query("operator") operator: String? = null,
+        @Query("mcc") mcc: Int? = null,
+        @Query("mnc") mnc: Int? = null,
         @Query("market") market: String = "FR",
         @Query("bestOnly") bestOnly: Boolean = true,
         @Query("limit") limit: Int? = null,

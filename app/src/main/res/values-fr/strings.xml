@@ -744,6 +744,17 @@
     <string name="appstrings_release_live_tracking_tracker_icon">Icône de suivi améliorée selon l’éloignement</string>
     <string name="appstrings_release_live_tracking_site_photo_focus">Meilleure mise en avant de la photo du site</string>
     <string name="appstrings_release_global_feature_availability">Gestion plus souple de certaines fonctions selon les disponibilités de l’application</string>
+    <string name="appstrings_release_global_internal_stability_update">Mise à jour interne pour améliorer la stabilité et la compatibilité Android</string>
+    <string name="appstrings_release_global_reliable_network_background_services">Gestion plus fiable du réseau et des services en arrière-plan</string>
+    <string name="appstrings_release_global_permissions_gps_compass_adjusted">Ajustement des autorisations et de la compatibilité GPS/boussole</string>
+    <string name="appstrings_release_signalquest_private_photo_data_removed">Suppression par défaut des données privées des photos envoyées</string>
+    <string name="appstrings_release_signalquest_speedtest_filtering_improved">Filtrage des speedtests amélioré</string>
+    <string name="appstrings_release_signalquest_pagination_fixed">Pagination corrigée</string>
+    <string name="appstrings_release_signalquest_network_display_clearer">Affichage réseau plus clair</string>
+    <string name="appstrings_release_widgets_refresh_more_reliable">Actualisation des widgets plus fiable et mieux maîtrisée</string>
+    <string name="appstrings_release_interface_speedtest_translations_completed">Traductions des speedtests complétées</string>
+    <string name="appstrings_release_interface_plurals_fixed">Pluriels corrigés</string>
+    <string name="appstrings_release_interface_map_share_improvements">Petites améliorations sur la carte et le partage</string>
     <string name="appstrings_release_community_source_settings">Ajout de nouveaux réglages pour les sources photos et speedtests</string>
     <string name="appstrings_release_photo_visibility_sync">Affichage des photos mieux synchronisé entre les pages Support et Site</string>
     <string name="appstrings_release_community_photo_filters">Photos filtrées selon l’opérateur et les sources activées</string>

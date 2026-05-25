@@ -762,6 +762,17 @@
     <string name="appstrings_release_live_tracking_tracker_icon">Improved tracking icon based on distance</string>
     <string name="appstrings_release_live_tracking_site_photo_focus">Better highlight of the site photo</string>
     <string name="appstrings_release_global_feature_availability">More flexible management of some features depending on app availability</string>
+    <string name="appstrings_release_global_internal_stability_update">Internal update to improve stability and Android compatibility</string>
+    <string name="appstrings_release_global_reliable_network_background_services">More reliable network handling and background services</string>
+    <string name="appstrings_release_global_permissions_gps_compass_adjusted">Adjusted permissions and GPS/compass compatibility</string>
+    <string name="appstrings_release_signalquest_private_photo_data_removed">Private photo data is removed by default when uploading</string>
+    <string name="appstrings_release_signalquest_speedtest_filtering_improved">Improved speedtest filtering</string>
+    <string name="appstrings_release_signalquest_pagination_fixed">Pagination fixed</string>
+    <string name="appstrings_release_signalquest_network_display_clearer">Clearer network display</string>
+    <string name="appstrings_release_widgets_refresh_more_reliable">Widget refresh is more reliable and better controlled</string>
+    <string name="appstrings_release_interface_speedtest_translations_completed">Completed speedtest translations</string>
+    <string name="appstrings_release_interface_plurals_fixed">Plural texts fixed</string>
+    <string name="appstrings_release_interface_map_share_improvements">Small improvements to map and sharing</string>
     <string name="appstrings_release_community_source_settings">Added new settings for photo and speedtest sources</string>
     <string name="appstrings_release_photo_visibility_sync">Photo display is better synchronized between Support and Site pages</string>
     <string name="appstrings_release_community_photo_filters">Photos are filtered by enabled operator and sources</string>

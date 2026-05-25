@@ -30,6 +30,18 @@ fun Iterable<SqSpeedtestData>.bestSignalQuestSpeedtestByMetric(
     return sortedBySignalQuestMetric(metric = metric, descending = true).firstOrNull()
 }
 
+fun Iterable<SqSpeedtestData>.filterBySignalQuestPlmn(
+    plmn: SignalQuestPlmnFilter?
+): List<SqSpeedtestData> {
+    if (plmn == null) return toList()
+    return filter { speedtest -> speedtest.matchesSignalQuestPlmn(plmn) }
+}
+
+fun SqSpeedtestData.matchesSignalQuestPlmn(plmn: SignalQuestPlmnFilter?): Boolean {
+    if (plmn == null) return true
+    return mnc == plmn.mnc && (plmn.mcc == null || mcc == null || mcc == plmn.mcc)
+}
+
 fun Iterable<SqSpeedtestData>.sortedBySignalQuestRanking(): List<SqSpeedtestData> {
     return sortedWith(signalQuestSpeedtestRankingComparator.reversed())
 }

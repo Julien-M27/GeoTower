@@ -20,7 +20,7 @@
         <item quantity="other">Invia %1$d foto</item>
     </plurals>
     <plurals name="upload_confirm_message">
-        <item quantity="one">Vuoi davvero inviare questa foto a Signal Quest?</item>
+        <item quantity="one">Vuoi davvero inviare %1$d foto a Signal Quest?</item>
         <item quantity="other">Vuoi davvero inviare queste %1$d foto a Signal Quest?</item>
     </plurals>
     <plurals name="community_photos_title">
@@ -28,8 +28,8 @@
         <item quantity="other">Foto della comunità da\n%1$s</item>
     </plurals>
     <plurals name="community_photos_title_short">
-        <item quantity="one">Foto della comunità</item>
-        <item quantity="other">Foto della comunità</item>
+        <item quantity="one">%1$d foto della comunità</item>
+        <item quantity="other">%1$d foto della comunità</item>
     </plurals>
     <plurals name="help_section_count">
         <item quantity="one">%1$d sezione</item>

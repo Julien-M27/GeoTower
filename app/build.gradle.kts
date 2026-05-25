@@ -1,19 +1,20 @@
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
 android {
     namespace = "fr.geotower"
-    compileSdk = 36
+    compileSdk {
+        version = release(37)
+    }
 
     defaultConfig {
         applicationId = "fr.geotower"
         minSdk = 24
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
-        versionName = "1.9.9.4"
+        versionName = "1.9.9.4.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -52,52 +53,51 @@ ksp {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
+    implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
-    implementation("androidx.compose.material:material-icons-extended:1.7.5")
+    implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.car.app)
     implementation(libs.androidx.car.app.projected)
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    implementation("androidx.preference:preference-ktx:1.2.1")
+    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.androidx.preference.ktx)
 
     // Carte OSM
-    implementation("org.osmdroid:osmdroid-android:6.1.18")
+    implementation(libs.osmdroid.android)
 
     // --- AJOUT POUR LES CLUSTERS (REGROUPEMENT D'ANTENNES) ---
-    implementation("com.github.MKergall:osmbonuspack:6.9.0")
+    implementation(libs.osmbonuspack)
     // ---------------------------------------------------------
 
     // --- AJOUT POUR LE VECTORIEL (Mapsforge) ---
     // Le pont entre Osmdroid et Mapsforge
-    implementation("org.osmdroid:osmdroid-mapsforge:6.1.18")
+    implementation(libs.osmdroid.mapsforge)
     // Le moteur Mapsforge
-    implementation("org.mapsforge:mapsforge-map-android:0.20.0")
-    implementation("org.mapsforge:mapsforge-map-reader:0.20.0")
-    implementation("org.mapsforge:mapsforge-themes:0.20.0")
+    implementation(libs.mapsforge.map.android)
+    implementation(libs.mapsforge.map.reader)
+    implementation(libs.mapsforge.themes)
     // --- ROOM (BASE DE DONNÉES) ---
-    val room_version = "2.6.1"
-    implementation("androidx.room:room-runtime:$room_version")
-    implementation("androidx.room:room-ktx:$room_version")
-    ksp("androidx.room:room-compiler:$room_version")
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
 
     // Pour parler à l'API (Retrofit)
-    implementation("com.squareup.retrofit2:retrofit:2.9.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.9.0")
+    implementation(libs.retrofit)
+    implementation(libs.retrofit.converter.gson)
     // --- AJOUT COIL POUR LES IMAGES ---
-    implementation("io.coil-kt:coil-compose:2.6.0")
+    implementation(libs.coil.compose)
     // ✅ NOUVEAU : Librairie ZXing pour générer le QR Code
-    implementation("com.google.zxing:core:3.5.3")
+    implementation(libs.zxing.core)
     // INDISPENSABLE pour le GPS
-    implementation("com.google.android.gms:play-services-location:21.3.0")
+    implementation(libs.play.services.location)
 
     // INDISPENSABLE pour .await()
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+    implementation(libs.kotlinx.coroutines.play.services)
     // Net
     implementation(libs.okhttp)
 
@@ -111,12 +111,12 @@ dependencies {
 
     // --- WIDGET & TÂCHES EN ARRIÈRE-PLAN ---
     // Jetpack Glance (Pour dessiner le widget comme on dessine du Compose)
-    implementation("androidx.glance:glance-appwidget:1.1.0")
-    implementation("androidx.glance:glance-material3:1.1.0")
+    implementation(libs.androidx.glance.appwidget)
+    implementation(libs.androidx.glance.material3)
 
     // WorkManager (Le seul outil autorisé par Google pour l'arrière-plan, min 15 min)
-    implementation("androidx.work:work-runtime-ktx:2.9.0")
+    implementation(libs.androidx.work.runtime.ktx)
 
     // WorkManager conversion photo
-    implementation("androidx.exifinterface:exifinterface:1.3.7")
+    implementation(libs.androidx.exifinterface)
 }

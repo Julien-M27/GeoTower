@@ -101,6 +101,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.PlatformTextStyle
 import androidx.compose.ui.text.TextStyle
@@ -398,6 +399,7 @@ fun MapScreen(
     viewModel: MapViewModel
 ) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current // ✅ AJOUT
     val isUltraCompact = configuration.screenWidthDp < 300 || configuration.screenHeightDp < 350 // ✅ AJOUT
     val scope = rememberCoroutineScope()
@@ -1402,7 +1404,7 @@ fun MapScreen(
                         // Si l'utilisateur n'a tapé QUE des chiffres et qu'on n'a rien trouvé en base,
                         // inutile d'aller chercher sur internet (Nominatim).
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                            Toast.makeText(context, context.getString(R.string.map_site_not_in_area, cleanQuery), Toast.LENGTH_LONG).show()
+                            Toast.makeText(context, resources.getString(R.string.map_site_not_in_area, cleanQuery), Toast.LENGTH_LONG).show()
                         }
                         return@launch
                     }
