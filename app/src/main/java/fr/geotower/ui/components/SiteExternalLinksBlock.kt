@@ -83,35 +83,68 @@ fun SiteExternalLinksBlock(
                 externalLinksOrder.forEach { block ->
                     when (block) {
                         "cartoradio" -> {
-                            if (showCartoradio) {
+                            if (
+                                showCartoradio &&
+                                featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.EXTERNAL_LINKS_CARTORADIO) &&
+                                featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.CARTORADIO) &&
+                                featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.OPEN_EXTERNAL_LINK)
+                            ) {
                                 CommunityLinkRow(siteExternalLinkById(block)?.label ?: "Cartoradio", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_cartoradio, buttonShape) {
                                     safeClick { onShowCartoradio() }
                                 }
                             }
                         }
                         "cellularfr" -> {
-                            if (showCellularFr && featureFlags.isSiteExternalLinkEnabled("cellularfr") && info.operateur?.contains("ORANGE", true) == true) {
+                            if (
+                                showCellularFr &&
+                                featureFlags.isSiteExternalLinkEnabled("cellularfr") &&
+                                featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.CELLULARFR) &&
+                                featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.OPEN_EXTERNAL_LINK) &&
+                                info.operateur?.contains("ORANGE", true) == true
+                            ) {
                                 CommunityLinkRow(siteExternalLinkById(block)?.label ?: "CellularFR", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_cellularfr, buttonShape) { safeClick { onShowCellularFr() } }
                             }
                         }
                         "rncmobile" -> {
-                            if (showRncMobile && info.operateur?.contains("FREE", true) == true) {
+                            if (
+                                showRncMobile &&
+                                featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.EXTERNAL_LINKS_RNC_MOBILE) &&
+                                featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.RNC_MOBILE) &&
+                                featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.OPEN_EXTERNAL_LINK) &&
+                                info.operateur?.contains("FREE", true) == true
+                            ) {
                                 CommunityLinkRow(siteExternalLinkById(block)?.label ?: "RNC Mobile", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_rncmobile, buttonShape) { safeClick { onShowRnc() } }
                             }
                         }
                         "signalquest" -> {
                             val signalQuestOperator = SignalQuestOperators.operatorParamFor(info.operateur)
-                            if (showSignalQuest && featureFlags.isSiteExternalLinkEnabled("signalquest") && signalQuestOperator != null) {
+                            if (
+                                showSignalQuest &&
+                                featureFlags.isSiteExternalLinkEnabled("signalquest") &&
+                                featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.SIGNALQUEST) &&
+                                featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.OPEN_EXTERNAL_LINK) &&
+                                signalQuestOperator != null
+                            ) {
                                 CommunityLinkRow(siteExternalLinkById(block)?.label ?: "Signal Quest", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_signalquest, buttonShape) { safeClick { onShowSignalQuest() } }
                             }
                         }
                         "enbanalytics" -> {
-                            if (showEnbAnalytics) {
+                            if (
+                                showEnbAnalytics &&
+                                featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.EXTERNAL_LINKS_ENB_ANALYTICS) &&
+                                featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ENB_ANALYTICS) &&
+                                featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.OPEN_EXTERNAL_LINK)
+                            ) {
                                 CommunityLinkRow(siteExternalLinkById(block)?.label ?: "eNB-Analytics", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_enbanalytics, buttonShape) { safeClick { onShowEnb() } }
                             }
                         }
                         "anfr" -> {
-                            if (showAnfr) {
+                            if (
+                                showAnfr &&
+                                featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.EXTERNAL_LINKS_ANFR) &&
+                                featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ANFR) &&
+                                featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.OPEN_EXTERNAL_LINK)
+                            ) {
                                 CommunityLinkRow(siteExternalLinkById(block)?.label ?: "data.gouv.fr", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_anfr, buttonShape) {
                                     safeClick { onShowAnfr() }
                                 }

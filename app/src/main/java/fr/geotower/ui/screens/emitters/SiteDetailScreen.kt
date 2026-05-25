@@ -103,6 +103,9 @@ import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.CellularFrApi
 import fr.geotower.data.api.SignalQuestOperators
+import fr.geotower.data.api.SignalQuestSpeedtestSortMetric
+import fr.geotower.data.api.SqSpeedtestData
+import fr.geotower.data.api.bestSignalQuestSpeedtestByMetric
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.data.models.LocalisationEntity
@@ -121,6 +124,8 @@ import fr.geotower.ui.screens.settings.CommunityDataSettingsSheet
 import fr.geotower.ui.screens.settings.MiniMapSettingsSheet
 import fr.geotower.ui.screens.settings.SiteFreqFiltersSheet
 import fr.geotower.ui.screens.settings.SitePhotosSettingsSheet
+import fr.geotower.ui.screens.settings.SiteSpeedtestsPagePreferences
+import fr.geotower.ui.screens.settings.SiteSpeedtestsSettingsSheet
 import fr.geotower.ui.screens.settings.SiteSettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
@@ -139,6 +144,7 @@ private const val TAG_SITE_DETAIL = "GeoTower"
 private const val TAG_SPEEDTEST = "GeoTowerUpload"
 private const val SIGNAL_QUEST_PACKAGE_NAME = "com.sfrmap.android"
 private const val SIGNAL_QUEST_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.sfrmap.android"
+private const val SIGNALQUEST_SPEEDTEST_PAGE_SIZE = 100
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -255,7 +261,18 @@ fun SiteDetailScreen(
     val unknownText = stringResource(R.string.appstrings_unknown)
 
     fun navigateToUploadWithUris(uris: List<Uri>) {
-        val selectedUris = uris.take(SignalQuestUploadRules.MAX_PHOTOS)
+        if (
+            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_PHOTO_UPLOAD) ||
+            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD) ||
+            !RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_SIGNALQUEST_UPLOAD) ||
+            !RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.SIGNALQUEST_UPLOAD)
+        ) {
+            return
+        }
+        val maxPhotos = RemoteFeatureFlags
+            .limitOrDefault(RemoteFeatureFlags.Limits.PHOTO_UPLOAD_MAX_COUNT, SignalQuestUploadRules.MAX_PHOTOS)
+            .coerceIn(1, SignalQuestUploadRules.MAX_PHOTOS)
+        val selectedUris = uris.take(maxPhotos)
         if (selectedUris.isNotEmpty() && antenna != null) {
             val draftId = SignalQuestUploadDraftStore.put(selectedUris.map { it.toString() })
             val uploadSiteId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: antenna!!.idAnfr
@@ -327,6 +344,7 @@ fun SiteDetailScreen(
     }
 
     fun launchCameraCapture() {
+        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_PHOTO_CAMERA)) return
         val uri = createCameraUri()
         currentCameraUriString = uri.toString()
         cameraLauncher.launch(uri)
@@ -341,6 +359,7 @@ fun SiteDetailScreen(
     }
 
     fun launchCameraCaptureWithStorageCheck() {
+        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_PHOTO_CAMERA)) return
         val needsLegacyStoragePermission = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED
         if (needsLegacyStoragePermission) {
@@ -352,6 +371,89 @@ fun SiteDetailScreen(
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val featureFlags by RemoteFeatureFlags.config
+    val canUseSitePhotos = featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_PHOTOS)
+    val canUploadSitePhotos =
+        canUseSitePhotos &&
+            featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_PHOTO_UPLOAD) &&
+            featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD) &&
+            featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_SIGNALQUEST_UPLOAD) &&
+            featureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.SIGNALQUEST_UPLOAD)
+    val canUseSiteSpeedtests =
+        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_SPEEDTESTS) &&
+            featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_SPEEDTESTS) &&
+            featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_SPEEDTESTS)
+    val canUseElevationProfile =
+        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ELEVATION_PROFILE) &&
+            featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_ELEVATION_PROFILE) &&
+            featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ELEVATION_IGN)
+    val canUseThroughputCalculator =
+        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THROUGHPUT_CALCULATOR) &&
+            featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_THROUGHPUT_CALCULATOR)
+    val canUseExternalNavigation =
+        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_EXTERNAL_NAVIGATION) &&
+            featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.OPEN_EXTERNAL_NAVIGATION)
+    val canUseSiteShare =
+        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_SHARE) &&
+            featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.SHARE_SITE)
+    val canUseSiteFrequencies = featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_FREQUENCIES)
+    val canUseSiteExternalLinks = featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.OPEN_EXTERNAL_LINK)
+    var speedtestFilterMajorEnb by rememberSaveable {
+        mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.FILTER_MAJOR_ENB, SiteSpeedtestsPagePreferences.DEFAULT_FILTER_MAJOR_ENB))
+    }
+    var speedtestIncludeMissingEnb by rememberSaveable {
+        mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.INCLUDE_MISSING_ENB, SiteSpeedtestsPagePreferences.DEFAULT_INCLUDE_MISSING_ENB))
+    }
+    var speedtestShowCount by rememberSaveable {
+        mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.SHOW_COUNT, SiteSpeedtestsPagePreferences.DEFAULT_SHOW_COUNT))
+    }
+    var speedtestShowRadio by rememberSaveable {
+        mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.SHOW_RADIO, SiteSpeedtestsPagePreferences.DEFAULT_SHOW_RADIO))
+    }
+    var speedtestShowNetwork by rememberSaveable {
+        mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.SHOW_NETWORK, SiteSpeedtestsPagePreferences.DEFAULT_SHOW_NETWORK))
+    }
+    var speedtestShowCoordinates by rememberSaveable {
+        mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.SHOW_COORDINATES, SiteSpeedtestsPagePreferences.DEFAULT_SHOW_COORDINATES))
+    }
+    var speedtestBestMetric by rememberSaveable {
+        mutableStateOf(
+            SiteSpeedtestsPagePreferences.normalizeSortMetric(
+                prefs.getString(SiteSpeedtestsPagePreferences.BEST_METRIC, SiteSpeedtestsPagePreferences.DEFAULT_BEST_METRIC)
+            )
+        )
+    }
+    var speedtestSortMetric by rememberSaveable {
+        mutableStateOf(
+            SiteSpeedtestsPagePreferences.normalizeSortMetric(
+                prefs.getString(SiteSpeedtestsPagePreferences.SORT_METRIC, SiteSpeedtestsPagePreferences.DEFAULT_SORT_METRIC)
+            )
+        )
+    }
+    var speedtestSortDescending by rememberSaveable {
+        mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.SORT_DESCENDING, SiteSpeedtestsPagePreferences.DEFAULT_SORT_DESCENDING))
+    }
+
+    fun updateSpeedtestPreference(key: String, value: Boolean) {
+        prefs.edit().putBoolean(key, value).apply()
+    }
+
+    fun updateSpeedtestStringPreference(key: String, value: String) {
+        prefs.edit().putString(key, value).apply()
+    }
+
+    fun resetSpeedtestPreferences() {
+        SiteSpeedtestsPagePreferences.reset(prefs)
+        speedtestFilterMajorEnb = SiteSpeedtestsPagePreferences.DEFAULT_FILTER_MAJOR_ENB
+        speedtestIncludeMissingEnb = SiteSpeedtestsPagePreferences.DEFAULT_INCLUDE_MISSING_ENB
+        speedtestShowCount = SiteSpeedtestsPagePreferences.DEFAULT_SHOW_COUNT
+        speedtestShowRadio = SiteSpeedtestsPagePreferences.DEFAULT_SHOW_RADIO
+        speedtestShowNetwork = SiteSpeedtestsPagePreferences.DEFAULT_SHOW_NETWORK
+        speedtestShowCoordinates = SiteSpeedtestsPagePreferences.DEFAULT_SHOW_COORDINATES
+        speedtestBestMetric = SiteSpeedtestsPagePreferences.DEFAULT_BEST_METRIC
+        speedtestSortMetric = SiteSpeedtestsPagePreferences.DEFAULT_SORT_METRIC
+        speedtestSortDescending = SiteSpeedtestsPagePreferences.DEFAULT_SORT_DESCENDING
+    }
+
     var miniMapDefaultMode by remember {
         mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString("page_site_mini_map_mode", null)))
     }
@@ -407,10 +509,32 @@ fun SiteDetailScreen(
         navController.navigate("map")
     }
     val openElevationProfile = onOpenElevationProfile ?: { id: String ->
-        navController.navigate("elevation_profile/$id")
+        if (canUseElevationProfile) {
+            navController.navigate("elevation_profile/$id")
+        }
     }
     val openThroughputCalculator = onOpenThroughputCalculator ?: { id: String ->
-        navController.navigate("throughput_calculator/$id")
+        if (canUseThroughputCalculator) {
+            navController.navigate("throughput_calculator/$id")
+        }
+    }
+    fun openSiteSpeedtests(site: LocalisationEntity, sitePhysique: PhysiqueEntity?) {
+        if (!canUseSiteSpeedtests) return
+        val params = buildList {
+            sitePhysique?.idSupport?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                add("siteId=${Uri.encode(it)}")
+            }
+            site.idAnfr.trim().takeIf { it.isNotEmpty() }?.let {
+                add("anfrCode=${Uri.encode(it)}")
+            }
+            SignalQuestOperators.operatorParamFor(site.operateur)?.let {
+                add("operator=${Uri.encode(it)}")
+            }
+            add("market=FR")
+        }
+        if (params.isNotEmpty()) {
+            navController.navigate("site_speedtests?${params.joinToString("&")}")
+        }
     }
 
     // 🚨 MODIFICATION : L'ordre par défaut (photos, speedtest, nav, share...)
@@ -442,6 +566,7 @@ fun SiteDetailScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val pageSettingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showSiteSettingsSheet by remember { mutableStateOf(false) }
+    var showSpeedtestsSettingsSheet by remember { mutableStateOf(false) }
     var showSiteMiniMapSettingsSheet by remember { mutableStateOf(false) }
     var showSiteFreqSettingsSheet by remember { mutableStateOf(false) }
     var showSitePhotosSettingsSheet by remember { mutableStateOf(false) }
@@ -486,7 +611,7 @@ fun SiteDetailScreen(
             } catch (e: Exception) { AppLogger.w(TAG_SITE_DETAIL, "Outage data request failed", e) }
         }
 
-        if (localData != null && localData.idAnfr.isNotBlank()) {
+        if (localData != null && localData.idAnfr.isNotBlank() && canUseSitePhotos) {
             val opName = localData.operateur ?: ""
             // ✅ CORRECTION MAJEURE : On utilise le numéro de support physique universel
             val supportSiteId = physique?.idSupport ?: localData.idAnfr
@@ -546,45 +671,79 @@ fun SiteDetailScreen(
             }
 
             communityPhotos = photosTemp
+        } else if (!canUseSitePhotos) {
+            communityPhotos = emptyList()
         }
     }
 
     // 🚀 CHARGEMENT DU SPEEDTEST (Signal Quest) - Séparé pour plus de stabilité
-    LaunchedEffect(antenna?.idAnfr, antenna?.operateur, featureFlags) {
+    LaunchedEffect(antenna?.idAnfr, antenna?.operateur, physique?.idSupport, speedtestBestMetric, featureFlags) {
         val currentAntenna = antenna
+        val currentPhysique = physique
         if (currentAntenna == null || currentAntenna.idAnfr.isBlank()) return@LaunchedEffect
 
         val apiOperator = SignalQuestOperators.operatorParamFor(currentAntenna.operateur)
 
         if (
             fr.geotower.utils.AppConfig.siteShowSpeedtest.value &&
+            canUseSiteSpeedtests &&
             apiOperator != null &&
             CommunityDataPreferences.isSignalQuestSpeedtestEnabled(prefs, currentAntenna.operateur)
         ) {
             speedtestData = null
             isSpeedtestLoading = true
             try {
-                val anfrCodeToSend = currentAntenna.idAnfr
+                val supportSiteId = currentPhysique?.idSupport?.trim()?.takeIf { it.isNotEmpty() }
+                val anfrCodeToSend = currentAntenna.idAnfr.trim().takeIf { it.isNotEmpty() }
 
-                AppLogger.d(TAG_SPEEDTEST, "Speedtest request anfr=$anfrCodeToSend operator=$apiOperator")
+                AppLogger.d(TAG_SPEEDTEST, "Speedtest request siteId=$supportSiteId anfr=$anfrCodeToSend operator=$apiOperator")
 
-                val response = fr.geotower.data.api.SignalQuestClient.api.getSiteSpeedtests(
-                    anfrCode = anfrCodeToSend,
-                    operator = apiOperator,
-                    bestOnly = true
-                )
+                val allSpeedtests = mutableListOf<SqSpeedtestData>()
+                var offset = 0
+                var total: Int? = null
+                while (true) {
+                    val response = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        fr.geotower.data.api.SignalQuestClient.api.getSiteSpeedtests(
+                            siteId = supportSiteId,
+                            anfrCode = anfrCodeToSend,
+                            nationalSiteCode = anfrCodeToSend,
+                            sourceCode = anfrCodeToSend,
+                            operator = apiOperator,
+                            bestOnly = false,
+                            limit = SIGNALQUEST_SPEEDTEST_PAGE_SIZE,
+                            offset = offset
+                        )
+                    }
 
-                AppLogger.d(TAG_SPEEDTEST, "Speedtest response code=${response.code()}")
+                    AppLogger.d(TAG_SPEEDTEST, "Speedtest response code=${response.code()} offset=$offset")
 
-                if (response.isSuccessful) {
-                    val body = response.body()
-                    speedtestData = body?.data?.firstOrNull()
-                    AppLogger.d(TAG_SPEEDTEST, "Speedtest data=$speedtestData")
-                } else {
-                    response.errorBody()?.close()
-                    AppLogger.d(TAG_SPEEDTEST, "Speedtest API failure code=${response.code()}")
-                    AppLogger.w(TAG_SPEEDTEST, "SignalQuest speedtest API failure")
+                    if (response.isSuccessful) {
+                        val body = response.body()
+                        val page = body?.data.orEmpty()
+                        allSpeedtests += page
+                        total = body?.meta?.total ?: total
+
+                        if (
+                            page.size < SIGNALQUEST_SPEEDTEST_PAGE_SIZE ||
+                            page.isEmpty() ||
+                            (total != null && allSpeedtests.size >= total!!)
+                        ) {
+                            break
+                        }
+                        offset += page.size
+                    } else {
+                        response.errorBody()?.close()
+                        AppLogger.d(TAG_SPEEDTEST, "Speedtest API failure code=${response.code()}")
+                        AppLogger.w(TAG_SPEEDTEST, "SignalQuest speedtest API failure")
+                        break
+                    }
                 }
+                speedtestData = allSpeedtests.bestSignalQuestSpeedtestByMetric(
+                    SignalQuestSpeedtestSortMetric.fromStorageKey(speedtestBestMetric)
+                )
+                AppLogger.d(TAG_SPEEDTEST, "Speedtest data=$speedtestData")
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 AppLogger.w(TAG_SPEEDTEST, "SignalQuest speedtest request failed", e)
             } finally {
@@ -861,7 +1020,7 @@ fun SiteDetailScreen(
                 }
             }
 
-            if (showNavigationSheet) {
+            if (showNavigationSheet && canUseExternalNavigation) {
                 fr.geotower.ui.components.NavigationBottomSheet(latitude = info.latitude, longitude = info.longitude, onDismiss = { showNavigationSheet = false }, sheetState = sheetState, useOneUi = useOneUi)
             }
 
@@ -1037,7 +1196,7 @@ fun SiteDetailScreen(
                         "photos" -> {
                             val opName = info.operateur ?: ""
                             // 🚨 CORRECTION : On affiche toujours le composant (plus de condition de liste vide)
-                            if (showPhotos && info.idAnfr.isNotBlank()) {
+                            if (showPhotos && canUseSitePhotos && info.idAnfr.isNotBlank()) {
                                 CommunityPhotosSectionShared(
                                     photos = communityPhotos,
                                     operatorName = opName,
@@ -1045,21 +1204,28 @@ fun SiteDetailScreen(
                                     supportOwner = physique?.proprietaire,
                                     bgColor = cardBgColor,
                                     shape = blockShape,
-                                    onAddPhotoClick = { safeClick { showImageSourceDialog = true } },
+                                    onAddPhotoClick = if (canUploadSitePhotos) {
+                                        { safeClick { showImageSourceDialog = true } }
+                                    } else {
+                                        null
+                                    },
                                     favoriteScopeId = physique?.idSupport ?: info.idAnfr,
                                     favoriteSelectionEnabled = true
                                 )
                             }
                         }
                         "speedtest" -> {
-                            SpeedtestCard(
-                                operatorName = info.operateur,
-                                speedtestData = speedtestData,
-                                isLoading = isSpeedtestLoading,
-                                shape = blockShape,
-                                bgColor = cardBgColor,
-                                contentColor = MaterialTheme.colorScheme.onSurface
-                            )
+                            if (canUseSiteSpeedtests) {
+                                SpeedtestCard(
+                                    operatorName = info.operateur,
+                                    speedtestData = speedtestData,
+                                    isLoading = isSpeedtestLoading,
+                                    shape = blockShape,
+                                    bgColor = cardBgColor,
+                                    contentColor = MaterialTheme.colorScheme.onSurface,
+                                    onClick = { safeClick("site_speedtests_${info.idAnfr}") { openSiteSpeedtests(info, physique) } }
+                                )
+                            }
                         }
                         "panel_heights" -> { if (showPanelHeights) fr.geotower.ui.components.SitePanelHeightsBlock(info = info, cardBgColor = cardBgColor, blockShape = blockShape) }
                         "ids" -> {
@@ -1092,7 +1258,7 @@ fun SiteDetailScreen(
                             }
                         }
                         "elevation_profile" -> {
-                            if (showElevationProfile) {
+                            if (showElevationProfile && canUseElevationProfile) {
                                 Button(
                                     onClick = { safeClick { openElevationProfile(info.idAnfr) } },
                                     modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -1111,7 +1277,7 @@ fun SiteDetailScreen(
                             }
                         }
                         "throughput_calculator" -> {
-                            if (showThroughputCalculator) {
+                            if (showThroughputCalculator && canUseThroughputCalculator) {
                                 Button(
                                     onClick = { safeClick { openThroughputCalculator(info.idAnfr) } },
                                     modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -1130,7 +1296,7 @@ fun SiteDetailScreen(
                             }
                         }
                         "nav" -> {
-                            if (showNav) {
+                            if (showNav && canUseExternalNavigation) {
                                 Button(onClick = { safeClick { showNavigationSheet = true } }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = buttonShape, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
                                         Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(24.dp))
@@ -1141,7 +1307,7 @@ fun SiteDetailScreen(
                             }
                         }
                         "share" -> {
-                            if (showShare) {
+                            if (showShare && canUseSiteShare) {
                                 fr.geotower.ui.components.AntennaShareMenu(
                                     info = info,
                                     physique = physique,
@@ -1178,20 +1344,32 @@ fun SiteDetailScreen(
                                 )
                             }
                         }
-                        "freqs" -> { if (showFreqs) fr.geotower.ui.components.SiteFrequenciesBlock(info = info, technique = technique, formattedAzimuths = formattedAzimuths, cardBgColor = cardBgColor, blockShape = blockShape) }
+                        "freqs" -> { if (showFreqs && canUseSiteFrequencies) fr.geotower.ui.components.SiteFrequenciesBlock(info = info, technique = technique, formattedAzimuths = formattedAzimuths, cardBgColor = cardBgColor, blockShape = blockShape) }
                         "links" -> {
-                            if (showLinks && opNameUrl.isNotEmpty()) {
+                            if (showLinks && canUseSiteExternalLinks && opNameUrl.isNotEmpty()) {
                                 fr.geotower.ui.components.SiteExternalLinksBlock(
                                     info = info,
                                     cardBgColor = cardBgColor,
                                     blockShape = blockShape,
                                     buttonShape = buttonShape,
-                                    onShowCartoradio = { showCartoradioSheet = true },
-                                    onShowCellularFr = { showCellularFrSheet = true },
-                                    onShowSignalQuest = { showSignalQuestSheet = true },
-                                    onShowRnc = { showRncSheet = true },
-                                    onShowEnb = { showEnbSheet = true },
-                                    onShowAnfr = { showAnfrSheet = true }
+                                    onShowCartoradio = {
+                                        if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.EXTERNAL_LINKS_CARTORADIO)) showCartoradioSheet = true
+                                    },
+                                    onShowCellularFr = {
+                                        if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.CELLULARFR_EXTERNAL_LINKS)) showCellularFrSheet = true
+                                    },
+                                    onShowSignalQuest = {
+                                        if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_EXTERNAL_LINKS)) showSignalQuestSheet = true
+                                    },
+                                    onShowRnc = {
+                                        if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.EXTERNAL_LINKS_RNC_MOBILE)) showRncSheet = true
+                                    },
+                                    onShowEnb = {
+                                        if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.EXTERNAL_LINKS_ENB_ANALYTICS)) showEnbSheet = true
+                                    },
+                                    onShowAnfr = {
+                                        if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.EXTERNAL_LINKS_ANFR)) showAnfrSheet = true
+                                    }
                                 )
                             }
                         }
@@ -1310,12 +1488,72 @@ fun SiteDetailScreen(
                         showSitePhotosSettingsSheet = true
                     },
                     onOpenSpeedtestSettings = {
-                        communityDataSettingsFeatureId = CommunityDataPreferences.FEATURE_SPEEDTEST
                         showSiteSettingsSheet = false
-                        showCommunityDataSettingsSheet = true
+                        showSpeedtestsSettingsSheet = true
                     },
                     onDismiss = { showSiteSettingsSheet = false },
                     onBack = { showSiteSettingsSheet = false },
+                    sheetState = pageSettingsSheetState,
+                    useOneUi = uiStyle.useOneUi,
+                    bubbleColor = uiStyle.bubbleColor
+                )
+            }
+
+            if (showSpeedtestsSettingsSheet) {
+                SiteSpeedtestsSettingsSheet(
+                    filterMajorEnb = speedtestFilterMajorEnb,
+                    onFilterMajorEnbChange = {
+                        speedtestFilterMajorEnb = it
+                        updateSpeedtestPreference(SiteSpeedtestsPagePreferences.FILTER_MAJOR_ENB, it)
+                    },
+                    includeMissingEnb = speedtestIncludeMissingEnb,
+                    onIncludeMissingEnbChange = {
+                        speedtestIncludeMissingEnb = it
+                        updateSpeedtestPreference(SiteSpeedtestsPagePreferences.INCLUDE_MISSING_ENB, it)
+                    },
+                    showSpeedtestsCount = speedtestShowCount,
+                    onShowSpeedtestsCountChange = {
+                        speedtestShowCount = it
+                        updateSpeedtestPreference(SiteSpeedtestsPagePreferences.SHOW_COUNT, it)
+                    },
+                    showRadioDetails = speedtestShowRadio,
+                    onShowRadioDetailsChange = {
+                        speedtestShowRadio = it
+                        updateSpeedtestPreference(SiteSpeedtestsPagePreferences.SHOW_RADIO, it)
+                    },
+                    showNetworkDetails = speedtestShowNetwork,
+                    onShowNetworkDetailsChange = {
+                        speedtestShowNetwork = it
+                        updateSpeedtestPreference(SiteSpeedtestsPagePreferences.SHOW_NETWORK, it)
+                    },
+                    showCoordinates = speedtestShowCoordinates,
+                    onShowCoordinatesChange = {
+                        speedtestShowCoordinates = it
+                        updateSpeedtestPreference(SiteSpeedtestsPagePreferences.SHOW_COORDINATES, it)
+                    },
+                    bestMetric = speedtestBestMetric,
+                    onBestMetricChange = {
+                        val normalizedMetric = SiteSpeedtestsPagePreferences.normalizeSortMetric(it)
+                        speedtestBestMetric = normalizedMetric
+                        updateSpeedtestStringPreference(SiteSpeedtestsPagePreferences.BEST_METRIC, normalizedMetric)
+                    },
+                    sortMetric = speedtestSortMetric,
+                    onSortMetricChange = {
+                        val normalizedMetric = SiteSpeedtestsPagePreferences.normalizeSortMetric(it)
+                        speedtestSortMetric = normalizedMetric
+                        updateSpeedtestStringPreference(SiteSpeedtestsPagePreferences.SORT_METRIC, normalizedMetric)
+                    },
+                    sortDescending = speedtestSortDescending,
+                    onSortDescendingChange = {
+                        speedtestSortDescending = it
+                        updateSpeedtestPreference(SiteSpeedtestsPagePreferences.SORT_DESCENDING, it)
+                    },
+                    onReset = { resetSpeedtestPreferences() },
+                    onDismiss = { showSpeedtestsSettingsSheet = false },
+                    onBack = {
+                        showSpeedtestsSettingsSheet = false
+                        showSiteSettingsSheet = true
+                    },
                     sheetState = pageSettingsSheetState,
                     useOneUi = uiStyle.useOneUi,
                     bubbleColor = uiStyle.bubbleColor
@@ -1379,7 +1617,7 @@ fun SiteDetailScreen(
                 )
             }
 
-            if (showImageSourceDialog) {
+            if (showImageSourceDialog && canUploadSitePhotos) {
                 AlertDialog(
                     onDismissRequest = { showImageSourceDialog = false },
                     shape = blockShape,
@@ -1387,36 +1625,40 @@ fun SiteDetailScreen(
                     title = { Text(stringResource(R.string.appstrings_add_photos), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                     text = {
                         Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                            Button(
-                                onClick = {
-                                    safeClick {
-                                        showImageSourceDialog = false
-                                        launchCameraCaptureWithStorageCheck()
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth().height(56.dp),
-                                shape = buttonShape,
-                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                            ) {
-                                Icon(Icons.Default.PhotoCamera, null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(stringResource(R.string.appstrings_camera), fontWeight = FontWeight.Bold)
+                            if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_PHOTO_CAMERA)) {
+                                Button(
+                                    onClick = {
+                                        safeClick {
+                                            showImageSourceDialog = false
+                                            launchCameraCaptureWithStorageCheck()
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                                    shape = buttonShape,
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                                ) {
+                                    Icon(Icons.Default.PhotoCamera, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(stringResource(R.string.appstrings_camera), fontWeight = FontWeight.Bold)
+                                }
                             }
-                            OutlinedButton(
-                                onClick = {
-                                    safeClick {
-                                        showImageSourceDialog = false
-                                        photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
-                                    }
-                                },
-                                modifier = Modifier.fillMaxWidth().height(56.dp),
-                                shape = buttonShape,
-                                colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
-                                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
-                            ) {
-                                Icon(Icons.Default.PhotoLibrary, null)
-                                Spacer(Modifier.width(8.dp))
-                                Text(stringResource(R.string.appstrings_gallery), fontWeight = FontWeight.Bold)
+                            if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_PHOTO_GALLERY)) {
+                                OutlinedButton(
+                                    onClick = {
+                                        safeClick {
+                                            showImageSourceDialog = false
+                                            photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                                    shape = buttonShape,
+                                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
+                                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                                ) {
+                                    Icon(Icons.Default.PhotoLibrary, null)
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(stringResource(R.string.appstrings_gallery), fontWeight = FontWeight.Bold)
+                                }
                             }
                             OutlinedButton(
                                 onClick = {

@@ -25,6 +25,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.workDataOf
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.api.RetrofitClient
 import fr.geotower.data.models.OfflineMapDto
 import fr.geotower.data.workers.DownloadNotificationCenter
@@ -90,6 +91,12 @@ fun MapDownloadCard(
     val context = LocalContext.current
     val workManager = remember { androidx.work.WorkManager.getInstance(context) }
     val safeClick = onSafeClick ?: rememberSafeClick()
+    val featureFlags by RemoteFeatureFlags.config
+    val canLoadCatalog = featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.OFFLINE_MAPS_CATALOG)
+    val canDownloadMaps =
+        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.OFFLINE_MAPS_DOWNLOAD) &&
+            featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_OFFLINE_MAP_DOWNLOAD) &&
+            featureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.OFFLINE_MAP_DOWNLOAD)
 
     val workInfos by workManager.getWorkInfosByTagFlow("map_download").collectAsState(initial = emptyList())
 
@@ -102,7 +109,13 @@ fun MapDownloadCard(
 
     val mapsDir = remember { File(context.getExternalFilesDir(null), "maps") }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(canLoadCatalog) {
+        if (!canLoadCatalog) {
+            catalog = emptyList()
+            isLoading = false
+            isError = false
+            return@LaunchedEffect
+        }
         try {
             catalog = RetrofitClient.apiService.getMapsCatalog()
                 .filter { OfflineMapDownloadValidator.isValidCatalogEntry(it) }
@@ -138,7 +151,7 @@ fun MapDownloadCard(
                 }
 
                 // 🚀 BOUTON : TOUT TÉLÉCHARGER
-                if (!isLoading && !isError && catalog.isNotEmpty()) {
+                if (!isLoading && !isError && catalog.isNotEmpty() && canDownloadMaps) {
                     IconButton(
                         onClick = {
                             safeClick("map_download_all") {
@@ -149,7 +162,7 @@ fun MapDownloadCard(
                                     val currentWork = workInfos.find { it.tags.contains("map_id_${map.id}") }
                                     val isSyncing = currentWork?.state == WorkInfo.State.RUNNING || currentWork?.state == WorkInfo.State.ENQUEUED
 
-                                    if (mapFile != null && !isDownloaded && !isSyncing) {
+                                    if (mapFile != null && !isDownloaded && !isSyncing && canDownloadMaps) {
                                         val data = workDataOf(
                                             "map_url" to map.mapUrl,
                                             "map_name" to displayName,
@@ -231,7 +244,7 @@ fun MapDownloadCard(
                                 IconButton(onClick = { safeClick("map_delete_${map.id}") { mapToDelete = map } }) {
                                     Icon(Icons.Default.Delete, contentDescription = stringResource(R.string.appstrings_delete), tint = MaterialTheme.colorScheme.error)
                                 }
-                            } else {
+                            } else if (canDownloadMaps) {
                                 IconButton(
                                     onClick = {
                                         safeClick("map_download_${map.id}") {

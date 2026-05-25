@@ -35,7 +35,8 @@ fun SpeedtestCard(
     isLoading: Boolean,
     shape: Shape,
     bgColor: Color,
-    contentColor: Color
+    contentColor: Color,
+    onClick: (() -> Unit)? = null
 ) {
     // 1. Vérification du paramètre utilisateur (Affichage activé ?)
     if (!AppConfig.siteShowSpeedtest.value) return
@@ -49,14 +50,42 @@ fun SpeedtestCard(
     // Si l'opérateur n'est pas supporté, on ne dessine rien et le bloc disparaît
     if (!isCompatible) return
 
-    // 3. Dessin de la carte
-    Card(
-        shape = shape,
-        colors = CardDefaults.cardColors(containerColor = bgColor, contentColor = contentColor),
-        elevation = CardDefaults.cardElevation(0.dp),
-        modifier = Modifier.fillMaxWidth() // Le padding extérieur sera géré par l'écran parent
-    ) {
-        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+    val cardModifier = Modifier.fillMaxWidth()
+    val cardColors = CardDefaults.cardColors(containerColor = bgColor, contentColor = contentColor)
+    val cardElevation = CardDefaults.cardElevation(0.dp)
+
+    if (onClick != null) {
+        Card(
+            onClick = onClick,
+            shape = shape,
+            colors = cardColors,
+            elevation = cardElevation,
+            modifier = cardModifier
+        ) {
+            SpeedtestCardContent(speedtestData, isLoading, contentColor)
+        }
+    } else {
+        Card(
+            shape = shape,
+            colors = cardColors,
+            elevation = cardElevation,
+            modifier = cardModifier
+        ) {
+            SpeedtestCardContent(speedtestData, isLoading, contentColor)
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun SpeedtestCardContent(
+    speedtestData: SqSpeedtestData?,
+    isLoading: Boolean,
+    contentColor: Color
+) {
+    val context = LocalContext.current
+
+    Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
 
             // Titre du bloc
             Text(
@@ -136,7 +165,6 @@ fun SpeedtestCard(
                 }
             }
         }
-    }
 }
 
 // Petit sous-composant privé pour éviter de dupliquer le code des 3 colonnes

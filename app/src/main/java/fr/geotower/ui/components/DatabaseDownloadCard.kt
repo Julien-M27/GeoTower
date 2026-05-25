@@ -26,6 +26,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.R
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DatabaseVersionPolicy
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.workers.DatabaseDownloadWorker
@@ -46,6 +47,7 @@ fun DatabaseDownloadCard(
     val context = LocalContext.current
     val workManager = remember { androidx.work.WorkManager.getInstance(context) }
     val safeClick = onSafeClick ?: rememberSafeClick()
+    val featureFlags by RemoteFeatureFlags.config
     val workInfos by workManager.getWorkInfosForUniqueWorkFlow(DatabaseDownloadWorker.UNIQUE_WORK_NAME).collectAsState(initial = emptyList())
     val currentWork = workInfos.firstOrNull()
 
@@ -59,6 +61,10 @@ fun DatabaseDownloadCard(
     val txtOldDb = stringResource(R.string.database_old_undated)
     val txtLatestDb = stringResource(R.string.database_latest_available)
     val txtDownloadedDb = stringResource(R.string.database_currently_downloaded)
+    val canStartDatabaseDownload =
+        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) &&
+            featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
+            featureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
 
     var dbSizeMb by remember { mutableDoubleStateOf(-1.0) }
     var localDbVersion by remember { mutableStateOf(txtSearching) }
@@ -72,7 +78,7 @@ fun DatabaseDownloadCard(
     var dbRefreshTrigger by remember { mutableIntStateOf(0) } // Déclenche le re-scan local
 
     // ✅ ON AJOUTE dbRefreshTrigger AUX CLÉS DE L'EFFET
-    LaunchedEffect(isSyncing, dbRefreshTrigger, txtSearching, txtUnknown, txtNoDb, txtInvalidDb, txtOldDb) {
+    LaunchedEffect(isSyncing, dbRefreshTrigger, txtSearching, txtUnknown, txtNoDb, txtInvalidDb, txtOldDb, featureFlags) {
         withContext(Dispatchers.IO) {
             fun formatVersion(raw: String?): String {
                 if (raw != null && raw.length == 13) {
@@ -334,12 +340,17 @@ fun DatabaseDownloadCard(
                     localDbVersionRaw
                 )
                 val isSearchingDatabaseInfo = localDbVersion == txtSearching || remoteDbVersion == txtSearching
-                val canDownloadRemoteDatabase = remoteDbVersionRaw != null
+                val canDownloadRemoteDatabase = remoteDbVersionRaw != null && canStartDatabaseDownload
 
                 Button(
                     onClick = {
                         safeClick("database_start_download") {
-                            DatabaseDownloadWorker.enqueue(workManager)
+                            if (RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) &&
+                                RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
+                                RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
+                            ) {
+                                DatabaseDownloadWorker.enqueue(workManager)
+                            }
                         }
                     },
                     enabled = canDownloadRemoteDatabase && !isUpToDate && !isSearchingDatabaseInfo,

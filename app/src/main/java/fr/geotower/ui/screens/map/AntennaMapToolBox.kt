@@ -30,7 +30,11 @@ fun AntennaMapToolBox(
     isMeasuringMode: Boolean,
     onToggleMeasure: () -> Unit,
     onOpenLayers: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    showSearch: Boolean = true,
+    showMeasure: Boolean = true,
+    showLayers: Boolean = true,
+    showSettings: Boolean = true
 ) {
     // L'animation est gérée en interne par le composant !
     val toolboxRotation by animateFloatAsState(
@@ -53,40 +57,48 @@ fun AntennaMapToolBox(
                     modifier = Modifier.padding(top = 7.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    IconButton(
-                        onClick = onToggleSearch,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(
-                                if (isSearchActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                                CircleShape
+                    if (showSearch) {
+                        IconButton(
+                            onClick = onToggleSearch,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(
+                                    if (isSearchActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                                    CircleShape
+                                )
+                        ) {
+                            Icon(
+                                Icons.Default.Search,
+                                contentDescription = stringResource(R.string.appstrings_search),
+                                tint = if (isSearchActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp)
                             )
-                    ) {
-                        Icon(
-                            Icons.Default.Search,
-                            contentDescription = stringResource(R.string.appstrings_search),
-                            tint = if (isSearchActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp)
-                        )
+                        }
                     }
-                    IconButton(
-                        onClick = onToggleMeasure,
-                        modifier = Modifier
-                            .size(40.dp)
-                            .background(if (isMeasuringMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, CircleShape)
-                    ) {
-                        Icon(
-                            Icons.Default.Straighten,
-                            contentDescription = stringResource(R.string.appstrings_ruler),
-                            tint = if (isMeasuringMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(22.dp)
-                        )
+                    if (showMeasure) {
+                        IconButton(
+                            onClick = onToggleMeasure,
+                            modifier = Modifier
+                                .size(40.dp)
+                                .background(if (isMeasuringMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, CircleShape)
+                        ) {
+                            Icon(
+                                Icons.Default.Straighten,
+                                contentDescription = stringResource(R.string.appstrings_ruler),
+                                tint = if (isMeasuringMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
                     }
-                    IconButton(onClick = onOpenLayers, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Default.Layers, contentDescription = stringResource(R.string.appstrings_layers), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+                    if (showLayers) {
+                        IconButton(onClick = onOpenLayers, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.Default.Layers, contentDescription = stringResource(R.string.appstrings_layers), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+                        }
                     }
-                    IconButton(onClick = onOpenSettings, modifier = Modifier.size(40.dp)) {
-                        Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.appstrings_settings_title), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+                    if (showSettings) {
+                        IconButton(onClick = onOpenSettings, modifier = Modifier.size(40.dp)) {
+                            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.appstrings_settings_title), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+                        }
                     }
                     HorizontalDivider(modifier = Modifier.width(32.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                 }

@@ -8,14 +8,17 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.BitmapShader
 import android.graphics.Canvas
+import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Shader
+import android.graphics.drawable.Icon
 import android.content.pm.ServiceInfo
 import android.location.Location
 import android.net.Uri
@@ -26,6 +29,7 @@ import android.os.Looper
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import androidx.core.graphics.drawable.DrawableCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationCallback
@@ -77,6 +81,7 @@ class LiveTrackingService : Service() {
     private var lockedOperator: String? = null
     private var lockedAntennaId: String? = null
     private var initialDistance: Float? = null
+    private var lastDistanceToLockedAntenna: Float? = null
     private val liveSitePhotoCacheLock = Any()
     private val liveSitePhotoCache = LinkedHashMap<String, Bitmap?>()
     @Volatile
@@ -121,7 +126,8 @@ class LiveTrackingService : Service() {
                 operator = defaultOp,
                 antLoc = null,
                 address = "",
-                sitePhotoBitmap = null
+                sitePhotoBitmap = null,
+                mirrorTrackerIcon = false
             )
         } else {
             buildNotification(
@@ -192,6 +198,7 @@ class LiveTrackingService : Service() {
                 val opAntennas = findActiveAntennasByRadius(dao, location, defaultOp)
 
                 if (opAntennas.isEmpty()) {
+                    lastDistanceToLockedAntenna = null
                     updateNotification(
                         text = applicationContext.getString(R.string.live_tracking_no_antenna_found, defaultOp),
                         userLoc = null,
@@ -227,7 +234,13 @@ class LiveTrackingService : Service() {
                 if (lockedAntennaId != currentId) {
                     lockedAntennaId = currentId
                     initialDistance = minDistance
+                    lastDistanceToLockedAntenna = null
                 }
+
+                val previousDistance = lastDistanceToLockedAntenna
+                val isMovingAwayFromAntenna = previousDistance != null &&
+                    minDistance > previousDistance + MOVING_AWAY_DISTANCE_THRESHOLD_METERS
+                lastDistanceToLockedAntenna = minDistance
 
                 val progress = if (initialDistance != null && initialDistance!! > 10f) {
                     ((1f - (minDistance / initialDistance!!).coerceIn(0f, 1f)) * 100).toInt()
@@ -268,7 +281,8 @@ class LiveTrackingService : Service() {
                     operator = defaultOp,
                     progress = progress,
                     address = fullAddress,
-                    sitePhotoBitmap = liveSitePhotoBitmap
+                    sitePhotoBitmap = liveSitePhotoBitmap,
+                    mirrorTrackerIcon = isMovingAwayFromAntenna
                 )
 
                 requestLiveSitePhotoBitmapIfNeeded(
@@ -279,7 +293,8 @@ class LiveTrackingService : Service() {
                     userLoc = location,
                     antLoc = closestAntenna,
                     progress = progress,
-                    address = fullAddress
+                    address = fullAddress,
+                    mirrorTrackerIcon = isMovingAwayFromAntenna
                 )
             } catch (_: CancellationException) {
                 // Newer GPS updates replace older calculations.
@@ -340,7 +355,8 @@ class LiveTrackingService : Service() {
         operator: String,
         progress: Int = 0,
         address: String = "",
-        sitePhotoBitmap: Bitmap? = null
+        sitePhotoBitmap: Bitmap? = null,
+        mirrorTrackerIcon: Boolean = false
     ) {
         if (!LiveTrackingController.hasPostNotificationsPermission(this)) {
             stopTrackingAndSelf()
@@ -349,9 +365,9 @@ class LiveTrackingService : Service() {
 
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val notification = if (supportsProgressStyle()) {
-            buildLiveNotification(text, progress, operator, antLoc, address, sitePhotoBitmap)
+            buildLiveNotification(text, progress, operator, antLoc, address, sitePhotoBitmap, mirrorTrackerIcon)
         } else {
-            buildNotification(text, userLoc, antLoc, operator, progress, address)
+            buildNotification(text, userLoc, antLoc, operator, progress, address, mirrorTrackerIcon)
         }
 
         manager.notify(notificationId, notification)
@@ -365,7 +381,8 @@ class LiveTrackingService : Service() {
         userLoc: Location?,
         antLoc: LocalisationEntity,
         progress: Int,
-        address: String
+        address: String,
+        mirrorTrackerIcon: Boolean
     ) {
         if (!supportsProgressStyle() || siteId.isBlank() || hasLiveSitePhotoCacheEntry(cacheKey)) return
         if (liveSitePhotoLoadingKey == cacheKey) return
@@ -389,7 +406,8 @@ class LiveTrackingService : Service() {
                         operator = operator,
                         progress = progress,
                         address = address,
-                        sitePhotoBitmap = bitmap
+                        sitePhotoBitmap = bitmap,
+                        mirrorTrackerIcon = mirrorTrackerIcon
                     )
                 }
             } catch (e: CancellationException) {
@@ -565,7 +583,8 @@ class LiveTrackingService : Service() {
         operator: String,
         antLoc: LocalisationEntity?,
         address: String,
-        sitePhotoBitmap: Bitmap?
+        sitePhotoBitmap: Bitmap?,
+        mirrorTrackerIcon: Boolean
     ): Notification {
         val pendingIntent = PendingIntent.getActivity(
             this,
@@ -583,21 +602,23 @@ class LiveTrackingService : Service() {
 
         val progressStyle = Notification.ProgressStyle()
             .setProgress(progress)
-            .setProgressTrackerIcon(
-                IconCompat.createWithResource(this, R.drawable.ic_live_user_tracker).toIcon(this)
-            )
+            .setProgressTrackerIcon(liveTrackerIcon(mirrorTrackerIcon))
             .setProgressSegments(
                 listOf(Notification.ProgressStyle.Segment(100).setColor(operatorColor(operator)))
             )
 
-        progressEndIcon(operator, sitePhotoBitmap)?.let(progressStyle::setProgressEndIcon)
-
         val hasAddress = address.isNotBlank()
-        val liveTitle = if (hasAddress) contentText else getString(R.string.live_tracking_title)
         val liveContentText = if (hasAddress) notificationAddressText(address) else contentText
         val shortCriticalText = extractShortCriticalText(contentText)
+        val livePrimaryInfo = liveActivityPrimaryInfo(
+            operator = operator,
+            distanceText = shortCriticalText,
+            fallbackTitle = getString(R.string.live_tracking_title),
+            primaryInfo = contentText,
+            secondaryInfo = liveContentText
+        )
         val builder = Notification.Builder(this, liveTrackingChannelV3)
-            .setContentTitle(liveTitle)
+            .setContentTitle(livePrimaryInfo)
             .setContentText(liveContentText)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
@@ -615,6 +636,9 @@ class LiveTrackingService : Service() {
                 ).build()
             )
         NotificationIconResources.applyTo(builder, this)
+        sitePhotoBitmap?.let { bitmap ->
+            builder.setLargeIcon(Icon.createWithBitmap(bitmap))
+        }
 
         runCatching {
             Notification.Builder::class.java
@@ -641,10 +665,11 @@ class LiveTrackingService : Service() {
                 samsungOngoingActivityExtras(
                     operator = operator,
                     progress = progress,
-                    primaryInfo = liveTitle,
+                    primaryInfo = livePrimaryInfo,
                     secondaryInfo = liveContentText,
                     shortCriticalText = shortCriticalText,
-                    sitePhotoBitmap = sitePhotoBitmap
+                    sitePhotoBitmap = sitePhotoBitmap,
+                    mirrorTrackerIcon = mirrorTrackerIcon
                 )
             )
         }
@@ -656,7 +681,8 @@ class LiveTrackingService : Service() {
         antLoc: LocalisationEntity?,
         operator: String,
         progress: Int = 0,
-        address: String = ""
+        address: String = "",
+        mirrorTrackerIcon: Boolean = false
     ): Notification {
         val pendingIntent = PendingIntent.getActivity(
             this,
@@ -673,10 +699,22 @@ class LiveTrackingService : Service() {
         )
 
         val expandedText = notificationContentText(contentText, address)
+        val shortCriticalText = extractShortCriticalText(contentText)
+        val notificationTitle = liveActivityPrimaryInfo(
+            operator = operator,
+            distanceText = shortCriticalText,
+            fallbackTitle = getString(R.string.live_tracking_title),
+            primaryInfo = contentText,
+            secondaryInfo = expandedText
+        )
+        val notificationText = address
+            .takeIf { it.isNotBlank() }
+            ?.let(::notificationAddressText)
+            ?: contentText
 
         val builder = NotificationCompat.Builder(this, liveTrackingChannelV3)
-            .setContentTitle(getString(R.string.live_tracking_title))
-            .setContentText(contentText)
+            .setContentTitle(notificationTitle)
+            .setContentText(notificationText)
             .setContentIntent(pendingIntent)
             .setOngoing(true)
             .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
@@ -695,10 +733,11 @@ class LiveTrackingService : Service() {
                 samsungOngoingActivityExtras(
                     operator = operator,
                     progress = progress,
-                    primaryInfo = contentText,
+                    primaryInfo = notificationTitle,
                     secondaryInfo = expandedText,
-                    shortCriticalText = extractShortCriticalText(contentText),
-                    sitePhotoBitmap = null
+                    shortCriticalText = shortCriticalText,
+                    sitePhotoBitmap = null,
+                    mirrorTrackerIcon = mirrorTrackerIcon
                 )
             )
         }
@@ -749,12 +788,19 @@ class LiveTrackingService : Service() {
         primaryInfo: String,
         secondaryInfo: String,
         shortCriticalText: String?,
-        sitePhotoBitmap: Bitmap?
+        sitePhotoBitmap: Bitmap?,
+        mirrorTrackerIcon: Boolean
     ): Bundle {
         if (!DeviceProfile.supportsSamsungOngoingActivity) return Bundle.EMPTY
 
         val chipText = samsungChipText(shortCriticalText, primaryInfo)
-        val drawerPrimaryInfo = samsungDrawerPrimaryInfo(chipText)
+        val drawerPrimaryInfo = liveActivityPrimaryInfo(
+            operator = operator,
+            distanceText = shortCriticalText,
+            fallbackTitle = getString(R.string.live_tracking_title),
+            primaryInfo = primaryInfo,
+            secondaryInfo = secondaryInfo
+        )
         val compactSecondary = secondaryInfo
             .replace('\n', ' ')
             .replace(Regex("\\s+"), " ")
@@ -764,7 +810,7 @@ class LiveTrackingService : Service() {
         val expandedIcon = sitePhotoBitmap?.let { bitmap ->
             IconCompat.createWithBitmap(bitmap).toIcon(this)
         } ?: operatorIcon
-        val trackerIcon = IconCompat.createWithResource(this, R.drawable.ic_live_user_tracker).toIcon(this)
+        val trackerIcon = liveTrackerIcon(mirrorTrackerIcon)
         val progressSegment = Bundle().apply {
             putFloat("android.ongoingActivityNoti.progressSegments.segmentStart", 0.0f)
             putInt("android.ongoingActivityNoti.progressSegments.segmentColor", operatorColor(operator))
@@ -804,9 +850,68 @@ class LiveTrackingService : Service() {
             .take(MAX_SAMSUNG_CHIP_TEXT_LENGTH)
     }
 
-    private fun samsungDrawerPrimaryInfo(chipText: String): String {
-        return getString(R.string.live_tracking_drawer_primary, getString(R.string.live_tracking_title), chipText)
-            .take(MAX_SAMSUNG_DRAWER_TITLE_LENGTH)
+    private fun liveActivityPrimaryInfo(
+        operator: String,
+        distanceText: String?,
+        fallbackTitle: String,
+        primaryInfo: String,
+        secondaryInfo: String
+    ): String {
+        val orientationText = liveOrientationText(primaryInfo)
+            ?: liveOrientationText(secondaryInfo)
+
+        if (!distanceText.isNullOrBlank() && !orientationText.isNullOrBlank()) {
+            return listOf(liveOperatorName(operator), distanceText, orientationText)
+                .joinToString(" \u2022 ")
+                .take(MAX_SAMSUNG_DRAWER_TITLE_LENGTH)
+        }
+
+        if (!distanceText.isNullOrBlank()) {
+            return getString(R.string.live_tracking_drawer_primary, fallbackTitle, distanceText)
+                .take(MAX_SAMSUNG_DRAWER_TITLE_LENGTH)
+        }
+
+        return fallbackTitle.take(MAX_SAMSUNG_DRAWER_TITLE_LENGTH)
+    }
+
+    private fun liveOperatorName(operator: String): String {
+        return OperatorColors.specForKey(operator)?.label?.takeIf { it.isNotBlank() }
+            ?: operator.replace('_', ' ')
+    }
+
+    private fun liveOrientationText(text: String): String? {
+        return Regex("""(?:^|[\s\u2022])([NSEO]{1,2}\s*\(\s*\d{1,3}\s*\u00B0\s*\))""")
+            .find(text)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.replace(Regex("""\s+"""), " ")
+            ?.replace("( ", "(")
+            ?.replace(" )", ")")
+            ?.takeIf { it.isNotBlank() }
+    }
+
+    private fun liveTrackerIcon(mirrored: Boolean): Icon {
+        val drawable = ContextCompat.getDrawable(this, R.drawable.ic_live_user_tracker)?.mutate()
+            ?: return IconCompat.createWithResource(this, R.drawable.ic_live_user_tracker).toIcon(this)
+
+        DrawableCompat.setTint(drawable, liveTrackerIconColor())
+        val size = (resources.displayMetrics.density * LIVE_TRACKER_ICON_DP)
+            .toInt()
+            .coerceAtLeast(1)
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        drawable.setBounds(0, 0, size, size)
+        if (mirrored) {
+            canvas.translate(size.toFloat(), 0f)
+            canvas.scale(-1f, 1f)
+        }
+        drawable.draw(canvas)
+        return Icon.createWithBitmap(bitmap)
+    }
+
+    private fun liveTrackerIconColor(): Int {
+        val nightMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK
+        return if (nightMode == Configuration.UI_MODE_NIGHT_YES) Color.WHITE else Color.BLACK
     }
 
     private fun createNotificationChannel() {
@@ -874,6 +979,7 @@ class LiveTrackingService : Service() {
             lockedOperator = null
             lockedAntennaId = null
             initialDistance = null
+            lastDistanceToLockedAntenna = null
         }
     }
 
@@ -915,10 +1021,6 @@ class LiveTrackingService : Service() {
         return OperatorColors.colorInt(operator)
     }
 
-    private fun progressEndIcon(operator: String, sitePhotoBitmap: Bitmap?) =
-        sitePhotoBitmap?.let { IconCompat.createWithBitmap(it).toIcon(this) }
-            ?: roundedOperatorLogoIcon(operator)
-
     private fun roundedOperatorLogoIcon(operator: String) =
         operatorLogo(operator)
             ?.let(::roundedDrawableBitmap)
@@ -950,10 +1052,12 @@ class LiveTrackingService : Service() {
         private const val ACTION_STOP_SERVICE = "ACTION_STOP_SERVICE"
         private const val MIN_PROCESS_INTERVAL_MS = 30_000L
         private const val MIN_PROCESS_DISTANCE_METERS = 15f
+        private const val MOVING_AWAY_DISTANCE_THRESHOLD_METERS = 5f
         private const val KM_PER_LATITUDE_DEGREE = 111.0
         private const val MAX_SAMSUNG_NOW_BAR_TEXT_LENGTH = 80
         private const val MAX_SAMSUNG_CHIP_TEXT_LENGTH = 24
         private const val MAX_SAMSUNG_DRAWER_TITLE_LENGTH = 36
+        private const val LIVE_TRACKER_ICON_DP = 24
         private const val LIVE_SITE_PHOTO_ICON_DP = 64
         private const val LIVE_SITE_PHOTO_CORNER_RADIUS_DP = 10
         private const val MIN_LIVE_SITE_PHOTO_ICON_PX = 96

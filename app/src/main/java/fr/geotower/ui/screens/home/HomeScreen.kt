@@ -108,6 +108,10 @@ fun HomeScreen(navController: NavController) {
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val homeLogoChoice = prefs.getString("home_logo_choice", "app") ?: "app"
     val featureFlags by RemoteFeatureFlags.config
+    val canStartDatabaseDownload =
+        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) &&
+            featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
+            featureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
     var dismissedHomeAnnouncementKey by remember {
         mutableStateOf(prefs.getString(PREF_HOME_ANNOUNCEMENT_DISMISSED, "") ?: "")
     }
@@ -311,7 +315,13 @@ fun HomeScreen(navController: NavController) {
                     isUpdateAvailable = false
                     AppConfig.isDbUpdateAvailable.value = false
 
-                    DatabaseDownloadWorker.enqueue(workManager)
+                    if (canStartDatabaseDownload &&
+                        RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) &&
+                        RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
+                        RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
+                    ) {
+                        DatabaseDownloadWorker.enqueue(workManager)
+                    }
                 }
             )
 

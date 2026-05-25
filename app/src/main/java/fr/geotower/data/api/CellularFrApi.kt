@@ -19,7 +19,8 @@ data class CellularFrPhoto(
 object CellularFrApi {
     // CellularFR masqué — voir CellularFrApi.ENABLED
     val isEnabled: Boolean
-        get() = RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.CELLULARFR_PHOTOS)
+        get() = RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.CELLULARFR_PHOTOS) &&
+            RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.CELLULARFR)
 
     private const val TAG = "GeoTowerCellularFR"
     private const val BASE_URL = "https://cellularfr.fr/"

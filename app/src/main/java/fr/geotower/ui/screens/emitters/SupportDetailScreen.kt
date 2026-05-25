@@ -123,6 +123,13 @@ fun SupportDetailScreen(
     val safeClick = rememberSafeClick()
     val effectiveHighlightedOperatorKey = OperatorColors.keyFor(highlightedOperatorKey)
     val featureFlags by RemoteFeatureFlags.config
+    val canUseSupportPhotos = featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SUPPORT_PHOTOS)
+    val canUseSupportNavigation =
+        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SUPPORT_EXTERNAL_NAVIGATION) &&
+            featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.OPEN_EXTERNAL_NAVIGATION)
+    val canUseSupportShare =
+        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SUPPORT_SHARE) &&
+            featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.SHARE_SUPPORT)
 
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "emitters")
 
@@ -261,6 +268,10 @@ fun SupportDetailScreen(
 
         // 2️⃣ CHARGEMENT RÉSEAU DES PHOTOS (En arrière-plan, ne bloque pas l'écran)
         launch(Dispatchers.IO) {
+            if (!canUseSupportPhotos) {
+                communityPhotos = emptyList()
+                return@launch
+            }
             try {
                 val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
                 val photosTemp = mutableListOf<CommunityPhoto>()
@@ -523,7 +534,7 @@ fun SupportDetailScreen(
                             }
                             "photos" -> {
                                 // 🚨 CORRECTION : On retire "&& communityPhotos.isNotEmpty()"
-                                if (showPhotos) {
+                                if (showPhotos && canUseSupportPhotos) {
                                     Box(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
                                         CommunityPhotosSectionShared(
                                             photos = communityPhotos,
@@ -562,7 +573,7 @@ fun SupportDetailScreen(
                                 }
                             }
                             "nav" -> {
-                                if (showNav) {
+                                if (showNav && canUseSupportNavigation) {
                                     Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                                         Button(
                                             onClick = { safeClick { showNavigationSheet = true } },
@@ -583,7 +594,7 @@ fun SupportDetailScreen(
                                 }
                             }
                             "share" -> {
-                                if (showShare) {
+                                if (showShare && canUseSupportShare) {
                                     Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                                         SupportShareMenu(
                                             siteId = siteId,
@@ -625,7 +636,7 @@ fun SupportDetailScreen(
             }
         }
 
-        if (showNavigationSheet && antennas.isNotEmpty()) {
+        if (showNavigationSheet && antennas.isNotEmpty() && canUseSupportNavigation) {
             val mainInfo = antennas.first()
             fr.geotower.ui.components.NavigationBottomSheet(
                 latitude = mainInfo.latitude,

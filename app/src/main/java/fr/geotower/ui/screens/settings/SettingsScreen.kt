@@ -166,11 +166,12 @@ private fun resetSettingsToDefaultsAndRestart(context: Context, prefs: SharedPre
     LiveTrackingController.stop(appContext)
     AppIconManager.setIcon(appContext, 0)
 
-    prefs.edit()
+    SiteSpeedtestsPagePreferences.putDefaults(
+        prefs.edit()
         .clear()
         .putBoolean("isFirstRun", false)
         .putBoolean("is_blur_enabled", true)
-        .apply()
+    ).apply()
     AppConfig.isBlurEnabled.value = true
     CommunityDataPreferences.reset(prefs)
 
@@ -565,6 +566,7 @@ fun SettingsScreen(
     var showStartupPageSheet by remember { mutableStateOf(false) }
     var showThroughputCalculatorSettingsSheet by remember { mutableStateOf(false) }
     var showThroughputCalculationDefaultsSheet by remember { mutableStateOf(false) }
+    var showSpeedtestsSettingsSheet by remember { mutableStateOf(false) }
     // On préparera les autres (showHomeSettingsSheet, etc.) dans la prochaine étape
 
     // La sauvegarde de la page de démarrage
@@ -578,6 +580,27 @@ fun SettingsScreen(
         )
     }
     var showNearbySettingsSheet by remember { mutableStateOf(false) }
+    var pageSpeedtestsFilterMajorEnb by remember { mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.FILTER_MAJOR_ENB, SiteSpeedtestsPagePreferences.DEFAULT_FILTER_MAJOR_ENB)) }
+    var pageSpeedtestsIncludeMissingEnb by remember { mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.INCLUDE_MISSING_ENB, SiteSpeedtestsPagePreferences.DEFAULT_INCLUDE_MISSING_ENB)) }
+    var pageSpeedtestsShowCount by remember { mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.SHOW_COUNT, SiteSpeedtestsPagePreferences.DEFAULT_SHOW_COUNT)) }
+    var pageSpeedtestsShowRadio by remember { mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.SHOW_RADIO, SiteSpeedtestsPagePreferences.DEFAULT_SHOW_RADIO)) }
+    var pageSpeedtestsShowNetwork by remember { mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.SHOW_NETWORK, SiteSpeedtestsPagePreferences.DEFAULT_SHOW_NETWORK)) }
+    var pageSpeedtestsShowCoordinates by remember { mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.SHOW_COORDINATES, SiteSpeedtestsPagePreferences.DEFAULT_SHOW_COORDINATES)) }
+    var pageSpeedtestsBestMetric by remember {
+        mutableStateOf(
+            SiteSpeedtestsPagePreferences.normalizeSortMetric(
+                prefs.getString(SiteSpeedtestsPagePreferences.BEST_METRIC, SiteSpeedtestsPagePreferences.DEFAULT_BEST_METRIC)
+            )
+        )
+    }
+    var pageSpeedtestsSortMetric by remember {
+        mutableStateOf(
+            SiteSpeedtestsPagePreferences.normalizeSortMetric(
+                prefs.getString(SiteSpeedtestsPagePreferences.SORT_METRIC, SiteSpeedtestsPagePreferences.DEFAULT_SORT_METRIC)
+            )
+        )
+    }
+    var pageSpeedtestsSortDescending by remember { mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.SORT_DESCENDING, SiteSpeedtestsPagePreferences.DEFAULT_SORT_DESCENDING)) }
     var nearbyOrder by remember { mutableStateOf(prefs.getString("nearby_order", "search,sites")!!.split(",")) }
     var showSearchBar by remember { mutableStateOf(prefs.getBoolean("show_search_bar", true)) }
     var showSearchSuggestions by remember { mutableStateOf(prefs.getBoolean("show_search_suggestions", true)) }
@@ -602,6 +625,19 @@ fun SettingsScreen(
             .putBoolean("page_support_photos", visible)
             .putBoolean("page_site_photos", visible)
             .apply()
+    }
+
+    fun resetSpeedtestsSettings() {
+        SiteSpeedtestsPagePreferences.reset(prefs)
+        pageSpeedtestsFilterMajorEnb = SiteSpeedtestsPagePreferences.DEFAULT_FILTER_MAJOR_ENB
+        pageSpeedtestsIncludeMissingEnb = SiteSpeedtestsPagePreferences.DEFAULT_INCLUDE_MISSING_ENB
+        pageSpeedtestsShowCount = SiteSpeedtestsPagePreferences.DEFAULT_SHOW_COUNT
+        pageSpeedtestsShowRadio = SiteSpeedtestsPagePreferences.DEFAULT_SHOW_RADIO
+        pageSpeedtestsShowNetwork = SiteSpeedtestsPagePreferences.DEFAULT_SHOW_NETWORK
+        pageSpeedtestsShowCoordinates = SiteSpeedtestsPagePreferences.DEFAULT_SHOW_COORDINATES
+        pageSpeedtestsBestMetric = SiteSpeedtestsPagePreferences.DEFAULT_BEST_METRIC
+        pageSpeedtestsSortMetric = SiteSpeedtestsPagePreferences.DEFAULT_SORT_METRIC
+        pageSpeedtestsSortDescending = SiteSpeedtestsPagePreferences.DEFAULT_SORT_DESCENDING
     }
 
     LaunchedEffect(initialSection) {
@@ -934,6 +970,7 @@ fun SettingsScreen(
                 onStatsClick = { safeClick { showPagesCustomizationSheet = false; showStatsSettingsSheet = true } },
                 onSupportClick = { safeClick { showPagesCustomizationSheet = false; showSupportSettingsSheet = true } },
                 onSiteClick = { safeClick { showPagesCustomizationSheet = false; showSiteSettingsSheet = true } },
+                onSpeedtestsClick = { safeClick { showPagesCustomizationSheet = false; showSpeedtestsSettingsSheet = true } },
                 onThroughputCalculatorClick = { safeClick { showPagesCustomizationSheet = false; showThroughputCalculatorSettingsSheet = true } },
                 onOpenFrequencies = {
                     // ✅ L'échange se fait ici : on ferme l'un et on ouvre l'autre
@@ -1325,6 +1362,63 @@ fun SettingsScreen(
                 },
                 onDismiss = { showSiteSettingsSheet = false },
                 onBack = { safeClick { showSiteSettingsSheet = false; showPagesCustomizationSheet = true } },
+                sheetState = sheetState,
+                useOneUi = useOneUi,
+                bubbleColor = bubbleBaseColor
+            )
+        }
+        if (showSpeedtestsSettingsSheet) {
+            SiteSpeedtestsSettingsSheet(
+                filterMajorEnb = pageSpeedtestsFilterMajorEnb,
+                onFilterMajorEnbChange = {
+                    pageSpeedtestsFilterMajorEnb = it
+                    prefs.edit().putBoolean(SiteSpeedtestsPagePreferences.FILTER_MAJOR_ENB, it).apply()
+                },
+                includeMissingEnb = pageSpeedtestsIncludeMissingEnb,
+                onIncludeMissingEnbChange = {
+                    pageSpeedtestsIncludeMissingEnb = it
+                    prefs.edit().putBoolean(SiteSpeedtestsPagePreferences.INCLUDE_MISSING_ENB, it).apply()
+                },
+                showSpeedtestsCount = pageSpeedtestsShowCount,
+                onShowSpeedtestsCountChange = {
+                    pageSpeedtestsShowCount = it
+                    prefs.edit().putBoolean(SiteSpeedtestsPagePreferences.SHOW_COUNT, it).apply()
+                },
+                showRadioDetails = pageSpeedtestsShowRadio,
+                onShowRadioDetailsChange = {
+                    pageSpeedtestsShowRadio = it
+                    prefs.edit().putBoolean(SiteSpeedtestsPagePreferences.SHOW_RADIO, it).apply()
+                },
+                showNetworkDetails = pageSpeedtestsShowNetwork,
+                onShowNetworkDetailsChange = {
+                    pageSpeedtestsShowNetwork = it
+                    prefs.edit().putBoolean(SiteSpeedtestsPagePreferences.SHOW_NETWORK, it).apply()
+                },
+                showCoordinates = pageSpeedtestsShowCoordinates,
+                onShowCoordinatesChange = {
+                    pageSpeedtestsShowCoordinates = it
+                    prefs.edit().putBoolean(SiteSpeedtestsPagePreferences.SHOW_COORDINATES, it).apply()
+                },
+                bestMetric = pageSpeedtestsBestMetric,
+                onBestMetricChange = {
+                    val normalizedMetric = SiteSpeedtestsPagePreferences.normalizeSortMetric(it)
+                    pageSpeedtestsBestMetric = normalizedMetric
+                    prefs.edit().putString(SiteSpeedtestsPagePreferences.BEST_METRIC, normalizedMetric).apply()
+                },
+                sortMetric = pageSpeedtestsSortMetric,
+                onSortMetricChange = {
+                    val normalizedMetric = SiteSpeedtestsPagePreferences.normalizeSortMetric(it)
+                    pageSpeedtestsSortMetric = normalizedMetric
+                    prefs.edit().putString(SiteSpeedtestsPagePreferences.SORT_METRIC, normalizedMetric).apply()
+                },
+                sortDescending = pageSpeedtestsSortDescending,
+                onSortDescendingChange = {
+                    pageSpeedtestsSortDescending = it
+                    prefs.edit().putBoolean(SiteSpeedtestsPagePreferences.SORT_DESCENDING, it).apply()
+                },
+                onReset = ::resetSpeedtestsSettings,
+                onDismiss = { showSpeedtestsSettingsSheet = false },
+                onBack = { safeClick { showSpeedtestsSettingsSheet = false; showPagesCustomizationSheet = true } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor

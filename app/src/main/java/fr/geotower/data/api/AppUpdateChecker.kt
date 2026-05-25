@@ -2,6 +2,7 @@ package fr.geotower.data.api
 
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import fr.geotower.data.config.RemoteFeatureFlags
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
@@ -37,6 +38,9 @@ object AppUpdateChecker {
     private val VERSION_NUMBER_REGEX = Regex("\\d+")
 
     suspend fun getLatestRelease(): AppReleaseInfo? {
+        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.APP_UPDATE_CHECK)) {
+            return null
+        }
         return withContext(Dispatchers.IO) {
             try {
                 val request = Request.Builder()

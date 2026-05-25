@@ -58,6 +58,7 @@ import fr.geotower.ui.screens.help.HelpScreen
 import fr.geotower.ui.screens.settings.SettingsScreen
 import fr.geotower.ui.screens.emitters.ElevationProfileScreen
 import fr.geotower.ui.screens.emitters.NearEmittersSupportWrapperScreen
+import fr.geotower.ui.screens.emitters.SiteSpeedtestsScreen
 import fr.geotower.ui.screens.emitters.SiteDetailToolWrapperScreen
 import fr.geotower.ui.screens.emitters.ThroughputCalculatorScreen
 import fr.geotower.ui.screens.stats.FrequencyStatsDetailScreen
@@ -142,11 +143,28 @@ class MainActivity : ComponentActivity() {
 
         // On garde la gestion des anciens Extras si jamais l'URL est absente
         val siteIdFromNotif = intent.getStringExtra("TARGET_SITE_ID")
+        val widgetDest = intent.getStringExtra("widget_dest")
         if (siteIdFromNotif != null && intent.data == null) {
             navigateToSiteFlow.tryEmit("site_detail/$siteIdFromNotif")
-        } else if (intent.getStringExtra("widget_dest") == "nearby") {
+        } else if (widgetDest == "map") {
+            applyWidgetMapTarget(intent)
+            navigateToSiteFlow.tryEmit("map")
+        } else if (widgetDest == "nearby") {
             navigateToSiteFlow.tryEmit("emitters")
         }
+    }
+
+    private fun applyWidgetMapTarget(intent: Intent?) {
+        val lat = intent?.getDoubleExtra("widget_lat", Double.NaN) ?: return
+        val lon = intent.getDoubleExtra("widget_lon", Double.NaN)
+        if (lat.isNaN() || lon.isNaN()) return
+
+        getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+            .edit()
+            .putFloat("last_map_lat", lat.toFloat())
+            .putFloat("last_map_lon", lon.toFloat())
+            .putFloat("last_map_zoom", 15.5f)
+            .apply()
     }
 
     private fun handleGlobalPopupIntent(intent: Intent?) {
@@ -223,13 +241,21 @@ class MainActivity : ComponentActivity() {
         // =====================================================================
 
 
-        val updateWidgetRequest = OneTimeWorkRequestBuilder<AntennaWidgetWorker>().build()
-        WorkManager.getInstance(this).enqueueUniqueWork(
-            "WidgetUpdateOnOpen",
-            ExistingWorkPolicy.REPLACE,
-            updateWidgetRequest
-        )
+        if (
+            RemoteFeatureFlags.isPlatformEnabled(RemoteFeatureFlags.Platform.WIDGETS) &&
+            RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.WIDGET_UPDATE)
+        ) {
+            val updateWidgetRequest = OneTimeWorkRequestBuilder<AntennaWidgetWorker>().build()
+            WorkManager.getInstance(this).enqueueUniqueWork(
+                "WidgetUpdateOnOpen",
+                ExistingWorkPolicy.REPLACE,
+                updateWidgetRequest
+            )
+        }
         val widgetDest = intent.getStringExtra("widget_dest")
+        if (widgetDest == "map") {
+            applyWidgetMapTarget(intent)
+        }
 
         // Verification quotidienne de mise a jour de base autour de 20h.
         UpdateCheckScheduler.reconcile(applicationContext)
@@ -260,6 +286,8 @@ class MainActivity : ComponentActivity() {
             "emitters" // Ouvre la page NearEmittersScreen
         } else if (widgetDest == "detail" && widgetSiteId != null) {
             "support_detail/$widgetSiteId" // Ouvre la page SupportDetailScreen du pylône sélectionné
+        } else if (widgetDest == "map") {
+            "map"
         } else if (assistantFeature != null) {
             "map" // 🗺️ Téléportation directe sur la carte si demandé par la voix !
         } else {
@@ -269,6 +297,7 @@ class MainActivity : ComponentActivity() {
                 "nearby" -> "emitters"
                 "map" -> "map"
                 "compass" -> "compass"
+                "stats" -> "stats"
                 else -> "home"
             }
         }
@@ -424,16 +453,25 @@ class MainActivity : ComponentActivity() {
                             // Tuto
                             composable("first_start") {
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    FirstStartScreen(
-                                        repository = repository,
-                                        onFinished = {
-                                            sharedPref.edit().putBoolean("isFirstRun", false)
-                                                .apply()
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.FIRST_START)) {
+                                        FirstStartScreen(
+                                            repository = repository,
+                                            onFinished = {
+                                                sharedPref.edit().putBoolean("isFirstRun", false)
+                                                    .apply()
+                                                navController.navigate("home") {
+                                                    popUpTo("first_start") { inclusive = true }
+                                                }
+                                            }
+                                        )
+                                    } else {
+                                        LaunchedEffect(Unit) {
+                                            sharedPref.edit().putBoolean("isFirstRun", false).apply()
                                             navController.navigate("home") {
                                                 popUpTo("first_start") { inclusive = true }
                                             }
                                         }
-                                    )
+                                    }
                                 }
                             }
 
@@ -446,7 +484,11 @@ class MainActivity : ComponentActivity() {
 
                             composable("help") {
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    HelpScreen(navController)
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.HELP)) {
+                                        HelpScreen(navController)
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
                                 }
                             }
 
@@ -503,7 +545,11 @@ class MainActivity : ComponentActivity() {
                                 val section = backStackEntry.arguments?.getString("section")
                                 val targetMapFilename = backStackEntry.arguments?.getString("targetMapFilename")
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    SettingsScreen(navController, repository, section, targetMapFilename)
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SETTINGS)) {
+                                        SettingsScreen(navController, repository, section, targetMapFilename)
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
                                 }
                             }
 
@@ -514,7 +560,10 @@ class MainActivity : ComponentActivity() {
                             ) { backStackEntry ->
                                 val tech = backStackEntry.arguments?.getString("tech").orEmpty()
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
+                                    if (
+                                        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS) &&
+                                        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.STATS_FREQUENCY_DETAILS)
+                                    ) {
                                         FrequencyStatsDetailScreen(
                                             navController = navController,
                                             repository = repository,
@@ -540,43 +589,51 @@ class MainActivity : ComponentActivity() {
                             // À propos
                             composable("about") {
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    AboutScreen(navController)
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ABOUT)) {
+                                        AboutScreen(navController)
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
                                 }
                             }
 
                             composable("photo_upload_history") {
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    PhotoUploadHistoryScreen(
-                                        onNavigateBack = { navController.popBackStack() },
-                                        onOpenSite = { supportId, operator ->
-                                            lifecycleScope.launch {
-                                                val targetAntenna = withContext(Dispatchers.IO) {
-                                                    val operatorKey = OperatorColors.keyFor(operator)
-                                                    val antennas = repository.getAntennasByExactId(supportId)
-                                                    antennas.firstOrNull { antenna ->
-                                                        val antennaKeys = OperatorColors.keysFor(antenna.operateur)
-                                                        val signalQuestOperator = SignalQuestOperators.operatorParamFor(antenna.operateur)
-                                                        (operatorKey != null && operatorKey in antennaKeys) ||
-                                                            signalQuestOperator.equals(operator, ignoreCase = true)
-                                                    } ?: antennas.firstOrNull()
-                                                }
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.PHOTO_UPLOAD_HISTORY)) {
+                                        PhotoUploadHistoryScreen(
+                                            onNavigateBack = { navController.popBackStack() },
+                                            onOpenSite = { supportId, operator ->
+                                                lifecycleScope.launch {
+                                                    val targetAntenna = withContext(Dispatchers.IO) {
+                                                        val operatorKey = OperatorColors.keyFor(operator)
+                                                        val antennas = repository.getAntennasByExactId(supportId)
+                                                        antennas.firstOrNull { antenna ->
+                                                            val antennaKeys = OperatorColors.keysFor(antenna.operateur)
+                                                            val signalQuestOperator = SignalQuestOperators.operatorParamFor(antenna.operateur)
+                                                            (operatorKey != null && operatorKey in antennaKeys) ||
+                                                                signalQuestOperator.equals(operator, ignoreCase = true)
+                                                        } ?: antennas.firstOrNull()
+                                                    }
 
-                                                if (targetAntenna != null) {
-                                                    getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-                                                        .edit()
-                                                        .putFloat("clicked_lat", targetAntenna.latitude.toFloat())
-                                                        .putFloat("clicked_lon", targetAntenna.longitude.toFloat())
-                                                        .apply()
-                                                    navController.navigate("site_detail/${Uri.encode(targetAntenna.idAnfr)}")
-                                                } else {
-                                                    val operatorParam = OperatorColors.keyFor(operator)
-                                                        ?.let { "?operator=${Uri.encode(it)}" }
-                                                        .orEmpty()
-                                                    navController.navigate("support_detail/${Uri.encode(supportId)}$operatorParam")
+                                                    if (targetAntenna != null) {
+                                                        getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+                                                            .edit()
+                                                            .putFloat("clicked_lat", targetAntenna.latitude.toFloat())
+                                                            .putFloat("clicked_lon", targetAntenna.longitude.toFloat())
+                                                            .apply()
+                                                        navController.navigate("site_detail/${Uri.encode(targetAntenna.idAnfr)}")
+                                                    } else {
+                                                        val operatorParam = OperatorColors.keyFor(operator)
+                                                            ?.let { "?operator=${Uri.encode(it)}" }
+                                                            .orEmpty()
+                                                        navController.navigate("support_detail/${Uri.encode(supportId)}$operatorParam")
+                                                    }
                                                 }
                                             }
-                                        }
-                                    )
+                                        )
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
                                 }
                             }
 
@@ -623,12 +680,66 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             composable(
+                                route = "site_speedtests?siteId={siteId}&anfrCode={anfrCode}&operator={operator}&market={market}",
+                                arguments = listOf(
+                                    navArgument("siteId") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    },
+                                    navArgument("anfrCode") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    },
+                                    navArgument("operator") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    },
+                                    navArgument("market") {
+                                        type = NavType.StringType
+                                        defaultValue = "FR"
+                                    }
+                                )
+                            ) { backStackEntry ->
+                                val siteId = backStackEntry.arguments?.getString("siteId")
+                                val anfrCode = backStackEntry.arguments?.getString("anfrCode")
+                                val operator = backStackEntry.arguments?.getString("operator")
+                                val market = backStackEntry.arguments?.getString("market") ?: "FR"
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    if (
+                                        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_SPEEDTESTS) &&
+                                        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_SPEEDTESTS) &&
+                                        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_SPEEDTESTS)
+                                    ) {
+                                        SiteSpeedtestsScreen(
+                                            navController = navController,
+                                            siteId = siteId,
+                                            anfrCode = anfrCode,
+                                            operator = operator,
+                                            market = market
+                                        )
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
+                                }
+                            }
+                            composable(
                                 route = "elevation_profile/{id}",
                                 arguments = listOf(navArgument("id") { type = NavType.StringType })
                             ) { backStackEntry ->
                                 val id = backStackEntry.arguments?.getString("id") ?: ""
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    ElevationProfileScreen(navController, repository, id)
+                                    if (
+                                        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ELEVATION_PROFILE) &&
+                                        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_ELEVATION_PROFILE) &&
+                                        featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ELEVATION_IGN)
+                                    ) {
+                                        ElevationProfileScreen(navController, repository, id)
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
                                 }
                             }
                             composable(
@@ -637,7 +748,10 @@ class MainActivity : ComponentActivity() {
                             ) { backStackEntry ->
                                 val id = backStackEntry.arguments?.getString("id") ?: ""
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THROUGHPUT_CALCULATOR)) {
+                                    if (
+                                        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THROUGHPUT_CALCULATOR) &&
+                                        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_THROUGHPUT_CALCULATOR)
+                                    ) {
                                         ThroughputCalculatorScreen(navController, repository, id)
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
@@ -675,7 +789,12 @@ class MainActivity : ComponentActivity() {
                                 }
 
                                 Box(modifier = Modifier.padding(innerPadding)) {
-                                    if (!featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD)) {
+                                    val canUploadSignalQuest =
+                                        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SIGNALQUEST_UPLOAD) &&
+                                            featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD) &&
+                                            featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_SIGNALQUEST_UPLOAD) &&
+                                            featureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.SIGNALQUEST_UPLOAD)
+                                    if (!canUploadSignalQuest) {
                                         LaunchedEffect(Unit) {
                                             Toast.makeText(context, txtUnavailable, Toast.LENGTH_SHORT).show()
                                             navController.popBackStack()
@@ -691,7 +810,11 @@ class MainActivity : ComponentActivity() {
                                         azimuts = decodedAzimuts,
                                         onNavigateBack = { navController.popBackStack() },
                                         onStartUpload = { finalUris, description, stripExifBeforeUpload ->
-                                            if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD)) {
+                                            if (
+                                                !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD) ||
+                                                !RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_SIGNALQUEST_UPLOAD) ||
+                                                !RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.SIGNALQUEST_UPLOAD)
+                                            ) {
                                                 Toast.makeText(context, txtUnavailable, Toast.LENGTH_SHORT).show()
                                                 return@SignalQuestUploadScreen
                                             }
@@ -727,8 +850,10 @@ class MainActivity : ComponentActivity() {
                         }
                         fr.geotower.ui.components.GlobalUploadOverlay(
                             onOpenUploadHistory = {
-                                navController.navigate("photo_upload_history") {
-                                    launchSingleTop = true
+                                if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.PHOTO_UPLOAD_HISTORY)) {
+                                    navController.navigate("photo_upload_history") {
+                                        launchSingleTop = true
+                                    }
                                 }
                             }
                         )

@@ -16,6 +16,7 @@ import androidx.work.workDataOf
 import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.api.RetrofitClient
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.NotificationIconResources
 import fr.geotower.utils.OfflineMapDisplayNames
@@ -36,6 +37,12 @@ class MapDownloadWorker(
     private val channelId = DownloadNotificationCenter.MAP_DOWNLOAD_CHANNEL_ID
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
+        if (
+            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.OFFLINE_MAPS_DOWNLOAD) ||
+            !RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.OFFLINE_MAP_DOWNLOAD)
+        ) {
+            return@withContext Result.success()
+        }
         val mapUrl = inputData.getString("map_url") ?: return@withContext Result.failure()
         val mapFilename = inputData.getString("map_filename") ?: return@withContext Result.failure()
         val mapDisplayName = inputData.getString("map_name")

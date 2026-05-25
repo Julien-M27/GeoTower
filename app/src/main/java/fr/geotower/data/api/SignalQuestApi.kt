@@ -42,15 +42,51 @@ data class SqPhotoUploadData(
 )
 
 data class SqSpeedtestsResponse(
-    val data: List<SqSpeedtestData>
+    val data: List<SqSpeedtestData> = emptyList(),
+    val meta: SqSpeedtestsMeta? = null,
+    val requestId: String? = null
 )
 
 data class SqSpeedtestData(
-    val id: String?,
-    val downloadSpeed: Float?,
-    val uploadSpeed: Float?,
-    val ping: Float?,
-    val timestamp: String?
+    val id: String? = null,
+    val coordinates: SqCoordinates? = null,
+    val downloadSpeed: Float? = null,
+    val averageSpeed: Float? = null,
+    val maxSpeed: Float? = null,
+    val uploadSpeed: Float? = null,
+    val ping: Float? = null,
+    val timestamp: String? = null,
+    val mcc: Int? = null,
+    val mnc: Int? = null,
+    val mobileOperator: String? = null,
+    val networkType: String? = null,
+    val connectionType: String? = null,
+    val deviceType: String? = null,
+    val radio: SqSpeedtestRadio? = null
+)
+
+data class SqCoordinates(
+    val lat: Double? = null,
+    val lng: Double? = null
+)
+
+data class SqSpeedtestRadio(
+    val enb: String? = null,
+    val gnb: String? = null,
+    val cellId: String? = null,
+    val pci: Int? = null,
+    val rsrp: Float? = null,
+    val rsrq: Float? = null,
+    val snr: Float? = null
+)
+
+data class SqSpeedtestsMeta(
+    val total: Int? = null,
+    val limit: Int? = null,
+    val offset: Int? = null,
+    val bestOnly: Boolean? = null,
+    val market: String? = null,
+    val operator: String? = null
 )
 
 interface SignalQuestApiService {
@@ -79,10 +115,14 @@ interface SignalQuestApiService {
     suspend fun getSiteSpeedtests(
         @Query("siteId") siteId: String? = null,
         @Query("anfrCode") anfrCode: String? = null,
+        @Query("nationalSiteCode") nationalSiteCode: String? = null,
+        @Query("sourceCode") sourceCode: String? = null,
         @Query("enb") enb: String? = null,
         @Query("operator") operator: String? = null,
         @Query("market") market: String = "FR",
-        @Query("bestOnly") bestOnly: Boolean = true
+        @Query("bestOnly") bestOnly: Boolean = true,
+        @Query("limit") limit: Int? = null,
+        @Query("offset") offset: Int? = null
     ): retrofit2.Response<SqSpeedtestsResponse>
 }
 

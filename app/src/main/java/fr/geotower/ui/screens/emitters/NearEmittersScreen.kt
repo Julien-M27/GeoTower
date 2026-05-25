@@ -87,6 +87,7 @@ import fr.geotower.ui.components.geoTowerLazyListFadingEdge
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.NominatimApi
 import fr.geotower.data.api.NominatimGeoPoint
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.settings.NearbySettingsSheet
@@ -214,13 +215,22 @@ fun NearEmittersScreen(
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val featureFlags by RemoteFeatureFlags.config
+    val nearbyMaxRadiusKm = featureFlags.limitOrDefault(RemoteFeatureFlags.Limits.NEARBY_MAX_RADIUS_KM, 50).coerceAtLeast(1)
     var showSearchBar by remember { mutableStateOf(prefs.getBoolean("show_search_bar", true)) }
     var showSearchSuggestions by remember { mutableStateOf(prefs.getBoolean("show_search_suggestions", true)) }
     var showNearbySites by remember { mutableStateOf(prefs.getBoolean("show_nearby_sites", true)) }
     var nearbyOrder by remember { mutableStateOf(prefs.getString("nearby_order", "search,sites")!!.split(",")) }
-    var nearbySearchRadius by remember { mutableIntStateOf(prefs.getInt("nearby_search_radius", 5)) }
+    var nearbySearchRadius by remember { mutableIntStateOf(prefs.getInt("nearby_search_radius", 5).coerceAtMost(nearbyMaxRadiusKm)) }
     var showNearbySettingsSheet by remember { mutableStateOf(false) }
     val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    LaunchedEffect(nearbyMaxRadiusKm) {
+        if (nearbySearchRadius > nearbyMaxRadiusKm) {
+            nearbySearchRadius = nearbyMaxRadiusKm
+            prefs.edit().putInt("nearby_search_radius", nearbyMaxRadiusKm).apply()
+        }
+    }
     val searchedOperatorKey = remember(searchQuery) {
         val spec = parseNearbySearchQuery(searchQuery)
         if (spec.field == NearbySearchField.Operator) {
@@ -846,8 +856,9 @@ fun NearEmittersScreen(
             },
             searchRadius = nearbySearchRadius,
             onRadiusChange = {
-                nearbySearchRadius = it
-                prefs.edit().putInt("nearby_search_radius", it).apply()
+                val safeRadius = it.coerceAtMost(nearbyMaxRadiusKm)
+                nearbySearchRadius = safeRadius
+                prefs.edit().putInt("nearby_search_radius", safeRadius).apply()
             },
             onDismiss = { showNearbySettingsSheet = false },
             onBack = { showNearbySettingsSheet = false },

@@ -5,6 +5,7 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import fr.geotower.BuildConfig
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.utils.AppLogger
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
@@ -30,6 +31,12 @@ object NominatimApi {
     private val userAgent = "GeoTower/${BuildConfig.VERSION_NAME} (Android)"
 
     fun searchArea(query: String): NominatimArea? {
+        if (
+            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.MAP_SEARCH_NOMINATIM) ||
+            !RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.SEARCH_NOMINATIM)
+        ) {
+            return null
+        }
         val trimmedQuery = query.trim()
         if (trimmedQuery.isBlank()) return null
 

@@ -731,6 +731,7 @@ private fun StatsDisplayModeChip(
     }
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun StatCard(
     title: String,
@@ -754,7 +755,10 @@ private fun StatCard(
             Spacer(modifier = Modifier.height(18.dp))
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
-                    CircularWavyProgressIndicator(color = MaterialTheme.colorScheme.primary)
+                    LoadingIndicator(
+                        modifier = Modifier.size(48.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    )
                 }
             } else {
                 SupportBarChart(data = data, displayMode = displayMode)

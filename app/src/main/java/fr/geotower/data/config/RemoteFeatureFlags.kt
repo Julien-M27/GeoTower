@@ -78,6 +78,11 @@ data class RemoteFeatureFlagConfig(
     val screens: Map<String, Boolean>,
     val menus: Map<String, Boolean>,
     val features: Map<String, Boolean>,
+    val actions: Map<String, Boolean>,
+    val providers: Map<String, Boolean>,
+    val workers: Map<String, Boolean>,
+    val platform: Map<String, Boolean>,
+    val limits: Map<String, Int>,
     val homeAnnouncement: RemoteHomeAnnouncement
 ) {
     fun isScreenEnabled(screenId: String): Boolean = screens[screenId] ?: true
@@ -85,6 +90,16 @@ data class RemoteFeatureFlagConfig(
     fun isMenuEnabled(menuId: String): Boolean = menus[menuId] ?: true
 
     fun isFeatureEnabled(featureId: String): Boolean = features[featureId] ?: true
+
+    fun isActionEnabled(actionId: String): Boolean = actions[actionId] ?: true
+
+    fun isProviderEnabled(providerId: String): Boolean = providers[providerId] ?: true
+
+    fun isWorkerEnabled(workerId: String): Boolean = workers[workerId] ?: true
+
+    fun isPlatformEnabled(platformId: String): Boolean = platform[platformId] ?: true
+
+    fun limitOrDefault(limitId: String, defaultValue: Int): Int = limits[limitId] ?: defaultValue
 
     fun isCommunitySourceEnabled(featureId: String, sourceId: String): Boolean {
         return when {
@@ -118,9 +133,17 @@ object RemoteFeatureFlags {
         const val MAP = "map"
         const val COMPASS = "compass"
         const val STATS = "stats"
+        const val SETTINGS = "settings"
+        const val HELP = "help"
+        const val ABOUT = "about"
+        const val PHOTO_UPLOAD_HISTORY = "photoUploadHistory"
         const val SUPPORT_DETAIL = "supportDetail"
         const val SITE_DETAIL = "siteDetail"
+        const val SITE_SPEEDTESTS = "siteSpeedtests"
+        const val ELEVATION_PROFILE = "elevationProfile"
         const val THROUGHPUT_CALCULATOR = "throughputCalculator"
+        const val SIGNALQUEST_UPLOAD = "signalQuestUpload"
+        const val FIRST_START = "firstStart"
     }
 
     object Menus {
@@ -129,15 +152,114 @@ object RemoteFeatureFlags {
         const val EXTERNAL_LINKS_SETTINGS = "externalLinksSettings"
         const val PHOTO_SETTINGS = "photoSettings"
         const val SHARE_SETTINGS = "shareSettings"
+        const val MAP_SETTINGS = "mapSettings"
+        const val SITE_SETTINGS = "siteSettings"
+        const val SUPPORT_SETTINGS = "supportSettings"
+        const val STATS_SETTINGS = "statsSettings"
+        const val THROUGHPUT_SETTINGS = "throughputSettings"
     }
 
     object Features {
+        const val DATABASE_DOWNLOAD = "database.download"
+        const val DATABASE_UPDATE_CHECK = "database.updateCheck"
+        const val APP_UPDATE_CHECK = "appUpdate.check"
+        const val OUTAGES_DATA = "outages.data"
+        const val OUTAGES_MAP_LAYER = "outages.mapLayer"
+        const val OUTAGES_SITE_STATUS = "outages.siteStatus"
+        const val OFFLINE_MAPS_CATALOG = "offlineMaps.catalog"
+        const val OFFLINE_MAPS_DOWNLOAD = "offlineMaps.download"
+        const val MAP_SEARCH_NOMINATIM = "map.search.nominatim"
+        const val MAP_CITY_BOUNDARIES = "map.cityBoundaries"
+        const val MAP_MEASURE = "map.measure"
+        const val MAP_SHARE = "map.share"
+        const val MAP_AZIMUTHS = "map.azimuths"
+        const val MAP_LOCATION = "map.location"
+        const val SITE_PHOTOS = "site.photos"
+        const val SITE_PHOTO_UPLOAD = "site.photoUpload"
+        const val SITE_PHOTO_CAMERA = "site.photoCamera"
+        const val SITE_PHOTO_GALLERY = "site.photoGallery"
+        const val SITE_PHOTO_EXIF = "site.photoExif"
+        const val SITE_SCHEMES = "site.schemes"
+        const val SITE_SPEEDTESTS = "site.speedtests"
+        const val SITE_EXTERNAL_NAVIGATION = "site.externalNavigation"
+        const val SITE_SHARE = "site.share"
+        const val SITE_FREQUENCIES = "site.frequencies"
+        const val SITE_SPECTRUM = "site.spectrum"
+        const val SITE_ELEVATION_PROFILE = "site.elevationProfile"
+        const val SITE_THROUGHPUT_CALCULATOR = "site.throughputCalculator"
+        const val SUPPORT_PHOTOS = "support.photos"
+        const val SUPPORT_EXTERNAL_NAVIGATION = "support.externalNavigation"
+        const val SUPPORT_SHARE = "support.share"
+        const val STATS_FREQUENCY_DETAILS = "stats.frequencyDetails"
+        const val STATS_HISTORY = "stats.history"
+        const val COMPASS_RADAR = "compass.radar"
+        const val COMPASS_REVERSE_GEOCODING = "compass.reverseGeocoding"
         const val SIGNALQUEST_PHOTOS = "signalQuest.photos"
         const val SIGNALQUEST_UPLOAD = "signalQuest.upload"
         const val SIGNALQUEST_SPEEDTESTS = "signalQuest.speedtests"
         const val SIGNALQUEST_EXTERNAL_LINKS = "signalQuest.externalLinks"
         const val CELLULARFR_PHOTOS = "cellularFr.photos"
         const val CELLULARFR_EXTERNAL_LINKS = "cellularFr.externalLinks"
+        const val EXTERNAL_LINKS_CARTORADIO = "externalLinks.cartoradio"
+        const val EXTERNAL_LINKS_RNC_MOBILE = "externalLinks.rncMobile"
+        const val EXTERNAL_LINKS_ENB_ANALYTICS = "externalLinks.enbAnalytics"
+        const val EXTERNAL_LINKS_SIGNALQUEST = "externalLinks.signalQuest"
+        const val EXTERNAL_LINKS_CELLULARFR = "externalLinks.cellularFr"
+        const val EXTERNAL_LINKS_ANFR = "externalLinks.anfr"
+    }
+
+    object Actions {
+        const val SHARE_SITE = "share.site"
+        const val SHARE_SUPPORT = "share.support"
+        const val SHARE_MAP = "share.map"
+        const val OPEN_EXTERNAL_NAVIGATION = "externalNavigation.open"
+        const val OPEN_EXTERNAL_LINK = "externalLink.open"
+        const val START_DATABASE_DOWNLOAD = "databaseDownload.start"
+        const val START_OFFLINE_MAP_DOWNLOAD = "offlineMapDownload.start"
+        const val START_SIGNALQUEST_UPLOAD = "signalQuestUpload.start"
+    }
+
+    object Providers {
+        const val MAP_IGN = "map.ign"
+        const val MAP_OSM = "map.osm"
+        const val MAP_MAPLIBRE = "map.mapLibre"
+        const val MAP_OPEN_TOPO = "map.openTopo"
+        const val MAP_OFFLINE = "map.offline"
+        const val SEARCH_NOMINATIM = "search.nominatim"
+        const val ELEVATION_IGN = "elevation.ign"
+        const val OUTAGES_GEOTOWER = "outages.geotower"
+        const val SIGNALQUEST = "signalQuest"
+        const val CELLULARFR = "cellularFr"
+        const val CARTORADIO = "cartoradio"
+        const val RNC_MOBILE = "rncMobile"
+        const val ENB_ANALYTICS = "enbAnalytics"
+        const val ANFR = "anfr"
+    }
+
+    object Workers {
+        const val DATABASE_DOWNLOAD = "databaseDownload"
+        const val DATABASE_UPDATE_CHECK = "databaseUpdateCheck"
+        const val APP_UPDATE_CHECK = "appUpdateCheck"
+        const val OFFLINE_MAP_DOWNLOAD = "offlineMapDownload"
+        const val SIGNALQUEST_UPLOAD = "signalQuestUpload"
+        const val WIDGET_UPDATE = "widgetUpdate"
+    }
+
+    object Platform {
+        const val WIDGETS = "widgets"
+        const val ANDROID_AUTO = "androidAuto"
+        const val LIVE_TRACKING = "liveTracking"
+        const val NOTIFICATIONS = "notifications"
+        const val PROMOTED_NOTIFICATIONS = "promotedNotifications"
+        const val BACKGROUND_LOCATION_PROMPT = "backgroundLocationPrompt"
+    }
+
+    object Limits {
+        const val NEARBY_MAX_RADIUS_KM = "nearbyMaxRadiusKm"
+        const val PHOTO_UPLOAD_MAX_COUNT = "photoUploadMaxCount"
+        const val PHOTO_UPLOAD_MAX_SIZE_MB = "photoUploadMaxSizeMb"
+        const val OFFLINE_MAP_MAX_PARALLEL_DOWNLOADS = "offlineMapMaxParallelDownloads"
+        const val MAP_SEARCH_MIN_QUERY_LENGTH = "mapSearchMinQueryLength"
     }
 
     val defaultConfig = RemoteFeatureFlagConfig(
@@ -148,24 +270,126 @@ object RemoteFeatureFlags {
             Screens.MAP to true,
             Screens.COMPASS to true,
             Screens.STATS to true,
+            Screens.SETTINGS to true,
+            Screens.HELP to true,
+            Screens.ABOUT to true,
+            Screens.PHOTO_UPLOAD_HISTORY to true,
             Screens.SUPPORT_DETAIL to true,
             Screens.SITE_DETAIL to true,
-            Screens.THROUGHPUT_CALCULATOR to true
+            Screens.SITE_SPEEDTESTS to true,
+            Screens.ELEVATION_PROFILE to true,
+            Screens.THROUGHPUT_CALCULATOR to true,
+            Screens.SIGNALQUEST_UPLOAD to true,
+            Screens.FIRST_START to true
         ),
         menus = mapOf(
             Menus.PAGES_CUSTOMIZATION to true,
             Menus.COMMUNITY_DATA_SETTINGS to true,
             Menus.EXTERNAL_LINKS_SETTINGS to true,
             Menus.PHOTO_SETTINGS to true,
-            Menus.SHARE_SETTINGS to true
+            Menus.SHARE_SETTINGS to true,
+            Menus.MAP_SETTINGS to true,
+            Menus.SITE_SETTINGS to true,
+            Menus.SUPPORT_SETTINGS to true,
+            Menus.STATS_SETTINGS to true,
+            Menus.THROUGHPUT_SETTINGS to true
         ),
         features = mapOf(
+            Features.DATABASE_DOWNLOAD to true,
+            Features.DATABASE_UPDATE_CHECK to true,
+            Features.APP_UPDATE_CHECK to true,
+            Features.OUTAGES_DATA to true,
+            Features.OUTAGES_MAP_LAYER to true,
+            Features.OUTAGES_SITE_STATUS to true,
+            Features.OFFLINE_MAPS_CATALOG to true,
+            Features.OFFLINE_MAPS_DOWNLOAD to true,
+            Features.MAP_SEARCH_NOMINATIM to true,
+            Features.MAP_CITY_BOUNDARIES to true,
+            Features.MAP_MEASURE to true,
+            Features.MAP_SHARE to true,
+            Features.MAP_AZIMUTHS to true,
+            Features.MAP_LOCATION to true,
+            Features.SITE_PHOTOS to true,
+            Features.SITE_PHOTO_UPLOAD to true,
+            Features.SITE_PHOTO_CAMERA to true,
+            Features.SITE_PHOTO_GALLERY to true,
+            Features.SITE_PHOTO_EXIF to true,
+            Features.SITE_SCHEMES to true,
+            Features.SITE_SPEEDTESTS to true,
+            Features.SITE_EXTERNAL_NAVIGATION to true,
+            Features.SITE_SHARE to true,
+            Features.SITE_FREQUENCIES to true,
+            Features.SITE_SPECTRUM to true,
+            Features.SITE_ELEVATION_PROFILE to true,
+            Features.SITE_THROUGHPUT_CALCULATOR to true,
+            Features.SUPPORT_PHOTOS to true,
+            Features.SUPPORT_EXTERNAL_NAVIGATION to true,
+            Features.SUPPORT_SHARE to true,
+            Features.STATS_FREQUENCY_DETAILS to true,
+            Features.STATS_HISTORY to true,
+            Features.COMPASS_RADAR to true,
+            Features.COMPASS_REVERSE_GEOCODING to true,
             Features.SIGNALQUEST_PHOTOS to true,
             Features.SIGNALQUEST_UPLOAD to true,
             Features.SIGNALQUEST_SPEEDTESTS to true,
             Features.SIGNALQUEST_EXTERNAL_LINKS to true,
             Features.CELLULARFR_PHOTOS to false,
-            Features.CELLULARFR_EXTERNAL_LINKS to false
+            Features.CELLULARFR_EXTERNAL_LINKS to false,
+            Features.EXTERNAL_LINKS_CARTORADIO to true,
+            Features.EXTERNAL_LINKS_RNC_MOBILE to true,
+            Features.EXTERNAL_LINKS_ENB_ANALYTICS to true,
+            Features.EXTERNAL_LINKS_SIGNALQUEST to true,
+            Features.EXTERNAL_LINKS_CELLULARFR to false,
+            Features.EXTERNAL_LINKS_ANFR to true
+        ),
+        actions = mapOf(
+            Actions.SHARE_SITE to true,
+            Actions.SHARE_SUPPORT to true,
+            Actions.SHARE_MAP to true,
+            Actions.OPEN_EXTERNAL_NAVIGATION to true,
+            Actions.OPEN_EXTERNAL_LINK to true,
+            Actions.START_DATABASE_DOWNLOAD to true,
+            Actions.START_OFFLINE_MAP_DOWNLOAD to true,
+            Actions.START_SIGNALQUEST_UPLOAD to true
+        ),
+        providers = mapOf(
+            Providers.MAP_IGN to true,
+            Providers.MAP_OSM to true,
+            Providers.MAP_MAPLIBRE to true,
+            Providers.MAP_OPEN_TOPO to true,
+            Providers.MAP_OFFLINE to true,
+            Providers.SEARCH_NOMINATIM to true,
+            Providers.ELEVATION_IGN to true,
+            Providers.OUTAGES_GEOTOWER to true,
+            Providers.SIGNALQUEST to true,
+            Providers.CELLULARFR to false,
+            Providers.CARTORADIO to true,
+            Providers.RNC_MOBILE to true,
+            Providers.ENB_ANALYTICS to true,
+            Providers.ANFR to true
+        ),
+        workers = mapOf(
+            Workers.DATABASE_DOWNLOAD to true,
+            Workers.DATABASE_UPDATE_CHECK to true,
+            Workers.APP_UPDATE_CHECK to true,
+            Workers.OFFLINE_MAP_DOWNLOAD to true,
+            Workers.SIGNALQUEST_UPLOAD to true,
+            Workers.WIDGET_UPDATE to true
+        ),
+        platform = mapOf(
+            Platform.WIDGETS to true,
+            Platform.ANDROID_AUTO to true,
+            Platform.LIVE_TRACKING to true,
+            Platform.NOTIFICATIONS to true,
+            Platform.PROMOTED_NOTIFICATIONS to true,
+            Platform.BACKGROUND_LOCATION_PROMPT to true
+        ),
+        limits = mapOf(
+            Limits.NEARBY_MAX_RADIUS_KM to 50,
+            Limits.PHOTO_UPLOAD_MAX_COUNT to 20,
+            Limits.PHOTO_UPLOAD_MAX_SIZE_MB to 10,
+            Limits.OFFLINE_MAP_MAX_PARALLEL_DOWNLOADS to 1,
+            Limits.MAP_SEARCH_MIN_QUERY_LENGTH to 2
         ),
         homeAnnouncement = RemoteHomeAnnouncement()
     )
@@ -178,6 +402,16 @@ object RemoteFeatureFlags {
     fun isMenuEnabled(menuId: String): Boolean = currentConfig.value.isMenuEnabled(menuId)
 
     fun isFeatureEnabled(featureId: String): Boolean = currentConfig.value.isFeatureEnabled(featureId)
+
+    fun isActionEnabled(actionId: String): Boolean = currentConfig.value.isActionEnabled(actionId)
+
+    fun isProviderEnabled(providerId: String): Boolean = currentConfig.value.isProviderEnabled(providerId)
+
+    fun isWorkerEnabled(workerId: String): Boolean = currentConfig.value.isWorkerEnabled(workerId)
+
+    fun isPlatformEnabled(platformId: String): Boolean = currentConfig.value.isPlatformEnabled(platformId)
+
+    fun limitOrDefault(limitId: String, defaultValue: Int): Int = currentConfig.value.limitOrDefault(limitId, defaultValue)
 
     fun loadCached(context: Context) {
         val prefs = prefs(context)
@@ -234,6 +468,11 @@ object RemoteFeatureFlags {
                 screens = mergeBooleanMap(defaultConfig.screens, root.booleanMap("screens")),
                 menus = mergeBooleanMap(defaultConfig.menus, root.booleanMap("menus")),
                 features = mergeBooleanMap(defaultConfig.features, root.booleanMap("features")),
+                actions = mergeBooleanMap(defaultConfig.actions, root.booleanMap("actions")),
+                providers = mergeBooleanMap(defaultConfig.providers, root.booleanMap("providers")),
+                workers = mergeBooleanMap(defaultConfig.workers, root.booleanMap("workers")),
+                platform = mergeBooleanMap(defaultConfig.platform, root.booleanMap("platform")),
+                limits = mergeIntMap(defaultConfig.limits, root.intMap("limits")),
                 homeAnnouncement = root.homeAnnouncementOrDefault()
             )
         }.getOrNull()
@@ -244,6 +483,10 @@ object RemoteFeatureFlags {
     }
 
     private fun mergeBooleanMap(defaults: Map<String, Boolean>, overrides: Map<String, Boolean>): Map<String, Boolean> {
+        return defaults + overrides
+    }
+
+    private fun mergeIntMap(defaults: Map<String, Int>, overrides: Map<String, Int>): Map<String, Int> {
         return defaults + overrides
     }
 
@@ -331,6 +574,16 @@ object RemoteFeatureFlags {
                 ?.takeIf { !it.isJsonNull && it.isJsonPrimitive }
                 ?.let { runCatching { it.asBoolean }.getOrNull() }
             booleanValue?.let { key to it }
+        }.toMap()
+    }
+
+    private fun JsonObject.intMap(memberName: String): Map<String, Int> {
+        val obj = get(memberName)?.asJsonObjectOrNull() ?: return emptyMap()
+        return obj.entrySet().mapNotNull { (key, value) ->
+            val intValue = value
+                ?.takeIf { !it.isJsonNull && it.isJsonPrimitive }
+                ?.let { runCatching { it.asInt.coerceIn(0, 100_000) }.getOrNull() }
+            intValue?.let { key to it }
         }.toMap()
     }
 

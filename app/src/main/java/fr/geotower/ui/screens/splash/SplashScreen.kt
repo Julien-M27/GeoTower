@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 import fr.geotower.R
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.AppLogoDrawingResources
@@ -57,7 +58,12 @@ fun SplashScreen(
                     null
                 }
 
-                val latestVersion = fr.geotower.data.api.DatabaseDownloader.getLatestDatabaseVersion()
+                val latestVersion =
+                    if (RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_UPDATE_CHECK)) {
+                        fr.geotower.data.api.DatabaseDownloader.getLatestDatabaseVersion()
+                    } else {
+                        null
+                    }
                 val updateAvailable = fr.geotower.data.db.DatabaseVersionPolicy.isRemoteNewer(latestVersion, currentVersion)
                 withContext(Dispatchers.Main) {
                     AppConfig.isDbUpdateAvailable.value = updateAvailable

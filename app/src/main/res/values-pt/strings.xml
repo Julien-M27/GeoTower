@@ -1,4 +1,5 @@
 <resources>
+    <string name="antenna_map_widget_label">Mapa de antenas próximas</string>
     <string name="antenna_widget_label">Antenas próximas</string>
     <string name="common_logo">Logótipo</string>
     <string name="common_version">Versão</string>
@@ -235,6 +236,9 @@
     <string name="car_site_distance_operators">%1$s - %2$s</string>
     <string name="site_anfr_title">Site ANFR %1$s</string>
     <string name="widget_title">Antenas próximas</string>
+    <string name="widget_map_title">Mapa de antenas</string>
+    <string name="widget_map_empty">Nenhuma antena próxima encontrada.</string>
+    <string name="widget_map_image_desc">Mini mapa de antenas próximas</string>
     <string name="widget_updated_at">Atualizado às %1$s</string>
     <string name="widget_waiting_gps">À espera do GPS...</string>
     <string name="widget_immediate_search">Pesquisa imediata...</string>
@@ -707,6 +711,8 @@
     <string name="appstrings_release_section_global">Geral</string>
     <string name="appstrings_release_section_settings">Definições</string>
     <string name="appstrings_release_section_community_services">Serviços comunitários</string>
+    <string name="appstrings_release_section_speedtests">Speedtests</string>
+    <string name="appstrings_release_section_widgets">Widgets</string>
     <string name="appstrings_release_live_site_photos_rounded">Fotos do site agora apresentadas com cantos arredondados</string>
     <string name="appstrings_release_live_operator_fallback_logos">Melhor apresentação dos logótipos das operadoras quando não há foto do site disponível</string>
     <string name="appstrings_release_statistics_ready">Estatísticas disponíveis assim que os dados locais estão prontos</string>
@@ -725,6 +731,18 @@
     <string name="appstrings_release_statistics_custom_frequency_display">Apresentação mais personalizável, com detalhe por frequência</string>
     <string name="appstrings_release_settings_shortcuts_across_screens">Adição de acessos rápidos às definições a partir de vários ecrãs da aplicação</string>
     <string name="appstrings_release_community_cellularfr_availability">Melhor gestão das fotos e ligações CellularFR conforme a disponibilidade</string>
+    <string name="appstrings_release_speedtests_all_page">Adição de uma página para consultar todos os speedtests</string>
+    <string name="appstrings_release_speedtests_sort_filters_details">Ordenação, filtros e detalhes mais completos para cada resultado</string>
+    <string name="appstrings_release_speedtests_best_card_clickable">O cartão “Melhor speedtest” agora é clicável</string>
+    <string name="appstrings_release_speedtests_best_metric_setting">O melhor resultado segue o critério escolhido nas definições</string>
+    <string name="appstrings_release_widgets_mini_map">Adição de um novo widget de mini-mapa das antenas</string>
+    <string name="appstrings_release_widgets_nearby_antennas">Apresentação das antenas próximas, azimutes e sites HS</string>
+    <string name="appstrings_release_widgets_open_map">Abertura direta do mapa a partir do widget</string>
+    <string name="appstrings_release_widgets_previews_improved">Pré-visualizações dos widgets melhoradas</string>
+    <string name="appstrings_release_live_tracking_compact_display">Apresentação mais compacta e mais legível</string>
+    <string name="appstrings_release_live_tracking_tracker_icon">Ícone de seguimento melhorado conforme a distância</string>
+    <string name="appstrings_release_live_tracking_site_photo_focus">Melhor destaque da foto do site</string>
+    <string name="appstrings_release_global_feature_availability">Gestão mais flexível de algumas funções conforme a disponibilidade da aplicação</string>
     <string name="appstrings_release_community_source_settings">Adição de novas definições para fontes de fotos e speedtests</string>
     <string name="appstrings_release_photo_visibility_sync">Apresentação das fotos melhor sincronizada entre as páginas Suporte e Site</string>
     <string name="appstrings_release_community_photo_filters">Fotos filtradas pela operadora e fontes ativadas</string>
@@ -843,6 +861,13 @@
     <string name="appstrings_speedtest_ping">Ping</string>
     <string name="appstrings_speedtest_title">Melhor Speedtest</string>
     <string name="appstrings_speedtest_upload">Upload</string>
+    <string name="appstrings_speedtests_all_title">Todos os speedtests</string>
+    <string name="appstrings_speedtests_average">Média</string>
+    <string name="appstrings_speedtests_error">Não foi possível carregar os speedtests.</string>
+    <string name="appstrings_speedtests_load_more">Mostrar mais</string>
+    <string name="appstrings_speedtests_max">Máx.</string>
+    <string name="appstrings_speedtests_network">Rede</string>
+    <string name="appstrings_speedtests_radio">Rádio</string>
     <string name="appstrings_split_share_image">Dividir a imagem de partilha</string>
     <string name="appstrings_split_share_image_desc">Separa as frequências numa 2ª imagem</string>
     <string name="appstrings_src_antennas">Dados de Antenas</string>

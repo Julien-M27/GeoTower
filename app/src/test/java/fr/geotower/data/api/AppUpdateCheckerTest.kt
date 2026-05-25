@@ -17,7 +17,12 @@ class AppUpdateCheckerTest {
               "publishedAt": "2026-05-13T16:08:00+02:00",
               "downloadUrl": "https://kdrive.infomaniak.com/app/share/2149816/6d30423f-ac8b-4509-9857-86684d3a2e03",
               "fileName": "GeoTower_v1.9.9.2.4.apk",
-              "notes": "Corrections et ameliorations."
+              "notes": "Corrections et ameliorations.",
+              "notesTranslations": {
+                "fr": "Corrections et ameliorations FR.",
+                "en": "Fixes and improvements.",
+                "pt-BR": "Correcoes e melhorias."
+              }
             }
             """.trimIndent()
         )
@@ -26,6 +31,10 @@ class AppUpdateCheckerTest {
         assertEquals("geotower-1.9.9.2.4-20260513-1608", release?.releaseId)
         assertEquals("1.9.9.2.4", release?.versionName)
         assertEquals("GeoTower_v1.9.9.2.4.apk", release?.fileName)
+        assertEquals("Corrections et ameliorations FR.", release?.localizedNotes("fr-FR"))
+        assertEquals("Fixes and improvements.", release?.localizedNotes("en-US"))
+        assertEquals("Correcoes e melhorias.", release?.localizedNotes("pt-BR"))
+        assertEquals("Corrections et ameliorations FR.", release?.localizedNotes("de-DE"))
     }
 
     @Test

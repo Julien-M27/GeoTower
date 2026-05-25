@@ -13,6 +13,7 @@
     <string name="mapping_provider_topo" translatable="false">OpenTopoMap</string>
 
     <string name="antenna_widget_label">Nearby antennas</string>
+    <string name="antenna_map_widget_label">Nearby antenna map</string>
     <string name="common_logo">Logo</string>
     <string name="common_version">Version</string>
     <string name="loading_app">Loading...</string>
@@ -248,6 +249,9 @@
     <string name="car_site_distance_operators">%1$s - %2$s</string>
     <string name="site_anfr_title">Site ANFR %1$s</string>
     <string name="widget_title">Nearby antennas</string>
+    <string name="widget_map_title">Antenna map</string>
+    <string name="widget_map_empty">No nearby antenna found.</string>
+    <string name="widget_map_image_desc">Mini-map of nearby antennas</string>
     <string name="widget_updated_at">Updated at %1$s</string>
     <string name="widget_waiting_gps">Waiting for GPS...</string>
     <string name="widget_immediate_search">Searching...</string>
@@ -686,6 +690,7 @@
     <string name="appstrings_page_map_settings">Antennas map</string>
     <string name="appstrings_page_nearby_settings">Nearby antennas</string>
     <string name="appstrings_page_site_settings">Site details</string>
+    <string name="appstrings_page_speedtests_settings">Speedtests</string>
     <string name="appstrings_page_support_settings">Support details</string>
     <string name="appstrings_pages_customization_desc">Customize the display of the different pages of the application</string>
     <string name="appstrings_pages_customization_title">Pages customization</string>
@@ -725,6 +730,8 @@
     <string name="appstrings_release_section_global">General</string>
     <string name="appstrings_release_section_settings">Settings</string>
     <string name="appstrings_release_section_community_services">Community services</string>
+    <string name="appstrings_release_section_speedtests">Speedtests</string>
+    <string name="appstrings_release_section_widgets">Widgets</string>
     <string name="appstrings_release_live_site_photos_rounded">Site photos now display with rounded corners</string>
     <string name="appstrings_release_live_operator_fallback_logos">Operator logos look better when no site photo is available</string>
     <string name="appstrings_release_statistics_ready">Statistics are available as soon as local data is ready</string>
@@ -743,6 +750,18 @@
     <string name="appstrings_release_statistics_custom_frequency_display">More customizable display, with details by frequency</string>
     <string name="appstrings_release_settings_shortcuts_across_screens">Added quick access to settings from several app screens</string>
     <string name="appstrings_release_community_cellularfr_availability">Better handling of CellularFR photos and links based on availability</string>
+    <string name="appstrings_release_speedtests_all_page">Added a page to view all speedtests</string>
+    <string name="appstrings_release_speedtests_sort_filters_details">More complete sorting, filters and details for each result</string>
+    <string name="appstrings_release_speedtests_best_card_clickable">The “Best speedtest” card is now clickable</string>
+    <string name="appstrings_release_speedtests_best_metric_setting">The best result follows the criterion chosen in settings</string>
+    <string name="appstrings_release_widgets_mini_map">Added a new mini-map antenna widget</string>
+    <string name="appstrings_release_widgets_nearby_antennas">Displays nearby antennas, azimuths and offline sites</string>
+    <string name="appstrings_release_widgets_open_map">Open the map directly from the widget</string>
+    <string name="appstrings_release_widgets_previews_improved">Improved widget previews</string>
+    <string name="appstrings_release_live_tracking_compact_display">More compact and easier to read display</string>
+    <string name="appstrings_release_live_tracking_tracker_icon">Improved tracking icon based on distance</string>
+    <string name="appstrings_release_live_tracking_site_photo_focus">Better highlight of the site photo</string>
+    <string name="appstrings_release_global_feature_availability">More flexible management of some features depending on app availability</string>
     <string name="appstrings_release_community_source_settings">Added new settings for photo and speedtest sources</string>
     <string name="appstrings_release_photo_visibility_sync">Photo display is better synchronized between Support and Site pages</string>
     <string name="appstrings_release_community_photo_filters">Photos are filtered by enabled operator and sources</string>
@@ -861,6 +880,32 @@
     <string name="appstrings_speedtest_ping">Ping</string>
     <string name="appstrings_speedtest_title">Best Speedtest</string>
     <string name="appstrings_speedtest_upload">Upload</string>
+    <string name="appstrings_speedtests_all_title">All speedtests</string>
+    <string name="appstrings_speedtests_average">Average</string>
+    <string name="appstrings_speedtests_error">Unable to load speedtests.</string>
+    <string name="appstrings_speedtests_load_more">Load more</string>
+    <string name="appstrings_speedtests_max">Max</string>
+    <string name="appstrings_speedtests_network">Network</string>
+    <string name="appstrings_speedtests_radio">Radio</string>
+    <string name="appstrings_speedtests_anfr_label">ANFR</string>
+    <string name="appstrings_speedtests_filter_major_enb">Keep the main eNB only</string>
+    <string name="appstrings_speedtests_include_missing_enb">Keep speedtests without eNB</string>
+    <string name="appstrings_speedtests_settings_title">Speedtests settings</string>
+    <string name="appstrings_speedtests_show_coordinates">Show coordinates</string>
+    <string name="appstrings_speedtests_show_count">Show speedtest count</string>
+    <string name="appstrings_speedtests_show_network_details">Show network and device details</string>
+    <string name="appstrings_speedtests_show_radio_details">Show radio details</string>
+    <string name="appstrings_speedtests_support_label">Support</string>
+    <string name="appstrings_speedtests_best_average">Best average throughput</string>
+    <string name="appstrings_speedtests_best_download">Best displayed throughput</string>
+    <string name="appstrings_speedtests_best_max">Best max throughput</string>
+    <string name="appstrings_speedtests_best_metric_title">Best speedtest card</string>
+    <string name="appstrings_speedtests_display_title">Display</string>
+    <string name="appstrings_speedtests_sort_average">Average throughput</string>
+    <string name="appstrings_speedtests_sort_descending">Highest values first</string>
+    <string name="appstrings_speedtests_sort_download">Download throughput (displayed value)</string>
+    <string name="appstrings_speedtests_sort_max">Max throughput</string>
+    <string name="appstrings_speedtests_sort_title">Sort</string>
     <string name="appstrings_split_share_image">Split share image</string>
     <string name="appstrings_split_share_image_desc">Separates frequencies on a 2nd image</string>
     <string name="appstrings_src_antennas">Antenna Data</string>

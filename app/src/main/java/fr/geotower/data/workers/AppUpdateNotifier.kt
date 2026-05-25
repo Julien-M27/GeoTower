@@ -12,6 +12,7 @@ import fr.geotower.BuildConfig
 import fr.geotower.R
 import fr.geotower.data.api.AppReleaseInfo
 import fr.geotower.data.api.AppUpdateChecker
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.utils.AppLocale
 import fr.geotower.utils.NotificationIconResources
 import kotlinx.coroutines.sync.Mutex
@@ -26,6 +27,13 @@ object AppUpdateNotifier {
     suspend fun checkAndNotify(context: Context) {
         val appContext = context.applicationContext
         if (!UpdateCheckScheduler.areUpdateNotificationsEnabled(appContext)) return
+        if (
+            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.APP_UPDATE_CHECK) ||
+            !RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.APP_UPDATE_CHECK) ||
+            !RemoteFeatureFlags.isPlatformEnabled(RemoteFeatureFlags.Platform.NOTIFICATIONS)
+        ) {
+            return
+        }
         if (!checkMutex.tryLock()) return
 
         try {

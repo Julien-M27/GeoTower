@@ -12,6 +12,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import fr.geotower.R
 import fr.geotower.data.api.DatabaseDownloader
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DatabaseVersionPolicy
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.utils.NotificationIconResources
@@ -29,7 +30,19 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
             return Result.success()
         }
 
-        AppUpdateNotifier.checkAndNotify(context)
+        val canCheckApp = RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.APP_UPDATE_CHECK) &&
+            RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.APP_UPDATE_CHECK)
+        val canCheckDatabase = RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_UPDATE_CHECK) &&
+            RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_UPDATE_CHECK)
+
+        if (canCheckApp) {
+            AppUpdateNotifier.checkAndNotify(context)
+        }
+
+        if (!canCheckDatabase) {
+            UpdateCheckScheduler.scheduleNextAfterSuccessfulRun(context)
+            return Result.success()
+        }
 
         // 2. On interroge discrètement ton serveur
         val remoteVersion = DatabaseDownloader.getLatestDatabaseVersion() ?: return Result.retry()

@@ -420,7 +420,7 @@ class RefreshWidgetAction : ActionCallback {
         withContext(Dispatchers.IO) {
             suspend fun updateUi(isSuccess: Boolean, jsonToSave: String? = null) {
                 val currentTime = timeFormat.format(java.util.Date())
-                val timeString = if (isSuccess) currentTime else "$currentTime ⚠️"
+                val timeString = currentTime
 
                 val editor = prefs.edit().putString("widget_last_update", timeString)
                 if (jsonToSave != null) {

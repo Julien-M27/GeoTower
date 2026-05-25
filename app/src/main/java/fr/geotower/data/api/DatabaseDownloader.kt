@@ -3,6 +3,7 @@ package fr.geotower.data.api
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.AppDatabase
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.utils.AppConfig
@@ -31,6 +32,9 @@ object DatabaseDownloader {
     }
 
     fun getDatabaseSize(): Double {
+        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_UPDATE_CHECK)) {
+            return 0.0
+        }
         return try {
             val sizeBytes = readRemoteDatabaseInfo()?.optLong("size_bytes", 0L) ?: 0L
             if (sizeBytes > 0L) sizeBytes / (1024.0 * 1024.0) else 0.0
@@ -40,6 +44,9 @@ object DatabaseDownloader {
     }
 
     suspend fun getLatestDatabaseVersion(): String? {
+        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_UPDATE_CHECK)) {
+            return null
+        }
         return withContext(Dispatchers.IO) {
             try {
                 val request = Request.Builder()
@@ -76,6 +83,9 @@ object DatabaseDownloader {
     }
 
     suspend fun downloadUpdate(context: Context, onProgress: suspend (Int) -> Unit): Boolean {
+        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD)) {
+            return false
+        }
         return withContext(Dispatchers.IO) {
             if (readRemoteDatabaseInfo() == null) {
                 AppLogger.w(TAG, "Remote database is unavailable or incompatible")

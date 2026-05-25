@@ -26,26 +26,28 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
+    section(stringResource(R.string.appstrings_release_section_speedtests)) {
+        item(stringResource(R.string.appstrings_release_speedtests_all_page))
+        item(stringResource(R.string.appstrings_release_speedtests_sort_filters_details))
+        item(stringResource(R.string.appstrings_release_speedtests_best_card_clickable))
+        item(stringResource(R.string.appstrings_release_speedtests_best_metric_setting))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_widgets)) {
+        item(stringResource(R.string.appstrings_release_widgets_mini_map))
+        item(stringResource(R.string.appstrings_release_widgets_nearby_antennas))
+        item(stringResource(R.string.appstrings_release_widgets_open_map))
+        item(stringResource(R.string.appstrings_release_widgets_previews_improved))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_live_tracking)) {
+        item(stringResource(R.string.appstrings_release_live_tracking_compact_display))
+        item(stringResource(R.string.appstrings_release_live_tracking_tracker_icon))
+        item(stringResource(R.string.appstrings_release_live_tracking_site_photo_focus))
+    }
+
     section(stringResource(R.string.appstrings_release_section_global)) {
-        item(stringResource(R.string.appstrings_release_global_flexible_features))
-        item(stringResource(R.string.appstrings_release_global_home_announcement))
-        item(stringResource(R.string.appstrings_release_global_unavailable_pages))
-        item(stringResource(R.string.appstrings_release_global_localized_update_notes))
-        item(stringResource(R.string.appstrings_release_global_database_version_check))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_statistics)) {
-        item(stringResource(R.string.appstrings_release_statistics_declared_active_sites))
-        item(stringResource(R.string.appstrings_release_statistics_weekly_trends))
-        item(stringResource(R.string.appstrings_release_statistics_custom_frequency_display))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_settings)) {
-        item(stringResource(R.string.appstrings_release_settings_shortcuts_across_screens))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_community_services)) {
-        item(stringResource(R.string.appstrings_release_community_cellularfr_availability))
+        item(stringResource(R.string.appstrings_release_global_feature_availability))
     }
 }
 

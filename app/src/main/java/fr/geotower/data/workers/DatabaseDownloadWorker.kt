@@ -20,6 +20,7 @@ import androidx.work.workDataOf
 import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.api.DatabaseDownloader
+import fr.geotower.data.config.RemoteFeatureFlags
 import android.content.pm.ServiceInfo
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.NotificationIconResources
@@ -36,6 +37,12 @@ class DatabaseDownloadWorker(
     private val notificationId = DownloadNotificationCenter.DB_DOWNLOAD_PROGRESS_NOTIFICATION_ID
 
     override suspend fun doWork(): Result {
+        if (
+            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) ||
+            !RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
+        ) {
+            return Result.success()
+        }
         createChannel()
         return try {
 

@@ -8,6 +8,7 @@ import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Template
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.utils.AppLogger
 
 class CarHomeScreen(
@@ -17,6 +18,12 @@ class CarHomeScreen(
 
     override fun onGetTemplate(): Template {
         AppLogger.i(TAG, "Rendering Android Auto home template")
+        if (!RemoteFeatureFlags.isPlatformEnabled(RemoteFeatureFlags.Platform.ANDROID_AUTO)) {
+            return MessageTemplate.Builder(carContext.getString(R.string.appstrings_unavailable))
+                .setTitle(carContext.getString(R.string.app_name))
+                .setHeaderAction(Action.APP_ICON)
+                .build()
+        }
         val screenManager = carContext.getCarService(ScreenManager::class.java)
         return MessageTemplate.Builder(carContext.getString(R.string.car_connected))
             .setTitle(carContext.getString(R.string.app_name))

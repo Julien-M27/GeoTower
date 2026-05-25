@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.ContextCompat
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.utils.OperatorColors
 
 object LiveTrackingController {
@@ -22,6 +23,10 @@ object LiveTrackingController {
 
     fun startIfEligible(context: Context): StartResult {
         val appContext = context.applicationContext
+        if (!RemoteFeatureFlags.isPlatformEnabled(RemoteFeatureFlags.Platform.LIVE_TRACKING)) {
+            stop(appContext)
+            return StartResult.Stopped
+        }
         val eligibility = eligibility(appContext)
         if (eligibility != StartResult.Started) {
             stop(appContext)
@@ -38,6 +43,7 @@ object LiveTrackingController {
     }
 
     fun startOnAppLaunchIfEnabled(context: Context): StartResult {
+        if (!RemoteFeatureFlags.isPlatformEnabled(RemoteFeatureFlags.Platform.LIVE_TRACKING)) return StartResult.Stopped
         val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
         if (!prefs.getBoolean("enable_live_notifications", false)) return StartResult.Stopped
         if (LiveTrackingService.isRunning) return StartResult.Started
@@ -52,6 +58,7 @@ object LiveTrackingController {
 
     fun eligibility(context: Context): StartResult {
         return when {
+            !RemoteFeatureFlags.isPlatformEnabled(RemoteFeatureFlags.Platform.LIVE_TRACKING) -> StartResult.Stopped
             currentOperator(context) == "AUCUN" -> StartResult.MissingOperator
             !hasPreciseLocationPermission(context) -> StartResult.MissingPreciseLocation
             !hasPostNotificationsPermission(context) -> StartResult.MissingNotifications
@@ -61,12 +68,14 @@ object LiveTrackingController {
 
     fun shouldOpenPromotedNotificationSettings(context: Context): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) return false
+        if (!RemoteFeatureFlags.isPlatformEnabled(RemoteFeatureFlags.Platform.PROMOTED_NOTIFICATIONS)) return false
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         return !manager.canPostPromotedNotifications()
     }
 
     fun openPromotedNotificationSettings(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) return
+        if (!RemoteFeatureFlags.isPlatformEnabled(RemoteFeatureFlags.Platform.PROMOTED_NOTIFICATIONS)) return
         val appContext = context.applicationContext
         val promotedIntent = Intent(Settings.ACTION_APP_NOTIFICATION_PROMOTION_SETTINGS).apply {
             putExtra(Settings.EXTRA_APP_PACKAGE, appContext.packageName)

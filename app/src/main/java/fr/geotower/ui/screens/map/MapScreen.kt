@@ -116,6 +116,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
 import fr.geotower.data.api.NominatimApi
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.data.models.isDeclaredActive
@@ -408,6 +409,7 @@ fun MapScreen(
     val cityStatsTechniques by viewModel.cityStatsTechniques.collectAsState()
     val isCityStatsTechniquesLoading by viewModel.isCityStatsTechniquesLoading.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
+    val featureFlags by RemoteFeatureFlags.config
 
     val rawPrimaryColor = MaterialTheme.colorScheme.primary.toArgb()
     val isColorTooLight = ColorUtils.calculateLuminance(rawPrimaryColor) > 0.85
@@ -420,6 +422,28 @@ fun MapScreen(
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val uiStyle = LocalGeoTowerUiStyle.current
+
+    fun isMapProviderEnabled(providerId: Int): Boolean {
+        return when (providerId) {
+            0 -> featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.MAP_IGN)
+            1 -> featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.MAP_OSM)
+            2 -> featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.MAP_MAPLIBRE)
+            3 -> featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.MAP_OPEN_TOPO)
+            4 -> featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.MAP_OFFLINE)
+            else -> true
+        }
+    }
+
+    fun fallbackMapProvider(): Int {
+        return listOf(1, 0, 2, 3, 4).firstOrNull(::isMapProviderEnabled) ?: 1
+    }
+
+    val canUseMapSearch =
+        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.MAP_SEARCH_NOMINATIM) &&
+            featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.SEARCH_NOMINATIM)
+    val canUseMapMeasure = featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.MAP_MEASURE)
+    val canUseMapLocation = featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.MAP_LOCATION)
+    val canUseLayerSelector = listOf(0, 1, 2, 3, 4).any(::isMapProviderEnabled)
 
     LaunchedEffect(Unit) {
         AppConfig.loadMapDisplayPreferences(prefs)
@@ -445,7 +469,11 @@ fun MapScreen(
     var isClosestFavSiteExpanded by remember { mutableStateOf(true) }
 
     // Rétablit l'auto-ouverture à l'activation du mode mesure
-    LaunchedEffect(isMeasuringMode) {
+    LaunchedEffect(isMeasuringMode, canUseMapMeasure) {
+        if (!canUseMapMeasure && isMeasuringMode) {
+            isMeasuringMode = false
+            measuredSites.clear()
+        }
         if (isMeasuringMode) {
             isClosestSiteExpanded = true
             isClosestFavSiteExpanded = true
@@ -560,18 +588,28 @@ fun MapScreen(
     var mapFiles by remember { mutableStateOf(emptyArray<java.io.File>()) }
 
     // Synchronisation si l'utilisateur change la carte dans les paramètres
-    LaunchedEffect(AppConfig.mapProvider.intValue) {
-        effectiveProvider = AppConfig.mapProvider.intValue
+    LaunchedEffect(AppConfig.mapProvider.intValue, featureFlags) {
+        val requestedProvider = AppConfig.mapProvider.intValue
+        val nextProvider = if (isMapProviderEnabled(requestedProvider)) {
+            requestedProvider
+        } else {
+            fallbackMapProvider()
+        }
+        effectiveProvider = nextProvider
+        if (nextProvider != requestedProvider) {
+            AppConfig.mapProvider.value = nextProvider
+            prefs.edit().putInt("map_provider", nextProvider).apply()
+        }
     }
 
     // Vérification réseau + fichiers au premier affichage
-    LaunchedEffect(Unit) {
+    LaunchedEffect(featureFlags) {
         val offlineDir = java.io.File(context.getExternalFilesDir(null), "maps")
         val files = offlineDir.listFiles { file -> file.extension == "map" && file.length() > 0L } ?: emptyArray()
         mapFiles = files
 
         // Si on est hors ligne ET qu'on a bien téléchargé une carte
-        if (!isNetworkAvailable(context) && files.isNotEmpty()) {
+        if (!isNetworkAvailable(context) && files.isNotEmpty() && isMapProviderEnabled(4)) {
             effectiveProvider = 4 // On bascule silencieusement sur le hors-ligne
         }
     }
@@ -1913,7 +1951,8 @@ fun MapScreen(
                     },
                     isSearchActive = isSearchActive,
                     onToggleSearch = {
-                        isSearchActive = !isSearchActive
+                        if (canUseMapSearch) {
+                            isSearchActive = !isSearchActive
                         if (!isSearchActive) {
                             restoreOperatorSearchSelection()
                             searchQuery = ""
@@ -1927,19 +1966,25 @@ fun MapScreen(
 
                             mapViewRef?.invalidate()
                         }
+                        }
                     },
                     isMeasuringMode = isMeasuringMode,
                     onToggleMeasure = {
-                        isMeasuringMode = !isMeasuringMode
-                        if (!isMeasuringMode) {
-                            trackNearestAll = false
-                            trackNearestFav = false
-                            measuredSites.clear()
-                            mapViewRef?.let { refreshMeasureLayers(it) }
+                        if (canUseMapMeasure) {
+                            isMeasuringMode = !isMeasuringMode
+                            if (!isMeasuringMode) {
+                                trackNearestAll = false
+                                trackNearestFav = false
+                                measuredSites.clear()
+                                mapViewRef?.let { refreshMeasureLayers(it) }
+                            }
                         }
                     },
-                    onOpenLayers = { safeClick { showLayerSheet = true } },
-                    onOpenSettings = { safeClick { showMapPageSettingsSheet = true } }
+                    onOpenLayers = { safeClick { if (canUseLayerSelector) showLayerSheet = true } },
+                    onOpenSettings = { safeClick { showMapPageSettingsSheet = true } },
+                    showSearch = canUseMapSearch,
+                    showMeasure = canUseMapMeasure,
+                    showLayers = canUseLayerSelector
                 )
             }
 
@@ -1973,7 +2018,7 @@ fun MapScreen(
                     }
                 }
             }
-            if (showLocationBtn) {
+            if (showLocationBtn && canUseMapLocation) {
                 FloatingActionButton(
                     onClick = {
                         safeClick {
@@ -2138,7 +2183,7 @@ fun MapScreen(
     }
 
 
-        if (showLayerSheet) {
+        if (showLayerSheet && canUseLayerSelector) {
             // ✅ On vérifie l'état du réseau dès que le menu s'ouvre
             val isOnline = remember(showLayerSheet) { isNetworkAvailable(context) }
 
@@ -2167,20 +2212,28 @@ fun MapScreen(
                         // 🌐 ON N'AFFICHE LES CARTES EN LIGNE QUE SI ON A INTERNET
                         if (isOnline) {
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                MapLayerButton(txtMapOsmLayer, mapProvider == 1, Modifier.weight(1f)) {
-                                    AppConfig.mapProvider.value = 1; prefs.edit().putInt("map_provider", 1).apply()
-                                    if (ignStyle == 2) { AppConfig.ignStyle.value = 0; prefs.edit().putInt("ign_style", 0).apply() }
+                                if (isMapProviderEnabled(1)) {
+                                    MapLayerButton(txtMapOsmLayer, mapProvider == 1, Modifier.weight(1f)) {
+                                        AppConfig.mapProvider.value = 1; prefs.edit().putInt("map_provider", 1).apply()
+                                        if (ignStyle == 2) { AppConfig.ignStyle.value = 0; prefs.edit().putInt("ign_style", 0).apply() }
+                                    }
                                 }
-                                MapLayerButton(txtMapIgnLayer, mapProvider == 0, Modifier.weight(1f)) {
-                                    AppConfig.mapProvider.value = 0; prefs.edit().putInt("map_provider", 0).apply()
+                                if (isMapProviderEnabled(0)) {
+                                    MapLayerButton(txtMapIgnLayer, mapProvider == 0, Modifier.weight(1f)) {
+                                        AppConfig.mapProvider.value = 0; prefs.edit().putInt("map_provider", 0).apply()
+                                    }
                                 }
                             }
                             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                MapLayerButton(txtMapMapLibre, mapProvider == 2, Modifier.weight(1f)) {
-                                    AppConfig.mapProvider.value = 2; prefs.edit().putInt("map_provider", 2).apply()
+                                if (isMapProviderEnabled(2)) {
+                                    MapLayerButton(txtMapMapLibre, mapProvider == 2, Modifier.weight(1f)) {
+                                        AppConfig.mapProvider.value = 2; prefs.edit().putInt("map_provider", 2).apply()
+                                    }
                                 }
-                                MapLayerButton(txtMapTopo, mapProvider == 3, Modifier.weight(1f)) {
-                                    AppConfig.mapProvider.value = 3; prefs.edit().putInt("map_provider", 3).apply()
+                                if (isMapProviderEnabled(3)) {
+                                    MapLayerButton(txtMapTopo, mapProvider == 3, Modifier.weight(1f)) {
+                                        AppConfig.mapProvider.value = 3; prefs.edit().putInt("map_provider", 3).apply()
+                                    }
                                 }
                             }
                         } else {
@@ -2194,7 +2247,7 @@ fun MapScreen(
                         }
 
                         // 🗺️ LE BOUTON HORS-LIGNE NE S'AFFICHE QUE SI UNE CARTE EXISTE
-                        if (hasOfflineMaps) {
+                        if (hasOfflineMaps && isMapProviderEnabled(4)) {
                             MapLayerButton(txtMapOfflineLayer, mapProvider == 4, Modifier.fillMaxWidth()) {
                                 AppConfig.mapProvider.value = 4
                                 prefs.edit().putInt("map_provider", 4).apply()

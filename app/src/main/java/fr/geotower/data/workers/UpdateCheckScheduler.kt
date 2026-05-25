@@ -7,6 +7,7 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
+import fr.geotower.data.config.RemoteFeatureFlags
 import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
@@ -23,7 +24,7 @@ object UpdateCheckScheduler {
     fun reconcile(context: Context) {
         cancelLegacyPeriodicCheck(context)
 
-        if (areUpdateNotificationsEnabled(context)) {
+        if (areUpdateNotificationsEnabled(context) && canScheduleAnyUpdateCheck()) {
             enqueueNextCheck(context, ExistingWorkPolicy.KEEP)
         } else {
             cancelDailyCheck(context)
@@ -33,7 +34,7 @@ object UpdateCheckScheduler {
     fun onNotificationsPreferenceChanged(context: Context, enabled: Boolean) {
         cancelLegacyPeriodicCheck(context)
 
-        if (enabled) {
+        if (enabled && canScheduleAnyUpdateCheck()) {
             enqueueNextCheck(context, ExistingWorkPolicy.REPLACE)
         } else {
             cancelDailyCheck(context)
@@ -41,7 +42,7 @@ object UpdateCheckScheduler {
     }
 
     fun scheduleNextAfterSuccessfulRun(context: Context) {
-        if (areUpdateNotificationsEnabled(context)) {
+        if (areUpdateNotificationsEnabled(context) && canScheduleAnyUpdateCheck()) {
             enqueueNextCheck(context, ExistingWorkPolicy.APPEND_OR_REPLACE)
         } else {
             cancelDailyCheck(context)
@@ -98,5 +99,13 @@ object UpdateCheckScheduler {
     fun areUpdateNotificationsEnabled(context: Context): Boolean {
         val prefs = context.applicationContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         return prefs.getBoolean(UPDATE_NOTIFICATIONS_KEY, DEFAULT_UPDATE_NOTIFICATIONS_ENABLED)
+    }
+
+    private fun canScheduleAnyUpdateCheck(): Boolean {
+        val canCheckDatabase = RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_UPDATE_CHECK) &&
+            RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_UPDATE_CHECK)
+        val canCheckApp = RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.APP_UPDATE_CHECK) &&
+            RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.APP_UPDATE_CHECK)
+        return canCheckDatabase || canCheckApp
     }
 }

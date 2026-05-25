@@ -3,6 +3,7 @@ package fr.geotower.data.api
 import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
+import fr.geotower.data.config.RemoteFeatureFlags
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
 import kotlin.math.atan2
@@ -31,6 +32,12 @@ object ElevationProfileApi {
         toLatitude: Double,
         toLongitude: Double
     ): ElevationProfileApiResult {
+        if (
+            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_ELEVATION_PROFILE) ||
+            !RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ELEVATION_IGN)
+        ) {
+            error("Elevation profile disabled")
+        }
         val fallbackDistanceMeters = distanceMeters(fromLatitude, fromLongitude, toLatitude, toLongitude)
         val sampling = samplingForDistance(fallbackDistanceMeters)
         val url = PROFILE_URL.toHttpUrl().newBuilder()

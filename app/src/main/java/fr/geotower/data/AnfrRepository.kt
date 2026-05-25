@@ -19,6 +19,7 @@ import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.RadioFilterMasks
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.api.SignalQuestClient
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
@@ -607,6 +608,12 @@ class AnfrRepository(
     // 3. PANNES RÉSEAU (Nouveau système GeoJSON GeoTower)
     // =================================================================
     suspend fun getSitesHs(): List<SiteHsEntity> {
+        if (
+            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.OUTAGES_DATA) ||
+            !RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.OUTAGES_GEOTOWER)
+        ) {
+            return emptyList()
+        }
         return try {
             // 1. On télécharge le fichier brut depuis ton serveur
             val response = api.getSitesHsGeoJson()

@@ -75,6 +75,7 @@ import androidx.compose.ui.zIndex
 import fr.geotower.R
 import fr.geotower.utils.AppConfig
 import android.content.Context
+import android.content.SharedPreferences
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.FilterChip
@@ -101,6 +102,57 @@ import fr.geotower.utils.StatsDisplayMode
 import fr.geotower.utils.StatsPreferences
 import fr.geotower.utils.ThroughputDisplayText
 
+object SiteSpeedtestsPagePreferences {
+    const val FILTER_MAJOR_ENB = "page_speedtests_filter_major_enb"
+    const val INCLUDE_MISSING_ENB = "page_speedtests_include_missing_enb"
+    const val SHOW_COUNT = "page_speedtests_show_count"
+    const val SHOW_RADIO = "page_speedtests_show_radio"
+    const val SHOW_NETWORK = "page_speedtests_show_network"
+    const val SHOW_COORDINATES = "page_speedtests_show_coordinates"
+    const val BEST_METRIC = "page_speedtests_best_metric"
+    const val SORT_METRIC = "page_speedtests_sort_metric"
+    const val SORT_DESCENDING = "page_speedtests_sort_descending"
+
+    const val SORT_AVERAGE = "average"
+    const val SORT_MAX = "max"
+    const val SORT_DOWNLOAD = "download"
+
+    const val DEFAULT_FILTER_MAJOR_ENB = true
+    const val DEFAULT_INCLUDE_MISSING_ENB = true
+    const val DEFAULT_SHOW_COUNT = true
+    const val DEFAULT_SHOW_RADIO = true
+    const val DEFAULT_SHOW_NETWORK = true
+    const val DEFAULT_SHOW_COORDINATES = true
+    const val DEFAULT_BEST_METRIC = SORT_AVERAGE
+    const val DEFAULT_SORT_METRIC = SORT_AVERAGE
+    const val DEFAULT_SORT_DESCENDING = true
+
+    fun putDefaults(editor: SharedPreferences.Editor): SharedPreferences.Editor {
+        return editor
+            .putBoolean(FILTER_MAJOR_ENB, DEFAULT_FILTER_MAJOR_ENB)
+            .putBoolean(INCLUDE_MISSING_ENB, DEFAULT_INCLUDE_MISSING_ENB)
+            .putBoolean(SHOW_COUNT, DEFAULT_SHOW_COUNT)
+            .putBoolean(SHOW_RADIO, DEFAULT_SHOW_RADIO)
+            .putBoolean(SHOW_NETWORK, DEFAULT_SHOW_NETWORK)
+            .putBoolean(SHOW_COORDINATES, DEFAULT_SHOW_COORDINATES)
+            .putString(BEST_METRIC, DEFAULT_BEST_METRIC)
+            .putString(SORT_METRIC, DEFAULT_SORT_METRIC)
+            .putBoolean(SORT_DESCENDING, DEFAULT_SORT_DESCENDING)
+    }
+
+    fun reset(prefs: SharedPreferences) {
+        putDefaults(prefs.edit()).apply()
+    }
+
+    fun normalizeSortMetric(metric: String?): String {
+        return when (metric) {
+            SORT_MAX -> SORT_MAX
+            SORT_DOWNLOAD -> SORT_DOWNLOAD
+            else -> SORT_AVERAGE
+        }
+    }
+}
+
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -117,6 +169,7 @@ fun PagesCustomizationSheet(
     // --- NOUVEAUX PARAMÈTRES ---
     onSupportClick: () -> Unit,
     onSiteClick: () -> Unit,
+    onSpeedtestsClick: () -> Unit,
     onThroughputCalculatorClick: () -> Unit,
     onOpenFrequencies: () -> Unit
 ) {
@@ -180,6 +233,7 @@ fun PagesCustomizationSheet(
             }
             if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)) {
                 NavigationMenuItem(title = stringResource(R.string.appstrings_page_site_settings), icon = Icons.Default.WifiTethering, isSelected = false, isDark = isDark) { onSiteClick() }
+                NavigationMenuItem(title = stringResource(R.string.appstrings_page_speedtests_settings), icon = Icons.Default.Speed, isSelected = false, isDark = isDark) { onSpeedtestsClick() }
             }
             if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THROUGHPUT_CALCULATOR)) {
                 NavigationMenuItem(title = stringResource(R.string.appstrings_throughput_calculator_title), icon = Icons.Default.Speed, isSelected = false, isDark = isDark) { onThroughputCalculatorClick() }
@@ -206,6 +260,7 @@ fun StartupPageSelectionSheet(
             currentStartupPage == "nearby" && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY) -> currentStartupPage
             currentStartupPage == "map" && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP) -> currentStartupPage
             currentStartupPage == "compass" && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS) -> currentStartupPage
+            currentStartupPage == "stats" && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS) -> currentStartupPage
             currentStartupPage == "home" -> currentStartupPage
             else -> "home"
         }
@@ -244,6 +299,10 @@ fun StartupPageSelectionSheet(
                 }
                 if (AppConfig.hasCompass.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)) {
                     SettingsRadioItem(stringResource(R.string.appstrings_page_compass_settings), tempPage == "compass", useOneUi, bubbleColor) { tempPage = "compass" }
+                }
+
+                if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
+                    SettingsRadioItem(stringResource(R.string.appstrings_stats_title), tempPage == "stats", useOneUi, bubbleColor) { tempPage = "stats" }
                 }
 
                 // --- NOUVEAU BOUTON RÉINITIALISER ---
@@ -1010,6 +1069,142 @@ fun SimpleSwitchCard(title: String, showMapLocation: Boolean, onLocationChange: 
                 useOneUi = useOneUi,
                 checkedColor = switchColor
             )
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SiteSpeedtestsSettingsSheet(
+    filterMajorEnb: Boolean,
+    onFilterMajorEnbChange: (Boolean) -> Unit,
+    includeMissingEnb: Boolean,
+    onIncludeMissingEnbChange: (Boolean) -> Unit,
+    showSpeedtestsCount: Boolean,
+    onShowSpeedtestsCountChange: (Boolean) -> Unit,
+    showRadioDetails: Boolean,
+    onShowRadioDetailsChange: (Boolean) -> Unit,
+    showNetworkDetails: Boolean,
+    onShowNetworkDetailsChange: (Boolean) -> Unit,
+    showCoordinates: Boolean,
+    onShowCoordinatesChange: (Boolean) -> Unit,
+    bestMetric: String,
+    onBestMetricChange: (String) -> Unit,
+    sortMetric: String,
+    onSortMetricChange: (String) -> Unit,
+    sortDescending: Boolean,
+    onSortDescendingChange: (Boolean) -> Unit,
+    onReset: () -> Unit,
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    bubbleColor: Color
+) {
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val scrollState = rememberScrollState()
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        BackHandler(onBack = onBack)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                Text(
+                    text = stringResource(R.string.appstrings_speedtests_settings_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.width(48.dp))
+            }
+
+            val shape = oneUiActionButtonShape(useOneUi)
+            val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Text(
+                    text = stringResource(R.string.appstrings_speedtests_best_metric_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                SettingsRadioItem(
+                    stringResource(R.string.appstrings_speedtests_best_average),
+                    bestMetric == SiteSpeedtestsPagePreferences.SORT_AVERAGE,
+                    useOneUi,
+                    bubbleColor
+                ) { onBestMetricChange(SiteSpeedtestsPagePreferences.SORT_AVERAGE) }
+                SettingsRadioItem(
+                    stringResource(R.string.appstrings_speedtests_best_max),
+                    bestMetric == SiteSpeedtestsPagePreferences.SORT_MAX,
+                    useOneUi,
+                    bubbleColor
+                ) { onBestMetricChange(SiteSpeedtestsPagePreferences.SORT_MAX) }
+                SettingsRadioItem(
+                    stringResource(R.string.appstrings_speedtests_best_download),
+                    bestMetric == SiteSpeedtestsPagePreferences.SORT_DOWNLOAD,
+                    useOneUi,
+                    bubbleColor
+                ) { onBestMetricChange(SiteSpeedtestsPagePreferences.SORT_DOWNLOAD) }
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.appstrings_speedtests_sort_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                SettingsRadioItem(
+                    stringResource(R.string.appstrings_speedtests_sort_average),
+                    sortMetric == SiteSpeedtestsPagePreferences.SORT_AVERAGE,
+                    useOneUi,
+                    bubbleColor
+                ) { onSortMetricChange(SiteSpeedtestsPagePreferences.SORT_AVERAGE) }
+                SettingsRadioItem(
+                    stringResource(R.string.appstrings_speedtests_sort_max),
+                    sortMetric == SiteSpeedtestsPagePreferences.SORT_MAX,
+                    useOneUi,
+                    bubbleColor
+                ) { onSortMetricChange(SiteSpeedtestsPagePreferences.SORT_MAX) }
+                SettingsRadioItem(
+                    stringResource(R.string.appstrings_speedtests_sort_download),
+                    sortMetric == SiteSpeedtestsPagePreferences.SORT_DOWNLOAD,
+                    useOneUi,
+                    bubbleColor
+                ) { onSortMetricChange(SiteSpeedtestsPagePreferences.SORT_DOWNLOAD) }
+                SimpleSwitchCard(stringResource(R.string.appstrings_speedtests_sort_descending), sortDescending, onSortDescendingChange, shape, border, bubbleColor, useOneUi)
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = stringResource(R.string.appstrings_speedtests_display_title),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                SimpleSwitchCard(stringResource(R.string.appstrings_speedtests_filter_major_enb), filterMajorEnb, onFilterMajorEnbChange, shape, border, bubbleColor, useOneUi)
+                SimpleSwitchCard(stringResource(R.string.appstrings_speedtests_include_missing_enb), includeMissingEnb, onIncludeMissingEnbChange, shape, border, bubbleColor, useOneUi)
+                SimpleSwitchCard(stringResource(R.string.appstrings_speedtests_show_count), showSpeedtestsCount, onShowSpeedtestsCountChange, shape, border, bubbleColor, useOneUi)
+                SimpleSwitchCard(stringResource(R.string.appstrings_speedtests_show_radio_details), showRadioDetails, onShowRadioDetailsChange, shape, border, bubbleColor, useOneUi)
+                SimpleSwitchCard(stringResource(R.string.appstrings_speedtests_show_network_details), showNetworkDetails, onShowNetworkDetailsChange, shape, border, bubbleColor, useOneUi)
+                SimpleSwitchCard(stringResource(R.string.appstrings_speedtests_show_coordinates), showCoordinates, onShowCoordinatesChange, shape, border, bubbleColor, useOneUi)
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+            TextButton(onClick = onReset) {
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
     }
 }

@@ -55,7 +55,10 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
             return Result.failure()
         }
 
-        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD)) {
+        if (
+            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD) ||
+            !RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.SIGNALQUEST_UPLOAD)
+        ) {
             SignalQuestUploadQueue.cleanupUpload(applicationContext, uploadId)
             return Result.failure()
         }
