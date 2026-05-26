@@ -732,6 +732,8 @@
     <string name="appstrings_release_section_community_services">Community services</string>
     <string name="appstrings_release_section_speedtests">Speedtests</string>
     <string name="appstrings_release_section_widgets">Widgets</string>
+    <string name="appstrings_release_section_security">Security</string>
+    <string name="appstrings_release_section_offline_maps">Offline maps</string>
     <string name="appstrings_release_live_site_photos_rounded">Site photos now display with rounded corners</string>
     <string name="appstrings_release_live_operator_fallback_logos">Operator logos look better when no site photo is available</string>
     <string name="appstrings_release_statistics_ready">Statistics are available as soon as local data is ready</string>
@@ -773,6 +775,15 @@
     <string name="appstrings_release_interface_speedtest_translations_completed">Completed speedtest translations</string>
     <string name="appstrings_release_interface_plurals_fixed">Plural texts fixed</string>
     <string name="appstrings_release_interface_map_share_improvements">Small improvements to map and sharing</string>
+    <string name="appstrings_release_security_downloads_verified">Downloads are better secured and verified before use</string>
+    <string name="appstrings_release_security_official_sources">Official sources strengthened for updates and announcements</string>
+    <string name="appstrings_release_security_downloaded_files_checked">Better checks on downloaded files to avoid invalid content</string>
+    <string name="appstrings_release_offline_maps_invalid_rejected">Invalid maps are rejected earlier</string>
+    <string name="appstrings_release_offline_maps_cancel_cleanup">Cancelled downloads are cleaned up more cleanly</string>
+    <string name="appstrings_release_offline_maps_download_checks">Stronger checks while maps are downloading</string>
+    <string name="appstrings_release_signalquest_upload_more_secure">Photo uploads are better secured</string>
+    <string name="appstrings_release_global_release_optimized_protected">Release version is better optimized and protected</string>
+    <string name="appstrings_release_global_internal_checks_reinforced">Internal checks strengthened to make downloads and uploads more reliable</string>
     <string name="appstrings_release_community_source_settings">Added new settings for photo and speedtest sources</string>
     <string name="appstrings_release_photo_visibility_sync">Photo display is better synchronized between Support and Site pages</string>
     <string name="appstrings_release_community_photo_filters">Photos are filtered by enabled operator and sources</string>

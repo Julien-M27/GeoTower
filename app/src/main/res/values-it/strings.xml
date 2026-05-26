@@ -714,6 +714,8 @@
     <string name="appstrings_release_section_community_services">Servizi comunitari</string>
     <string name="appstrings_release_section_speedtests">Speedtest</string>
     <string name="appstrings_release_section_widgets">Widget</string>
+    <string name="appstrings_release_section_security">Sicurezza</string>
+    <string name="appstrings_release_section_offline_maps">Mappe offline</string>
     <string name="appstrings_release_live_site_photos_rounded">Foto del sito visualizzate con angoli arrotondati</string>
     <string name="appstrings_release_live_operator_fallback_logos">Migliore resa dei loghi operatore quando non è disponibile una foto del sito</string>
     <string name="appstrings_release_statistics_ready">Statistiche disponibili non appena i dati locali sono pronti</string>
@@ -755,6 +757,15 @@
     <string name="appstrings_release_interface_speedtest_translations_completed">Traduzioni degli speedtest completate</string>
     <string name="appstrings_release_interface_plurals_fixed">Plurali corretti</string>
     <string name="appstrings_release_interface_map_share_improvements">Piccoli miglioramenti a mappa e condivisione</string>
+    <string name="appstrings_release_security_downloads_verified">Download più sicuri e verificati prima dell’uso</string>
+    <string name="appstrings_release_security_official_sources">Fonti ufficiali rafforzate per aggiornamenti e annunci</string>
+    <string name="appstrings_release_security_downloaded_files_checked">Migliori controlli sui file scaricati per evitare contenuti non validi</string>
+    <string name="appstrings_release_offline_maps_invalid_rejected">Mappe non valide respinte prima</string>
+    <string name="appstrings_release_offline_maps_cancel_cleanup">Download annullati puliti in modo più corretto</string>
+    <string name="appstrings_release_offline_maps_download_checks">Controlli rafforzati durante il download delle mappe</string>
+    <string name="appstrings_release_signalquest_upload_more_secure">Invio delle foto più sicuro</string>
+    <string name="appstrings_release_global_release_optimized_protected">Versione di rilascio più ottimizzata e protetta</string>
+    <string name="appstrings_release_global_internal_checks_reinforced">Verifiche interne rafforzate per rendere più affidabili download e invii</string>
     <string name="appstrings_release_community_source_settings">Aggiunte nuove impostazioni per fonti di foto e speedtest</string>
     <string name="appstrings_release_photo_visibility_sync">Visualizzazione delle foto meglio sincronizzata tra le pagine Supporto e Sito</string>
     <string name="appstrings_release_community_photo_filters">Foto filtrate in base all’operatore e alle fonti attivate</string>

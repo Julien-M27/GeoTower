@@ -714,6 +714,8 @@
     <string name="appstrings_release_section_community_services">Community-Dienste</string>
     <string name="appstrings_release_section_speedtests">Speedtests</string>
     <string name="appstrings_release_section_widgets">Widgets</string>
+    <string name="appstrings_release_section_security">Sicherheit</string>
+    <string name="appstrings_release_section_offline_maps">Offline-Karten</string>
     <string name="appstrings_release_live_site_photos_rounded">Standortfotos werden mit abgerundeten Ecken angezeigt</string>
     <string name="appstrings_release_live_operator_fallback_logos">Bessere Darstellung der Betreiberlogos, wenn kein Standortfoto verfügbar ist</string>
     <string name="appstrings_release_statistics_ready">Statistiken verfügbar, sobald die lokalen Daten bereit sind</string>
@@ -755,6 +757,15 @@
     <string name="appstrings_release_interface_speedtest_translations_completed">Speedtest-Übersetzungen vervollständigt</string>
     <string name="appstrings_release_interface_plurals_fixed">Pluraltexte korrigiert</string>
     <string name="appstrings_release_interface_map_share_improvements">Kleine Verbesserungen an Karte und Teilen</string>
+    <string name="appstrings_release_security_downloads_verified">Downloads werden vor der Verwendung besser abgesichert und geprüft</string>
+    <string name="appstrings_release_security_official_sources">Offizielle Quellen für Updates und Ankündigungen gestärkt</string>
+    <string name="appstrings_release_security_downloaded_files_checked">Bessere Prüfung heruntergeladener Dateien, um ungültige Inhalte zu vermeiden</string>
+    <string name="appstrings_release_offline_maps_invalid_rejected">Ungültige Karten werden früher abgelehnt</string>
+    <string name="appstrings_release_offline_maps_cancel_cleanup">Abgebrochene Downloads werden sauberer bereinigt</string>
+    <string name="appstrings_release_offline_maps_download_checks">Stärkere Prüfungen während des Karten-Downloads</string>
+    <string name="appstrings_release_signalquest_upload_more_secure">Foto-Uploads sind besser abgesichert</string>
+    <string name="appstrings_release_global_release_optimized_protected">Release-Version besser optimiert und geschützt</string>
+    <string name="appstrings_release_global_internal_checks_reinforced">Interne Prüfungen verstärkt, um Downloads und Uploads zuverlässiger zu machen</string>
     <string name="appstrings_release_community_source_settings">Neue Einstellungen für Foto- und Speedtest-Quellen hinzugefügt</string>
     <string name="appstrings_release_photo_visibility_sync">Fotoanzeige zwischen Support- und Standortseiten besser synchronisiert</string>
     <string name="appstrings_release_community_photo_filters">Fotos werden nach aktivem Betreiber und aktivierten Quellen gefiltert</string>
