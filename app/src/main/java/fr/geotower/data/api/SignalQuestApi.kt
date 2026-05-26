@@ -5,6 +5,7 @@ import okhttp3.RequestBody
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.Multipart
 import retrofit2.http.POST
 import retrofit2.http.Part
@@ -28,6 +29,11 @@ data class SqPhotoData(
 
 data class SqPhotoUploadResponse(
     val data: SqPhotoUploadData?
+)
+
+data class SqUploadTokenResponse(
+    val token: String?,
+    val expiresAt: Long?
 )
 
 data class SqPhotoUploadData(
@@ -102,6 +108,7 @@ interface SignalQuestApiService {
     @POST("api/v2/signalquest/sites/{siteId}/photos")
     suspend fun uploadSitePhoto(
         @Path("siteId") siteId: String,
+        @Header("X-GeoTower-Upload-Token") uploadToken: String,
         @Part file: MultipartBody.Part,
         @Part("description") description: RequestBody?,
         @Part("operator") operator: RequestBody?,
@@ -110,6 +117,11 @@ interface SignalQuestApiService {
         @Part("sourceCode") sourceCode: RequestBody?,
         @Part("exifMetadata") exifMetadata: RequestBody?
     ): retrofit2.Response<SqPhotoUploadResponse>
+
+    @POST("api/v2/signalquest/upload-token")
+    suspend fun createUploadToken(
+        @Query("siteId") siteId: String
+    ): retrofit2.Response<SqUploadTokenResponse>
 
     @GET("api/v2/signalquest/speedtests/site")
     suspend fun getSiteSpeedtests(

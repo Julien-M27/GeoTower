@@ -3,6 +3,14 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
 }
+
+fun String.asBuildConfigString(): String {
+    return "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+}
+
+val defaultManifestPublicKeys =
+    "geotower-prod-2026-01:MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAELaFBNviqR+Ja4TUXuLBLafOrhyLk8W34heF1+pm+XHRHJhCoCQHWhWZK1j8aXNxbYFpge62oMuwNIGB6ZHV6yw=="
+
 android {
     namespace = "fr.geotower"
     compileSdk {
@@ -14,9 +22,15 @@ android {
         minSdk = 24
         targetSdk = 37
         versionCode = 1
-        versionName = "1.9.9.4.1"
+        versionName = "1.9.9.4.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        val manifestPublicKeys = providers
+            .gradleProperty("GEOTOWER_MANIFEST_PUBLIC_KEYS")
+            .orElse(providers.environmentVariable("GEOTOWER_MANIFEST_PUBLIC_KEYS"))
+            .orElse(defaultManifestPublicKeys)
+            .get()
+        buildConfigField("String", "GEOTOWER_MANIFEST_PUBLIC_KEYS", manifestPublicKeys.asBuildConfigString())
     }
 
     buildFeatures {
@@ -26,7 +40,7 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

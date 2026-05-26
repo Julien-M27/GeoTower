@@ -4,6 +4,9 @@ import fr.geotower.data.models.OfflineMapDto
 import retrofit2.http.GET
 
 interface AnfrService {
+    @GET("/api/v2/download/manifest")
+    suspend fun getDownloadManifest(): okhttp3.ResponseBody
+
     @GET("/api/v2/maps/catalog")
     suspend fun getMapsCatalog(): List<OfflineMapDto>
 

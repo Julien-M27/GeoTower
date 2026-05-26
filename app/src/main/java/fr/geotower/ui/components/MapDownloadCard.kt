@@ -28,6 +28,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.workDataOf
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.api.DownloadManifestVerifier
 import fr.geotower.data.api.RetrofitClient
 import fr.geotower.data.models.OfflineMapDto
 import fr.geotower.data.workers.DownloadNotificationCenter
@@ -119,8 +120,11 @@ fun MapDownloadCard(
             return@LaunchedEffect
         }
         try {
-            catalog = RetrofitClient.apiService.getMapsCatalog()
-                .filter { OfflineMapDownloadValidator.isValidCatalogEntry(it) }
+            val rawManifest = RetrofitClient.apiService.getDownloadManifest().use { it.string() }
+            catalog = DownloadManifestVerifier.verifyAndParse(rawManifest)
+                ?.maps
+                ?.filter { OfflineMapDownloadValidator.isValidCatalogEntry(it) }
+                .orEmpty()
         } catch (e: Exception) {
             isError = true
         } finally {

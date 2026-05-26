@@ -11,8 +11,40 @@ import fr.geotower.utils.AppLogger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
+import java.net.URI
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+
+private val OFFICIAL_ANNOUNCEMENT_URLS = listOf(
+    OfficialAnnouncementUrl(
+        host = "api.cajejuma.fr",
+        pathPrefixes = listOf("/status", "/api/", "/geotower/")
+    ),
+    OfficialAnnouncementUrl(
+        host = "cajejuma.fr",
+        pathPrefixes = listOf("/geotower/")
+    ),
+    OfficialAnnouncementUrl(
+        host = "www.cajejuma.fr",
+        pathPrefixes = listOf("/geotower/")
+    )
+)
+
+private data class OfficialAnnouncementUrl(
+    val host: String,
+    val pathPrefixes: List<String>
+)
+
+private fun isOfficialAnnouncementUrl(rawUrl: String): Boolean {
+    val uri = runCatching { URI(rawUrl.trim()) }.getOrNull() ?: return false
+    if (!uri.scheme.equals("https", ignoreCase = true)) return false
+    if (uri.userInfo != null) return false
+    val host = uri.host?.lowercase(Locale.ROOT) ?: return false
+    val path = uri.path.orEmpty()
+    return OFFICIAL_ANNOUNCEMENT_URLS.any { allowed ->
+        host == allowed.host && allowed.pathPrefixes.any { prefix -> path.startsWith(prefix) }
+    }
+}
 
 data class RemoteHomeAnnouncementText(
     val title: String = "",
@@ -58,10 +90,7 @@ data class RemoteHomeAnnouncement(
     fun dismissKey(): String = id.ifBlank { "$title\n$message\n${translations.hashCode()}".hashCode().toString() }
 
     fun httpActionUrlOrNull(): String? {
-        return actionUrl.takeIf {
-            it.startsWith("https://", ignoreCase = true) ||
-                it.startsWith("http://", ignoreCase = true)
-        }
+        return actionUrl.takeIf { isOfficialAnnouncementUrl(it) }
     }
 
     private fun normalizeLanguageTag(languageTag: String?): String {
@@ -516,10 +545,7 @@ object RemoteFeatureFlags {
             .lowercase(Locale.ROOT)
             .takeIf { it in validAnnouncementSeverities }
             ?: defaultConfig.homeAnnouncement.severity
-        val actionUrl = obj.stringOrBlank("actionUrl", 500).takeIf {
-            it.startsWith("https://", ignoreCase = true) ||
-                it.startsWith("http://", ignoreCase = true)
-        } ?: ""
+        val actionUrl = obj.stringOrBlank("actionUrl", 500).takeIf(::isOfficialAnnouncementUrl) ?: ""
 
         val announcement = RemoteHomeAnnouncement(
             enabled = obj.booleanOrDefault("enabled", defaultConfig.homeAnnouncement.enabled),

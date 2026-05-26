@@ -53,6 +53,36 @@ class AppUpdateCheckerTest {
     }
 
     @Test
+    fun parseRelease_rejectsHttpDownloadUrl() {
+        val release = AppUpdateChecker.parseRelease(
+            """
+            {
+              "releaseId": "geotower-1.9.9.2.4-20260513-1608",
+              "versionName": "1.9.9.2.4",
+              "downloadUrl": "http://kdrive.infomaniak.com/app/share/2149816/6d30423f-ac8b-4509-9857-86684d3a2e03"
+            }
+            """.trimIndent()
+        )
+
+        assertNull(release)
+    }
+
+    @Test
+    fun parseRelease_rejectsNonOfficialDownloadDomain() {
+        val release = AppUpdateChecker.parseRelease(
+            """
+            {
+              "releaseId": "geotower-1.9.9.2.4-20260513-1608",
+              "versionName": "1.9.9.2.4",
+              "downloadUrl": "https://example.com/GeoTower.apk"
+            }
+            """.trimIndent()
+        )
+
+        assertNull(release)
+    }
+
+    @Test
     fun isRemoteVersionNewer_acceptsOnlyStrictlyNewerVersions() {
         assertEquals(true, AppUpdateChecker.isRemoteVersionNewer("1.9.9.2.5", "1.9.9.2.4"))
         assertEquals(false, AppUpdateChecker.isRemoteVersionNewer("1.9.9.2.4", "1.9.9.2.4"))

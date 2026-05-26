@@ -6,6 +6,7 @@ import fr.geotower.data.config.RemoteFeatureFlags
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.Request
+import java.net.URI
 import java.util.Locale
 
 data class AppReleaseInfo(
@@ -36,6 +37,20 @@ data class AppReleaseInfo(
 object AppUpdateChecker {
     private const val LATEST_APP_RELEASE_URL = "https://api.cajejuma.fr/api/v2/app/latest"
     private val VERSION_NUMBER_REGEX = Regex("\\d+")
+    private val OFFICIAL_DOWNLOAD_URLS = listOf(
+        OfficialDownloadUrl(
+            host = "kdrive.infomaniak.com",
+            pathPrefixes = listOf("/app/share/2149816/6d30423f-ac8b-4509-9857-86684d3a2e03")
+        ),
+        OfficialDownloadUrl(
+            host = "api.cajejuma.fr",
+            pathPrefixes = listOf("/downloads/geotower/")
+        ),
+        OfficialDownloadUrl(
+            host = "play.google.com",
+            pathPrefixes = listOf("/store/apps/details")
+        )
+    )
 
     suspend fun getLatestRelease(): AppReleaseInfo? {
         if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.APP_UPDATE_CHECK)) {
@@ -66,7 +81,7 @@ object AppUpdateChecker {
         val versionName = json.stringOrBlank("versionName")
         val downloadUrl = json.stringOrBlank("downloadUrl")
 
-        if (releaseId.isBlank() || versionName.isBlank() || !downloadUrl.isWebUrl()) {
+        if (releaseId.isBlank() || versionName.isBlank() || !downloadUrl.isOfficialDownloadUrl()) {
             return null
         }
 
@@ -124,8 +139,15 @@ object AppUpdateChecker {
         }.toMap()
     }
 
-    private fun String.isWebUrl(): Boolean {
-        return startsWith("https://", ignoreCase = true) || startsWith("http://", ignoreCase = true)
+    private fun String.isOfficialDownloadUrl(): Boolean {
+        val uri = runCatching { URI(this.trim()) }.getOrNull() ?: return false
+        if (!uri.scheme.equals("https", ignoreCase = true)) return false
+        if (uri.userInfo != null) return false
+        val host = uri.host?.lowercase(Locale.ROOT) ?: return false
+        val path = uri.path.orEmpty()
+        return OFFICIAL_DOWNLOAD_URLS.any { allowed ->
+            host == allowed.host && allowed.pathPrefixes.any { prefix -> path.startsWith(prefix) }
+        }
     }
 
     private fun String.versionParts(): List<Int> {
@@ -143,4 +165,9 @@ object AppUpdateChecker {
             key.isNotBlank() && key.all { it.isLetterOrDigit() || it == '-' }
         }.orEmpty()
     }
+
+    private data class OfficialDownloadUrl(
+        val host: String,
+        val pathPrefixes: List<String>
+    )
 }

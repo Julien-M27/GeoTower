@@ -51,9 +51,12 @@ class MapDownloadWorker(
             ?: OfflineMapDisplayNames.formatMapName(mapFilename)
         val expectedSha256 = inputData.getString("map_sha256")?.takeIf { it.isNotBlank() }
         val estimatedSizeMb = inputData.getInt("estimated_size_mb", 2000)
+        val maxAllowedBytes = OfflineMapDownloadValidator.maxAllowedDownloadBytes(estimatedSizeMb)
 
         if (!OfflineMapDownloadValidator.isAllowedHttpsUrl(mapUrl) ||
-            !OfflineMapDownloadValidator.isSafeMapFilename(mapFilename)
+            !OfflineMapDownloadValidator.isSafeMapFilename(mapFilename) ||
+            !OfflineMapDownloadValidator.isValidSha256(expectedSha256) ||
+            maxAllowedBytes == null
         ) {
             setProgress(workDataOf("error" to "invalid_map_catalog"))
             return@withContext Result.failure()
@@ -96,6 +99,10 @@ class MapDownloadWorker(
 
                 val body = safeResponse.body ?: return@withContext Result.failure()
                 val expectedContentLength = body.contentLength()
+                if (expectedContentLength > maxAllowedBytes) {
+                    setProgress(workDataOf("error" to "map_too_large"))
+                    return@withContext Result.failure()
+                }
 
                 body.byteStream().use { inputStream ->
                     FileOutputStream(tempMapFile).use { outputStream ->
@@ -110,8 +117,12 @@ class MapDownloadWorker(
                                 return@withContext Result.failure()
                             }
 
-                            outputStream.write(buffer, 0, bytes)
                             bytesCopied += bytes
+                            if (bytesCopied > maxAllowedBytes) {
+                                setProgress(workDataOf("error" to "map_too_large"))
+                                throw IllegalStateException("map_download_too_large")
+                            }
+                            outputStream.write(buffer, 0, bytes)
 
                             if (expectedContentLength > 0) {
                                 val progress = ((bytesCopied * 100) / expectedContentLength).toInt()
@@ -149,6 +160,9 @@ class MapDownloadWorker(
                 tempMapFile.delete()
                 Result.failure()
             }
+        } catch (e: CancellationException) {
+            if (tempMapFile.exists()) tempMapFile.delete()
+            throw e
         } catch (e: Exception) {
             AppLogger.w(TAG, "Map download failed", e)
             if (tempMapFile.exists()) tempMapFile.delete()

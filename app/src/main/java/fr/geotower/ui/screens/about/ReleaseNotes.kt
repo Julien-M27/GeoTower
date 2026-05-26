@@ -26,27 +26,25 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_global)) {
-        item(stringResource(R.string.appstrings_release_global_internal_stability_update))
-        item(stringResource(R.string.appstrings_release_global_reliable_network_background_services))
-        item(stringResource(R.string.appstrings_release_global_permissions_gps_compass_adjusted))
+    section(stringResource(R.string.appstrings_release_section_security)) {
+        item(stringResource(R.string.appstrings_release_security_downloads_verified))
+        item(stringResource(R.string.appstrings_release_security_official_sources))
+        item(stringResource(R.string.appstrings_release_security_downloaded_files_checked))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_offline_maps)) {
+        item(stringResource(R.string.appstrings_release_offline_maps_invalid_rejected))
+        item(stringResource(R.string.appstrings_release_offline_maps_cancel_cleanup))
+        item(stringResource(R.string.appstrings_release_offline_maps_download_checks))
     }
 
     section(stringResource(R.string.appstrings_release_section_signalquest)) {
-        item(stringResource(R.string.appstrings_release_signalquest_private_photo_data_removed))
-        item(stringResource(R.string.appstrings_release_signalquest_speedtest_filtering_improved))
-        item(stringResource(R.string.appstrings_release_signalquest_pagination_fixed))
-        item(stringResource(R.string.appstrings_release_signalquest_network_display_clearer))
+        item(stringResource(R.string.appstrings_release_signalquest_upload_more_secure))
     }
 
-    section(stringResource(R.string.appstrings_release_section_widgets)) {
-        item(stringResource(R.string.appstrings_release_widgets_refresh_more_reliable))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_interface)) {
-        item(stringResource(R.string.appstrings_release_interface_speedtest_translations_completed))
-        item(stringResource(R.string.appstrings_release_interface_plurals_fixed))
-        item(stringResource(R.string.appstrings_release_interface_map_share_improvements))
+    section(stringResource(R.string.appstrings_release_section_global)) {
+        item(stringResource(R.string.appstrings_release_global_release_optimized_protected))
+        item(stringResource(R.string.appstrings_release_global_internal_checks_reinforced))
     }
 }
 

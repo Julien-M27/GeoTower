@@ -147,6 +147,9 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         manifest: SignalQuestUploadManifest,
         uploadFile: SignalQuestUploadFile
     ): UploadFileResult {
+        val uploadToken = requestUploadToken(manifest.siteId)
+            ?: return UploadFileResult(UploadFileOutcome.RetryableFailure)
+
         val preparedFile = try {
             SignalQuestUploadQueue.prepareJpegForUpload(applicationContext, manifest, uploadFile)
         } catch (e: SignalQuestInvalidPhotoException) {
@@ -167,6 +170,7 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
 
             val response = SignalQuestClient.api.uploadSitePhoto(
                 siteId = manifest.siteId,
+                uploadToken = uploadToken,
                 file = body,
                 description = descBody,
                 operator = opBody,
@@ -208,6 +212,27 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         } catch (e: Exception) {
             logUploadIssue("upload_exception", e)
             UploadFileResult(UploadFileOutcome.RetryableFailure)
+        }
+    }
+
+    private suspend fun requestUploadToken(siteId: String): String? {
+        return try {
+            val response = SignalQuestClient.api.createUploadToken(siteId)
+            if (!response.isSuccessful) {
+                val code = response.code()
+                response.errorBody()?.close()
+                logApiFailure(code)
+                return null
+            }
+            response.body()?.token?.trim()?.takeIf { it.isNotEmpty() }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: IOException) {
+            logUploadIssue("upload_token_network_failure", e)
+            null
+        } catch (e: Exception) {
+            logUploadIssue("upload_token_exception", e)
+            null
         }
     }
 

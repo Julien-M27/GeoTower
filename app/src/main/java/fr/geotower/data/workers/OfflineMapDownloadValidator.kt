@@ -13,7 +13,8 @@ object OfflineMapDownloadValidator {
     fun isValidCatalogEntry(map: OfflineMapDto): Boolean {
         return isAllowedHttpsUrl(map.mapUrl) &&
             isSafeMapFilename(map.mapFilename) &&
-            isValidSha256OrBlank(map.sha256)
+            isValidSha256(map.sha256) &&
+            maxAllowedDownloadBytes(map.estimatedSizeMb) != null
     }
 
     fun isAllowedHttpsUrl(url: String): Boolean {
@@ -61,14 +62,19 @@ object OfflineMapDownloadValidator {
         if (!file.isFile || file.length() <= 0L) return false
         if (expectedContentLength > 0L && file.length() != expectedContentLength) return false
         val normalizedSha256 = expectedSha256?.trim().orEmpty()
-        if (normalizedSha256.isEmpty()) return true
         if (!sha256Regex.matches(normalizedSha256)) return false
         return calculateSha256(file).equals(normalizedSha256, ignoreCase = true)
     }
 
-    private fun isValidSha256OrBlank(value: String?): Boolean {
+    fun isValidSha256(value: String?): Boolean {
         val normalized = value?.trim().orEmpty()
-        return normalized.isEmpty() || sha256Regex.matches(normalized)
+        return sha256Regex.matches(normalized)
+    }
+
+    fun maxAllowedDownloadBytes(estimatedSizeMb: Int): Long? {
+        if (estimatedSizeMb <= 0 || estimatedSizeMb > 10_000) return null
+        val estimatedBytes = estimatedSizeMb * 1024L * 1024L
+        return (estimatedBytes * 11L) / 10L
     }
 
     private fun calculateSha256(file: File): String {

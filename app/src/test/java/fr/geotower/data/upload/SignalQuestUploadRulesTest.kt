@@ -66,6 +66,20 @@ class SignalQuestUploadRulesTest {
     }
 
     @Test
+    fun newManifestsStripExifByDefault() {
+        val manifest = SignalQuestUploadManifest(
+            uploadId = "upload-1",
+            siteId = "12345",
+            operator = "SFR",
+            description = "",
+            createdAtMillis = 123L,
+            files = emptyList()
+        )
+
+        assertTrue(manifest.stripExifBeforeUpload)
+    }
+
+    @Test
     fun uploadOrderSendsPhotosFromLastPositionToFirst() {
         val files = listOf(
             SignalQuestUploadFile(

@@ -4,6 +4,7 @@ import fr.geotower.data.models.OfflineMapDto
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
@@ -25,6 +26,28 @@ class OfflineMapDownloadValidatorTest {
         val invalid = mapDto(
             mapUrl = "http://download.mapsforge.org/maps/v5/europe/france/alsace.map",
             mapFilename = "alsace.map"
+        )
+
+        assertFalse(OfflineMapDownloadValidator.isValidCatalogEntry(invalid))
+    }
+
+    @Test
+    fun catalogEntryWithoutSha256IsRejected() {
+        val invalid = mapDto(
+            mapUrl = "https://download.mapsforge.org/maps/v5/europe/france/alsace.map",
+            mapFilename = "alsace.map",
+            sha256 = null
+        )
+
+        assertFalse(OfflineMapDownloadValidator.isValidCatalogEntry(invalid))
+    }
+
+    @Test
+    fun catalogEntryWithInvalidSha256IsRejected() {
+        val invalid = mapDto(
+            mapUrl = "https://download.mapsforge.org/maps/v5/europe/france/alsace.map",
+            mapFilename = "alsace.map",
+            sha256 = "abc"
         )
 
         assertFalse(OfflineMapDownloadValidator.isValidCatalogEntry(invalid))
@@ -109,7 +132,7 @@ class OfflineMapDownloadValidatorTest {
     }
 
     @Test
-    fun downloadedMapRequiresExpectedLengthAndSha256WhenProvided() {
+    fun downloadedMapRequiresExpectedLengthAndSha256() {
         val mapsDir = Files.createTempDirectory("geotower-maps").toFile()
         val mapFile = mapsDir.resolve("alsace.map")
         try {
@@ -125,7 +148,7 @@ class OfflineMapDownloadValidatorTest {
             assertFalse(
                 OfflineMapDownloadValidator.isValidDownloadedMap(
                     file = mapFile,
-                    expectedContentLength = 4,
+                    expectedContentLength = 3,
                     expectedSha256 = null
                 )
             )
@@ -141,10 +164,16 @@ class OfflineMapDownloadValidatorTest {
         }
     }
 
+    @Test
+    fun maxAllowedDownloadBytesKeepsStrictMargin() {
+        assertEquals(110L * 1024L * 1024L, OfflineMapDownloadValidator.maxAllowedDownloadBytes(100))
+        assertNull(OfflineMapDownloadValidator.maxAllowedDownloadBytes(0))
+    }
+
     private fun mapDto(
         mapUrl: String,
         mapFilename: String,
-        sha256: String? = null
+        sha256: String? = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
     ): OfflineMapDto {
         return OfflineMapDto(
             id = "alsace",
