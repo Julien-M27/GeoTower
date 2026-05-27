@@ -64,13 +64,15 @@ import fr.geotower.ui.screens.emitters.DEFAULT_ELEVATION_PROFILE_FREQUENCY_MHZ
 import fr.geotower.ui.screens.emitters.extractElevationProfileAntennaHeightsByFrequency
 import fr.geotower.ui.screens.emitters.extractElevationProfileFrequencies
 import fr.geotower.ui.screens.emitters.fetchIgnElevationProfileData
-import fr.geotower.ui.screens.emitters.formatDateToFrench
-import fr.geotower.ui.screens.emitters.formatTechnologies
+import fr.geotower.utils.formatDateToFrench
+import fr.geotower.utils.formatTechnologies
 import fr.geotower.ui.screens.emitters.getElevationProfileLastKnownLocation
 import fr.geotower.ui.screens.emitters.getDetailLogoRes
 import fr.geotower.utils.AnfrDisplayText
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.SharePrefs
+import fr.geotower.utils.parseAndSortFrequencies
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -88,8 +90,6 @@ private const val TAG_SHARE_IMAGE = "GeoTower"
 
 private fun Int.dpToPx(context: Context): Int = (this * context.resources.displayMetrics.density).toInt()
 
-private const val DEFAULT_SITE_SHARE_ORDER = "map,elevation_profile,support,ids,dates,address,speedtest,throughput,status,freq"
-
 private fun formatShareHeightMeters(heightMeters: Double?): String {
     if (heightMeters == null) return "--"
     return if (AppConfig.distanceUnit.intValue == 1) {
@@ -105,29 +105,6 @@ private fun formatSharePanelHeightMeters(heightMeters: Double, distanceUnit: Int
     } else {
         if (heightMeters % 1.0 == 0.0) "${heightMeters.toInt()} m" else String.format(Locale.US, "%.1f m", heightMeters)
     }
-}
-
-private fun normalizeSiteShareOrder(rawOrder: String?): List<String> {
-    return (rawOrder ?: DEFAULT_SITE_SHARE_ORDER)
-        .split(",")
-        .filter { it.isNotBlank() }
-        .toMutableList()
-        .apply {
-            if (!contains("elevation_profile")) {
-                val mapIndex = indexOf("map")
-                if (mapIndex >= 0) add(mapIndex + 1, "elevation_profile") else add("elevation_profile")
-            }
-            if (!contains("speedtest")) {
-                val addressIndex = indexOf("address")
-                if (addressIndex >= 0) add(addressIndex + 1, "speedtest") else add("speedtest")
-            }
-            if (!contains("throughput")) {
-                val speedtestIndex = indexOf("speedtest")
-                if (speedtestIndex >= 0) add(speedtestIndex + 1, "throughput") else add("throughput")
-            }
-            removeAll { it == "heights" }
-        }
-        .distinct()
 }
 
 private fun isOnlyElevationProfileSelected(
@@ -335,7 +312,7 @@ fun shareFullAntennaCapture(
                                         )
                                     }
                                     Spacer(modifier = Modifier.width(16.dp))
-                                    Column {
+                                    Column(modifier = Modifier.weight(1f)) {
                                         Text(
                                             info.operateur ?: stringResource(R.string.appstrings_unknown),
                                             fontWeight = FontWeight.Bold
@@ -347,6 +324,21 @@ fun shareFullAntennaCapture(
                                             formatTechnologies(rawTechs, stringResource(R.string.appstrings_unknown)),
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
+                                    }
+                                    if (info.isZb == 1) {
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Surface(
+                                            color = MaterialTheme.colorScheme.tertiaryContainer,
+                                            contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text(
+                                                text = "ZB",
+                                                modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                                fontSize = 12.sp,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -522,6 +514,13 @@ fun shareFullAntennaCapture(
                                                     )
                                                     Text(
                                                         "$txtAnfrStationNumber ${info.idAnfr}",
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                    val arcepNidtValue =
+                                                        info.arcepNidt?.takeIf { it.isNotBlank() }
+                                                            ?: txtNotSpecified
+                                                    Text(
+                                                        "${stringResource(R.string.appstrings_arcep_nidt_label)}$arcepNidtValue",
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
                                                 }
@@ -877,6 +876,8 @@ fun shareFullAntennaCapture(
                                                 isProjectSite = isEntirelyProject,
                                                 isOutage = isOutage,
                                                 outageText = outageText,
+                                                outageStartDate = hsEntity?.dateDebut,
+                                                outageExpectedRestorationDate = hsEntity?.dateFin,
                                                 cardBgColor = MaterialTheme.colorScheme.surfaceVariant,
                                                 blockShape = RoundedCornerShape(12.dp),
                                                 techStatus = realTechStatus
@@ -1254,7 +1255,7 @@ fun shareFullAntennaCapture(
                                             )
                                         }
                                         Spacer(modifier = Modifier.width(16.dp))
-                                        Column {
+                                        Column(modifier = Modifier.weight(1f)) {
                                             Text(
                                                 info.operateur ?: stringResource(R.string.appstrings_unknown),
                                                 fontWeight = FontWeight.Bold
@@ -1266,6 +1267,21 @@ fun shareFullAntennaCapture(
                                                 formatTechnologies(rawTechs, stringResource(R.string.appstrings_unknown)),
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
+                                        }
+                                        if (info.isZb == 1) {
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Surface(
+                                                color = MaterialTheme.colorScheme.tertiaryContainer,
+                                                contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                                                shape = RoundedCornerShape(4.dp)
+                                            ) {
+                                                Text(
+                                                    text = "ZB",
+                                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
+                                                    fontSize = 12.sp,
+                                                    fontWeight = FontWeight.Bold
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -1301,6 +1317,13 @@ fun shareFullAntennaCapture(
                                             )
                                             Text(
                                                 "$txtAnfrStationNumber ${info.idAnfr}",
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            )
+                                            val arcepNidtValue =
+                                                info.arcepNidt?.takeIf { it.isNotBlank() }
+                                                    ?: txtNotSpecified
+                                            Text(
+                                                "${stringResource(R.string.appstrings_arcep_nidt_label)}$arcepNidtValue",
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
@@ -2007,41 +2030,41 @@ fun AntennaShareMenu(
     var isGeneratingShare by remember { mutableStateOf(false) }
     var generationMessage by remember { mutableStateOf("") }
 
-    var incMap by remember { mutableStateOf(prefs.getBoolean("share_map_enabled", true)) }
-    var incElevationProfile by remember { mutableStateOf(prefs.getBoolean("share_elevation_profile_enabled", true)) }
-    var incSupport by remember { mutableStateOf(prefs.getBoolean("share_support_enabled", true)) }
+    var incMap by remember { mutableStateOf(SharePrefs.siteMapEnabled.read(prefs)) }
+    var incElevationProfile by remember { mutableStateOf(SharePrefs.siteElevationProfileEnabled.read(prefs)) }
+    var incSupport by remember { mutableStateOf(SharePrefs.siteSupportEnabled.read(prefs)) }
     var incHeights by remember { mutableStateOf(prefs.getBoolean("share_heights_enabled", true)) }
-    var incIds by remember { mutableStateOf(prefs.getBoolean("share_ids_enabled", true)) }
-    var incDates by remember { mutableStateOf(prefs.getBoolean("share_dates_enabled", true)) }
-    var incAddress by remember { mutableStateOf(prefs.getBoolean("share_address_enabled", true)) }
-    var incSpeedtest by remember { mutableStateOf(prefs.getBoolean("share_speedtest_enabled", true)) } // 🚨 NEW
-    var incThroughput by remember { mutableStateOf(prefs.getBoolean("share_throughput_enabled", true)) }
-    var incFreqs by remember { mutableStateOf(prefs.getBoolean("share_freq_enabled", true)) }
-    var incConfidential by remember { mutableStateOf(prefs.getBoolean("share_confidential_enabled", false)) }
-    var incQrCode by remember { mutableStateOf(prefs.getBoolean("share_site_qr_enabled", true)) }
-    var incSplitImage by remember { mutableStateOf(prefs.getBoolean("share_split_image_enabled", true)) } // ✅ NOUVELLE VARIABLE SCINDER
+    var incIds by remember { mutableStateOf(SharePrefs.siteIdsEnabled.read(prefs)) }
+    var incDates by remember { mutableStateOf(SharePrefs.siteDatesEnabled.read(prefs)) }
+    var incAddress by remember { mutableStateOf(SharePrefs.siteAddressEnabled.read(prefs)) }
+    var incSpeedtest by remember { mutableStateOf(SharePrefs.siteSpeedtestEnabled.read(prefs)) } // 🚨 NEW
+    var incThroughput by remember { mutableStateOf(SharePrefs.siteThroughputEnabled.read(prefs)) }
+    var incFreqs by remember { mutableStateOf(SharePrefs.siteFrequencyEnabled.read(prefs)) }
+    var incConfidential by remember { mutableStateOf(SharePrefs.siteConfidentialEnabled.read(prefs)) }
+    var incQrCode by remember { mutableStateOf(SharePrefs.siteQrEnabled.read(prefs)) }
+    var incSplitImage by remember { mutableStateOf(SharePrefs.siteSplitImageEnabled.read(prefs)) } // ✅ NOUVELLE VARIABLE SCINDER
     var shareOrder by remember {
         mutableStateOf(
-            normalizeSiteShareOrder(prefs.getString("share_order", DEFAULT_SITE_SHARE_ORDER))
+            SharePrefs.siteOrder(prefs)
         )
     }
 
     // ✅ FORCE LE RECHARGEMENT DES PARAMÈTRES PAR DÉFAUT À CHAQUE OUVERTURE
     LaunchedEffect(showShareSheet) {
         if (showShareSheet) {
-            incMap = prefs.getBoolean("share_map_enabled", true)
-            incElevationProfile = prefs.getBoolean("share_elevation_profile_enabled", true)
-            incSupport = prefs.getBoolean("share_support_enabled", true)
-            incIds = prefs.getBoolean("share_ids_enabled", true)
-            incDates = prefs.getBoolean("share_dates_enabled", true)
-            incAddress = prefs.getBoolean("share_address_enabled", true)
-            incSpeedtest = prefs.getBoolean("share_speedtest_enabled", true) // 🚨 NEW
-            incThroughput = prefs.getBoolean("share_throughput_enabled", true)
-            incFreqs = prefs.getBoolean("share_freq_enabled", true)
-            incConfidential = prefs.getBoolean("share_confidential_enabled", false)
-            incQrCode = prefs.getBoolean("share_site_qr_enabled", true)
-            incSplitImage = prefs.getBoolean("share_split_image_enabled", true) // ✅ CHARGEMENT DE L'ÉTAT
-            shareOrder = normalizeSiteShareOrder(prefs.getString("share_order", DEFAULT_SITE_SHARE_ORDER))
+            incMap = SharePrefs.siteMapEnabled.read(prefs)
+            incElevationProfile = SharePrefs.siteElevationProfileEnabled.read(prefs)
+            incSupport = SharePrefs.siteSupportEnabled.read(prefs)
+            incIds = SharePrefs.siteIdsEnabled.read(prefs)
+            incDates = SharePrefs.siteDatesEnabled.read(prefs)
+            incAddress = SharePrefs.siteAddressEnabled.read(prefs)
+            incSpeedtest = SharePrefs.siteSpeedtestEnabled.read(prefs) // 🚨 NEW
+            incThroughput = SharePrefs.siteThroughputEnabled.read(prefs)
+            incFreqs = SharePrefs.siteFrequencyEnabled.read(prefs)
+            incConfidential = SharePrefs.siteConfidentialEnabled.read(prefs)
+            incQrCode = SharePrefs.siteQrEnabled.read(prefs)
+            incSplitImage = SharePrefs.siteSplitImageEnabled.read(prefs) // ✅ CHARGEMENT DE L'ÉTAT
+            shareOrder = SharePrefs.siteOrder(prefs)
         }
     }
 
@@ -2164,7 +2187,7 @@ fun AntennaShareMenu(
                     itemHeight = itemHeight,
                     onOrderChange = { newOrder ->
                         shareOrder = newOrder
-                        prefs.edit().putString("share_order", newOrder.joinToString(",")).apply()
+                        prefs.edit().putString(SharePrefs.SITE_ORDER, newOrder.joinToString(",")).apply()
                     }
                 )
 
@@ -2221,8 +2244,8 @@ fun AntennaShareMenu(
                     // ✅ AJOUT DU BOUTON RÉINITIALISER
                     TextButton(
                         onClick = {
-                            shareOrder = DEFAULT_SITE_SHARE_ORDER.split(",")
-                            prefs.edit().putString("share_order", shareOrder.joinToString(",")).apply()
+                            shareOrder = SharePrefs.DEFAULT_SITE_ORDER.split(",")
+                            prefs.edit().putString(SharePrefs.SITE_ORDER, shareOrder.joinToString(",")).apply()
                             incMap = true; incElevationProfile = true; incSupport = true; incIds = true; incDates = true; incAddress = true; incSpeedtest = true; incThroughput = true; incFreqs = true; incQrCode = true; incSplitImage = true
                             AppConfig.shareSiteStatus.value = true
                         },
@@ -2244,7 +2267,7 @@ fun AntennaShareMenu(
                             }
                             GeoTowerSwitch(
                                 checked = incSplitImage,
-                                onCheckedChange = { incSplitImage = it; prefs.edit().putBoolean("share_split_image_enabled", it).apply() },
+                                onCheckedChange = { incSplitImage = it; prefs.edit().putBoolean(SharePrefs.siteSplitImageEnabled.key, it).apply() },
                                 modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
                                 useOneUi = useOneUi
                             )
@@ -2442,22 +2465,22 @@ fun SupportShareMenu(
     var isGeneratingShare by remember { mutableStateOf(false) }
     var generationMessage by remember { mutableStateOf("") }
 
-    var incMap by remember { mutableStateOf(prefs.getBoolean("share_sup_map_enabled", true)) }
-    var incSupport by remember { mutableStateOf(prefs.getBoolean("share_sup_support_enabled", true)) }
-    var incOperators by remember { mutableStateOf(prefs.getBoolean("share_sup_operators_enabled", true)) }
-    var incConfidential by remember { mutableStateOf(prefs.getBoolean("share_sup_confidential_enabled", false)) }
-    var incQrCode by remember { mutableStateOf(prefs.getBoolean("share_sup_qr_enabled", true)) } // ✅ NOUVELLE VARIABLE
-    var shareOrder by remember { mutableStateOf(prefs.getString("share_sup_order", "map,support,operators")!!.split(",")) }
+    var incMap by remember { mutableStateOf(SharePrefs.supportMapEnabled.read(prefs)) }
+    var incSupport by remember { mutableStateOf(SharePrefs.supportDetailsEnabled.read(prefs)) }
+    var incOperators by remember { mutableStateOf(SharePrefs.supportOperatorsEnabled.read(prefs)) }
+    var incConfidential by remember { mutableStateOf(SharePrefs.supportConfidentialEnabled.read(prefs)) }
+    var incQrCode by remember { mutableStateOf(SharePrefs.supportQrEnabled.read(prefs)) } // ✅ NOUVELLE VARIABLE
+    var shareOrder by remember { mutableStateOf(SharePrefs.supportOrder(prefs)) }
 
     // ✅ FORCE LE RECHARGEMENT À CHAQUE OUVERTURE
     LaunchedEffect(showShareSheet) {
         if (showShareSheet) {
-            incMap = prefs.getBoolean("share_sup_map_enabled", true)
-            incSupport = prefs.getBoolean("share_sup_support_enabled", true)
-            incOperators = prefs.getBoolean("share_sup_operators_enabled", true)
-            incConfidential = prefs.getBoolean("share_sup_confidential_enabled", false)
-            incQrCode = prefs.getBoolean("share_sup_qr_enabled", true) // ✅ RECHARGEMENT
-            shareOrder = prefs.getString("share_sup_order", "map,support,operators")!!.split(",")
+            incMap = SharePrefs.supportMapEnabled.read(prefs)
+            incSupport = SharePrefs.supportDetailsEnabled.read(prefs)
+            incOperators = SharePrefs.supportOperatorsEnabled.read(prefs)
+            incConfidential = SharePrefs.supportConfidentialEnabled.read(prefs)
+            incQrCode = SharePrefs.supportQrEnabled.read(prefs) // ✅ RECHARGEMENT
+            shareOrder = SharePrefs.supportOrder(prefs)
         }
     }
 
@@ -2543,7 +2566,7 @@ fun SupportShareMenu(
                     itemHeight = itemHeight,
                     onOrderChange = { newOrder ->
                         shareOrder = newOrder
-                        prefs.edit().putString("share_sup_order", newOrder.joinToString(",")).apply()
+                        prefs.edit().putString(SharePrefs.SUPPORT_ORDER, newOrder.joinToString(",")).apply()
                     }
                 )
 
@@ -2593,7 +2616,7 @@ fun SupportShareMenu(
                     TextButton(
                         onClick = {
                             shareOrder = listOf("map", "support", "operators")
-                            prefs.edit().putString("share_sup_order", shareOrder.joinToString(",")).apply()
+                            prefs.edit().putString(SharePrefs.SUPPORT_ORDER, shareOrder.joinToString(",")).apply()
                             incMap = true; incSupport = true; incOperators = true; incQrCode = true
                         },
                         modifier = Modifier.align(Alignment.CenterHorizontally)

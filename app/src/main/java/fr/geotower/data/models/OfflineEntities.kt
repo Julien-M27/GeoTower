@@ -126,7 +126,9 @@ data class LocalisationDbEntity(
     @ColumnInfo(name = "code_insee") val codeInsee: String?,
     @ColumnInfo(name = "azimuts_fh") val azimutsFh: String?,
     @ColumnInfo(name = "tech_mask") val techMask: Int,
-    @ColumnInfo(name = "band_mask") val bandMask: Int
+    @ColumnInfo(name = "band_mask") val bandMask: Int,
+    @ColumnInfo(name = "arcep_nidt") val arcepNidt: String?,
+    @ColumnInfo(name = "is_zb") val isZb: Int
 )
 
 @Entity(tableName = "technique")
@@ -257,8 +259,11 @@ data class LocalisationEntity(
     @ColumnInfo(name = "azimuts_fh") val azimutsFh: String?,
     @ColumnInfo(name = "tech_mask") val techMask: Int = 0,
     @ColumnInfo(name = "band_mask") val bandMask: Int = 0,
+    @ColumnInfo(name = "arcep_nidt") val arcepNidt: String? = null,
+    @ColumnInfo(name = "is_zb") val isZb: Int = 0,
     @ColumnInfo(name = "statut") val statut: String? = null,
-    @ColumnInfo(name = "has_active") val hasActive: Int = 0
+    @ColumnInfo(name = "has_active") val hasActive: Int = 0,
+    @ColumnInfo(name = "has_underground_support") val hasUndergroundSupport: Int = 0
 ) {
     @androidx.room.Ignore
     var frequences: String? = null

@@ -13,6 +13,7 @@ object AppConfig {
     const val PREF_SHOW_MAP_LOCATION_MARKER = "show_map_location_marker"
     const val PREF_SHOW_AZIMUTH_LINES = "show_azimuths"
     const val PREF_SHOW_AZIMUTH_CONES = "show_azimuths_cone"
+    const val PREF_HIDE_UNDERGROUND_SITES = "hide_underground_sites"
     const val DEFAULT_SHOW_AZIMUTH_LINES = true
     const val DEFAULT_SHOW_AZIMUTH_CONES = false
 
@@ -73,6 +74,7 @@ object AppConfig {
     // --- FILTRES : AFFICHAGE DES SITES ---
     var showSitesInService = mutableStateOf(true)
     var showSitesOutOfService = mutableStateOf(true)
+    var hideUndergroundSites = mutableStateOf(false)
 
     // --- FILTRES : TECHNOLOGIES ---
     var showTechno2G = mutableStateOf(true)
@@ -181,45 +183,46 @@ object AppConfig {
     var siteShowPhotoExif = mutableStateOf(true)
 
     fun loadMapDisplayPreferences(prefs: SharedPreferences) {
-        defaultOperator.value = prefs.getString("default_operator", "Aucun") ?: "Aucun"
+        defaultOperator.value = MapDisplayPrefs.defaultOperator.read(prefs)
 
-        showOrange.value = prefs.getBoolean("show_orange", true)
-        showSfr.value = prefs.getBoolean("show_sfr", true)
-        showBouygues.value = prefs.getBoolean("show_bouygues", true)
-        showFree.value = prefs.getBoolean("show_free", true)
+        showOrange.value = MapDisplayPrefs.showOrange.read(prefs)
+        showSfr.value = MapDisplayPrefs.showSfr.read(prefs)
+        showBouygues.value = MapDisplayPrefs.showBouygues.read(prefs)
+        showFree.value = MapDisplayPrefs.showFree.read(prefs)
         setSelectedOperatorKeys(loadSelectedOperatorKeys(prefs))
 
-        showAzimuths.value = prefs.getBoolean(PREF_SHOW_AZIMUTH_LINES, DEFAULT_SHOW_AZIMUTH_LINES)
-        showAzimuthsCone.value = prefs.getBoolean(PREF_SHOW_AZIMUTH_CONES, DEFAULT_SHOW_AZIMUTH_CONES)
-        showMapLocationMarker.value = prefs.getBoolean(PREF_SHOW_MAP_LOCATION_MARKER, true)
-        showSpeedometer.value = prefs.getBoolean("show_speedometer", true)
+        showAzimuths.value = MapDisplayPrefs.showAzimuthLines.read(prefs)
+        showAzimuthsCone.value = MapDisplayPrefs.showAzimuthCones.read(prefs)
+        showMapLocationMarker.value = MapDisplayPrefs.showLocationMarker.read(prefs)
+        showSpeedometer.value = MapDisplayPrefs.showSpeedometer.read(prefs)
 
-        showSitesInService.value = prefs.getBoolean("show_sites_in_service", true)
-        showSitesOutOfService.value = prefs.getBoolean("show_sites_out_of_service", true)
+        showSitesInService.value = MapDisplayPrefs.showSitesInService.read(prefs)
+        showSitesOutOfService.value = MapDisplayPrefs.showSitesOutOfService.read(prefs)
+        hideUndergroundSites.value = MapDisplayPrefs.hideUndergroundSites.read(prefs)
 
-        showTechno2G.value = prefs.getBoolean("show_techno_2g", true)
-        showTechno3G.value = prefs.getBoolean("show_techno_3g", true)
-        showTechno4G.value = prefs.getBoolean("show_techno_4g", true)
-        showTechno5G.value = prefs.getBoolean("show_techno_5g", true)
-        showTechnoFH.value = prefs.getBoolean("show_techno_fh", true)
+        showTechno2G.value = MapDisplayPrefs.showTechno2G.read(prefs)
+        showTechno3G.value = MapDisplayPrefs.showTechno3G.read(prefs)
+        showTechno4G.value = MapDisplayPrefs.showTechno4G.read(prefs)
+        showTechno5G.value = MapDisplayPrefs.showTechno5G.read(prefs)
+        showTechnoFH.value = MapDisplayPrefs.showTechnoFh.read(prefs)
 
-        f2G_900.value = prefs.getBoolean("f2g_900", true)
-        f2G_1800.value = prefs.getBoolean("f2g_1800", true)
+        f2G_900.value = MapDisplayPrefs.f2G900.read(prefs)
+        f2G_1800.value = MapDisplayPrefs.f2G1800.read(prefs)
 
-        f3G_900.value = prefs.getBoolean("f3g_900", true)
-        f3G_2100.value = prefs.getBoolean("f3g_2100", true)
+        f3G_900.value = MapDisplayPrefs.f3G900.read(prefs)
+        f3G_2100.value = MapDisplayPrefs.f3G2100.read(prefs)
 
-        f4G_700.value = prefs.getBoolean("f4g_700", true)
-        f4G_800.value = prefs.getBoolean("f4g_800", true)
-        f4G_900.value = prefs.getBoolean("f4g_900", true)
-        f4G_1800.value = prefs.getBoolean("f4g_1800", true)
-        f4G_2100.value = prefs.getBoolean("f4g_2100", true)
-        f4G_2600.value = prefs.getBoolean("f4g_2600", true)
+        f4G_700.value = MapDisplayPrefs.f4G700.read(prefs)
+        f4G_800.value = MapDisplayPrefs.f4G800.read(prefs)
+        f4G_900.value = MapDisplayPrefs.f4G900.read(prefs)
+        f4G_1800.value = MapDisplayPrefs.f4G1800.read(prefs)
+        f4G_2100.value = MapDisplayPrefs.f4G2100.read(prefs)
+        f4G_2600.value = MapDisplayPrefs.f4G2600.read(prefs)
 
-        f5G_700.value = prefs.getBoolean("f5g_700", true)
-        f5G_2100.value = prefs.getBoolean("f5g_2100", true)
-        f5G_3500.value = prefs.getBoolean("f5g_3500", true)
-        f5G_26000.value = prefs.getBoolean("f5g_26000", true)
+        f5G_700.value = MapDisplayPrefs.f5G700.read(prefs)
+        f5G_2100.value = MapDisplayPrefs.f5G2100.read(prefs)
+        f5G_3500.value = MapDisplayPrefs.f5G3500.read(prefs)
+        f5G_26000.value = MapDisplayPrefs.f5G26000.read(prefs)
     }
 
     // --- FONCTION POUR CHARGER LA MÉMOIRE AU DÉMARRAGE ---

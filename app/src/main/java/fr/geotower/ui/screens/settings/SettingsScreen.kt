@@ -115,6 +115,9 @@ import fr.geotower.utils.AppLocale
 import fr.geotower.utils.AppLogoDrawingResources
 import fr.geotower.utils.AppUiMode
 import fr.geotower.utils.AppIconManager
+import fr.geotower.utils.HomePrefs
+import fr.geotower.utils.MapDisplayPrefs
+import fr.geotower.utils.PreferenceStores
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.filled.Straighten
@@ -144,11 +147,13 @@ import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.services.LiveTrackingController
 import fr.geotower.utils.OperatorLogos
+import fr.geotower.utils.SharePrefs
+import fr.geotower.utils.SitePagePrefs
+import fr.geotower.utils.SupportPagePrefs
+import fr.geotower.utils.ThroughputPrefs
+import fr.geotower.utils.WidgetPrefs
 import fr.geotower.widget.WidgetUpdateScheduler
 import kotlin.math.roundToInt
-
-private const val DEFAULT_SITE_SHARE_ORDER = "map,elevation_profile,support,ids,dates,address,speedtest,throughput,status,freq"
-private const val DEFAULT_WIDGET_SYNC_MINUTES = 60
 
 private data class SettingsSectionBounds(
     val top: Float = Float.NaN,
@@ -177,35 +182,12 @@ private fun resetSettingsToDefaultsAndRestart(context: Context, prefs: SharedPre
 
     UpdateCheckScheduler.reconcile(appContext)
 
-    WidgetUpdateScheduler.schedulePeriodicUpdate(appContext, DEFAULT_WIDGET_SYNC_MINUTES)
+    WidgetUpdateScheduler.schedulePeriodicUpdate(appContext, WidgetPrefs.DEFAULT_SYNC_MINUTES)
 
     val intent = appContext.packageManager.getLaunchIntentForPackage(appContext.packageName)
     intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
     appContext.startActivity(intent)
     Runtime.getRuntime().exit(0)
-}
-
-private fun normalizeSiteShareOrder(rawOrder: String?): List<String> {
-    return (rawOrder ?: DEFAULT_SITE_SHARE_ORDER)
-        .split(",")
-        .filter { it.isNotBlank() }
-        .toMutableList()
-        .apply {
-            if (!contains("elevation_profile")) {
-                val mapIndex = indexOf("map")
-                if (mapIndex >= 0) add(mapIndex + 1, "elevation_profile") else add("elevation_profile")
-            }
-            if (!contains("speedtest")) {
-                val addressIndex = indexOf("address")
-                if (addressIndex >= 0) add(addressIndex + 1, "speedtest") else add("speedtest")
-            }
-            if (!contains("throughput")) {
-                val speedtestIndex = indexOf("speedtest")
-                if (speedtestIndex >= 0) add(speedtestIndex + 1, "throughput") else add("throughput")
-            }
-            removeAll { it == "heights" }
-        }
-        .distinct()
 }
 
 @Composable
@@ -236,7 +218,7 @@ fun SettingsScreen(
 
     var themeMode by AppConfig.themeMode
     var isOledMode by AppConfig.isOledMode
-    val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
     val featureFlags by RemoteFeatureFlags.config
     val uiStyle = LocalGeoTowerUiStyle.current
     var showUnitSheet by remember { mutableStateOf(false) }
@@ -369,38 +351,36 @@ fun SettingsScreen(
     var showGlobalResetDialog by remember { mutableStateOf(false) }
 
     // ✅ AJOUT : Variables de la Carte
-    var shareMapAzimuths by remember { mutableStateOf(prefs.getBoolean("share_map_azimuths", true)) }
-    var shareMapSpeedometer by remember { mutableStateOf(prefs.getBoolean("share_map_speedometer", true)) }
-    var shareMapScale by remember { mutableStateOf(prefs.getBoolean("share_map_scale", true)) }
-    var shareMapAttribution by remember { mutableStateOf(prefs.getBoolean("share_map_attribution", true)) }
-    var shareMapConfidential by remember { mutableStateOf(prefs.getBoolean("share_map_confidential", false)) }
+    var shareMapAzimuths by remember { mutableStateOf(SharePrefs.mapAzimuths.read(prefs)) }
+    var shareMapSpeedometer by remember { mutableStateOf(SharePrefs.mapSpeedometer.read(prefs)) }
+    var shareMapScale by remember { mutableStateOf(SharePrefs.mapScale.read(prefs)) }
+    var shareMapAttribution by remember { mutableStateOf(SharePrefs.mapAttribution.read(prefs)) }
+    var shareMapConfidential by remember { mutableStateOf(SharePrefs.mapConfidential.read(prefs)) }
 
     // 1. Variables de l'Antenne (Site)
-    var shareMapEnabled by remember { mutableStateOf(prefs.getBoolean("share_map_enabled", true)) }
-    var shareElevationProfileEnabled by remember { mutableStateOf(prefs.getBoolean("share_elevation_profile_enabled", true)) }
-    var shareSupportEnabled by remember { mutableStateOf(prefs.getBoolean("share_support_enabled", true)) }
-    var shareIdsEnabled by remember { mutableStateOf(prefs.getBoolean("share_ids_enabled", true)) }
-    var shareDatesEnabled by remember { mutableStateOf(prefs.getBoolean("share_dates_enabled", true)) }
-    var shareAddressEnabled by remember { mutableStateOf(prefs.getBoolean("share_address_enabled", true)) }
-    var shareSpeedtestEnabled by remember { mutableStateOf(prefs.getBoolean("share_speedtest_enabled", true)) } // 🚨 NEW
-    var shareThroughputEnabled by remember { mutableStateOf(prefs.getBoolean("share_throughput_enabled", true)) }
-    var shareFreqEnabled by remember { mutableStateOf(prefs.getBoolean("share_freq_enabled", true)) }
-    var shareConfidentialEnabled by remember { mutableStateOf(prefs.getBoolean("share_confidential_enabled", false)) }
-    var shareSiteQrEnabled by remember { mutableStateOf(prefs.getBoolean("share_site_qr_enabled", true)) }
-    var shareSupQrEnabled by remember { mutableStateOf(prefs.getBoolean("share_sup_qr_enabled", true)) }
-    var shareSplitImageEnabled by remember { mutableStateOf(prefs.getBoolean("share_split_image_enabled", true)) } // ✅ NOUVELLE VARIABLE
+    var shareMapEnabled by remember { mutableStateOf(SharePrefs.siteMapEnabled.read(prefs)) }
+    var shareElevationProfileEnabled by remember { mutableStateOf(SharePrefs.siteElevationProfileEnabled.read(prefs)) }
+    var shareSupportEnabled by remember { mutableStateOf(SharePrefs.siteSupportEnabled.read(prefs)) }
+    var shareIdsEnabled by remember { mutableStateOf(SharePrefs.siteIdsEnabled.read(prefs)) }
+    var shareDatesEnabled by remember { mutableStateOf(SharePrefs.siteDatesEnabled.read(prefs)) }
+    var shareAddressEnabled by remember { mutableStateOf(SharePrefs.siteAddressEnabled.read(prefs)) }
+    var shareSpeedtestEnabled by remember { mutableStateOf(SharePrefs.siteSpeedtestEnabled.read(prefs)) } // 🚨 NEW
+    var shareThroughputEnabled by remember { mutableStateOf(SharePrefs.siteThroughputEnabled.read(prefs)) }
+    var shareFreqEnabled by remember { mutableStateOf(SharePrefs.siteFrequencyEnabled.read(prefs)) }
+    var shareConfidentialEnabled by remember { mutableStateOf(SharePrefs.siteConfidentialEnabled.read(prefs)) }
+    var shareSiteQrEnabled by remember { mutableStateOf(SharePrefs.siteQrEnabled.read(prefs)) }
+    var shareSupQrEnabled by remember { mutableStateOf(SharePrefs.supportQrEnabled.read(prefs)) }
+    var shareSplitImageEnabled by remember { mutableStateOf(SharePrefs.siteSplitImageEnabled.read(prefs)) } // ✅ NOUVELLE VARIABLE
     var shareOrder by remember {
-        mutableStateOf(
-            normalizeSiteShareOrder(prefs.getString("share_order", DEFAULT_SITE_SHARE_ORDER))
-        )
+        mutableStateOf(SharePrefs.siteOrder(prefs))
     }
 
     // 2. Variables du Pylône (Support) - SEULEMENT 3 BLOCS !
-    var shareSupMapEnabled by remember { mutableStateOf(prefs.getBoolean("share_sup_map_enabled", true)) }
-    var shareSupSupportEnabled by remember { mutableStateOf(prefs.getBoolean("share_sup_support_enabled", true)) }
-    var shareSupOperatorsEnabled by remember { mutableStateOf(prefs.getBoolean("share_sup_operators_enabled", true)) }
-    var shareSupConfidentialEnabled by remember { mutableStateOf(prefs.getBoolean("share_sup_confidential_enabled", false)) }
-    var shareSupOrder by remember { mutableStateOf(prefs.getString("share_sup_order", "map,support,operators")!!.split(",")) }
+    var shareSupMapEnabled by remember { mutableStateOf(SharePrefs.supportMapEnabled.read(prefs)) }
+    var shareSupSupportEnabled by remember { mutableStateOf(SharePrefs.supportDetailsEnabled.read(prefs)) }
+    var shareSupOperatorsEnabled by remember { mutableStateOf(SharePrefs.supportOperatorsEnabled.read(prefs)) }
+    var shareSupConfidentialEnabled by remember { mutableStateOf(SharePrefs.supportConfidentialEnabled.read(prefs)) }
+    var shareSupOrder by remember { mutableStateOf(SharePrefs.supportOrder(prefs)) }
 
     // --- VARIABLES POUR LA VISIBILITÉ DES PAGES ---
     var showNearbyPage by AppConfig.showNearbyPage
@@ -410,7 +390,7 @@ fun SettingsScreen(
 
     var showMapScale by remember { mutableStateOf(prefs.getBoolean("show_map_scale", true)) }
     var showMapAttribution by remember { mutableStateOf(prefs.getBoolean("show_map_attribution", true)) }
-    var showMapSpeedometer by remember { mutableStateOf(prefs.getBoolean("show_speedometer", true)) }
+    var showMapSpeedometer by remember { mutableStateOf(MapDisplayPrefs.showSpeedometer.read(prefs)) }
     var showMapSettingsSheet by remember { mutableStateOf(false) }
     var showMapLocation by remember { mutableStateOf(prefs.getBoolean("show_map_location", true)) }
     var showMapLocationMarker by AppConfig.showMapLocationMarker
@@ -434,117 +414,45 @@ fun SettingsScreen(
     var showSiteMiniMapSettingsSheet by remember { mutableStateOf(false) }
     var showPhotosSettingsSheet by remember { mutableStateOf(false) }
 
-    fun insertMissingAfter(order: MutableList<String>, item: String, after: String) {
-        if (!order.contains(item)) {
-            val afterIndex = order.indexOf(after)
-            if (afterIndex >= 0) order.add(afterIndex + 1, item) else order.add(item)
-        }
-    }
-
-    fun normalizeSupportOrder(order: List<String>): List<String> {
-        val mutableOrder = order.filter { it.isNotBlank() }.toMutableList()
-        mutableOrder.remove("open_map")
-        val navIndex = mutableOrder.indexOf("nav")
-        if (navIndex >= 0) mutableOrder.add(navIndex, "open_map") else mutableOrder.add("open_map")
-        return mutableOrder
-    }
-
-    fun normalizeSiteOrder(order: List<String>): List<String> {
-        val mutableOrder = order.filter { it.isNotBlank() }.toMutableList()
-        if (!mutableOrder.contains("speedtest")) {
-            val photosIndex = mutableOrder.indexOf("photos")
-            if (photosIndex >= 0) mutableOrder.add(photosIndex + 1, "speedtest") else mutableOrder.add("speedtest")
-        }
-        if (!mutableOrder.contains("open_map")) {
-            val elevationProfileIndex = mutableOrder.indexOf("elevation_profile")
-            if (elevationProfileIndex >= 0) {
-                mutableOrder.add(elevationProfileIndex + 1, "open_map")
-            } else {
-                insertMissingAfter(mutableOrder, "open_map", "support_details")
-            }
-        }
-        if (!mutableOrder.contains("elevation_profile")) {
-            val openMapIndex = mutableOrder.indexOf("open_map")
-            if (openMapIndex >= 0) mutableOrder.add(openMapIndex, "elevation_profile") else mutableOrder.add("elevation_profile")
-        }
-        if (!mutableOrder.contains("throughput_calculator")) {
-            val elevationProfileIndex = mutableOrder.indexOf("elevation_profile")
-            val openMapIndex = mutableOrder.indexOf("open_map")
-            when {
-                elevationProfileIndex >= 0 -> mutableOrder.add(elevationProfileIndex + 1, "throughput_calculator")
-                openMapIndex >= 0 -> mutableOrder.add(openMapIndex, "throughput_calculator")
-                else -> mutableOrder.add("throughput_calculator")
-            }
-        }
-        val openMapIndex = mutableOrder.indexOf("open_map")
-        val elevationProfileIndex = mutableOrder.indexOf("elevation_profile")
-        if (openMapIndex >= 0 && elevationProfileIndex >= 0 && openMapIndex < elevationProfileIndex) {
-            mutableOrder.remove("elevation_profile")
-            mutableOrder.remove("open_map")
-            mutableOrder.add(openMapIndex, "elevation_profile")
-            mutableOrder.add(openMapIndex + 1, "open_map")
-        }
-        return mutableOrder
-    }
-
-    val defaultThroughputOrder = listOf("header", "summary", "cone", "controls", "bands", "assumptions")
-    fun normalizeThroughputOrder(order: List<String>): List<String> {
-        val knownBlocks = defaultThroughputOrder.toSet()
-        val mutableOrder = order.map { it.trim() }.filter { it in knownBlocks }.distinct().toMutableList()
-        defaultThroughputOrder.forEach { block ->
-            if (!mutableOrder.contains(block)) mutableOrder.add(block)
-        }
-        return mutableOrder
-    }
-
-    var pageSupportOrder by remember { mutableStateOf(normalizeSupportOrder(prefs.getString("page_support_order", "map,details,photos,open_map,nav,share,operators")!!.split(","))) }
-    var pageSupportMap by remember { mutableStateOf(prefs.getBoolean("page_support_map", true)) }
-    var pageSupportDetails by remember { mutableStateOf(prefs.getBoolean("page_support_details", true)) }
-    var pageSupportPhotos by remember { mutableStateOf(prefs.getBoolean("page_support_photos", true)) }
-    var pageSupportOpenMap by remember { mutableStateOf(prefs.getBoolean("page_support_open_map", true)) }
-    var pageSupportNav by remember { mutableStateOf(prefs.getBoolean("page_support_nav", true)) }
-    var pageSupportShare by remember { mutableStateOf(prefs.getBoolean("page_support_share", true)) }
-    var pageSupportOperators by remember { mutableStateOf(prefs.getBoolean("page_support_operators", true)) }
-    var pageSupportMiniMapMode by remember { mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString("page_support_mini_map_mode", null))) }
+    var pageSupportOrder by remember { mutableStateOf(SupportPagePrefs.order(prefs)) }
+    var pageSupportMap by remember { mutableStateOf(SupportPagePrefs.map.read(prefs)) }
+    var pageSupportDetails by remember { mutableStateOf(SupportPagePrefs.details.read(prefs)) }
+    var pageSupportPhotos by remember { mutableStateOf(SupportPagePrefs.photos.read(prefs)) }
+    var pageSupportOpenMap by remember { mutableStateOf(SupportPagePrefs.openMap.read(prefs)) }
+    var pageSupportNav by remember { mutableStateOf(SupportPagePrefs.nav.read(prefs)) }
+    var pageSupportShare by remember { mutableStateOf(SupportPagePrefs.share.read(prefs)) }
+    var pageSupportOperators by remember { mutableStateOf(SupportPagePrefs.operators.read(prefs)) }
+    var pageSupportMiniMapMode by remember { mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString(SupportPagePrefs.MINI_MAP_MODE, null))) }
 
     // --- Variables d'état pour l'Antenne (Site) ---
     var pageSiteOrder by remember {
-        mutableStateOf(
-            normalizeSiteOrder(
-                (prefs.getString("page_site_order", "operator,bearing_height,map,support_details,elevation_profile,throughput_calculator,open_map,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links") ?: "operator,bearing_height,map,support_details,elevation_profile,throughput_calculator,open_map,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links")
-                    .split(",")
-            )
-        )
-    };    var pageSiteOperator by remember { mutableStateOf(prefs.getBoolean("page_site_operator", true)) }
-    var pageSiteBearingHeight by remember { mutableStateOf(prefs.getBoolean("page_site_bearing_height", true)) }
-    var pageSiteMap by remember { mutableStateOf(prefs.getBoolean("page_site_map", true)) }
-    var pageSiteSupportDetails by remember { mutableStateOf(prefs.getBoolean("page_site_support_details", true)) }
-    var pageSitePanelHeights by remember { mutableStateOf(prefs.getBoolean("page_site_panel_heights", true)) }
-    var pageSiteIds by remember { mutableStateOf(prefs.getBoolean("page_site_ids", true)) }
-    var pageSiteOpenMap by remember { mutableStateOf(prefs.getBoolean("page_site_open_map", true)) }
-    var pageSiteElevationProfile by remember { mutableStateOf(prefs.getBoolean("page_site_elevation_profile", true)) }
-    var pageSiteThroughputCalculator by remember { mutableStateOf(prefs.getBoolean("page_site_throughput_calculator", true)) }
-    var pageSiteNav by remember { mutableStateOf(prefs.getBoolean("page_site_nav", true)) }
-    var pageSiteShare by remember { mutableStateOf(prefs.getBoolean("page_site_share", true)) }
-    var pageSiteDates by remember { mutableStateOf(prefs.getBoolean("page_site_dates", true)) }
-    var pageSiteAddress by remember { mutableStateOf(prefs.getBoolean("page_site_address", true)) }
-    var pageSiteFreqs by remember { mutableStateOf(prefs.getBoolean("page_site_freqs", true)) }
-    var pageSiteLinks by remember { mutableStateOf(prefs.getBoolean("page_site_links", true)) }
-    var pageSiteMiniMapMode by remember { mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString("page_site_mini_map_mode", null))) }
-    var pageThroughputOrder by remember {
-        mutableStateOf(
-            normalizeThroughputOrder(
-                (prefs.getString("page_throughput_order", defaultThroughputOrder.joinToString(",")) ?: defaultThroughputOrder.joinToString(","))
-                    .split(",")
-            )
-        )
+        mutableStateOf(SitePagePrefs.order(prefs))
     }
-    var pageThroughputHeader by remember { mutableStateOf(prefs.getBoolean("page_throughput_header", true)) }
-    var pageThroughputSummary by remember { mutableStateOf(prefs.getBoolean("page_throughput_summary", true)) }
-    var pageThroughputCone by remember { mutableStateOf(prefs.getBoolean("page_throughput_cone", true)) }
-    var pageThroughputControls by remember { mutableStateOf(prefs.getBoolean("page_throughput_controls", true)) }
-    var pageThroughputBands by remember { mutableStateOf(prefs.getBoolean("page_throughput_bands", true)) }
-    var pageThroughputAssumptions by remember { mutableStateOf(prefs.getBoolean("page_throughput_assumptions", true)) }
+    var pageSiteOperator by remember { mutableStateOf(SitePagePrefs.operator.read(prefs)) }
+    var pageSiteBearingHeight by remember { mutableStateOf(SitePagePrefs.bearingHeight.read(prefs)) }
+    var pageSiteMap by remember { mutableStateOf(SitePagePrefs.map.read(prefs)) }
+    var pageSiteSupportDetails by remember { mutableStateOf(SitePagePrefs.supportDetails.read(prefs)) }
+    var pageSitePanelHeights by remember { mutableStateOf(SitePagePrefs.panelHeights.read(prefs)) }
+    var pageSiteIds by remember { mutableStateOf(SitePagePrefs.ids.read(prefs)) }
+    var pageSiteOpenMap by remember { mutableStateOf(SitePagePrefs.openMap.read(prefs)) }
+    var pageSiteElevationProfile by remember { mutableStateOf(SitePagePrefs.elevationProfile.read(prefs)) }
+    var pageSiteThroughputCalculator by remember { mutableStateOf(SitePagePrefs.throughputCalculator.read(prefs)) }
+    var pageSiteNav by remember { mutableStateOf(SitePagePrefs.nav.read(prefs)) }
+    var pageSiteShare by remember { mutableStateOf(SitePagePrefs.share.read(prefs)) }
+    var pageSiteDates by remember { mutableStateOf(SitePagePrefs.dates.read(prefs)) }
+    var pageSiteAddress by remember { mutableStateOf(SitePagePrefs.address.read(prefs)) }
+    var pageSiteFreqs by remember { mutableStateOf(SitePagePrefs.freqs.read(prefs)) }
+    var pageSiteLinks by remember { mutableStateOf(SitePagePrefs.links.read(prefs)) }
+    var pageSiteMiniMapMode by remember { mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString(SitePagePrefs.MINI_MAP_MODE, null))) }
+    var pageThroughputOrder by remember {
+        mutableStateOf(ThroughputPrefs.blockOrder(prefs))
+    }
+    var pageThroughputHeader by remember { mutableStateOf(prefs.getBoolean(ThroughputPrefs.BLOCK_HEADER_VISIBLE, true)) }
+    var pageThroughputSummary by remember { mutableStateOf(prefs.getBoolean(ThroughputPrefs.BLOCK_SUMMARY_VISIBLE, true)) }
+    var pageThroughputCone by remember { mutableStateOf(prefs.getBoolean(ThroughputPrefs.BLOCK_CONE_VISIBLE, true)) }
+    var pageThroughputControls by remember { mutableStateOf(prefs.getBoolean(ThroughputPrefs.BLOCK_CONTROLS_VISIBLE, true)) }
+    var pageThroughputBands by remember { mutableStateOf(prefs.getBoolean(ThroughputPrefs.BLOCK_BANDS_VISIBLE, true)) }
+    var pageThroughputAssumptions by remember { mutableStateOf(prefs.getBoolean(ThroughputPrefs.BLOCK_ASSUMPTIONS_VISIBLE, true)) }
 
     var showPagesCustomizationSheet by remember { mutableStateOf(false) }
     var showFrequenciesSheet by remember { mutableStateOf(false) }
@@ -560,11 +468,11 @@ fun SettingsScreen(
     // On préparera les autres (showHomeSettingsSheet, etc.) dans la prochaine étape
 
     // La sauvegarde de la page de démarrage
-    var startupPage by remember { mutableStateOf(prefs.getString("startup_page", "home") ?: "home") }
+    var startupPage by remember { mutableStateOf(HomePrefs.startupPage(prefs)) }
     var showHomeSettingsSheet by remember { mutableStateOf(false) }
     var pagesOrder by remember {
         mutableStateOf(
-            (prefs.getString("pages_order", "nearby,map,compass,stats,settings") ?: "nearby,map,compass,stats,settings")
+            (prefs.getString(HomePrefs.PAGES_ORDER, HomePrefs.DEFAULT_PAGES_ORDER) ?: HomePrefs.DEFAULT_PAGES_ORDER)
                 .let { if (!it.contains("settings")) "$it,settings" else it }
                 .split(",")
         )
@@ -599,10 +507,10 @@ fun SettingsScreen(
 
     LaunchedEffect(Unit) {
         AppConfig.menuSize.value = prefs.getString("menuSize", "normal") ?: "normal"
-        showNearbyPage = prefs.getBoolean("show_nearby_page", true)
-        showMapPage = prefs.getBoolean("show_map_page", true)
-        showCompassPage = prefs.getBoolean("show_compass_page", true)
-        showStatsPage = prefs.getBoolean("show_stats_page", true)
+        showNearbyPage = HomePrefs.showNearbyPage.read(prefs)
+        showMapPage = HomePrefs.showMapPage.read(prefs)
+        showCompassPage = HomePrefs.showCompassPage.read(prefs)
+        showStatsPage = HomePrefs.showStatsPage.read(prefs)
     }
 
     val logoResId by AppIconManager.currentIconRes
@@ -612,8 +520,8 @@ fun SettingsScreen(
         pageSupportPhotos = visible
         AppConfig.siteShowPhotos.value = visible
         prefs.edit()
-            .putBoolean("page_support_photos", visible)
-            .putBoolean("page_site_photos", visible)
+            .putBoolean(SupportPagePrefs.photos.key, visible)
+            .putBoolean(SitePagePrefs.photos.key, visible)
             .apply()
     }
 
@@ -1019,7 +927,7 @@ fun SettingsScreen(
                 currentStartupPage = startupPage,
                 onPageSelected = { newPage ->
                     startupPage = newPage
-                    prefs.edit().putString("startup_page", newPage).apply()
+                    prefs.edit().putString(HomePrefs.STARTUP_PAGE, newPage).apply()
                 },
                 onDismiss = { showStartupPageSheet = false },
                 onBack = {
@@ -1038,43 +946,43 @@ fun SettingsScreen(
                 showThroughputCalculator = pageSiteThroughputCalculator,
                 onThroughputCalculatorChange = {
                     pageSiteThroughputCalculator = it
-                    prefs.edit().putBoolean("page_site_throughput_calculator", it).apply()
+                    prefs.edit().putBoolean(SitePagePrefs.throughputCalculator.key, it).apply()
                 },
                 throughputOrder = pageThroughputOrder,
                 onThroughputOrderChange = {
-                    val normalized = normalizeThroughputOrder(it)
+                    val normalized = ThroughputPrefs.normalizeBlockOrder(it)
                     pageThroughputOrder = normalized
-                    prefs.edit().putString("page_throughput_order", normalized.joinToString(",")).apply()
+                    prefs.edit().putString(ThroughputPrefs.BLOCK_ORDER, normalized.joinToString(",")).apply()
                 },
                 showHeader = pageThroughputHeader,
                 onHeaderChange = {
                     pageThroughputHeader = it
-                    prefs.edit().putBoolean("page_throughput_header", it).apply()
+                    prefs.edit().putBoolean(ThroughputPrefs.BLOCK_HEADER_VISIBLE, it).apply()
                 },
                 showSummary = pageThroughputSummary,
                 onSummaryChange = {
                     pageThroughputSummary = it
-                    prefs.edit().putBoolean("page_throughput_summary", it).apply()
+                    prefs.edit().putBoolean(ThroughputPrefs.BLOCK_SUMMARY_VISIBLE, it).apply()
                 },
                 showCone = pageThroughputCone,
                 onConeChange = {
                     pageThroughputCone = it
-                    prefs.edit().putBoolean("page_throughput_cone", it).apply()
+                    prefs.edit().putBoolean(ThroughputPrefs.BLOCK_CONE_VISIBLE, it).apply()
                 },
                 showControls = pageThroughputControls,
                 onControlsChange = {
                     pageThroughputControls = it
-                    prefs.edit().putBoolean("page_throughput_controls", it).apply()
+                    prefs.edit().putBoolean(ThroughputPrefs.BLOCK_CONTROLS_VISIBLE, it).apply()
                 },
                 showBands = pageThroughputBands,
                 onBandsChange = {
                     pageThroughputBands = it
-                    prefs.edit().putBoolean("page_throughput_bands", it).apply()
+                    prefs.edit().putBoolean(ThroughputPrefs.BLOCK_BANDS_VISIBLE, it).apply()
                 },
                 showAssumptions = pageThroughputAssumptions,
                 onAssumptionsChange = {
                     pageThroughputAssumptions = it
-                    prefs.edit().putBoolean("page_throughput_assumptions", it).apply()
+                    prefs.edit().putBoolean(ThroughputPrefs.BLOCK_ASSUMPTIONS_VISIBLE, it).apply()
                 },
                 onOpenCalculationDefaults = {
                     showThroughputCalculatorSettingsSheet = false
@@ -1115,7 +1023,7 @@ fun SettingsScreen(
                 pagesOrder = pagesOrder,
                 onOrderChange = { newOrder ->
                     pagesOrder = newOrder
-                    prefs.edit().putString("pages_order", newOrder.joinToString(",")).apply()
+                    prefs.edit().putString(HomePrefs.PAGES_ORDER, newOrder.joinToString(",")).apply()
                 },
                 showNearby = showNearbyPage,
                 onNearbyChange = {
@@ -1225,7 +1133,7 @@ fun SettingsScreen(
                 onSpeedometerChange = {
                     showMapSpeedometer = it
                     AppConfig.showSpeedometer.value = it
-                    prefs.edit().putBoolean("show_speedometer", it).apply()
+                    prefs.edit().putBoolean(MapDisplayPrefs.showSpeedometer.key, it).apply()
                 },
 
                 onDismiss = { showMapSettingsSheet = false },
@@ -1285,14 +1193,14 @@ fun SettingsScreen(
 
         if (showSupportSettingsSheet) {
             SupportSettingsSheet(
-                supportOrder = pageSupportOrder, onOrderChange = { pageSupportOrder = it; prefs.edit().putString("page_support_order", it.joinToString(",")).apply() },
-                showMap = pageSupportMap, onMapChange = { pageSupportMap = it; prefs.edit().putBoolean("page_support_map", it).apply() },
-                showDetails = pageSupportDetails, onDetailsChange = { pageSupportDetails = it; prefs.edit().putBoolean("page_support_details", it).apply() },
+                supportOrder = pageSupportOrder, onOrderChange = { pageSupportOrder = it; prefs.edit().putString(SupportPagePrefs.ORDER, it.joinToString(",")).apply() },
+                showMap = pageSupportMap, onMapChange = { pageSupportMap = it; prefs.edit().putBoolean(SupportPagePrefs.map.key, it).apply() },
+                showDetails = pageSupportDetails, onDetailsChange = { pageSupportDetails = it; prefs.edit().putBoolean(SupportPagePrefs.details.key, it).apply() },
                 showPhotos = AppConfig.siteShowPhotos.value, onPhotosChange = ::updateSharedPhotosVisibility,
-                showOpenMap = pageSupportOpenMap, onOpenMapChange = { pageSupportOpenMap = it; prefs.edit().putBoolean("page_support_open_map", it).apply() },
-                showNav = pageSupportNav, onNavChange = { pageSupportNav = it; prefs.edit().putBoolean("page_support_nav", it).apply() },
-                showShare = pageSupportShare, onShareChange = { pageSupportShare = it; prefs.edit().putBoolean("page_support_share", it).apply() },
-                showOperators = pageSupportOperators, onOperatorsChange = { pageSupportOperators = it; prefs.edit().putBoolean("page_support_operators", it).apply() },
+                showOpenMap = pageSupportOpenMap, onOpenMapChange = { pageSupportOpenMap = it; prefs.edit().putBoolean(SupportPagePrefs.openMap.key, it).apply() },
+                showNav = pageSupportNav, onNavChange = { pageSupportNav = it; prefs.edit().putBoolean(SupportPagePrefs.nav.key, it).apply() },
+                showShare = pageSupportShare, onShareChange = { pageSupportShare = it; prefs.edit().putBoolean(SupportPagePrefs.share.key, it).apply() },
+                showOperators = pageSupportOperators, onOperatorsChange = { pageSupportOperators = it; prefs.edit().putBoolean(SupportPagePrefs.operators.key, it).apply() },
                 onOpenMiniMapSettings = {
                     showSupportSettingsSheet = false
                     showSupportMiniMapSettingsSheet = true
@@ -1312,25 +1220,25 @@ fun SettingsScreen(
 
         if (showSiteSettingsSheet) {
             SiteSettingsSheet(
-                siteOrder = pageSiteOrder, onOrderChange = { pageSiteOrder = it; prefs.edit().putString("page_site_order", it.joinToString(",")).apply() },
-                showOperator = pageSiteOperator, onOperatorChange = { pageSiteOperator = it; prefs.edit().putBoolean("page_site_operator", it).apply() },
-                showBearingHeight = pageSiteBearingHeight, onBearingHeightChange = { pageSiteBearingHeight = it; prefs.edit().putBoolean("page_site_bearing_height", it).apply() },
-                showMap = pageSiteMap, onMapChange = { pageSiteMap = it; prefs.edit().putBoolean("page_site_map", it).apply() },
-                showSupportDetails = pageSiteSupportDetails, onSupportDetailsChange = { pageSiteSupportDetails = it; prefs.edit().putBoolean("page_site_support_details", it).apply() },
+                siteOrder = pageSiteOrder, onOrderChange = { pageSiteOrder = it; prefs.edit().putString(SitePagePrefs.ORDER, it.joinToString(",")).apply() },
+                showOperator = pageSiteOperator, onOperatorChange = { pageSiteOperator = it; prefs.edit().putBoolean(SitePagePrefs.operator.key, it).apply() },
+                showBearingHeight = pageSiteBearingHeight, onBearingHeightChange = { pageSiteBearingHeight = it; prefs.edit().putBoolean(SitePagePrefs.bearingHeight.key, it).apply() },
+                showMap = pageSiteMap, onMapChange = { pageSiteMap = it; prefs.edit().putBoolean(SitePagePrefs.map.key, it).apply() },
+                showSupportDetails = pageSiteSupportDetails, onSupportDetailsChange = { pageSiteSupportDetails = it; prefs.edit().putBoolean(SitePagePrefs.supportDetails.key, it).apply() },
                 showPhotos = AppConfig.siteShowPhotos.value, onPhotosChange = ::updateSharedPhotosVisibility,
-                showPanelHeights = pageSitePanelHeights, onPanelHeightsChange = { pageSitePanelHeights = it; prefs.edit().putBoolean("page_site_panel_heights", it).apply() },
-                showIds = pageSiteIds, onIdsChange = { pageSiteIds = it; prefs.edit().putBoolean("page_site_ids", it).apply() },
-                showOpenMap = pageSiteOpenMap, onOpenMapChange = { pageSiteOpenMap = it; prefs.edit().putBoolean("page_site_open_map", it).apply() },
-                showElevationProfile = pageSiteElevationProfile, onElevationProfileChange = { pageSiteElevationProfile = it; prefs.edit().putBoolean("page_site_elevation_profile", it).apply() },
-                showThroughputCalculator = pageSiteThroughputCalculator, onThroughputCalculatorChange = { pageSiteThroughputCalculator = it; prefs.edit().putBoolean("page_site_throughput_calculator", it).apply() },
-                showNav = pageSiteNav, onNavChange = { pageSiteNav = it; prefs.edit().putBoolean("page_site_nav", it).apply() },
-                showShare = pageSiteShare, onShareChange = { pageSiteShare = it; prefs.edit().putBoolean("page_site_share", it).apply() },
-                showDates = pageSiteDates, onDatesChange = { pageSiteDates = it; prefs.edit().putBoolean("page_site_dates", it).apply() },
-                showAddress = pageSiteAddress, onAddressChange = { pageSiteAddress = it; prefs.edit().putBoolean("page_site_address", it).apply() },
+                showPanelHeights = pageSitePanelHeights, onPanelHeightsChange = { pageSitePanelHeights = it; prefs.edit().putBoolean(SitePagePrefs.panelHeights.key, it).apply() },
+                showIds = pageSiteIds, onIdsChange = { pageSiteIds = it; prefs.edit().putBoolean(SitePagePrefs.ids.key, it).apply() },
+                showOpenMap = pageSiteOpenMap, onOpenMapChange = { pageSiteOpenMap = it; prefs.edit().putBoolean(SitePagePrefs.openMap.key, it).apply() },
+                showElevationProfile = pageSiteElevationProfile, onElevationProfileChange = { pageSiteElevationProfile = it; prefs.edit().putBoolean(SitePagePrefs.elevationProfile.key, it).apply() },
+                showThroughputCalculator = pageSiteThroughputCalculator, onThroughputCalculatorChange = { pageSiteThroughputCalculator = it; prefs.edit().putBoolean(SitePagePrefs.throughputCalculator.key, it).apply() },
+                showNav = pageSiteNav, onNavChange = { pageSiteNav = it; prefs.edit().putBoolean(SitePagePrefs.nav.key, it).apply() },
+                showShare = pageSiteShare, onShareChange = { pageSiteShare = it; prefs.edit().putBoolean(SitePagePrefs.share.key, it).apply() },
+                showDates = pageSiteDates, onDatesChange = { pageSiteDates = it; prefs.edit().putBoolean(SitePagePrefs.dates.key, it).apply() },
+                showAddress = pageSiteAddress, onAddressChange = { pageSiteAddress = it; prefs.edit().putBoolean(SitePagePrefs.address.key, it).apply() },
                 showStatus = AppConfig.siteShowStatus.value, onStatusChange = { AppConfig.siteShowStatus.value = it; prefs.edit().putBoolean("site_show_status", it).apply() }, // 🚨 AJOUT DU STATUT
                 showSpeedtest = AppConfig.siteShowSpeedtest.value, onSpeedtestChange = { AppConfig.siteShowSpeedtest.value = it; prefs.edit().putBoolean("site_show_speedtest", it).apply() }, // 🚨 NEW
-                showFreqs = pageSiteFreqs, onFreqsChange = { pageSiteFreqs = it; prefs.edit().putBoolean("page_site_freqs", it).apply() },
-                showLinks = pageSiteLinks, onLinksChange = { pageSiteLinks = it; prefs.edit().putBoolean("page_site_links", it).apply() },
+                showFreqs = pageSiteFreqs, onFreqsChange = { pageSiteFreqs = it; prefs.edit().putBoolean(SitePagePrefs.freqs.key, it).apply() },
+                showLinks = pageSiteLinks, onLinksChange = { pageSiteLinks = it; prefs.edit().putBoolean(SitePagePrefs.links.key, it).apply() },
                 onOpenMiniMapSettings = {
                     showSiteSettingsSheet = false
                     showSiteMiniMapSettingsSheet = true
@@ -1420,7 +1328,7 @@ fun SettingsScreen(
                 selectedMode = pageSupportMiniMapMode,
                 onModeChange = {
                     pageSupportMiniMapMode = it
-                    prefs.edit().putString("page_support_mini_map_mode", it.storageKey).apply()
+                    prefs.edit().putString(SupportPagePrefs.MINI_MAP_MODE, it.storageKey).apply()
                 },
                 onDismiss = { showSupportMiniMapSettingsSheet = false },
                 onBack = {
@@ -1440,7 +1348,7 @@ fun SettingsScreen(
                 selectedMode = pageSiteMiniMapMode,
                 onModeChange = {
                     pageSiteMiniMapMode = it
-                    prefs.edit().putString("page_site_mini_map_mode", it.storageKey).apply()
+                    prefs.edit().putString(SitePagePrefs.MINI_MAP_MODE, it.storageKey).apply()
                 },
                 onDismiss = { showSiteMiniMapSettingsSheet = false },
                 onBack = {
@@ -1528,29 +1436,29 @@ fun SettingsScreen(
                 shareOrder = shareSupOrder,
                 onOrderChange = { newOrder ->
                     shareSupOrder = newOrder; prefs.edit()
-                    .putString("share_sup_order", newOrder.joinToString(",")).apply()
+                    .putString(SharePrefs.SUPPORT_ORDER, newOrder.joinToString(",")).apply()
                 },
                 mapEnabled = shareSupMapEnabled,
                 onMapChange = {
-                    shareSupMapEnabled = it; prefs.edit().putBoolean("share_sup_map_enabled", it)
+                    shareSupMapEnabled = it; prefs.edit().putBoolean(SharePrefs.supportMapEnabled.key, it)
                     .apply()
                 },
                 supportEnabled = shareSupSupportEnabled,
                 onSupportChange = {
                     shareSupSupportEnabled = it; prefs.edit()
-                    .putBoolean("share_sup_support_enabled", it).apply()
+                    .putBoolean(SharePrefs.supportDetailsEnabled.key, it).apply()
                 },
                 operatorsEnabled = shareSupOperatorsEnabled,
                 onOperatorsChange = {
                     shareSupOperatorsEnabled = it; prefs.edit()
-                    .putBoolean("share_sup_operators_enabled", it).apply()
+                    .putBoolean(SharePrefs.supportOperatorsEnabled.key, it).apply()
                 },
                 qrEnabled = shareSupQrEnabled,
-                onQrChange = { shareSupQrEnabled = it; prefs.edit().putBoolean("share_sup_qr_enabled", it).apply() },
+                onQrChange = { shareSupQrEnabled = it; prefs.edit().putBoolean(SharePrefs.supportQrEnabled.key, it).apply() },
                 confidentialEnabled = shareSupConfidentialEnabled,
                 onConfidentialChange = {
                     shareSupConfidentialEnabled = it; prefs.edit()
-                    .putBoolean("share_sup_confidential_enabled", it).apply()
+                    .putBoolean(SharePrefs.supportConfidentialEnabled.key, it).apply()
                 },
                 onDismiss = { showSupportSharePrefsSheet = false },
                 onBack = {
@@ -1592,33 +1500,33 @@ fun SettingsScreen(
                 shareOrder = shareOrder,
                 onOrderChange = { newOrder ->
                     shareOrder = newOrder
-                    prefs.edit().putString("share_order", newOrder.joinToString(",")).apply()
+                    prefs.edit().putString(SharePrefs.SITE_ORDER, newOrder.joinToString(",")).apply()
                 },
                 mapEnabled = shareMapEnabled,
                 onMapChange = {
-                    shareMapEnabled = it; prefs.edit().putBoolean("share_map_enabled", it).apply()
+                    shareMapEnabled = it; prefs.edit().putBoolean(SharePrefs.siteMapEnabled.key, it).apply()
                 },
                 elevationProfileEnabled = shareElevationProfileEnabled,
                 onElevationProfileChange = {
-                    shareElevationProfileEnabled = it; prefs.edit().putBoolean("share_elevation_profile_enabled", it).apply()
+                    shareElevationProfileEnabled = it; prefs.edit().putBoolean(SharePrefs.siteElevationProfileEnabled.key, it).apply()
                 },
                 supportEnabled = shareSupportEnabled,
                 onSupportChange = {
-                    shareSupportEnabled = it; prefs.edit().putBoolean("share_support_enabled", it)
+                    shareSupportEnabled = it; prefs.edit().putBoolean(SharePrefs.siteSupportEnabled.key, it)
                     .apply()
                 },
                 idsEnabled = shareIdsEnabled,
                 onIdsChange = {
-                    shareIdsEnabled = it; prefs.edit().putBoolean("share_ids_enabled", it).apply()
+                    shareIdsEnabled = it; prefs.edit().putBoolean(SharePrefs.siteIdsEnabled.key, it).apply()
                 },
                 datesEnabled = shareDatesEnabled,
                 onDatesChange = {
-                    shareDatesEnabled = it; prefs.edit().putBoolean("share_dates_enabled", it)
+                    shareDatesEnabled = it; prefs.edit().putBoolean(SharePrefs.siteDatesEnabled.key, it)
                     .apply()
                 },
                 addressEnabled = shareAddressEnabled,
                 onAddressChange = {
-                    shareAddressEnabled = it; prefs.edit().putBoolean("share_address_enabled", it).apply()
+                    shareAddressEnabled = it; prefs.edit().putBoolean(SharePrefs.siteAddressEnabled.key, it).apply()
                 },
                 statusEnabled = AppConfig.shareSiteStatus.value,
                 onStatusChange = {
@@ -1626,29 +1534,29 @@ fun SettingsScreen(
                 },
                 speedtestEnabled = shareSpeedtestEnabled, // 🚨 NEW
                 onSpeedtestChange = {
-                    shareSpeedtestEnabled = it; prefs.edit().putBoolean("share_speedtest_enabled", it).apply()
+                    shareSpeedtestEnabled = it; prefs.edit().putBoolean(SharePrefs.siteSpeedtestEnabled.key, it).apply()
                 },
                 throughputEnabled = shareThroughputEnabled,
                 onThroughputChange = {
-                    shareThroughputEnabled = it; prefs.edit().putBoolean("share_throughput_enabled", it).apply()
+                    shareThroughputEnabled = it; prefs.edit().putBoolean(SharePrefs.siteThroughputEnabled.key, it).apply()
                 },
                 freqEnabled = shareFreqEnabled,
                 onFreqChange = {
-                    shareFreqEnabled = it; prefs.edit().putBoolean("share_freq_enabled", it).apply()
+                    shareFreqEnabled = it; prefs.edit().putBoolean(SharePrefs.siteFrequencyEnabled.key, it).apply()
                 },
                 qrEnabled = shareSiteQrEnabled,
-                onQrChange = { shareSiteQrEnabled = it; prefs.edit().putBoolean("share_site_qr_enabled", it).apply() },
+                onQrChange = { shareSiteQrEnabled = it; prefs.edit().putBoolean(SharePrefs.siteQrEnabled.key, it).apply() },
 
                 // ✅ AJOUT DES DEUX PARAMÈTRES MANQUANTS ICI :
                 splitImageEnabled = shareSplitImageEnabled,
                 onSplitImageChange = {
-                    shareSplitImageEnabled = it; prefs.edit().putBoolean("share_split_image_enabled", it).apply()
+                    shareSplitImageEnabled = it; prefs.edit().putBoolean(SharePrefs.siteSplitImageEnabled.key, it).apply()
                 },
 
                 confidentialEnabled = shareConfidentialEnabled,
                 onConfidentialChange = {
                     shareConfidentialEnabled = it; prefs.edit()
-                    .putBoolean("share_confidential_enabled", it).apply()
+                    .putBoolean(SharePrefs.siteConfidentialEnabled.key, it).apply()
                 },
                 onDismiss = { showSharePrefsSheet = false },
                 onBack = {
@@ -1668,22 +1576,22 @@ fun SettingsScreen(
             // ✅ On change 'compass' par 'azimuths'
             azimuthsEnabled = shareMapAzimuths,
             onAzimuthsChange = {
-                shareMapAzimuths = it; prefs.edit().putBoolean("share_map_azimuths", it).apply()
+                shareMapAzimuths = it; prefs.edit().putBoolean(SharePrefs.mapAzimuths.key, it).apply()
                 AppConfig.shareMapAzimuths.value = it // Met à jour l'état global
             },
             speedometerEnabled = shareMapSpeedometer,
             onSpeedometerChange = {
-                shareMapSpeedometer = it; prefs.edit().putBoolean("share_map_speedometer", it).apply()
+                shareMapSpeedometer = it; prefs.edit().putBoolean(SharePrefs.mapSpeedometer.key, it).apply()
                 AppConfig.shareMapSpeedometer.value = it
             },
             scaleEnabled = shareMapScale,
             onScaleChange = {
-                shareMapScale = it; prefs.edit().putBoolean("share_map_scale", it).apply()
+                shareMapScale = it; prefs.edit().putBoolean(SharePrefs.mapScale.key, it).apply()
                 AppConfig.shareMapScale.value = it
             },
             attributionEnabled = shareMapAttribution,
             onAttributionChange = {
-                shareMapAttribution = it; prefs.edit().putBoolean("share_map_attribution", it).apply()
+                shareMapAttribution = it; prefs.edit().putBoolean(SharePrefs.mapAttribution.key, it).apply()
                 AppConfig.shareMapAttribution.value = it
             },
             statusEnabled = AppConfig.shareSiteStatus.value, // 🚨 C'EST ICI QU'IL MANQUAIT LES VARIABLES !
@@ -1692,7 +1600,7 @@ fun SettingsScreen(
             },
             confidentialEnabled = shareMapConfidential,
             onConfidentialChange = {
-                shareMapConfidential = it; prefs.edit().putBoolean("share_map_confidential", it).apply()
+                shareMapConfidential = it; prefs.edit().putBoolean(SharePrefs.mapConfidential.key, it).apply()
                 AppConfig.shareMapConfidential.value = it
             },
             onDismiss = { showMapSharePrefsSheet = false },
@@ -1825,7 +1733,7 @@ fun SectionApparence(
     onColorPaletteClick: () -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val prefs = context.getSharedPreferences("GeoTowerPrefs", android.content.Context.MODE_PRIVATE)
+    val prefs = context.getSharedPreferences(PreferenceStores.APP, android.content.Context.MODE_PRIVATE)
     val menuSize by AppConfig.menuSize
     val logoDrawingChoice by AppConfig.appLogoDrawingChoice
     val isDark = LocalGeoTowerUiStyle.current.isDark
@@ -1884,7 +1792,7 @@ fun SectionPreferences(
 ) {
     // NOUVEAU : On récupère le contexte et les préférences ici pour le curseur
     val context = LocalContext.current
-    val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
 
     // ✅ NOUVEAU : Le lanceur magique qui déclenche le menu Android spécifique !
     val featureFlags by RemoteFeatureFlags.config
@@ -1895,7 +1803,7 @@ fun SectionPreferences(
     )
 
     var widgetFrequency by remember {
-        mutableIntStateOf(prefs.getInt("widget_sync_freq", 60).let { if (it < 30) 30 else it })
+        mutableIntStateOf(WidgetPrefs.syncFrequencyMinutes(prefs))
     }
 
     // ✅ AJOUT POUR LE STYLE D'AFFICHAGE
@@ -2277,7 +2185,7 @@ fun SectionPreferences(
         labels = listOf("30 min", "45 min", "1 h", "2 h", "4 h", "8 h", "12 h", "24 h"),
         onValueChange = { newFreq ->
             widgetFrequency = newFreq
-            prefs.edit().putInt("widget_sync_freq", newFreq).apply()
+            prefs.edit().putInt(WidgetPrefs.SYNC_FREQUENCY_MINUTES, newFreq).apply()
 
             // Mettre à jour le WorkManager instantanément avec la nouvelle fréquence
             WidgetUpdateScheduler.schedulePeriodicUpdate(context, newFreq)
@@ -2320,7 +2228,7 @@ fun SectionDatabase(
     onTargetMapPositioned: (Float, Int) -> Unit = { _, _ -> }
 ) {
     var showResetDialog by remember { mutableStateOf(false) }
-    val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
 
     // On génère la bordure si on n'est pas en OneUI
     val border = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))

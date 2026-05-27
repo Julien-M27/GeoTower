@@ -133,8 +133,9 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
-import java.text.DateFormat
-import java.text.SimpleDateFormat
+import fr.geotower.utils.SitePagePrefs
+import fr.geotower.utils.formatTechnologies
+import fr.geotower.utils.formatSiteDistanceMeters
 import java.util.Locale
 import java.util.UUID
 import kotlin.math.roundToInt
@@ -152,7 +153,7 @@ private const val SIGNALQUEST_SPEEDTEST_PAGE_SIZE = 100
 fun SiteDetailScreen(
     navController: NavController,
     repository: AnfrRepository,
-    antennaId: Long,
+    antennaId: String,
     isSplitScreen: Boolean = false,
     onCloseSplitScreen: () -> Unit = {},
     onOpenElevationProfile: ((String) -> Unit)? = null,
@@ -171,7 +172,7 @@ fun SiteDetailScreen(
                 val savedLon = prefs.getFloat("clicked_lon", 0f).toDouble()
 
                 // On utilise la recherche stricte
-                val antennas = repository.getAntennasByExactId(antennaId.toString())
+                val antennas = repository.getAntennasByExactId(antennaId)
                 if (antennas.isNotEmpty()) {
                     var site = antennas.find {
                         Math.abs(it.latitude - savedLat) < 0.005 && Math.abs(it.longitude - savedLon) < 0.005
@@ -456,46 +457,7 @@ fun SiteDetailScreen(
     }
 
     var miniMapDefaultMode by remember {
-        mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString("page_site_mini_map_mode", null)))
-    }
-
-    fun normalizeSiteOrder(order: List<String>): List<String> {
-        val mutableOrder = order.filter { it.isNotBlank() }.toMutableList()
-        if (!mutableOrder.contains("speedtest")) {
-            val photosIndex = mutableOrder.indexOf("photos")
-            if (photosIndex >= 0) mutableOrder.add(photosIndex + 1, "speedtest") else mutableOrder.add("speedtest")
-        }
-        if (!mutableOrder.contains("open_map")) {
-            val elevationProfileIndex = mutableOrder.indexOf("elevation_profile")
-            if (elevationProfileIndex >= 0) {
-                mutableOrder.add(elevationProfileIndex + 1, "open_map")
-            } else {
-                val supportDetailsIndex = mutableOrder.indexOf("support_details")
-                if (supportDetailsIndex >= 0) mutableOrder.add(supportDetailsIndex + 1, "open_map") else mutableOrder.add("open_map")
-            }
-        }
-        if (!mutableOrder.contains("elevation_profile")) {
-            val openMapIndex = mutableOrder.indexOf("open_map")
-            if (openMapIndex >= 0) mutableOrder.add(openMapIndex, "elevation_profile") else mutableOrder.add("elevation_profile")
-        }
-        if (!mutableOrder.contains("throughput_calculator")) {
-            val elevationProfileIndex = mutableOrder.indexOf("elevation_profile")
-            val openMapIndex = mutableOrder.indexOf("open_map")
-            when {
-                elevationProfileIndex >= 0 -> mutableOrder.add(elevationProfileIndex + 1, "throughput_calculator")
-                openMapIndex >= 0 -> mutableOrder.add(openMapIndex, "throughput_calculator")
-                else -> mutableOrder.add("throughput_calculator")
-            }
-        }
-        val openMapIndex = mutableOrder.indexOf("open_map")
-        val elevationProfileIndex = mutableOrder.indexOf("elevation_profile")
-        if (openMapIndex >= 0 && elevationProfileIndex >= 0 && openMapIndex < elevationProfileIndex) {
-            mutableOrder.remove("elevation_profile")
-            mutableOrder.remove("open_map")
-            mutableOrder.add(openMapIndex, "elevation_profile")
-            mutableOrder.add(openMapIndex + 1, "open_map")
-        }
-        return mutableOrder
+        mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString(SitePagePrefs.MINI_MAP_MODE, null)))
     }
 
     fun openMapAt(latitude: Double, longitude: Double) {
@@ -547,29 +509,24 @@ fun SiteDetailScreen(
 
     // 🚨 MODIFICATION : L'ordre par défaut (photos, speedtest, nav, share...)
     var pageSiteOrder by remember {
-        mutableStateOf(
-            normalizeSiteOrder(
-                (prefs.getString("page_site_order", "operator,bearing_height,map,support_details,elevation_profile,throughput_calculator,open_map,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links") ?: "operator,bearing_height,map,support_details,elevation_profile,throughput_calculator,open_map,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links")
-                    .split(",")
-            )
-        )
+        mutableStateOf(SitePagePrefs.order(prefs))
     }
-    var showOperator by remember { mutableStateOf(prefs.getBoolean("page_site_operator", true)) }
-    var showBearingHeight by remember { mutableStateOf(prefs.getBoolean("page_site_bearing_height", true)) }
-    var showMap by remember { mutableStateOf(prefs.getBoolean("page_site_map", true)) }
-    var showSupportDetails by remember { mutableStateOf(prefs.getBoolean("page_site_support_details", true)) }
+    var showOperator by remember { mutableStateOf(SitePagePrefs.operator.read(prefs)) }
+    var showBearingHeight by remember { mutableStateOf(SitePagePrefs.bearingHeight.read(prefs)) }
+    var showMap by remember { mutableStateOf(SitePagePrefs.map.read(prefs)) }
+    var showSupportDetails by remember { mutableStateOf(SitePagePrefs.supportDetails.read(prefs)) }
     val showPhotos by AppConfig.siteShowPhotos
-    var showPanelHeights by remember { mutableStateOf(prefs.getBoolean("page_site_panel_heights", true)) }
-    var showIds by remember { mutableStateOf(prefs.getBoolean("page_site_ids", true)) }
-    var showOpenMap by remember { mutableStateOf(prefs.getBoolean("page_site_open_map", true)) }
-    var showElevationProfile by remember { mutableStateOf(prefs.getBoolean("page_site_elevation_profile", true)) }
-    var showThroughputCalculator by remember { mutableStateOf(prefs.getBoolean("page_site_throughput_calculator", true)) }
-    var showNav by remember { mutableStateOf(prefs.getBoolean("page_site_nav", true)) }
-    var showShare by remember { mutableStateOf(prefs.getBoolean("page_site_share", true)) }
-    var showDates by remember { mutableStateOf(prefs.getBoolean("page_site_dates", true)) }
-    var showAddress by remember { mutableStateOf(prefs.getBoolean("page_site_address", true)) }
-    var showFreqs by remember { mutableStateOf(prefs.getBoolean("page_site_freqs", true)) }
-    var showLinks by remember { mutableStateOf(prefs.getBoolean("page_site_links", true)) }
+    var showPanelHeights by remember { mutableStateOf(SitePagePrefs.panelHeights.read(prefs)) }
+    var showIds by remember { mutableStateOf(SitePagePrefs.ids.read(prefs)) }
+    var showOpenMap by remember { mutableStateOf(SitePagePrefs.openMap.read(prefs)) }
+    var showElevationProfile by remember { mutableStateOf(SitePagePrefs.elevationProfile.read(prefs)) }
+    var showThroughputCalculator by remember { mutableStateOf(SitePagePrefs.throughputCalculator.read(prefs)) }
+    var showNav by remember { mutableStateOf(SitePagePrefs.nav.read(prefs)) }
+    var showShare by remember { mutableStateOf(SitePagePrefs.share.read(prefs)) }
+    var showDates by remember { mutableStateOf(SitePagePrefs.dates.read(prefs)) }
+    var showAddress by remember { mutableStateOf(SitePagePrefs.address.read(prefs)) }
+    var showFreqs by remember { mutableStateOf(SitePagePrefs.freqs.read(prefs)) }
+    var showLinks by remember { mutableStateOf(SitePagePrefs.links.read(prefs)) }
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val pageSettingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -598,7 +555,7 @@ fun SiteDetailScreen(
                 latSouth = lat - 0.0005,
                 lonWest = lon - 0.0005
             )
-            localData = box.firstOrNull { it.latitude.toFloat() == lat.toFloat() && it.longitude.toFloat() == lon.toFloat() && it.idAnfr.toLongOrNull() == antennaId }
+            localData = box.firstOrNull { it.latitude.toFloat() == lat.toFloat() && it.longitude.toFloat() == lon.toFloat() && it.idAnfr.matchesRequestedAnfrId(antennaId) }
                 ?: box.firstOrNull { it.latitude.toFloat() == lat.toFloat() && it.longitude.toFloat() == lon.toFloat() }
         }
         antenna = localData
@@ -1128,6 +1085,8 @@ fun SiteDetailScreen(
                                 isProjectSite = isEntirelyProject, // Ne s'affiche en jaune que si TOUT le site est en projet
                                 isOutage = isOutage,
                                 outageText = outageText,
+                                outageStartDate = hsEntity?.dateDebut,
+                                outageExpectedRestorationDate = hsEntity?.dateFin,
                                 cardBgColor = cardBgColor,
                                 blockShape = blockShape,
                                 techStatus = realTechStatus
@@ -1143,12 +1102,31 @@ fun SiteDetailScreen(
                                         if (logoRes != null) { Image(painter = painterResource(id = logoRes), contentDescription = null, modifier = Modifier.size(72.dp).clip(RoundedCornerShape(8.dp))) }
                                         else { Box(modifier = Modifier.size(72.dp).background(getOperatorColor(opNameDisplay), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Text(text = opNameDisplay.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp) } }
                                         Spacer(modifier = Modifier.width(16.dp))
-                                        Column {
+                                        Column(modifier = Modifier.weight(1f)) {
                                             Text(text = opNameDisplay, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                                             Spacer(modifier = Modifier.height(4.dp))
                                             val rawTechs = technique?.technologies?.takeIf { it.isNotBlank() } ?: info.frequences
                                             val realTechs = formatTechnologies(rawTechs, stringResource(R.string.appstrings_unknown))
                                             Text(text = realTechs, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        }
+                                        if (info.isZb == 1) {
+                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(
+                                                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                                                        shape = RoundedCornerShape(4.dp)
+                                                    )
+                                                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = "ZB",
+                                                    color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                                    fontWeight = FontWeight.Bold,
+                                                    fontSize = 12.sp
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -1399,28 +1377,28 @@ fun SiteDetailScreen(
                 SiteSettingsSheet(
                     siteOrder = pageSiteOrder,
                     onOrderChange = {
-                        pageSiteOrder = normalizeSiteOrder(it)
-                        prefs.edit().putString("page_site_order", pageSiteOrder.joinToString(",")).apply()
+                        pageSiteOrder = SitePagePrefs.normalizeOrder(it)
+                        prefs.edit().putString(SitePagePrefs.ORDER, pageSiteOrder.joinToString(",")).apply()
                     },
                     showOperator = showOperator,
                     onOperatorChange = {
                         showOperator = it
-                        prefs.edit().putBoolean("page_site_operator", it).apply()
+                        prefs.edit().putBoolean(SitePagePrefs.operator.key, it).apply()
                     },
                     showBearingHeight = showBearingHeight,
                     onBearingHeightChange = {
                         showBearingHeight = it
-                        prefs.edit().putBoolean("page_site_bearing_height", it).apply()
+                        prefs.edit().putBoolean(SitePagePrefs.bearingHeight.key, it).apply()
                     },
                     showMap = showMap,
                     onMapChange = {
                         showMap = it
-                        prefs.edit().putBoolean("page_site_map", it).apply()
+                        prefs.edit().putBoolean(SitePagePrefs.map.key, it).apply()
                     },
                     showSupportDetails = showSupportDetails,
                     onSupportDetailsChange = {
                         showSupportDetails = it
-                        prefs.edit().putBoolean("page_site_support_details", it).apply()
+                        prefs.edit().putBoolean(SitePagePrefs.supportDetails.key, it).apply()
                     },
                     showPhotos = showPhotos,
                     onPhotosChange = {
@@ -1430,47 +1408,47 @@ fun SiteDetailScreen(
                     showPanelHeights = showPanelHeights,
                     onPanelHeightsChange = {
                         showPanelHeights = it
-                        prefs.edit().putBoolean("page_site_panel_heights", it).apply()
+                        prefs.edit().putBoolean(SitePagePrefs.panelHeights.key, it).apply()
                     },
                     showIds = showIds,
                     onIdsChange = {
                         showIds = it
-                        prefs.edit().putBoolean("page_site_ids", it).apply()
+                        prefs.edit().putBoolean(SitePagePrefs.ids.key, it).apply()
                     },
                     showOpenMap = showOpenMap,
                     onOpenMapChange = {
                         showOpenMap = it
-                        prefs.edit().putBoolean("page_site_open_map", it).apply()
+                        prefs.edit().putBoolean(SitePagePrefs.openMap.key, it).apply()
                     },
                     showElevationProfile = showElevationProfile,
                     onElevationProfileChange = {
                         showElevationProfile = it
-                        prefs.edit().putBoolean("page_site_elevation_profile", it).apply()
+                        prefs.edit().putBoolean(SitePagePrefs.elevationProfile.key, it).apply()
                     },
                     showThroughputCalculator = showThroughputCalculator,
                     onThroughputCalculatorChange = {
                         showThroughputCalculator = it
-                        prefs.edit().putBoolean("page_site_throughput_calculator", it).apply()
+                        prefs.edit().putBoolean(SitePagePrefs.throughputCalculator.key, it).apply()
                     },
                     showNav = showNav,
                     onNavChange = {
                         showNav = it
-                        prefs.edit().putBoolean("page_site_nav", it).apply()
+                        prefs.edit().putBoolean(SitePagePrefs.nav.key, it).apply()
                     },
                     showShare = showShare,
                     onShareChange = {
                         showShare = it
-                        prefs.edit().putBoolean("page_site_share", it).apply()
+                        prefs.edit().putBoolean(SitePagePrefs.share.key, it).apply()
                     },
                     showDates = showDates,
                     onDatesChange = {
                         showDates = it
-                        prefs.edit().putBoolean("page_site_dates", it).apply()
+                        prefs.edit().putBoolean(SitePagePrefs.dates.key, it).apply()
                     },
                     showAddress = showAddress,
                     onAddressChange = {
                         showAddress = it
-                        prefs.edit().putBoolean("page_site_address", it).apply()
+                        prefs.edit().putBoolean(SitePagePrefs.address.key, it).apply()
                     },
                     showStatus = AppConfig.siteShowStatus.value,
                     onStatusChange = {
@@ -1485,12 +1463,12 @@ fun SiteDetailScreen(
                     showFreqs = showFreqs,
                     onFreqsChange = {
                         showFreqs = it
-                        prefs.edit().putBoolean("page_site_freqs", it).apply()
+                        prefs.edit().putBoolean(SitePagePrefs.freqs.key, it).apply()
                     },
                     showLinks = showLinks,
                     onLinksChange = {
                         showLinks = it
-                        prefs.edit().putBoolean("page_site_links", it).apply()
+                        prefs.edit().putBoolean(SitePagePrefs.links.key, it).apply()
                     },
                     onOpenMiniMapSettings = {
                         showSiteSettingsSheet = false
@@ -1582,7 +1560,7 @@ fun SiteDetailScreen(
                     selectedMode = miniMapDefaultMode,
                     onModeChange = {
                         miniMapDefaultMode = it
-                        prefs.edit().putString("page_site_mini_map_mode", it.storageKey).apply()
+                        prefs.edit().putString(SitePagePrefs.MINI_MAP_MODE, it.storageKey).apply()
                     },
                     onDismiss = { showSiteMiniMapSettingsSheet = false },
                     onBack = {
@@ -1766,16 +1744,6 @@ private fun openSignalQuestApp(context: Context, deeplinkUrl: String, fallback: 
     }
 }
 
-private fun formatSiteDistanceMeters(distanceMeters: Double, distanceUnit: Int = AppConfig.distanceUnit.intValue): String {
-    return if (distanceUnit == 1) {
-        val feet = distanceMeters * 3.28084
-        val miles = distanceMeters / 1609.344
-        if (miles >= 0.1) String.format(Locale.US, "%.2f mi", miles) else "${feet.roundToInt()} ft"
-    } else {
-        if (distanceMeters >= 1000.0) String.format(Locale.US, "%.3f km", distanceMeters / 1000.0) else "${distanceMeters.toInt()} m"
-    }
-}
-
 private fun formatSiteHeightMeters(heightMeters: Double?): String {
     if (heightMeters == null) return "--"
     return if (AppConfig.distanceUnit.intValue == 1) {
@@ -1807,25 +1775,17 @@ private fun getOperatorColor(name: String?): Color {
 
 fun getDetailLogoRes(opName: String?): Int? = OperatorLogos.drawableRes(opName)
 
-fun formatTechnologies(tech: String?, txtUnknown: String): String = tech?.split(Regex("[/,\\-]"))?.map { it.trim().uppercase() }?.filter { it.isNotEmpty() }?.sortedDescending()?.joinToString(" - ") ?: txtUnknown
+private fun String.matchesRequestedAnfrId(requested: String): Boolean {
+    if (this == requested) return true
+    val candidateLong = takeIf { it.all(Char::isDigit) }?.toLongOrNull()
+    val requestedLong = requested.takeIf { it.all(Char::isDigit) }?.toLongOrNull()
+    return candidateLong != null && candidateLong == requestedLong
+}
 
 @SuppressLint("MissingPermission")
 private fun getLocalLastKnownLocation(context: Context): Location? {
     val locManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
     return try { locManager.getProviders(true).mapNotNull { locManager.getLastKnownLocation(it) }.maxByOrNull { it.time } } catch (e: Exception) { null }
-}
-
-fun formatDateToFrench(dateStr: String?): String {
-    if (dateStr.isNullOrBlank() || dateStr == "-") return "-"
-    return try {
-        val cleanDate = dateStr.take(10)
-        val inputFormat = SimpleDateFormat("yyyy-MM-dd", Locale.US)
-        val outputFormat = DateFormat.getDateInstance(DateFormat.SHORT, Locale.getDefault())
-        val date = inputFormat.parse(cleanDate)
-        if (date != null) outputFormat.format(date) else dateStr
-    } catch (e: Exception) {
-        dateStr
-    }
 }
 
 private fun Int.dpToPx(context: Context): Int = (this * context.resources.displayMetrics.density).toInt()

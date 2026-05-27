@@ -87,13 +87,11 @@ import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.R
 import fr.geotower.radio.MobileOperator
-import fr.geotower.radio.RadioTechnology
 import fr.geotower.radio.RadioThroughputEngine
 import fr.geotower.radio.RatAssumptions
-import fr.geotower.radio.SiteRadioSystem
 import fr.geotower.radio.ThroughputProfile
 import fr.geotower.radio.ThroughputProfiles
-import fr.geotower.ui.components.FreqBand
+import fr.geotower.ui.components.buildThroughputRadioSystems
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.MiniMapConeOverlayData
 import fr.geotower.ui.components.MiniMapStrongPoint
@@ -105,17 +103,23 @@ import fr.geotower.ui.components.extractThroughputPanelHeightMeters
 import fr.geotower.ui.components.formatThroughputDistanceMeters
 import fr.geotower.ui.components.formatThroughputMbps
 import fr.geotower.ui.components.geoTowerFadingEdge
-import fr.geotower.ui.components.parseAndSortFrequencies
+import fr.geotower.ui.components.isPlannedThroughputBand
+import fr.geotower.ui.components.isThroughputBandEnabledByDefault
 import fr.geotower.ui.components.resolveThroughputBandwidth
-import fr.geotower.ui.components.siteRadioStatusFromBandStatus
 import fr.geotower.ui.components.throughputBandKey
+import fr.geotower.ui.components.throughputCalculationBands
 import fr.geotower.ui.components.throughputBandLabel
+import fr.geotower.ui.components.throughputModulationLabel
 import fr.geotower.ui.components.ThroughputConeDistance as ConeDistance
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.settings.ThroughputCalculationDefaultsSheet
 import fr.geotower.ui.screens.settings.ThroughputCalculatorSettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.FreqBand
+import fr.geotower.utils.SitePagePrefs
+import fr.geotower.utils.ThroughputPrefs
+import fr.geotower.utils.parseAndSortFrequencies
 import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.asin
@@ -136,8 +140,6 @@ import fr.geotower.utils.ThroughputTextKey
 private const val PANEL_AZIMUTH_HALF_BEAM_DEGREES = 45.0
 private const val MAX_FR_UPLINK_AGGREGATED_CARRIERS = 2
 private val LTE_LOW_BAND_MHZ = setOf(700, 800, 900)
-private const val THROUGHPUT_BLOCK_ORDER_PREF = "page_throughput_order"
-private const val DEFAULT_THROUGHPUT_BLOCK_ORDER = "header,summary,cone,controls,bands,assumptions"
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
@@ -177,62 +179,62 @@ fun ThroughputCalculatorScreen(
     var physique by remember { mutableStateOf<PhysiqueEntity?>(null) }
     var technique by remember { mutableStateOf<TechniqueEntity?>(null) }
     var isLoading by remember { mutableStateOf(true) }
-    var selectedPreset by remember { mutableStateOf(presetFromPreference(prefs.getString("throughput_default_preset", "conservative"))) }
+    var selectedPreset by remember { mutableStateOf(presetFromPreference(prefs.getString(ThroughputPrefs.DEFAULT_PRESET, ThroughputPrefs.DEFAULT_PRESET_VALUE))) }
     var customSettings by remember {
         mutableStateOf(
             CustomModulationSettings(
-                lteDownIndex = prefs.getInt("throughput_custom_lte_down", 3).coerceIn(0, lteDownModulationOptions.lastIndex),
-                lteUpIndex = prefs.getInt("throughput_custom_lte_up", 2).coerceIn(0, lteUpModulationOptions.lastIndex),
-                nrDownIndex = prefs.getInt("throughput_custom_nr_down", 3).coerceIn(0, nrDownModulationOptions.lastIndex),
-                nrUpIndex = prefs.getInt("throughput_custom_nr_up", 2).coerceIn(0, nrUpModulationOptions.lastIndex),
-                lteRsrpDbm = prefs.getFloat("throughput_custom_lte_rsrp", -95f),
-                lteSinrDb = prefs.getFloat("throughput_custom_lte_sinr", 15f),
-                nrRsrpDbm = prefs.getFloat("throughput_custom_nr_rsrp", -92f),
-                nrSinrDb = prefs.getFloat("throughput_custom_nr_sinr", 18f),
-                environment = radioEnvironmentFromPreference(prefs.getString("throughput_custom_environment", null)),
-                positionScenario = positionScenarioFromPreference(prefs.getString("throughput_custom_position", null)),
-                networkLoad = networkLoadFromPreference(prefs.getString("throughput_custom_network_load", null)),
-                backhaul = backhaulQualityFromPreference(prefs.getString("throughput_custom_backhaul", null)),
-                lteAggregation = lteAggregationModeFromPreference(prefs.getString("throughput_custom_lte_aggregation", null)),
-                selectedLatitude = prefs.getString("throughput_custom_selected_lat", null)?.toDoubleOrNull(),
-                selectedLongitude = prefs.getString("throughput_custom_selected_lon", null)?.toDoubleOrNull()
+                lteDownIndex = prefs.getInt(ThroughputPrefs.CUSTOM_LTE_DOWN, 3).coerceIn(0, lteDownModulationOptions.lastIndex),
+                lteUpIndex = prefs.getInt(ThroughputPrefs.CUSTOM_LTE_UP, 2).coerceIn(0, lteUpModulationOptions.lastIndex),
+                nrDownIndex = prefs.getInt(ThroughputPrefs.CUSTOM_NR_DOWN, 3).coerceIn(0, nrDownModulationOptions.lastIndex),
+                nrUpIndex = prefs.getInt(ThroughputPrefs.CUSTOM_NR_UP, 2).coerceIn(0, nrUpModulationOptions.lastIndex),
+                lteRsrpDbm = prefs.getFloat(ThroughputPrefs.CUSTOM_LTE_RSRP, -95f),
+                lteSinrDb = prefs.getFloat(ThroughputPrefs.CUSTOM_LTE_SINR, 15f),
+                nrRsrpDbm = prefs.getFloat(ThroughputPrefs.CUSTOM_NR_RSRP, -92f),
+                nrSinrDb = prefs.getFloat(ThroughputPrefs.CUSTOM_NR_SINR, 18f),
+                environment = radioEnvironmentFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_ENVIRONMENT, null)),
+                positionScenario = positionScenarioFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_POSITION, null)),
+                networkLoad = networkLoadFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_NETWORK_LOAD, null)),
+                backhaul = backhaulQualityFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_BACKHAUL, null)),
+                lteAggregation = lteAggregationModeFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_LTE_AGGREGATION, null)),
+                selectedLatitude = prefs.getString(ThroughputPrefs.CUSTOM_SELECTED_LAT, null)?.toDoubleOrNull(),
+                selectedLongitude = prefs.getString(ThroughputPrefs.CUSTOM_SELECTED_LON, null)?.toDoubleOrNull()
             )
         )
     }
     fun updateCustomSettings(newSettings: CustomModulationSettings) {
         customSettings = newSettings
         val editor = prefs.edit()
-            .putInt("throughput_custom_lte_down", newSettings.lteDownIndex)
-            .putInt("throughput_custom_lte_up", newSettings.lteUpIndex)
-            .putInt("throughput_custom_nr_down", newSettings.nrDownIndex)
-            .putInt("throughput_custom_nr_up", newSettings.nrUpIndex)
-            .putFloat("throughput_custom_lte_rsrp", newSettings.lteRsrpDbm)
-            .putFloat("throughput_custom_lte_sinr", newSettings.lteSinrDb)
-            .putFloat("throughput_custom_nr_rsrp", newSettings.nrRsrpDbm)
-            .putFloat("throughput_custom_nr_sinr", newSettings.nrSinrDb)
-            .putString("throughput_custom_environment", newSettings.environment.id)
-            .putString("throughput_custom_position", newSettings.positionScenario.id)
-            .putString("throughput_custom_network_load", newSettings.networkLoad.id)
-            .putString("throughput_custom_backhaul", newSettings.backhaul.id)
-            .putString("throughput_custom_lte_aggregation", newSettings.lteAggregation.id)
-            .remove("throughput_custom_device")
+            .putInt(ThroughputPrefs.CUSTOM_LTE_DOWN, newSettings.lteDownIndex)
+            .putInt(ThroughputPrefs.CUSTOM_LTE_UP, newSettings.lteUpIndex)
+            .putInt(ThroughputPrefs.CUSTOM_NR_DOWN, newSettings.nrDownIndex)
+            .putInt(ThroughputPrefs.CUSTOM_NR_UP, newSettings.nrUpIndex)
+            .putFloat(ThroughputPrefs.CUSTOM_LTE_RSRP, newSettings.lteRsrpDbm)
+            .putFloat(ThroughputPrefs.CUSTOM_LTE_SINR, newSettings.lteSinrDb)
+            .putFloat(ThroughputPrefs.CUSTOM_NR_RSRP, newSettings.nrRsrpDbm)
+            .putFloat(ThroughputPrefs.CUSTOM_NR_SINR, newSettings.nrSinrDb)
+            .putString(ThroughputPrefs.CUSTOM_ENVIRONMENT, newSettings.environment.id)
+            .putString(ThroughputPrefs.CUSTOM_POSITION, newSettings.positionScenario.id)
+            .putString(ThroughputPrefs.CUSTOM_NETWORK_LOAD, newSettings.networkLoad.id)
+            .putString(ThroughputPrefs.CUSTOM_BACKHAUL, newSettings.backhaul.id)
+            .putString(ThroughputPrefs.CUSTOM_LTE_AGGREGATION, newSettings.lteAggregation.id)
+            .remove(ThroughputPrefs.CUSTOM_DEVICE)
         if (newSettings.selectedLatitude != null && newSettings.selectedLongitude != null) {
             editor
-                .putString("throughput_custom_selected_lat", newSettings.selectedLatitude.toString())
-                .putString("throughput_custom_selected_lon", newSettings.selectedLongitude.toString())
+                .putString(ThroughputPrefs.CUSTOM_SELECTED_LAT, newSettings.selectedLatitude.toString())
+                .putString(ThroughputPrefs.CUSTOM_SELECTED_LON, newSettings.selectedLongitude.toString())
         } else {
             editor
-                .remove("throughput_custom_selected_lat")
-                .remove("throughput_custom_selected_lon")
+                .remove(ThroughputPrefs.CUSTOM_SELECTED_LAT)
+                .remove(ThroughputPrefs.CUSTOM_SELECTED_LON)
         }
         editor.apply()
     }
     var enabledBandKeys by remember(antennaId) { mutableStateOf<Set<String>>(emptySet()) }
     var bandKeysInitialized by remember(antennaId) { mutableStateOf(false) }
-    var include4G by remember { mutableStateOf(prefs.getBoolean("throughput_include_4g", true)) }
-    var include5G by remember { mutableStateOf(prefs.getBoolean("throughput_include_5g", true)) }
-    var includePlanned by remember { mutableStateOf(prefs.getBoolean("throughput_include_planned", false)) }
-    var pageSiteThroughputCalculator by remember { mutableStateOf(prefs.getBoolean("page_site_throughput_calculator", true)) }
+    var include4G by remember { mutableStateOf(ThroughputPrefs.include4G.read(prefs)) }
+    var include5G by remember { mutableStateOf(ThroughputPrefs.include5G.read(prefs)) }
+    var includePlanned by remember { mutableStateOf(ThroughputPrefs.includePlanned.read(prefs)) }
+    var pageSiteThroughputCalculator by remember { mutableStateOf(SitePagePrefs.throughputCalculator.read(prefs)) }
     var showThroughputSettingsSheet by remember { mutableStateOf(false) }
     var showThroughputDefaultsSheet by remember { mutableStateOf(false) }
     var throughputDefaultsVersion by remember { mutableStateOf(0) }
@@ -240,7 +242,7 @@ fun ThroughputCalculatorScreen(
     var throughputBlockOrder by remember(prefs) {
         mutableStateOf(
         normalizeThroughputBlockOrder(
-            prefs.getString(THROUGHPUT_BLOCK_ORDER_PREF, DEFAULT_THROUGHPUT_BLOCK_ORDER)
+            prefs.getString(ThroughputPrefs.BLOCK_ORDER, ThroughputPrefs.defaultBlockOrder.joinToString(","))
                 ?.split(",")
                 .orEmpty()
         )
@@ -278,16 +280,12 @@ fun ThroughputCalculatorScreen(
         parseAndSortFrequencies(rawFrequencies, txtUnknown, txtAzimuthNotSpecified)
     }
     val availableBandKeys = remember(parsedBands) {
-        parsedBands
-            .filter { it.gen == 4 || it.gen == 5 }
-            .filterNot { isHiddenThroughputBand(it) }
+        throughputCalculationBands(parsedBands)
             .map { throughputBandKey(it) }
             .toSet()
     }
     val defaultEnabledBandKeys = remember(parsedBands, prefs, throughputDefaultsVersion) {
-        parsedBands
-            .filter { it.gen == 4 || it.gen == 5 }
-            .filterNot { isHiddenThroughputBand(it) }
+        throughputCalculationBands(parsedBands)
             .filter { isThroughputBandEnabledByDefault(it, prefs) }
             .map { throughputBandKey(it) }
             .toSet()
@@ -375,27 +373,27 @@ fun ThroughputCalculatorScreen(
     }
 
     fun refreshThroughputDefaultsFromPrefs() {
-        selectedPreset = presetFromPreference(prefs.getString("throughput_default_preset", "conservative"))
+        selectedPreset = presetFromPreference(prefs.getString(ThroughputPrefs.DEFAULT_PRESET, ThroughputPrefs.DEFAULT_PRESET_VALUE))
         customSettings = CustomModulationSettings(
-            lteDownIndex = prefs.getInt("throughput_custom_lte_down", 3).coerceIn(0, lteDownModulationOptions.lastIndex),
-            lteUpIndex = prefs.getInt("throughput_custom_lte_up", 2).coerceIn(0, lteUpModulationOptions.lastIndex),
-            nrDownIndex = prefs.getInt("throughput_custom_nr_down", 3).coerceIn(0, nrDownModulationOptions.lastIndex),
-            nrUpIndex = prefs.getInt("throughput_custom_nr_up", 2).coerceIn(0, nrUpModulationOptions.lastIndex),
-            lteRsrpDbm = prefs.getFloat("throughput_custom_lte_rsrp", -95f),
-            lteSinrDb = prefs.getFloat("throughput_custom_lte_sinr", 15f),
-            nrRsrpDbm = prefs.getFloat("throughput_custom_nr_rsrp", -92f),
-            nrSinrDb = prefs.getFloat("throughput_custom_nr_sinr", 18f),
-            environment = radioEnvironmentFromPreference(prefs.getString("throughput_custom_environment", null)),
-            positionScenario = positionScenarioFromPreference(prefs.getString("throughput_custom_position", null)),
-            networkLoad = networkLoadFromPreference(prefs.getString("throughput_custom_network_load", null)),
-            backhaul = backhaulQualityFromPreference(prefs.getString("throughput_custom_backhaul", null)),
-            lteAggregation = lteAggregationModeFromPreference(prefs.getString("throughput_custom_lte_aggregation", null)),
-            selectedLatitude = prefs.getString("throughput_custom_selected_lat", null)?.toDoubleOrNull(),
-            selectedLongitude = prefs.getString("throughput_custom_selected_lon", null)?.toDoubleOrNull()
+            lteDownIndex = prefs.getInt(ThroughputPrefs.CUSTOM_LTE_DOWN, 3).coerceIn(0, lteDownModulationOptions.lastIndex),
+            lteUpIndex = prefs.getInt(ThroughputPrefs.CUSTOM_LTE_UP, 2).coerceIn(0, lteUpModulationOptions.lastIndex),
+            nrDownIndex = prefs.getInt(ThroughputPrefs.CUSTOM_NR_DOWN, 3).coerceIn(0, nrDownModulationOptions.lastIndex),
+            nrUpIndex = prefs.getInt(ThroughputPrefs.CUSTOM_NR_UP, 2).coerceIn(0, nrUpModulationOptions.lastIndex),
+            lteRsrpDbm = prefs.getFloat(ThroughputPrefs.CUSTOM_LTE_RSRP, -95f),
+            lteSinrDb = prefs.getFloat(ThroughputPrefs.CUSTOM_LTE_SINR, 15f),
+            nrRsrpDbm = prefs.getFloat(ThroughputPrefs.CUSTOM_NR_RSRP, -92f),
+            nrSinrDb = prefs.getFloat(ThroughputPrefs.CUSTOM_NR_SINR, 18f),
+            environment = radioEnvironmentFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_ENVIRONMENT, null)),
+            positionScenario = positionScenarioFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_POSITION, null)),
+            networkLoad = networkLoadFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_NETWORK_LOAD, null)),
+            backhaul = backhaulQualityFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_BACKHAUL, null)),
+            lteAggregation = lteAggregationModeFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_LTE_AGGREGATION, null)),
+            selectedLatitude = prefs.getString(ThroughputPrefs.CUSTOM_SELECTED_LAT, null)?.toDoubleOrNull(),
+            selectedLongitude = prefs.getString(ThroughputPrefs.CUSTOM_SELECTED_LON, null)?.toDoubleOrNull()
         )
-        include4G = prefs.getBoolean("throughput_include_4g", true)
-        include5G = prefs.getBoolean("throughput_include_5g", true)
-        includePlanned = prefs.getBoolean("throughput_include_planned", false)
+        include4G = ThroughputPrefs.include4G.read(prefs)
+        include5G = ThroughputPrefs.include5G.read(prefs)
+        includePlanned = ThroughputPrefs.includePlanned.read(prefs)
         bandKeysInitialized = false
         throughputDefaultsVersion++
     }
@@ -405,13 +403,13 @@ fun ThroughputCalculatorScreen(
             showThroughputCalculator = pageSiteThroughputCalculator,
             onThroughputCalculatorChange = {
                 pageSiteThroughputCalculator = it
-                prefs.edit().putBoolean("page_site_throughput_calculator", it).apply()
+                prefs.edit().putBoolean(SitePagePrefs.throughputCalculator.key, it).apply()
             },
             throughputOrder = throughputBlockOrder.map { it.id },
             onThroughputOrderChange = { newOrder ->
                 val normalized = normalizeThroughputBlockOrder(newOrder)
                 throughputBlockOrder = normalized
-                prefs.edit().putString(THROUGHPUT_BLOCK_ORDER_PREF, normalized.joinToString(",") { it.id }).apply()
+                prefs.edit().putString(ThroughputPrefs.BLOCK_ORDER, normalized.joinToString(",") { it.id }).apply()
             },
             showHeader = visibleThroughputBlocks[ThroughputBlock.Header] ?: true,
             onHeaderChange = {
@@ -1762,23 +1760,7 @@ private fun calculateThroughput(
     val operator = MobileOperator.fromLabel(operatorName)
     val engineProfile = engineProfileFor(preset, customSettings)
     val engineResult = if (operator != null) {
-        val systems = bands
-            .filter { it.gen == 4 || it.gen == 5 }
-            .filterNot { isHiddenThroughputBand(it) }
-            .map { band ->
-                SiteRadioSystem(
-                    sourceKey = throughputBandKey(band),
-                    supportId = "unknown",
-                    operator = operator,
-                    technology = if (band.gen == 5) RadioTechnology.NR_5G else RadioTechnology.LTE_4G,
-                    bandLabel = band.value.toString(),
-                    status = siteRadioStatusFromBandStatus(band.status),
-                    azimuthDeg = extractThroughputAzimuths(band).firstOrNull(),
-                    supportHeightM = supportHeightMeters,
-                    antennaHeightM = extractThroughputPanelHeightMeters(band, supportHeightMeters),
-                    lastSeenAt = band.date.takeIf { it.isNotBlank() }
-                )
-            }
+        val systems = buildThroughputRadioSystems(bands, operator, supportHeightMeters)
         RadioThroughputEngine.estimate(systems, engineProfile)
     } else {
         null
@@ -1786,18 +1768,14 @@ private fun calculateThroughput(
     val carrierByKey = engineResult?.perCarrierResults.orEmpty().associateBy { it.sourceKey }
     val excludedByKey = engineResult?.excludedCarriers.orEmpty().associateBy { it.sourceKey }
 
-    val calculatedBands = bands
-        .filter { it.gen == 4 || it.gen == 5 }
-        .filterNot { isHiddenThroughputBand(it) }
+    val calculatedBands = throughputCalculationBands(bands)
         .map { band ->
             val key = throughputBandKey(band)
             val carrierResult = carrierByKey[key]
             val bandwidth = carrierResult?.let {
                 ThroughputBandwidth(valueMHz = it.bandwidthMHz, isEstimated = false)
             } ?: resolveThroughputBandwidth(band)
-            val isPlanned = band.status.contains("Projet", ignoreCase = true) ||
-                band.status.contains("Approuv", ignoreCase = true) ||
-                band.status.contains("Planned", ignoreCase = true)
+            val isPlanned = isPlannedThroughputBand(band)
             val generationAllowed = (band.gen == 4 && include4G) || (band.gen == 5 && include5G)
             val bandAllowed = enabledBandKeys.contains(key)
             val engineIncluded = carrierResult?.included == true
@@ -1821,8 +1799,8 @@ private fun calculateThroughput(
                 generation = band.gen,
                 frequencyMHz = band.value,
                 frequencyDetails = frequencyDetailsLabel(band),
-                modulationLabel = carrierResult?.let { modulationLabel(it.dlModulationOrder, it.ulModulationOrder, it.dlMimoLayers, it.ulMimoLayers) }
-                    ?: modulationLabel(band.gen, engineProfile),
+                modulationLabel = carrierResult?.let { throughputModulationLabel(it.dlModulationOrder, it.ulModulationOrder, it.dlMimoLayers, it.ulMimoLayers) }
+                    ?: throughputModulationLabel(band.gen, engineProfile),
                 bandwidthMHz = bandwidth.valueMHz,
                 bandwidthIsEstimated = bandwidth.isEstimated,
                 coneDistance = estimateThroughputConeDistance(panelHeightMeters),
@@ -1858,61 +1836,6 @@ private fun calculateThroughput(
 private fun frequencyDetailsLabel(band: FreqBand): String {
     val detailed = band.rawFreq.substringAfter(":", "").trim()
     return detailed.takeIf { it.isNotBlank() } ?: if (band.value > 0) "${band.value} MHz" else band.rawFreq
-}
-
-private fun isThroughputBandEnabledByDefault(
-    band: FreqBand,
-    prefs: SharedPreferences
-): Boolean {
-    if (band.value <= 0) return true
-    val generationPrefix = when (band.gen) {
-        4 -> "4g"
-        5 -> "5g"
-        else -> return true
-    }
-    return prefs.getBoolean("throughput_band_${generationPrefix}_${band.value}", true)
-}
-
-private fun isHiddenThroughputBand(band: FreqBand): Boolean {
-    return band.gen == 5 && band.value in setOf(1800, 26000)
-}
-
-private fun modulationLabel(gen: Int, profile: ThroughputProfile): String {
-    val assumptions = if (gen == 5) profile.nr else profile.lte
-    return modulationLabel(
-        dlModulationOrder = assumptions.dlModulationOrder,
-        ulModulationOrder = assumptions.ulModulationOrder,
-        dlLayers = assumptions.dlMimoLayers,
-        ulLayers = assumptions.ulMimoLayers
-    )
-}
-
-private fun modulationLabel(
-    dlModulationOrder: Int,
-    ulModulationOrder: Int,
-    dlLayers: Int,
-    ulLayers: Int
-): String {
-    return "${modulationName(dlModulationOrder)} ${layerLabel(dlLayers)} DL / ${modulationName(ulModulationOrder)} ${layerLabel(ulLayers)} UL"
-}
-
-private fun modulationName(modulationOrder: Int): String {
-    return when (modulationOrder) {
-        2 -> "QPSK"
-        4 -> "16-QAM"
-        6 -> "64-QAM"
-        8 -> "256-QAM"
-        10 -> "1024-QAM"
-        else -> "$modulationOrder bits/symbol"
-    }
-}
-
-private fun layerLabel(layers: Int): String {
-    return if (layers <= 1) {
-        "1 layer"
-    } else {
-        "MIMO ${layers}x${layers}"
-    }
 }
 
 private fun engineProfileFor(
@@ -2288,21 +2211,17 @@ private fun bestLastKnownThroughputLocation(context: Context): Location? {
 }
 
 private enum class ThroughputBlock(val id: String, val prefKey: String) {
-    Header("header", "page_throughput_header"),
-    Summary("summary", "page_throughput_summary"),
-    Cone("cone", "page_throughput_cone"),
-    Controls("controls", "page_throughput_controls"),
-    Bands("bands", "page_throughput_bands"),
-    Assumptions("assumptions", "page_throughput_assumptions")
+    Header(ThroughputPrefs.BLOCK_HEADER, ThroughputPrefs.BLOCK_HEADER_VISIBLE),
+    Summary(ThroughputPrefs.BLOCK_SUMMARY, ThroughputPrefs.BLOCK_SUMMARY_VISIBLE),
+    Cone(ThroughputPrefs.BLOCK_CONE, ThroughputPrefs.BLOCK_CONE_VISIBLE),
+    Controls(ThroughputPrefs.BLOCK_CONTROLS, ThroughputPrefs.BLOCK_CONTROLS_VISIBLE),
+    Bands(ThroughputPrefs.BLOCK_BANDS, ThroughputPrefs.BLOCK_BANDS_VISIBLE),
+    Assumptions(ThroughputPrefs.BLOCK_ASSUMPTIONS, ThroughputPrefs.BLOCK_ASSUMPTIONS_VISIBLE)
 }
 
 private fun normalizeThroughputBlockOrder(order: List<String>): List<ThroughputBlock> {
     val byId = ThroughputBlock.entries.associateBy { it.id }
-    val normalized = order.mapNotNull { byId[it.trim()] }.distinct().toMutableList()
-    ThroughputBlock.entries.forEach { block ->
-        if (!normalized.contains(block)) normalized.add(block)
-    }
-    return normalized
+    return ThroughputPrefs.normalizeBlockOrder(order).mapNotNull { byId[it] }
 }
 
 private enum class ThroughputPreset {

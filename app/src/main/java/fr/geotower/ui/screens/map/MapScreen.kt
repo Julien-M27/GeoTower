@@ -127,6 +127,7 @@ import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.MapDisplayPrefs
 import fr.geotower.utils.MapUtils
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.isNetworkAvailable
@@ -739,12 +740,13 @@ fun MapScreen(
         AppConfig.f2G_900.value, AppConfig.f2G_1800.value, AppConfig.f3G_900.value, AppConfig.f3G_2100.value,
         AppConfig.f4G_700.value, AppConfig.f4G_800.value, AppConfig.f4G_900.value, AppConfig.f4G_1800.value, AppConfig.f4G_2100.value, AppConfig.f4G_2600.value,
         AppConfig.f5G_700.value, AppConfig.f5G_2100.value, AppConfig.f5G_3500.value, AppConfig.f5G_26000.value,
-        AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, sitesHs, currentCityPolygons
+        AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value, sitesHs, currentCityPolygons
     ) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             val selectedOperators = AppConfig.selectedOperatorKeys.value
             val showSitesInService = AppConfig.showSitesInService.value
             val showSitesOutOfService = AppConfig.showSitesOutOfService.value
+            val hideUndergroundSites = AppConfig.hideUndergroundSites.value
             val sFh = AppConfig.showTechnoFH.value
             val s2G = AppConfig.showTechno2G.value; val s3G = AppConfig.showTechno3G.value
             val s4G = AppConfig.showTechno4G.value; val s5G = AppConfig.showTechno5G.value
@@ -772,6 +774,7 @@ fun MapScreen(
 
                 // --- 3. POUR LES VRAIES ANTENNES, ON CONTINUE AVEC LE RESTE DES FILTRES ---
                 val isInCityBounds = currentCityPolygons.isNullOrEmpty() || currentCityPolygons!!.any { poly -> isPointInPolygon(antenna.latitude, antenna.longitude, poly) }
+                val matchesUndergroundFilter = !hideUndergroundSites || antenna.hasUndergroundSupport != 1
 
                 val isFhOnly = antenna.azimuts.isNullOrBlank() && !antenna.azimutsFh.isNullOrBlank()
                 val matchFh = if (!sFh && isFhOnly) false else true
@@ -791,7 +794,7 @@ fun MapScreen(
                     matchTechno = (s2G && s3G && s4G && s5G && sFh)
                 }
 
-                visibleOperators.isNotEmpty() && matchFh && isInCityBounds && matchTechno
+                visibleOperators.isNotEmpty() && matchesUndergroundFilter && matchFh && isInCityBounds && matchTechno
             }
             filteredAntennas = result
         }
@@ -1023,14 +1026,15 @@ fun MapScreen(
         AppConfig.showAzimuthsCone.value,
         AppConfig.selectedOperatorKeys.value,
         AppConfig.showSitesInService.value,
-        AppConfig.showSitesOutOfService.value
+        AppConfig.showSitesOutOfService.value,
+        AppConfig.hideUndergroundSites.value
     ) {
         mapViewRef?.let { map ->
             updateMarkers(map, filteredAntennas, sitesHs)
         }
     }
 
-    LaunchedEffect(AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value) {
+    LaunchedEffect(AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value) {
         mapViewRef?.let { map ->
             map.loadVisibleAntennas(viewModel)
         }
@@ -2342,7 +2346,7 @@ fun MapScreen(
                 showSpeedometer = AppConfig.showSpeedometer.value,
                 onSpeedometerChange = {
                     AppConfig.showSpeedometer.value = it
-                    prefs.edit().putBoolean("show_speedometer", it).apply()
+                    prefs.edit().putBoolean(MapDisplayPrefs.showSpeedometer.key, it).apply()
                 },
                 onDismiss = { showMapPageSettingsSheet = false },
                 onBack = { showMapPageSettingsSheet = false },

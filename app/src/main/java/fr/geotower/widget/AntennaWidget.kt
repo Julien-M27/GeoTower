@@ -72,6 +72,7 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppUiMode
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
+import fr.geotower.utils.PreferenceStores
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -83,7 +84,7 @@ class AntennaWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
 
-        val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
         val lastUpdate = prefs.getString("widget_last_update", "--:--") ?: "--:--"
         val isOled = prefs.getBoolean("oled_mode", false)
         val useOneUi = AppUiMode.fromStorageKey(
@@ -409,7 +410,7 @@ fun GlanceGridCell(opName: String?, modifier: GlanceModifier) {
 class RefreshWidgetAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         // 1. On affiche le message TOUT DE SUITE pour confirmer le clic
-        val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
         Handler(Looper.getMainLooper()).post {
             Toast.makeText(context, context.getString(R.string.widget_immediate_search), Toast.LENGTH_SHORT).show()
         }

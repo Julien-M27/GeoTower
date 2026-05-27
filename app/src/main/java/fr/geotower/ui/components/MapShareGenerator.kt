@@ -47,6 +47,7 @@ import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.SharePrefs
 import java.io.File
 import java.io.FileOutputStream
 import androidx.compose.foundation.Image
@@ -213,19 +214,19 @@ fun MapShareMenu(
     var showSelectionSheet by remember { mutableStateOf(false) }
     var selectedShareTheme by remember { mutableStateOf(false) }
 
-    var incAzimuths by remember { mutableStateOf(prefs.getBoolean("share_map_azimuths", true)) }
-    var incSpeedometer by remember { mutableStateOf(prefs.getBoolean("share_map_speedometer", true)) }
-    var incScale by remember { mutableStateOf(prefs.getBoolean("share_map_scale", true)) }
-    var incAttribution by remember { mutableStateOf(prefs.getBoolean("share_map_attribution", true)) }
-    var incConfidential by remember { mutableStateOf(prefs.getBoolean("share_map_confidential", false)) }
+    var incAzimuths by remember { mutableStateOf(SharePrefs.mapAzimuths.read(prefs)) }
+    var incSpeedometer by remember { mutableStateOf(SharePrefs.mapSpeedometer.read(prefs)) }
+    var incScale by remember { mutableStateOf(SharePrefs.mapScale.read(prefs)) }
+    var incAttribution by remember { mutableStateOf(SharePrefs.mapAttribution.read(prefs)) }
+    var incConfidential by remember { mutableStateOf(SharePrefs.mapConfidential.read(prefs)) }
 
     LaunchedEffect(showShareSheet) {
         if (showShareSheet) {
-            incAzimuths = prefs.getBoolean("share_map_azimuths", true)
-            incSpeedometer = prefs.getBoolean("share_map_speedometer", true)
-            incScale = prefs.getBoolean("share_map_scale", true)
-            incAttribution = prefs.getBoolean("share_map_attribution", true)
-            incConfidential = prefs.getBoolean("share_map_confidential", false)
+            incAzimuths = SharePrefs.mapAzimuths.read(prefs)
+            incSpeedometer = SharePrefs.mapSpeedometer.read(prefs)
+            incScale = SharePrefs.mapScale.read(prefs)
+            incAttribution = SharePrefs.mapAttribution.read(prefs)
+            incConfidential = SharePrefs.mapConfidential.read(prefs)
         }
     }
 

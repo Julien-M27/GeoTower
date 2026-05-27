@@ -758,6 +758,7 @@
     <string name="appstrings_site_dates_option">Datas de ativação</string>
     <string name="appstrings_site_detail_title">Detalhes do site</string>
     <string name="appstrings_site_display_title">Exibição dos sites</string>
+    <string name="appstrings_hide_underground_sites_label">Ocultar sites subterrâneos</string>
     <string name="appstrings_site_elevation_profile_option">Botão Perfil altimétrico</string>
     <string name="appstrings_site_freq_filters_title">Filtros de fréquence da antena</string>
     <string name="appstrings_site_freqs_option">Frequências, Espectros e Azimutes</string>

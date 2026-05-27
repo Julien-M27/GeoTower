@@ -758,6 +758,7 @@
     <string name="appstrings_site_dates_option">Aktivierungsdaten</string>
     <string name="appstrings_site_detail_title">Standortdetail</string>
     <string name="appstrings_site_display_title">Standortanzeige</string>
+    <string name="appstrings_hide_underground_sites_label">Unterirdische Standorte ausblenden</string>
     <string name="appstrings_site_elevation_profile_option">Schaltfläche Höhenprofil</string>
     <string name="appstrings_site_freq_filters_title">Antennenfrequenzfilter</string>
     <string name="appstrings_site_freqs_option">Frequenzen, Spektrum und Azimute</string>

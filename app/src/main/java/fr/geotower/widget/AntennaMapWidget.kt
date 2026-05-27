@@ -47,6 +47,7 @@ import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppUiMode
+import fr.geotower.utils.PreferenceStores
 import java.io.File
 
 class AntennaMapWidget : GlanceAppWidget() {
@@ -54,7 +55,7 @@ class AntennaMapWidget : GlanceAppWidget() {
     override val sizeMode = SizeMode.Exact
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
         val lastUpdate = prefs.getString("widget_last_update", "--:--") ?: "--:--"
         val fallbackImagePath = prefs.getString(PREF_WIDGET_MAP_IMAGE_PATH, null)
         val wideImagePath = prefs.getString(PREF_WIDGET_MAP_IMAGE_WIDE_PATH, fallbackImagePath)

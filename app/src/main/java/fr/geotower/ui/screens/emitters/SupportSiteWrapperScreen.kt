@@ -1,6 +1,7 @@
 package fr.geotower.ui.screens.emitters
 
 import android.content.Context
+import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -45,11 +46,11 @@ fun SupportSiteWrapperScreen(
     highlightedOperatorKey: String? = null,
     isSplitScreen: Boolean = false,
     onCloseSplitScreen: () -> Unit = {},
-    onOpenAntennaInHost: ((Long) -> Unit)? = null
+    onOpenAntennaInHost: ((String) -> Unit)? = null
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     var isReady by remember { mutableStateOf(false) }
-    var selectedSiteId by remember { mutableStateOf<Long?>(null) }
+    var selectedSiteId by remember { mutableStateOf<String?>(null) }
     var selectedSidePane by remember { mutableStateOf<SiteDetailSidePane?>(null) }
     val displayStyle by AppConfig.displayStyle
 
@@ -161,7 +162,7 @@ fun SupportSiteWrapperScreen(
                                 selectedSidePane = null
                             }
                         } else {
-                            navController.navigate("site_detail/$id")
+                            navController.navigate("site_detail/${Uri.encode(id)}")
                         }
                     }
                 )
@@ -209,7 +210,7 @@ fun NearEmittersSupportWrapperScreen(
     val displayStyle by AppConfig.displayStyle
     var selectedSupportId by rememberSaveable { mutableStateOf<Long?>(null) }
     var selectedSupportOperatorKey by rememberSaveable { mutableStateOf<String?>(null) }
-    var selectedSiteId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var selectedSiteId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSidePane by remember { mutableStateOf<SiteDetailSidePane?>(null) }
     val isSplitActive = displayStyle == 1 && selectedSupportId != null
     val leftWidthFraction by animateFloatAsState(
@@ -318,7 +319,7 @@ fun NearEmittersSupportWrapperScreen(
 fun SiteDetailToolWrapperScreen(
     navController: NavController,
     repository: AnfrRepository,
-    antennaId: Long
+    antennaId: String
 ) {
     val displayStyle by AppConfig.displayStyle
     var selectedSidePane by remember(antennaId) { mutableStateOf<SiteDetailSidePane?>(null) }
@@ -403,7 +404,7 @@ private fun RowScope.AnimatedSplitPane(
 private fun SiteDetailPane(
     navController: NavController,
     repository: AnfrRepository,
-    antennaId: Long,
+    antennaId: String,
     onClose: () -> Unit,
     onOpenElevation: (String) -> Unit,
     onOpenThroughput: (String) -> Unit
@@ -423,13 +424,13 @@ private fun SiteDetailPane(
 private fun ElevationProfilePane(
     navController: NavController,
     repository: AnfrRepository,
-    antennaId: Long,
+    antennaId: String,
     onClose: () -> Unit
 ) {
     ElevationProfileScreen(
         navController = navController,
         repository = repository,
-        antennaId = antennaId.toString(),
+        antennaId = antennaId,
         isSplitScreen = true,
         onCloseSplitScreen = onClose
     )
@@ -439,13 +440,13 @@ private fun ElevationProfilePane(
 private fun ThroughputCalculatorPane(
     navController: NavController,
     repository: AnfrRepository,
-    antennaId: Long,
+    antennaId: String,
     onClose: () -> Unit
 ) {
     ThroughputCalculatorScreen(
         navController = navController,
         repository = repository,
-        antennaId = antennaId.toString(),
+        antennaId = antennaId,
         isSplitScreen = true,
         onCloseSplitScreen = onClose
     )

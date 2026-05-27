@@ -165,6 +165,8 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
             val anfrCodeBody = manifest.anfrCode.toTextPartBody()
             val nationalSiteCodeBody = manifest.nationalSiteCode.toTextPartBody()
             val sourceCodeBody = manifest.sourceCode.toTextPartBody()
+            val stripExifBody = manifest.stripExifBeforeUpload.toString()
+                .toRequestBody("text/plain".toMediaTypeOrNull())
             val exifBody = SignalQuestUploadQueue.exifMetadataJsonForUpload(applicationContext, manifest, uploadFile)
                 ?.toRequestBody("application/json".toMediaTypeOrNull())
 
@@ -177,6 +179,7 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
                 anfrCode = anfrCodeBody,
                 nationalSiteCode = nationalSiteCodeBody,
                 sourceCode = sourceCodeBody,
+                stripExifBeforeUpload = stripExifBody,
                 exifMetadata = exifBody
             )
 

@@ -24,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.geotower.R
+import fr.geotower.services.LiveTrackingController
 import fr.geotower.utils.AppConfig
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -49,6 +50,9 @@ fun UnitSettingsSheet(
     fun saveUnit(key: String, configState: MutableIntState, value: Int) {
         configState.intValue = value
         prefs.edit().putInt(key, value).apply()
+        if (key == "distance_unit") {
+            LiveTrackingController.refreshNotification(context)
+        }
 
         // ✅ NOUVEAU : On force le rafraîchissement silencieux du widget en arrière-plan !
         // Dès que l'utilisateur change l'unité, le widget recalcule ses distances.

@@ -8,7 +8,7 @@ import java.util.Locale
 object GeoTowerDatabaseValidator {
     const val DB_NAME = "geotower_fr.db"
     const val EXPECTED_COUNTRY_CODE = "FR"
-    const val EXPECTED_SCHEMA_VERSION = 5
+    const val EXPECTED_SCHEMA_VERSION = 6
 
     private const val LEGACY_DB_NAME = "geotower.db"
     private const val PREFS_NAME = "GeoTowerPrefs"
@@ -93,7 +93,9 @@ object GeoTowerDatabaseValidator {
             "code_insee",
             "azimuts_fh",
             "tech_mask",
-            "band_mask"
+            "band_mask",
+            "arcep_nidt",
+            "is_zb"
         ),
         "technique" to setOf(
             "id_anfr",
@@ -176,7 +178,9 @@ object GeoTowerDatabaseValidator {
             "latitude" to SQLiteAffinity.REAL,
             "longitude" to SQLiteAffinity.REAL,
             "tech_mask" to SQLiteAffinity.INTEGER,
-            "band_mask" to SQLiteAffinity.INTEGER
+            "band_mask" to SQLiteAffinity.INTEGER,
+            "arcep_nidt" to SQLiteAffinity.TEXT,
+            "is_zb" to SQLiteAffinity.INTEGER
         ),
         "technique" to mapOf(
             "id_anfr" to SQLiteAffinity.TEXT,
@@ -242,7 +246,7 @@ object GeoTowerDatabaseValidator {
     )
 
     private val requiredNotNullColumns = mapOf(
-        "localisation" to listOf("id_anfr", "latitude", "longitude", "tech_mask", "band_mask"),
+        "localisation" to listOf("id_anfr", "latitude", "longitude", "tech_mask", "band_mask", "is_zb"),
         "technique" to listOf("id_anfr", "has_active"),
         "support" to listOf("id_anfr", "id_support"),
         "antenne" to listOf("aer_id", "id_anfr", "is_fh"),

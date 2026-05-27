@@ -10,6 +10,7 @@ import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.data.community.CommunityDataSource
 import fr.geotower.utils.OperatorColors
 import java.util.Locale
+import kotlinx.coroutines.withTimeoutOrNull
 
 internal data class LiveSitePhotoCandidate(
     val url: String,
@@ -22,6 +23,7 @@ internal object LiveSitePhotoSelector {
     private const val FAVORITE_QUERY_LIMIT = 50
     private const val MAX_THUMBNAIL_BYTES = 3 * 1024 * 1024
     private const val MAX_IMAGE_BYTES = 10 * 1024 * 1024
+    private const val SIGNALQUEST_PHOTOS_TIMEOUT_MS = 5_000L
     private const val CACHE_VERSION = "v2"
 
     suspend fun firstCandidate(
@@ -46,14 +48,18 @@ internal object LiveSitePhotoSelector {
 
         var previousEnabledSourceHasPhotos = false
         val visiblePhotos = mutableListOf<SourcePhoto>()
-
-        for (source in sources) {
-            val sourceFavoriteId = favoritePhotoIdForSource(
+        val favoriteIdsBySource = sources.associate { source ->
+            source.id to favoritePhotoIdForSource(
                 prefs = prefs,
                 siteId = normalizedSiteId,
                 source = source,
                 operatorKey = operatorKey
             )
+        }
+        val hasFavoritePhoto = favoriteIdsBySource.values.any { !it.isNullOrBlank() }
+
+        for (source in sources) {
+            val sourceFavoriteId = favoriteIdsBySource[source.id]
             val sourcePhotos = sourcePhotos(
                 sourceId = source.id,
                 siteId = normalizedSiteId,
@@ -69,6 +75,11 @@ internal object LiveSitePhotoSelector {
             )
 
             if (isVisibleSource) {
+                if (!hasFavoritePhoto) {
+                    sourcePhotos.firstNotNullOfOrNull { photo -> photo.toCandidate() }?.let { candidate ->
+                        return candidate
+                    }
+                }
                 visiblePhotos += sourcePhotos
             }
 
@@ -152,10 +163,13 @@ internal object LiveSitePhotoSelector {
         val signalQuestOperatorKey = OperatorColors.keyFor(signalQuestOperator)
             ?: OperatorColors.keyFor(operator)
 
-        val response = SignalQuestClient.api.getSitePhotos(
-            siteId = siteId,
-            limit = if (favoriteId.isNullOrBlank()) DEFAULT_QUERY_LIMIT else FAVORITE_QUERY_LIMIT
-        )
+        val response = withTimeoutOrNull(SIGNALQUEST_PHOTOS_TIMEOUT_MS) {
+            SignalQuestClient.api.getSitePhotos(
+                siteId = siteId,
+                operator = signalQuestOperator,
+                limit = if (favoriteId.isNullOrBlank()) DEFAULT_QUERY_LIMIT else FAVORITE_QUERY_LIMIT
+            )
+        } ?: return emptyList()
         if (!response.isSuccessful) return emptyList()
 
         return response.body()

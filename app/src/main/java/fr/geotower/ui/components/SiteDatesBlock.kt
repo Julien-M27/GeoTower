@@ -13,7 +13,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.TechniqueEntity // ✅ NOUVEL IMPORT
-import fr.geotower.ui.screens.emitters.formatDateToFrench // ✅ Formatage localisé des dates
+import fr.geotower.utils.formatDateToFrench // ✅ Formatage localisé des dates
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
 

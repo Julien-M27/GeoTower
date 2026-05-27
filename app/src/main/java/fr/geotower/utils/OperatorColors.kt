@@ -107,6 +107,17 @@ object OperatorColors {
         return specsByKey[key?.uppercase()?.trim()]
     }
 
+    fun searchLabelsFor(raw: String?): List<String> {
+        val cleanRaw = raw?.trim().orEmpty()
+        val spec = keyFor(cleanRaw)?.let { specsByKey[it] }
+            ?: return cleanRaw.takeIf { it.isNotBlank() }?.let(::listOf).orEmpty()
+
+        return (spec.aliases + spec.label + spec.key)
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+            .distinctBy { it.uppercase() }
+    }
+
     fun hasKey(key: String): Boolean {
         return key.uppercase().trim() in specsByKey
     }

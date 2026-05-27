@@ -70,7 +70,8 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
             _isLoading.value = true
             try {
                 // ✅ 2. ON EMPÊCHE LE CLUSTERING GLOBAL SI UNE VILLE EST RECHERCHÉE
-                val hasSiteDisplayFilter = !AppConfig.showSitesInService.value || !AppConfig.showSitesOutOfService.value
+                val hasSiteDisplayFilter = !AppConfig.showSitesInService.value ||
+                    !AppConfig.showSitesOutOfService.value
 
                 if (zoom < 13.0 && cityPolygons == null && !hasSiteDisplayFilter) {
                     val clusters = repository.getClusteredAntennas(zoom, latNorth, lonEast, latSouth, lonWest)

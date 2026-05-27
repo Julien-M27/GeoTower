@@ -9,6 +9,7 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -64,6 +65,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
@@ -98,8 +100,12 @@ import fr.geotower.ui.components.rememberReorderableDragState
 import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.ui.components.MiniMapViewMode
 import kotlin.math.roundToInt
+import fr.geotower.utils.PreferenceStores
 import fr.geotower.utils.StatsDisplayMode
 import fr.geotower.utils.StatsPreferences
+import fr.geotower.utils.SitePagePrefs
+import fr.geotower.utils.SupportPagePrefs
+import fr.geotower.utils.ThroughputPrefs
 import fr.geotower.utils.ThroughputDisplayText
 
 object SiteSpeedtestsPagePreferences {
@@ -372,7 +378,7 @@ fun HomeSettingsSheet(
 ) {
     // ---> 1. LECTURE DE LA PRÉFÉRENCE DU LOGO <---
     val context = LocalContext.current
-    val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
     var showLogo by remember { mutableStateOf(prefs.getBoolean("show_home_logo", true)) }
     var showHelpButton by remember { mutableStateOf(prefs.getBoolean("show_home_help", true)) }
     var helpButtonPosition by remember { mutableStateOf(prefs.getString("home_help_position", "bottom_end") ?: "bottom_end") }
@@ -698,7 +704,6 @@ fun NearbySettingsSheet(
     onBack: () -> Unit, // <-- NOUVEAU
     sheetState: SheetState, useOneUi: Boolean, bubbleColor: Color
 ) {
-    val currentOrder by rememberUpdatedState(nearbyOrder)
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
@@ -722,28 +727,22 @@ fun NearbySettingsSheet(
             }
             Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
 
-            val cardHeight = 64.dp
-            val spacing = 12.dp
-            val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
-
             val shape = oneUiActionButtonShape(useOneUi)
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
             // --- 1. LES BLOCS GLISSER/DÉPOSER ---
-            Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
-                currentOrder.forEach { blockId ->
-                    key(blockId) {
-                        val isDragged = reorderState.isDragged(blockId)
-                        val dragModifier = reorderState.dragModifier(blockId)
-                        val dragOffset = reorderState.offsetFor(blockId)
-
-                        when (blockId) {
-                            "search" -> DraggableSwitchCard(stringResource(R.string.appstrings_nearby_search_option), showSearch, onSearchChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "sites" -> DraggableSwitchCard(stringResource(R.string.appstrings_nearby_sites_option), showSites, onSitesChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                        }
-                    }
-                }
-            }
+            ReorderableBlockList(
+                order = nearbyOrder,
+                blocks = listOf(
+                    ConfigurableBlock("search", { stringResource(R.string.appstrings_nearby_search_option) }, showSearch, onSearchChange),
+                    ConfigurableBlock("sites", { stringResource(R.string.appstrings_nearby_sites_option) }, showSites, onSitesChange)
+                ),
+                onOrderChange = onOrderChange,
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                useOneUi = useOneUi
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
@@ -875,7 +874,6 @@ fun CompassSettingsSheet(
     onDismiss: () -> Unit, onBack: () -> Unit,
     sheetState: SheetState, useOneUi: Boolean, bubbleColor: Color
 ) {
-    val currentOrder by rememberUpdatedState(compassOrder)
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
@@ -899,28 +897,22 @@ fun CompassSettingsSheet(
             }
             Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
 
-            val cardHeight = 64.dp
-            val spacing = 12.dp
-            val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
-
             val shape = oneUiActionButtonShape(useOneUi)
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
-            Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
-                currentOrder.forEach { blockId ->
-                    key(blockId) {
-                        val isDragged = reorderState.isDragged(blockId)
-                        val dragModifier = reorderState.dragModifier(blockId)
-                        val dragOffset = reorderState.offsetFor(blockId)
-
-                        when (blockId) {
-                            "location" -> DraggableSwitchCard(stringResource(R.string.appstrings_compass_location_option), showLocation, onLocationChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "gps" -> DraggableSwitchCard(stringResource(R.string.appstrings_compass_gps_option), showGps, onGpsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "accuracy" -> DraggableSwitchCard(stringResource(R.string.appstrings_compass_accuracy_option), showAccuracy, onAccuracyChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                        }
-                    }
-                }
-            }
+            ReorderableBlockList(
+                order = compassOrder,
+                blocks = listOf(
+                    ConfigurableBlock("location", { stringResource(R.string.appstrings_compass_location_option) }, showLocation, onLocationChange),
+                    ConfigurableBlock("gps", { stringResource(R.string.appstrings_compass_gps_option) }, showGps, onGpsChange),
+                    ConfigurableBlock("accuracy", { stringResource(R.string.appstrings_compass_accuracy_option) }, showAccuracy, onAccuracyChange)
+                ),
+                onOrderChange = onOrderChange,
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                useOneUi = useOneUi
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
             TextButton(onClick = {
@@ -1209,17 +1201,6 @@ fun SiteSpeedtestsSettingsSheet(
     }
 }
 
-private val defaultThroughputBlockOrder = listOf("header", "summary", "cone", "controls", "bands", "assumptions")
-
-private fun normalizeThroughputBlockOrder(order: List<String>): List<String> {
-    val knownBlocks = defaultThroughputBlockOrder.toSet()
-    val normalized = order.map { it.trim() }.filter { it in knownBlocks }.distinct().toMutableList()
-    defaultThroughputBlockOrder.forEach { block ->
-        if (!normalized.contains(block)) normalized.add(block)
-    }
-    return normalized
-}
-
 @Composable
 private fun throughputBlockTitle(blockId: String): String {
     return ThroughputDisplayText.blockTitle(blockId)
@@ -1251,35 +1232,37 @@ fun ThroughputCalculatorSettingsSheet(
     useOneUi: Boolean,
     bubbleColor: Color
 ) {
-    val themeMode by AppConfig.themeMode
-    val isOledMode by AppConfig.isOledMode
-    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
-    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
-    val shape = oneUiActionButtonShape(useOneUi)
-    val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
-    val currentOrder by rememberUpdatedState(normalizeThroughputBlockOrder(throughputOrder))
-    val scrollState = rememberScrollState()
-
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
-        BackHandler(onBack = onBack)
-        val cardHeight = 64.dp
-        val spacing = 12.dp
-        val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onThroughputOrderChange)
-
-        Column(
-            modifier = Modifier
-                .navigationBarsPadding()
-                .settingsPopupFadingEdge(scrollState)
-                .verticalScroll(scrollState)
-                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text(stringResource(R.string.appstrings_throughput_calculator_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                Spacer(Modifier.width(48.dp))
-            }
-
+    ReorderableBlockSettingsSheet(
+        title = stringResource(R.string.appstrings_throughput_calculator_title),
+        order = ThroughputPrefs.normalizeBlockOrder(throughputOrder),
+        blocks = listOf(
+            ConfigurableBlock(ThroughputPrefs.BLOCK_HEADER, { throughputBlockTitle(ThroughputPrefs.BLOCK_HEADER) }, showHeader, onHeaderChange),
+            ConfigurableBlock(ThroughputPrefs.BLOCK_SUMMARY, { throughputBlockTitle(ThroughputPrefs.BLOCK_SUMMARY) }, showSummary, onSummaryChange),
+            ConfigurableBlock(ThroughputPrefs.BLOCK_CONE, { throughputBlockTitle(ThroughputPrefs.BLOCK_CONE) }, showCone, onConeChange),
+            ConfigurableBlock(ThroughputPrefs.BLOCK_CONTROLS, { throughputBlockTitle(ThroughputPrefs.BLOCK_CONTROLS) }, showControls, onControlsChange, onSettingsClick = {
+                onDismiss()
+                onOpenCalculationDefaults()
+            }),
+            ConfigurableBlock(ThroughputPrefs.BLOCK_BANDS, { throughputBlockTitle(ThroughputPrefs.BLOCK_BANDS) }, showBands, onBandsChange),
+            ConfigurableBlock(ThroughputPrefs.BLOCK_ASSUMPTIONS, { throughputBlockTitle(ThroughputPrefs.BLOCK_ASSUMPTIONS) }, showAssumptions, onAssumptionsChange)
+        ),
+        onOrderChange = onThroughputOrderChange,
+        onReset = {
+            onThroughputCalculatorChange(true)
+            onThroughputOrderChange(ThroughputPrefs.defaultBlockOrder)
+            onHeaderChange(true)
+            onSummaryChange(true)
+            onConeChange(true)
+            onControlsChange(true)
+            onBandsChange(true)
+            onAssumptionsChange(true)
+        },
+        onDismiss = onDismiss,
+        onBack = onBack,
+        sheetState = sheetState,
+        useOneUi = useOneUi,
+        bubbleColor = bubbleColor,
+        contentBeforeList = { shape, border ->
             SimpleSwitchCard(
                 title = stringResource(R.string.appstrings_site_throughput_calculator_option),
                 showMapLocation = showThroughputCalculator,
@@ -1293,75 +1276,8 @@ fun ThroughputCalculatorSettingsSheet(
             Spacer(modifier = Modifier.height(20.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
             Spacer(modifier = Modifier.height(16.dp))
-            Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 16.dp), textAlign = TextAlign.Center)
-
-            Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
-                currentOrder.forEach { blockId ->
-                    key(blockId) {
-                        val isDragged = reorderState.isDragged(blockId)
-                        val dragModifier = reorderState.dragModifier(blockId)
-                        val dragOffset = reorderState.offsetFor(blockId)
-                        val checked = when (blockId) {
-                            "header" -> showHeader
-                            "summary" -> showSummary
-                            "cone" -> showCone
-                            "controls" -> showControls
-                            "bands" -> showBands
-                            "assumptions" -> showAssumptions
-                            else -> true
-                        }
-                        val onCheckedChange: (Boolean) -> Unit = when (blockId) {
-                            "header" -> onHeaderChange
-                            "summary" -> onSummaryChange
-                            "cone" -> onConeChange
-                            "controls" -> onControlsChange
-                            "bands" -> onBandsChange
-                            "assumptions" -> onAssumptionsChange
-                            else -> { _: Boolean -> }
-                        }
-                        DraggableSwitchCard(
-                            throughputBlockTitle(blockId),
-                            checked,
-                            onCheckedChange,
-                            shape,
-                            border,
-                            bubbleColor,
-                            useOneUi,
-                            dragModifier,
-                            isDragged,
-                            dragOffset,
-                            cardHeight,
-                            onSettingsClick = if (blockId == "controls") {
-                                {
-                                    onDismiss()
-                                    onOpenCalculationDefaults()
-                                }
-                            } else {
-                                null
-                            }
-                        )
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-            TextButton(onClick = {
-                onThroughputCalculatorChange(true)
-                onThroughputOrderChange(defaultThroughputBlockOrder)
-                onHeaderChange(true)
-                onSummaryChange(true)
-                onConeChange(true)
-                onControlsChange(true)
-                onBandsChange(true)
-                onAssumptionsChange(true)
-            }) {
-                Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            }
-            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
-    }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1374,7 +1290,7 @@ fun ThroughputCalculationDefaultsSheet(
     bubbleColor: Color
 ) {
     val context = LocalContext.current
-    val prefs = remember(context) { context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE) }
+    val prefs = remember(context) { context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE) }
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
@@ -1383,25 +1299,25 @@ fun ThroughputCalculationDefaultsSheet(
     val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
     val scrollState = rememberScrollState()
 
-    var preset by remember { mutableStateOf(prefs.getString("throughput_default_preset", "conservative") ?: "conservative") }
-    var lteDownIndex by remember { mutableStateOf(prefs.getInt("throughput_custom_lte_down", 3).coerceIn(0, throughputModulationLabels.lastIndex)) }
-    var lteUpIndex by remember { mutableStateOf(prefs.getInt("throughput_custom_lte_up", 2).coerceIn(0, throughputModulationLabels.lastIndex)) }
-    var nrDownIndex by remember { mutableStateOf(prefs.getInt("throughput_custom_nr_down", 3).coerceIn(0, throughputModulationLabels.lastIndex)) }
-    var nrUpIndex by remember { mutableStateOf(prefs.getInt("throughput_custom_nr_up", 2).coerceIn(0, throughputModulationLabels.lastIndex)) }
-    var include4G by remember { mutableStateOf(prefs.getBoolean("throughput_include_4g", true)) }
-    var include5G by remember { mutableStateOf(prefs.getBoolean("throughput_include_5g", true)) }
-    var includePlanned by remember { mutableStateOf(prefs.getBoolean("throughput_include_planned", false)) }
+    var preset by remember { mutableStateOf(prefs.getString(ThroughputPrefs.DEFAULT_PRESET, ThroughputPrefs.DEFAULT_PRESET_VALUE) ?: ThroughputPrefs.DEFAULT_PRESET_VALUE) }
+    var lteDownIndex by remember { mutableStateOf(prefs.getInt(ThroughputPrefs.CUSTOM_LTE_DOWN, 3).coerceIn(0, throughputModulationLabels.lastIndex)) }
+    var lteUpIndex by remember { mutableStateOf(prefs.getInt(ThroughputPrefs.CUSTOM_LTE_UP, 2).coerceIn(0, throughputModulationLabels.lastIndex)) }
+    var nrDownIndex by remember { mutableStateOf(prefs.getInt(ThroughputPrefs.CUSTOM_NR_DOWN, 3).coerceIn(0, throughputModulationLabels.lastIndex)) }
+    var nrUpIndex by remember { mutableStateOf(prefs.getInt(ThroughputPrefs.CUSTOM_NR_UP, 2).coerceIn(0, throughputModulationLabels.lastIndex)) }
+    var include4G by remember { mutableStateOf(ThroughputPrefs.include4G.read(prefs)) }
+    var include5G by remember { mutableStateOf(ThroughputPrefs.include5G.read(prefs)) }
+    var includePlanned by remember { mutableStateOf(ThroughputPrefs.includePlanned.read(prefs)) }
     var bandSelection by remember {
         mutableStateOf(
             throughputBandDefaults
                 .flatMap { it.bands }
-                .associate { band -> band.prefSuffix to prefs.getBoolean("throughput_band_${band.prefSuffix}", true) }
+                .associate { band -> band.prefSuffix to prefs.getBoolean(ThroughputPrefs.bandVisiblePrefKey(band.prefSuffix), true) }
         )
     }
 
     fun savePreset(value: String) {
         preset = value
-        prefs.edit().putString("throughput_default_preset", value).apply()
+        prefs.edit().putString(ThroughputPrefs.DEFAULT_PRESET, value).apply()
     }
 
     fun saveInt(key: String, value: Int, update: (Int) -> Unit) {
@@ -1417,7 +1333,7 @@ fun ThroughputCalculationDefaultsSheet(
 
     fun saveBand(prefSuffix: String, value: Boolean) {
         bandSelection = bandSelection + (prefSuffix to value)
-        prefs.edit().putBoolean("throughput_band_$prefSuffix", value).apply()
+        prefs.edit().putBoolean(ThroughputPrefs.bandVisiblePrefKey(prefSuffix), value).apply()
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
@@ -1472,16 +1388,16 @@ fun ThroughputCalculationDefaultsSheet(
                         fontWeight = FontWeight.Bold
                     )
                     ThroughputDefaultModulationSlider(stringResource(R.string.appstrings_throughput4g_download_label), lteDownIndex, useOneUi) {
-                        saveInt("throughput_custom_lte_down", it) { value -> lteDownIndex = value }
+                        saveInt(ThroughputPrefs.CUSTOM_LTE_DOWN, it) { value -> lteDownIndex = value }
                     }
                     ThroughputDefaultModulationSlider(stringResource(R.string.appstrings_throughput4g_upload_label), lteUpIndex, useOneUi) {
-                        saveInt("throughput_custom_lte_up", it) { value -> lteUpIndex = value }
+                        saveInt(ThroughputPrefs.CUSTOM_LTE_UP, it) { value -> lteUpIndex = value }
                     }
                     ThroughputDefaultModulationSlider(stringResource(R.string.appstrings_throughput5g_download_label), nrDownIndex, useOneUi) {
-                        saveInt("throughput_custom_nr_down", it) { value -> nrDownIndex = value }
+                        saveInt(ThroughputPrefs.CUSTOM_NR_DOWN, it) { value -> nrDownIndex = value }
                     }
                     ThroughputDefaultModulationSlider(stringResource(R.string.appstrings_throughput5g_upload_label), nrUpIndex, useOneUi) {
-                        saveInt("throughput_custom_nr_up", it) { value -> nrUpIndex = value }
+                        saveInt(ThroughputPrefs.CUSTOM_NR_UP, it) { value -> nrUpIndex = value }
                     }
                 }
             }
@@ -1490,11 +1406,11 @@ fun ThroughputCalculationDefaultsSheet(
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
             Spacer(Modifier.height(12.dp))
 
-            SimpleSwitchCard(stringResource(R.string.appstrings_throughput_include4g), include4G, { saveBool("throughput_include_4g", it) { value -> include4G = value } }, shape, border, bubbleColor, useOneUi)
+            SimpleSwitchCard(stringResource(R.string.appstrings_throughput_include4g), include4G, { saveBool(ThroughputPrefs.include4G.key, it) { value -> include4G = value } }, shape, border, bubbleColor, useOneUi)
             Spacer(Modifier.height(8.dp))
-            SimpleSwitchCard(stringResource(R.string.appstrings_throughput_include5g), include5G, { saveBool("throughput_include_5g", it) { value -> include5G = value } }, shape, border, bubbleColor, useOneUi)
+            SimpleSwitchCard(stringResource(R.string.appstrings_throughput_include5g), include5G, { saveBool(ThroughputPrefs.include5G.key, it) { value -> include5G = value } }, shape, border, bubbleColor, useOneUi)
             Spacer(Modifier.height(8.dp))
-            SimpleSwitchCard(stringResource(R.string.appstrings_throughput_include_planned), includePlanned, { saveBool("throughput_include_planned", it) { value -> includePlanned = value } }, shape, border, bubbleColor, useOneUi)
+            SimpleSwitchCard(stringResource(R.string.appstrings_throughput_include_planned), includePlanned, { saveBool(ThroughputPrefs.includePlanned.key, it) { value -> includePlanned = value } }, shape, border, bubbleColor, useOneUi)
 
             Spacer(Modifier.height(20.dp))
             Text(
@@ -1527,7 +1443,7 @@ fun ThroughputCalculationDefaultsSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
             TextButton(onClick = {
-                preset = "conservative"
+                preset = ThroughputPrefs.DEFAULT_PRESET_VALUE
                 lteDownIndex = 3
                 lteUpIndex = 2
                 nrDownIndex = 3
@@ -1537,16 +1453,16 @@ fun ThroughputCalculationDefaultsSheet(
                 includePlanned = false
                 bandSelection = throughputBandDefaults.flatMap { it.bands }.associate { it.prefSuffix to true }
                 val editor = prefs.edit()
-                    .putString("throughput_default_preset", "conservative")
-                    .putInt("throughput_custom_lte_down", 3)
-                    .putInt("throughput_custom_lte_up", 2)
-                    .putInt("throughput_custom_nr_down", 3)
-                    .putInt("throughput_custom_nr_up", 2)
-                    .putBoolean("throughput_include_4g", true)
-                    .putBoolean("throughput_include_5g", true)
-                    .putBoolean("throughput_include_planned", false)
+                    .putString(ThroughputPrefs.DEFAULT_PRESET, ThroughputPrefs.DEFAULT_PRESET_VALUE)
+                    .putInt(ThroughputPrefs.CUSTOM_LTE_DOWN, 3)
+                    .putInt(ThroughputPrefs.CUSTOM_LTE_UP, 2)
+                    .putInt(ThroughputPrefs.CUSTOM_NR_DOWN, 3)
+                    .putInt(ThroughputPrefs.CUSTOM_NR_UP, 2)
+                    .putBoolean(ThroughputPrefs.include4G.key, true)
+                    .putBoolean(ThroughputPrefs.include5G.key, true)
+                    .putBoolean(ThroughputPrefs.includePlanned.key, false)
                 throughputBandDefaults.flatMap { it.bands }.forEach { band ->
-                    editor.putBoolean("throughput_band_${band.prefSuffix}", true)
+                    editor.putBoolean(ThroughputPrefs.bandVisiblePrefKey(band.prefSuffix), true)
                 }
                 editor.apply()
             }) {
@@ -1668,28 +1584,81 @@ private val throughputBandDefaults = listOf(
     )
 )
 
+data class ConfigurableBlock(
+    val id: String,
+    val title: @Composable () -> String,
+    val visible: Boolean,
+    val onVisibilityChange: (Boolean) -> Unit,
+    val isAvailable: Boolean = true,
+    val hideSwitch: Boolean = false,
+    val onSettingsClick: (() -> Unit)? = null
+)
+
+@Composable
+private fun ReorderableBlockList(
+    order: List<String>,
+    blocks: List<ConfigurableBlock>,
+    onOrderChange: (List<String>) -> Unit,
+    shape: Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
+    useOneUi: Boolean,
+    cardHeight: Dp = 64.dp,
+    spacing: Dp = 12.dp
+) {
+    val currentOrder by rememberUpdatedState(order)
+    val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
+    val blocksById = blocks.associateBy { it.id }
+
+    Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
+        currentOrder.forEach { blockId ->
+            val block = blocksById[blockId]
+            if (block != null && block.isAvailable) {
+                key(blockId) {
+                    DraggableSwitchCard(
+                        block.title(),
+                        block.visible,
+                        block.onVisibilityChange,
+                        shape,
+                        border,
+                        bubbleColor,
+                        useOneUi,
+                        reorderState.dragModifier(blockId),
+                        reorderState.isDragged(blockId),
+                        reorderState.offsetFor(blockId),
+                        cardHeight,
+                        hideSwitch = block.hideSwitch,
+                        onSettingsClick = block.onSettingsClick
+                    )
+                }
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SupportSettingsSheet(
-    supportOrder: List<String>, onOrderChange: (List<String>) -> Unit,
-    showMap: Boolean, onMapChange: (Boolean) -> Unit,
-    showDetails: Boolean, onDetailsChange: (Boolean) -> Unit,
-    showPhotos: Boolean, onPhotosChange: (Boolean) -> Unit,
-    showOpenMap: Boolean, onOpenMapChange: (Boolean) -> Unit,
-    showNav: Boolean, onNavChange: (Boolean) -> Unit,
-    showShare: Boolean, onShareChange: (Boolean) -> Unit,
-    showOperators: Boolean, onOperatorsChange: (Boolean) -> Unit,
-    onOpenMiniMapSettings: () -> Unit,
-    onOpenPhotosSettings: () -> Unit,
-    onDismiss: () -> Unit, onBack: () -> Unit,
-    sheetState: SheetState, useOneUi: Boolean, bubbleColor: Color
+fun ReorderableBlockSettingsSheet(
+    title: String,
+    order: List<String>,
+    blocks: List<ConfigurableBlock>,
+    onOrderChange: (List<String>) -> Unit,
+    onReset: () -> Unit,
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    bubbleColor: Color,
+    contentBeforeList: @Composable ColumnScope.(Shape, BorderStroke?) -> Unit = { _, _ -> },
+    contentAfterReset: @Composable ColumnScope.(Shape, BorderStroke?) -> Unit = { _, _ -> }
 ) {
-    val currentOrder by rememberUpdatedState(supportOrder)
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
     val scrollState = rememberScrollState()
+    val shape = oneUiActionButtonShape(useOneUi)
+    val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1708,6 +1677,7 @@ fun SupportSettingsSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
+                .navigationBarsPadding()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
                 .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
@@ -1715,59 +1685,82 @@ fun SupportSettingsSheet(
         ) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text(stringResource(R.string.appstrings_page_support_settings), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Spacer(Modifier.width(48.dp))
             }
+            contentBeforeList(shape, border)
             Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
 
-            val cardHeight = 64.dp
-            val spacing = 12.dp
-            val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
-
-            val shape = oneUiActionButtonShape(useOneUi)
-            val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
-
-            Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
-                currentOrder.forEach { blockId ->
-                    key(blockId) {
-                        val isDragged = reorderState.isDragged(blockId)
-                        val dragModifier = reorderState.dragModifier(blockId)
-                        val dragOffset = reorderState.offsetFor(blockId)
-
-                        when (blockId) {
-                            "map" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_map_option), showMap, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = onOpenMiniMapSettings)
-                            "details" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_details_option), showDetails, onDetailsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "photos" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_photos_option), showPhotos, onPhotosChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = {
-                                onDismiss()
-                                onOpenPhotosSettings()
-                            })
-                            "open_map" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_open_map_option), showOpenMap, onOpenMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "nav" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_nav_option), showNav, onNavChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "share" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_share_option), showShare, onShareChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "operators" -> DraggableSwitchCard(stringResource(R.string.appstrings_support_operators_option), showOperators, onOperatorsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                        }
-                    }
-                }
-            }
+            ReorderableBlockList(
+                order = order,
+                blocks = blocks,
+                onOrderChange = onOrderChange,
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                useOneUi = useOneUi
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
-            TextButton(onClick = {
-                onOrderChange(listOf("map", "details", "photos", "open_map", "nav", "share", "operators"))
-                onMapChange(true)
-                onDetailsChange(true)
-                onPhotosChange(true)
-                onOpenMapChange(true)
-                onNavChange(true)
-                onShareChange(true)
-                onOperatorsChange(true)
-            }) {
+            TextButton(onClick = onReset) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(8.dp))
                 Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
+            contentAfterReset(shape, border)
             Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SupportSettingsSheet(
+    supportOrder: List<String>, onOrderChange: (List<String>) -> Unit,
+    showMap: Boolean, onMapChange: (Boolean) -> Unit,
+    showDetails: Boolean, onDetailsChange: (Boolean) -> Unit,
+    showPhotos: Boolean, onPhotosChange: (Boolean) -> Unit,
+    showOpenMap: Boolean, onOpenMapChange: (Boolean) -> Unit,
+    showNav: Boolean, onNavChange: (Boolean) -> Unit,
+    showShare: Boolean, onShareChange: (Boolean) -> Unit,
+    showOperators: Boolean, onOperatorsChange: (Boolean) -> Unit,
+    onOpenMiniMapSettings: () -> Unit,
+    onOpenPhotosSettings: () -> Unit,
+    onDismiss: () -> Unit, onBack: () -> Unit,
+    sheetState: SheetState, useOneUi: Boolean, bubbleColor: Color
+) {
+    ReorderableBlockSettingsSheet(
+        title = stringResource(R.string.appstrings_page_support_settings),
+        order = supportOrder,
+        blocks = listOf(
+            ConfigurableBlock("map", { stringResource(R.string.appstrings_support_map_option) }, showMap, onMapChange, onSettingsClick = onOpenMiniMapSettings),
+            ConfigurableBlock("details", { stringResource(R.string.appstrings_support_details_option) }, showDetails, onDetailsChange),
+            ConfigurableBlock("photos", { stringResource(R.string.appstrings_support_photos_option) }, showPhotos, onPhotosChange, onSettingsClick = {
+                onDismiss()
+                onOpenPhotosSettings()
+            }),
+            ConfigurableBlock("open_map", { stringResource(R.string.appstrings_support_open_map_option) }, showOpenMap, onOpenMapChange),
+            ConfigurableBlock("nav", { stringResource(R.string.appstrings_support_nav_option) }, showNav, onNavChange),
+            ConfigurableBlock("share", { stringResource(R.string.appstrings_support_share_option) }, showShare, onShareChange),
+            ConfigurableBlock("operators", { stringResource(R.string.appstrings_support_operators_option) }, showOperators, onOperatorsChange)
+        ),
+        onOrderChange = onOrderChange,
+        onReset = {
+            onOrderChange(SupportPagePrefs.defaultOrder)
+            onMapChange(true)
+            onDetailsChange(true)
+            onPhotosChange(true)
+            onOpenMapChange(true)
+            onNavChange(true)
+            onShareChange(true)
+            onOperatorsChange(true)
+        },
+        onDismiss = onDismiss,
+        onBack = onBack,
+        sheetState = sheetState,
+        useOneUi = useOneUi,
+        bubbleColor = bubbleColor
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -1802,118 +1795,65 @@ fun SiteSettingsSheet(
     useOneUi: Boolean,
     bubbleColor: Color
 ) {
-    val currentOrder by rememberUpdatedState(siteOrder)
-    val themeMode by AppConfig.themeMode
-    val isOledMode by AppConfig.isOledMode
-    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
-    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
-
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
+    ReorderableBlockSettingsSheet(
+        title = stringResource(R.string.appstrings_page_site_settings),
+        order = siteOrder,
+        blocks = listOf(
+            ConfigurableBlock("operator", { stringResource(R.string.appstrings_site_operator_option) }, showOperator, onOperatorChange),
+            ConfigurableBlock("bearing_height", { stringResource(R.string.appstrings_site_bearing_height_option) }, showBearingHeight, onBearingHeightChange, isAvailable = AppConfig.hasCompass.value),
+            ConfigurableBlock("map", { stringResource(R.string.appstrings_site_map_option) }, showMap, onMapChange, onSettingsClick = onOpenMiniMapSettings),
+            ConfigurableBlock("support_details", { stringResource(R.string.appstrings_site_support_details_option) }, showSupportDetails, onSupportDetailsChange),
+            ConfigurableBlock("photos", { stringResource(R.string.appstrings_site_photos_and_schemes_option) }, showPhotos, onPhotosChange, onSettingsClick = {
+                onDismiss()
+                onOpenPhotosSettings()
+            }),
+            ConfigurableBlock("ids", { stringResource(R.string.appstrings_site_ids_option) }, showIds, onIdsChange),
+            ConfigurableBlock("open_map", { stringResource(R.string.appstrings_site_open_map_option) }, showOpenMap, onOpenMapChange),
+            ConfigurableBlock("elevation_profile", { stringResource(R.string.appstrings_site_elevation_profile_option) }, showElevationProfile, onElevationProfileChange),
+            ConfigurableBlock("throughput_calculator", { stringResource(R.string.appstrings_site_throughput_calculator_option) }, showThroughputCalculator, onThroughputCalculatorChange),
+            ConfigurableBlock("nav", { stringResource(R.string.appstrings_site_nav_option) }, showNav, onNavChange),
+            ConfigurableBlock("share", { stringResource(R.string.appstrings_site_share_option) }, showShare, onShareChange),
+            ConfigurableBlock("dates", { stringResource(R.string.appstrings_site_dates_option) }, showDates, onDatesChange),
+            ConfigurableBlock("address", { stringResource(R.string.appstrings_site_address_option) }, showAddress, onAddressChange),
+            ConfigurableBlock("status", { stringResource(R.string.appstrings_show_status_option) }, showStatus, onStatusChange),
+            ConfigurableBlock("speedtest", { stringResource(R.string.appstrings_show_speedtest_label) }, showSpeedtest, onSpeedtestChange, onSettingsClick = {
+                onDismiss()
+                onOpenSpeedtestSettings()
+            }),
+            ConfigurableBlock("freqs", { stringResource(R.string.appstrings_site_freqs_option) }, showFreqs, onFreqsChange, onSettingsClick = {
+                onDismiss()
+                onOpenFrequencies()
+            }),
+            ConfigurableBlock("links", { stringResource(R.string.appstrings_site_links_option) }, showLinks, onLinksChange)
+        ),
+        onOrderChange = onOrderChange,
+        onReset = {
+            onOrderChange(SitePagePrefs.defaultOrder)
+            onOperatorChange(true)
+            onBearingHeightChange(true)
+            onMapChange(true)
+            onSupportDetailsChange(true)
+            onPhotosChange(true)
+            onSpeedtestChange(true)
+            onPanelHeightsChange(true)
+            onIdsChange(true)
+            onOpenMapChange(true)
+            onElevationProfileChange(true)
+            onThroughputCalculatorChange(true)
+            onNavChange(true)
+            onShareChange(true)
+            onDatesChange(true)
+            onAddressChange(true)
+            onStatusChange(true)
+            onFreqsChange(true)
+            onLinksChange(true)
+        },
+        onDismiss = onDismiss,
+        onBack = onBack,
         sheetState = sheetState,
-        containerColor = sheetBgColor,
-        dragHandle = {
-            Column(
-                modifier = Modifier.fillMaxWidth().statusBarsPadding(),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                BottomSheetDefaults.DragHandle(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
-            }
-        }
-    ) {
-        BackHandler(onBack = onBack)
-        val scrollState = rememberScrollState()
-
-        Column(
-            modifier = Modifier
-                .navigationBarsPadding()
-                .settingsPopupFadingEdge(scrollState)
-                .verticalScroll(scrollState)
-                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text(stringResource(R.string.appstrings_page_site_settings), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                Spacer(Modifier.width(48.dp))
-            }
-            Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
-
-            val cardHeight = 64.dp
-            val spacing = 12.dp
-            val reorderState = rememberReorderableDragState(currentOrder, cardHeight, spacing, onOrderChange)
-
-            val shape = oneUiActionButtonShape(useOneUi)
-            val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
-
-            Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
-                currentOrder.forEach { blockId ->
-                    key(blockId) {
-                        val isDragged = reorderState.isDragged(blockId)
-                        val dragModifier = reorderState.dragModifier(blockId)
-                        val dragOffset = reorderState.offsetFor(blockId)
-
-                        when (blockId) {
-                            "operator" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_operator_option), showOperator, onOperatorChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "bearing_height" -> if (AppConfig.hasCompass.value) DraggableSwitchCard(stringResource(R.string.appstrings_site_bearing_height_option), showBearingHeight, onBearingHeightChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "map" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_map_option), showMap, onMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = onOpenMiniMapSettings)
-                            "support_details" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_support_details_option), showSupportDetails, onSupportDetailsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "photos" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_photos_and_schemes_option), showPhotos, onPhotosChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = {
-                                onDismiss()
-                                onOpenPhotosSettings()
-                            })
-                            "ids" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_ids_option), showIds, onIdsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "open_map" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_open_map_option), showOpenMap, onOpenMapChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "elevation_profile" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_elevation_profile_option), showElevationProfile, onElevationProfileChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "throughput_calculator" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_throughput_calculator_option), showThroughputCalculator, onThroughputCalculatorChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "nav" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_nav_option), showNav, onNavChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "share" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_share_option), showShare, onShareChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "dates" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_dates_option), showDates, onDatesChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "address" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_address_option), showAddress, onAddressChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "status" -> DraggableSwitchCard(stringResource(R.string.appstrings_show_status_option), showStatus, onStatusChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                            "speedtest" -> DraggableSwitchCard(stringResource(R.string.appstrings_show_speedtest_label), showSpeedtest, onSpeedtestChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = {
-                                onDismiss()
-                                onOpenSpeedtestSettings()
-                            })
-                            "freqs" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_freqs_option), showFreqs, onFreqsChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, onSettingsClick = {
-                                onDismiss()
-                                onOpenFrequencies()
-                            })
-                            "links" -> DraggableSwitchCard(stringResource(R.string.appstrings_site_links_option), showLinks, onLinksChange, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight)
-                        }
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-            TextButton(onClick = {
-                onOrderChange(listOf("operator", "bearing_height", "map", "support_details", "elevation_profile", "throughput_calculator", "open_map", "photos", "speedtest", "nav", "share", "panel_heights", "ids", "dates", "address", "status", "freqs", "links"))
-                onOperatorChange(true)
-                onBearingHeightChange(true)
-                onMapChange(true)
-                onSupportDetailsChange(true)
-                onPhotosChange(true)
-                onSpeedtestChange(true)
-                onPanelHeightsChange(true)
-                onIdsChange(true)
-                onOpenMapChange(true)
-                onElevationProfileChange(true)
-                onThroughputCalculatorChange(true)
-                onNavChange(true)
-                onShareChange(true)
-                onDatesChange(true)
-                onAddressChange(true)
-                onStatusChange(true)
-                onFreqsChange(true)
-                onLinksChange(true)
-            }) {
-                Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            }
-            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
-        }
-    }
+        useOneUi = useOneUi,
+        bubbleColor = bubbleColor
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -2058,7 +1998,7 @@ fun StatsSettingsSheet(
     bubbleColor: Color
 ) {
     val context = LocalContext.current
-    val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
@@ -2235,36 +2175,27 @@ fun StatsSettingsSheet(
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 16.dp), textAlign = TextAlign.Center)
 
-                val cardHeight = 64.dp
-                val spacing = 12.dp
-                val currentStatsOrder by rememberUpdatedState(statsOrder)
-                val statsReorderState = rememberReorderableDragState(currentStatsOrder, cardHeight, spacing, ::saveStatsOrder)
-
-                Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
-                    currentStatsOrder.forEach { blockId ->
-                        key(blockId) {
-                            val isDragged = statsReorderState.isDragged(blockId)
-                            DraggableSwitchCard(
-                                title = statsSettingsBlockTitle(blockId),
-                                checked = blockVisibility[blockId] ?: true,
-                                onCheckedChange = { saveStatsBlockVisibility(blockId, it) },
-                                shape = shape,
-                                border = border,
-                                bubbleColor = bubbleColor,
-                                useOneUi = useOneUi,
-                                dragModifier = statsReorderState.dragModifier(blockId),
-                                isDragged = isDragged,
-                                dragOffset = statsReorderState.offsetFor(blockId),
-                                height = cardHeight,
-                                onSettingsClick = if (blockId in StatsPreferences.defaultTechOrder) {
-                                    { selectedFrequencyTech = blockId }
-                                } else {
-                                    null
-                                }
-                            )
-                        }
-                    }
-                }
+                ReorderableBlockList(
+                    order = statsOrder,
+                    blocks = StatsPreferences.defaultStatsBlockOrder.map { blockId ->
+                        ConfigurableBlock(
+                            id = blockId,
+                            title = { statsSettingsBlockTitle(blockId) },
+                            visible = blockVisibility[blockId] ?: true,
+                            onVisibilityChange = { saveStatsBlockVisibility(blockId, it) },
+                            onSettingsClick = if (blockId in StatsPreferences.defaultTechOrder) {
+                                { selectedFrequencyTech = blockId }
+                            } else {
+                                null
+                            }
+                        )
+                    },
+                    onOrderChange = ::saveStatsOrder,
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    useOneUi = useOneUi
+                )
 
                 Spacer(modifier = Modifier.height(24.dp))
                 TextButton(onClick = ::resetStatsSettings) {
@@ -2377,7 +2308,7 @@ fun SiteFreqFiltersSheet(
     onBack: () -> Unit
 ) {
     val context = LocalContext.current
-    val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
     val switchColor = MaterialTheme.colorScheme.primary
     val useOneUi = AppConfig.useOneUiDesign
     val technoDragState = rememberReorderableDragState(
@@ -2704,7 +2635,7 @@ fun SitePhotosSettingsSheet(
     onOpenCommunityDataSettings: () -> Unit
 ) {
     val context = LocalContext.current
-    val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
     val switchColor = MaterialTheme.colorScheme.primary
     val useOneUi = AppConfig.useOneUiDesign
     val scrollState = rememberScrollState()

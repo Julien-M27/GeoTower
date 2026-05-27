@@ -271,6 +271,7 @@
     <string name="appstrings_address_label">Adresse :\u0020</string>
     <string name="appstrings_anfr_database_from">Données hebdomadaires actuellement téléchargées :\u0020</string>
     <string name="appstrings_anfr_station_number">Numéro de station ANFR :\u0020</string>
+    <string name="appstrings_arcep_nidt_label">Identifiant ARCEP (NIDT) :\u0020</string>
     <string name="appstrings_antenna_type">Type d\'antenne</string>
     <string name="appstrings_antennas_table_title">Antennes</string>
     <string name="appstrings_api_detail_incident">Incident en cours</string>
@@ -658,9 +659,12 @@
     <string name="appstrings_operators_title">Opérateurs</string>
     <string name="appstrings_outage_attention_desc">Attention panne</string>
     <string name="appstrings_outage_data">Data</string>
+    <string name="appstrings_outage_date_unavailable">Non communiqué</string>
     <string name="appstrings_outage_reason_incident">Incident</string>
     <string name="appstrings_outage_reason_maintenance">Maintenance</string>
     <string name="appstrings_outage_reason_technical">Intervention technique</string>
+    <string name="appstrings_outage_restore_forecast">Rétablissement prévu</string>
+    <string name="appstrings_outage_start_date">Début de panne</string>
     <string name="appstrings_outage_status_degraded">Dégradé</string>
     <string name="appstrings_outage_status_hs">Hors Service</string>
     <string name="appstrings_outage_voice">Voix</string>
@@ -716,6 +720,8 @@
     <string name="appstrings_release_section_widgets">Widgets</string>
     <string name="appstrings_release_section_security">Sécurité</string>
     <string name="appstrings_release_section_offline_maps">Cartes offline</string>
+    <string name="appstrings_release_section_map">Carte</string>
+    <string name="appstrings_release_section_sites_sharing">Sites et partage</string>
     <string name="appstrings_release_live_site_photos_rounded">Affichage des photos de site avec des coins arrondis</string>
     <string name="appstrings_release_live_operator_fallback_logos">Meilleur rendu des logos opérateur lorsqu’aucune photo de site n’est disponible</string>
     <string name="appstrings_release_statistics_ready">Activation des statistiques dès que les données locales sont prêtes</string>
@@ -766,6 +772,18 @@
     <string name="appstrings_release_signalquest_upload_more_secure">Envoi des photos mieux sécurisé</string>
     <string name="appstrings_release_global_release_optimized_protected">Version de publication mieux optimisée et protégée</string>
     <string name="appstrings_release_global_internal_checks_reinforced">Vérifications internes renforcées pour fiabiliser les téléchargements et les envois</string>
+    <string name="appstrings_release_global_anfr_underground_supports">Données ANFR enrichies avec une meilleure détection des supports souterrains</string>
+    <string name="appstrings_release_global_settings_sharing_consistent">Réglages et partage plus cohérents</string>
+    <string name="appstrings_release_global_translations_updated">Traductions mises à jour dans toutes les langues</string>
+    <string name="appstrings_release_map_hide_underground_sites_filter">Ajout d’un filtre pour masquer les sites souterrains</string>
+    <string name="appstrings_release_map_nearby_search_more_precise">Recherche de proximité plus précise</string>
+    <string name="appstrings_release_sites_arcep_nidt_display_copy">Affichage et copie de l’identifiant ARCEP NIDT</string>
+    <string name="appstrings_release_sites_zb_badge">Ajout du badge ZB</string>
+    <string name="appstrings_release_sites_outage_dates">Meilleur affichage des dates liées aux pannes</string>
+    <string name="appstrings_release_live_tracking_hs_notification">Indication HS ajoutée dans la notification</string>
+    <string name="appstrings_release_live_tracking_operator_change_refresh">Suivi plus réactif lors d’un changement d’opérateur</string>
+    <string name="appstrings_release_live_tracking_search_photo_reliability">Recherche de site et chargement des photos plus fiables</string>
+    <string name="appstrings_release_signalquest_private_data_upload_setting">Envoi des photos avec meilleure gestion des données privées</string>
     <string name="appstrings_release_community_source_settings">Ajout de nouveaux réglages pour les sources photos et speedtests</string>
     <string name="appstrings_release_photo_visibility_sync">Affichage des photos mieux synchronisé entre les pages Support et Site</string>
     <string name="appstrings_release_community_photo_filters">Photos filtrées selon l’opérateur et les sources activées</string>
@@ -853,6 +871,7 @@
     <string name="appstrings_site_dates_option">Dates d\'activation</string>
     <string name="appstrings_site_detail_title">Détail du site</string>
     <string name="appstrings_site_display_title">Affichage des sites</string>
+    <string name="appstrings_hide_underground_sites_label">Masquer les sites sous terrains</string>
     <string name="appstrings_site_elevation_profile_option">Bouton Profil altimétrique</string>
     <string name="appstrings_site_freq_filters_title">Filtres des fréquences de l\'antenne</string>
     <string name="appstrings_site_freqs_option">Fréquences, Spectres et Azimuts</string>

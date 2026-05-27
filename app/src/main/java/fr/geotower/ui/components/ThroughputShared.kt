@@ -1,7 +1,15 @@
 package fr.geotower.ui.components
 
+import android.content.SharedPreferences
+import fr.geotower.radio.MobileOperator
+import fr.geotower.radio.RadioTechnology
+import fr.geotower.radio.SiteRadioSystem
 import fr.geotower.radio.SiteRadioStatus
+import fr.geotower.radio.ThroughputProfile
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.FreqBand
+import fr.geotower.utils.ThroughputPrefs
+import fr.geotower.utils.radioBandCode
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -124,49 +132,101 @@ fun estimateThroughputConeDistance(
     return ThroughputConeDistance(centerMeters = center, nearMeters = near, farMeters = far)
 }
 
-fun throughputBandLabel(band: FreqBand): String {
-    return if (band.value > 0) {
-        val base = "${band.gen}G ${band.value} MHz"
-        throughputRadioBandCode(band.gen, band.value)?.let { "$base ($it)" } ?: base
-    } else {
-        band.rawFreq.substringBefore(":").ifBlank { "${band.gen}G" }
+fun buildThroughputRadioSystems(
+    bands: List<FreqBand>,
+    operator: MobileOperator,
+    supportHeightMeters: Double?
+): List<SiteRadioSystem> {
+    return throughputCalculationBands(bands)
+        .map { band ->
+            SiteRadioSystem(
+                sourceKey = throughputBandKey(band),
+                supportId = "unknown",
+                operator = operator,
+                technology = if (band.gen == 5) RadioTechnology.NR_5G else RadioTechnology.LTE_4G,
+                bandLabel = band.value.toString(),
+                status = siteRadioStatusFromBandStatus(band.status),
+                azimuthDeg = extractThroughputAzimuths(band).firstOrNull(),
+                supportHeightM = supportHeightMeters,
+                antennaHeightM = extractThroughputPanelHeightMeters(band, supportHeightMeters),
+                lastSeenAt = band.date.takeIf { it.isNotBlank() }
+            )
+        }
+}
+
+fun throughputCalculationBands(bands: List<FreqBand>): List<FreqBand> {
+    return bands
+        .filter { it.gen == 4 || it.gen == 5 }
+        .filterNot { isHiddenThroughputBand(it) }
+}
+
+fun isHiddenThroughputBand(band: FreqBand): Boolean {
+    return band.gen == 5 && band.value in setOf(1800, 26000)
+}
+
+fun isPlannedThroughputBand(band: FreqBand): Boolean {
+    return band.status.contains("Projet", ignoreCase = true) ||
+        band.status.contains("Approuv", ignoreCase = true) ||
+        band.status.contains("Planned", ignoreCase = true)
+}
+
+fun isThroughputBandEnabledByDefault(
+    band: FreqBand,
+    prefs: SharedPreferences
+): Boolean {
+    if (band.value <= 0) return true
+    val generationPrefix = when (band.gen) {
+        4 -> "4g"
+        5 -> "5g"
+        else -> return true
+    }
+    return prefs.getBoolean(ThroughputPrefs.bandVisiblePrefKey(generationPrefix, band.value), true)
+}
+
+fun throughputModulationLabel(gen: Int, profile: ThroughputProfile): String {
+    val assumptions = if (gen == 5) profile.nr else profile.lte
+    return throughputModulationLabel(
+        dlModulationOrder = assumptions.dlModulationOrder,
+        ulModulationOrder = assumptions.ulModulationOrder,
+        dlLayers = assumptions.dlMimoLayers,
+        ulLayers = assumptions.ulMimoLayers
+    )
+}
+
+fun throughputModulationLabel(
+    dlModulationOrder: Int,
+    ulModulationOrder: Int,
+    dlLayers: Int,
+    ulLayers: Int
+): String {
+    return "${throughputModulationName(dlModulationOrder)} ${throughputLayerLabel(dlLayers)} DL / ${throughputModulationName(ulModulationOrder)} ${throughputLayerLabel(ulLayers)} UL"
+}
+
+private fun throughputModulationName(modulationOrder: Int): String {
+    return when (modulationOrder) {
+        2 -> "QPSK"
+        4 -> "16-QAM"
+        6 -> "64-QAM"
+        8 -> "256-QAM"
+        10 -> "1024-QAM"
+        else -> "$modulationOrder bits/symbol"
     }
 }
 
-fun throughputRadioBandCode(gen: Int, value: Int): String? {
-    return when (gen) {
-        5 -> when (value) {
-            700 -> "N28"
-            800 -> "N20"
-            900 -> "N8"
-            1800 -> "N3"
-            2100 -> "N1"
-            2600 -> "N7"
-            3500 -> "N78"
-            26000 -> "N258"
-            else -> null
-        }
-        4 -> when (value) {
-            700 -> "B28"
-            800 -> "B20"
-            900 -> "B8"
-            1800 -> "B3"
-            2100 -> "B1"
-            2600 -> "B7"
-            3500 -> "B42"
-            else -> null
-        }
-        3 -> when (value) {
-            900 -> "B8"
-            2100 -> "B1"
-            else -> null
-        }
-        2 -> when (value) {
-            900 -> "GSM 900"
-            1800 -> "DCS 1800"
-            else -> null
-        }
-        else -> null
+private fun throughputLayerLabel(layers: Int): String {
+    return if (layers <= 1) {
+        "1 layer"
+    } else {
+        "MIMO ${layers}x${layers}"
+    }
+}
+
+fun throughputBandLabel(band: FreqBand): String {
+    return if (band.value > 0) {
+        val base = "${band.gen}G ${band.value} MHz"
+        radioBandCode(band.gen, band.value)?.let { "$base ($it)" } ?: base
+    } else {
+        band.rawFreq.substringBefore(":").ifBlank { "${band.gen}G" }
     }
 }
 

@@ -80,6 +80,7 @@ import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.SupportPagePrefs
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -98,7 +99,7 @@ fun SupportDetailScreen(
     highlightedOperatorKey: String? = null,
     isSplitScreen: Boolean = false,
     onCloseSplitScreen: () -> Unit = {},
-    onAntennaClick: (Long) -> Unit = {}
+    onAntennaClick: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
@@ -421,15 +422,7 @@ fun SupportDetailScreen(
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     var miniMapDefaultMode by remember {
-        mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString("page_support_mini_map_mode", null)))
-    }
-
-    fun normalizeSupportOrder(order: List<String>): List<String> {
-        val mutableOrder = order.filter { it.isNotBlank() }.toMutableList()
-        mutableOrder.remove("open_map")
-        val navIndex = mutableOrder.indexOf("nav")
-        if (navIndex >= 0) mutableOrder.add(navIndex, "open_map") else mutableOrder.add("open_map")
-        return mutableOrder
+        mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString(SupportPagePrefs.MINI_MAP_MODE, null)))
     }
 
     fun openMapAt(latitude: Double, longitude: Double) {
@@ -443,14 +436,14 @@ fun SupportDetailScreen(
         navController.navigate("map")
     }
 
-    var pageSupportOrder by remember { mutableStateOf(normalizeSupportOrder(prefs.getString("page_support_order", "map,details,photos,open_map,nav,share,operators")!!.split(","))) }
-    var showMap by remember { mutableStateOf(prefs.getBoolean("page_support_map", true)) }
-    var showDetails by remember { mutableStateOf(prefs.getBoolean("page_support_details", true)) }
+    var pageSupportOrder by remember { mutableStateOf(SupportPagePrefs.order(prefs)) }
+    var showMap by remember { mutableStateOf(SupportPagePrefs.map.read(prefs)) }
+    var showDetails by remember { mutableStateOf(SupportPagePrefs.details.read(prefs)) }
     val showPhotos by AppConfig.siteShowPhotos
-    var showOpenMap by remember { mutableStateOf(prefs.getBoolean("page_support_open_map", true)) }
-    var showNav by remember { mutableStateOf(prefs.getBoolean("page_support_nav", true)) }
-    var showShare by remember { mutableStateOf(prefs.getBoolean("page_support_share", true)) }
-    var showOperators by remember { mutableStateOf(prefs.getBoolean("page_support_operators", true)) }
+    var showOpenMap by remember { mutableStateOf(SupportPagePrefs.openMap.read(prefs)) }
+    var showNav by remember { mutableStateOf(SupportPagePrefs.nav.read(prefs)) }
+    var showShare by remember { mutableStateOf(SupportPagePrefs.share.read(prefs)) }
+    var showOperators by remember { mutableStateOf(SupportPagePrefs.operators.read(prefs)) }
 
     Scaffold(
         containerColor = mainBgColor,
@@ -623,8 +616,7 @@ fun SupportDetailScreen(
                                         priorityOperatorKey = effectiveHighlightedOperatorKey,
                                         onAntennaClick = { idAnfr ->
                                             safeClick {
-                                                val cleanId = idAnfr.toLongOrNull() ?: 0L
-                                                onAntennaClick(cleanId)
+                                                onAntennaClick(idAnfr)
                                             }
                                         }
                                     )
@@ -651,18 +643,18 @@ fun SupportDetailScreen(
             SupportSettingsSheet(
                 supportOrder = pageSupportOrder,
                 onOrderChange = {
-                    pageSupportOrder = normalizeSupportOrder(it)
-                    prefs.edit().putString("page_support_order", pageSupportOrder.joinToString(",")).apply()
+                    pageSupportOrder = SupportPagePrefs.normalizeOrder(it)
+                    prefs.edit().putString(SupportPagePrefs.ORDER, pageSupportOrder.joinToString(",")).apply()
                 },
                 showMap = showMap,
                 onMapChange = {
                     showMap = it
-                    prefs.edit().putBoolean("page_support_map", it).apply()
+                    prefs.edit().putBoolean(SupportPagePrefs.map.key, it).apply()
                 },
                 showDetails = showDetails,
                 onDetailsChange = {
                     showDetails = it
-                    prefs.edit().putBoolean("page_support_details", it).apply()
+                    prefs.edit().putBoolean(SupportPagePrefs.details.key, it).apply()
                 },
                 showPhotos = showPhotos,
                 onPhotosChange = {
@@ -672,22 +664,22 @@ fun SupportDetailScreen(
                 showOpenMap = showOpenMap,
                 onOpenMapChange = {
                     showOpenMap = it
-                    prefs.edit().putBoolean("page_support_open_map", it).apply()
+                    prefs.edit().putBoolean(SupportPagePrefs.openMap.key, it).apply()
                 },
                 showNav = showNav,
                 onNavChange = {
                     showNav = it
-                    prefs.edit().putBoolean("page_support_nav", it).apply()
+                    prefs.edit().putBoolean(SupportPagePrefs.nav.key, it).apply()
                 },
                 showShare = showShare,
                 onShareChange = {
                     showShare = it
-                    prefs.edit().putBoolean("page_support_share", it).apply()
+                    prefs.edit().putBoolean(SupportPagePrefs.share.key, it).apply()
                 },
                 showOperators = showOperators,
                 onOperatorsChange = {
                     showOperators = it
-                    prefs.edit().putBoolean("page_support_operators", it).apply()
+                    prefs.edit().putBoolean(SupportPagePrefs.operators.key, it).apply()
                 },
                 onOpenMiniMapSettings = {
                     showSupportSettingsSheet = false
@@ -710,7 +702,7 @@ fun SupportDetailScreen(
                 selectedMode = miniMapDefaultMode,
                 onModeChange = {
                     miniMapDefaultMode = it
-                    prefs.edit().putString("page_support_mini_map_mode", it.storageKey).apply()
+                    prefs.edit().putString(SupportPagePrefs.MINI_MAP_MODE, it.storageKey).apply()
                 },
                 onDismiss = { showSupportMiniMapSettingsSheet = false },
                 onBack = {

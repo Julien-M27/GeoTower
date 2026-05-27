@@ -67,6 +67,7 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppIconManager
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.ui.zIndex
+import fr.geotower.BuildConfig
 import fr.geotower.R
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.config.RemoteHomeAnnouncement
@@ -485,6 +486,7 @@ private fun HomeAnnouncementBanner(
     val localizedText = announcement.localizedText(languageTag)
     val currentDismissKey = announcement.dismissKey()
     val isVisible = announcement.enabled &&
+        announcement.isVisibleForAppVersion(BuildConfig.VERSION_NAME) &&
         localizedText.hasContent() &&
         (!announcement.dismissible || dismissedKey != currentDismissKey)
     val actionUrl = announcement.httpActionUrlOrNull()

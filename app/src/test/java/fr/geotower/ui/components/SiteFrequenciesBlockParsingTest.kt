@@ -1,0 +1,97 @@
+package fr.geotower.ui.components
+
+import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.TechniqueEntity
+import fr.geotower.utils.addMicrowaveFallbackBands
+import fr.geotower.utils.parseAndSortFrequencies
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
+import org.junit.Test
+
+class SiteFrequenciesBlockParsingTest {
+    @Test
+    fun microwaveLinksWithSameSystemNameKeepSeparateSpectrumBlocks() {
+        val details = """
+            FH : 10700-10728 MHz | En service | 2026-05-07 | Parabole FH : 10 deg (20m)
+            FH : 11200-11228 MHz | En service | 2026-05-07 | Parabole FH : 190 deg (20m)
+        """.trimIndent()
+
+        val parsed = parseAndSortFrequencies(
+            freqStr = details,
+            txtUnknown = "Inconnu",
+            txtAzimuthNotSpecified = "Azimut non specifie"
+        )
+
+        assertEquals(2, parsed.size)
+        assertTrue(parsed.any { it.spectrumLines == listOf("10700-10728 MHz") && it.physDetails.any { phys -> phys.contains("10 deg") } })
+        assertTrue(parsed.any { it.spectrumLines == listOf("11200-11228 MHz") && it.physDetails.any { phys -> phys.contains("190 deg") } })
+    }
+
+    @Test
+    fun microwaveFallbackAddsTableRowFromLocalisationAzimuths() {
+        val enriched = addMicrowaveFallbackBands(
+            bands = emptyList(),
+            info = localisation(azimutsFh = "40,220"),
+            technique = technique(technologies = "FH", statut = "En service", dateService = "2026-05-07"),
+            rawFreqs = null,
+            txtUnknown = "Inconnu"
+        )
+
+        assertEquals(1, enriched.size)
+        assertEquals("FH", enriched.single().rawFreq)
+        assertEquals(listOf("FH : 40\u00B0 (-)", "FH : 220\u00B0 (-)"), enriched.single().physDetails)
+    }
+
+    @Test
+    fun microwaveFallbackCompletesExistingTableRowPhysicalDetails() {
+        val parsed = parseAndSortFrequencies(
+            freqStr = "FH : 10700-10728 MHz | En service | 2026-05-07 | Azimut non specifie",
+            txtUnknown = "Inconnu",
+            txtAzimuthNotSpecified = "Azimut non specifie"
+        )
+
+        val enriched = addMicrowaveFallbackBands(
+            bands = parsed,
+            info = localisation(azimutsFh = "360,180"),
+            technique = technique(technologies = "FH"),
+            rawFreqs = null,
+            txtUnknown = "Inconnu"
+        )
+
+        assertEquals(1, enriched.size)
+        assertEquals(listOf("FH : 0\u00B0 (-)", "FH : 180\u00B0 (-)"), enriched.single().physDetails)
+    }
+
+    private fun localisation(azimutsFh: String?): LocalisationEntity {
+        return LocalisationEntity(
+            idAnfr = "12345",
+            operateur = "Test",
+            latitude = 48.0,
+            longitude = 2.0,
+            azimuts = null,
+            codeInsee = null,
+            azimutsFh = azimutsFh,
+            techMask = 16,
+            bandMask = 1 shl 14,
+            statut = "En service",
+            hasActive = 1
+        )
+    }
+
+    private fun technique(
+        technologies: String?,
+        statut: String = "En service",
+        dateService: String = ""
+    ): TechniqueEntity {
+        return TechniqueEntity(
+            idAnfr = "12345",
+            technologies = technologies,
+            statut = statut,
+            dateImplantation = "",
+            dateService = dateService,
+            dateModif = "",
+            encodedDetailsFrequences = null,
+            adresse = null
+        )
+    }
+}

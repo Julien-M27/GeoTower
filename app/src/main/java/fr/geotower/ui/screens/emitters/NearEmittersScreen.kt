@@ -97,6 +97,7 @@ import fr.geotower.utils.AppLogger
 import fr.geotower.utils.LocationHelper
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
+import fr.geotower.utils.formatNearbyDistanceLabel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -207,7 +208,6 @@ fun NearEmittersScreen(
     var remoteSearchSites by remember { mutableStateOf<List<UiSite>>(emptyList()) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var maxItemsToShow by rememberSaveable { mutableIntStateOf(100) }
-    var searchRadiusMultiplier by remember { mutableIntStateOf(1) }
     var isSearchingRemote by remember { mutableStateOf(false) }
     val unknownAddressText = stringResource(R.string.appstrings_unknown_address)
     val siteAnfrLabel = stringResource(R.string.appstrings_site_anfr_label)
@@ -292,26 +292,18 @@ fun NearEmittersScreen(
         }
     }
 
-    LaunchedEffect(searchCenter, searchRadiusMultiplier) {
+    LaunchedEffect(searchCenter, maxItemsToShow) {
         val currentLoc = searchCenter ?: return@LaunchedEffect
 
         isLoading = true
 
         withContext(Dispatchers.IO) {
             // A. RÉCUPÉRATION DES DONNÉES
-            val newAntennas = if (searchRadiusMultiplier > 1) {
-                // Si on a cliqué sur "Plus de sites", on élargit la zone de recherche !
-                val offset = 0.05 * searchRadiusMultiplier
-                repository.getAntennasInBox(
-                    latNorth = currentLoc.latitude + offset,
-                    lonEast = currentLoc.longitude + offset,
-                    latSouth = currentLoc.latitude - offset,
-                    lonWest = currentLoc.longitude - offset
-                )
-            } else {
-                // Chargement initial ultra-rapide des 100 plus proches
-                repository.getNearest100(currentLoc.latitude, currentLoc.longitude)
-            }
+            val newAntennas = repository.getNearest(
+                lat = currentLoc.latitude,
+                lon = currentLoc.longitude,
+                limit = maxItemsToShow
+            )
 
             // B. TRAITEMENT ET FORMATAGE
             val finalSites = if (newAntennas.isNotEmpty()) {
@@ -358,7 +350,7 @@ fun NearEmittersScreen(
     }
 
     // Recherche globale differee (base de donnees, coordonnees, ville, adresse, code postal).
-    LaunchedEffect(searchCenter, searchQuery, searchRadiusMultiplier) {
+    LaunchedEffect(searchCenter, searchQuery) {
         val query = searchQuery.trim()
         if (query.isEmpty()) {
             remoteSearchQuery = ""
@@ -488,13 +480,11 @@ fun NearEmittersScreen(
 
                     // Si on a trouvé des coordonnées, on récupère le bloc d'antennes autour
                     if (fieldSearchesCurrentArea && referenceLocation != null) {
-                        val offset = 0.05 * searchRadiusMultiplier
                         globalAntennas.addAll(
-                            repository.getAntennasInBox(
-                                latNorth = referenceLocation.latitude + offset,
-                                lonEast = referenceLocation.longitude + offset,
-                                latSouth = referenceLocation.latitude - offset,
-                                lonWest = referenceLocation.longitude - offset
+                            repository.getNearest(
+                                lat = referenceLocation.latitude,
+                                lon = referenceLocation.longitude,
+                                limit = NEARBY_GLOBAL_MAPPING_LIMIT
                             )
                         )
                     }
@@ -502,14 +492,12 @@ fun NearEmittersScreen(
                     if (targetLat != null && targetLon != null) {
                         resultSortLat = targetLat
                         resultSortLon = targetLon
-                        val offset = 0.05 * searchRadiusMultiplier
-                        val boxResults = repository.getAntennasInBox(
-                            latNorth = targetLat + offset,
-                            lonEast = targetLon + offset,
-                            latSouth = targetLat - offset,
-                            lonWest = targetLon - offset
+                        val nearestResults = repository.getNearest(
+                            lat = targetLat,
+                            lon = targetLon,
+                            limit = NEARBY_GLOBAL_MAPPING_LIMIT
                         )
-                        globalAntennas.addAll(boxResults)
+                        globalAntennas.addAll(nearestResults)
                     }
 
                     // On supprime les doublons éventuels
@@ -748,11 +736,10 @@ fun NearEmittersScreen(
                                                     ) {
                                                         Text(stringResource(R.string.appstrings_load_more_sites), fontWeight = FontWeight.Bold)
                                                     }
-                                                } else if (searchCenter != null && searchQuery.isEmpty()) {
+                                                } else if (searchCenter != null && searchQuery.isEmpty() && sites.size >= maxItemsToShow) {
                                                     OutlinedButton(
                                                         onClick = {
                                                             safeClick {
-                                                                searchRadiusMultiplier++
                                                                 maxItemsToShow += 100
                                                             }
                                                         },
@@ -1128,35 +1115,6 @@ fun EmitterCard(
 
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
-    }
-}
-
-private data class NearbyDistanceLabel(
-    val primaryText: String,
-    val secondaryText: String? = null
-)
-
-private fun formatNearbyDistanceLabel(distanceMeters: Int, useMiles: Boolean): NearbyDistanceLabel {
-    return if (useMiles) {
-        val distanceMiles = distanceMeters / 1609.34f
-        if (distanceMiles < 0.1f) {
-            NearbyDistanceLabel(
-                primaryText = "${(distanceMeters * 3.28084f).toInt()} ft"
-            )
-        } else {
-            NearbyDistanceLabel(
-                primaryText = String.format(Locale.US, "%.2f mi", distanceMiles)
-            )
-        }
-    } else if (distanceMeters >= 1000) {
-        NearbyDistanceLabel(
-            primaryText = String.format(Locale.FRANCE, "%.2f", distanceMeters / 1000f),
-            secondaryText = "km"
-        )
-    } else {
-        NearbyDistanceLabel(
-            primaryText = "$distanceMeters m"
-        )
     }
 }
 

@@ -758,6 +758,7 @@
     <string name="appstrings_site_dates_option">Activation dates</string>
     <string name="appstrings_site_detail_title">Site Detail</string>
     <string name="appstrings_site_display_title">Site display</string>
+    <string name="appstrings_hide_underground_sites_label">Hide underground sites</string>
     <string name="appstrings_site_elevation_profile_option">Elevation profile button</string>
     <string name="appstrings_site_freq_filters_title">Antenna frequency filters</string>
     <string name="appstrings_site_freqs_option">Frequencies, Spectrum &amp; Azimuths</string>

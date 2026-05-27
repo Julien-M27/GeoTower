@@ -26,6 +26,7 @@ import fr.geotower.R
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.PreferenceStores
 
 data class WidgetSiteData(val id: String, val operateur: String, val distance: String, val adresse: String, val colorHex: String)
 
@@ -51,7 +52,7 @@ class AntennaWidgetWorker(
         ) {
             return Result.success()
         }
-        val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
         val timeFormat = java.text.SimpleDateFormat("HH:mm", Locale.getDefault())
 
         suspend fun updateUiAndFinish(

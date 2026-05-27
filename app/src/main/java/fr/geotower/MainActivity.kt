@@ -44,6 +44,7 @@ import fr.geotower.utils.AppLocale
 import fr.geotower.utils.AppUiMode
 import fr.geotower.utils.GeoTowerLocaleProvider
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.PreferenceStores
 import fr.geotower.data.api.RetrofitClient
 import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.config.RemoteFeatureFlags
@@ -123,7 +124,7 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             RemoteFeatureFlags.refreshIfNeeded(this@MainActivity, force = true)
         }
-        val prefs = getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+        val prefs = getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
         if (!prefs.getBoolean("isFirstRun", true)) {
             LiveTrackingController.startOnAppLaunchIfEnabled(this)
         }
@@ -159,7 +160,7 @@ class MainActivity : ComponentActivity() {
         val lon = intent.getDoubleExtra("widget_lon", Double.NaN)
         if (lat.isNaN() || lon.isNaN()) return
 
-        getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+        getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
             .edit()
             .putFloat("last_map_lat", lat.toFloat())
             .putFloat("last_map_lon", lon.toFloat())
@@ -207,11 +208,11 @@ class MainActivity : ComponentActivity() {
         )
 
         // Vérification premier lancement (CORRIGÉ : on utilise le fichier global)
-        val sharedPref = getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+        val sharedPref = getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
         val isFirstRun = sharedPref.getBoolean("isFirstRun", true)
 
         // --- CONFIGURATION OSMDROID (SÉCURITÉ ANTI-403) ---
-        val sharedPrefs = getSharedPreferences("osmdroid", Context.MODE_PRIVATE)
+        val sharedPrefs = getSharedPreferences(PreferenceStores.OSM_DROID, Context.MODE_PRIVATE)
         val osmdroidConfig = org.osmdroid.config.Configuration.getInstance()
 
         // 1. On charge la config
@@ -308,7 +309,7 @@ class MainActivity : ComponentActivity() {
         // ========================================================
 
         // --- LECTURE ET DÉTECTION DE LA LANGUE DÈS LE LANCEMENT ---
-        val appPrefs = getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+        val appPrefs = getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
 
         if (!appPrefs.contains("app_language")) {
             // Premier lancement : On définit le choix sur "Système" par défaut
@@ -616,7 +617,7 @@ class MainActivity : ComponentActivity() {
                                                     }
 
                                                     if (targetAntenna != null) {
-                                                        getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+                                                        getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
                                                             .edit()
                                                             .putFloat("clicked_lat", targetAntenna.latitude.toFloat())
                                                             .putFloat("clicked_lon", targetAntenna.longitude.toFloat())
@@ -670,10 +671,9 @@ class MainActivity : ComponentActivity() {
                                 deepLinks = listOf(navDeepLink { uriPattern = "geotower://site/{id}" })
                             ) { backStackEntry ->
                                 val id = backStackEntry.arguments?.getString("id") ?: ""
-                                val idLong = id.toLongOrNull() ?: 0L
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)) {
-                                        SiteDetailToolWrapperScreen(navController, repository, idLong)
+                                        SiteDetailToolWrapperScreen(navController, repository, id)
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }

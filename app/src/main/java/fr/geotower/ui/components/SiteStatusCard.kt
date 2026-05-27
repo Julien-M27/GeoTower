@@ -18,6 +18,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.text.DateFormat
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -39,6 +40,8 @@ fun SiteStatusCard(
     outageText: String?,
     cardBgColor: Color,
     blockShape: Shape,
+    outageStartDate: String? = null,
+    outageExpectedRestorationDate: String? = null,
     techStatus: Map<String, ServiceStatus> = emptyMap()
 ) {
     // Couleurs
@@ -112,6 +115,29 @@ fun SiteStatusCard(
                 )
             }
 
+            if (isOutage) {
+                val formattedStartDate = formatOutageStatusDate(outageStartDate)
+                val formattedRestorationDate = formatOutageStatusDate(outageExpectedRestorationDate)
+
+                if (formattedStartDate != null || formattedRestorationDate != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        OutageDateLine(
+                            label = stringResource(R.string.appstrings_outage_start_date),
+                            value = formattedStartDate
+                                ?: stringResource(R.string.appstrings_outage_date_unavailable),
+                            color = colorKo
+                        )
+                        OutageDateLine(
+                            label = stringResource(R.string.appstrings_outage_restore_forecast),
+                            value = formattedRestorationDate
+                                ?: stringResource(R.string.appstrings_outage_date_unavailable),
+                            color = colorKo
+                        )
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(16.dp))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
             Spacer(modifier = Modifier.height(16.dp))
@@ -158,6 +184,51 @@ fun SiteStatusCard(
             )
         }
     }
+}
+
+@Composable
+private fun OutageDateLine(label: String, value: String, color: Color) {
+    Text(
+        text = "$label : $value",
+        fontSize = 12.sp,
+        color = color,
+        modifier = Modifier.fillMaxWidth(),
+        textAlign = TextAlign.Start
+    )
+}
+
+private fun formatOutageStatusDate(rawDate: String?): String? {
+    val cleanDate = rawDate
+        ?.trim()
+        ?.takeIf { it.isNotBlank() && it != "-" && !it.equals("null", ignoreCase = true) }
+        ?: return null
+
+    val normalizedDate = cleanDate
+        .replace('T', ' ')
+        .substringBefore('+')
+        .substringBefore('Z')
+        .trim()
+
+    val patterns = listOf("yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd HH:mm", "yyyy-MM-dd")
+    patterns.forEach { pattern ->
+        val candidate = normalizedDate.take(pattern.length)
+        runCatching {
+            val parsedDate = SimpleDateFormat(pattern, Locale.US).apply {
+                isLenient = false
+            }.parse(candidate)
+
+            if (parsedDate != null) {
+                val formatter = if (pattern.contains("HH")) {
+                    DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT, Locale.getDefault())
+                } else {
+                    DateFormat.getDateInstance(DateFormat.SHORT, Locale.getDefault())
+                }
+                return formatter.format(parsedDate)
+            }
+        }
+    }
+
+    return cleanDate
 }
 
 @Composable

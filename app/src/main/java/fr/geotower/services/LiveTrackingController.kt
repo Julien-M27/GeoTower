@@ -34,6 +34,11 @@ object LiveTrackingController {
             return eligibility
         }
 
+        if (LiveTrackingService.isRunning) {
+            refreshNotification(appContext)
+            return StartResult.Started
+        }
+
         val serviceIntent = Intent(appContext, LiveTrackingService::class.java)
         return startLiveTrackingService(appContext, serviceIntent)
     }
@@ -50,6 +55,21 @@ object LiveTrackingController {
         context.applicationContext.stopService(
             Intent(context.applicationContext, LiveTrackingService::class.java)
         )
+    }
+
+    fun refreshNotification(context: Context) {
+        if (!LiveTrackingService.isRunning) return
+        val appContext = context.applicationContext
+        val serviceIntent = Intent(appContext, LiveTrackingService::class.java).apply {
+            action = LiveTrackingService.ACTION_REFRESH_NOTIFICATION
+        }
+        try {
+            appContext.startService(serviceIntent)
+        } catch (e: SecurityException) {
+            AppLogger.w(TAG, "Live tracking notification refresh blocked by permissions", e)
+        } catch (e: IllegalStateException) {
+            AppLogger.w(TAG, "Live tracking notification refresh blocked by app state", e)
+        }
     }
 
     fun eligibility(context: Context): StartResult {

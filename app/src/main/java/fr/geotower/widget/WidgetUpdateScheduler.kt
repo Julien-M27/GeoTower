@@ -6,18 +6,16 @@ import android.content.Context
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import fr.geotower.utils.PreferenceStores
+import fr.geotower.utils.WidgetPrefs
 import java.util.concurrent.TimeUnit
 
 object WidgetUpdateScheduler {
     const val UNIQUE_WORK_NAME = "WidgetPeriodicUpdate"
-    private const val PREFS_NAME = "GeoTowerPrefs"
-    private const val PREF_WIDGET_SYNC_FREQ = "widget_sync_freq"
-    private const val DEFAULT_FREQUENCY_MINUTES = 60
-    private const val MIN_FREQUENCY_MINUTES = 30
 
     fun schedulePeriodicUpdate(context: Context) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        schedulePeriodicUpdate(context, prefs.getInt(PREF_WIDGET_SYNC_FREQ, DEFAULT_FREQUENCY_MINUTES))
+        val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+        schedulePeriodicUpdate(context, WidgetPrefs.syncFrequencyMinutes(prefs))
     }
 
     fun schedulePeriodicUpdate(context: Context, requestedFrequencyMinutes: Int) {
@@ -42,7 +40,7 @@ object WidgetUpdateScheduler {
     }
 
     internal fun normalizedFrequencyMinutes(rawMinutes: Int): Long {
-        return rawMinutes.coerceAtLeast(MIN_FREQUENCY_MINUTES).toLong()
+        return rawMinutes.coerceAtLeast(WidgetPrefs.MIN_SYNC_MINUTES).toLong()
     }
 
     internal fun shouldCancelPeriodicWork(activeWidgetCounts: List<Int>): Boolean {

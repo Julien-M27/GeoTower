@@ -204,11 +204,13 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
+        <!-- Android Auto must discover this exported CarAppService; release hosts are restricted in createHostValidator(). -->
         <service
             android:name=".services.GeoTowerCarAppService"
             android:exported="true"
             android:label="@string/app_name"
-            android:icon="@mipmap/ic_launcher_geotower">
+            android:icon="@mipmap/ic_launcher_geotower"
+            tools:ignore="ExportedService">
             <intent-filter>
                 <action android:name="androidx.car.app.CarAppService" />
                 <category android:name="androidx.car.app.category.POI" />

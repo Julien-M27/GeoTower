@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.sp
 import fr.geotower.R
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.TechniqueEntity // ✅ NOUVEL IMPORT
-import fr.geotower.ui.screens.emitters.formatDateToFrench // ✅ Formatage localisé des dates
+import fr.geotower.utils.formatDateToFrench // ✅ Formatage localisé des dates
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos

@@ -73,6 +73,7 @@ fun MapSettingsSheet(
     // Variables Affichage des sites
     var showSitesInService by AppConfig.showSitesInService
     var showSitesOutOfService by AppConfig.showSitesOutOfService
+    var hideUndergroundSites by AppConfig.hideUndergroundSites
 
     // Variables Technos
     var show2G by AppConfig.showTechno2G
@@ -298,6 +299,17 @@ fun MapSettingsSheet(
                     showSitesOutOfService = it
                     prefs.edit().putBoolean("show_sites_out_of_service", it).apply()
                 }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            SelectableButton(
+                label = stringResource(R.string.appstrings_hide_underground_sites_label),
+                isSelected = hideUndergroundSites,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                hideUndergroundSites = it
+                prefs.edit().putBoolean(AppConfig.PREF_HIDE_UNDERGROUND_SITES, it).apply()
             }
         }
     }

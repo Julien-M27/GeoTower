@@ -44,6 +44,7 @@ import fr.geotower.data.api.RetrofitClient
 import fr.geotower.data.db.AppDatabase
 import fr.geotower.data.db.GeoTowerDao
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.DeviceProfile
 import fr.geotower.utils.NotificationIconResources
@@ -52,6 +53,7 @@ import fr.geotower.utils.OperatorLogos
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.util.Locale
+import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
@@ -84,9 +86,25 @@ class LiveTrackingService : Service() {
     private var lastDistanceToLockedAntenna: Float? = null
     private val liveSitePhotoCacheLock = Any()
     private val liveSitePhotoCache = LinkedHashMap<String, Bitmap?>()
+    private val liveSitePhotoHttpClient by lazy {
+        RetrofitClient.currentClient.newBuilder()
+            .connectTimeout(LIVE_SITE_PHOTO_CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(LIVE_SITE_PHOTO_READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .callTimeout(LIVE_SITE_PHOTO_CALL_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .build()
+    }
     @Volatile
     private var liveSitePhotoLoadingKey: String? = null
     private var liveSitePhotoJob: Job? = null
+    @Volatile
+    private var liveOutageInfoMap: Map<String, List<LiveOutageInfo>> = emptyMap()
+    @Volatile
+    private var liveOutageFetchedAt: Long = 0L
+    private var liveOutageRefreshJob: Job? = null
+
+    private data class LiveOutageInfo(
+        val operatorKeys: Set<String>
+    )
 
     override fun onCreate() {
         super.onCreate()
@@ -117,7 +135,16 @@ class LiveTrackingService : Service() {
             return stopTrackingAndSelf()
         }
 
-        resetIfOperatorChanged(defaultOp)
+        val operatorChanged = resetIfOperatorChanged(defaultOp)
+
+        if (intent?.action == ACTION_REFRESH_NOTIFICATION) {
+            refreshFromLastProcessedLocation()
+            return START_STICKY
+        }
+
+        if (operatorChanged && refreshFromLastProcessedLocation()) {
+            return START_STICKY
+        }
 
         val initialNotification = if (supportsProgressStyle()) {
             buildLiveNotification(
@@ -143,6 +170,7 @@ class LiveTrackingService : Service() {
         if (!startAsForeground(initialNotification)) {
             return START_NOT_STICKY
         }
+        requestLiveOutageRefreshIfNeeded()
         startLocationUpdates()
 
         return START_STICKY
@@ -259,6 +287,9 @@ class LiveTrackingService : Service() {
                 val degreeStr = "${Math.round(bearing)}°"
                 val distanceWithDirectionStr = "$baseDistanceStr • $directionStr ($degreeStr)"
 
+                requestLiveOutageRefreshIfNeeded()
+                val hsSuffix = liveOutageTitleSuffixFor(closestAntenna, defaultOp)
+
                 val technique = repository.getTechniqueDetails(closestAntenna.idAnfr)
                 val sitePhotoId = repository.getPhysiqueDetails(closestAntenna.idAnfr)
                     .firstOrNull()
@@ -269,7 +300,7 @@ class LiveTrackingService : Service() {
                 val notificationText = applicationContext.getString(
                     R.string.live_tracking_antenna_distance,
                     defaultOp,
-                    distanceWithDirectionStr
+                    distanceWithDirectionStr + hsSuffix
                 )
                 val photoCacheKey = liveSitePhotoCacheKey(defaultOp, sitePhotoId)
                 val liveSitePhotoBitmap = cachedLiveSitePhotoBitmap(photoCacheKey)
@@ -317,19 +348,23 @@ class LiveTrackingService : Service() {
         operator: String
     ): List<LocalisationEntity> {
         val safeCos = max(0.1, abs(cos(Math.toRadians(location.latitude))))
+        val operatorQueryNames = OperatorColors.searchLabelsFor(operator)
 
         SEARCH_RADII_KM.forEach { radiusKm ->
             val radiusMeters = (radiusKm * 1000.0).toFloat()
             val offsetLat = radiusKm / KM_PER_LATITUDE_DEGREE
             val offsetLon = offsetLat / safeCos
-            val operatorQueryName = OperatorColors.specForKey(operator)?.aliases?.firstOrNull() ?: operator
-            val candidates = dao.getActiveLocalisationsInBoxByOperator(
-                operatorName = operatorQueryName,
-                minLat = location.latitude - offsetLat,
-                maxLat = location.latitude + offsetLat,
-                minLon = location.longitude - offsetLon,
-                maxLon = location.longitude + offsetLon
-            )
+            val candidates = operatorQueryNames
+                .flatMap { operatorQueryName ->
+                    dao.getActiveLocalisationsInBoxByOperator(
+                        operatorName = operatorQueryName,
+                        minLat = location.latitude - offsetLat,
+                        maxLat = location.latitude + offsetLat,
+                        minLon = location.longitude - offsetLon,
+                        maxLon = location.longitude + offsetLon
+                    )
+                }
+                .distinctBy { it.idAnfr }
 
             val insideRadius = candidates.filter { antenna ->
                 val results = FloatArray(1)
@@ -345,7 +380,79 @@ class LiveTrackingService : Service() {
             if (insideRadius.isNotEmpty()) return insideRadius
         }
 
-        return emptyList()
+        return operatorQueryNames
+            .flatMap { operatorQueryName ->
+                dao.getNearestActiveLocalisationsByOperator(
+                    operatorName = operatorQueryName,
+                    lat = location.latitude,
+                    lon = location.longitude,
+                    limit = GLOBAL_OPERATOR_FALLBACK_LIMIT
+                )
+            }
+            .distinctBy { it.idAnfr }
+    }
+
+    private fun requestLiveOutageRefreshIfNeeded(force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        val hasFreshCache = liveOutageFetchedAt > 0L &&
+            now - liveOutageFetchedAt < LIVE_OUTAGE_CACHE_TTL_MS
+        if (!force && hasFreshCache) return
+        if (liveOutageRefreshJob?.isActive == true) return
+
+        liveOutageRefreshJob = serviceScope.launch {
+            try {
+                liveOutageInfoMap = buildLiveOutageInfoMap(repository.getSitesHs())
+                liveOutageFetchedAt = System.currentTimeMillis()
+                refreshFromLastProcessedLocation()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.w(TAG_LOCATION, "Live tracking outage data failed", e)
+            }
+        }
+    }
+
+    private fun buildLiveOutageInfoMap(sitesHs: List<SiteHsEntity>): Map<String, List<LiveOutageInfo>> {
+        val result = mutableMapOf<String, MutableList<LiveOutageInfo>>()
+
+        sitesHs.forEach { hs ->
+            val id = normalizedLiveAnfrId(hs.idAnfr)
+            if (id.isBlank()) return@forEach
+
+            val parsedOperators = OperatorColors.keysFor(hs.operateur)
+            val operators = if (parsedOperators.isEmpty()) {
+                setOf(LIVE_HS_OPERATOR_WILDCARD)
+            } else {
+                parsedOperators.toSet()
+            }
+            result.getOrPut(id) { mutableListOf() }.add(
+                LiveOutageInfo(operatorKeys = operators)
+            )
+        }
+
+        return result
+    }
+
+    private fun liveOutageTitleSuffixFor(antenna: LocalisationEntity, operator: String): String {
+        val outages = liveOutageInfoMap[normalizedLiveAnfrId(antenna.idAnfr)].orEmpty()
+        if (outages.isEmpty()) return ""
+        val operatorKeys = (OperatorColors.keysFor(antenna.operateur) + operator)
+            .mapNotNull { OperatorColors.keyFor(it) }
+            .distinct()
+            .toSet()
+
+        val matchingOutages = outages.filter { outage ->
+            LIVE_HS_OPERATOR_WILDCARD in outage.operatorKeys ||
+                outage.operatorKeys.any { it in operatorKeys }
+        }
+        if (matchingOutages.isEmpty()) return ""
+
+        return "$LIVE_HS_TITLE_SEPARATOR$LIVE_HS_TITLE_LABEL"
+    }
+
+    private fun normalizedLiveAnfrId(value: String): String {
+        val trimmed = value.trim()
+        return trimmed.toLongOrNull()?.toString() ?: trimmed
     }
 
     private fun updateNotification(
@@ -434,7 +541,7 @@ class LiveTrackingService : Service() {
             .get()
             .build()
 
-        return RetrofitClient.currentClient.newCall(request).execute().use { response ->
+        return liveSitePhotoHttpClient.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return@use null
             val body = response.body ?: return@use null
             val contentLength = body.contentLength()
@@ -595,7 +702,7 @@ class LiveTrackingService : Service() {
 
         val stopPendingIntent = PendingIntent.getService(
             this,
-            1,
+            STOP_ACTION_REQUEST_CODE,
             Intent(this, LiveTrackingService::class.java).apply { action = ACTION_STOP_SERVICE },
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
@@ -607,8 +714,7 @@ class LiveTrackingService : Service() {
                 listOf(Notification.ProgressStyle.Segment(100).setColor(operatorColor(operator)))
             )
 
-        val hasAddress = address.isNotBlank()
-        val liveContentText = if (hasAddress) notificationAddressText(address) else contentText
+        val liveContentText = liveNotificationContentText(contentText, address)
         val shortCriticalText = extractShortCriticalText(contentText)
         val livePrimaryInfo = liveActivityPrimaryInfo(
             operator = operator,
@@ -636,7 +742,7 @@ class LiveTrackingService : Service() {
                 ).build()
             )
         NotificationIconResources.applyTo(builder, this)
-        sitePhotoBitmap?.let { bitmap ->
+        liveVisualIconBitmap(operator, sitePhotoBitmap)?.let { bitmap ->
             builder.setLargeIcon(Icon.createWithBitmap(bitmap))
         }
 
@@ -693,7 +799,7 @@ class LiveTrackingService : Service() {
 
         val stopPendingIntent = PendingIntent.getService(
             this,
-            1,
+            STOP_ACTION_REQUEST_CODE,
             Intent(this, LiveTrackingService::class.java).apply { action = ACTION_STOP_SERVICE },
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
@@ -760,12 +866,27 @@ class LiveTrackingService : Service() {
         return antLoc?.idAnfr?.hashCode() ?: notificationId
     }
 
-    private fun notificationContentText(contentText: String, address: String): String {
+    private fun liveNotificationContentText(
+        contentText: String,
+        address: String
+    ): String {
         val cleanAddress = address.trim()
         return if (cleanAddress.isBlank()) {
             contentText
         } else {
-            "$contentText\n${notificationAddressText(cleanAddress)}"
+            notificationAddressText(cleanAddress)
+        }
+    }
+
+    private fun notificationContentText(contentText: String, address: String): String {
+        val cleanAddress = address.trim()
+
+        return buildString {
+            append(contentText)
+            if (cleanAddress.isNotBlank()) {
+                append('\n')
+                append(notificationAddressText(cleanAddress))
+            }
         }
     }
 
@@ -880,7 +1001,7 @@ class LiveTrackingService : Service() {
     }
 
     private fun liveOrientationText(text: String): String? {
-        return Regex("""(?:^|[\s\u2022])([NSEO]{1,2}\s*\(\s*\d{1,3}\s*\u00B0\s*\))""")
+        return Regex("""(?:^|[\s\u2022])([NSEO]{1,2}\s*\(\s*\d{1,3}\s*\u00B0\s*\)(?:\s*\u2022\s*HS)?)""")
             .find(text)
             ?.groupValues
             ?.getOrNull(1)
@@ -967,24 +1088,26 @@ class LiveTrackingService : Service() {
         processingJob?.cancel()
         liveSitePhotoJob?.cancel()
         liveSitePhotoLoadingKey = null
+        liveOutageRefreshJob?.cancel()
         stopLocationUpdates()
         runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
         stopSelf()
         return START_NOT_STICKY
     }
 
-    private fun resetIfOperatorChanged(operator: String) {
+    private fun resetIfOperatorChanged(operator: String): Boolean {
         if (lockedOperator != null && lockedOperator != operator) {
             processingJob?.cancel()
             liveSitePhotoJob?.cancel()
             liveSitePhotoLoadingKey = null
-            lastProcessedLocation = null
             lastProcessedAt = 0L
             lockedOperator = null
             lockedAntennaId = null
             initialDistance = null
             lastDistanceToLockedAntenna = null
+            return true
         }
+        return false
     }
 
     private fun isMiles(context: Context): Boolean {
@@ -994,6 +1117,13 @@ class LiveTrackingService : Service() {
         } catch (_: Exception) {
             prefs.getString("distance_unit", "0") == "1"
         }
+    }
+
+    private fun refreshFromLastProcessedLocation(): Boolean {
+        val location = lastProcessedLocation?.let(::Location) ?: return false
+        lastProcessedAt = 0L
+        processLocationUpdate(location)
+        return true
     }
 
     private val currentOperator: String
@@ -1013,12 +1143,33 @@ class LiveTrackingService : Service() {
     }
 
     private fun extractShortCriticalText(contentText: String): String? {
-        val distanceRegex = Regex("""\d+(?:[.,]\d+)?\s?(?:km|mi|m)""", RegexOption.IGNORE_CASE)
-        return distanceRegex.find(contentText)
-            ?.value
-            ?.replace(" ", "")
-            ?.take(7)
-            ?.ifBlank { null }
+        val match = shortDistanceRegex.find(contentText) ?: return null
+        val value = match.groupValues.getOrNull(1)
+            ?.replace(',', '.')
+            ?.toFloatOrNull()
+            ?: return match.value.replace(" ", "").ifBlank { null }
+        val unit = match.groupValues.getOrNull(2)?.lowercase(Locale.US).orEmpty()
+        return formatShortCriticalDistance(value, unit).ifBlank { null }
+    }
+
+    private fun formatShortCriticalDistance(value: Float, unit: String): String {
+        return when (unit) {
+            "km" -> {
+                if (value >= 100f) {
+                    "${Math.round(value)}km"
+                } else {
+                    String.format(Locale.US, "%.1fkm", value)
+                }
+            }
+            "mi" -> {
+                if (value >= 100f) {
+                    "${Math.round(value)}mi"
+                } else {
+                    String.format(Locale.US, "%.1fmi", value)
+                }
+            }
+            else -> "${Math.round(value)}m"
+        }
     }
 
     private fun operatorColor(operator: String): Int {
@@ -1030,6 +1181,10 @@ class LiveTrackingService : Service() {
             ?.let(::roundedDrawableBitmap)
             ?.let { bitmap -> IconCompat.createWithBitmap(bitmap).toIcon(this) }
 
+    private fun liveVisualIconBitmap(operator: String, sitePhotoBitmap: Bitmap?): Bitmap? {
+        return sitePhotoBitmap ?: operatorLogo(operator)?.let(::roundedDrawableBitmap)
+    }
+
     private fun operatorLogo(operator: String): Int? {
         return OperatorLogos.drawableRes(operator)
     }
@@ -1040,6 +1195,7 @@ class LiveTrackingService : Service() {
         processingJob?.cancel()
         liveSitePhotoJob?.cancel()
         liveSitePhotoLoadingKey = null
+        liveOutageRefreshJob?.cancel()
         runCatching { stopForeground(STOP_FOREGROUND_REMOVE) }
         stopLocationUpdates()
         clearLiveSitePhotoCache()
@@ -1054,6 +1210,8 @@ class LiveTrackingService : Service() {
             private set
 
         private const val ACTION_STOP_SERVICE = "ACTION_STOP_SERVICE"
+        internal const val ACTION_REFRESH_NOTIFICATION = "ACTION_REFRESH_NOTIFICATION"
+        private const val STOP_ACTION_REQUEST_CODE = 1
         private const val MIN_PROCESS_INTERVAL_MS = 30_000L
         private const val MIN_PROCESS_DISTANCE_METERS = 15f
         private const val MOVING_AWAY_DISTANCE_THRESHOLD_METERS = 5f
@@ -1066,7 +1224,17 @@ class LiveTrackingService : Service() {
         private const val LIVE_SITE_PHOTO_CORNER_RADIUS_DP = 10
         private const val MIN_LIVE_SITE_PHOTO_ICON_PX = 96
         private const val MAX_LIVE_SITE_PHOTO_CACHE_ENTRIES = 12
+        private const val LIVE_SITE_PHOTO_CONNECT_TIMEOUT_SECONDS = 4L
+        private const val LIVE_SITE_PHOTO_READ_TIMEOUT_SECONDS = 6L
+        private const val LIVE_SITE_PHOTO_CALL_TIMEOUT_SECONDS = 8L
+        private const val LIVE_HS_OPERATOR_WILDCARD = "*"
+        private const val LIVE_HS_TITLE_SEPARATOR = " \u2022 "
+        private const val LIVE_HS_TITLE_LABEL = "HS"
+        private const val GLOBAL_OPERATOR_FALLBACK_LIMIT = 100
         private const val TAG_LOCATION = "GeoTowerLocation"
+        private val LIVE_OUTAGE_CACHE_TTL_MS = TimeUnit.MINUTES.toMillis(15)
         private val SEARCH_RADII_KM = doubleArrayOf(5.0, 10.0, 25.0, 50.0, 100.0)
+        private val shortDistanceRegex =
+            Regex("""(\d+(?:[.,]\d+)?)\s?(km|mi|m)""", RegexOption.IGNORE_CASE)
     }
 }

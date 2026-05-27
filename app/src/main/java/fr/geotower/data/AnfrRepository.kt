@@ -321,16 +321,17 @@ class AnfrRepository(
         minLat: Double,
         maxLat: Double,
         minLon: Double,
-        maxLon: Double
+        maxLon: Double,
+        hideUndergroundSites: Boolean
     ): List<DbCluster> {
         return when {
-            zoom < 6.5 -> getL1Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
-            zoom < 8.0 -> getL2Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
-            zoom < 9.5 -> getL3Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
-            zoom < 10.5 -> getL4Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
-            zoom < 11.5 -> getL5Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
-            zoom < 12.5 -> getL6Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
-            else -> getL7Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon)
+            zoom < 6.5 -> getL1Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon, hideUndergroundSites = hideUndergroundSites)
+            zoom < 8.0 -> getL2Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon, hideUndergroundSites = hideUndergroundSites)
+            zoom < 9.5 -> getL3Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon, hideUndergroundSites = hideUndergroundSites)
+            zoom < 10.5 -> getL4Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon, hideUndergroundSites = hideUndergroundSites)
+            zoom < 11.5 -> getL5Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon, hideUndergroundSites = hideUndergroundSites)
+            zoom < 12.5 -> getL6Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon, hideUndergroundSites = hideUndergroundSites)
+            else -> getL7Clusters(minLat = minLat, maxLat = maxLat, minLon = minLon, maxLon = maxLon, hideUndergroundSites = hideUndergroundSites)
         }
     }
 
@@ -354,7 +355,12 @@ class AnfrRepository(
     }
 
     suspend fun getNearest100(lat: Double, lon: Double): List<LocalisationEntity> {
+        return getNearest(lat, lon, 100)
+    }
+
+    suspend fun getNearest(lat: Double, lon: Double, limit: Int): List<LocalisationEntity> {
         return queryLocalDatabase(emptyList()) {
+            val safeLimit = limit.coerceAtLeast(1)
             val radii = listOf(0.03, 0.08, 0.18, 0.45, 1.0, 2.5, 5.0)
             var bestResult = emptyList<LocalisationEntity>()
 
@@ -367,14 +373,14 @@ class AnfrRepository(
                     minLon = lon - radius,
                     maxLon = lon + radius,
                     maxDistanceSquared = radius * radius,
-                    limit = 100
+                    limit = safeLimit
                 )
 
                 if (nearest.size > bestResult.size) bestResult = nearest
-                if (nearest.size >= 100) return@queryLocalDatabase nearest
+                if (nearest.size >= safeLimit) return@queryLocalDatabase nearest
             }
 
-            bestResult
+            this.getNearest(lat, lon, safeLimit).ifEmpty { bestResult }
         }
     }
 
@@ -390,7 +396,8 @@ class AnfrRepository(
                     minLat = bounds.minLat,
                     maxLat = bounds.maxLat,
                     minLon = range.min,
-                    maxLon = range.max
+                    maxLon = range.max,
+                    hideUndergroundSites = AppConfig.hideUndergroundSites.value
                 )
             }
             MacroClusterGrouper.mergeTargetedTerritories(clusters, zoom)

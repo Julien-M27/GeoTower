@@ -24,7 +24,13 @@ import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.utils.AnfrDisplayText
 import fr.geotower.utils.AppConfig
-import fr.geotower.ui.screens.emitters.formatDateToFrench
+import fr.geotower.utils.FrequencyStatusType
+import fr.geotower.utils.FreqBand
+import fr.geotower.utils.addMicrowaveFallbackBands
+import fr.geotower.utils.classifyFrequencyStatus
+import fr.geotower.utils.formatDateToFrench
+import fr.geotower.utils.parseAndSortFrequencies
+import fr.geotower.utils.radioBandCode
 import kotlin.math.roundToInt
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
@@ -132,12 +138,12 @@ fun SiteFrequenciesBlock(
                                 modifier = Modifier.padding(bottom = 10.dp)
                             )
                         }
-                        val (statusColor, statusText) = when {
-                        band.status.contains("En service", true) -> Pair(Color(0xFF4CAF50), txtInService)
-                        band.status.contains("Techniquement", true) -> Pair(Color(0xFF4CAF50), txtTechnically)
-                        band.status.contains("Approuvé", true) -> Pair(Color(0xFF2196F3), txtProjectApproved)
-                        else -> Pair(Color.Gray, txtUnknownStatus)
-                    }
+                        val (statusColor, statusText) = when (classifyFrequencyStatus(band.status)) {
+                            FrequencyStatusType.InService -> Pair(Color(0xFF4CAF50), txtInService)
+                            FrequencyStatusType.TechnicallyOperational -> Pair(Color(0xFF4CAF50), txtTechnically)
+                            FrequencyStatusType.Approved -> Pair(Color(0xFF2196F3), txtProjectApproved)
+                            FrequencyStatusType.Unknown -> Pair(Color.Gray, txtUnknownStatus)
+                        }
 
                     val dateFormatted = formatDateToFrench(band.date)
                     // ✅ TEXTES ENTIÈREMENT DYNAMIQUES
@@ -156,7 +162,7 @@ fun SiteFrequenciesBlock(
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                                 // ✅ NOUVEAU : Formatage propre "4G 700" ici aussi
-                                val bandCode = bandEquivalentLabel(band.gen, band.value)
+                                val bandCode = radioBandCode(band.gen, band.value)
                                 val mainBandLabel = if (band.gen in 2..5 && band.value > 0) {
                                     "${band.gen}G ${band.value} MHz"
                                 } else {
@@ -341,140 +347,8 @@ fun SiteFrequenciesBlock(
     }
 }
 
-data class FreqBand(
-    val rawFreq: String,
-    val status: String,
-    val date: String,
-    val physDetails: List<String>,
-    val gen: Int,
-    val value: Int,
-    val spectrumLines: List<String> = emptyList()
-)
-
-private data class FrequencyAccumulator(
-    val band: FreqBand,
-    val physDetails: MutableSet<String> = mutableSetOf(),
-    val spectrumLines: MutableSet<String> = mutableSetOf()
-)
-
 // ✅ NOUVEAU : On passe les traductions en paramètres pour plus de sécurité
 // ✅ NOUVEAU : On passe les traductions en paramètres
-fun parseAndSortFrequencies(freqStr: String?, txtUnknown: String, txtAzimuthNotSpecified: String): List<FreqBand> {
-    if (freqStr.isNullOrBlank()) return emptyList()
-
-    val parsedLines = freqStr.split("\n").map { it.trim() }.filter { it.isNotEmpty() }
-    val tempMap = mutableMapOf<String, FrequencyAccumulator>()
-
-    for (line in parsedLines) {
-        val parts = line.split("|").map { it.trim() }
-        val rawFrequencies = parts.getOrNull(0) ?: ""
-        val status = parts.getOrNull(1) ?: txtUnknown // ✅ TRADUIT
-        val dateStr = parts.getOrNull(2) ?: ""
-        val phys = parts.getOrNull(3) ?: ""
-
-        val systemName = rawFrequencies.substringBefore(":").trim().uppercase()
-        val isFh = isMicrowaveSystem(systemName)
-        val g = when {
-            isFh -> 0
-            systemName.contains("5G", true) || systemName.contains("NR", true) -> 5
-            systemName.contains("4G", true) || systemName.contains("LTE", true) -> 4
-            systemName.contains("3G", true) || systemName.contains("UMTS", true) -> 3
-            systemName.contains("2G", true) || systemName.contains("GSM", true) -> 2
-            else -> 0
-        }
-        val groupingKey = frequencyGroupingKey(systemName, rawFrequencies, status, dateStr, g, isFh)
-        val preciseFrequencies = rawFrequencies.substringAfter(":", "").trim()
-
-        val accumulator = tempMap.getOrPut(groupingKey) {
-            val freqValue = frequencySortValue(systemName, rawFrequencies, isFh)
-
-            val band = FreqBand(rawFrequencies, status, dateStr, emptyList(), g, freqValue)
-            FrequencyAccumulator(band)
-        }
-
-        if (preciseFrequencies.isNotBlank() && preciseFrequencies != rawFrequencies.trim()) {
-            accumulator.spectrumLines.add(preciseFrequencies)
-        }
-
-        // ✅ TRADUIT
-        if (phys.isNotBlank() && phys != "Azimut non spécifié" && phys != txtAzimuthNotSpecified) {
-            accumulator.physDetails.add(phys)
-        }
-    }
-
-    // ✅ TRI SELON L'ORDRE PERSONNALISÉ
-    // ✅ APPLICATION DE L'ORDRE PERSONNALISÉ
-    return sortFrequencyBandsForDisplay(tempMap.values.map { accumulator ->
-        accumulator.band.copy(
-            physDetails = accumulator.physDetails.toList().sorted(),
-            spectrumLines = accumulator.spectrumLines.toList().sortedWith(compareBy(
-                { frequencySortValue("", it, isFh = true) },
-                { it }
-            ))
-        )
-    })
-}
-
-private fun sortFrequencyBandsForDisplay(bands: List<FreqBand>): List<FreqBand> {
-    return bands.sortedWith(compareBy(
-        // 1. On trie par Technologie (selon ton ordre personnalisé)
-        { AppConfig.siteTechnoOrder.value.indexOf(if(it.gen == 5) "5G" else if(it.gen == 4) "4G" else if(it.gen == 3) "3G" else if(it.gen == 2) "2G" else "FH") },
-        // 2. On trie par Fréquence à l'intérieur de la technologie
-        { band ->
-            val orderList = when(band.gen) {
-                5 -> AppConfig.siteFreqOrder5G.value
-                4 -> AppConfig.siteFreqOrder4G.value
-                3 -> AppConfig.siteFreqOrder3G.value
-                2 -> AppConfig.siteFreqOrder2G.value
-                else -> emptyList()
-            }
-            val idx = orderList.indexOf(band.value.toString())
-            if (idx == -1) 999 else idx // Si fréquence inconnue, on la met à la fin
-        },
-        { band -> if (band.gen == 0) band.value else 0 },
-        { band -> band.rawFreq }
-    ))
-}
-
-internal fun addMicrowaveFallbackBands(
-    bands: List<FreqBand>,
-    info: LocalisationEntity,
-    technique: TechniqueEntity?,
-    rawFreqs: String?,
-    txtUnknown: String
-): List<FreqBand> {
-    val fallbackPhysDetails = microwavePhysicalDetailsFromAzimuths(info.azimutsFh)
-    val enrichedBands = bands.map { band ->
-        if (band.isMicrowaveBand() && band.physDetails.isEmpty() && fallbackPhysDetails.isNotEmpty()) {
-            band.copy(physDetails = fallbackPhysDetails)
-        } else {
-            band
-        }
-    }
-
-    if (enrichedBands.any { it.isMicrowaveBand() } || !hasDeclaredMicrowave(info, technique, rawFreqs)) {
-        return enrichedBands
-    }
-
-    val fallbackStatus = technique?.statut?.takeIf { it.isNotBlank() }
-        ?: info.statut?.takeIf { it.isNotBlank() }
-        ?: txtUnknown
-    val fallbackDate = listOfNotNull(
-        technique?.dateService,
-        technique?.dateImplantation,
-        technique?.dateModif
-    ).firstOrNull { it.isNotBlank() }.orEmpty()
-
-    return sortFrequencyBandsForDisplay(enrichedBands + FreqBand(
-        rawFreq = "FH",
-        status = fallbackStatus,
-        date = fallbackDate,
-        physDetails = fallbackPhysDetails,
-        gen = 0,
-        value = 0
-    ))
-}
-
 private fun shouldDisplayFrequencyBand(band: FreqBand): Boolean {
     return when (band.gen) {
         5 -> AppConfig.siteShowTechno5G.value && when (band.value) {
@@ -507,112 +381,10 @@ private fun shouldDisplayFrequencyBand(band: FreqBand): Boolean {
     }
 }
 
-private fun hasDeclaredMicrowave(
-    info: LocalisationEntity,
-    technique: TechniqueEntity?,
-    rawFreqs: String?
-): Boolean {
-    return !info.azimutsFh.isNullOrBlank() ||
-        info.filtres?.contains("FH", ignoreCase = true) == true ||
-        technique?.technologies?.contains("FH", ignoreCase = true) == true ||
-        rawFreqs?.let { isMicrowaveSystem(it) } == true
-}
-
-private fun microwavePhysicalDetailsFromAzimuths(rawAzimuths: String?): List<String> {
-    return rawAzimuths
-        ?.split(",")
-        ?.mapNotNull { value ->
-            value.substringBefore("\u00B0")
-                .trim()
-                .toIntOrNull()
-                ?.let { if (it == 360) 0 else it }
-        }
-        ?.distinct()
-        ?.sorted()
-        ?.map { azimuth -> "FH : $azimuth\u00B0 (-)" }
-        .orEmpty()
-}
-
-private fun isMicrowaveSystem(systemName: String): Boolean {
-    return systemName.contains("FH", ignoreCase = true) ||
-        systemName.contains("FAISCEAU", ignoreCase = true) ||
-        systemName.contains("HERTZIEN", ignoreCase = true)
-}
-
-private fun FreqBand.isMicrowaveBand(): Boolean {
-    return gen == 0 && isMicrowaveSystem(rawFreq.substringBefore(":").trim())
-}
-
-private fun frequencyGroupingKey(
-    systemName: String,
-    rawFrequencies: String,
-    status: String,
-    dateStr: String,
-    gen: Int,
-    isFh: Boolean
-): String {
-    if (!isFh && gen in 2..5) return systemName
-
-    val preciseFrequencies = rawFrequencies.substringAfter(":", rawFrequencies).trim()
-    return listOf(
-        systemName,
-        preciseFrequencies.uppercase(),
-        status.trim().uppercase(),
-        dateStr.trim()
-    ).joinToString("|")
-}
-
-private fun frequencySortValue(systemName: String, rawFrequencies: String, isFh: Boolean): Int {
-    val source = if (isFh) {
-        rawFrequencies.substringAfter(":", rawFrequencies)
-    } else {
-        systemName
-    }
-    val values = Regex("\\d+").findAll(source).mapNotNull { it.value.toIntOrNull() }.toList()
-    return if (isFh) values.firstOrNull() ?: 0 else values.maxOrNull() ?: 0
-}
-
-private fun bandEquivalentLabel(gen: Int, value: Int): String? {
-    return when (gen) {
-        5 -> when (value) {
-            700 -> "N28"
-            800 -> "N20"
-            900 -> "N8"
-            1800 -> "N3"
-            2100 -> "N1"
-            2600 -> "N7"
-            3500 -> "N78"
-            26000 -> "N258"
-            else -> null
-        }
-        4 -> when (value) {
-            700 -> "B28"
-            800 -> "B20"
-            900 -> "B8"
-            1800 -> "B3"
-            2100 -> "B1"
-            2600 -> "B7"
-            3500 -> "B42"
-            else -> null
-        }
-        3 -> when (value) {
-            900 -> "B8"
-            2100 -> "B1"
-            else -> null
-        }
-        2 -> when (value) {
-            900 -> "GSM 900"
-            1800 -> "DCS 1800"
-            else -> null
-        }
-        else -> null
-    }
-}
-
 private fun displayFrequencyBandLabel(band: FreqBand): String {
     if (band.gen in 2..5 && band.value > 0) {
         val base = "${band.gen}G ${band.value} MHz"
-        return bandEquivalentLabel(band.gen, band.value)?.let { "$base ($it)" } ?: base
+        return radioBandCode(band.gen, band.value)?.let { "$base ($it)" } ?: base
     }
     return band.rawFreq.substringBefore(":").trim().ifBlank { band.rawFreq }
 }
@@ -713,24 +485,22 @@ fun FrequenciesGridView(
             // Lignes de données
             parsedBands.forEachIndexed { index, band ->
                 val technoName = displayFrequencyBandLabel(band)
-                val dateFormatted = fr.geotower.ui.screens.emitters.formatDateToFrench(band.date)
+                val dateFormatted = formatDateToFrench(band.date)
                 val dateDisplay =
                     if (dateFormatted.isNotBlank() && dateFormatted != "-") dateFormatted else txtDateNotSpecifiedAnfr
 
-                val statusColor = when {
-                    band.status.contains("En service", true) -> Color(0xFF4CAF50) // Vert
-                    band.status.contains(
-                        "Techniquement",
-                        true
-                    ) -> MaterialTheme.colorScheme.primary // Bleu/Primaire
-                    band.status.contains("Approuvé", true) -> Color(0xFF2196F3) // Bleu clair
-                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                val statusType = classifyFrequencyStatus(band.status)
+                val statusColor = when (statusType) {
+                    FrequencyStatusType.InService -> Color(0xFF4CAF50)
+                    FrequencyStatusType.TechnicallyOperational -> MaterialTheme.colorScheme.primary
+                    FrequencyStatusType.Approved -> Color(0xFF2196F3)
+                    FrequencyStatusType.Unknown -> MaterialTheme.colorScheme.onSurfaceVariant
                 }
-                val statusText = when {
-                    band.status.contains("En service", true) -> txtInService
-                    band.status.contains("Techniquement", true) -> txtTechnically
-                    band.status.contains("Approuvé", true) -> txtProjectApproved
-                    else -> txtUnknownStatus
+                val statusText = when (statusType) {
+                    FrequencyStatusType.InService -> txtInService
+                    FrequencyStatusType.TechnicallyOperational -> txtTechnically
+                    FrequencyStatusType.Approved -> txtProjectApproved
+                    FrequencyStatusType.Unknown -> txtUnknownStatus
                 }
 
                 Row(

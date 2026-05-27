@@ -46,6 +46,28 @@ private fun isOfficialAnnouncementUrl(rawUrl: String): Boolean {
     }
 }
 
+private val APP_VERSION_NUMBER_REGEX = Regex("\\d+")
+
+private fun compareAppVersionNames(left: String, right: String): Int? {
+    val leftParts = left.versionNumberParts()
+    val rightParts = right.versionNumberParts()
+    if (leftParts.isEmpty() || rightParts.isEmpty()) return null
+
+    val maxSize = maxOf(leftParts.size, rightParts.size)
+    for (index in 0 until maxSize) {
+        val leftPart = leftParts.getOrElse(index) { 0 }
+        val rightPart = rightParts.getOrElse(index) { 0 }
+        if (leftPart != rightPart) return leftPart.compareTo(rightPart)
+    }
+    return 0
+}
+
+private fun String.versionNumberParts(): List<Int> {
+    return APP_VERSION_NUMBER_REGEX.findAll(this)
+        .mapNotNull { it.value.toIntOrNull() }
+        .toList()
+}
+
 data class RemoteHomeAnnouncementText(
     val title: String = "",
     val message: String = "",
@@ -63,6 +85,8 @@ data class RemoteHomeAnnouncement(
     val actionLabel: String = "",
     val actionUrl: String = "",
     val dismissible: Boolean = true,
+    val minAppVersionInclusive: String = "",
+    val maxAppVersionExclusive: String = "",
     val translations: Map<String, RemoteHomeAnnouncementText> = emptyMap()
 ) {
     fun localizedText(languageTag: String?): RemoteHomeAnnouncementText {
@@ -86,6 +110,22 @@ data class RemoteHomeAnnouncement(
     }
 
     fun hasContent(languageTag: String? = null): Boolean = localizedText(languageTag).hasContent()
+
+    fun isVisibleForAppVersion(installedVersionName: String): Boolean {
+        val minVersion = minAppVersionInclusive.trim()
+        if (minVersion.isNotBlank()) {
+            val comparison = compareAppVersionNames(installedVersionName, minVersion)
+            if (comparison != null && comparison < 0) return false
+        }
+
+        val maxVersion = maxAppVersionExclusive.trim()
+        if (maxVersion.isNotBlank()) {
+            val comparison = compareAppVersionNames(installedVersionName, maxVersion)
+            if (comparison != null && comparison >= 0) return false
+        }
+
+        return true
+    }
 
     fun dismissKey(): String = id.ifBlank { "$title\n$message\n${translations.hashCode()}".hashCode().toString() }
 
@@ -556,6 +596,8 @@ object RemoteFeatureFlags {
             actionLabel = obj.stringOrBlank("actionLabel", 48),
             actionUrl = actionUrl,
             dismissible = obj.booleanOrDefault("dismissible", defaultConfig.homeAnnouncement.dismissible),
+            minAppVersionInclusive = obj.stringOrBlank("minAppVersionInclusive", 64),
+            maxAppVersionExclusive = obj.stringOrBlank("maxAppVersionExclusive", 64),
             translations = obj.announcementTranslations("translations")
         )
         return if (announcement.enabled && !announcement.hasContent()) {

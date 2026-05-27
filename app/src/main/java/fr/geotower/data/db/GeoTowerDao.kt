@@ -51,8 +51,17 @@ interface GeoTowerDao {
             l.azimuts_fh,
             l.tech_mask,
             l.band_mask,
+            l.arcep_nidt,
+            l.is_zb,
             COALESCE(st.libelle, '') AS statut,
-            COALESCE(t.has_active, 0) AS has_active
+            COALESCE(t.has_active, 0) AS has_active,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM support underground_support
+                LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+                WHERE underground_support.id_anfr = l.id_anfr
+                AND underground_nature.libelle = 'Intérieur sous-terrain'
+            ) THEN 1 ELSE 0 END AS has_underground_support
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         LEFT JOIN technique t ON l.id_anfr = t.id_anfr
@@ -73,8 +82,17 @@ interface GeoTowerDao {
             l.azimuts_fh,
             l.tech_mask,
             l.band_mask,
+            l.arcep_nidt,
+            l.is_zb,
             COALESCE(st.libelle, '') AS statut,
-            COALESCE(t.has_active, 0) AS has_active
+            COALESCE(t.has_active, 0) AS has_active,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM support underground_support
+                LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+                WHERE underground_support.id_anfr = l.id_anfr
+                AND underground_nature.libelle = 'Intérieur sous-terrain'
+            ) THEN 1 ELSE 0 END AS has_underground_support
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         LEFT JOIN technique t ON l.id_anfr = t.id_anfr
@@ -106,11 +124,81 @@ interface GeoTowerDao {
             l.azimuts_fh,
             l.tech_mask,
             l.band_mask,
-            NULL AS statut,
-            0 AS has_active
+            l.arcep_nidt,
+            l.is_zb,
+            COALESCE(st.libelle, '') AS statut,
+            COALESCE(t.has_active, 0) AS has_active,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM support underground_support
+                LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+                WHERE underground_support.id_anfr = l.id_anfr
+                AND underground_nature.libelle = 'Intérieur sous-terrain'
+            ) THEN 1 ELSE 0 END AS has_underground_support
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
-        ORDER BY ((l.latitude - :lat) * (l.latitude - :lat) + (l.longitude - :lon) * (l.longitude - :lon)) ASC
+        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
+        LEFT JOIN ref_statut st ON t.statut_id = st.id
+        WHERE UPPER(COALESCE(o.libelle, '')) LIKE '%' || UPPER(:operatorName) || '%'
+        AND (
+            COALESCE(st.libelle, '') IN ('En service', 'Techniquement opÃ©rationnel', 'Techniquement operationnel')
+            OR COALESCE(t.has_active, 0) = 1
+        )
+        ORDER BY (
+            (l.latitude - :lat) * (l.latitude - :lat) +
+            (CASE
+                WHEN ABS(l.longitude - :lon) > 180 THEN 360 - ABS(l.longitude - :lon)
+                ELSE ABS(l.longitude - :lon)
+            END) *
+            (CASE
+                WHEN ABS(l.longitude - :lon) > 180 THEN 360 - ABS(l.longitude - :lon)
+                ELSE ABS(l.longitude - :lon)
+            END)
+        ) ASC
+        LIMIT :limit
+    """)
+    suspend fun getNearestActiveLocalisationsByOperator(
+        operatorName: String,
+        lat: Double,
+        lon: Double,
+        limit: Int
+    ): List<LocalisationEntity>
+
+    @Query("""
+        SELECT
+            l.id_anfr,
+            COALESCE(o.libelle, 'Inconnu') AS operateur,
+            l.latitude,
+            l.longitude,
+            l.azimuts,
+            l.code_insee,
+            l.azimuts_fh,
+            l.tech_mask,
+            l.band_mask,
+            l.arcep_nidt,
+            l.is_zb,
+            NULL AS statut,
+            0 AS has_active,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM support underground_support
+                LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+                WHERE underground_support.id_anfr = l.id_anfr
+                AND underground_nature.libelle = 'Intérieur sous-terrain'
+            ) THEN 1 ELSE 0 END AS has_underground_support
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        ORDER BY (
+            (l.latitude - :lat) * (l.latitude - :lat) +
+            (CASE
+                WHEN ABS(l.longitude - :lon) > 180 THEN 360 - ABS(l.longitude - :lon)
+                ELSE ABS(l.longitude - :lon)
+            END) *
+            (CASE
+                WHEN ABS(l.longitude - :lon) > 180 THEN 360 - ABS(l.longitude - :lon)
+                ELSE ABS(l.longitude - :lon)
+            END)
+        ) ASC
         LIMIT 100
     """)
     suspend fun getNearest100(lat: Double, lon: Double): List<LocalisationEntity>
@@ -126,8 +214,60 @@ interface GeoTowerDao {
             l.azimuts_fh,
             l.tech_mask,
             l.band_mask,
+            l.arcep_nidt,
+            l.is_zb,
             NULL AS statut,
-            0 AS has_active
+            0 AS has_active,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM support underground_support
+                LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+                WHERE underground_support.id_anfr = l.id_anfr
+                AND underground_nature.libelle = 'Intérieur sous-terrain'
+            ) THEN 1 ELSE 0 END AS has_underground_support
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        ORDER BY (
+            (l.latitude - :lat) * (l.latitude - :lat) +
+            (CASE
+                WHEN ABS(l.longitude - :lon) > 180 THEN 360 - ABS(l.longitude - :lon)
+                ELSE ABS(l.longitude - :lon)
+            END) *
+            (CASE
+                WHEN ABS(l.longitude - :lon) > 180 THEN 360 - ABS(l.longitude - :lon)
+                ELSE ABS(l.longitude - :lon)
+            END)
+        ) ASC
+        LIMIT :limit
+    """)
+    suspend fun getNearest(
+        lat: Double,
+        lon: Double,
+        limit: Int
+    ): List<LocalisationEntity>
+
+    @Query("""
+        SELECT
+            l.id_anfr,
+            COALESCE(o.libelle, 'Inconnu') AS operateur,
+            l.latitude,
+            l.longitude,
+            l.azimuts,
+            l.code_insee,
+            l.azimuts_fh,
+            l.tech_mask,
+            l.band_mask,
+            l.arcep_nidt,
+            l.is_zb,
+            NULL AS statut,
+            0 AS has_active,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM support underground_support
+                LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+                WHERE underground_support.id_anfr = l.id_anfr
+                AND underground_nature.libelle = 'Intérieur sous-terrain'
+            ) THEN 1 ELSE 0 END AS has_underground_support
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         WHERE l.latitude BETWEEN :minLat AND :maxLat
@@ -323,26 +463,124 @@ interface GeoTowerDao {
     """)
     suspend fun getFaisceauxDetails(idAnfr: String): List<FaisceauxEntity>
 
-    @Query("SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators FROM localisation l LEFT JOIN ref_operateur o ON l.operateur_id = o.id WHERE l.latitude BETWEEN :minLat AND :maxLat AND l.longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(l.latitude / 2.5), ROUND(l.longitude / 3.0)")
-    suspend fun getL1Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
+    @Query("""
+        SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+        AND (:hideUndergroundSites = 0 OR NOT EXISTS (
+            SELECT 1
+            FROM support underground_support
+            LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+            WHERE underground_support.id_anfr = l.id_anfr
+            AND underground_nature.libelle = 'Intérieur sous-terrain'
+        ))
+        GROUP BY ROUND(l.latitude / 2.5), ROUND(l.longitude / 3.0)
+    """)
+    suspend fun getL1Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean): List<DbCluster>
 
-    @Query("SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators FROM localisation l LEFT JOIN ref_operateur o ON l.operateur_id = o.id WHERE l.latitude BETWEEN :minLat AND :maxLat AND l.longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(l.latitude / 1.0), ROUND(l.longitude / 1.2)")
-    suspend fun getL2Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
+    @Query("""
+        SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+        AND (:hideUndergroundSites = 0 OR NOT EXISTS (
+            SELECT 1
+            FROM support underground_support
+            LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+            WHERE underground_support.id_anfr = l.id_anfr
+            AND underground_nature.libelle = 'Intérieur sous-terrain'
+        ))
+        GROUP BY ROUND(l.latitude / 1.0), ROUND(l.longitude / 1.2)
+    """)
+    suspend fun getL2Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean): List<DbCluster>
 
-    @Query("SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators FROM localisation l LEFT JOIN ref_operateur o ON l.operateur_id = o.id WHERE l.latitude BETWEEN :minLat AND :maxLat AND l.longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(l.latitude / 0.4), ROUND(l.longitude / 0.5)")
-    suspend fun getL3Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
+    @Query("""
+        SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+        AND (:hideUndergroundSites = 0 OR NOT EXISTS (
+            SELECT 1
+            FROM support underground_support
+            LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+            WHERE underground_support.id_anfr = l.id_anfr
+            AND underground_nature.libelle = 'Intérieur sous-terrain'
+        ))
+        GROUP BY ROUND(l.latitude / 0.4), ROUND(l.longitude / 0.5)
+    """)
+    suspend fun getL3Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean): List<DbCluster>
 
-    @Query("SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators FROM localisation l LEFT JOIN ref_operateur o ON l.operateur_id = o.id WHERE l.latitude BETWEEN :minLat AND :maxLat AND l.longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(l.latitude / 0.15), ROUND(l.longitude / 0.2)")
-    suspend fun getL4Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
+    @Query("""
+        SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+        AND (:hideUndergroundSites = 0 OR NOT EXISTS (
+            SELECT 1
+            FROM support underground_support
+            LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+            WHERE underground_support.id_anfr = l.id_anfr
+            AND underground_nature.libelle = 'Intérieur sous-terrain'
+        ))
+        GROUP BY ROUND(l.latitude / 0.15), ROUND(l.longitude / 0.2)
+    """)
+    suspend fun getL4Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean): List<DbCluster>
 
-    @Query("SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators FROM localisation l LEFT JOIN ref_operateur o ON l.operateur_id = o.id WHERE l.latitude BETWEEN :minLat AND :maxLat AND l.longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(l.latitude, 1), ROUND(l.longitude, 1)")
-    suspend fun getL5Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
+    @Query("""
+        SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+        AND (:hideUndergroundSites = 0 OR NOT EXISTS (
+            SELECT 1
+            FROM support underground_support
+            LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+            WHERE underground_support.id_anfr = l.id_anfr
+            AND underground_nature.libelle = 'Intérieur sous-terrain'
+        ))
+        GROUP BY ROUND(l.latitude, 1), ROUND(l.longitude, 1)
+    """)
+    suspend fun getL5Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean): List<DbCluster>
 
-    @Query("SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators FROM localisation l LEFT JOIN ref_operateur o ON l.operateur_id = o.id WHERE l.latitude BETWEEN :minLat AND :maxLat AND l.longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(l.latitude / 0.05), ROUND(l.longitude / 0.06)")
-    suspend fun getL6Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
+    @Query("""
+        SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+        AND (:hideUndergroundSites = 0 OR NOT EXISTS (
+            SELECT 1
+            FROM support underground_support
+            LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+            WHERE underground_support.id_anfr = l.id_anfr
+            AND underground_nature.libelle = 'Intérieur sous-terrain'
+        ))
+        GROUP BY ROUND(l.latitude / 0.05), ROUND(l.longitude / 0.06)
+    """)
+    suspend fun getL6Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean): List<DbCluster>
 
-    @Query("SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators FROM localisation l LEFT JOIN ref_operateur o ON l.operateur_id = o.id WHERE l.latitude BETWEEN :minLat AND :maxLat AND l.longitude BETWEEN :minLon AND :maxLon GROUP BY ROUND(l.latitude / 0.02), ROUND(l.longitude / 0.025)")
-    suspend fun getL7Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<DbCluster>
+    @Query("""
+        SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+        AND (:hideUndergroundSites = 0 OR NOT EXISTS (
+            SELECT 1
+            FROM support underground_support
+            LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+            WHERE underground_support.id_anfr = l.id_anfr
+            AND underground_nature.libelle = 'Intérieur sous-terrain'
+        ))
+        GROUP BY ROUND(l.latitude / 0.02), ROUND(l.longitude / 0.025)
+    """)
+    suspend fun getL7Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean): List<DbCluster>
 
     @Query("""
         SELECT
@@ -355,13 +593,23 @@ interface GeoTowerDao {
             l.azimuts_fh,
             l.tech_mask,
             l.band_mask,
+            l.arcep_nidt,
+            l.is_zb,
             COALESCE(st.libelle, '') AS statut,
-            COALESCE(t.has_active, 0) AS has_active
+            COALESCE(t.has_active, 0) AS has_active,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM support underground_support
+                LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+                WHERE underground_support.id_anfr = l.id_anfr
+                AND underground_nature.libelle = 'Intérieur sous-terrain'
+            ) THEN 1 ELSE 0 END AS has_underground_support
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         LEFT JOIN technique t ON l.id_anfr = t.id_anfr
         LEFT JOIN ref_statut st ON t.statut_id = st.id
         WHERE l.id_anfr LIKE '%' || :query || '%'
+        OR UPPER(COALESCE(l.arcep_nidt, '')) LIKE '%' || UPPER(:query) || '%'
         OR l.id_anfr IN (SELECT id_anfr FROM support WHERE id_support LIKE '%' || :query || '%')
         LIMIT 50
     """)
@@ -378,8 +626,17 @@ interface GeoTowerDao {
             l.azimuts_fh,
             l.tech_mask,
             l.band_mask,
+            l.arcep_nidt,
+            l.is_zb,
             COALESCE(st.libelle, '') AS statut,
-            COALESCE(t.has_active, 0) AS has_active
+            COALESCE(t.has_active, 0) AS has_active,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM support underground_support
+                LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+                WHERE underground_support.id_anfr = l.id_anfr
+                AND underground_nature.libelle = 'Intérieur sous-terrain'
+            ) THEN 1 ELSE 0 END AS has_underground_support
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         LEFT JOIN technique t ON l.id_anfr = t.id_anfr
@@ -390,6 +647,7 @@ interface GeoTowerDao {
         LEFT JOIN ref_commune c ON l.code_insee = c.code_insee
         WHERE l.id_anfr LIKE '%' || :query || '%'
            OR UPPER(COALESCE(o.libelle, '')) LIKE '%' || UPPER(:query) || '%'
+           OR UPPER(COALESCE(l.arcep_nidt, '')) LIKE '%' || UPPER(:query) || '%'
            OR UPPER(COALESCE(l.code_insee, '')) LIKE '%' || UPPER(:query) || '%'
            OR UPPER(COALESCE(c.nom, '')) LIKE '%' || UPPER(:query) || '%'
            OR UPPER(COALESCE(t.adresse, '')) LIKE '%' || UPPER(:query) || '%'
@@ -432,8 +690,17 @@ interface GeoTowerDao {
             l.azimuts_fh,
             l.tech_mask,
             l.band_mask,
+            l.arcep_nidt,
+            l.is_zb,
             COALESCE(st.libelle, '') AS statut,
-            COALESCE(t.has_active, 0) AS has_active
+            COALESCE(t.has_active, 0) AS has_active,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM support underground_support
+                LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+                WHERE underground_support.id_anfr = l.id_anfr
+                AND underground_nature.libelle = 'Intérieur sous-terrain'
+            ) THEN 1 ELSE 0 END AS has_underground_support
         FROM localisation l
         INNER JOIN technique t ON l.id_anfr = t.id_anfr
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
@@ -454,15 +721,38 @@ interface GeoTowerDao {
             l.azimuts_fh,
             l.tech_mask,
             l.band_mask,
+            l.arcep_nidt,
+            l.is_zb,
             COALESCE(st.libelle, '') AS statut,
-            COALESCE(t.has_active, 0) AS has_active
+            COALESCE(t.has_active, 0) AS has_active,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM support underground_support
+                LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+                WHERE underground_support.id_anfr = l.id_anfr
+                AND underground_nature.libelle = 'Intérieur sous-terrain'
+            ) THEN 1 ELSE 0 END AS has_underground_support
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         LEFT JOIN technique t ON l.id_anfr = t.id_anfr
         LEFT JOIN ref_statut st ON t.statut_id = st.id
-        WHERE CAST(l.id_anfr AS INTEGER) = CAST(:exactId AS INTEGER)
+        WHERE l.id_anfr = :exactId
+        OR (
+            :exactId != ''
+            AND
+            :exactId NOT GLOB '*[^0-9]*'
+            AND l.id_anfr = printf('%010d', CAST(:exactId AS INTEGER))
+        )
         OR l.id_anfr IN (
-            SELECT id_anfr FROM support WHERE CAST(id_support AS INTEGER) = CAST(:exactId AS INTEGER)
+            SELECT id_anfr
+            FROM support
+            WHERE id_support = :exactId
+            OR (
+                :exactId != ''
+                AND
+                :exactId NOT GLOB '*[^0-9]*'
+                AND CAST(id_support AS INTEGER) = CAST(:exactId AS INTEGER)
+            )
         )
     """)
     suspend fun getAntennasByExactId(exactId: String): List<LocalisationEntity>

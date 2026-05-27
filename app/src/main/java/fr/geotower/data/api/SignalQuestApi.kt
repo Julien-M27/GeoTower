@@ -115,6 +115,7 @@ interface SignalQuestApiService {
         @Part("anfrCode") anfrCode: RequestBody?,
         @Part("nationalSiteCode") nationalSiteCode: RequestBody?,
         @Part("sourceCode") sourceCode: RequestBody?,
+        @Part("stripExifBeforeUpload") stripExifBeforeUpload: RequestBody,
         @Part("exifMetadata") exifMetadata: RequestBody?
     ): retrofit2.Response<SqPhotoUploadResponse>
 

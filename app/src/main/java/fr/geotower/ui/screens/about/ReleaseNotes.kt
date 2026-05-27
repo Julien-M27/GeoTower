@@ -26,25 +26,31 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_security)) {
-        item(stringResource(R.string.appstrings_release_security_downloads_verified))
-        item(stringResource(R.string.appstrings_release_security_official_sources))
-        item(stringResource(R.string.appstrings_release_security_downloaded_files_checked))
+    section(stringResource(R.string.appstrings_release_section_global)) {
+        item(stringResource(R.string.appstrings_release_global_anfr_underground_supports))
+        item(stringResource(R.string.appstrings_release_global_settings_sharing_consistent))
+        item(stringResource(R.string.appstrings_release_global_translations_updated))
     }
 
-    section(stringResource(R.string.appstrings_release_section_offline_maps)) {
-        item(stringResource(R.string.appstrings_release_offline_maps_invalid_rejected))
-        item(stringResource(R.string.appstrings_release_offline_maps_cancel_cleanup))
-        item(stringResource(R.string.appstrings_release_offline_maps_download_checks))
+    section(stringResource(R.string.appstrings_release_section_map)) {
+        item(stringResource(R.string.appstrings_release_map_hide_underground_sites_filter))
+        item(stringResource(R.string.appstrings_release_map_nearby_search_more_precise))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_sites_sharing)) {
+        item(stringResource(R.string.appstrings_release_sites_arcep_nidt_display_copy))
+        item(stringResource(R.string.appstrings_release_sites_zb_badge))
+        item(stringResource(R.string.appstrings_release_sites_outage_dates))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_live_tracking)) {
+        item(stringResource(R.string.appstrings_release_live_tracking_hs_notification))
+        item(stringResource(R.string.appstrings_release_live_tracking_operator_change_refresh))
+        item(stringResource(R.string.appstrings_release_live_tracking_search_photo_reliability))
     }
 
     section(stringResource(R.string.appstrings_release_section_signalquest)) {
-        item(stringResource(R.string.appstrings_release_signalquest_upload_more_secure))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_global)) {
-        item(stringResource(R.string.appstrings_release_global_release_optimized_protected))
-        item(stringResource(R.string.appstrings_release_global_internal_checks_reinforced))
+        item(stringResource(R.string.appstrings_release_signalquest_private_data_upload_setting))
     }
 }
 

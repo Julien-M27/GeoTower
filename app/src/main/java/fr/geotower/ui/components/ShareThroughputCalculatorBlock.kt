@@ -36,17 +36,18 @@ import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.radio.MobileOperator
-import fr.geotower.radio.RadioTechnology
 import fr.geotower.radio.RadioThroughputEngine
 import fr.geotower.radio.RatAssumptions
-import fr.geotower.radio.SiteRadioSystem
 import fr.geotower.radio.ThroughputProfile
 import fr.geotower.radio.ThroughputProfiles
 import java.util.Locale
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
+import fr.geotower.utils.FreqBand
 import fr.geotower.utils.ThroughputDisplayText
+import fr.geotower.utils.ThroughputPrefs
 import fr.geotower.utils.ThroughputTextKey
+import fr.geotower.utils.parseAndSortFrequencies
 
 private const val MAX_SHARE_FR_UPLINK_AGGREGATED_CARRIERS = 2
 
@@ -66,24 +67,22 @@ fun ShareThroughputCalculatorBlock(
         parseAndSortFrequencies(rawFrequencies, txtUnknown, txtAzimuthNotSpecified)
     }
     val preset = remember(prefs) {
-        shareThroughputPresetFromPreference(prefs.getString("throughput_default_preset", "conservative"))
+        shareThroughputPresetFromPreference(prefs.getString(ThroughputPrefs.DEFAULT_PRESET, ThroughputPrefs.DEFAULT_PRESET_VALUE))
     }
     val customSettings = remember(prefs) {
         ShareCustomModulationSettings(
-            lteDownIndex = prefs.getInt("throughput_custom_lte_down", 3).coerceIn(0, shareLteDownModulationOptions.lastIndex),
-            lteUpIndex = prefs.getInt("throughput_custom_lte_up", 2).coerceIn(0, shareLteUpModulationOptions.lastIndex),
-            nrDownIndex = prefs.getInt("throughput_custom_nr_down", 3).coerceIn(0, shareNrDownModulationOptions.lastIndex),
-            nrUpIndex = prefs.getInt("throughput_custom_nr_up", 2).coerceIn(0, shareNrUpModulationOptions.lastIndex)
+            lteDownIndex = prefs.getInt(ThroughputPrefs.CUSTOM_LTE_DOWN, 3).coerceIn(0, shareLteDownModulationOptions.lastIndex),
+            lteUpIndex = prefs.getInt(ThroughputPrefs.CUSTOM_LTE_UP, 2).coerceIn(0, shareLteUpModulationOptions.lastIndex),
+            nrDownIndex = prefs.getInt(ThroughputPrefs.CUSTOM_NR_DOWN, 3).coerceIn(0, shareNrDownModulationOptions.lastIndex),
+            nrUpIndex = prefs.getInt(ThroughputPrefs.CUSTOM_NR_UP, 2).coerceIn(0, shareNrUpModulationOptions.lastIndex)
         )
     }
-    val include4G = remember(prefs) { prefs.getBoolean("throughput_include_4g", true) }
-    val include5G = remember(prefs) { prefs.getBoolean("throughput_include_5g", true) }
-    val includePlanned = remember(prefs) { prefs.getBoolean("throughput_include_planned", false) }
+    val include4G = remember(prefs) { ThroughputPrefs.include4G.read(prefs) }
+    val include5G = remember(prefs) { ThroughputPrefs.include5G.read(prefs) }
+    val includePlanned = remember(prefs) { ThroughputPrefs.includePlanned.read(prefs) }
     val enabledBandKeys = remember(parsedBands, prefs) {
-        parsedBands
-            .filter { it.gen == 4 || it.gen == 5 }
-            .filterNot { isShareHiddenThroughputBand(it) }
-            .filter { isShareThroughputBandEnabledByDefault(it, prefs) }
+        throughputCalculationBands(parsedBands)
+            .filter { isThroughputBandEnabledByDefault(it, prefs) }
             .map { throughputBandKey(it) }
             .toSet()
     }
@@ -278,23 +277,7 @@ private fun calculateShareThroughput(
     val operator = MobileOperator.fromLabel(operatorName)
     val engineProfile = shareEngineProfileFor(preset, customSettings)
     val engineResult = if (operator != null) {
-        val systems = bands
-            .filter { it.gen == 4 || it.gen == 5 }
-            .filterNot { isShareHiddenThroughputBand(it) }
-            .map { band ->
-                SiteRadioSystem(
-                    sourceKey = throughputBandKey(band),
-                    supportId = "unknown",
-                    operator = operator,
-                    technology = if (band.gen == 5) RadioTechnology.NR_5G else RadioTechnology.LTE_4G,
-                    bandLabel = band.value.toString(),
-                    status = siteRadioStatusFromBandStatus(band.status),
-                    azimuthDeg = extractThroughputAzimuths(band).firstOrNull(),
-                    supportHeightM = supportHeightMeters,
-                    antennaHeightM = extractThroughputPanelHeightMeters(band, supportHeightMeters),
-                    lastSeenAt = band.date.takeIf { it.isNotBlank() }
-                )
-            }
+        val systems = buildThroughputRadioSystems(bands, operator, supportHeightMeters)
         RadioThroughputEngine.estimate(systems, engineProfile)
     } else {
         null
@@ -302,18 +285,14 @@ private fun calculateShareThroughput(
     val carrierByKey = engineResult?.perCarrierResults.orEmpty().associateBy { it.sourceKey }
     val excludedByKey = engineResult?.excludedCarriers.orEmpty().associateBy { it.sourceKey }
 
-    val calculatedBands = bands
-        .filter { it.gen == 4 || it.gen == 5 }
-        .filterNot { isShareHiddenThroughputBand(it) }
+    val calculatedBands = throughputCalculationBands(bands)
         .map { band ->
             val key = throughputBandKey(band)
             val carrierResult = carrierByKey[key]
             val bandwidth = carrierResult?.let {
                 ThroughputBandwidth(valueMHz = it.bandwidthMHz, isEstimated = false)
             } ?: resolveThroughputBandwidth(band)
-            val isPlanned = band.status.contains("Projet", ignoreCase = true) ||
-                band.status.contains("Approuv", ignoreCase = true) ||
-                band.status.contains("Planned", ignoreCase = true)
+            val isPlanned = isPlannedThroughputBand(band)
             val generationAllowed = (band.gen == 4 && include4G) || (band.gen == 5 && include5G)
             val bandAllowed = enabledBandKeys.contains(key)
             val engineIncluded = carrierResult?.included == true
@@ -334,8 +313,8 @@ private fun calculateShareThroughput(
                 label = throughputBandLabel(band),
                 generation = band.gen,
                 modulationLabel = carrierResult?.let {
-                    shareModulationLabel(it.dlModulationOrder, it.ulModulationOrder, it.dlMimoLayers, it.ulMimoLayers)
-                } ?: shareModulationLabel(band.gen, engineProfile),
+                    throughputModulationLabel(it.dlModulationOrder, it.ulModulationOrder, it.dlMimoLayers, it.ulMimoLayers)
+                } ?: throughputModulationLabel(band.gen, engineProfile),
                 bandwidthMHz = bandwidth.valueMHz,
                 coneDistance = estimateThroughputConeDistance(panelHeightMeters),
                 azimuths = extractThroughputAzimuths(band),
@@ -366,54 +345,6 @@ private fun shareThroughputPresetLabel(preset: ShareThroughputPreset): String {
         ShareThroughputPreset.Maximum -> ThroughputDisplayText.presetLabel("ideal")
         ShareThroughputPreset.Custom -> ThroughputDisplayText.presetLabel("custom")
     }
-}
-
-private fun isShareThroughputBandEnabledByDefault(band: FreqBand, prefs: SharedPreferences): Boolean {
-    if (band.value <= 0) return true
-    val generationPrefix = when (band.gen) {
-        4 -> "4g"
-        5 -> "5g"
-        else -> return true
-    }
-    return prefs.getBoolean("throughput_band_${generationPrefix}_${band.value}", true)
-}
-
-private fun isShareHiddenThroughputBand(band: FreqBand): Boolean {
-    return band.gen == 5 && band.value in setOf(1800, 26000)
-}
-
-private fun shareModulationLabel(gen: Int, profile: ThroughputProfile): String {
-    val assumptions = if (gen == 5) profile.nr else profile.lte
-    return shareModulationLabel(
-        dlModulationOrder = assumptions.dlModulationOrder,
-        ulModulationOrder = assumptions.ulModulationOrder,
-        dlLayers = assumptions.dlMimoLayers,
-        ulLayers = assumptions.ulMimoLayers
-    )
-}
-
-private fun shareModulationLabel(
-    dlModulationOrder: Int,
-    ulModulationOrder: Int,
-    dlLayers: Int,
-    ulLayers: Int
-): String {
-    return "${shareModulationName(dlModulationOrder)} ${shareLayerLabel(dlLayers)} DL / ${shareModulationName(ulModulationOrder)} ${shareLayerLabel(ulLayers)} UL"
-}
-
-private fun shareModulationName(modulationOrder: Int): String {
-    return when (modulationOrder) {
-        2 -> "QPSK"
-        4 -> "16-QAM"
-        6 -> "64-QAM"
-        8 -> "256-QAM"
-        10 -> "1024-QAM"
-        else -> "$modulationOrder bits/symbol"
-    }
-}
-
-private fun shareLayerLabel(layers: Int): String {
-    return if (layers <= 1) "1 layer" else "MIMO ${layers}x${layers}"
 }
 
 private fun shareEngineProfileFor(
