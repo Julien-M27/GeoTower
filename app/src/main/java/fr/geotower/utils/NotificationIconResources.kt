@@ -32,20 +32,32 @@ object NotificationIconResources {
         }
     }
 
-    fun applyTo(builder: NotificationCompat.Builder, context: Context): NotificationCompat.Builder {
+    fun applyTo(
+        builder: NotificationCompat.Builder,
+        context: Context,
+        includeLargeIcon: Boolean = false
+    ): NotificationCompat.Builder {
         builder.setSmallIcon(smallIconRes(context))
-        largeIconBitmap(context)?.let(builder::setLargeIcon)
+        if (includeLargeIcon) {
+            largeIconBitmap(context)?.let(builder::setLargeIcon)
+        }
         return builder
     }
 
-    fun applyTo(builder: Notification.Builder, context: Context): Notification.Builder {
+    fun applyTo(
+        builder: Notification.Builder,
+        context: Context,
+        includeLargeIcon: Boolean = false
+    ): Notification.Builder {
         builder.setSmallIcon(smallIconRes(context))
-        largeIconBitmap(context)?.let { bitmap ->
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                builder.setLargeIcon(Icon.createWithBitmap(bitmap))
-            } else {
-                @Suppress("DEPRECATION")
-                builder.setLargeIcon(bitmap)
+        if (includeLargeIcon) {
+            largeIconBitmap(context)?.let { bitmap ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                    builder.setLargeIcon(Icon.createWithBitmap(bitmap))
+                } else {
+                    @Suppress("DEPRECATION")
+                    builder.setLargeIcon(bitmap)
+                }
             }
         }
         return builder

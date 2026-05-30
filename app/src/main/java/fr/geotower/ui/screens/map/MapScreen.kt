@@ -740,13 +740,14 @@ fun MapScreen(
         AppConfig.f2G_900.value, AppConfig.f2G_1800.value, AppConfig.f3G_900.value, AppConfig.f3G_2100.value,
         AppConfig.f4G_700.value, AppConfig.f4G_800.value, AppConfig.f4G_900.value, AppConfig.f4G_1800.value, AppConfig.f4G_2100.value, AppConfig.f4G_2600.value,
         AppConfig.f5G_700.value, AppConfig.f5G_2100.value, AppConfig.f5G_3500.value, AppConfig.f5G_26000.value,
-        AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value, sitesHs, currentCityPolygons
+        AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value, AppConfig.showOnlyZbSites.value, sitesHs, currentCityPolygons
     ) {
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             val selectedOperators = AppConfig.selectedOperatorKeys.value
             val showSitesInService = AppConfig.showSitesInService.value
             val showSitesOutOfService = AppConfig.showSitesOutOfService.value
             val hideUndergroundSites = AppConfig.hideUndergroundSites.value
+            val showOnlyZbSites = AppConfig.showOnlyZbSites.value
             val sFh = AppConfig.showTechnoFH.value
             val s2G = AppConfig.showTechno2G.value; val s3G = AppConfig.showTechno3G.value
             val s4G = AppConfig.showTechno4G.value; val s5G = AppConfig.showTechno5G.value
@@ -769,12 +770,13 @@ fun MapScreen(
                 // ✅ 1. ON VÉRIFIE LES OPÉRATEURS TOUT DE SUITE
                 // 🚨 2. LA CORRECTION : Si c'est un cluster, on vérifie au moins l'opérateur !
                 if (antenna.idAnfr.startsWith("CLUSTER_")) {
-                    return@filter visibleOperators.isNotEmpty()
+                    return@filter visibleOperators.isNotEmpty() && (!showOnlyZbSites || antenna.isZb == 1)
                 }
 
                 // --- 3. POUR LES VRAIES ANTENNES, ON CONTINUE AVEC LE RESTE DES FILTRES ---
                 val isInCityBounds = currentCityPolygons.isNullOrEmpty() || currentCityPolygons!!.any { poly -> isPointInPolygon(antenna.latitude, antenna.longitude, poly) }
                 val matchesUndergroundFilter = !hideUndergroundSites || antenna.hasUndergroundSupport != 1
+                val matchesZbFilter = !showOnlyZbSites || antenna.isZb == 1
 
                 val isFhOnly = antenna.azimuts.isNullOrBlank() && !antenna.azimutsFh.isNullOrBlank()
                 val matchFh = if (!sFh && isFhOnly) false else true
@@ -794,7 +796,7 @@ fun MapScreen(
                     matchTechno = (s2G && s3G && s4G && s5G && sFh)
                 }
 
-                visibleOperators.isNotEmpty() && matchesUndergroundFilter && matchFh && isInCityBounds && matchTechno
+                visibleOperators.isNotEmpty() && matchesUndergroundFilter && matchesZbFilter && matchFh && isInCityBounds && matchTechno
             }
             filteredAntennas = result
         }
@@ -1027,14 +1029,15 @@ fun MapScreen(
         AppConfig.selectedOperatorKeys.value,
         AppConfig.showSitesInService.value,
         AppConfig.showSitesOutOfService.value,
-        AppConfig.hideUndergroundSites.value
+        AppConfig.hideUndergroundSites.value,
+        AppConfig.showOnlyZbSites.value
     ) {
         mapViewRef?.let { map ->
             updateMarkers(map, filteredAntennas, sitesHs)
         }
     }
 
-    LaunchedEffect(AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value) {
+    LaunchedEffect(AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value, AppConfig.showOnlyZbSites.value) {
         mapViewRef?.let { map ->
             map.loadVisibleAntennas(viewModel)
         }

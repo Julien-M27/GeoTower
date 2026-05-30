@@ -78,6 +78,7 @@ fun SupportDetailsSection(
 
     val txtSupportHeight = stringResource(R.string.appstrings_support_height)
     val txtSupportNature = stringResource(R.string.appstrings_support_nature)
+    val txtOwner = stringResource(R.string.appstrings_owner)
     val txtDistanceLabel = stringResource(R.string.appstrings_distance_label)
     val txtFromMyPosition = stringResource(R.string.appstrings_from_my_position)
     val txtBearingLabel = stringResource(R.string.appstrings_bearing_label)
@@ -132,6 +133,7 @@ fun SupportDetailsSection(
             )
 
             val nature = AnfrDisplayText.nature(physique?.natureSupport)
+            val proprietaire = AnfrDisplayText.owner(physique?.proprietaire)
 
             // ✅ CALCUL HAUTEUR (ft/in ou m)
             val hauteurMeters = physique?.hauteur?.toString()?.toFloatOrNull()
@@ -160,6 +162,7 @@ fun SupportDetailsSection(
 
             InfoLine(txtSupportHeight, hauteurStr)
             InfoLine(label = "$txtSupportNature : ", value = nature)
+            InfoLine(label = "$txtOwner : ", value = proprietaire)
             InfoLine(txtDistanceLabel, "$finalDistanceStr $txtFromMyPosition")
             InfoLine(txtBearingLabel, bearingStr)
         }
@@ -193,6 +196,7 @@ fun SiteSupportDetailsBlock(
     val txtSupportDetailsTitle = stringResource(R.string.appstrings_support_details_title)
     val txtSupportNature = stringResource(R.string.appstrings_support_nature)
     val txtOwner = stringResource(R.string.appstrings_owner)
+    val txtExploitant = stringResource(R.string.appstrings_exploitant)
     val txtLikelyNetworkVendor = stringResource(R.string.appstrings_likely_network_vendor)
     val txtNotSpecified = stringResource(R.string.appstrings_not_specified)
     val txtDistanceLabel = stringResource(R.string.appstrings_distance_label)
@@ -233,11 +237,14 @@ fun SiteSupportDetailsBlock(
 
             val nature = AnfrDisplayText.nature(physique?.natureSupport)
             val proprietaire = AnfrDisplayText.owner(physique?.proprietaire)
+            val exploitant = physique?.exploitant?.takeIf { it.isNotBlank() } ?: txtNotSpecified
             val likelyOrangeVendor = resolveLikelyOrangeVendor(info)
 
             InfoLine(label = "$txtSupportNature : ", value = nature)
             Spacer(modifier = Modifier.height(4.dp))
             InfoLine(label = "$txtOwner : ", value = proprietaire)
+            Spacer(modifier = Modifier.height(4.dp))
+            InfoLine(label = "$txtExploitant : ", value = exploitant)
             if (likelyOrangeVendor != null) {
                 Spacer(modifier = Modifier.height(4.dp))
                 InfoLine(label = "$txtLikelyNetworkVendor : ", value = likelyOrangeVendor)

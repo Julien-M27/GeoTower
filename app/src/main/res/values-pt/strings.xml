@@ -271,6 +271,7 @@
     <string name="appstrings_address_label">Endereço :\u0020</string>
     <string name="appstrings_anfr_database_from">Dados semanais atualmente transferidos:\u0020</string>
     <string name="appstrings_anfr_station_number">Número de estação ANFR :\u0020</string>
+    <string name="appstrings_arcep_identifier_label">Identificador ARCEP:\u0020</string>
     <string name="appstrings_arcep_nidt_label">Identificador ARCEP (NIDT):\u0020</string>
     <string name="appstrings_antenna_type">Tipo de antena</string>
     <string name="appstrings_antennas_table_title">Antenas</string>
@@ -583,6 +584,7 @@
     <string name="appstrings_nearby_search_help_tech_desc">Filtra por tecnologia.</string>
     <string name="appstrings_nearby_search_help_title">Códigos de pesquisa</string>
     <string name="appstrings_nearby_search_help_type_desc">Filtra por tipo de suporte.</string>
+    <string name="appstrings_nearby_search_help_zb_desc">Filtra os locais ZB.</string>
     <string name="appstrings_nearby_search_option">Barra de pesquisa</string>
     <string name="appstrings_nearby_search_suggestion_city">Cidade</string>
     <string name="appstrings_nearby_search_suggestion_postal_code">Código postal</string>
@@ -669,6 +671,7 @@
     <string name="appstrings_outage_status_hs">Fora de Serviço</string>
     <string name="appstrings_outage_voice">Voz</string>
     <string name="appstrings_owner">Proprietário</string>
+    <string name="appstrings_exploitant">Operador</string>
     <string name="appstrings_page_compass">Bússola</string>
     <string name="appstrings_page_compass_settings">Bússola</string>
     <string name="appstrings_page_home_logo_settings">Logótipo da aplicação</string>
@@ -722,6 +725,8 @@
     <string name="appstrings_release_section_offline_maps">Mapas offline</string>
     <string name="appstrings_release_section_map">Mapa</string>
     <string name="appstrings_release_section_sites_sharing">Sites e partilha</string>
+    <string name="appstrings_release_section_sites_supports">Sites e suportes</string>
+    <string name="appstrings_release_section_spectrums">Espectros</string>
     <string name="appstrings_release_live_site_photos_rounded">Fotos do site agora apresentadas com cantos arredondados</string>
     <string name="appstrings_release_live_operator_fallback_logos">Melhor apresentação dos logótipos das operadoras quando não há foto do site disponível</string>
     <string name="appstrings_release_statistics_ready">Estatísticas disponíveis assim que os dados locais estão prontos</string>
@@ -784,6 +789,15 @@
     <string name="appstrings_release_live_tracking_operator_change_refresh">O seguimento atualiza-se melhor quando a operadora muda</string>
     <string name="appstrings_release_live_tracking_search_photo_reliability">Pesquisa do site e carregamento das fotos mais fiáveis</string>
     <string name="appstrings_release_signalquest_private_data_upload_setting">Envios de fotos respeitam melhor as definições de dados privados</string>
+    <string name="appstrings_release_sites_supports_operator_added">Adição da entidade responsável nos detalhes dos sites e suportes</string>
+    <string name="appstrings_release_sites_supports_arcep_label_operator">Identificador ARCEP melhor adaptado conforme a operadora</string>
+    <string name="appstrings_release_map_zb_only_filter">Adição do filtro “apenas ZB”</string>
+    <string name="appstrings_release_map_zb_filter_everywhere">Filtro ZB aplicado ao mapa e à pesquisa de proximidade</string>
+    <string name="appstrings_release_map_zb_quick_search">Pesquisa ZB mais rápida com uma sugestão dedicada</string>
+    <string name="appstrings_release_spectrums_precise_readable">Apresentação dos espectros mais precisa e legível</string>
+    <string name="appstrings_release_spectrums_totals_bands_better">Totais e larguras de banda calculados melhor</string>
+    <string name="appstrings_release_notifications_large_icons_flexible">Apresentação dos ícones grandes mais flexível</string>
+    <string name="appstrings_release_global_local_data_new_info">Dados locais atualizados para as novas informações</string>
     <string name="appstrings_release_community_source_settings">Adição de novas definições para fontes de fotos e speedtests</string>
     <string name="appstrings_release_photo_visibility_sync">Apresentação das fotos melhor sincronizada entre as páginas Suporte e Site</string>
     <string name="appstrings_release_community_photo_filters">Fotos filtradas pela operadora e fontes ativadas</string>
@@ -872,6 +886,7 @@
     <string name="appstrings_site_detail_title">Detalhes do site</string>
     <string name="appstrings_site_display_title">Exibição dos sites</string>
     <string name="appstrings_hide_underground_sites_label">Ocultar sites subterrâneos</string>
+    <string name="appstrings_show_only_zb_sites_label">Apenas ZB</string>
     <string name="appstrings_site_elevation_profile_option">Botão Perfil altimétrico</string>
     <string name="appstrings_site_freq_filters_title">Filtros de fréquence da antena</string>
     <string name="appstrings_site_freqs_option">Frequências, Espectros e Azimutes</string>

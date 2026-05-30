@@ -8,7 +8,7 @@ import java.util.Locale
 object GeoTowerDatabaseValidator {
     const val DB_NAME = "geotower_fr.db"
     const val EXPECTED_COUNTRY_CODE = "FR"
-    const val EXPECTED_SCHEMA_VERSION = 6
+    const val EXPECTED_SCHEMA_VERSION = 7
 
     private const val LEGACY_DB_NAME = "geotower.db"
     private const val PREFS_NAME = "GeoTowerPrefs"
@@ -99,6 +99,7 @@ object GeoTowerDatabaseValidator {
         ),
         "technique" to setOf(
             "id_anfr",
+            "adm_id",
             "statut_id",
             "date_implantation",
             "date_service",
@@ -126,6 +127,7 @@ object GeoTowerDatabaseValidator {
         "ref_operateur" to setOf("id", "libelle"),
         "ref_nature" to setOf("nat_id", "libelle"),
         "ref_proprietaire" to setOf("tpo_id", "libelle"),
+        "ref_exploitant" to setOf("adm_id", "libelle"),
         "ref_type_antenne" to setOf("tae_id", "libelle"),
         "ref_systeme" to setOf("id", "libelle"),
         "ref_statut" to setOf("id", "libelle"),
@@ -166,6 +168,7 @@ object GeoTowerDatabaseValidator {
         "support",
         "metadata",
         "ref_operateur",
+        "ref_exploitant",
         "ref_systeme",
         "ref_statut",
         "radio_stat_current"
@@ -184,6 +187,7 @@ object GeoTowerDatabaseValidator {
         ),
         "technique" to mapOf(
             "id_anfr" to SQLiteAffinity.TEXT,
+            "adm_id" to SQLiteAffinity.INTEGER,
             "statut_id" to SQLiteAffinity.INTEGER,
             "has_active" to SQLiteAffinity.INTEGER
         ),
@@ -202,6 +206,10 @@ object GeoTowerDatabaseValidator {
             "azimut" to SQLiteAffinity.INTEGER,
             "hauteur_bas" to SQLiteAffinity.REAL,
             "is_fh" to SQLiteAffinity.INTEGER
+        ),
+        "ref_exploitant" to mapOf(
+            "adm_id" to SQLiteAffinity.INTEGER,
+            "libelle" to SQLiteAffinity.TEXT
         ),
         "metadata" to mapOf(
             "version" to SQLiteAffinity.TEXT,
@@ -236,6 +244,7 @@ object GeoTowerDatabaseValidator {
         "ref_operateur" to listOf("id"),
         "ref_nature" to listOf("nat_id"),
         "ref_proprietaire" to listOf("tpo_id"),
+        "ref_exploitant" to listOf("adm_id"),
         "ref_type_antenne" to listOf("tae_id"),
         "ref_systeme" to listOf("id"),
         "ref_statut" to listOf("id"),
@@ -253,6 +262,7 @@ object GeoTowerDatabaseValidator {
         "ref_operateur" to listOf("id", "libelle"),
         "ref_nature" to listOf("nat_id", "libelle"),
         "ref_proprietaire" to listOf("tpo_id", "libelle"),
+        "ref_exploitant" to listOf("adm_id", "libelle"),
         "ref_type_antenne" to listOf("tae_id", "libelle"),
         "ref_systeme" to listOf("id", "libelle"),
         "ref_statut" to listOf("id", "libelle"),

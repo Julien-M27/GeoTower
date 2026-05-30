@@ -14,6 +14,7 @@ object AppConfig {
     const val PREF_SHOW_AZIMUTH_LINES = "show_azimuths"
     const val PREF_SHOW_AZIMUTH_CONES = "show_azimuths_cone"
     const val PREF_HIDE_UNDERGROUND_SITES = "hide_underground_sites"
+    const val PREF_SHOW_ONLY_ZB_SITES = "show_only_zb_sites"
     const val DEFAULT_SHOW_AZIMUTH_LINES = true
     const val DEFAULT_SHOW_AZIMUTH_CONES = false
 
@@ -75,6 +76,7 @@ object AppConfig {
     var showSitesInService = mutableStateOf(true)
     var showSitesOutOfService = mutableStateOf(true)
     var hideUndergroundSites = mutableStateOf(false)
+    var showOnlyZbSites = mutableStateOf(false)
 
     // --- FILTRES : TECHNOLOGIES ---
     var showTechno2G = mutableStateOf(true)
@@ -199,6 +201,7 @@ object AppConfig {
         showSitesInService.value = MapDisplayPrefs.showSitesInService.read(prefs)
         showSitesOutOfService.value = MapDisplayPrefs.showSitesOutOfService.read(prefs)
         hideUndergroundSites.value = MapDisplayPrefs.hideUndergroundSites.read(prefs)
+        showOnlyZbSites.value = MapDisplayPrefs.showOnlyZbSites.read(prefs)
 
         showTechno2G.value = MapDisplayPrefs.showTechno2G.read(prefs)
         showTechno3G.value = MapDisplayPrefs.showTechno3G.read(prefs)

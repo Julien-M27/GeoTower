@@ -135,6 +135,7 @@ data class LocalisationDbEntity(
 data class TechniqueDbEntity(
     @PrimaryKey
     @ColumnInfo(name = "id_anfr") val idAnfr: String,
+    @ColumnInfo(name = "adm_id") val admId: Int?,
     @ColumnInfo(name = "statut_id") val statutId: Int?,
     @ColumnInfo(name = "date_implantation") val dateImplantation: String?,
     @ColumnInfo(name = "date_service") val dateService: String?,
@@ -183,6 +184,13 @@ data class RefNatureDbEntity(
 data class RefProprietaireDbEntity(
     @PrimaryKey
     @ColumnInfo(name = "tpo_id") val tpoId: Int,
+    @ColumnInfo(name = "libelle") val libelle: String
+)
+
+@Entity(tableName = "ref_exploitant")
+data class RefExploitantDbEntity(
+    @PrimaryKey
+    @ColumnInfo(name = "adm_id") val admId: Int,
     @ColumnInfo(name = "libelle") val libelle: String
 )
 
@@ -303,6 +311,7 @@ data class PhysiqueEntity(
     @ColumnInfo(name = "id_support") val idSupport: String,
     @ColumnInfo(name = "nature_support") val natureSupport: String?,
     @ColumnInfo(name = "proprietaire") val proprietaire: String?,
+    @ColumnInfo(name = "exploitant") val exploitant: String?,
     @ColumnInfo(name = "hauteur") val hauteur: Double?,
     @ColumnInfo(name = "azimuts_et_types") val azimutsEtTypes: String?
 )

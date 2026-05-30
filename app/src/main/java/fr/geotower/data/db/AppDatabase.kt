@@ -10,6 +10,7 @@ import fr.geotower.data.models.MetadataDbEntity
 import fr.geotower.data.models.RadioStatCurrentDbEntity
 import fr.geotower.data.models.RadioStatWeeklyDbEntity
 import fr.geotower.data.models.RefCommuneDbEntity
+import fr.geotower.data.models.RefExploitantDbEntity
 import fr.geotower.data.models.RefNatureDbEntity
 import fr.geotower.data.models.RefOperateurDbEntity
 import fr.geotower.data.models.RefProprietaireDbEntity
@@ -28,6 +29,7 @@ import fr.geotower.data.models.TechniqueDbEntity
         RefOperateurDbEntity::class,
         RefNatureDbEntity::class,
         RefProprietaireDbEntity::class,
+        RefExploitantDbEntity::class,
         RefTypeAntenneDbEntity::class,
         RefSystemeDbEntity::class,
         RefStatutDbEntity::class,

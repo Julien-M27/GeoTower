@@ -28,6 +28,28 @@ class SiteFrequenciesBlockParsingTest {
     }
 
     @Test
+    fun mobileBandWithSameRangesInDifferentOrderKeepsUniqueSpectrumLines() {
+        val details = """
+            5G NR 2100 (5G) : 1935,3-1950,1 MHz, 2125,3-2140,1 MHz | Techniquement operationnel | 2024-06-27 | Panneau : 120 deg (24,6m)
+            5G NR 2100 (5G) : 2125,3-2140,1 MHz, 1935,3-1950,1 MHz | Techniquement operationnel | 2024-06-27 | Panneau : 220 deg (24,6m)
+            LTE 2100 (4G) : 1935,3-1950,1 MHz, 2125,3-2140,1 MHz | En service | 2024-06-11 | Panneau : 120 deg (24,6m)
+        """.trimIndent()
+
+        val parsed = parseAndSortFrequencies(
+            freqStr = details,
+            txtUnknown = "Inconnu",
+            txtAzimuthNotSpecified = "Azimut non specifie"
+        )
+
+        val nr2100 = parsed.single { it.gen == 5 && it.value == 2100 }
+        val lte2100 = parsed.single { it.gen == 4 && it.value == 2100 }
+
+        assertEquals(listOf("1935,3-1950,1 MHz", "2125,3-2140,1 MHz"), nr2100.spectrumLines)
+        assertEquals(listOf("1935,3-1950,1 MHz", "2125,3-2140,1 MHz"), lte2100.spectrumLines)
+        assertEquals(2, nr2100.physDetails.size)
+    }
+
+    @Test
     fun microwaveFallbackAddsTableRowFromLocalisationAzimuths() {
         val enriched = addMicrowaveFallbackBands(
             bands = emptyList(),

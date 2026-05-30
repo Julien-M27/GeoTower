@@ -75,6 +75,7 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
 
                 if (zoom < 13.0 && cityPolygons == null && !hasSiteDisplayFilter) {
                     val clusters = repository.getClusteredAntennas(zoom, latNorth, lonEast, latSouth, lonWest)
+                    val clusterIsZb = if (AppConfig.showOnlyZbSites.value) 1 else 0
 
                     // On transforme ces DbCluster en fausses LocalisationEntity
                     val fakeAntennas = clusters.map { cluster ->
@@ -85,7 +86,8 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
                             longitude = cluster.centerLon,
                             azimuts = null, codeInsee = null, azimutsFh = null,
                             techMask = 0,
-                            bandMask = 0
+                            bandMask = 0,
+                            isZb = clusterIsZb
                         )
                     }
                     _antennas.value = fakeAntennas

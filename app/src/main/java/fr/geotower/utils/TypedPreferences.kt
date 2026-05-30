@@ -61,6 +61,7 @@ object MapDisplayPrefs {
     val showSitesInService = BooleanPreference("show_sites_in_service", true)
     val showSitesOutOfService = BooleanPreference("show_sites_out_of_service", true)
     val hideUndergroundSites = BooleanPreference(AppConfig.PREF_HIDE_UNDERGROUND_SITES, false)
+    val showOnlyZbSites = BooleanPreference(AppConfig.PREF_SHOW_ONLY_ZB_SITES, false)
     val showTechno2G = BooleanPreference("show_techno_2g", true)
     val showTechno3G = BooleanPreference("show_techno_3g", true)
     val showTechno4G = BooleanPreference("show_techno_4g", true)

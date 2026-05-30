@@ -74,6 +74,7 @@ fun MapSettingsSheet(
     var showSitesInService by AppConfig.showSitesInService
     var showSitesOutOfService by AppConfig.showSitesOutOfService
     var hideUndergroundSites by AppConfig.hideUndergroundSites
+    var showOnlyZbSites by AppConfig.showOnlyZbSites
 
     // Variables Technos
     var show2G by AppConfig.showTechno2G
@@ -299,6 +300,18 @@ fun MapSettingsSheet(
                     showSitesOutOfService = it
                     prefs.edit().putBoolean("show_sites_out_of_service", it).apply()
                 }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            SelectableButton(
+                label = stringResource(R.string.appstrings_show_only_zb_sites_label),
+                isSelected = showOnlyZbSites,
+                modifier = Modifier.fillMaxWidth(),
+                selectedColor = MaterialTheme.colorScheme.tertiary
+            ) {
+                showOnlyZbSites = it
+                prefs.edit().putBoolean(AppConfig.PREF_SHOW_ONLY_ZB_SITES, it).apply()
             }
 
             Spacer(modifier = Modifier.height(12.dp))

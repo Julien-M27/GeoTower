@@ -72,6 +72,7 @@ import fr.geotower.utils.AnfrDisplayText
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.SharePrefs
+import fr.geotower.utils.formatSpectrumDisplayDetails
 import fr.geotower.utils.parseAndSortFrequencies
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -226,6 +227,7 @@ fun shareFullAntennaCapture(
     txtSupportDetailsTitle: String,
     txtSupportNature: String,
     txtOwner: String,
+    txtExploitant: String,
     txtAntennaType: String,
     mapBitmap: Bitmap?,
     txtInitError: String,
@@ -462,12 +464,19 @@ fun shareFullAntennaCapture(
                                                     val proprietaire =
                                                         physique?.proprietaire?.takeIf { it.isNotBlank() }
                                                             ?: stringResource(R.string.appstrings_unknown)
+                                                    val exploitant =
+                                                        physique?.exploitant?.takeIf { it.isNotBlank() }
+                                                            ?: txtNotSpecified
                                                     Text(
                                                         "$txtSupportNature : $nature",
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
                                                     Text(
                                                         "$txtOwner : $proprietaire",
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                    Text(
+                                                        "$txtExploitant : $exploitant",
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
                                                 }
@@ -520,7 +529,7 @@ fun shareFullAntennaCapture(
                                                         info.arcepNidt?.takeIf { it.isNotBlank() }
                                                             ?: txtNotSpecified
                                                     Text(
-                                                        "${stringResource(R.string.appstrings_arcep_nidt_label)}$arcepNidtValue",
+                                                        "${stringResource(arcepIdentifierLabelResId(info.operateur))}$arcepNidtValue",
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                                     )
                                                 }
@@ -1038,70 +1047,30 @@ fun shareFullAntennaCapture(
                                                                         ""
                                                                     ).trim()
                                                                 if (AppConfig.siteShowSpectrum.value && preciseFreqs.isNotBlank() && preciseFreqs != band.rawFreq.trim()) {
-                                                                    var totalBandwidth = 0.0
-                                                                    var detectedUnit = "MHz"
-                                                                    val regex =
-                                                                        Regex("""([0-9]+(?:[.,][0-9]+)?)\s*-\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]*Hz)?""")
-                                                                    val detailedFreqs =
-                                                                        regex.findAll(preciseFreqs).joinToString("\n") { match ->
-                                                                            val n1 =
-                                                                                match.groupValues[1].replace(
-                                                                                    ',',
-                                                                                    '.'
-                                                                                ).toDoubleOrNull()
-                                                                                    ?: 0.0
-                                                                            val n2 =
-                                                                                match.groupValues[2].replace(
-                                                                                    ',',
-                                                                                    '.'
-                                                                                ).toDoubleOrNull()
-                                                                                    ?: 0.0
-                                                                            val unit =
-                                                                                match.groupValues[3].takeIf { it.isNotBlank() }
-                                                                                    ?: "MHz"
-                                                                            detectedUnit = unit
-                                                                            val diff =
-                                                                                kotlin.math.abs(n2 - n1)
-                                                                            totalBandwidth += diff
-                                                                            val diffStr =
-                                                                                if (diff % 1.0 == 0.0) diff.toInt()
-                                                                                    .toString() else String.format(
-                                                                                    java.util.Locale.US,
-                                                                                    "%.1f",
-                                                                                    diff
-                                                                                )
-                                                                            "${match.groupValues[1]}-${match.groupValues[2]} $unit [$diffStr $unit]".trim()
-                                                                        }.ifBlank { preciseFreqs }
+                                                                    val spectrumDisplay = formatSpectrumDisplayDetails(preciseFreqs)
                                                                     if (AppConfig.siteShowSpectrumBand.value) {
                                                                         Text(
-                                                                            text = "${stringResource(R.string.appstrings_spectrum_by_band)} :\n\n$detailedFreqs",
+                                                                            text = "${stringResource(R.string.appstrings_spectrum_by_band)} :\n\n${spectrumDisplay.detailedFrequencies}",
                                                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                             fontSize = 12.sp,
                                                                             fontWeight = FontWeight.Normal,
                                                                             lineHeight = 16.sp
                                                                         )
                                                                     }
-                                                                    if (AppConfig.siteShowSpectrumTotal.value && totalBandwidth > 0) {
-                                                                        val totalStr =
-                                                                            if (totalBandwidth % 1.0 == 0.0) totalBandwidth.toInt()
-                                                                                .toString() else String.format(
-                                                                                java.util.Locale.US,
-                                                                                "%.1f",
-                                                                                totalBandwidth
-                                                                            )
+                                                                    if (AppConfig.siteShowSpectrumTotal.value && spectrumDisplay.hasTotal) {
                                                                         if (AppConfig.siteShowSpectrumBand.value) Spacer(
                                                                             modifier = Modifier.height(
                                                                                 2.dp
                                                                             )
                                                                         )
                                                                         Text(
-                                                                            text = "${stringResource(R.string.appstrings_totalspectrum)} : $totalStr $detectedUnit",
+                                                                            text = "${stringResource(R.string.appstrings_totalspectrum)} : ${spectrumDisplay.totalBandwidth} ${spectrumDisplay.totalUnit}",
                                                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                             fontSize = 12.sp,
                                                                             fontWeight = FontWeight.Medium
                                                                         )
                                                                     }
-                                                                    if (AppConfig.siteShowSpectrumBand.value || (AppConfig.siteShowSpectrumTotal.value && totalBandwidth > 0)) {
+                                                                    if (AppConfig.siteShowSpectrumBand.value || (AppConfig.siteShowSpectrumTotal.value && spectrumDisplay.hasTotal)) {
                                                                         Spacer(
                                                                             modifier = Modifier.height(
                                                                                 4.dp
@@ -1323,7 +1292,7 @@ fun shareFullAntennaCapture(
                                                 info.arcepNidt?.takeIf { it.isNotBlank() }
                                                     ?: txtNotSpecified
                                             Text(
-                                                "${stringResource(R.string.appstrings_arcep_nidt_label)}$arcepNidtValue",
+                                                "${stringResource(arcepIdentifierLabelResId(info.operateur))}$arcepNidtValue",
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                                             )
                                         }
@@ -1457,66 +1426,28 @@ fun shareFullAntennaCapture(
                                                             band.rawFreq.substringAfter(":", "")
                                                                 .trim()
                                                         if (AppConfig.siteShowSpectrum.value && preciseFreqs.isNotBlank() && preciseFreqs != band.rawFreq.trim()) {
-                                                            var totalBandwidth = 0.0
-                                                            var detectedUnit = "MHz"
-                                                            val regex =
-                                                                Regex("""([0-9]+(?:[.,][0-9]+)?)\s*-\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]*Hz)?""")
-                                                            val detailedFreqs =
-                                                                regex.findAll(preciseFreqs).joinToString("\n") { match ->
-                                                                    val n1 =
-                                                                        match.groupValues[1].replace(
-                                                                            ',',
-                                                                            '.'
-                                                                        ).toDoubleOrNull() ?: 0.0
-                                                                    val n2 =
-                                                                        match.groupValues[2].replace(
-                                                                            ',',
-                                                                            '.'
-                                                                        ).toDoubleOrNull() ?: 0.0
-                                                                    val unit =
-                                                                        match.groupValues[3].takeIf { it.isNotBlank() }
-                                                                            ?: "MHz"
-                                                                    detectedUnit = unit
-                                                                    val diff =
-                                                                        kotlin.math.abs(n2 - n1)
-                                                                    totalBandwidth += diff
-                                                                    val diffStr =
-                                                                        if (diff % 1.0 == 0.0) diff.toInt()
-                                                                            .toString() else String.format(
-                                                                            java.util.Locale.US,
-                                                                            "%.1f",
-                                                                            diff
-                                                                        )
-                                                                    "${match.groupValues[1]}-${match.groupValues[2]} $unit [$diffStr $unit]".trim()
-                                                                }.ifBlank { preciseFreqs }
+                                                            val spectrumDisplay = formatSpectrumDisplayDetails(preciseFreqs)
                                                             if (AppConfig.siteShowSpectrumBand.value) {
                                                                 Text(
-                                                                    text = "${stringResource(R.string.appstrings_spectrum_by_band)} :\n\n$detailedFreqs",
+                                                                    text = "${stringResource(R.string.appstrings_spectrum_by_band)} :\n\n${spectrumDisplay.detailedFrequencies}",
                                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                     fontSize = 12.sp,
                                                                     fontWeight = FontWeight.Normal,
                                                                     lineHeight = 16.sp
                                                                 )
                                                             }
-                                                            if (AppConfig.siteShowSpectrumTotal.value && totalBandwidth > 0) {
-                                                                val totalStr =
-                                                                    if (totalBandwidth % 1.0 == 0.0) totalBandwidth.toInt()
-                                                                        .toString() else String.format(
-                                                                        java.util.Locale.US,
-                                                                        "%.1f",
-                                                                        totalBandwidth
-                                                                    )
+                                                            if (AppConfig.siteShowSpectrumTotal.value && spectrumDisplay.hasTotal) {
                                                                 if (AppConfig.siteShowSpectrumBand.value) Spacer(
                                                                     modifier = Modifier.height(2.dp)
                                                                 )
                                                                 Text(
-                                                                    text = "${stringResource(R.string.appstrings_totalspectrum)} : $totalStr $detectedUnit",
+                                                                    text = "${stringResource(R.string.appstrings_totalspectrum)} : ${spectrumDisplay.totalBandwidth} ${spectrumDisplay.totalUnit}",
                                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                     fontSize = 12.sp,
                                                                     fontWeight = FontWeight.Medium
                                                                 )
                                                             }
-                                                            if (AppConfig.siteShowSpectrumBand.value || (AppConfig.siteShowSpectrumTotal.value && totalBandwidth > 0)) {
+                                                            if (AppConfig.siteShowSpectrumBand.value || (AppConfig.siteShowSpectrumTotal.value && spectrumDisplay.hasTotal)) {
                                                                 Spacer(modifier = Modifier.height(4.dp))
                                                             }
                                                         }
@@ -2099,6 +2030,7 @@ fun AntennaShareMenu(
     val txtSupportDetailsTitle = stringResource(R.string.appstrings_support_details_title)
     val txtSupportNature = stringResource(R.string.appstrings_support_nature)
     val txtOwner = stringResource(R.string.appstrings_owner)
+    val txtExploitant = stringResource(R.string.appstrings_exploitant)
     val txtAntennaType = stringResource(R.string.appstrings_antenna_type)
     val txtCommunityPhotosTitle = pluralStringResource(R.plurals.community_photos_title_short, communityPhotosSize, communityPhotosSize)
     val txtThemeLight = stringResource(R.string.appstrings_theme_light)
@@ -2395,7 +2327,7 @@ fun AntennaShareMenu(
                                                 hsDataMap,
                                                 speedtestData,
                                                 distanceStr, bearingStr, selectedShareTheme,
-                                                txtSiteDetailsTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtGeneratedBy, txtShareSiteVia, txtimplementation, txtLastModification, txtIdentifiers, txtIdNumber, txtFrequenciesTitle, txtBandsNotSpecified, txtInService, txtTechnically, txtUnknownStatus, txtAnfrStationNumber, txtDates, txtError, txtProjectApproved, txtActivatedOn, txtDateNotSpecifiedAnfr, txtPanelHeightsTitle, txtAzimuths, txtIdSupportLabel, txtSupportDetailsTitle, txtSupportNature, txtOwner, txtAntennaType,
+                                                txtSiteDetailsTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtGeneratedBy, txtShareSiteVia, txtimplementation, txtLastModification, txtIdentifiers, txtIdNumber, txtFrequenciesTitle, txtBandsNotSpecified, txtInService, txtTechnically, txtUnknownStatus, txtAnfrStationNumber, txtDates, txtError, txtProjectApproved, txtActivatedOn, txtDateNotSpecifiedAnfr, txtPanelHeightsTitle, txtAzimuths, txtIdSupportLabel, txtSupportDetailsTitle, txtSupportNature, txtOwner, txtExploitant, txtAntennaType,
                                                 mapBmp, txtInitError, emptyList(), txtCommunityPhotosTitle,
                                                 incMap, incSupport, incHeights, incIds, incDates, incAddress, incFreqs, incSpeedtest, incThroughput, incConfidential, incQrCode,
                                                 incSplitImage,

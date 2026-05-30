@@ -63,7 +63,7 @@ class DownloadManifestVerifierTest {
                 "url": "https://api.cajejuma.fr/api/v2/download/db",
                 "size_bytes": 1024,
                 "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-                "schema_version": 5,
+                "schema_version": 7,
                 "country_code": "FR",
                 "version": "1.0.0"
               },

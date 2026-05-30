@@ -271,6 +271,7 @@
     <string name="appstrings_address_label">Address :\u0020</string>
     <string name="appstrings_anfr_database_from">Weekly data currently downloaded:\u0020</string>
     <string name="appstrings_anfr_station_number">ANFR Station Number :\u0020</string>
+    <string name="appstrings_arcep_identifier_label">ARCEP identifier:\u0020</string>
     <string name="appstrings_arcep_nidt_label">ARCEP identifier (NIDT):\u0020</string>
     <string name="appstrings_antenna_type">Antenna type</string>
     <string name="appstrings_antennas_table_title">Antennas</string>
@@ -583,6 +584,7 @@
     <string name="appstrings_nearby_search_help_tech_desc">Filters by technology.</string>
     <string name="appstrings_nearby_search_help_title">Search codes</string>
     <string name="appstrings_nearby_search_help_type_desc">Filters by support type.</string>
+    <string name="appstrings_nearby_search_help_zb_desc">Filters on ZB sites.</string>
     <string name="appstrings_nearby_search_option">Search bar</string>
     <string name="appstrings_nearby_search_suggestion_city">City</string>
     <string name="appstrings_nearby_search_suggestion_postal_code">Postal code</string>
@@ -669,6 +671,7 @@
     <string name="appstrings_outage_status_hs">Out of Service</string>
     <string name="appstrings_outage_voice">Voice</string>
     <string name="appstrings_owner">Owner</string>
+    <string name="appstrings_exploitant">Operator</string>
     <string name="appstrings_page_compass">Compass</string>
     <string name="appstrings_page_compass_settings">Compass</string>
     <string name="appstrings_page_home_logo_settings">App logo</string>
@@ -722,6 +725,8 @@
     <string name="appstrings_release_section_offline_maps">Offline maps</string>
     <string name="appstrings_release_section_map">Map</string>
     <string name="appstrings_release_section_sites_sharing">Sites and sharing</string>
+    <string name="appstrings_release_section_sites_supports">Sites and supports</string>
+    <string name="appstrings_release_section_spectrums">Spectrum</string>
     <string name="appstrings_release_live_site_photos_rounded">Site photos now display with rounded corners</string>
     <string name="appstrings_release_live_operator_fallback_logos">Operator logos look better when no site photo is available</string>
     <string name="appstrings_release_statistics_ready">Statistics are available as soon as local data is ready</string>
@@ -784,6 +789,15 @@
     <string name="appstrings_release_live_tracking_operator_change_refresh">Tracking updates better when the operator changes</string>
     <string name="appstrings_release_live_tracking_search_photo_reliability">Site search and photo loading are more reliable</string>
     <string name="appstrings_release_signalquest_private_data_upload_setting">Photo uploads better respect private data settings</string>
+    <string name="appstrings_release_sites_supports_operator_added">Added the operator owner in site and support details</string>
+    <string name="appstrings_release_sites_supports_arcep_label_operator">ARCEP identifier better adapted to the operator</string>
+    <string name="appstrings_release_map_zb_only_filter">Added the “ZB only” filter</string>
+    <string name="appstrings_release_map_zb_filter_everywhere">ZB filter applied to the map and nearby search</string>
+    <string name="appstrings_release_map_zb_quick_search">Faster ZB search with a dedicated suggestion</string>
+    <string name="appstrings_release_spectrums_precise_readable">More precise and readable spectrum display</string>
+    <string name="appstrings_release_spectrums_totals_bands_better">Better calculation of totals and band widths</string>
+    <string name="appstrings_release_notifications_large_icons_flexible">Large icon display is more flexible</string>
+    <string name="appstrings_release_global_local_data_new_info">Local data updated for the new information</string>
     <string name="appstrings_release_community_source_settings">Added new settings for photo and speedtest sources</string>
     <string name="appstrings_release_photo_visibility_sync">Photo display is better synchronized between Support and Site pages</string>
     <string name="appstrings_release_community_photo_filters">Photos are filtered by enabled operator and sources</string>
@@ -872,6 +886,7 @@
     <string name="appstrings_site_detail_title">Site Detail</string>
     <string name="appstrings_site_display_title">Site display</string>
     <string name="appstrings_hide_underground_sites_label">Hide underground sites</string>
+    <string name="appstrings_show_only_zb_sites_label">ZB only</string>
     <string name="appstrings_site_elevation_profile_option">Elevation profile button</string>
     <string name="appstrings_site_freq_filters_title">Antenna frequency filters</string>
     <string name="appstrings_site_freqs_option">Frequencies, Spectrum &amp; Azimuths</string>

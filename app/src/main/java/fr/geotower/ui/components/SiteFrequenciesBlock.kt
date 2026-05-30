@@ -28,6 +28,7 @@ import fr.geotower.utils.FrequencyStatusType
 import fr.geotower.utils.FreqBand
 import fr.geotower.utils.addMicrowaveFallbackBands
 import fr.geotower.utils.classifyFrequencyStatus
+import fr.geotower.utils.formatSpectrumDisplayDetails
 import fr.geotower.utils.formatDateToFrench
 import fr.geotower.utils.parseAndSortFrequencies
 import fr.geotower.utils.radioBandCode
@@ -234,31 +235,12 @@ fun SiteFrequenciesBlock(
 
                                 // ✅ ÉTAPE 1 : On vérifie si le switch maître du spectre est activé
                                 if (AppConfig.siteShowSpectrum.value && preciseFreqs.isNotBlank() && preciseFreqs != band.rawFreq.trim()) {
-
-                                    var totalBandwidth = 0.0
-                                    var detectedUnit = "MHz" // Unité par défaut
-
-                                    val regex = Regex("""([0-9]+(?:[.,][0-9]+)?)\s*-\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]*Hz)?""")
-
-                                    val detailedFreqs = regex.findAll(preciseFreqs).joinToString("\n") { match ->
-                                        val n1 = match.groupValues[1].replace(',', '.').toDoubleOrNull() ?: 0.0
-                                        val n2 = match.groupValues[2].replace(',', '.').toDoubleOrNull() ?: 0.0
-                                        val unit = match.groupValues[3].takeIf { it.isNotBlank() } ?: "MHz"
-
-                                        detectedUnit = unit // On met à jour l'unité courante
-
-                                        val diff = kotlin.math.abs(n2 - n1)
-                                        totalBandwidth += diff
-
-                                        val diffStr = if (diff % 1.0 == 0.0) diff.toInt().toString() else String.format(java.util.Locale.US, "%.1f", diff)
-
-                                        "${match.groupValues[1]}-${match.groupValues[2]} $unit [$diffStr $unit]".trim()
-                                    }.ifBlank { preciseFreqs }
+                                    val spectrumDisplay = formatSpectrumDisplayDetails(preciseFreqs)
 
                                     // ✅ ÉTAPE 2 : On affiche le détail par bande uniquement si son switch est actif
                                     if (AppConfig.siteShowSpectrumBand.value) {
                                         Text(
-                                            text = "${stringResource(R.string.appstrings_spectrum_by_band)} :\n\n$detailedFreqs",
+                                            text = "${stringResource(R.string.appstrings_spectrum_by_band)} :\n\n${spectrumDisplay.detailedFrequencies}",
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             fontSize = 12.sp,
                                             fontWeight = FontWeight.Medium,
@@ -267,15 +249,13 @@ fun SiteFrequenciesBlock(
                                     }
 
                                     // ✅ ÉTAPE 3 : On affiche le spectre total uniquement si son switch est actif et qu'il y a une valeur
-                                    if (AppConfig.siteShowSpectrumTotal.value && totalBandwidth > 0) {
-                                        val totalStr = if (totalBandwidth % 1.0 == 0.0) totalBandwidth.toInt().toString() else String.format(java.util.Locale.US, "%.1f", totalBandwidth)
-
+                                    if (AppConfig.siteShowSpectrumTotal.value && spectrumDisplay.hasTotal) {
                                         // On ajoute un petit espace seulement si le texte du dessus est affiché
                                         if (AppConfig.siteShowSpectrumBand.value) {
                                             Spacer(modifier = Modifier.height(2.dp))
                                         }
 
-                                        Text(text = "${stringResource(R.string.appstrings_totalspectrum)} : $totalStr $detectedUnit", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+                                        Text(text = "${stringResource(R.string.appstrings_totalspectrum)} : ${spectrumDisplay.totalBandwidth} ${spectrumDisplay.totalUnit}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
                                         Spacer(modifier = Modifier.height(2.dp))
                                         Text(
                                             text = stringResource(R.string.appstrings_total_spectrum_warning),
@@ -286,7 +266,7 @@ fun SiteFrequenciesBlock(
                                     }
 
                                     // Espacement final uniquement si l'un des deux éléments a été affiché
-                                    if (AppConfig.siteShowSpectrumBand.value || (AppConfig.siteShowSpectrumTotal.value && totalBandwidth > 0)) {
+                                    if (AppConfig.siteShowSpectrumBand.value || (AppConfig.siteShowSpectrumTotal.value && spectrumDisplay.hasTotal)) {
                                         Spacer(modifier = Modifier.height(4.dp))
                                     }
                                 }

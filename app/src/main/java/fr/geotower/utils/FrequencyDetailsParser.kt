@@ -16,7 +16,12 @@ data class FreqBand(
 private data class FrequencyAccumulator(
     val band: FreqBand,
     val physDetails: MutableSet<String> = mutableSetOf(),
-    val spectrumLines: MutableSet<String> = mutableSetOf()
+    val spectrumLines: MutableMap<String, String> = linkedMapOf()
+)
+
+private data class SpectrumLine(
+    val key: String,
+    val display: String
 )
 
 fun parseAndSortFrequencies(
@@ -56,7 +61,17 @@ fun parseAndSortFrequencies(
         }
 
         if (preciseFrequencies.isNotBlank() && preciseFrequencies != rawFrequencies.trim()) {
-            accumulator.spectrumLines.add(preciseFrequencies)
+            val spectrumLines = extractSpectrumLines(preciseFrequencies)
+            if (spectrumLines.isEmpty()) {
+                accumulator.spectrumLines.putIfAbsent(
+                    preciseFrequencies.normalizedSpectrumKey(),
+                    preciseFrequencies
+                )
+            } else {
+                spectrumLines.forEach { spectrumLine ->
+                    accumulator.spectrumLines.putIfAbsent(spectrumLine.key, spectrumLine.display)
+                }
+            }
         }
 
         if (phys.isNotBlank() && phys != "Azimut non spécifié" && phys != txtAzimuthNotSpecified) {
@@ -67,7 +82,7 @@ fun parseAndSortFrequencies(
     return sortFrequencyBandsForDisplay(tempMap.values.map { accumulator ->
         accumulator.band.copy(
             physDetails = accumulator.physDetails.toList().sorted(),
-            spectrumLines = accumulator.spectrumLines.toList().sortedWith(compareBy(
+            spectrumLines = accumulator.spectrumLines.values.toList().sortedWith(compareBy(
                 { frequencySortValue("", it, isFh = true) },
                 { it }
             ))
@@ -206,4 +221,26 @@ private fun frequencySortValue(systemName: String, rawFrequencies: String, isFh:
     }
     val values = Regex("\\d+").findAll(source).mapNotNull { it.value.toIntOrNull() }.toList()
     return if (isFh) values.firstOrNull() ?: 0 else values.maxOrNull() ?: 0
+}
+
+private val spectrumRangeRegex = Regex("""([0-9]+(?:[.,][0-9]+)?)\s*-\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]*Hz)?""")
+
+private fun extractSpectrumLines(raw: String): List<SpectrumLine> {
+    return spectrumRangeRegex.findAll(raw).map { match ->
+        val start = match.groupValues[1].trim()
+        val end = match.groupValues[2].trim()
+        val unit = match.groupValues[3].trim().ifBlank { "MHz" }
+        SpectrumLine(
+            key = "${start.normalizedSpectrumNumberKey()}-${end.normalizedSpectrumNumberKey()}-${unit.lowercase()}",
+            display = "$start-$end $unit"
+        )
+    }.toList()
+}
+
+private fun String.normalizedSpectrumKey(): String {
+    return trim().replace(Regex("""\s+"""), " ").uppercase()
+}
+
+private fun String.normalizedSpectrumNumberKey(): String {
+    return replace(',', '.').toDoubleOrNull()?.toString() ?: normalizedSpectrumKey()
 }

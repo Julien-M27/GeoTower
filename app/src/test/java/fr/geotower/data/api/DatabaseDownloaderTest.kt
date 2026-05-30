@@ -30,7 +30,7 @@ class DatabaseDownloaderTest {
         filename: String = "geotower_fr.db",
         sizeBytes: Long = 1024L,
         sha256: String = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
-        schemaVersion: Int? = 5,
+        schemaVersion: Int? = 7,
         countryCode: String? = "FR"
     ): Boolean {
         return DatabaseDownloader.isValidRemoteDatabaseInfo(

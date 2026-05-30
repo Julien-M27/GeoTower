@@ -266,6 +266,50 @@ interface GeoTowerDao {
                 FROM support underground_support
                 LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
                 WHERE underground_support.id_anfr = l.id_anfr
+                AND underground_nature.libelle = 'IntÃ©rieur sous-terrain'
+            ) THEN 1 ELSE 0 END AS has_underground_support
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.is_zb = 1
+        ORDER BY (
+            (l.latitude - :lat) * (l.latitude - :lat) +
+            (CASE
+                WHEN ABS(l.longitude - :lon) > 180 THEN 360 - ABS(l.longitude - :lon)
+                ELSE ABS(l.longitude - :lon)
+            END) *
+            (CASE
+                WHEN ABS(l.longitude - :lon) > 180 THEN 360 - ABS(l.longitude - :lon)
+                ELSE ABS(l.longitude - :lon)
+            END)
+        ) ASC
+        LIMIT :limit
+    """)
+    suspend fun getNearestZb(
+        lat: Double,
+        lon: Double,
+        limit: Int
+    ): List<LocalisationEntity>
+
+    @Query("""
+        SELECT
+            l.id_anfr,
+            COALESCE(o.libelle, 'Inconnu') AS operateur,
+            l.latitude,
+            l.longitude,
+            l.azimuts,
+            l.code_insee,
+            l.azimuts_fh,
+            l.tech_mask,
+            l.band_mask,
+            l.arcep_nidt,
+            l.is_zb,
+            NULL AS statut,
+            0 AS has_active,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM support underground_support
+                LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+                WHERE underground_support.id_anfr = l.id_anfr
                 AND underground_nature.libelle = 'Intérieur sous-terrain'
             ) THEN 1 ELSE 0 END AS has_underground_support
         FROM localisation l
@@ -317,6 +361,7 @@ interface GeoTowerDao {
             s.id_support,
             COALESCE(n.libelle, CASE WHEN s.nat_id IS NULL THEN NULL ELSE 'Code Nature ' || CAST(s.nat_id AS TEXT) END) AS nature_support,
             COALESCE(p.libelle, 'Inconnu') AS proprietaire,
+            COALESCE(e.libelle, CASE WHEN t.adm_id IS NULL THEN NULL ELSE 'Code Exploitant ' || CAST(t.adm_id AS TEXT) END) AS exploitant,
             s.hauteur,
             (
                 SELECT GROUP_CONCAT(antenna_line, char(10))
@@ -334,8 +379,10 @@ interface GeoTowerDao {
                 )
             ) AS azimuts_et_types
         FROM support s
+        LEFT JOIN technique t ON s.id_anfr = t.id_anfr
         LEFT JOIN ref_nature n ON s.nat_id = n.nat_id
         LEFT JOIN ref_proprietaire p ON s.tpo_id = p.tpo_id
+        LEFT JOIN ref_exploitant e ON t.adm_id = e.adm_id
         WHERE s.id_anfr = :idAnfr
     """)
     suspend fun getPhysiqueDetails(idAnfr: String): List<PhysiqueEntity>
@@ -394,6 +441,7 @@ interface GeoTowerDao {
             s.id_support,
             COALESCE(n.libelle, CASE WHEN s.nat_id IS NULL THEN NULL ELSE 'Code Nature ' || CAST(s.nat_id AS TEXT) END) AS nature_support,
             COALESCE(p.libelle, 'Inconnu') AS proprietaire,
+            COALESCE(e.libelle, CASE WHEN t.adm_id IS NULL THEN NULL ELSE 'Code Exploitant ' || CAST(t.adm_id AS TEXT) END) AS exploitant,
             s.hauteur,
             (
                 SELECT GROUP_CONCAT(antenna_line, char(10))
@@ -411,8 +459,10 @@ interface GeoTowerDao {
                 )
             ) AS azimuts_et_types
         FROM support s
+        LEFT JOIN technique t ON s.id_anfr = t.id_anfr
         LEFT JOIN ref_nature n ON s.nat_id = n.nat_id
         LEFT JOIN ref_proprietaire p ON s.tpo_id = p.tpo_id
+        LEFT JOIN ref_exploitant e ON t.adm_id = e.adm_id
         WHERE s.id_anfr IN (:idAnfrs)
     """)
     suspend fun getPhysiqueDetailsByIds(idAnfrs: List<String>): List<PhysiqueEntity>
@@ -423,11 +473,14 @@ interface GeoTowerDao {
             s.id_support,
             COALESCE(n.libelle, CASE WHEN s.nat_id IS NULL THEN NULL ELSE 'Code Nature ' || CAST(s.nat_id AS TEXT) END) AS nature_support,
             COALESCE(p.libelle, 'Inconnu') AS proprietaire,
+            COALESCE(e.libelle, CASE WHEN t.adm_id IS NULL THEN NULL ELSE 'Code Exploitant ' || CAST(t.adm_id AS TEXT) END) AS exploitant,
             s.hauteur,
             NULL AS azimuts_et_types
         FROM support s
+        LEFT JOIN technique t ON s.id_anfr = t.id_anfr
         LEFT JOIN ref_nature n ON s.nat_id = n.nat_id
         LEFT JOIN ref_proprietaire p ON s.tpo_id = p.tpo_id
+        LEFT JOIN ref_exploitant e ON t.adm_id = e.adm_id
         WHERE s.id_anfr IN (:idAnfrs)
     """)
     suspend fun getPhysiqueSummariesByIds(idAnfrs: List<String>): List<PhysiqueEntity>
@@ -469,6 +522,7 @@ interface GeoTowerDao {
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
+        AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
         AND (:hideUndergroundSites = 0 OR NOT EXISTS (
             SELECT 1
             FROM support underground_support
@@ -478,7 +532,7 @@ interface GeoTowerDao {
         ))
         GROUP BY ROUND(l.latitude / 2.5), ROUND(l.longitude / 3.0)
     """)
-    suspend fun getL1Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean): List<DbCluster>
+    suspend fun getL1Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean, showOnlyZbSites: Boolean): List<DbCluster>
 
     @Query("""
         SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
@@ -486,6 +540,7 @@ interface GeoTowerDao {
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
+        AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
         AND (:hideUndergroundSites = 0 OR NOT EXISTS (
             SELECT 1
             FROM support underground_support
@@ -495,7 +550,7 @@ interface GeoTowerDao {
         ))
         GROUP BY ROUND(l.latitude / 1.0), ROUND(l.longitude / 1.2)
     """)
-    suspend fun getL2Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean): List<DbCluster>
+    suspend fun getL2Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean, showOnlyZbSites: Boolean): List<DbCluster>
 
     @Query("""
         SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
@@ -503,6 +558,7 @@ interface GeoTowerDao {
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
+        AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
         AND (:hideUndergroundSites = 0 OR NOT EXISTS (
             SELECT 1
             FROM support underground_support
@@ -512,7 +568,7 @@ interface GeoTowerDao {
         ))
         GROUP BY ROUND(l.latitude / 0.4), ROUND(l.longitude / 0.5)
     """)
-    suspend fun getL3Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean): List<DbCluster>
+    suspend fun getL3Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean, showOnlyZbSites: Boolean): List<DbCluster>
 
     @Query("""
         SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
@@ -520,6 +576,7 @@ interface GeoTowerDao {
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
+        AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
         AND (:hideUndergroundSites = 0 OR NOT EXISTS (
             SELECT 1
             FROM support underground_support
@@ -529,7 +586,7 @@ interface GeoTowerDao {
         ))
         GROUP BY ROUND(l.latitude / 0.15), ROUND(l.longitude / 0.2)
     """)
-    suspend fun getL4Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean): List<DbCluster>
+    suspend fun getL4Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean, showOnlyZbSites: Boolean): List<DbCluster>
 
     @Query("""
         SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
@@ -537,6 +594,7 @@ interface GeoTowerDao {
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
+        AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
         AND (:hideUndergroundSites = 0 OR NOT EXISTS (
             SELECT 1
             FROM support underground_support
@@ -546,7 +604,7 @@ interface GeoTowerDao {
         ))
         GROUP BY ROUND(l.latitude, 1), ROUND(l.longitude, 1)
     """)
-    suspend fun getL5Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean): List<DbCluster>
+    suspend fun getL5Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean, showOnlyZbSites: Boolean): List<DbCluster>
 
     @Query("""
         SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
@@ -554,6 +612,7 @@ interface GeoTowerDao {
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
+        AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
         AND (:hideUndergroundSites = 0 OR NOT EXISTS (
             SELECT 1
             FROM support underground_support
@@ -563,7 +622,7 @@ interface GeoTowerDao {
         ))
         GROUP BY ROUND(l.latitude / 0.05), ROUND(l.longitude / 0.06)
     """)
-    suspend fun getL6Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean): List<DbCluster>
+    suspend fun getL6Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean, showOnlyZbSites: Boolean): List<DbCluster>
 
     @Query("""
         SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
@@ -571,6 +630,7 @@ interface GeoTowerDao {
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
+        AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
         AND (:hideUndergroundSites = 0 OR NOT EXISTS (
             SELECT 1
             FROM support underground_support
@@ -580,7 +640,7 @@ interface GeoTowerDao {
         ))
         GROUP BY ROUND(l.latitude / 0.02), ROUND(l.longitude / 0.025)
     """)
-    suspend fun getL7Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean): List<DbCluster>
+    suspend fun getL7Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean, showOnlyZbSites: Boolean): List<DbCluster>
 
     @Query("""
         SELECT
@@ -884,6 +944,7 @@ interface GeoTowerDao {
             s.id_support,
             COALESCE(n.libelle, CASE WHEN s.nat_id IS NULL THEN NULL ELSE 'Code Nature ' || CAST(s.nat_id AS TEXT) END) AS nature_support,
             COALESCE(p.libelle, 'Inconnu') AS proprietaire,
+            COALESCE(e.libelle, CASE WHEN t.adm_id IS NULL THEN NULL ELSE 'Code Exploitant ' || CAST(t.adm_id AS TEXT) END) AS exploitant,
             s.hauteur,
             (
                 SELECT GROUP_CONCAT(antenna_line, char(10))
@@ -901,8 +962,10 @@ interface GeoTowerDao {
                 )
             ) AS azimuts_et_types
         FROM support s
+        LEFT JOIN technique t ON s.id_anfr = t.id_anfr
         LEFT JOIN ref_nature n ON s.nat_id = n.nat_id
         LEFT JOIN ref_proprietaire p ON s.tpo_id = p.tpo_id
+        LEFT JOIN ref_exploitant e ON t.adm_id = e.adm_id
         WHERE s.id_anfr = :idAnfr
     """)
     suspend fun getPhysiqueByAnfr(idAnfr: String): List<PhysiqueEntity>

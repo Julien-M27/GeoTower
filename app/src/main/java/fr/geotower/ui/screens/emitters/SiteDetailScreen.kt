@@ -1113,18 +1113,18 @@ fun SiteDetailScreen(
                                             Spacer(modifier = Modifier.width(12.dp))
                                             Box(
                                                 modifier = Modifier
+                                                    .size(width = 72.dp, height = 48.dp)
                                                     .background(
                                                         color = MaterialTheme.colorScheme.tertiaryContainer,
-                                                        shape = RoundedCornerShape(4.dp)
-                                                    )
-                                                    .padding(horizontal = 10.dp, vertical = 5.dp),
+                                                        shape = RoundedCornerShape(8.dp)
+                                                    ),
                                                 contentAlignment = Alignment.Center
                                             ) {
                                                 Text(
                                                     text = "ZB",
                                                     color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                                    fontWeight = FontWeight.Bold,
-                                                    fontSize = 12.sp
+                                                    fontWeight = FontWeight.Black,
+                                                    fontSize = 18.sp
                                                 )
                                             }
                                         }

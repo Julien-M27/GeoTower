@@ -20,6 +20,14 @@ import fr.geotower.data.models.LocalisationEntity // ✅ NOUVEL IMPORT
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
 
+internal fun arcepIdentifierLabelResId(operator: String?): Int {
+    return if (operator?.contains("orange", ignoreCase = true) == true) {
+        R.string.appstrings_arcep_nidt_label
+    } else {
+        R.string.appstrings_arcep_identifier_label
+    }
+}
+
 @Composable
 fun SiteIdentifiersBlock(
     info: LocalisationEntity,
@@ -32,7 +40,7 @@ fun SiteIdentifiersBlock(
     val txtIdentifiers = stringResource(R.string.appstrings_identifiers)
     val txtIdSupportLabel = stringResource(R.string.appstrings_id_support_label)
     val txtAnfrStationNumber = stringResource(R.string.appstrings_anfr_station_number)
-    val txtArcepNidtLabel = stringResource(R.string.appstrings_arcep_nidt_label)
+    val txtArcepIdentifierLabel = stringResource(arcepIdentifierLabelResId(info.operateur))
     val txtNotSpecified = stringResource(R.string.appstrings_not_specified)
     val txtIdSupportCopy = stringResource(R.string.appstrings_id_support_copy)
     val txtIdCopied = stringResource(R.string.appstrings_id_copied)
@@ -85,12 +93,12 @@ fun SiteIdentifiersBlock(
 
             val arcepNidtValue = info.arcepNidt?.takeIf { it.isNotBlank() } ?: txtNotSpecified
             InfoLine(
-                label = txtArcepNidtLabel,
+                label = txtArcepIdentifierLabel,
                 value = arcepNidtValue,
                 onCopy = {
                     if (arcepNidtValue != txtNotSpecified) {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.setPrimaryClip(ClipData.newPlainText(txtArcepNidtLabel.replace(" : ", ""), arcepNidtValue))
+                        clipboard.setPrimaryClip(ClipData.newPlainText(txtArcepIdentifierLabel.substringBefore(":").trim(), arcepNidtValue))
                         Toast.makeText(context, txtIdCopied, Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(context, txtIdUnavailable, Toast.LENGTH_SHORT).show()

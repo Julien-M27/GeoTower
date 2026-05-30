@@ -136,6 +136,7 @@ data class UiSite(
     val allAddresses: List<String> = emptyList(),
     val technicalText: String = "",
     val supportText: String = "",
+    val isZb: Boolean = false,
     val searchText: String = ""
 )
 
@@ -154,7 +155,8 @@ private enum class NearbySearchField {
     Address,
     City,
     PostalCode,
-    Gps
+    Gps,
+    Zb
 }
 
 private data class NearbySearchSpec(
@@ -231,10 +233,13 @@ fun NearEmittersScreen(
             prefs.edit().putInt("nearby_search_radius", nearbyMaxRadiusKm).apply()
         }
     }
+    val currentSearchSpec = remember(searchQuery) {
+        parseNearbySearchQuery(searchQuery)
+    }
+    val isZbNearbySearch = currentSearchSpec.field == NearbySearchField.Zb
     val searchedOperatorKey = remember(searchQuery) {
-        val spec = parseNearbySearchQuery(searchQuery)
-        if (spec.field == NearbySearchField.Operator) {
-            OperatorColors.keyFor(spec.value)
+        if (currentSearchSpec.field == NearbySearchField.Operator) {
+            OperatorColors.keyFor(currentSearchSpec.value)
         } else {
             null
         }
@@ -292,18 +297,26 @@ fun NearEmittersScreen(
         }
     }
 
-    LaunchedEffect(searchCenter, maxItemsToShow) {
+    LaunchedEffect(searchCenter, maxItemsToShow, isZbNearbySearch) {
         val currentLoc = searchCenter ?: return@LaunchedEffect
 
         isLoading = true
 
         withContext(Dispatchers.IO) {
             // A. RÉCUPÉRATION DES DONNÉES
-            val newAntennas = repository.getNearest(
-                lat = currentLoc.latitude,
-                lon = currentLoc.longitude,
-                limit = maxItemsToShow
-            )
+            val newAntennas = if (isZbNearbySearch) {
+                repository.getNearestZb(
+                    lat = currentLoc.latitude,
+                    lon = currentLoc.longitude,
+                    limit = maxItemsToShow
+                )
+            } else {
+                repository.getNearest(
+                    lat = currentLoc.latitude,
+                    lon = currentLoc.longitude,
+                    limit = maxItemsToShow
+                )
+            }
 
             // B. TRAITEMENT ET FORMATAGE
             val finalSites = if (newAntennas.isNotEmpty()) {
@@ -736,7 +749,7 @@ fun NearEmittersScreen(
                                                     ) {
                                                         Text(stringResource(R.string.appstrings_load_more_sites), fontWeight = FontWeight.Bold)
                                                     }
-                                                } else if (searchCenter != null && searchQuery.isEmpty() && sites.size >= maxItemsToShow) {
+                                                } else if (searchCenter != null && (searchQuery.isEmpty() || isZbNearbySearch) && sites.size >= maxItemsToShow) {
                                                     OutlinedButton(
                                                         onClick = {
                                                             safeClick {
@@ -928,6 +941,7 @@ private fun NearbyQuickSearchSuggestions(
         NearbySearchSuggestion("SFR", "op:SFR"),
         NearbySearchSuggestion("Bouygues", "op:Bouygues"),
         NearbySearchSuggestion("Free", "op:Free"),
+        NearbySearchSuggestion("ZB", "zb"),
         NearbySearchSuggestion("5G", "tech:5G"),
         NearbySearchSuggestion("4G", "tech:4G"),
         NearbySearchSuggestion(stringResource(R.string.appstrings_nearby_search_suggestion_pylon), "type:pylone"),
@@ -1010,6 +1024,7 @@ private fun NearbySearchHelpDialog(onDismiss: () -> Unit) {
                 NearbySearchHelpLine("anfr:123456", stringResource(R.string.appstrings_nearby_search_help_anfr_desc))
                 NearbySearchHelpLine("support:123456", stringResource(R.string.appstrings_nearby_search_help_support_desc))
                 NearbySearchHelpLine("op:Orange", stringResource(R.string.appstrings_nearby_search_help_operator_desc))
+                NearbySearchHelpLine("zb", stringResource(R.string.appstrings_nearby_search_help_zb_desc))
                 NearbySearchHelpLine("tech:5G", stringResource(R.string.appstrings_nearby_search_help_tech_desc))
                 NearbySearchHelpLine("type:pylone", stringResource(R.string.appstrings_nearby_search_help_type_desc))
             }
@@ -1232,6 +1247,7 @@ private suspend fun mapAntennasToUiSites(
         val operators = list.mapNotNull { it.operateur }
             .flatMap { OperatorColors.keysFor(it) }
             .distinct()
+        val isZb = list.any { it.isZb == 1 }
 
         val techniques = list.mapNotNull { techniquesById[it.idAnfr] }
         val physiques = list.flatMap { physiquesById[it.idAnfr].orEmpty() }
@@ -1274,7 +1290,8 @@ private suspend fun mapAntennasToUiSites(
             supportIds.joinToString(" "),
             supportTypes.joinToString(" "),
             supportText,
-            technicalText
+            technicalText,
+            if (isZb) "ZB zone blanche" else null
         ).filterNotNull().joinToString(" ")
 
         UiSite(
@@ -1296,6 +1313,7 @@ private suspend fun mapAntennasToUiSites(
             allAddresses = allAddresses,
             technicalText = technicalText,
             supportText = supportText,
+            isZb = isZb,
             searchText = searchText
         )
     }
@@ -1333,6 +1351,7 @@ private fun parseNearbySearchQuery(raw: String): NearbySearchSpec {
         "ville", "city", "commune" -> NearbySearchField.City
         "adresse", "address", "addr" -> NearbySearchField.Address
         "gps", "coord", "coords", "latlon", "latlng" -> NearbySearchField.Gps
+        "zb", "zoneblanche" -> NearbySearchField.Zb
         else -> null
     }
 
@@ -1358,6 +1377,7 @@ private fun inferNearbySearchField(value: String): NearbySearchField {
                 normalized == normalizeNearbySearchCompact(operator.label) ||
                 operator.aliases.any { alias -> normalized == normalizeNearbySearchCompact(alias) }
         } -> NearbySearchField.Operator
+        normalized in setOf("zb", "zoneblanche") -> NearbySearchField.Zb
         normalized in setOf("2g", "3g", "4g", "5g", "gsm", "umts", "lte", "nr") -> NearbySearchField.Technology
         else -> NearbySearchField.All
     }
@@ -1366,6 +1386,7 @@ private fun inferNearbySearchField(value: String): NearbySearchField {
 private fun siteMatchesSearch(site: UiSite, spec: NearbySearchSpec): Boolean {
     val needle = normalizeNearbySearch(spec.value)
     val compactNeedle = normalizeNearbySearchCompact(spec.value)
+    if (spec.field == NearbySearchField.Zb) return site.isZb
     if (needle.isBlank()) return true
 
     fun containsNeedle(values: Iterable<String?>): Boolean {
@@ -1382,6 +1403,7 @@ private fun siteMatchesSearch(site: UiSite, spec: NearbySearchSpec): Boolean {
         NearbySearchField.Address -> containsNeedle(site.allAddresses + listOf(site.fullAddress, site.address, site.description))
         NearbySearchField.City -> containsNeedle(site.allAddresses + listOf(site.city, site.description, site.fullAddress))
         NearbySearchField.PostalCode -> containsNeedle(site.allAddresses + listOf(site.postalCode, site.description, site.fullAddress))
+        NearbySearchField.Zb -> site.isZb
         NearbySearchField.Gps -> containsNeedle(
             listOf(
                 site.latitude.toString(),
