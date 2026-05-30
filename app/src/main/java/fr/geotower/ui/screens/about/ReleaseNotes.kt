@@ -26,29 +26,28 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_sites_supports)) {
-        item(stringResource(R.string.appstrings_release_sites_supports_operator_added))
-        item(stringResource(R.string.appstrings_release_sites_supports_arcep_label_operator))
-    }
-
     section(stringResource(R.string.appstrings_release_section_map)) {
-        item(stringResource(R.string.appstrings_release_map_zb_only_filter))
-        item(stringResource(R.string.appstrings_release_map_zb_filter_everywhere))
-        item(stringResource(R.string.appstrings_release_map_zb_quick_search))
+        item(stringResource(R.string.appstrings_release_map_frequency_filters_consistent))
+        item(stringResource(R.string.appstrings_release_map_frequency_change_refresh))
+        item(stringResource(R.string.appstrings_release_map_clusters_frequency_filter_adapted))
+        item(stringResource(R.string.appstrings_release_map_support_count_more_reliable))
     }
 
-    section(stringResource(R.string.appstrings_release_section_spectrums)) {
-        item(stringResource(R.string.appstrings_release_spectrums_precise_readable))
-        item(stringResource(R.string.appstrings_release_spectrums_totals_bands_better))
+    section(stringResource(R.string.appstrings_release_section_site_detail)) {
+        item(stringResource(R.string.appstrings_release_site_detail_filtered_bands_distinguished))
     }
 
-    section(stringResource(R.string.appstrings_release_section_notifications)) {
-        item(stringResource(R.string.appstrings_release_notifications_large_icons_flexible))
+    section(stringResource(R.string.appstrings_release_section_support_detail)) {
+        item(stringResource(R.string.appstrings_release_support_detail_operators_frequency_highlight))
     }
 
-    section(stringResource(R.string.appstrings_release_section_global)) {
-        item(stringResource(R.string.appstrings_release_global_local_data_new_info))
-        item(stringResource(R.string.appstrings_release_global_translations_updated))
+    section(stringResource(R.string.appstrings_release_section_map_settings)) {
+        item(stringResource(R.string.appstrings_release_map_settings_frequency_order))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_about)) {
+        item(stringResource(R.string.appstrings_release_about_quarterly_data_version))
+        item(stringResource(R.string.appstrings_release_about_quarterly_data_translations))
     }
 }
 

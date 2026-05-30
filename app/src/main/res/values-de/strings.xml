@@ -727,6 +727,10 @@
     <string name="appstrings_release_section_sites_sharing">Standorte und Teilen</string>
     <string name="appstrings_release_section_sites_supports">Standorte und Träger</string>
     <string name="appstrings_release_section_spectrums">Spektren</string>
+    <string name="appstrings_release_section_site_detail">Standortdetails</string>
+    <string name="appstrings_release_section_support_detail">Trägerdetails</string>
+    <string name="appstrings_release_section_map_settings">Karteneinstellungen</string>
+    <string name="appstrings_release_section_about">Info</string>
     <string name="appstrings_release_live_site_photos_rounded">Standortfotos werden mit abgerundeten Ecken angezeigt</string>
     <string name="appstrings_release_live_operator_fallback_logos">Bessere Darstellung der Betreiberlogos, wenn kein Standortfoto verfügbar ist</string>
     <string name="appstrings_release_statistics_ready">Statistiken verfügbar, sobald die lokalen Daten bereit sind</string>
@@ -798,6 +802,15 @@
     <string name="appstrings_release_spectrums_totals_bands_better">Summen und Bandbreiten werden besser berechnet</string>
     <string name="appstrings_release_notifications_large_icons_flexible">Anzeige großer Symbole flexibler</string>
     <string name="appstrings_release_global_local_data_new_info">Lokale Daten für neue Informationen aktualisiert</string>
+    <string name="appstrings_release_map_frequency_filters_consistent">Technologie- und Frequenzfilter sind konsistenter</string>
+    <string name="appstrings_release_map_frequency_change_refresh">Zuverlässigere Aktualisierung, wenn sich ein Frequenzband ändert</string>
+    <string name="appstrings_release_map_clusters_frequency_filter_adapted">Kartengruppierungen passen sich aktiven Filtern besser an</string>
+    <string name="appstrings_release_map_support_count_more_reliable">Zuverlässigere Trägerzählung auf der Karte</string>
+    <string name="appstrings_release_site_detail_filtered_bands_distinguished">Bänder außerhalb des Kartenfilters sind besser erkennbar</string>
+    <string name="appstrings_release_support_detail_operators_frequency_highlight">Betreiber werden nach aktiven Frequenzen besser sortiert und hervorgehoben</string>
+    <string name="appstrings_release_map_settings_frequency_order">Frequenzreihenfolge neu geordnet: 5G, 4G, 3G, 2G</string>
+    <string name="appstrings_release_about_quarterly_data_version">Version der Quartalsdaten wird jetzt angezeigt</string>
+    <string name="appstrings_release_about_quarterly_data_translations">Übersetzungen für Quartalsdaten hinzugefügt</string>
     <string name="appstrings_release_community_source_settings">Neue Einstellungen für Foto- und Speedtest-Quellen hinzugefügt</string>
     <string name="appstrings_release_photo_visibility_sync">Fotoanzeige zwischen Support- und Standortseiten besser synchronisiert</string>
     <string name="appstrings_release_community_photo_filters">Fotos werden nach aktivem Betreiber und aktivierten Quellen gefiltert</string>
@@ -1105,6 +1118,7 @@
     <string name="appstrings_version_db_label">Datenbank-\nversion</string>
     <string name="appstrings_version_hs_label">Daten HS-\nStandorte</string>
     <string name="appstrings_version_monthly_label">Monats-\ndaten</string>
+    <string name="appstrings_version_quarterly_label">Quartals-\ndaten</string>
     <string name="appstrings_version_time_at">um</string>
     <string name="appstrings_version_weekly_label">Wochen-\ndaten</string>
     <string name="version_week_number_with_date">Woche %1$d\n%2$s</string>

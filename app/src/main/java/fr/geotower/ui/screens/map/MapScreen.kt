@@ -127,6 +127,7 @@ import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.MapDisplayPrefs
 import fr.geotower.utils.MapUtils
 import fr.geotower.utils.OperatorColors
@@ -748,14 +749,7 @@ fun MapScreen(
             val showSitesOutOfService = AppConfig.showSitesOutOfService.value
             val hideUndergroundSites = AppConfig.hideUndergroundSites.value
             val showOnlyZbSites = AppConfig.showOnlyZbSites.value
-            val sFh = AppConfig.showTechnoFH.value
-            val s2G = AppConfig.showTechno2G.value; val s3G = AppConfig.showTechno3G.value
-            val s4G = AppConfig.showTechno4G.value; val s5G = AppConfig.showTechno5G.value
-            val f2_900 = AppConfig.f2G_900.value; val f2_1800 = AppConfig.f2G_1800.value
-            val f3_900 = AppConfig.f3G_900.value; val f3_2100 = AppConfig.f3G_2100.value
-            val f4_700 = AppConfig.f4G_700.value; val f4_800 = AppConfig.f4G_800.value; val f4_900 = AppConfig.f4G_900.value
-            val f4_1800 = AppConfig.f4G_1800.value; val f4_2100 = AppConfig.f4G_2100.value; val f4_2600 = AppConfig.f4G_2600.value
-            val f5_700 = AppConfig.f5G_700.value; val f5_2100 = AppConfig.f5G_2100.value; val f5_3500 = AppConfig.f5G_3500.value; val f5_26000 = AppConfig.f5G_26000.value
+            val frequencyFilter = FrequencyFilterSelection.fromMapConfig()
             val hsOperatorMap = buildHsOperatorMap(sitesHs)
 
             val result = antennas.filter { antenna ->
@@ -770,7 +764,9 @@ fun MapScreen(
                 // ✅ 1. ON VÉRIFIE LES OPÉRATEURS TOUT DE SUITE
                 // 🚨 2. LA CORRECTION : Si c'est un cluster, on vérifie au moins l'opérateur !
                 if (antenna.idAnfr.startsWith("CLUSTER_")) {
-                    return@filter visibleOperators.isNotEmpty() && (!showOnlyZbSites || antenna.isZb == 1)
+                    return@filter frequencyFilter.isFullyEnabled &&
+                        visibleOperators.isNotEmpty() &&
+                        (!showOnlyZbSites || antenna.isZb == 1)
                 }
 
                 // --- 3. POUR LES VRAIES ANTENNES, ON CONTINUE AVEC LE RESTE DES FILTRES ---
@@ -778,25 +774,9 @@ fun MapScreen(
                 val matchesUndergroundFilter = !hideUndergroundSites || antenna.hasUndergroundSupport != 1
                 val matchesZbFilter = !showOnlyZbSites || antenna.isZb == 1
 
-                val isFhOnly = antenna.azimuts.isNullOrBlank() && !antenna.azimutsFh.isNullOrBlank()
-                val matchFh = if (!sFh && isFhOnly) false else true
+                val matchTechno = frequencyFilter.matchesAntenna(antenna)
 
-                val f = antenna.filtres ?: ""
-                var matchTechno = false
-
-                if (s2G && ((f2_900 && f.contains("2G900")) || (f2_1800 && f.contains("2G1800")))) matchTechno = true
-                if (!matchTechno && s3G && ((f3_900 && f.contains("3G900")) || (f3_2100 && f.contains("3G2100")))) matchTechno = true
-                if (!matchTechno && s4G && ((f4_700 && f.contains("4G700")) || (f4_800 && f.contains("4G800")) || (f4_900 && f.contains("4G900")) || (f4_1800 && f.contains("4G1800")) || (f4_2100 && f.contains("4G2100")) || (f4_2600 && f.contains("4G2600")))) matchTechno = true
-                if (!matchTechno && s5G && ((f5_700 && f.contains("5G700")) || (f5_2100 && f.contains("5G2100")) || (f5_3500 && f.contains("5G3500")) || (f5_26000 && f.contains("5G26000")))) matchTechno = true
-                if (!matchTechno && !antenna.azimutsFh.isNullOrBlank() && sFh) matchTechno = true
-
-                // Si la base ne connait pas les fréquences de cette antenne,
-                // on la cache directement, SAUF si le filtre est vierge (tout est coché par défaut)
-                if (f.isBlank() && antenna.azimutsFh.isNullOrBlank()) {
-                    matchTechno = (s2G && s3G && s4G && s5G && sFh)
-                }
-
-                visibleOperators.isNotEmpty() && matchesUndergroundFilter && matchesZbFilter && matchFh && isInCityBounds && matchTechno
+                visibleOperators.isNotEmpty() && matchesUndergroundFilter && matchesZbFilter && isInCityBounds && matchTechno
             }
             filteredAntennas = result
         }
@@ -1037,7 +1017,31 @@ fun MapScreen(
         }
     }
 
-    LaunchedEffect(AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value, AppConfig.showOnlyZbSites.value) {
+    LaunchedEffect(
+        AppConfig.showSitesInService.value,
+        AppConfig.showSitesOutOfService.value,
+        AppConfig.hideUndergroundSites.value,
+        AppConfig.showOnlyZbSites.value,
+        AppConfig.showTechnoFH.value,
+        AppConfig.showTechno2G.value,
+        AppConfig.showTechno3G.value,
+        AppConfig.showTechno4G.value,
+        AppConfig.showTechno5G.value,
+        AppConfig.f2G_900.value,
+        AppConfig.f2G_1800.value,
+        AppConfig.f3G_900.value,
+        AppConfig.f3G_2100.value,
+        AppConfig.f4G_700.value,
+        AppConfig.f4G_800.value,
+        AppConfig.f4G_900.value,
+        AppConfig.f4G_1800.value,
+        AppConfig.f4G_2100.value,
+        AppConfig.f4G_2600.value,
+        AppConfig.f5G_700.value,
+        AppConfig.f5G_2100.value,
+        AppConfig.f5G_3500.value,
+        AppConfig.f5G_26000.value
+    ) {
         mapViewRef?.let { map ->
             map.loadVisibleAntennas(viewModel)
         }

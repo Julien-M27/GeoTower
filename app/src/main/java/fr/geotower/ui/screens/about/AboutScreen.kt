@@ -732,6 +732,7 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
     var appVersion by remember { mutableStateOf("-") }
     var dbVersion by remember { mutableStateOf("-") }
     var anfrDate by remember { mutableStateOf("-") }
+    var quarterlyVersion by remember { mutableStateOf("-") }
     var rawMonthlyVersion by remember { mutableStateOf("-") } // ✅ Changé en "rawMonthlyVersion"
     var hsDate by remember { mutableStateOf("-") }
     val txtDownloadNewBase = stringResource(R.string.appstrings_about_download_new_database)
@@ -800,6 +801,7 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
                             rawMonthlyVersion = txtDownloadNewBase
                         }
                     }
+                    quarterlyVersion = readQuarterlyDataVersion(db)
                     cursor.close()
                     db.close()
                 } else {
@@ -810,8 +812,10 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
                     }
                     anfrDate = "-"
                     rawMonthlyVersion = "-"
+                    quarterlyVersion = "-"
                 }
             } catch (e: Exception) {
+                quarterlyVersion = "-"
                 AppLogger.w(TAG_ABOUT, "Database version info could not be read", e)
             }
 
@@ -835,6 +839,7 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
                 stringResource(R.string.appstrings_version_db_label) to dbVersion,
                 stringResource(R.string.appstrings_version_weekly_label) to LocalizedDateLabels.formatWeeklyVersionWithWeekNumber(context, anfrDate),
                 stringResource(R.string.appstrings_version_monthly_label) to LocalizedDateLabels.formatMonthlyVersion(context, rawMonthlyVersion),
+                stringResource(R.string.appstrings_version_quarterly_label) to quarterlyVersion,
                 stringResource(R.string.appstrings_version_hs_label) to hsDate
             )
 
@@ -849,6 +854,46 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
             }
         }
     }
+}
+
+private fun readQuarterlyDataVersion(db: SQLiteDatabase): String {
+    return try {
+        db.rawQuery(
+            """
+            SELECT source_value
+            FROM source_versions
+            WHERE source_key = 'quarterly_version'
+            LIMIT 1
+            """.trimIndent(),
+            null
+        ).use { cursor ->
+            if (cursor.moveToFirst()) {
+                normalizeQuarterlyVersion(cursor.getString(0))
+            } else {
+                "-"
+            }
+        }
+    } catch (e: Exception) {
+        "-"
+    }
+}
+
+private fun normalizeQuarterlyVersion(rawValue: String?): String {
+    val raw = rawValue?.trim().orEmpty()
+    if (raw.isBlank() || raw == "-") return "-"
+
+    val normalized = raw.uppercase()
+    Regex("""(20\d{2})[\s_-]*(?:T|Q|TRIM(?:ESTRE)?)[\s_-]*([1-4])""")
+        .find(normalized)
+        ?.let { return "${it.groupValues[1]}-T${it.groupValues[2]}" }
+    Regex("""(?:T|Q|TRIM(?:ESTRE)?)[\s_-]*([1-4])[\s_-]*(20\d{2})""")
+        .find(normalized)
+        ?.let { return "${it.groupValues[2]}-T${it.groupValues[1]}" }
+    Regex("""([1-4])(?:ER|E)?[\s_-]*TRIM(?:ESTRE)?[\s_-]*(20\d{2})""")
+        .find(normalized)
+        ?.let { return "${it.groupValues[2]}-T${it.groupValues[1]}" }
+
+    return raw
 }
 
 @Composable

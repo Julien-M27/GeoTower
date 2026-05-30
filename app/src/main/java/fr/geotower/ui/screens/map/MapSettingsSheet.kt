@@ -217,23 +217,14 @@ fun MapSettingsSheet(
             // 3. FRÉQUENCES
             SectionTitle(stringResource(R.string.appstrings_frequencies_title))
 
-            // Ligne 2G
-            AnimatedVisibility(visible = show2G) {
+            // Ligne 5G
+            AnimatedVisibility(visible = show5G) {
                 Column {
-                    FreqRow("2G") {
-                        FilterToggleButton("900 MHz", "f2g_900", AppConfig.f2G_900, prefs)
-                        FilterToggleButton("1800 MHz", "f2g_1800", AppConfig.f2G_1800, prefs)
-                    }
-                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                }
-            }
-
-            // Ligne 3G
-            AnimatedVisibility(visible = show3G) {
-                Column {
-                    FreqRow("3G") {
-                        FilterToggleButton("900 MHz", "f3g_900", AppConfig.f3G_900, prefs)
-                        FilterToggleButton("2100 MHz", "f3g_2100", AppConfig.f3G_2100, prefs)
+                    FreqRow("5G") {
+                        FilterToggleButton("700 MHz", "f5g_700", AppConfig.f5G_700, prefs)
+                        FilterToggleButton("2100 MHz", "f5g_2100", AppConfig.f5G_2100, prefs)
+                        FilterToggleButton("3500 MHz", "f5g_3500", AppConfig.f5G_3500, prefs)
+                        //FilterToggleButton("26 GHz", "f5g_26000", AppConfig.f5G_26000, prefs)
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
@@ -254,14 +245,23 @@ fun MapSettingsSheet(
                 }
             }
 
-            // Ligne 5G
-            AnimatedVisibility(visible = show5G) {
+            // Ligne 3G
+            AnimatedVisibility(visible = show3G) {
                 Column {
-                    FreqRow("5G") {
-                        FilterToggleButton("700 MHz", "f5g_700", AppConfig.f5G_700, prefs)
-                        FilterToggleButton("2100 MHz", "f5g_2100", AppConfig.f5G_2100, prefs)
-                        FilterToggleButton("3500 MHz", "f5g_3500", AppConfig.f5G_3500, prefs)
-                        //FilterToggleButton("26 GHz", "f5g_26000", AppConfig.f5G_26000, prefs)
+                    FreqRow("3G") {
+                        FilterToggleButton("900 MHz", "f3g_900", AppConfig.f3G_900, prefs)
+                        FilterToggleButton("2100 MHz", "f3g_2100", AppConfig.f3G_2100, prefs)
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                }
+            }
+
+            // Ligne 2G
+            AnimatedVisibility(visible = show2G) {
+                Column {
+                    FreqRow("2G") {
+                        FilterToggleButton("900 MHz", "f2g_900", AppConfig.f2G_900, prefs)
+                        FilterToggleButton("1800 MHz", "f2g_1800", AppConfig.f2G_1800, prefs)
                     }
                 }
             }

@@ -16,6 +16,7 @@ import org.osmdroid.util.GeoPoint
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.OperatorColors
 
 class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
@@ -72,8 +73,9 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
                 // ✅ 2. ON EMPÊCHE LE CLUSTERING GLOBAL SI UNE VILLE EST RECHERCHÉE
                 val hasSiteDisplayFilter = !AppConfig.showSitesInService.value ||
                     !AppConfig.showSitesOutOfService.value
+                val hasFrequencyFilter = !FrequencyFilterSelection.fromMapConfig().isFullyEnabled
 
-                if (zoom < 13.0 && cityPolygons == null && !hasSiteDisplayFilter) {
+                if (zoom < 13.0 && cityPolygons == null && !hasSiteDisplayFilter && !hasFrequencyFilter) {
                     val clusters = repository.getClusteredAntennas(zoom, latNorth, lonEast, latSouth, lonWest)
                     val clusterIsZb = if (AppConfig.showOnlyZbSites.value) 1 else 0
 

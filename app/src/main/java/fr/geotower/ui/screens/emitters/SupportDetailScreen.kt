@@ -79,6 +79,7 @@ import fr.geotower.ui.screens.settings.SupportSettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.SupportPagePrefs
 import java.util.Locale
@@ -444,6 +445,18 @@ fun SupportDetailScreen(
     var showNav by remember { mutableStateOf(SupportPagePrefs.nav.read(prefs)) }
     var showShare by remember { mutableStateOf(SupportPagePrefs.share.read(prefs)) }
     var showOperators by remember { mutableStateOf(SupportPagePrefs.operators.read(prefs)) }
+    val mapFrequencyFilter = FrequencyFilterSelection.fromMapConfig()
+    val frequencyMatchedOperatorKeys = remember(antennas, mapFrequencyFilter) {
+        if (mapFrequencyFilter.isFullyEnabled) {
+            null
+        } else {
+            antennas
+                .filter { mapFrequencyFilter.matchesAntenna(it) }
+                .flatMap { OperatorColors.keysFor(it.operateur) }
+                .toSet()
+        }
+    }
+    val priorityOperatorKey = effectiveHighlightedOperatorKey ?: frequencyMatchedOperatorKeys?.singleOrNull()
 
     Scaffold(
         containerColor = mainBgColor,
@@ -613,7 +626,8 @@ fun SupportDetailScreen(
                                         cardBgColor = cardBgColor,
                                         blockShape = blockShape,
                                         useOneUi = useOneUi,
-                                        priorityOperatorKey = effectiveHighlightedOperatorKey,
+                                        priorityOperatorKey = priorityOperatorKey,
+                                        activeOperatorKeys = frequencyMatchedOperatorKeys,
                                         onAntennaClick = { idAnfr ->
                                             safeClick {
                                                 onAntennaClick(idAnfr)

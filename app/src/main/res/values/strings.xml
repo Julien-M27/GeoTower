@@ -745,6 +745,10 @@
     <string name="appstrings_release_section_sites_sharing">Sites and sharing</string>
     <string name="appstrings_release_section_sites_supports">Sites and supports</string>
     <string name="appstrings_release_section_spectrums">Spectrum</string>
+    <string name="appstrings_release_section_site_detail">Site detail</string>
+    <string name="appstrings_release_section_support_detail">Support detail</string>
+    <string name="appstrings_release_section_map_settings">Map settings</string>
+    <string name="appstrings_release_section_about">About</string>
     <string name="appstrings_release_live_site_photos_rounded">Site photos now display with rounded corners</string>
     <string name="appstrings_release_live_operator_fallback_logos">Operator logos look better when no site photo is available</string>
     <string name="appstrings_release_statistics_ready">Statistics are available as soon as local data is ready</string>
@@ -816,6 +820,15 @@
     <string name="appstrings_release_spectrums_totals_bands_better">Better calculation of totals and band widths</string>
     <string name="appstrings_release_notifications_large_icons_flexible">Large icon display is more flexible</string>
     <string name="appstrings_release_global_local_data_new_info">Local data updated for the new information</string>
+    <string name="appstrings_release_map_frequency_filters_consistent">Technology and frequency filters are more consistent</string>
+    <string name="appstrings_release_map_frequency_change_refresh">More reliable update when a frequency band changes</string>
+    <string name="appstrings_release_map_clusters_frequency_filter_adapted">Map groupings better adapt to active filters</string>
+    <string name="appstrings_release_map_support_count_more_reliable">More reliable support count on the map</string>
+    <string name="appstrings_release_site_detail_filtered_bands_distinguished">Bands not covered by the map filter are easier to distinguish</string>
+    <string name="appstrings_release_support_detail_operators_frequency_highlight">Operators are better sorted and highlighted based on active frequencies</string>
+    <string name="appstrings_release_map_settings_frequency_order">Frequency order reorganized: 5G, 4G, 3G, 2G</string>
+    <string name="appstrings_release_about_quarterly_data_version">Quarterly data version is now displayed</string>
+    <string name="appstrings_release_about_quarterly_data_translations">Translations added for quarterly data</string>
     <string name="appstrings_release_community_source_settings">Added new settings for photo and speedtest sources</string>
     <string name="appstrings_release_photo_visibility_sync">Photo display is better synchronized between Support and Site pages</string>
     <string name="appstrings_release_community_photo_filters">Photos are filtered by enabled operator and sources</string>
@@ -1123,6 +1136,7 @@
     <string name="appstrings_version_db_label">Database\nversion</string>
     <string name="appstrings_version_hs_label">HS sites\ndata</string>
     <string name="appstrings_version_monthly_label">Monthly\ndata</string>
+    <string name="appstrings_version_quarterly_label">Quarterly\ndata</string>
     <string name="appstrings_version_time_at">at</string>
     <string name="appstrings_version_weekly_label">Weekly\ndata</string>
     <string name="version_week_number_with_date">Week %1$d\n%2$s</string>

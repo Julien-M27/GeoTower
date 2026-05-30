@@ -727,6 +727,10 @@
     <string name="appstrings_release_section_sites_sharing">Sites et partage</string>
     <string name="appstrings_release_section_sites_supports">Sites et supports</string>
     <string name="appstrings_release_section_spectrums">Spectres</string>
+    <string name="appstrings_release_section_site_detail">Détail site</string>
+    <string name="appstrings_release_section_support_detail">Détail support</string>
+    <string name="appstrings_release_section_map_settings">Réglages carte</string>
+    <string name="appstrings_release_section_about">À propos</string>
     <string name="appstrings_release_live_site_photos_rounded">Affichage des photos de site avec des coins arrondis</string>
     <string name="appstrings_release_live_operator_fallback_logos">Meilleur rendu des logos opérateur lorsqu’aucune photo de site n’est disponible</string>
     <string name="appstrings_release_statistics_ready">Activation des statistiques dès que les données locales sont prêtes</string>
@@ -798,6 +802,15 @@
     <string name="appstrings_release_spectrums_totals_bands_better">Totaux et largeurs de bandes mieux calculés</string>
     <string name="appstrings_release_notifications_large_icons_flexible">Affichage des grandes icônes plus souple</string>
     <string name="appstrings_release_global_local_data_new_info">Données locales mises à jour pour les nouvelles informations</string>
+    <string name="appstrings_release_map_frequency_filters_consistent">Filtres de technologies et fréquences plus cohérents</string>
+    <string name="appstrings_release_map_frequency_change_refresh">Mise à jour plus fiable quand une bande de fréquence change</string>
+    <string name="appstrings_release_map_clusters_frequency_filter_adapted">Regroupements de carte mieux adaptés aux filtres actifs</string>
+    <string name="appstrings_release_map_support_count_more_reliable">Comptage des supports plus fiable sur la carte</string>
+    <string name="appstrings_release_site_detail_filtered_bands_distinguished">Bandes non concernées par le filtre de carte mieux distinguées</string>
+    <string name="appstrings_release_support_detail_operators_frequency_highlight">Opérateurs mieux triés et mis en avant selon les fréquences actives</string>
+    <string name="appstrings_release_map_settings_frequency_order">Ordre des fréquences réorganisé : 5G, 4G, 3G, 2G</string>
+    <string name="appstrings_release_about_quarterly_data_version">Affichage de la version des données trimestrielles</string>
+    <string name="appstrings_release_about_quarterly_data_translations">Traductions ajoutées pour les données trimestrielles</string>
     <string name="appstrings_release_community_source_settings">Ajout de nouveaux réglages pour les sources photos et speedtests</string>
     <string name="appstrings_release_photo_visibility_sync">Affichage des photos mieux synchronisé entre les pages Support et Site</string>
     <string name="appstrings_release_community_photo_filters">Photos filtrées selon l’opérateur et les sources activées</string>
@@ -1105,6 +1118,7 @@
     <string name="appstrings_version_db_label">Version de la base\nde données</string>
     <string name="appstrings_version_hs_label">Données des\nsites HS</string>
     <string name="appstrings_version_monthly_label">Données\nmensuelles</string>
+    <string name="appstrings_version_quarterly_label">Données\ntrimestrielles</string>
     <string name="appstrings_version_time_at">à</string>
     <string name="appstrings_version_weekly_label">Données\nhebdomadaires</string>
     <string name="version_week_number_with_date">Semaine %1$d\n%2$s</string>

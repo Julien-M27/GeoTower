@@ -41,6 +41,7 @@ fun OperatorsListSection(
     blockShape: Shape,
     useOneUi: Boolean,
     priorityOperatorKey: String? = null,
+    activeOperatorKeys: Set<String>? = null,
     onAntennaClick: (String) -> Unit
 ) {
     // ✅ 1. LECTURE DES PARAMÈTRES SPÉCIFIQUES AU DÉTAIL DU SITE
@@ -74,12 +75,14 @@ fun OperatorsListSection(
     if (filteredAntennas.isEmpty()) return
 
     val defaultOperatorKey = OperatorColors.keyFor(AppConfig.defaultOperator.value)
+    val activeKeys = activeOperatorKeys
     val hasPriorityMatch = priorityOperatorKey != null && filteredAntennas.any { antenna ->
         priorityOperatorKey in OperatorColors.keysFor(antenna.operateur)
     }
     val sortedAntennas = filteredAntennas.sortedBy { antenna ->
         val operatorKeys = OperatorColors.keysFor(antenna.operateur)
         when {
+            activeKeys != null && operatorKeys.any { it in activeKeys } -> 0
             priorityOperatorKey != null && priorityOperatorKey in operatorKeys -> 0
             defaultOperatorKey != null && defaultOperatorKey in operatorKeys -> 1
             else -> 2
@@ -105,7 +108,8 @@ fun OperatorsListSection(
                 cardBgColor = cardBgColor,
                 blockShape = blockShape,
                 useOneUi = useOneUi,
-                isMuted = hasPriorityMatch && priorityOperatorKey !in operatorKeys,
+                isMuted = (activeKeys != null && operatorKeys.none { it in activeKeys }) ||
+                    (activeKeys == null && hasPriorityMatch && priorityOperatorKey !in operatorKeys),
                 onClick = { onAntennaClick(antenna.idAnfr) }
             )
             if (!useOneUi) {

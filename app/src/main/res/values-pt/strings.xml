@@ -727,6 +727,10 @@
     <string name="appstrings_release_section_sites_sharing">Sites e partilha</string>
     <string name="appstrings_release_section_sites_supports">Sites e suportes</string>
     <string name="appstrings_release_section_spectrums">Espectros</string>
+    <string name="appstrings_release_section_site_detail">Detalhe do site</string>
+    <string name="appstrings_release_section_support_detail">Detalhe do suporte</string>
+    <string name="appstrings_release_section_map_settings">Definições do mapa</string>
+    <string name="appstrings_release_section_about">Sobre</string>
     <string name="appstrings_release_live_site_photos_rounded">Fotos do site agora apresentadas com cantos arredondados</string>
     <string name="appstrings_release_live_operator_fallback_logos">Melhor apresentação dos logótipos das operadoras quando não há foto do site disponível</string>
     <string name="appstrings_release_statistics_ready">Estatísticas disponíveis assim que os dados locais estão prontos</string>
@@ -798,6 +802,15 @@
     <string name="appstrings_release_spectrums_totals_bands_better">Totais e larguras de banda calculados melhor</string>
     <string name="appstrings_release_notifications_large_icons_flexible">Apresentação dos ícones grandes mais flexível</string>
     <string name="appstrings_release_global_local_data_new_info">Dados locais atualizados para as novas informações</string>
+    <string name="appstrings_release_map_frequency_filters_consistent">Filtros de tecnologias e frequências mais coerentes</string>
+    <string name="appstrings_release_map_frequency_change_refresh">Atualização mais fiável quando uma banda de frequência muda</string>
+    <string name="appstrings_release_map_clusters_frequency_filter_adapted">Agrupamentos do mapa melhor adaptados aos filtros ativos</string>
+    <string name="appstrings_release_map_support_count_more_reliable">Contagem de suportes mais fiável no mapa</string>
+    <string name="appstrings_release_site_detail_filtered_bands_distinguished">Bandas não abrangidas pelo filtro do mapa mais fáceis de distinguir</string>
+    <string name="appstrings_release_support_detail_operators_frequency_highlight">Operadoras melhor ordenadas e destacadas conforme as frequências ativas</string>
+    <string name="appstrings_release_map_settings_frequency_order">Ordem das frequências reorganizada: 5G, 4G, 3G, 2G</string>
+    <string name="appstrings_release_about_quarterly_data_version">Versão dos dados trimestrais agora apresentada</string>
+    <string name="appstrings_release_about_quarterly_data_translations">Traduções adicionadas para os dados trimestrais</string>
     <string name="appstrings_release_community_source_settings">Adição de novas definições para fontes de fotos e speedtests</string>
     <string name="appstrings_release_photo_visibility_sync">Apresentação das fotos melhor sincronizada entre as páginas Suporte e Site</string>
     <string name="appstrings_release_community_photo_filters">Fotos filtradas pela operadora e fontes ativadas</string>
@@ -1105,6 +1118,7 @@
     <string name="appstrings_version_db_label">Versão da base\nde dados</string>
     <string name="appstrings_version_hs_label">Dados dos\nsites HS</string>
     <string name="appstrings_version_monthly_label">Dados\nmensais</string>
+    <string name="appstrings_version_quarterly_label">Dados\ntrimestrais</string>
     <string name="appstrings_version_time_at">às</string>
     <string name="appstrings_version_weekly_label">Dados\nsemanais</string>
     <string name="version_week_number_with_date">Semana %1$d\n%2$s</string>

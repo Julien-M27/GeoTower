@@ -14,6 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
@@ -24,6 +25,7 @@ import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.utils.AnfrDisplayText
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.FrequencyStatusType
 import fr.geotower.utils.FreqBand
 import fr.geotower.utils.addMicrowaveFallbackBands
@@ -60,6 +62,7 @@ fun SiteFrequenciesBlock(
     val txtAzimuthNotSpecified = stringResource(R.string.appstrings_azimuth_not_specified)
 
     val rawFreqs = technique?.detailsFrequences ?: info.frequences
+    val mapFrequencyFilter = FrequencyFilterSelection.fromMapConfig()
 
     // ✅ ON INTÈGRE NOS NOUVEAUX FILTRES DYNAMIQUES
     val parsedBands = remember(
@@ -121,7 +124,8 @@ fun SiteFrequenciesBlock(
                         txtInService = txtInService,
                         txtTechnically = txtTechnically,
                         txtProjectApproved = txtProjectApproved,
-                        txtUnknownStatus = txtUnknownStatus
+                        txtUnknownStatus = txtUnknownStatus,
+                        mapFrequencyFilter = mapFrequencyFilter
                     )
                 } else {
                     // 👇 TON CODE ACTUEL COMMENCE ICI 👇
@@ -153,12 +157,17 @@ fun SiteFrequenciesBlock(
                     } else {
                         txtDateNotSpecifiedAnfr
                     }
+                    val isMutedByMapFilter = !mapFrequencyFilter.isFullyEnabled &&
+                        !mapFrequencyFilter.matchesBand(band.gen, band.value)
 
                     Card(
                         shape = RoundedCornerShape(12.dp),
                         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)),
-                        modifier = Modifier.fillMaxWidth().padding(bottom = if (index == sectionedBands.lastIndex) 0.dp else 12.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .alpha(if (isMutedByMapFilter) 0.42f else 1f)
+                            .padding(bottom = if (index == sectionedBands.lastIndex) 0.dp else 12.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -404,7 +413,8 @@ fun FrequenciesGridView(
     txtInService: String,
     txtTechnically: String,
     txtProjectApproved: String,
-    txtUnknownStatus: String
+    txtUnknownStatus: String,
+    mapFrequencyFilter: FrequencyFilterSelection
 ) {
     val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     val headerBgColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
@@ -482,9 +492,12 @@ fun FrequenciesGridView(
                     FrequencyStatusType.Approved -> txtProjectApproved
                     FrequencyStatusType.Unknown -> txtUnknownStatus
                 }
+                val isMutedByMapFilter = !mapFrequencyFilter.isFullyEnabled &&
+                    !mapFrequencyFilter.matchesBand(band.gen, band.value)
 
                 Row(
                     modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)
+                        .alpha(if (isMutedByMapFilter) 0.42f else 1f)
                         .background(MaterialTheme.colorScheme.surface),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -526,7 +539,8 @@ fun FrequenciesGridView(
         val bandEquivalent: String?,
         val freqs: String,
         val gen: Int,
-        val value: Int
+        val value: Int,
+        val isMuted: Boolean
     )
     val groupedAntennas = mutableMapOf<String, MutableMap<String, MutableList<AntennaRow>>>()
 
@@ -559,10 +573,13 @@ fun FrequenciesGridView(
             "-"
         }
 
+        val isMutedByMapFilter = !mapFrequencyFilter.isFullyEnabled &&
+            !mapFrequencyFilter.matchesBand(band.gen, band.value)
+
         if (band.physDetails.isEmpty()) {
             groupedAntennas.getOrPut("-") { mutableMapOf() }
                 .getOrPut("-") { mutableListOf() }
-                .add(AntennaRow(technoName, bandEquivalent, displayFreqs, band.gen, band.value))
+                .add(AntennaRow(technoName, bandEquivalent, displayFreqs, band.gen, band.value, isMutedByMapFilter))
         } else {
             band.physDetails.forEach { phys ->
                 // Séparation robuste: "Panneau : 60° (28.9m)" -> On récupère "60" et "28.9m"
@@ -578,7 +595,7 @@ fun FrequenciesGridView(
 
                 groupedAntennas.getOrPut(azimut) { mutableMapOf() }
                     .getOrPut(hauteur) { mutableListOf() }
-                    .add(AntennaRow(technoName, bandEquivalent, displayFreqs, band.gen, band.value))
+                    .add(AntennaRow(technoName, bandEquivalent, displayFreqs, band.gen, band.value, isMutedByMapFilter))
             }
         }
     }
@@ -709,7 +726,8 @@ fun FrequenciesGridView(
                                     rows.forEachIndexed { rowIndex, rowItem ->
                                         Row(
                                             modifier = Modifier.fillMaxWidth()
-                                                .height(IntrinsicSize.Min),
+                                                .height(IntrinsicSize.Min)
+                                                .alpha(if (rowItem.isMuted) 0.42f else 1f),
                                             verticalAlignment = Alignment.CenterVertically
                                         ) {
                                             Column(

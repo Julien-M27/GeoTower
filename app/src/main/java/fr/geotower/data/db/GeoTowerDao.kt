@@ -517,9 +517,14 @@ interface GeoTowerDao {
     suspend fun getFaisceauxDetails(idAnfr: String): List<FaisceauxEntity>
 
     @Query("""
-        SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+        SELECT
+            AVG(l.latitude) AS centerLat,
+            AVG(l.longitude) AS centerLon,
+            COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN support s ON s.id_anfr = l.id_anfr
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
         AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
@@ -535,9 +540,14 @@ interface GeoTowerDao {
     suspend fun getL1Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean, showOnlyZbSites: Boolean): List<DbCluster>
 
     @Query("""
-        SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+        SELECT
+            AVG(l.latitude) AS centerLat,
+            AVG(l.longitude) AS centerLon,
+            COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN support s ON s.id_anfr = l.id_anfr
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
         AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
@@ -553,9 +563,14 @@ interface GeoTowerDao {
     suspend fun getL2Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean, showOnlyZbSites: Boolean): List<DbCluster>
 
     @Query("""
-        SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+        SELECT
+            AVG(l.latitude) AS centerLat,
+            AVG(l.longitude) AS centerLon,
+            COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN support s ON s.id_anfr = l.id_anfr
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
         AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
@@ -571,9 +586,14 @@ interface GeoTowerDao {
     suspend fun getL3Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean, showOnlyZbSites: Boolean): List<DbCluster>
 
     @Query("""
-        SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+        SELECT
+            AVG(l.latitude) AS centerLat,
+            AVG(l.longitude) AS centerLon,
+            COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN support s ON s.id_anfr = l.id_anfr
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
         AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
@@ -589,9 +609,14 @@ interface GeoTowerDao {
     suspend fun getL4Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean, showOnlyZbSites: Boolean): List<DbCluster>
 
     @Query("""
-        SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+        SELECT
+            AVG(l.latitude) AS centerLat,
+            AVG(l.longitude) AS centerLon,
+            COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN support s ON s.id_anfr = l.id_anfr
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
         AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
@@ -607,9 +632,14 @@ interface GeoTowerDao {
     suspend fun getL5Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean, showOnlyZbSites: Boolean): List<DbCluster>
 
     @Query("""
-        SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+        SELECT
+            AVG(l.latitude) AS centerLat,
+            AVG(l.longitude) AS centerLon,
+            COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN support s ON s.id_anfr = l.id_anfr
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
         AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
@@ -625,9 +655,14 @@ interface GeoTowerDao {
     suspend fun getL6Clusters(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double, hideUndergroundSites: Boolean, showOnlyZbSites: Boolean): List<DbCluster>
 
     @Query("""
-        SELECT AVG(l.latitude) AS centerLat, AVG(l.longitude) AS centerLon, COUNT(*) AS count, GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+        SELECT
+            AVG(l.latitude) AS centerLat,
+            AVG(l.longitude) AS centerLon,
+            COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN support s ON s.id_anfr = l.id_anfr
         WHERE l.latitude BETWEEN :minLat AND :maxLat
         AND l.longitude BETWEEN :minLon AND :maxLon
         AND (:showOnlyZbSites = 0 OR l.is_zb = 1)
