@@ -1611,4 +1611,11 @@
     <string name="appstrings_release_offline_maps_auto_open">Ouverture automatique selon la navigation ou le téléchargement</string>
     <string name="appstrings_release_about_anfr_arcep_sources">Ajout de liens vers les sources ANFR et ARCEP</string>
     <string name="appstrings_release_about_dates_quarters_localized">Dates et trimestres mieux localisés</string>
+    <string name="appstrings_release_community_photo_viewer_navigation">Navigation dans les photos agrandies plus fluide et plus précise</string>
+    <string name="appstrings_release_community_photo_zoomed_swipe_disabled">Le changement de photo ne se déclenche plus par erreur quand une photo est zoomée</string>
+    <string name="appstrings_release_community_photo_double_tap_zoom">Double appui amélioré pour zoomer directement sur la zone touchée</string>
+    <string name="appstrings_release_community_photo_viewer_layout">Titre, favori et informations photo mieux placés dans le viewer</string>
+    <string name="appstrings_release_map_nearby_emitters_dark_readability">Meilleure lisibilité des cartes d’émetteurs proches en thème sombre</string>
+    <string name="appstrings_release_signalquest_upload_privacy_clearer">Réglage de confidentialité des photos plus clair sur l’écran d’upload</string>
+    <string name="appstrings_release_signalquest_exif_removal_default_off">Suppression des données EXIF désactivée par défaut</string>
 </resources>

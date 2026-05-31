@@ -26,27 +26,20 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_hs_sites)) {
-        item(stringResource(R.string.appstrings_release_hs_sites_data_enriched))
-        item(stringResource(R.string.appstrings_release_hs_sites_arcep_source_date))
-        item(stringResource(R.string.appstrings_release_hs_sites_service_details))
+    section(stringResource(R.string.appstrings_release_section_community_photos)) {
+        item(stringResource(R.string.appstrings_release_community_photo_viewer_navigation))
+        item(stringResource(R.string.appstrings_release_community_photo_zoomed_swipe_disabled))
+        item(stringResource(R.string.appstrings_release_community_photo_double_tap_zoom))
+        item(stringResource(R.string.appstrings_release_community_photo_viewer_layout))
     }
 
     section(stringResource(R.string.appstrings_release_section_map)) {
-        item(stringResource(R.string.appstrings_release_map_site_status_clearer))
-        item(stringResource(R.string.appstrings_release_map_status_legend_improved))
-        item(stringResource(R.string.appstrings_release_map_arcep_details_easier))
-        item(stringResource(R.string.appstrings_release_map_single_support_groups))
+        item(stringResource(R.string.appstrings_release_map_nearby_emitters_dark_readability))
     }
 
-    section(stringResource(R.string.appstrings_release_section_offline_maps)) {
-        item(stringResource(R.string.appstrings_release_offline_maps_section_collapsible))
-        item(stringResource(R.string.appstrings_release_offline_maps_auto_open))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_about)) {
-        item(stringResource(R.string.appstrings_release_about_anfr_arcep_sources))
-        item(stringResource(R.string.appstrings_release_about_dates_quarters_localized))
+    section(stringResource(R.string.appstrings_release_section_signalquest)) {
+        item(stringResource(R.string.appstrings_release_signalquest_upload_privacy_clearer))
+        item(stringResource(R.string.appstrings_release_signalquest_exif_removal_default_off))
     }
 }
 

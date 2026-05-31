@@ -9,6 +9,7 @@ import android.location.LocationManager
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
@@ -192,6 +193,7 @@ fun NearEmittersScreen(
         MaterialTheme.colorScheme.surfaceContainer
     }
     val uiStyle = LocalGeoTowerUiStyle.current
+    val cardBorder = if (!useOneUi && isDark) uiStyle.cardBorder else null
 
     val safeClick = rememberSafeClick()
 
@@ -722,6 +724,7 @@ fun NearEmittersScreen(
                                                     useOneUi = useOneUi,
                                                     cardShape = cardShape,
                                                     cardColor = cardColor,
+                                                    cardBorder = cardBorder,
                                                     priorityOperatorKey = searchedOperatorKey
                                                 ) {
                                                     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
@@ -1063,6 +1066,7 @@ fun EmitterCard(
     useOneUi: Boolean,
     cardShape: Shape,
     cardColor: Color,
+    cardBorder: BorderStroke? = null,
     priorityOperatorKey: String? = null,
     onClick: () -> Unit
 ) {
@@ -1074,6 +1078,7 @@ fun EmitterCard(
         modifier = Modifier.fillMaxWidth(),
         shape = cardShape,
         colors = CardDefaults.cardColors(containerColor = cardColor),
+        border = cardBorder,
         elevation = CardDefaults.cardElevation(if (useOneUi) 0.dp else 2.dp)
     ) {
         Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {

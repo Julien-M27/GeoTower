@@ -57,6 +57,7 @@ import androidx.compose.material3.OutlinedButton // 🚨 NOUVEAU
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -150,7 +151,7 @@ fun SignalQuestUploadScreen(
     // --- 1. ÉTATS ---
     val currentUris = remember { mutableStateListOf<String>().apply { addAll(imageUris) } }
     var description by remember { mutableStateOf("") }
-    var stripExifBeforeUpload by rememberSaveable { mutableStateOf(true) }
+    var stripExifBeforeUpload by rememberSaveable { mutableStateOf(false) }
     var showConfirmDialog by remember { mutableStateOf(false) }
     var showImageSourceDialog by remember { mutableStateOf(false) }
 
@@ -709,18 +710,15 @@ fun SignalQuestUploadScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { stripExifBeforeUpload = !stripExifBeforeUpload },
+            Surface(
+                onClick = { stripExifBeforeUpload = !stripExifBeforeUpload },
+                modifier = Modifier.fillMaxWidth(),
                 shape = blockShape,
                 border = BorderStroke(
                     1.dp,
                     if (stripExifBeforeUpload) activeColor.copy(alpha = 0.55f) else textColor.copy(alpha = 0.16f)
                 ),
-                colors = CardDefaults.cardColors(
-                    containerColor = if (stripExifBeforeUpload) activeColor.copy(alpha = 0.12f) else surfaceColor
-                )
+                color = if (stripExifBeforeUpload) activeColor.copy(alpha = 0.12f) else surfaceColor
             ) {
                 Row(
                     modifier = Modifier

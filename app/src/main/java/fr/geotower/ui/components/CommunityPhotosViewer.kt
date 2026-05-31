@@ -118,6 +118,11 @@ data class CommunityPhoto(
 )
 
 private val favoritePhotoColor = Color(0xFFE53935)
+private const val PHOTO_VIEWER_MIN_SCALE = 1f
+private const val PHOTO_VIEWER_MAX_SCALE = 5f
+private const val PHOTO_VIEWER_DOUBLE_TAP_SCALE = 2.6f
+private const val PHOTO_VIEWER_ZOOMED_THRESHOLD = 1.01f
+private const val PHOTO_VIEWER_RESET_THRESHOLD = 1.03f
 
 private fun CommunityPhoto.resolvedSourceId(): String? {
     return sourceId ?: CommunityDataPreferences.sourceIdForCommunityName(communityName)
@@ -269,6 +274,29 @@ private fun fittedPhotoFrame(containerSize: IntSize, sourceSize: IntSize?): Disp
         top = (containerHeight - fittedHeight) / 2f,
         width = fittedWidth,
         height = fittedHeight
+    )
+}
+
+private fun clampedPhotoOffset(
+    offset: Offset,
+    scale: Float,
+    containerSize: IntSize,
+    sourceSize: IntSize?
+): Offset {
+    if (
+        scale <= PHOTO_VIEWER_ZOOMED_THRESHOLD ||
+        containerSize.width <= 0 ||
+        containerSize.height <= 0
+    ) {
+        return Offset.Zero
+    }
+
+    val frame = fittedPhotoFrame(containerSize, sourceSize)
+    val maxX = maxOf(0f, (frame.width * scale - containerSize.width) / 2f)
+    val maxY = maxOf(0f, (frame.height * scale - containerSize.height) / 2f)
+    return Offset(
+        x = offset.x.coerceIn(-maxX, maxX),
+        y = offset.y.coerceIn(-maxY, maxY)
     )
 }
 
@@ -1025,6 +1053,7 @@ fun CommunityPhotosSectionShared(
         val coroutineScope = rememberCoroutineScope()
         var viewerContainerSize by remember { mutableStateOf(IntSize.Zero) }
         var photoSourceSizes by remember(viewerPhotos) { mutableStateOf<Map<Int, IntSize>>(emptyMap()) }
+        var currentPhotoZoomed by remember { mutableStateOf(false) }
 
         Dialog(
             onDismissRequest = {
@@ -1042,10 +1071,7 @@ fun CommunityPhotosSectionShared(
             val photoEndPadding = with(density) { (viewerContainerSize.width - currentPhotoFrame.right).coerceAtLeast(0f).toDp() + 16.dp }
             val photoTopPadding = with(density) { currentPhotoFrame.top.coerceAtLeast(0f).toDp() + 16.dp }
             val navigationBottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-            val photoBottomPadding = maxOf(
-                with(density) { (viewerContainerSize.height - currentPhotoFrame.bottom).coerceAtLeast(0f).toDp() + 12.dp },
-                navigationBottomPadding + 12.dp
-            )
+            val photoBottomPadding = navigationBottomPadding + 12.dp
 
             Surface(modifier = Modifier.fillMaxSize(), color = viewerBgBaseColor.copy(alpha = bgAlpha)) {
                 Box(
@@ -1054,37 +1080,68 @@ fun CommunityPhotosSectionShared(
                         .onSizeChanged { viewerContainerSize = it }
                         .graphicsLayer { translationY = dismissOffset.value }
                 ) {
-                    HorizontalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
+                    HorizontalPager(
+                        state = pagerState,
+                        modifier = Modifier.fillMaxSize(),
+                        userScrollEnabled = !currentPhotoZoomed
+                    ) { page ->
                         var scale by remember { mutableFloatStateOf(1f) }
                         var offset by remember { mutableStateOf(Offset.Zero) }
-                        var containerSize by remember { mutableStateOf(androidx.compose.ui.unit.IntSize.Zero) }
+                        var containerSize by remember { mutableStateOf(IntSize.Zero) }
 
-                        val isZoomed = scale > 1.01f
+                        val isZoomed = scale > PHOTO_VIEWER_ZOOMED_THRESHOLD
 
-                        LaunchedEffect(pagerState.currentPage) {
-                            if (pagerState.currentPage != page) {
-                                scale = 1f
-                                offset = Offset.Zero
+                        fun setZoomState(nextScale: Float, nextOffset: Offset) {
+                            scale = nextScale
+                            offset = if (nextScale > PHOTO_VIEWER_ZOOMED_THRESHOLD) {
+                                clampedPhotoOffset(nextOffset, nextScale, containerSize, photoSourceSizes[page])
+                            } else {
+                                Offset.Zero
+                            }
+                            if (pagerState.currentPage == page) {
+                                currentPhotoZoomed = nextScale > PHOTO_VIEWER_ZOOMED_THRESHOLD
                             }
                         }
 
-                        val transformState = rememberTransformableState { zoomChange, offsetChange, _ ->
-                            var newScale = scale * zoomChange
-                            if (newScale < 1.05f) {
-                                newScale = 1f
-                                offset = Offset.Zero
-                            } else if (newScale > 5f) {
-                                newScale = 5f
+                        LaunchedEffect(pagerState.currentPage) {
+                            if (pagerState.currentPage != page) {
+                                setZoomState(PHOTO_VIEWER_MIN_SCALE, Offset.Zero)
+                            } else {
+                                currentPhotoZoomed = isZoomed
                             }
-                            scale = newScale
+                        }
 
+                        LaunchedEffect(containerSize, photoSourceSizes[page]) {
                             if (isZoomed) {
-                                val maxX = (containerSize.width * (scale - 1)) / 2f
-                                val maxY = (containerSize.height * (scale - 1)) / 2f
-                                offset = Offset(
-                                    x = (offset.x + offsetChange.x).coerceIn(-maxX, maxX),
-                                    y = (offset.y + offsetChange.y).coerceIn(-maxY, maxY)
-                                )
+                                setZoomState(scale, offset)
+                            }
+                        }
+
+                        val transformState = rememberTransformableState { centroid, zoomChange, panChange, _ ->
+                            val previousScale = scale
+                            val rawScale = (previousScale * zoomChange).coerceIn(
+                                PHOTO_VIEWER_MIN_SCALE,
+                                PHOTO_VIEWER_MAX_SCALE
+                            )
+                            val nextScale = if (rawScale < PHOTO_VIEWER_RESET_THRESHOLD) {
+                                PHOTO_VIEWER_MIN_SCALE
+                            } else {
+                                rawScale
+                            }
+
+                            if (nextScale <= PHOTO_VIEWER_ZOOMED_THRESHOLD) {
+                                setZoomState(PHOTO_VIEWER_MIN_SCALE, Offset.Zero)
+                            } else {
+                                val scaleRatio = nextScale / previousScale.coerceAtLeast(PHOTO_VIEWER_MIN_SCALE)
+                                val center = Offset(containerSize.width / 2f, containerSize.height / 2f)
+                                val centroidFromCenter = if (centroid == Offset.Unspecified) {
+                                    Offset.Zero
+                                } else {
+                                    centroid - center
+                                }
+                                val transformedOffset =
+                                    offset * scaleRatio + centroidFromCenter * (1f - scaleRatio) + panChange
+                                setZoomState(nextScale, transformedOffset)
                             }
                         }
 
@@ -1094,30 +1151,17 @@ fun CommunityPhotosSectionShared(
                                 .onSizeChanged { containerSize = it }
                                 .pointerInput(Unit) {
                                     detectTapGestures(
-                                        onDoubleTap = {
-                                            if (scale > 1.01f) { scale = 1f; offset = Offset.Zero } else { scale = 3f }
-                                        }
-                                    )
-                                }
-                                .pointerInput(Unit) {
-                                    awaitPointerEventScope {
-                                        while (true) {
-                                            val event = awaitPointerEvent()
-                                            if (scale > 1.01f && event.changes.size == 1) {
-                                                val change = event.changes.first()
-                                                if (change.pressed && change.previousPressed && !change.isConsumed) {
-                                                    val dragAmount = change.position - change.previousPosition
-                                                    val maxX = (containerSize.width * (scale - 1)) / 2f
-                                                    val maxY = (containerSize.height * (scale - 1)) / 2f
-                                                    offset = Offset(
-                                                        x = (offset.x + dragAmount.x).coerceIn(-maxX, maxX),
-                                                        y = (offset.y + dragAmount.y).coerceIn(-maxY, maxY)
-                                                    )
-                                                    change.consume()
-                                                }
+                                        onDoubleTap = { tapOffset ->
+                                            if (scale > PHOTO_VIEWER_ZOOMED_THRESHOLD) {
+                                                setZoomState(PHOTO_VIEWER_MIN_SCALE, Offset.Zero)
+                                            } else {
+                                                val center = Offset(containerSize.width / 2f, containerSize.height / 2f)
+                                                val tapFromCenter = tapOffset - center
+                                                val focusedOffset = tapFromCenter * (1f - PHOTO_VIEWER_DOUBLE_TAP_SCALE)
+                                                setZoomState(PHOTO_VIEWER_DOUBLE_TAP_SCALE, focusedOffset)
                                             }
                                         }
-                                    }
+                                    )
                                 }
                                 .pointerInput(isZoomed) {
                                     if (!isZoomed) {
@@ -1141,7 +1185,11 @@ fun CommunityPhotosSectionShared(
                                         )
                                     }
                                 }
-                                .transformable(state = transformState, enabled = isZoomed)
+                                .transformable(
+                                    state = transformState,
+                                    canPan = { scale > PHOTO_VIEWER_ZOOMED_THRESHOLD },
+                                    lockRotationOnZoomPan = true
+                                )
                         ) {
                             // --- On utilise filteredPhotos ---
                             AsyncImage(
@@ -1187,9 +1235,10 @@ fun CommunityPhotosSectionShared(
                     }
 
                     // --- TEXTES EN HAUT ---
-                    Column(
-                        modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(top = 28.dp, start = 16.dp, end = 16.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
+                    Row(
+                        modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(top = 28.dp, start = 56.dp, end = 56.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = fullScreenTitle,
@@ -1200,19 +1249,10 @@ fun CommunityPhotosSectionShared(
                         )
                     }
 
-                    if (showPhotoExif && currentPhoto.hasExifInfo() && currentPhotoSourceSize != null) {
-                        PhotoInfoButton(
-                            modifier = Modifier.align(Alignment.TopEnd).padding(top = photoTopPadding, end = photoEndPadding),
-                            backgroundColor = overlayButtonBg,
-                            contentColor = viewerContentColor,
-                            onClick = { exifDialogPhoto = currentPhoto }
-                        )
-                    }
-
                     if (canFavoriteCurrentPhoto) {
                         PhotoFavoriteButton(
                             isFavorite = isCurrentPhotoFavorite,
-                            modifier = Modifier.align(Alignment.TopStart).padding(top = photoTopPadding, start = photoStartPadding),
+                            modifier = Modifier.align(Alignment.TopStart).padding(top = 28.dp, start = 12.dp),
                             backgroundColor = overlayButtonBg,
                             contentColor = viewerContentColor,
                             onClick = { toggleFavoritePhoto(currentPhoto) }
@@ -1231,17 +1271,37 @@ fun CommunityPhotosSectionShared(
                     }
 
                     // --- AUTEUR ET DATE ---
-                    if (!currentPhoto.author.isNullOrBlank() || !currentPhoto.date.isNullOrBlank()) {
+                    val hasCurrentPhotoCaption = !currentPhoto.author.isNullOrBlank() || !currentPhoto.date.isNullOrBlank()
+                    val hasCurrentPhotoInfo = showPhotoExif && currentPhoto.hasExifInfo() && currentPhotoSourceSize != null
+                    if (hasCurrentPhotoCaption || hasCurrentPhotoInfo) {
                         Column(
-                            modifier = Modifier.align(Alignment.BottomStart).padding(bottom = photoBottomPadding, start = photoStartPadding).background(overlayButtonBg, badgeShape).padding(horizontal = 12.dp, vertical = 8.dp),
+                            modifier = Modifier.align(Alignment.BottomStart).padding(bottom = photoBottomPadding, start = photoStartPadding),
                             horizontalAlignment = Alignment.Start
                         ) {
-                            if (!currentPhoto.author.isNullOrBlank() && currentPhoto.author != "null") {
-                                Text(text = stringResource(R.string.photo_by_author, currentPhoto.author), color = viewerContentColor, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            if (hasCurrentPhotoInfo) {
+                                PhotoInfoButton(
+                                    modifier = Modifier,
+                                    backgroundColor = overlayButtonBg,
+                                    contentColor = viewerContentColor,
+                                    onClick = { exifDialogPhoto = currentPhoto }
+                                )
                             }
-                            val formattedDate = formatPhotoDate(currentPhoto.date)
-                            if (formattedDate.isNotEmpty()) {
-                                Text(text = stringResource(R.string.photo_on_date, formattedDate), color = viewerContentColor.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall)
+                            if (hasCurrentPhotoCaption) {
+                                if (hasCurrentPhotoInfo) {
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                }
+                                Column(
+                                    modifier = Modifier.background(overlayButtonBg, badgeShape).padding(horizontal = 12.dp, vertical = 8.dp),
+                                    horizontalAlignment = Alignment.Start
+                                ) {
+                                    if (!currentPhoto.author.isNullOrBlank() && currentPhoto.author != "null") {
+                                        Text(text = stringResource(R.string.photo_by_author, currentPhoto.author), color = viewerContentColor, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                    }
+                                    val formattedDate = formatPhotoDate(currentPhoto.date)
+                                    if (formattedDate.isNotEmpty()) {
+                                        Text(text = stringResource(R.string.photo_on_date, formattedDate), color = viewerContentColor.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall)
+                                    }
+                                }
                             }
                         }
                     }
