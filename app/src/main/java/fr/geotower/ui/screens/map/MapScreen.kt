@@ -873,11 +873,87 @@ fun MapScreen(
             // Table de correspondance ANFR -> operateurs declares HS.
             val hsOperatorMap = buildHsOperatorMap(sitesHsList)
 
-            val isClusterMode = antennasList.first().idAnfr.startsWith("CLUSTER_")
+            fun buildAntennaMarkers(antennas: List<LocalisationEntity>): List<AntennaMarker> {
+                val groupedSites = antennas.groupBy { "${it.latitude}_${it.longitude}" }.values.take(6000)
 
-            if (isClusterMode) {
+                return groupedSites.mapNotNull { siteAntennas ->
+                    val filteredSiteAntennas = siteAntennas.mapNotNull { antenna ->
+                        val activeOps = visibleOperatorKeysForAntenna(
+                            antenna = antenna,
+                            hsOperatorMap = hsOperatorMap,
+                            showSitesInService = showSitesInService,
+                            showSitesOutOfService = showSitesOutOfService,
+                            selectedOperatorKeys = selectedOperators
+                        )
+
+                        if (activeOps.isEmpty()) null else antenna.copy(operateur = activeOps.joinToString(", "))
+                    }
+                    if (filteredSiteAntennas.isEmpty()) return@mapNotNull null
+
+                    val mainAntenna = filteredSiteAntennas.first()
+
+                    AntennaMarker(map, filteredSiteAntennas, safePrimaryColor).apply {
+                        position = GeoPoint(mainAntenna.latitude, mainAntenna.longitude)
+                        setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
+
+                        infoWindow = null // Pas de bulle grise par defaut
+
+                        val operatorsOnSite = filteredSiteAntennas.mapNotNull { it.operateur }
+                            .flatMap { OperatorColors.keysFor(it) }
+                            .distinct()
+                        relatedObject = operatorsOnSite
+
+                        val baseIcon = MapUtils.createAdaptiveMarker(context, filteredSiteAntennas, map.zoomLevelDouble >= 13.0 && AppConfig.showAzimuths.value, AppConfig.defaultOperator.value)
+
+                        val isHs = filteredSiteAntennas.any { antenna ->
+                            hasVisibleHsOperator(antenna, hsOperatorMap)
+                        }
+
+                        if (isHs) {
+                            val badgeIcon = createHsBadge(context)
+
+                            val combinedBitmap = android.graphics.Bitmap.createBitmap(
+                                baseIcon.intrinsicWidth,
+                                baseIcon.intrinsicHeight,
+                                android.graphics.Bitmap.Config.ARGB_8888
+                            )
+                            val canvas = android.graphics.Canvas(combinedBitmap)
+
+                            baseIcon.setBounds(0, 0, canvas.width, canvas.height)
+                            baseIcon.draw(canvas)
+
+                            val offsetX = (canvas.width - badgeIcon.intrinsicWidth) / 2
+                            val offsetY = (canvas.height - badgeIcon.intrinsicHeight) / 2
+                            badgeIcon.setBounds(offsetX, offsetY, offsetX + badgeIcon.intrinsicWidth, offsetY + badgeIcon.intrinsicHeight)
+                            badgeIcon.draw(canvas)
+
+                            icon = android.graphics.drawable.BitmapDrawable(context.resources, combinedBitmap)
+                        } else {
+                            icon = baseIcon
+                        }
+
+                        setOnMarkerClickListener { _, _ ->
+                            if (isMeasuringMode) {
+                                val id = mainAntenna.idAnfr
+                                if (measuredSites.containsKey(id)) measuredSites.remove(id) else if (myCurrentLoc != null) measuredSites[id] = mainAntenna
+                                refreshMeasureLayers(map)
+                            } else {
+                                val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+                                prefs.edit().putFloat("clicked_lat", mainAntenna.latitude.toFloat()).putFloat("clicked_lon", mainAntenna.longitude.toFloat()).apply()
+                                navController.navigate("support_detail/${mainAntenna.idAnfr.toLongOrNull() ?: 0L}")
+                            }
+                            true
+                        }
+                    }
+                }
+            }
+
+            val clusterAntennas = antennasList.filter { it.idAnfr.startsWith("CLUSTER_") }
+            val directAntennas = antennasList.filterNot { it.idAnfr.startsWith("CLUSTER_") }
+
+            if (clusterAntennas.isNotEmpty()) {
                 // ... (Ton code actuel MACRO reste identique)
-                val clusterMarkers = antennasList.map { fakeAntenna ->
+                val clusterMarkers = clusterAntennas.map { fakeAntenna ->
                     val count = fakeAntenna.idAnfr.removePrefix("CLUSTER_").toIntOrNull() ?: 1
                     org.osmdroid.views.overlay.Marker(map).apply {
                         position = GeoPoint(fakeAntenna.latitude, fakeAntenna.longitude)
@@ -897,8 +973,14 @@ fun MapScreen(
                         }
                     }
                 }
+                val directMarkers = buildAntennaMarkers(directAntennas)
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
-                    markersOverlay.items.clear(); markersOverlay.invalidate(); macroOverlay.items.clear(); macroOverlay.items.addAll(clusterMarkers); map.invalidate()
+                    markersOverlay.items.clear()
+                    markersOverlay.items.addAll(directMarkers)
+                    markersOverlay.invalidate()
+                    macroOverlay.items.clear()
+                    macroOverlay.items.addAll(clusterMarkers)
+                    map.invalidate()
                 }
             } else {
                 // 🔍 MODE MICRO

@@ -521,7 +521,8 @@ interface GeoTowerDao {
             AVG(l.latitude) AS centerLat,
             AVG(l.longitude) AS centerLon,
             COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
-            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
+            MIN(l.id_anfr) AS singleIdAnfr
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         LEFT JOIN support s ON s.id_anfr = l.id_anfr
@@ -544,7 +545,8 @@ interface GeoTowerDao {
             AVG(l.latitude) AS centerLat,
             AVG(l.longitude) AS centerLon,
             COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
-            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
+            MIN(l.id_anfr) AS singleIdAnfr
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         LEFT JOIN support s ON s.id_anfr = l.id_anfr
@@ -567,7 +569,8 @@ interface GeoTowerDao {
             AVG(l.latitude) AS centerLat,
             AVG(l.longitude) AS centerLon,
             COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
-            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
+            MIN(l.id_anfr) AS singleIdAnfr
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         LEFT JOIN support s ON s.id_anfr = l.id_anfr
@@ -590,7 +593,8 @@ interface GeoTowerDao {
             AVG(l.latitude) AS centerLat,
             AVG(l.longitude) AS centerLon,
             COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
-            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
+            MIN(l.id_anfr) AS singleIdAnfr
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         LEFT JOIN support s ON s.id_anfr = l.id_anfr
@@ -613,7 +617,8 @@ interface GeoTowerDao {
             AVG(l.latitude) AS centerLat,
             AVG(l.longitude) AS centerLon,
             COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
-            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
+            MIN(l.id_anfr) AS singleIdAnfr
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         LEFT JOIN support s ON s.id_anfr = l.id_anfr
@@ -636,7 +641,8 @@ interface GeoTowerDao {
             AVG(l.latitude) AS centerLat,
             AVG(l.longitude) AS centerLon,
             COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
-            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
+            MIN(l.id_anfr) AS singleIdAnfr
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         LEFT JOIN support s ON s.id_anfr = l.id_anfr
@@ -659,7 +665,8 @@ interface GeoTowerDao {
             AVG(l.latitude) AS centerLat,
             AVG(l.longitude) AS centerLon,
             COUNT(DISTINCT COALESCE(NULLIF(TRIM(s.id_support), ''), l.id_anfr)) AS count,
-            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators
+            GROUP_CONCAT(DISTINCT COALESCE(o.libelle, 'Inconnu')) AS operators,
+            MIN(l.id_anfr) AS singleIdAnfr
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
         LEFT JOIN support s ON s.id_anfr = l.id_anfr

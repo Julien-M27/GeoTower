@@ -642,6 +642,27 @@ fun SectionSources(cardShape: Shape, bubbleColor: Color) {
         Column(modifier = Modifier.padding(16.dp)) {
             // 1. ANFR (Données)
             CreditItem(stringResource(R.string.appstrings_src_antennas), stringResource(R.string.appstrings_src_antennas_desc))
+            Spacer(modifier = Modifier.height(8.dp))
+            SourceDataLink(
+                label = stringResource(R.string.appstrings_version_weekly_label).replace('\n', ' '),
+                host = "data.anfr.fr",
+                onClick = { uriHandler.openUri(ANFR_WEEKLY_DATA_URL) }
+            )
+            SourceDataLink(
+                label = stringResource(R.string.appstrings_version_monthly_label).replace('\n', ' '),
+                host = "data.gouv.fr",
+                onClick = { uriHandler.openUri(ANFR_MONTHLY_DATA_URL) }
+            )
+            SourceDataLink(
+                label = stringResource(R.string.appstrings_version_quarterly_label).replace('\n', ' '),
+                host = "data.arcep.fr",
+                onClick = { uriHandler.openUri(ARCEP_QUARTERLY_DATA_URL) }
+            )
+            SourceDataLink(
+                label = stringResource(R.string.appstrings_version_hs_label).replace('\n', ' '),
+                host = "data.gouv.fr",
+                onClick = { uriHandler.openUri(ARCEP_HS_DATA_URL) }
+            )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
@@ -713,6 +734,33 @@ private fun CreditItem(title: String, description: String) {
         Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
+
+@Composable
+private fun SourceDataLink(label: String, host: String, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp)
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodySmall,
+            fontWeight = FontWeight.SemiBold,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = host,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary
+        )
+    }
+}
+
+private const val ANFR_WEEKLY_DATA_URL = "https://data.anfr.fr/explore/dataset/observatoire_2g_3g_4g/"
+private const val ANFR_MONTHLY_DATA_URL = "https://www.data.gouv.fr/datasets/donnees-sur-les-installations-radioelectriques-de-plus-de-5-watts-1/"
+private const val ARCEP_QUARTERLY_DATA_URL = "https://data.arcep.fr/mobile/sites/"
+private const val ARCEP_HS_DATA_URL = "https://www.data.gouv.fr/datasets/sites-indisponibles"
 
 @Composable
 private fun AboutDrawableImage(resId: Int, modifier: Modifier = Modifier, contentDescription: String? = null) {
@@ -839,8 +887,8 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
                 stringResource(R.string.appstrings_version_db_label) to dbVersion,
                 stringResource(R.string.appstrings_version_weekly_label) to LocalizedDateLabels.formatWeeklyVersionWithWeekNumber(context, anfrDate),
                 stringResource(R.string.appstrings_version_monthly_label) to LocalizedDateLabels.formatMonthlyVersion(context, rawMonthlyVersion),
-                stringResource(R.string.appstrings_version_quarterly_label) to quarterlyVersion,
-                stringResource(R.string.appstrings_version_hs_label) to hsDate
+                stringResource(R.string.appstrings_version_quarterly_label) to LocalizedDateLabels.formatQuarterlyVersion(context, quarterlyVersion),
+                stringResource(R.string.appstrings_version_hs_label) to LocalizedDateLabels.formatVersionDate(context, hsDate)
             )
 
             versionRows.forEachIndexed { index, row ->

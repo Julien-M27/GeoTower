@@ -81,8 +81,11 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
 
                     // On transforme ces DbCluster en fausses LocalisationEntity
                     val fakeAntennas = clusters.map { cluster ->
+                        val singleAntennaId = cluster.singleIdAnfr
+                            ?.takeIf { cluster.count == 1 && it.isNotBlank() }
+
                         LocalisationEntity(
-                            idAnfr = "CLUSTER_${cluster.count}",
+                            idAnfr = singleAntennaId ?: "CLUSTER_${cluster.count}",
                             operateur = OperatorColors.keysFor(cluster.operators).joinToString(", "),
                             latitude = cluster.centerLat,
                             longitude = cluster.centerLon,

@@ -327,5 +327,6 @@ data class DbCluster(
     @ColumnInfo(name = "centerLat") val centerLat: Double,
     @ColumnInfo(name = "centerLon") val centerLon: Double,
     @ColumnInfo(name = "count") val count: Int,
-    @ColumnInfo(name = "operators") val operators: String?
+    @ColumnInfo(name = "operators") val operators: String?,
+    @ColumnInfo(name = "singleIdAnfr") val singleIdAnfr: String? = null
 )

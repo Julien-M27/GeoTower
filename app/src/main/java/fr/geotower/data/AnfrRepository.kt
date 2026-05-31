@@ -630,6 +630,12 @@ class AnfrRepository(
             return emptyList()
         }
         return try {
+            val sourceLastUpdate = runCatching {
+                api.getSitesHsInfo().lastUpdate
+                    ?.trim()
+                    ?.takeIf { it.isNotBlank() && !it.equals("Inconnue", ignoreCase = true) }
+            }.getOrNull()
+
             // 1. On télécharge le fichier brut depuis ton serveur
             val response = api.getSitesHsGeoJson()
             val jsonString = response.string()
@@ -649,6 +655,7 @@ class AnfrRepository(
                 // optJSONObject évite que l'application ne crashe si la géométrie est absente.
                 val geometry = feature.optJSONObject("geometry")
                 val coordinates = geometry?.optJSONArray("coordinates")
+                val geometryType = geometry?.optNullableString("type")
 
                 // GeoJSON range toujours [Longitude, Latitude]
                 val lon = coordinates?.optDouble(0, 0.0) ?: 0.0
@@ -662,7 +669,9 @@ class AnfrRepository(
                 val v2g = properties.optNullableString("voix2g")
                 val v3g = properties.optNullableString("voix3g")
                 val v4g = properties.optNullableString("voix4g")
+                val v5g = properties.optNullableString("voix5g")
 
+                val d2g = properties.optNullableString("data2g")
                 val d3g = properties.optNullableString("data3g")
                 val d4g = properties.optNullableString("data4g")
                 val d5g = properties.optNullableString("data5g")
@@ -679,6 +688,7 @@ class AnfrRepository(
                     operateur = operateurStr,
                     latitude = lat,
                     longitude = lon,
+                    geometryType = geometryType,
 
                     // Localisation
                     departement = dept,
@@ -690,8 +700,10 @@ class AnfrRepository(
                     voix2g = v2g,
                     voix3g = v3g,
                     voix4g = v4g,
+                    voix5g = v5g,
 
                     // Data
+                    data2g = d2g,
                     data3g = d3g,
                     data4g = d4g,
                     data5g = d5g,
@@ -709,7 +721,8 @@ class AnfrRepository(
                     debutData = properties.optNullableString("debut_data"),
                     finData = properties.optNullableString("fin_data"),
                     dateDebut = properties.optNullableString("debut"),
-                    dateFin = properties.optNullableString("fin")
+                    dateFin = properties.optNullableString("fin"),
+                    sourceLastUpdate = sourceLastUpdate
                 )
                 hsList.add(site)
             }
@@ -717,7 +730,7 @@ class AnfrRepository(
             // 🚨 AJOUT : Sauvegarde de la date du jour (Dernière vérification réussie)
             val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
             val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-            prefs.edit().putString("last_hs_update", currentDate).apply()
+            prefs.edit().putString("last_hs_update", sourceLastUpdate ?: currentDate).apply()
 
             hsList
         } catch (e: CancellationException) {

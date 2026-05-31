@@ -10,6 +10,7 @@ data class SiteHsEntity(
     val operateur: String,
     val latitude: Double,   // Extrait de geometry.coordinates[1]
     val longitude: Double,  // Extrait de geometry.coordinates[0]
+    val geometryType: String? = null,
 
     // --- Localisation ---
     val departement: String? = null,
@@ -46,5 +47,6 @@ data class SiteHsEntity(
 
     // --- Dates globales ---
     val dateDebut: String? = null, // Correspond à "debut"
-    val dateFin: String? = null    // Correspond à "fin"
+    val dateFin: String? = null,   // Correspond à "fin"
+    val sourceLastUpdate: String? = null
 )

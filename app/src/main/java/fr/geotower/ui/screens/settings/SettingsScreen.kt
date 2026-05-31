@@ -208,6 +208,7 @@ fun SettingsScreen(
     var scrollViewportTop by remember { mutableFloatStateOf(0f) }
     var scrollViewportBottom by remember { mutableFloatStateOf(0f) }
     var offlineMapsBounds by remember { mutableStateOf(SettingsSectionBounds()) }
+    var offlineMapsExpandedForNavigation by remember { mutableStateOf(false) }
     val offlineMapsTargetFilename = targetOfflineMapFilename?.takeIf { it.isNotBlank() }
     var offlineMapsTargetBounds by remember(offlineMapsTargetFilename) { mutableStateOf(SettingsSectionBounds()) }
     var hasPrimedOfflineMapsTargetScroll by remember(initialSection, offlineMapsTargetFilename) { mutableStateOf(false) }
@@ -581,16 +582,35 @@ fun SettingsScreen(
     }
 
     if (isWideScreen && navMode == 0) {
-        LaunchedEffect(scrollState.value, sectionRootSnapshot, scrollViewportTop) {
+        LaunchedEffect(
+            scrollState.value,
+            scrollState.maxValue,
+            sectionRootSnapshot,
+            offlineMapsExpandedForNavigation,
+            scrollViewportTop
+        ) {
             if (sectionRootSnapshot.size >= menuItems.size) {
                 val activationLine = scrollViewportTop + 24f
-                val nextSection = sectionRootSnapshot
-                    .filterKeys { it in menuItems.indices }
-                    .entries
-                    .filter { it.value <= activationLine }
-                    .maxByOrNull { it.value }
-                    ?.key
-                    ?: sectionRootSnapshot.filterKeys { it in menuItems.indices }.minByOrNull { it.value }?.key
+                val databaseSectionIndex = menuItems.last().third
+                val regularSectionIndices = menuItems.dropLast(1).map { it.third }.toSet()
+                val allowDatabaseSelectionBeforeEnd =
+                    initialSection == "database" ||
+                        initialSection == "offline_maps" ||
+                        offlineMapsTargetFilename != null ||
+                        offlineMapsExpandedForNavigation
+                val selectableSectionRoots = sectionRootSnapshot.filterKeys {
+                    it in regularSectionIndices || (allowDatabaseSelectionBeforeEnd && it == databaseSectionIndex)
+                }
+                val isAtScrollEnd = scrollState.maxValue > 0 && !scrollState.canScrollForward
+                val nextSection = if (isAtScrollEnd) {
+                    databaseSectionIndex
+                } else {
+                    selectableSectionRoots.entries
+                        .filter { it.value <= activationLine }
+                        .maxByOrNull { it.value }
+                        ?.key
+                        ?: selectableSectionRoots.minByOrNull { it.value }?.key
+                }
                 if (nextSection != null) activeSectionIndex = nextSection
             }
         }
@@ -756,7 +776,7 @@ fun SettingsScreen(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                             if (navMode == 0 || !isExpanded) {
-                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; offlineMapsBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) }, scrollViewportTop, scrollViewportBottom, scrollState.value, scrollState.maxValue, targetMapFilename = offlineMapsTargetFilename, onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) })
+                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; offlineMapsBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) }, scrollViewportTop, scrollViewportBottom, scrollState.value, scrollState.maxValue, targetMapFilename = offlineMapsTargetFilename, onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) }, onOfflineMapsExpandedChange = { offlineMapsExpandedForNavigation = it })
                             } else {
                                 when (activeSectionIndex) {
                                     0 -> SectionApparence(themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true })
@@ -778,7 +798,8 @@ fun SettingsScreen(
                                         targetMapFilename = offlineMapsTargetFilename,
                                         onTargetMapPositioned = { top, height ->
                                             offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height)
-                                        }
+                                        },
+                                        onOfflineMapsExpandedChange = { offlineMapsExpandedForNavigation = it }
                                     )
                                 }
                             }
@@ -1687,7 +1708,8 @@ fun AllSettingsContent(
     scrollValue: Int = 0,
     scrollMaxValue: Int = 0,
     targetMapFilename: String? = null,
-    onTargetMapPositioned: (Float, Int) -> Unit = { _, _ -> }
+    onTargetMapPositioned: (Float, Int) -> Unit = { _, _ -> },
+    onOfflineMapsExpandedChange: (Boolean) -> Unit = {}
 ) {
     Column(modifier = appearanceSectionModifier.fillMaxWidth()) {
         SectionApparence(theme, onTheme, oled, onOled, oneUi, onOneUi, blur, onBlur, logo, onIcon, onLogoDrawing, shape, border, bubbleColor, useOneUi, safeClick, onColorPaletteClick)
@@ -1720,7 +1742,8 @@ fun AllSettingsContent(
         scrollValue,
         scrollMaxValue,
         targetMapFilename,
-        onTargetMapPositioned
+        onTargetMapPositioned,
+        onOfflineMapsExpandedChange = onOfflineMapsExpandedChange
     )
 }
 
@@ -2225,7 +2248,8 @@ fun SectionDatabase(
     scrollValue: Int = 0,
     scrollMaxValue: Int = 0,
     targetMapFilename: String? = null,
-    onTargetMapPositioned: (Float, Int) -> Unit = { _, _ -> }
+    onTargetMapPositioned: (Float, Int) -> Unit = { _, _ -> },
+    onOfflineMapsExpandedChange: (Boolean) -> Unit = {}
 ) {
     var showResetDialog by remember { mutableStateOf(false) }
     val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
@@ -2260,7 +2284,8 @@ fun SectionDatabase(
             scrollValue = scrollValue,
             scrollMaxValue = scrollMaxValue,
             targetMapFilename = targetMapFilename,
-            onTargetMapPositioned = onTargetMapPositioned
+            onTargetMapPositioned = onTargetMapPositioned,
+            onExpandedChange = onOfflineMapsExpandedChange
         )
     }
 

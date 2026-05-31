@@ -26,28 +26,27 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
+    section(stringResource(R.string.appstrings_release_section_hs_sites)) {
+        item(stringResource(R.string.appstrings_release_hs_sites_data_enriched))
+        item(stringResource(R.string.appstrings_release_hs_sites_arcep_source_date))
+        item(stringResource(R.string.appstrings_release_hs_sites_service_details))
+    }
+
     section(stringResource(R.string.appstrings_release_section_map)) {
-        item(stringResource(R.string.appstrings_release_map_frequency_filters_consistent))
-        item(stringResource(R.string.appstrings_release_map_frequency_change_refresh))
-        item(stringResource(R.string.appstrings_release_map_clusters_frequency_filter_adapted))
-        item(stringResource(R.string.appstrings_release_map_support_count_more_reliable))
+        item(stringResource(R.string.appstrings_release_map_site_status_clearer))
+        item(stringResource(R.string.appstrings_release_map_status_legend_improved))
+        item(stringResource(R.string.appstrings_release_map_arcep_details_easier))
+        item(stringResource(R.string.appstrings_release_map_single_support_groups))
     }
 
-    section(stringResource(R.string.appstrings_release_section_site_detail)) {
-        item(stringResource(R.string.appstrings_release_site_detail_filtered_bands_distinguished))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_support_detail)) {
-        item(stringResource(R.string.appstrings_release_support_detail_operators_frequency_highlight))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_map_settings)) {
-        item(stringResource(R.string.appstrings_release_map_settings_frequency_order))
+    section(stringResource(R.string.appstrings_release_section_offline_maps)) {
+        item(stringResource(R.string.appstrings_release_offline_maps_section_collapsible))
+        item(stringResource(R.string.appstrings_release_offline_maps_auto_open))
     }
 
     section(stringResource(R.string.appstrings_release_section_about)) {
-        item(stringResource(R.string.appstrings_release_about_quarterly_data_version))
-        item(stringResource(R.string.appstrings_release_about_quarterly_data_translations))
+        item(stringResource(R.string.appstrings_release_about_anfr_arcep_sources))
+        item(stringResource(R.string.appstrings_release_about_dates_quarters_localized))
     }
 }
 

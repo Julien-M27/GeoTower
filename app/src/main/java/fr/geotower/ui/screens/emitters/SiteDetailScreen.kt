@@ -1054,30 +1054,46 @@ fun SiteDetailScreen(
                             val isEntirelyProject = totalTechs > 0 && totalTechs == projectTechs
 
                             // 4. On croise la présence avec l'état de la panne réelle ET le projet DB
+                            fun serviceStatus(hasTech: Boolean, rawStatus: String?): Boolean? {
+                                return fr.geotower.ui.components.serviceAvailabilityFromOutageCode(
+                                    hasTechnology = hasTech,
+                                    outageCode = rawStatus,
+                                    isOutage = isOutage
+                                )
+                            }
+
+                            fun isOutageStatusCode(rawStatus: String?): Boolean {
+                                val code = rawStatus
+                                    ?.trim()
+                                    ?.uppercase(Locale.ROOT)
+                                return code == "HS" || code == "DE"
+                            }
+
+                            val is5gVoiceProject = is5gProject || isOutageStatusCode(hsEntity?.voix5g)
+                            val is5gDataProject = is5gProject || (!has5G && isOutageStatusCode(hsEntity?.data5g))
+
                             val realTechStatus = mapOf(
                                 "2G" to fr.geotower.ui.components.ServiceStatus(
-                                    isVoixOk = if (has2G) hsEntity?.let { it.voix2g != "HS" } ?: true else null,
-                                    isSmsOk = if (has2G) hsEntity?.let { it.voix2g != "HS" } ?: true else null,
-                                    isInternetOk = if (has2G) hsEntity?.let { it.data2g != "HS" } ?: true else null,
+                                    isVoixOk = serviceStatus(has2G, hsEntity?.voix2g),
+                                    isInternetOk = serviceStatus(has2G, hsEntity?.data2g),
                                     isProject = is2gProject
                                 ),
                                 "3G" to fr.geotower.ui.components.ServiceStatus(
-                                    isVoixOk = if (has3G) hsEntity?.let { it.voix3g != "HS" } ?: true else null,
-                                    isSmsOk = if (has3G) hsEntity?.let { it.voix3g != "HS" } ?: true else null,
-                                    isInternetOk = if (has3G) hsEntity?.let { it.data3g != "HS" } ?: true else null,
+                                    isVoixOk = serviceStatus(has3G, hsEntity?.voix3g),
+                                    isInternetOk = serviceStatus(has3G, hsEntity?.data3g),
                                     isProject = is3gProject
                                 ),
                                 "4G" to fr.geotower.ui.components.ServiceStatus(
-                                    isVoixOk = if (has4G) hsEntity?.let { it.voix4g != "HS" } ?: true else null,
-                                    isSmsOk = if (has4G) hsEntity?.let { it.voix4g != "HS" } ?: true else null,
-                                    isInternetOk = if (has4G) hsEntity?.let { it.data4g != "HS" } ?: true else null,
+                                    isVoixOk = serviceStatus(has4G, hsEntity?.voix4g),
+                                    isInternetOk = serviceStatus(has4G, hsEntity?.data4g),
                                     isProject = is4gProject
                                 ),
                                 "5G" to fr.geotower.ui.components.ServiceStatus(
-                                    isVoixOk = if (has5G) hsEntity?.let { it.voix5g != "HS" } ?: true else null,
-                                    isSmsOk = if (has5G) hsEntity?.let { it.voix5g != "HS" } ?: true else null,
-                                    isInternetOk = if (has5G) hsEntity?.let { it.data5g != "HS" } ?: true else null,
-                                    isProject = is5gProject
+                                    isVoixOk = serviceStatus(has5G, hsEntity?.voix5g),
+                                    isInternetOk = serviceStatus(has5G, hsEntity?.data5g),
+                                    isProject = is5gProject,
+                                    isVoixProject = is5gVoiceProject,
+                                    isInternetProject = is5gDataProject
                                 )
                             )
 
@@ -1089,7 +1105,8 @@ fun SiteDetailScreen(
                                 outageExpectedRestorationDate = hsEntity?.dateFin,
                                 cardBgColor = cardBgColor,
                                 blockShape = blockShape,
-                                techStatus = realTechStatus
+                                techStatus = realTechStatus,
+                                outageDetails = hsEntity
                             )
                         }
                         "operator" -> {

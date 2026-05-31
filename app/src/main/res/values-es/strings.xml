@@ -731,6 +731,7 @@
     <string name="appstrings_release_section_support_detail">Detalle del soporte</string>
     <string name="appstrings_release_section_map_settings">Ajustes del mapa</string>
     <string name="appstrings_release_section_about">Acerca de</string>
+    <string name="appstrings_release_section_hs_sites">Sitios HS</string>
     <string name="appstrings_release_live_site_photos_rounded">Fotos del sitio mostradas con esquinas redondeadas</string>
     <string name="appstrings_release_live_operator_fallback_logos">Mejor visualización de los logotipos de operador cuando no hay foto del sitio disponible</string>
     <string name="appstrings_release_statistics_ready">Estadísticas disponibles en cuanto los datos locales están listos</string>
@@ -1571,4 +1572,15 @@
     <string name="appstrings_yes">Sí</string>
     <string name="appstrings_your_data_desc">GeoTower no recopila datos personales. Tus ajustes y favoritos se guardan solo en tu dispositivo.</string>
     <string name="appstrings_your_data_title">Tus datos</string>
+    <string name="appstrings_release_hs_sites_data_enriched">Datos de los sitios HS enriquecidos</string>
+    <string name="appstrings_release_hs_sites_arcep_source_date">Añadida la fecha de origen ARCEP</string>
+    <string name="appstrings_release_hs_sites_service_details">Detalles de servicio más completos para voz e internet</string>
+    <string name="appstrings_release_map_site_status_clearer">Mapa de estado de los sitios más claro</string>
+    <string name="appstrings_release_map_status_legend_improved">Leyenda mejorada</string>
+    <string name="appstrings_release_map_arcep_details_easier">Detalles ARCEP más fáciles de consultar</string>
+    <string name="appstrings_release_map_single_support_groups">Mejor gestión de agrupaciones con un solo soporte</string>
+    <string name="appstrings_release_offline_maps_section_collapsible">Sección más práctica y plegable</string>
+    <string name="appstrings_release_offline_maps_auto_open">Apertura automática según la navegación o la descarga</string>
+    <string name="appstrings_release_about_anfr_arcep_sources">Añadidos enlaces a las fuentes ANFR y ARCEP</string>
+    <string name="appstrings_release_about_dates_quarters_localized">Fechas y trimestres mejor localizados</string>
 </resources>

@@ -3,6 +3,7 @@ package fr.geotower.utils
 import android.content.Context
 import android.os.Build
 import fr.geotower.R
+import java.text.DateFormat
 import java.text.DateFormatSymbols
 import java.text.Normalizer
 import java.text.ParsePosition
@@ -37,6 +38,42 @@ object LocalizedDateLabels {
             if (monthName.isNotEmpty()) return "$monthName $year"
         }
         return rawName
+    }
+
+    fun formatVersionDate(context: Context, rawValue: String): String {
+        val cleanValue = rawValue.trim()
+        if (cleanValue.isBlank() || cleanValue == "-") return cleanValue.ifBlank { "-" }
+
+        val parsedDate = versionDatePatterns.firstNotNullOfOrNull { pattern ->
+            SimpleDateFormat(pattern, Locale.US).apply {
+                isLenient = false
+            }.parseFull(cleanValue)
+        }
+
+        return if (parsedDate != null) {
+            DateFormat.getDateInstance(DateFormat.SHORT, context.currentLocale()).format(parsedDate)
+        } else {
+            rawValue
+        }
+    }
+
+    fun formatQuarterlyVersion(context: Context, rawValue: String): String {
+        val cleanValue = rawValue.trim()
+        if (cleanValue.isBlank() || cleanValue == "-") return cleanValue.ifBlank { "-" }
+
+        val normalized = cleanValue.uppercase(Locale.ROOT)
+        val match = Regex("""(20\d{2})[\s_-]*(?:T|Q)[\s_-]*([1-4])""").find(normalized)
+            ?: Regex("""(?:T|Q)[\s_-]*([1-4])[\s_-]*(20\d{2})""").find(normalized)
+        if (match == null) return rawValue
+
+        val values = match.groupValues.drop(1)
+        val year = values.firstOrNull { it.startsWith("20") } ?: return rawValue
+        val quarter = values.firstOrNull { it.length == 1 && it[0] in '1'..'4' } ?: return rawValue
+        val quarterPrefix = when (context.currentLocale().language.lowercase(Locale.ROOT)) {
+            "fr", "es", "it", "pt" -> "T"
+            else -> "Q"
+        }
+        return "$quarterPrefix$quarter $year"
     }
 
     fun formatWeeklyVersionWithWeekNumber(context: Context, dateStr: String): String {
@@ -158,6 +195,20 @@ object LocalizedDateLabels {
         "yyyy/MM/dd",
         "yyyy_MM_dd",
         "yyyyMMdd",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+        "yyyy-MM-dd'T'HH:mm:ssXXX",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSX",
+        "yyyy-MM-dd'T'HH:mm:ssX",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss'Z'"
+    )
+
+    private val versionDatePatterns = listOf(
+        "yyyy-MM-dd",
+        "yyyy/MM/dd",
+        "yyyy_MM_dd",
+        "yyyyMMdd",
+        "dd/MM/yyyy",
         "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
         "yyyy-MM-dd'T'HH:mm:ssXXX",
         "yyyy-MM-dd'T'HH:mm:ss.SSSX",

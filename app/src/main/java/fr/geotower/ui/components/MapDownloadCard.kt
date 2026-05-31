@@ -1,16 +1,25 @@
 package fr.geotower.ui.components
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material3.*
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -89,6 +98,7 @@ fun MapDownloadCard(
     scrollMaxValue: Int = 0,
     targetMapFilename: String? = null,
     onTargetMapPositioned: (Float, Int) -> Unit = { _, _ -> },
+    onExpandedChange: (Boolean) -> Unit = {},
     onSafeClick: SafeClick? = null
 ) {
     val context = LocalContext.current
@@ -109,6 +119,7 @@ fun MapDownloadCard(
     var fileRefreshTrigger by remember { mutableIntStateOf(0) }
     var mapToDelete by remember { mutableStateOf<OfflineMapDto?>(null) }
     var showDeleteAllDialog by remember { mutableStateOf(false) }
+    var isExpanded by rememberSaveable(targetMapFilename) { mutableStateOf(targetMapFilename != null) }
 
     val mapsDir = remember { File(context.getExternalFilesDir(null), "maps") }
 
@@ -136,6 +147,23 @@ fun MapDownloadCard(
     val hasDownloadedMaps = remember(fileRefreshTrigger, workInfos) {
         OfflineMapDownloadValidator.listSafeMapFiles(mapsDir).isNotEmpty()
     }
+    val isAnySyncing = workInfos.any { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED }
+
+    LaunchedEffect(targetMapFilename) {
+        if (!targetMapFilename.isNullOrBlank()) {
+            isExpanded = true
+        }
+    }
+
+    LaunchedEffect(isAnySyncing) {
+        if (isAnySyncing) {
+            isExpanded = true
+        }
+    }
+
+    LaunchedEffect(isExpanded) {
+        onExpandedChange(isExpanded)
+    }
 
     Surface(
         shape = shape,
@@ -149,11 +177,22 @@ fun MapDownloadCard(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Default.Map, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(12.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(text = stringResource(R.string.appstrings_offline_maps_title), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                    Text(text = stringResource(R.string.appstrings_offline_maps_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .weight(1f)
+                        .clickable {
+                            safeClick("offline_maps_dropdown_toggle") {
+                                isExpanded = !isExpanded
+                            }
+                        }
+                ) {
+                    Icon(Icons.Default.Map, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(text = stringResource(R.string.appstrings_offline_maps_title), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
+                        Text(text = stringResource(R.string.appstrings_offline_maps_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
 
                 // 🚀 BOUTON : TOUT TÉLÉCHARGER
@@ -190,21 +229,41 @@ fun MapDownloadCard(
                                         workManager.enqueueUniqueWork("map_dl_${map.id}", ExistingWorkPolicy.REPLACE, request)
                                     }
                                 }
+                                isExpanded = true
                             }
                         }
                     ) {
                         Icon(Icons.Default.CloudDownload, contentDescription = stringResource(R.string.appstrings_download_all), tint = MaterialTheme.colorScheme.primary)
                     }
                 }
+                IconButton(
+                    onClick = {
+                        safeClick("offline_maps_dropdown_toggle_icon") {
+                            isExpanded = !isExpanded
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = if (isExpanded) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            AnimatedVisibility(
+                visible = isExpanded,
+                enter = fadeIn() + expandVertically(),
+                exit = fadeOut() + shrinkVertically()
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(16.dp))
 
-            if (isLoading) {
-                LoadingIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-            } else if (isError) {
-                Text(stringResource(R.string.appstrings_network_error_search), color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.CenterHorizontally))
-            } else {
+                    if (isLoading) {
+                        LoadingIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
+                    } else if (isError) {
+                        Text(stringResource(R.string.appstrings_network_error_search), color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.CenterHorizontally))
+                    } else {
                 catalog.forEachIndexed { index, map ->
                     val displayName = mapDisplayName(map)
                     val currentWork = workInfos.find { it.tags.contains("map_id_${map.id}") }
@@ -302,7 +361,6 @@ fun MapDownloadCard(
                 }
 
                 // 🚀 NOUVEAU : Bouton pour annuler TOUS les téléchargements de cartes
-                val isAnySyncing = workInfos.any { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED }
                 if (isAnySyncing) {
                     Spacer(modifier = Modifier.height(16.dp))
                     OutlinedButton(
@@ -335,6 +393,8 @@ fun MapDownloadCard(
                         Icon(Icons.Default.Delete, contentDescription = null)
                         Spacer(Modifier.width(8.dp))
                         Text(text = stringResource(R.string.appstrings_delete_all_maps), fontWeight = FontWeight.Bold)
+                    }
+                }
                     }
                 }
             }
