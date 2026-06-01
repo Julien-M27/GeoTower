@@ -22,6 +22,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
+private const val LARGE_SCREEN_MIN_DIMENSION_DP = 600
+
 @Composable
 fun ResponsiveDualPaneLayout(
     modifier: Modifier = Modifier,
@@ -35,7 +37,7 @@ fun ResponsiveDualPaneLayout(
     val fullSidebarWidth = androidx.compose.ui.unit.max(225.dp, (configuration.screenWidthDp * 0.3f).dp)
 
     // ✅ CORRECTION : On utilise la configuration pour savoir si on est sur tablette (plus besoin de BoxWithConstraints)
-    val isExpanded = configuration.screenWidthDp >= 600
+    val isExpanded = minOf(configuration.screenWidthDp, configuration.screenHeightDp) >= LARGE_SCREEN_MIN_DIMENSION_DP
 
     Box(modifier = modifier.fillMaxSize()) {
         if (isExpanded) {

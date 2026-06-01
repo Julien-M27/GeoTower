@@ -712,6 +712,7 @@
     <string name="appstrings_release_section_translations">Traduções</string>
     <string name="appstrings_release_section_signalquest">SignalQuest</string>
     <string name="appstrings_release_section_notifications">Notificações</string>
+    <string name="appstrings_release_section_compass">Bússola</string>
     <string name="appstrings_release_section_database">Base de dados</string>
     <string name="appstrings_release_section_live_tracking">Seguimento em direto</string>
     <string name="appstrings_release_section_statistics">Estatísticas</string>
@@ -923,7 +924,7 @@
     <string name="appstrings_site_throughput_calculator_option">Botão Calculadora de débito</string>
     <string name="appstrings_sites_in_service_label">Em serviço</string>
     <string name="appstrings_sites_label">Locais</string>
-    <string name="appstrings_sites_out_of_service_label">Fora de Serviço</string>
+    <string name="appstrings_sites_out_of_service_label">Avariado</string>
     <string name="appstrings_spectrum_by_band">Espectro por faixa de fréquence</string>
     <string name="appstrings_spectrum_title">Espectro</string>
     <string name="appstrings_speed_label">Velocidade :\u0020</string>
@@ -1590,4 +1591,16 @@
     <string name="appstrings_release_map_nearby_emitters_dark_readability">Melhor legibilidade dos cartões de emissores próximos no tema escuro</string>
     <string name="appstrings_release_signalquest_upload_privacy_clearer">Definição de privacidade das fotos mais clara no ecrã de envio</string>
     <string name="appstrings_release_signalquest_exif_removal_default_off">Remoção dos dados EXIF desativada por predefinição</string>
+    <string name="appstrings_release_interface_orientation_adapted">Melhor adaptação da aplicação à orientação do ecrã</string>
+    <string name="appstrings_release_interface_large_screens">Início, Sobre e Definições melhor adaptados aos grandes ecrãs</string>
+    <string name="appstrings_release_interface_two_pane_large_screens">Apresentação em painel duplo melhorada em verdadeiros grandes ecrãs</string>
+    <string name="appstrings_release_compass_rotation_reliable">Bússola mais fiável quando o ecrã roda</string>
+    <string name="appstrings_release_compass_landscape_compact">Interface em paisagem mais compacta</string>
+    <string name="appstrings_release_map_landscape_reorganized">Interface em paisagem reorganizada</string>
+    <string name="appstrings_release_map_search_tools_easier">Pesquisa e ferramentas mais fáceis de usar</string>
+    <string name="appstrings_release_map_buttons_consistent">Botões do mapa mais coerentes</string>
+    <string name="appstrings_release_notifications_live_visual">Notificações live mais visuais com foto do site ou logótipo da operadora</string>
+    <string name="appstrings_release_notifications_live_text_clearer">Texto das notificações mais claro</string>
+    <string name="appstrings_release_notifications_live_compatibility">Melhor compatibilidade conforme os dispositivos</string>
+    <string name="appstrings_release_global_outage_label_down">Rótulo “Fora de serviço” substituído por “Em avaria” na aplicação e traduções</string>
 </resources>

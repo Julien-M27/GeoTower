@@ -712,6 +712,7 @@
     <string name="appstrings_release_section_translations">Übersetzungen</string>
     <string name="appstrings_release_section_signalquest">SignalQuest</string>
     <string name="appstrings_release_section_notifications">Benachrichtigungen</string>
+    <string name="appstrings_release_section_compass">Kompass</string>
     <string name="appstrings_release_section_database">Datenbank</string>
     <string name="appstrings_release_section_live_tracking">Live-Tracking</string>
     <string name="appstrings_release_section_statistics">Statistiken</string>
@@ -923,7 +924,7 @@
     <string name="appstrings_site_throughput_calculator_option">Schaltfläche Durchsatzrechner</string>
     <string name="appstrings_sites_in_service_label">In Betrieb</string>
     <string name="appstrings_sites_label">Standorte</string>
-    <string name="appstrings_sites_out_of_service_label">Außer Betrieb</string>
+    <string name="appstrings_sites_out_of_service_label">Gestört</string>
     <string name="appstrings_spectrum_by_band">Spektrum nach Frequenzband</string>
     <string name="appstrings_spectrum_title">Spektrum</string>
     <string name="appstrings_speed_label">Geschwindigkeit:\u0020</string>
@@ -1590,4 +1591,16 @@
     <string name="appstrings_release_map_nearby_emitters_dark_readability">Bessere Lesbarkeit der Karten für nahe Sender im dunklen Design</string>
     <string name="appstrings_release_signalquest_upload_privacy_clearer">Klarere Foto-Datenschutzeinstellung auf dem Upload-Bildschirm</string>
     <string name="appstrings_release_signalquest_exif_removal_default_off">Entfernen von EXIF-Daten standardmäßig deaktiviert</string>
+    <string name="appstrings_release_interface_orientation_adapted">App passt sich besser an die Bildschirmausrichtung an</string>
+    <string name="appstrings_release_interface_large_screens">Startseite, Info und Einstellungen besser an große Bildschirme angepasst</string>
+    <string name="appstrings_release_interface_two_pane_large_screens">Verbesserte Zwei-Spalten-Anzeige auf echten Großbildschirmen</string>
+    <string name="appstrings_release_compass_rotation_reliable">Zuverlässigerer Kompass bei Bildschirmdrehung</string>
+    <string name="appstrings_release_compass_landscape_compact">Kompaktere Querformat-Oberfläche</string>
+    <string name="appstrings_release_map_landscape_reorganized">Querformat-Oberfläche neu organisiert</string>
+    <string name="appstrings_release_map_search_tools_easier">Suche und Werkzeuge leichter zu bedienen</string>
+    <string name="appstrings_release_map_buttons_consistent">Einheitlichere Kartenschaltflächen</string>
+    <string name="appstrings_release_notifications_live_visual">Visuellere Live-Benachrichtigungen mit Standortfoto oder Betreiberlogo</string>
+    <string name="appstrings_release_notifications_live_text_clearer">Klarerer Benachrichtigungstext</string>
+    <string name="appstrings_release_notifications_live_compatibility">Bessere Kompatibilität je nach Gerät</string>
+    <string name="appstrings_release_global_outage_label_down">Bezeichnung „Außer Betrieb“ in App und Übersetzungen durch „Gestört“ ersetzt</string>
 </resources>

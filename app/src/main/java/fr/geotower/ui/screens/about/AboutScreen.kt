@@ -159,7 +159,7 @@ fun AboutScreen(navController: NavController) {
     val logoResId by AppIconManager.currentIconRes
     val appLogoDrawingChoice by AppConfig.appLogoDrawingChoice
     val displayLogoResId = AppLogoDrawingResources.resolve(appLogoDrawingChoice, logoResId, isDark)
-    val isWideScreen = configuration.screenWidthDp >= 600
+    val isWideScreen = minOf(configuration.screenWidthDp, configuration.screenHeightDp) >= 600
 
     var activeSectionIndex by remember { mutableIntStateOf(0) }
 

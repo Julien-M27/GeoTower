@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -328,7 +329,10 @@ fun HomeScreen(navController: NavController) {
 
             // ---> 2. LE RESTE DE LA PAGE <---
             BoxWithConstraints(modifier = Modifier.weight(1f).fillMaxWidth()) {
-                val isExpanded = maxWidth >= 600.dp
+                val isExpanded = minOf(maxWidth, maxHeight) >= 600.dp
+                val isLandscape = maxWidth > maxHeight
+                val screenHeightDp = LocalConfiguration.current.screenHeightDp
+                val isCompactLandscape = isLandscape && (maxHeight < 700.dp || screenHeightDp < 700)
                 // Hauteur minimale pour forcer l'espace entre le titre, les boutons et le "À propos"
                 val minHeight = maxHeight
                 val showHelpButton = prefs.getBoolean("show_home_help", true)
@@ -349,7 +353,80 @@ fun HomeScreen(navController: NavController) {
                 }
 
                 Box(modifier = Modifier.fillMaxSize()) {
-                    if (isExpanded) {
+                    if (isLandscape) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(
+                                    horizontal = if (isCompactLandscape) 28.dp else 48.dp,
+                                    vertical = if (isCompactLandscape) 12.dp else 24.dp
+                                )
+                                .navigationBarsPadding(),
+                            horizontalArrangement = Arrangement.spacedBy(if (isCompactLandscape) 24.dp else 40.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .weight(if (isCompactLandscape) 0.9f else 1f)
+                                    .fillMaxHeight(),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.Center
+                            ) {
+                                DrawableImage(
+                                    resId = displayLogoResId,
+                                    modifier = Modifier
+                                        .size(if (isCompactLandscape) 128.dp else 220.dp)
+                                        .clip(RoundedCornerShape(if (isCompactLandscape) 24.dp else 36.dp))
+                                )
+                                Spacer(modifier = Modifier.height(if (isCompactLandscape) 14.dp else 24.dp))
+                                Text(
+                                    text = "GeoTower",
+                                    style = MaterialTheme.typography.displayLarge,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontSize = if (isCompactLandscape) 44.sp else 64.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Spacer(modifier = Modifier.height(if (isCompactLandscape) 10.dp else 18.dp))
+                                LandscapeHomeInfoActions(
+                                    navController = navController,
+                                    version = appVersion,
+                                    showHelpButton = showHelpButton,
+                                    onHelpClick = { safeClick { navController.navigate("help") { launchSingleTop = true } } }
+                                )
+                            }
+
+                            Box(
+                                modifier = Modifier
+                                    .weight(if (isCompactLandscape) 1.35f else 1.25f)
+                                    .fillMaxHeight(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    modifier = Modifier
+                                        .widthIn(max = if (isCompactLandscape) 620.dp else 700.dp)
+                                        .verticalScroll(rememberScrollState()),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    MenuButtonsList(
+                                        navController = navController,
+                                        useOneUi = useOneUi,
+                                        buttonBgColor = buttonBgColor,
+                                        paleColor = paleColor,
+                                        onPaleColor = onPaleColor,
+                                        isOnline = isOnline && !isDbBannerVisible,
+                                        logoResId = displayLogoResId,
+                                        isExpanded = true,
+                                        isDbReady = isDbReady,
+                                        isGrid = true,
+                                        compact = true
+                                    )
+
+                                }
+                            }
+                        }
+                    } else if (isExpanded) {
                         // --- DISPOSITION FOLD (TABLETTE) ---
                         val prefsFold = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
                         val showLogo = prefsFold.getBoolean("show_home_logo", true)
@@ -583,6 +660,50 @@ private fun HomeAnnouncementBanner(
 }
 
 @Composable
+private fun LandscapeHomeInfoActions(
+    navController: NavController,
+    version: String,
+    showHelpButton: Boolean,
+    onHelpClick: () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TextButton(onClick = { navController.navigate("about") }) {
+                Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(6.dp))
+                Text(
+                    text = stringResource(R.string.nav_about),
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp
+                )
+            }
+
+            if (showHelpButton) {
+                TextButton(onClick = onHelpClick) {
+                    Icon(Icons.AutoMirrored.Filled.Help, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = stringResource(R.string.nav_help),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 14.sp
+                    )
+                }
+            }
+        }
+
+        Text(
+            text = version,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
+            style = MaterialTheme.typography.labelSmall,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
 fun MenuButtonsList(
     navController: NavController,
     useOneUi: Boolean,
@@ -593,7 +714,8 @@ fun MenuButtonsList(
     logoResId: Int,
     isExpanded: Boolean,
     isDbReady: Boolean = true, // ✅ NOUVEAU PARAMÈTRE
-    isGrid: Boolean = false
+    isGrid: Boolean = false,
+    compact: Boolean = false
 ) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
@@ -635,19 +757,19 @@ fun MenuButtonsList(
             "nearby" -> {
                 if (showNearby) {
                     // ✅ On bloque avec isDbReady
-                    buttons.add { MenuButton(nearAntennasLabel, Icons.Default.MyLocation, paleColor, onPaleColor, useOneUi, menuSize, isGrid, enabled = isDbReady) { navController.navigate("emitters") } }
+                    buttons.add { MenuButton(nearAntennasLabel, Icons.Default.MyLocation, paleColor, onPaleColor, useOneUi, menuSize, isGrid, compact = compact, enabled = isDbReady) { navController.navigate("emitters") } }
                 }
             }
             "map" -> {
                 if (showMap) {
                     // ✅ On bloque avec isDbReady
-                    buttons.add { MenuButton(mapLabel, Icons.Default.Map, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, enabled = isDbReady) { navController.navigate("map") } }
+                    buttons.add { MenuButton(mapLabel, Icons.Default.Map, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, compact = compact, enabled = isDbReady) { navController.navigate("map") } }
                 }
             }
             "compass" -> {
                 if (showCompass && AppConfig.hasCompass.value) {
                     // ✅ On bloque avec isDbReady
-                    buttons.add { MenuButton(compassLabel, Icons.Default.Explore, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, enabled = isDbReady) { navController.navigate("compass") } }
+                    buttons.add { MenuButton(compassLabel, Icons.Default.Explore, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, compact = compact, enabled = isDbReady) { navController.navigate("compass") } }
                 }
             }
             "stats" -> {
@@ -664,6 +786,7 @@ fun MenuButtonsList(
                             useOneUi = useOneUi,
                             menuSize = menuSize,
                             fillWidth = isGrid,
+                            compact = compact,
                             enabled = isStatsEnabled,
                             onClick = { navController.navigate("stats") }
                         )
@@ -672,16 +795,16 @@ fun MenuButtonsList(
             }
             "settings" -> {
                 // ✅ PARAMÈTRES RESTE TOUJOURS CLIQUABLE (enabled = true)
-                buttons.add { MenuButton(settingsLabel, Icons.Default.Settings, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, enabled = true) { navController.navigate("settings") } }
+                buttons.add { MenuButton(settingsLabel, Icons.Default.Settings, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, compact = compact, enabled = true) { navController.navigate("settings") } }
             }
         }
     }
 
     if (isGrid) {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.widthIn(max = 800.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 16.dp), modifier = Modifier.widthIn(max = 800.dp)) {
             for (i in buttons.indices step 2) {
                 if (i + 1 < buttons.size) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 16.dp)) {
                         Box(modifier = Modifier.weight(1f)) { buttons[i]() }
                         Box(modifier = Modifier.weight(1f)) { buttons[i+1]() }
                     }
@@ -691,7 +814,7 @@ fun MenuButtonsList(
             }
         }
     } else {
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             buttons.forEach { it() }
         }
     }
@@ -750,15 +873,16 @@ fun MenuButton(
     useOneUi: Boolean,
     menuSize: String = "normal",
     fillWidth: Boolean = false, // ✅ NOUVEAU
+    compact: Boolean = false,
     enabled: Boolean = true,
     onClick: () -> Unit
 ) {
-    val buttonWidth = when(menuSize) { "petit" -> 280.dp; "large" -> 330.dp; else -> 320.dp }
-    val buttonHeight = when(menuSize) { "petit" -> 65.dp; "large" -> 80.dp; else -> 60.dp }
-    val iconSize = when(menuSize) { "petit" -> 24.dp; "large" -> 28.dp; else -> 28.dp }
-    val textSize = when(menuSize) { "petit" -> 16.sp; "large" -> 18.sp; else -> 18.sp }
+    val buttonWidth = if (compact) 300.dp else when(menuSize) { "petit" -> 280.dp; "large" -> 330.dp; else -> 320.dp }
+    val buttonHeight = if (compact) 66.dp else when(menuSize) { "petit" -> 65.dp; "large" -> 80.dp; else -> 60.dp }
+    val iconSize = if (compact) 26.dp else when(menuSize) { "petit" -> 24.dp; "large" -> 28.dp; else -> 28.dp }
+    val textSize = if (compact) 17.sp else when(menuSize) { "petit" -> 16.sp; "large" -> 18.sp; else -> 18.sp }
 
-    val buttonShape = if (useOneUi) RoundedCornerShape(28.dp) else RoundedCornerShape(20.dp)
+    val buttonShape = if (useOneUi) RoundedCornerShape(if (compact) 24.dp else 28.dp) else RoundedCornerShape(20.dp)
     val buttonElevation = if (useOneUi) 0.dp else 2.dp
 
     // ✅ NOUVEAU : Si fillWidth est true (Grille), le bouton s'adapte !
@@ -785,7 +909,7 @@ fun MenuButton(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
         ) {
             Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(iconSize))
-            Spacer(modifier = Modifier.width(20.dp))
+            Spacer(modifier = Modifier.width(if (compact) 14.dp else 20.dp))
             Text(text = text, fontSize = textSize, fontWeight = FontWeight.SemiBold)
         }
     }

@@ -6,7 +6,6 @@ import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Icon
-import android.os.Build
 import androidx.annotation.DrawableRes
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -51,14 +50,9 @@ object NotificationIconResources {
     ): Notification.Builder {
         builder.setSmallIcon(smallIconRes(context))
         if (includeLargeIcon) {
-            largeIconBitmap(context)?.let { bitmap ->
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                    builder.setLargeIcon(Icon.createWithBitmap(bitmap))
-                } else {
-                    @Suppress("DEPRECATION")
-                    builder.setLargeIcon(bitmap)
-                }
-            }
+            largeIconBitmap(context)
+                ?.let(Icon::createWithBitmap)
+                ?.let(builder::setLargeIcon)
         }
         return builder
     }
@@ -106,7 +100,7 @@ object NotificationIconResources {
             Configuration.UI_MODE_NIGHT_YES
 
     private data class LargeIconCacheKey(
-        @DrawableRes val drawableRes: Int,
+        @param:DrawableRes val drawableRes: Int,
         val densityDpi: Int
     )
 }

@@ -75,8 +75,6 @@
             android:exported="true"
             android:enabled="true"
             android:launchMode="singleTop"
-            android:screenOrientation="portrait"
-            tools:ignore="LockedOrientationActivity"
             android:theme="@style/Theme.GeoRadio">
 
             <meta-data

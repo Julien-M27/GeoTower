@@ -29,6 +29,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -273,6 +274,8 @@ private val operatorSearchSplitRegex = Regex("\\s*(?:[,;/\\u2022]|\\bet\\b|\\+|&
 private val operatorSearchCombiningMarksRegex = Regex("\\p{Mn}+")
 private val operatorSearchNonWordRegex = Regex("[^A-Z0-9]+")
 private val operatorSearchRepeatedSpacesRegex = Regex("\\s+")
+private val MapControlButtonDiameter = 54.dp
+private val MapSearchBarHeight = 54.dp
 
 private fun normalizeOperatorSearchToken(value: String): String {
     return Normalizer.normalize(value, Normalizer.Form.NFD)
@@ -743,7 +746,7 @@ fun MapScreen(
         AppConfig.f5G_700.value, AppConfig.f5G_2100.value, AppConfig.f5G_3500.value, AppConfig.f5G_26000.value,
         AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value, AppConfig.showOnlyZbSites.value, sitesHs, currentCityPolygons
     ) {
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             val selectedOperators = AppConfig.selectedOperatorKeys.value
             val showSitesInService = AppConfig.showSitesInService.value
             val showSitesOutOfService = AppConfig.showSitesOutOfService.value
@@ -752,7 +755,7 @@ fun MapScreen(
             val frequencyFilter = FrequencyFilterSelection.fromMapConfig()
             val hsOperatorMap = buildHsOperatorMap(sitesHs)
 
-            val result = antennas.filter { antenna ->
+            antennas.filter { antenna ->
                 val visibleOperators = visibleOperatorKeysForAntenna(
                     antenna = antenna,
                     hsOperatorMap = hsOperatorMap,
@@ -778,8 +781,8 @@ fun MapScreen(
 
                 visibleOperators.isNotEmpty() && matchesUndergroundFilter && matchesZbFilter && isInCityBounds && matchTechno
             }
-            filteredAntennas = result
         }
+        filteredAntennas = result
     }
 
     fun createDistanceLabel(text: String): BitmapDrawable {
@@ -853,6 +856,29 @@ fun MapScreen(
     }
 
     // ✅ AJOUT DU PARAMÈTRE sitesHsList
+    fun openSupportDetailFromMap(map: MapView, antenna: LocalisationEntity) {
+        val supportId = antenna.idAnfr.toLongOrNull()
+        if (supportId == null) {
+            AppLogger.w("GeoTowerMap", "Cannot open support detail for non numeric idAnfr=${antenna.idAnfr}")
+            return
+        }
+
+        prefs.edit()
+            .putFloat("clicked_lat", antenna.latitude.toFloat())
+            .putFloat("clicked_lon", antenna.longitude.toFloat())
+            .apply()
+
+        map.post {
+            try {
+                navController.navigate("support_detail/$supportId") {
+                    launchSingleTop = true
+                }
+            } catch (e: Exception) {
+                AppLogger.w("GeoTowerMap", "Map marker navigation failed for idAnfr=${antenna.idAnfr}", e)
+            }
+        }
+    }
+
     suspend fun updateMarkers(map: MapView, antennasList: List<LocalisationEntity>, sitesHsList: List<SiteHsEntity> = emptyList()) {
         val selectedOperators = AppConfig.selectedOperatorKeys.value
         val showSitesInService = AppConfig.showSitesInService.value
@@ -938,9 +964,7 @@ fun MapScreen(
                                 if (measuredSites.containsKey(id)) measuredSites.remove(id) else if (myCurrentLoc != null) measuredSites[id] = mainAntenna
                                 refreshMeasureLayers(map)
                             } else {
-                                val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-                                prefs.edit().putFloat("clicked_lat", mainAntenna.latitude.toFloat()).putFloat("clicked_lon", mainAntenna.longitude.toFloat()).apply()
-                                navController.navigate("support_detail/${mainAntenna.idAnfr.toLongOrNull() ?: 0L}")
+                                openSupportDetailFromMap(map, mainAntenna)
                             }
                             true
                         }
@@ -1059,9 +1083,7 @@ fun MapScreen(
                                 if (measuredSites.containsKey(id)) measuredSites.remove(id) else if (myCurrentLoc != null) measuredSites[id] = mainAntenna
                                 refreshMeasureLayers(map)
                             } else {
-                                val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-                                prefs.edit().putFloat("clicked_lat", mainAntenna.latitude.toFloat()).putFloat("clicked_lon", mainAntenna.longitude.toFloat()).apply()
-                                navController.navigate("support_detail/${mainAntenna.idAnfr.toLongOrNull() ?: 0L}")
+                                openSupportDetailFromMap(map, mainAntenna)
                             }
                             true
                         }
@@ -1229,7 +1251,7 @@ fun MapScreen(
         }
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val rawPrimaryColor = MaterialTheme.colorScheme.primary.toArgb()
         val isColorTooLight = ColorUtils.calculateLuminance(rawPrimaryColor) > 0.85
 
@@ -1641,83 +1663,29 @@ fun MapScreen(
         }
 
         // ✅ 1. OUVRE LA CONDITION ICI POUR PROTÉGER TA VRAIE INTERFACE
+        val isLandscapeLayout = maxWidth > maxHeight ||
+            configuration.screenWidthDp > configuration.screenHeightDp
+
         if (!isUltraCompact) {
 
             AnimatedVisibility(
-                visible = isSearchActive,
+                visible = isSearchActive && !isLandscapeLayout,
                 enter = fadeIn() + expandHorizontally(expandFrom = Alignment.End),
                 exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.End),
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                 .padding(start = 16.dp, end = 16.dp, top = 110.dp)
         ) {
-            Surface(
-                modifier = Modifier.fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 8.dp,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxSize(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Search,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 16.dp, end = 12.dp)
-                    )
-
-                    Box(modifier = Modifier.weight(1f)) {
-                        if (searchQuery.isEmpty()) {
-                            Text(
-                                text = txtSearchCityOrId,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 16.sp,
-                                maxLines = 1
-                            )
-                        }
-                        androidx.compose.foundation.text.BasicTextField(
-                            value = searchQuery,
-                            onValueChange = { searchQuery = it },
-                            singleLine = true,
-                            textStyle = TextStyle(
-                                color = MaterialTheme.colorScheme.onSurface,
-                                fontSize = 16.sp
-                            ),
-                            cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                imeAction = androidx.compose.ui.text.input.ImeAction.Search
-                            ),
-                            keyboardActions = androidx.compose.foundation.text.KeyboardActions(
-                                onSearch = {
-                                    performSearch(searchQuery)
-                                    focusManager.clearFocus()
-                                }
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
-
-                    IconButton(
-                        onClick = {
-                            performSearch(searchQuery)
-                            focusManager.clearFocus()
-                        },
-                        modifier = Modifier
-                            .padding(end = 6.dp)
-                            .size(44.dp)
-                            .background(MaterialTheme.colorScheme.primary, CircleShape)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = stringResource(R.string.appstrings_search),
-                            tint = MaterialTheme.colorScheme.onPrimary
-                        )
-                    }
-                }
-            }
+            MapSearchBar(
+                query = searchQuery,
+                placeholder = txtSearchCityOrId,
+                onQueryChange = { searchQuery = it },
+                onSearch = {
+                    performSearch(searchQuery)
+                    focusManager.clearFocus()
+                },
+                modifier = Modifier.fillMaxWidth()
+            )
         }
 
         val compassTopPadding by animateDpAsState(
@@ -1728,6 +1696,85 @@ fun MapScreen(
             targetValue = if (isSearchActive) 250.dp else 176.dp,
             label = "toolsAnim"
         )
+        val useCompactCompassPlacement = configuration.screenHeightDp < 600
+        val showCompassInMapHeader = showCompass && AppConfig.hasCompass.value && isLandscapeLayout
+        val compassEndPadding by animateDpAsState(
+            targetValue = if (isLandscapeLayout && !useCompactCompassPlacement) {
+                (maxWidth * 0.12f).coerceIn(144.dp, 320.dp)
+            } else {
+                16.dp
+            },
+            label = "compassEndAnim"
+        )
+        val showCompactCompass = showCompass && AppConfig.hasCompass.value &&
+            useCompactCompassPlacement && !showCompassInMapHeader
+        val compactCompassHeight = if (showCompactCompass) MapControlButtonDiameter else 0.dp
+        val toolboxExpandsLeft = isLandscapeLayout
+        val visibleToolboxActionCount = listOf(
+            canUseMapSearch,
+            canUseMapMeasure,
+            canUseLayerSelector,
+            true
+        ).count { it }
+        val toolboxHeight = when {
+            !showToolbox -> 0.dp
+            toolboxExpandsLeft -> MapControlButtonDiameter
+            isToolboxExpanded -> MapControlButtonDiameter +
+                7.dp +
+                (MapControlButtonDiameter * visibleToolboxActionCount.toFloat()) +
+                1.dp +
+                (visibleToolboxActionCount * 12).dp
+            else -> MapControlButtonDiameter
+        }
+        val zoomControlsHeight = if (showZoomBtns) 117.dp else 0.dp
+        val locationButtonHeight = if (showLocationBtn && canUseMapLocation) MapControlButtonDiameter else 0.dp
+        val defaultOp by AppConfig.defaultOperator
+        val trackingButtonHeight = if (isLandscapeLayout) MapControlButtonDiameter else 40.dp
+        val trackingButtonSpacing = if (isLandscapeLayout) 1.dp else 8.dp
+        val trackingRowCount = if (defaultOp != "Aucun") 2 else 1
+        val trackingDrawerHeight = (trackingButtonHeight * trackingRowCount.toFloat()) +
+            (trackingButtonSpacing * (trackingRowCount - 1).toFloat())
+        val zoomBottomPadding = 32.dp +
+            if (showLocationBtn && canUseMapLocation) {
+                MapControlButtonDiameter + 16.dp
+            } else {
+                0.dp
+            }
+        val trackingDrawerLandscapeBottomPadding = zoomBottomPadding +
+            ((zoomControlsHeight - trackingDrawerHeight) / 2f).coerceAtLeast(0.dp)
+        val visibleRightControlGroups = listOf(
+            showCompactCompass,
+            showToolbox,
+            showZoomBtns,
+            showLocationBtn && canUseMapLocation
+        ).count { it }
+        val rightControlsHeight = compactCompassHeight +
+            toolboxHeight +
+            zoomControlsHeight +
+            locationButtonHeight +
+            ((visibleRightControlGroups - 1).coerceAtLeast(0) * 16).dp
+        val measureDrawerBottomPadding by animateDpAsState(
+            targetValue = 40.dp + rightControlsHeight,
+            label = "measureDrawerBottomAnim"
+        )
+        val measureDrawerModifier = if (!useCompactCompassPlacement) {
+            Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 16.dp, bottom = measureDrawerBottomPadding)
+                .navigationBarsPadding()
+        } else if (isLandscapeLayout && showZoomBtns) {
+            Modifier
+                .align(Alignment.BottomEnd)
+                .padding(
+                    end = 16.dp + MapControlButtonDiameter + 12.dp,
+                    bottom = trackingDrawerLandscapeBottomPadding
+                )
+                .navigationBarsPadding()
+        } else {
+            Modifier
+                .align(Alignment.TopEnd)
+                .padding(end = 16.dp, top = toolsTopPadding)
+        }
 
         // ✅ NOUVEAU : Bouton de Partage positionné sous le bouton Retour avec animation
         Box(
@@ -1749,114 +1796,20 @@ fun MapScreen(
             )
         }
 
-        if (showCompass && AppConfig.hasCompass.value) {
-            Surface(
+        if (showCompass && AppConfig.hasCompass.value && !useCompactCompassPlacement && !showCompassInMapHeader) {
+            MapCompassButton(
+                azimuth = azimuth,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(end = 16.dp, top = compassTopPadding)
-                    .size(52.dp)
-                    .clickable {
-                        safeClick {
-                            mapViewRef?.mapOrientation = 0f
-                            mapViewRef?.invalidate()
-                        }
-                    },
-                shape = CircleShape,
-                color = MaterialTheme.colorScheme.surface,
-                shadowElevation = 4.dp,
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    .padding(end = compassEndPadding, top = compassTopPadding)
+                    .size(MapControlButtonDiameter)
             ) {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = "N",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFD32F2F),
-                        modifier = Modifier.align(Alignment.TopCenter),
-                        style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
-                    )
-                    Text(
-                        text = "S",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Gray,
-                        modifier = Modifier.align(Alignment.BottomCenter),
-                        style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
-                    )
-                    Text(
-                        "E",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Gray,
-                        modifier = Modifier.align(Alignment.CenterEnd).padding(end = 5.dp)
-                    )
-                    Text(
-                        "O",
-                        fontSize = 10.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.Gray,
-                        modifier = Modifier.align(Alignment.CenterStart).padding(start = 5.dp)
-                    )
-
-                    ComposeCanvas(
-                        modifier = Modifier
-                            .size(30.dp)
-                            .rotate(-azimuth)
-                    ) {
-                        val w = size.width
-                        val h = size.height
-                        val center = Offset(w / 2f, h / 2f)
-
-                        val padding = h * 0.12f
-                        val topTipY = padding
-                        val bottomTipY = h - padding
-
-                        val pathNorthLeft = Path().apply {
-                            moveTo(w / 2f, topTipY); lineTo(
-                            w / 2f,
-                            h / 2f
-                        ); lineTo(w / 4f, h / 2f); close()
-                        }
-                        val pathNorthRight = Path().apply {
-                            moveTo(w / 2f, topTipY); lineTo(
-                            w * 3 / 4f,
-                            h / 2f
-                        ); lineTo(w / 2f, h / 2f); close()
-                        }
-                        drawPath(pathNorthLeft, Color(0xFFD32F2F))
-                        drawPath(pathNorthRight, Color(0xFFF44336))
-
-                        val pathSouthLeft = Path().apply {
-                            moveTo(w / 2f, bottomTipY); lineTo(
-                            w / 2f,
-                            h / 2f
-                        ); lineTo(w / 4f, h / 2f); close()
-                        }
-                        val pathSouthRight = Path().apply {
-                            moveTo(w / 2f, bottomTipY); lineTo(
-                            w * 3 / 4f,
-                            h / 2f
-                        ); lineTo(w / 2f, h / 2f); close()
-                        }
-                        drawPath(pathSouthLeft, Color(0xFF9E9E9E))
-                        drawPath(pathSouthRight, Color(0xFFE0E0E0))
-
-                        drawCircle(Color.White, radius = w / 10f, center = center)
-                        drawCircle(
-                            Color.Gray,
-                            radius = w / 10f,
-                            center = center,
-                            style = Stroke(width = 1f)
-                        )
-                    }
+                safeClick {
+                    mapViewRef?.mapOrientation = 0f
+                    mapViewRef?.invalidate()
                 }
             }
         }
-
-        val defaultOp by AppConfig.defaultOperator
 
         val darkMaterialColor = Color(0xFF37474F)
         val opColor = OperatorColors.keyFor(defaultOp)
@@ -1869,13 +1822,11 @@ fun MapScreen(
             visible = isMeasuringMode,
             enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }),
             exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it }),
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(end = 16.dp, top = toolsTopPadding)
+            modifier = measureDrawerModifier
         ) {
             Column(
                 horizontalAlignment = Alignment.End,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(trackingButtonSpacing)
             ) {
                 // ========================================================
                 // 1. TIROIR SUIVI GLOBAL
@@ -1884,7 +1835,7 @@ fun MapScreen(
                     // La petite barre verticale cliquable (le toggle)
                     Box(
                         modifier = Modifier
-                            .height(40.dp).width(12.dp)
+                            .height(trackingButtonHeight).width(12.dp)
                             // ✅ NOUVEAU : Bords arrondis de tous les côtés pour la poignée
                             .background(darkMaterialColor, RoundedCornerShape(6.dp))
                             .clickable { safeClick { isClosestSiteExpanded = !isClosestSiteExpanded } }
@@ -1901,10 +1852,10 @@ fun MapScreen(
                     ) {
                         Button(
                             onClick = { safeClick { trackNearestAll = !trackNearestAll } },
-                            modifier = Modifier.height(40.dp).width(210.dp),
+                            modifier = Modifier.height(trackingButtonHeight).width(210.dp),
                             contentPadding = PaddingValues(horizontal = 14.dp),
                             // ✅ NOUVEAU : Forme de pilule parfaite
-                            shape = RoundedCornerShape(20.dp),
+                            shape = RoundedCornerShape(trackingButtonHeight / 2f),
                             colors = ButtonDefaults.buttonColors(containerColor = darkMaterialColor, contentColor = Color.White)
                         ) {
                             Icon(Icons.Default.NearMe, null, modifier = Modifier.size(18.dp))
@@ -1926,7 +1877,7 @@ fun MapScreen(
                         // La petite barre verticale cliquable (le toggle)
                         Box(
                             modifier = Modifier
-                                .height(40.dp).width(12.dp)
+                                .height(trackingButtonHeight).width(12.dp)
                                 // ✅ NOUVEAU : Bords arrondis de tous les côtés
                                 .background(opColor, RoundedCornerShape(6.dp))
                                 .clickable { safeClick { isClosestFavSiteExpanded = !isClosestFavSiteExpanded } }
@@ -1943,10 +1894,10 @@ fun MapScreen(
                         ) {
                             Button(
                                 onClick = { safeClick { trackNearestFav = !trackNearestFav } },
-                                modifier = Modifier.height(40.dp).width(210.dp),
+                                modifier = Modifier.height(trackingButtonHeight).width(210.dp),
                                 contentPadding = PaddingValues(horizontal = 14.dp),
                                 // ✅ NOUVEAU : Forme de pilule parfaite
-                                shape = RoundedCornerShape(20.dp),
+                                shape = RoundedCornerShape(trackingButtonHeight / 2f),
                                 colors = ButtonDefaults.buttonColors(containerColor = opColor, contentColor = Color.White)
                             ) {
                                 Icon(Icons.Default.WifiTethering, null, modifier = Modifier.size(18.dp))
@@ -1977,11 +1928,28 @@ fun MapScreen(
                     Text(txtMapTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
                 }
 
-                SmallFloatingButton(
-                    icon = Icons.Default.Menu,
-                    desc = txtFilter,
-                    modifier = Modifier.align(Alignment.CenterEnd)
-                ) { safeClick { showSettingsSheet = true } }
+                Row(
+                    modifier = Modifier.align(Alignment.CenterEnd),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (showCompassInMapHeader) {
+                        MapCompassButton(
+                            azimuth = azimuth,
+                            modifier = Modifier.size(MapControlButtonDiameter)
+                        ) {
+                            safeClick {
+                                mapViewRef?.mapOrientation = 0f
+                                mapViewRef?.invalidate()
+                            }
+                        }
+                    }
+
+                    SmallFloatingButton(
+                        icon = Icons.Default.Menu,
+                        desc = txtFilter
+                    ) { safeClick { showSettingsSheet = true } }
+                }
             }
 
             val deleteButtonSpacer by animateDpAsState(
@@ -2015,10 +1983,23 @@ fun MapScreen(
                 .align(Alignment.BottomEnd)
                 .padding(bottom = 32.dp, end = 16.dp)
                 .navigationBarsPadding(),
-            horizontalAlignment = Alignment.CenterHorizontally,
+            horizontalAlignment = Alignment.End,
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (showCompactCompass) {
+                MapCompassButton(
+                    azimuth = azimuth,
+                    modifier = Modifier.size(MapControlButtonDiameter)
+                ) {
+                    safeClick {
+                        mapViewRef?.mapOrientation = 0f
+                        mapViewRef?.invalidate()
+                    }
+                }
+            }
+
             if (showToolbox) {
+                val toolboxContent: @Composable () -> Unit = {
                 AntennaMapToolBox(
                     isToolboxExpanded = isToolboxExpanded,
                     onToggleToolbox = {
@@ -2079,14 +2060,41 @@ fun MapScreen(
                     onOpenSettings = { safeClick { showMapPageSettingsSheet = true } },
                     showSearch = canUseMapSearch,
                     showMeasure = canUseMapMeasure,
-                    showLayers = canUseLayerSelector
+                    showLayers = canUseLayerSelector,
+                    expandLeft = toolboxExpandsLeft
                 )
+                }
+
+                if (isLandscapeLayout && isSearchActive) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(start = 16.dp),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        MapSearchBar(
+                            query = searchQuery,
+                            placeholder = txtSearchCityOrId,
+                            onQueryChange = { searchQuery = it },
+                            onSearch = {
+                                performSearch(searchQuery)
+                                focusManager.clearFocus()
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        toolboxContent()
+                    }
+                } else {
+                    toolboxContent()
+                }
             }
 
             if (showZoomBtns) {
                 Surface(
-                    modifier = Modifier.width(54.dp),
-                    shape = RoundedCornerShape(27.dp),
+                    modifier = Modifier.width(MapControlButtonDiameter),
+                    shape = RoundedCornerShape(MapControlButtonDiameter / 2f),
                     color = MaterialTheme.colorScheme.surface,
                     shadowElevation = 6.dp,
                     border = BorderStroke(
@@ -2100,7 +2108,7 @@ fun MapScreen(
                     ) {
                         IconButton(
                             onClick = { mapViewRef?.controller?.zoomIn() },
-                            modifier = Modifier.size(54.dp)
+                            modifier = Modifier.size(MapControlButtonDiameter)
                         ) { Icon(Icons.Default.Add, null, modifier = Modifier.size(26.dp)) }
                         HorizontalDivider(
                             modifier = Modifier.width(32.dp),
@@ -2108,7 +2116,7 @@ fun MapScreen(
                         )
                         IconButton(
                             onClick = { mapViewRef?.controller?.zoomOut() },
-                            modifier = Modifier.size(54.dp)
+                            modifier = Modifier.size(MapControlButtonDiameter)
                         ) { Icon(Icons.Default.Remove, null, modifier = Modifier.size(26.dp)) }
                     }
                 }
@@ -2166,7 +2174,7 @@ fun MapScreen(
                     },
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     shape = CircleShape,
-                    modifier = Modifier.size(56.dp)
+                    modifier = Modifier.size(MapControlButtonDiameter)
                 ) {
                     // ✅ On ajoute le cercle très fin autour de l'icône si actif
                     Box(
@@ -2658,9 +2666,184 @@ private fun MapLayerButton(text: String, isSelected: Boolean, modifier: Modifier
 }
 
 @Composable
+private fun MapSearchBar(
+    query: String,
+    placeholder: String,
+    onQueryChange: (String) -> Unit,
+    onSearch: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier.height(MapSearchBarHeight),
+        shape = RoundedCornerShape(MapSearchBarHeight / 2f),
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 8.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxSize(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(start = 16.dp, end = 12.dp)
+            )
+
+            Box(modifier = Modifier.weight(1f)) {
+                if (query.isEmpty()) {
+                    Text(
+                        text = placeholder,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 16.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                androidx.compose.foundation.text.BasicTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    singleLine = true,
+                    textStyle = TextStyle(
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 16.sp
+                    ),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        imeAction = androidx.compose.ui.text.input.ImeAction.Search
+                    ),
+                    keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                        onSearch = { onSearch() }
+                    ),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+
+            IconButton(
+                onClick = onSearch,
+                modifier = Modifier
+                    .size(MapControlButtonDiameter)
+                    .background(MaterialTheme.colorScheme.primary, CircleShape)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Search,
+                    contentDescription = stringResource(R.string.appstrings_search),
+                    tint = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun SmallFloatingButton(icon: ImageVector, desc: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = CircleShape, color = MaterialTheme.colorScheme.surface, shadowElevation = 4.dp, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), modifier = modifier.size(48.dp)) {
+    Surface(onClick = onClick, shape = CircleShape, color = MaterialTheme.colorScheme.surface, shadowElevation = 4.dp, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), modifier = modifier.size(MapControlButtonDiameter)) {
         Box(contentAlignment = Alignment.Center) { Icon(icon, desc) }
+    }
+}
+
+@Composable
+private fun MapCompassButton(
+    azimuth: Float,
+    modifier: Modifier = Modifier,
+    onReset: () -> Unit
+) {
+    Surface(
+        modifier = modifier.clickable(onClick = onReset),
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surface,
+        shadowElevation = 4.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+    ) {
+        Box(
+            modifier = Modifier.fillMaxSize(),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "N",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFD32F2F),
+                modifier = Modifier.align(Alignment.TopCenter),
+                style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
+            )
+            Text(
+                text = "S",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                style = TextStyle(platformStyle = PlatformTextStyle(includeFontPadding = false))
+            )
+            Text(
+                text = "E",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray,
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 5.dp)
+            )
+            Text(
+                text = "O",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color.Gray,
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = 5.dp)
+            )
+
+            ComposeCanvas(
+                modifier = Modifier
+                    .size(30.dp)
+                    .rotate(-azimuth)
+            ) {
+                val w = size.width
+                val h = size.height
+                val center = Offset(w / 2f, h / 2f)
+
+                val padding = h * 0.12f
+                val topTipY = padding
+                val bottomTipY = h - padding
+
+                val pathNorthLeft = Path().apply {
+                    moveTo(w / 2f, topTipY)
+                    lineTo(w / 2f, h / 2f)
+                    lineTo(w / 4f, h / 2f)
+                    close()
+                }
+                val pathNorthRight = Path().apply {
+                    moveTo(w / 2f, topTipY)
+                    lineTo(w * 3 / 4f, h / 2f)
+                    lineTo(w / 2f, h / 2f)
+                    close()
+                }
+                drawPath(pathNorthLeft, Color(0xFFD32F2F))
+                drawPath(pathNorthRight, Color(0xFFF44336))
+
+                val pathSouthLeft = Path().apply {
+                    moveTo(w / 2f, bottomTipY)
+                    lineTo(w / 2f, h / 2f)
+                    lineTo(w / 4f, h / 2f)
+                    close()
+                }
+                val pathSouthRight = Path().apply {
+                    moveTo(w / 2f, bottomTipY)
+                    lineTo(w * 3 / 4f, h / 2f)
+                    lineTo(w / 2f, h / 2f)
+                    close()
+                }
+                drawPath(pathSouthLeft, Color(0xFF9E9E9E))
+                drawPath(pathSouthRight, Color(0xFFE0E0E0))
+
+                drawCircle(Color.White, radius = w / 10f, center = center)
+                drawCircle(
+                    Color.Gray,
+                    radius = w / 10f,
+                    center = center,
+                    style = Stroke(width = 1f)
+                )
+            }
+        }
     }
 }
 

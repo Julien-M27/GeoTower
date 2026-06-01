@@ -474,7 +474,16 @@ class LiveTrackingService : Service() {
         val notification = if (supportsProgressStyle()) {
             buildLiveNotification(text, progress, operator, antLoc, address, sitePhotoBitmap, mirrorTrackerIcon)
         } else {
-            buildNotification(text, userLoc, antLoc, operator, progress, address, mirrorTrackerIcon)
+            buildNotification(
+                contentText = text,
+                userLoc = userLoc,
+                antLoc = antLoc,
+                operator = operator,
+                progress = progress,
+                address = address,
+                sitePhotoBitmap = sitePhotoBitmap,
+                mirrorTrackerIcon = mirrorTrackerIcon
+            )
         }
 
         manager.notify(notificationId, notification)
@@ -491,7 +500,7 @@ class LiveTrackingService : Service() {
         address: String,
         mirrorTrackerIcon: Boolean
     ) {
-        if (!supportsProgressStyle() || siteId.isBlank() || hasLiveSitePhotoCacheEntry(cacheKey)) return
+        if (siteId.isBlank() || hasLiveSitePhotoCacheEntry(cacheKey)) return
         if (liveSitePhotoLoadingKey == cacheKey) return
 
         liveSitePhotoJob?.cancel()
@@ -742,7 +751,7 @@ class LiveTrackingService : Service() {
                 ).build()
             )
         NotificationIconResources.applyTo(builder, this)
-        liveVisualIconBitmap(operator, sitePhotoBitmap)?.let { bitmap ->
+        (sitePhotoBitmap ?: operatorLogoBitmap(operator))?.let { bitmap ->
             builder.setLargeIcon(Icon.createWithBitmap(bitmap))
         }
 
@@ -788,6 +797,7 @@ class LiveTrackingService : Service() {
         operator: String,
         progress: Int = 0,
         address: String = "",
+        sitePhotoBitmap: Bitmap? = null,
         mirrorTrackerIcon: Boolean = false
     ): Notification {
         val pendingIntent = PendingIntent.getActivity(
@@ -804,7 +814,7 @@ class LiveTrackingService : Service() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
-        val expandedText = notificationContentText(contentText, address)
+        val expandedText = liveNotificationContentText(contentText, address)
         val shortCriticalText = extractShortCriticalText(contentText)
         val notificationTitle = liveActivityPrimaryInfo(
             operator = operator,
@@ -826,12 +836,12 @@ class LiveTrackingService : Service() {
             .setCategory(NotificationCompat.CATEGORY_NAVIGATION)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .setWhen(serviceStartTime)
-            .setUsesChronometer(true)
+            .setShowWhen(false)
             .setColor(operatorColor(operator))
             .setProgress(100, progress, false)
             .addAction(0, getString(R.string.live_tracking_stop_action), stopPendingIntent)
             .setStyle(NotificationCompat.BigTextStyle().bigText(expandedText))
+        (sitePhotoBitmap ?: operatorLogoBitmap(operator))?.let(builder::setLargeIcon)
         NotificationIconResources.applyTo(builder, this)
 
         return builder.build().apply {
@@ -842,7 +852,7 @@ class LiveTrackingService : Service() {
                     primaryInfo = notificationTitle,
                     secondaryInfo = expandedText,
                     shortCriticalText = shortCriticalText,
-                    sitePhotoBitmap = null,
+                    sitePhotoBitmap = sitePhotoBitmap,
                     mirrorTrackerIcon = mirrorTrackerIcon
                 )
             )
@@ -875,18 +885,6 @@ class LiveTrackingService : Service() {
             contentText
         } else {
             notificationAddressText(cleanAddress)
-        }
-    }
-
-    private fun notificationContentText(contentText: String, address: String): String {
-        val cleanAddress = address.trim()
-
-        return buildString {
-            append(contentText)
-            if (cleanAddress.isNotBlank()) {
-                append('\n')
-                append(notificationAddressText(cleanAddress))
-            }
         }
     }
 
@@ -927,7 +925,7 @@ class LiveTrackingService : Service() {
             .replace(Regex("\\s+"), " ")
             .trim()
             .take(MAX_SAMSUNG_NOW_BAR_TEXT_LENGTH)
-        val operatorIcon = roundedOperatorLogoIcon(operator)
+        val operatorIcon = operatorLogoIcon(operator)
         val expandedIcon = sitePhotoBitmap?.let { bitmap ->
             IconCompat.createWithBitmap(bitmap).toIcon(this)
         } ?: operatorIcon
@@ -1176,17 +1174,14 @@ class LiveTrackingService : Service() {
         return OperatorColors.colorInt(operator)
     }
 
-    private fun roundedOperatorLogoIcon(operator: String) =
-        operatorLogo(operator)
-            ?.let(::roundedDrawableBitmap)
-            ?.let { bitmap -> IconCompat.createWithBitmap(bitmap).toIcon(this) }
-
-    private fun liveVisualIconBitmap(operator: String, sitePhotoBitmap: Bitmap?): Bitmap? {
-        return sitePhotoBitmap ?: operatorLogo(operator)?.let(::roundedDrawableBitmap)
+    private fun operatorLogoIcon(operator: String): Icon? {
+        return operatorLogoBitmap(operator)?.let { bitmap ->
+            IconCompat.createWithBitmap(bitmap).toIcon(this)
+        }
     }
 
-    private fun operatorLogo(operator: String): Int? {
-        return OperatorLogos.drawableRes(operator)
+    private fun operatorLogoBitmap(operator: String): Bitmap? {
+        return OperatorLogos.drawableRes(operator)?.let(::roundedDrawableBitmap)
     }
 
     override fun onDestroy() {

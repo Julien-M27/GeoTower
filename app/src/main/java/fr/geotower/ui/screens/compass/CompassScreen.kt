@@ -14,6 +14,9 @@ import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
 import android.os.Bundle
+import android.os.Build
+import android.view.Surface
+import android.view.WindowManager
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -36,6 +39,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Settings
@@ -76,9 +80,11 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -103,6 +109,8 @@ fun CompassScreen(
     viewModel: MapViewModel
 ) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
+    val screenRotation = currentDisplayRotation(context)
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val uiStyle = LocalGeoTowerUiStyle.current
     var showLocation by remember { mutableStateOf(prefs.getBoolean("show_compass_location", true)) }
@@ -162,7 +170,7 @@ fun CompassScreen(
     val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // --- GESTION DES CAPTEURS (Boussole) ---
-    DisposableEffect(Unit) {
+    DisposableEffect(screenRotation) {
         val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
 
         @Suppress("DEPRECATION")
@@ -175,13 +183,9 @@ fun CompassScreen(
             override fun onSensorChanged(event: SensorEvent) {
                 var newAzimuth = 0f
                 if (event.sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
-                    val rotationMatrix = FloatArray(9)
-                    SensorManager.getRotationMatrixFromVector(rotationMatrix, event.values)
-                    val orientation = FloatArray(3)
-                    SensorManager.getOrientation(rotationMatrix, orientation)
-                    newAzimuth = Math.toDegrees(orientation[0].toDouble()).toFloat()
+                    newAzimuth = azimuthFromRotationVector(event.values, screenRotation)
                 } else if (isLegacyOrientationSensor(event.sensor)) {
-                    newAzimuth = event.values[0]
+                    newAzimuth = correctLegacyAzimuthForDisplay(event.values[0], screenRotation)
                 }
 
                 newAzimuth = (newAzimuth + 360) % 360
@@ -389,17 +393,82 @@ fun CompassScreen(
             )
         }
     ) { padding ->
+        val isLandscape = configuration.screenWidthDp > configuration.screenHeightDp
+        val compactLandscape = isLandscape && configuration.screenHeightDp < 430
+        val dialSize = when {
+            compactLandscape -> 190.dp
+            isLandscape -> 230.dp
+            else -> 280.dp
+        }
+        val contentScrollState = rememberScrollState()
+
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .background(compassBg)
                 // --- 1. AJOUT DU DÉFILEMENT ICI ---
-                .verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                .then(if (!isLandscape) Modifier.verticalScroll(contentScrollState) else Modifier),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            val dialSize = 280.dp // Réduit légèrement pour les petits écrans
+            if (isLandscape) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    CompassInfoPanel(
+                        modifier = Modifier
+                            .weight(1f)
+                            .padding(horizontal = 8.dp),
+                        compassOrder = compassOrder,
+                        showLocation = showLocation,
+                        showGps = showGps,
+                        showAccuracy = showAccuracy,
+                        city = city,
+                        country = country,
+                        latitude = latitude,
+                        longitude = longitude,
+                        accuracy = accuracy,
+                        oncompassBg = oncompassBg,
+                        oncompassBgVariant = oncompassBgVariant,
+                        compassTextGray = compassTextGray,
+                        alignStart = true,
+                        compact = compactLandscape
+                    )
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        CompassRadarBlock(
+                            dialSize = dialSize,
+                            animatedAngle = animatedAngle,
+                            radarSites = radarSites,
+                            dynamicPrimaryColor = dynamicPrimaryColor,
+                            isDark = isDark,
+                            oncompassBg = oncompassBg,
+                            compassTextGray = compassTextGray,
+                            compassBg = compassBg,
+                            displayAzimuth = displayAzimuth,
+                            showInnerLogo = false,
+                            compactCenter = true,
+                            onSiteClick = { site ->
+                                prefs.edit()
+                                    .putFloat("clicked_lat", site.latitude.toFloat())
+                                    .putFloat("clicked_lon", site.longitude.toFloat())
+                                    .apply()
+                                navController.navigate("support_detail/${site.id}")
+                            },
+                            onClusterClick = { sites -> selectedClusterSites = sites }
+                        )
+                    }
+                }
+            } else {
 
             // --- LE BLOC BOUSSOLE ---
             Box(contentAlignment = Alignment.Center) {
@@ -441,6 +510,7 @@ fun CompassScreen(
                     // --- 2. ENVOI DES NOUVELLES COULEURS ---
                     oncompassBg = oncompassBg
                 )
+            }
             }
 
             // --- PANNEAU DE DÉTAILS (BULLLE DU BAS) ---
@@ -499,7 +569,8 @@ fun CompassScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            if (!isLandscape) {
+                Spacer(modifier = Modifier.height(24.dp))
 
             // --- 4. AFFICHAGE DYNAMIQUE (LIEU, GPS, PRÉCISION) ---
             Column(
@@ -542,14 +613,15 @@ fun CompassScreen(
                                     Text(text = stringResource(R.string.appstrings_accuracy), fontSize = 12.sp, color = compassTextGray, fontWeight = FontWeight.Bold)
                                     // ✅ On utilise la même logique d'unité pour la précision
                                     val isMi = AppConfig.distanceUnit.intValue == 1
-                                    Text(text = "± ${formatCompassDistance(accuracy, isMi)}", fontSize = 18.sp, color = oncompassBg)
+                                    Text(text = "+/- ${formatCompassDistance(accuracy, isMi)}", fontSize = 18.sp, color = oncompassBg)
                                 }
                             }
                         }
                     }
                 }
             }
-            Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(32.dp))
+            }
         }
     }
 
@@ -584,9 +656,222 @@ fun CompassScreen(
     }
 }
 
+@Composable
+private fun CompassRadarBlock(
+    dialSize: Dp,
+    animatedAngle: Float,
+    radarSites: List<RadarSite>,
+    dynamicPrimaryColor: Color,
+    isDark: Boolean,
+    oncompassBg: Color,
+    compassTextGray: Color,
+    compassBg: Color,
+    displayAzimuth: Int,
+    showInnerLogo: Boolean = true,
+    compactCenter: Boolean = false,
+    onSiteClick: (RadarSite) -> Unit,
+    onClusterClick: (List<RadarSite>) -> Unit
+) {
+    Box(contentAlignment = Alignment.Center) {
+        CompassDialView(
+            modifier = Modifier.size(dialSize),
+            rotationAngle = animatedAngle,
+            oncompassBg = oncompassBg,
+            compassTextGray = compassTextGray,
+            compact = compactCenter
+        )
+
+        RadarSitesOverlay(
+            modifier = Modifier.size(dialSize + 100.dp).rotate(animatedAngle),
+            sites = radarSites,
+            currentRotation = animatedAngle,
+            accentColor = dynamicPrimaryColor,
+            isDark = isDark,
+            oncompassBg = oncompassBg,
+            compassBg = compassBg,
+            onSiteClick = onSiteClick,
+            onClusterClick = onClusterClick
+        )
+
+        FixedCompassOverlay(
+            modifier = Modifier.size(dialSize),
+            accentColor = dynamicPrimaryColor
+        )
+
+        CenterCompassContent(
+            azimuthInt = displayAzimuth,
+            accentColor = dynamicPrimaryColor,
+            oncompassBg = oncompassBg,
+            showLogo = showInnerLogo,
+            compact = compactCenter
+        )
+    }
+}
+
+@Composable
+private fun CompassInfoPanel(
+    modifier: Modifier = Modifier,
+    compassOrder: List<String>,
+    showLocation: Boolean,
+    showGps: Boolean,
+    showAccuracy: Boolean,
+    city: String,
+    country: String,
+    latitude: Double,
+    longitude: Double,
+    accuracy: Float,
+    oncompassBg: Color,
+    oncompassBgVariant: Color,
+    compassTextGray: Color,
+    alignStart: Boolean,
+    compact: Boolean = false
+) {
+    val horizontalAlignment = if (alignStart) Alignment.Start else Alignment.CenterHorizontally
+    val blockSpacing = when {
+        compact -> 10.dp
+        alignStart -> 18.dp
+        else -> 24.dp
+    }
+    val iconSize = when {
+        compact -> 24.dp
+        alignStart -> 28.dp
+        else -> 32.dp
+    }
+    val cityTextSize = when {
+        compact -> 24.sp
+        alignStart -> 28.sp
+        else -> 32.sp
+    }
+    val countryTextSize = when {
+        compact -> 17.sp
+        alignStart -> 20.sp
+        else -> 24.sp
+    }
+    val coordinateSpacing = if (compact) 18.dp else if (alignStart) 24.dp else 32.dp
+    val labelTextSize = if (compact) 11.sp else 12.sp
+    val valueTextSize = if (compact) 16.sp else 18.sp
+
+    Column(
+        modifier = modifier,
+        horizontalAlignment = horizontalAlignment,
+        verticalArrangement = Arrangement.spacedBy(blockSpacing)
+    ) {
+        compassOrder.forEach { block ->
+            when (block) {
+                "location" -> {
+                    if (showLocation) {
+                        Column(horizontalAlignment = horizontalAlignment) {
+                            Icon(
+                                Icons.Outlined.LocationOn,
+                                contentDescription = "Position",
+                                tint = oncompassBg,
+                                modifier = Modifier.size(iconSize)
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            Text(
+                                text = city,
+                                fontSize = cityTextSize,
+                                fontWeight = FontWeight.Bold,
+                                color = oncompassBg
+                            )
+                            Text(
+                                text = country,
+                                fontSize = countryTextSize,
+                                fontWeight = FontWeight.Medium,
+                                color = oncompassBgVariant
+                            )
+                        }
+                    }
+                }
+
+                "gps" -> {
+                    if (showGps) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(coordinateSpacing)) {
+                            Column(horizontalAlignment = horizontalAlignment) {
+                                Text(text = stringResource(R.string.appstrings_lat_short), fontSize = labelTextSize, color = compassTextGray, fontWeight = FontWeight.Bold)
+                                Text(text = formatCoordinate(latitude, isLat = true), fontSize = valueTextSize, color = oncompassBg)
+                            }
+                            Column(horizontalAlignment = horizontalAlignment) {
+                                Text(text = stringResource(R.string.appstrings_lon_short), fontSize = labelTextSize, color = compassTextGray, fontWeight = FontWeight.Bold)
+                                Text(text = formatCoordinate(longitude, isLat = false), fontSize = valueTextSize, color = oncompassBg)
+                            }
+                        }
+                    }
+                }
+
+                "accuracy" -> {
+                    if (showAccuracy) {
+                        Column(horizontalAlignment = horizontalAlignment) {
+                            Text(text = stringResource(R.string.appstrings_accuracy), fontSize = labelTextSize, color = compassTextGray, fontWeight = FontWeight.Bold)
+                            val isMi = AppConfig.distanceUnit.intValue == 1
+                            Text(text = "+/- ${formatCompassDistance(accuracy, isMi)}", fontSize = valueTextSize, color = oncompassBg)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Suppress("DEPRECATION")
 private fun isLegacyOrientationSensor(sensor: Sensor): Boolean {
     return sensor.type == Sensor.TYPE_ORIENTATION
+}
+
+@Suppress("DEPRECATION")
+private fun currentDisplayRotation(context: Context): Int {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        context.display.rotation
+    } else {
+        val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        windowManager.defaultDisplay.rotation
+    }
+}
+
+private fun azimuthFromRotationVector(values: FloatArray, displayRotation: Int): Float {
+    val rotationMatrix = FloatArray(9)
+    SensorManager.getRotationMatrixFromVector(rotationMatrix, values)
+
+    val adjustedMatrix = remapRotationMatrixForDisplay(rotationMatrix, displayRotation)
+    val orientation = FloatArray(3)
+    SensorManager.getOrientation(adjustedMatrix, orientation)
+    return Math.toDegrees(orientation[0].toDouble()).toFloat()
+}
+
+private fun remapRotationMatrixForDisplay(rotationMatrix: FloatArray, displayRotation: Int): FloatArray {
+    val remappedMatrix = FloatArray(9)
+    val remapped = when (displayRotation) {
+        Surface.ROTATION_90 -> SensorManager.remapCoordinateSystem(
+            rotationMatrix,
+            SensorManager.AXIS_Y,
+            SensorManager.AXIS_MINUS_X,
+            remappedMatrix
+        )
+        Surface.ROTATION_180 -> SensorManager.remapCoordinateSystem(
+            rotationMatrix,
+            SensorManager.AXIS_MINUS_X,
+            SensorManager.AXIS_MINUS_Y,
+            remappedMatrix
+        )
+        Surface.ROTATION_270 -> SensorManager.remapCoordinateSystem(
+            rotationMatrix,
+            SensorManager.AXIS_MINUS_Y,
+            SensorManager.AXIS_X,
+            remappedMatrix
+        )
+        else -> false
+    }
+
+    return if (remapped) remappedMatrix else rotationMatrix
+}
+
+private fun correctLegacyAzimuthForDisplay(azimuth: Float, displayRotation: Int): Float {
+    return when (displayRotation) {
+        Surface.ROTATION_90 -> azimuth + 90f
+        Surface.ROTATION_180 -> azimuth + 180f
+        Surface.ROTATION_270 -> azimuth - 90f
+        else -> azimuth
+    }
 }
 
 // Fonction utilitaire pour formater en Degrés Minutes Secondes (DMS)
@@ -608,20 +893,26 @@ fun formatCoordinate(value: Double, isLat: Boolean): String {
 }
 
 @Composable
-fun CompassDialView(modifier: Modifier, rotationAngle: Float, oncompassBg: Color, compassTextGray: Color) {
+fun CompassDialView(
+    modifier: Modifier,
+    rotationAngle: Float,
+    oncompassBg: Color,
+    compassTextGray: Color,
+    compact: Boolean = false
+) {
     val density = LocalDensity.current
-    val textPaint = remember(compassTextGray) {
+    val textPaint = remember(compassTextGray, compact) {
         Paint().apply {
             textAlign = Paint.Align.CENTER
-            textSize = with(density) { 14.sp.toPx() }
+            textSize = with(density) { if (compact) 11.sp.toPx() else 14.sp.toPx() }
             color = compassTextGray.toArgb()
             typeface = Typeface.DEFAULT_BOLD
         }
     }
-    val cardinalPaint = remember(oncompassBg) {
+    val cardinalPaint = remember(oncompassBg, compact) {
         Paint().apply {
             textAlign = Paint.Align.CENTER
-            textSize = with(density) { 18.sp.toPx() }
+            textSize = with(density) { if (compact) 15.sp.toPx() else 18.sp.toPx() }
             color = oncompassBg.toArgb()
             typeface = Typeface.DEFAULT_BOLD
         }
@@ -630,7 +921,7 @@ fun CompassDialView(modifier: Modifier, rotationAngle: Float, oncompassBg: Color
     Canvas(modifier = modifier.rotate(rotationAngle)) {
         val center = Offset(size.width / 2, size.height / 2)
         val radius = size.width / 2
-        val textRadius = radius - 35.dp.toPx()
+        val textRadius = radius - if (compact) 24.dp.toPx() else 35.dp.toPx()
 
         for (degree in 0 until 360) {
             val angleRad = Math.toRadians((degree - 90).toDouble())
@@ -690,7 +981,13 @@ fun FixedCompassOverlay(modifier: Modifier, accentColor: Color) {
 }
 
 @Composable
-fun CenterCompassContent(azimuthInt: Int, accentColor: Color, oncompassBg: Color) {
+fun CenterCompassContent(
+    azimuthInt: Int,
+    accentColor: Color,
+    oncompassBg: Color,
+    showLogo: Boolean = true,
+    compact: Boolean = false
+) {
     val cardinal = when (azimuthInt) {
         in 338..360, in 0..22 -> "N"
         in 23..67 -> "NE"
@@ -707,6 +1004,7 @@ fun CenterCompassContent(azimuthInt: Int, accentColor: Color, oncompassBg: Color
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
+        if (showLogo) {
         val logoColor = accentColor.copy(alpha = 0.7f)
         Canvas(modifier = Modifier.size(80.dp)) {
             val u = size.width / 100f
@@ -738,18 +1036,19 @@ fun CenterCompassContent(azimuthInt: Int, accentColor: Color, oncompassBg: Color
         }
 
         Spacer(modifier = Modifier.height(8.dp))
+        }
 
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
                 text = cardinal,
-                fontSize = 18.sp,
+                fontSize = if (compact) 16.sp else 18.sp,
                 fontWeight = FontWeight.Bold,
                 color = accentColor, // Applique la couleur dynamique au NW, S, etc.
-                modifier = Modifier.padding(bottom = 6.dp, end = 4.dp)
+                modifier = Modifier.padding(bottom = if (compact) 5.dp else 6.dp, end = 4.dp)
             )
             Text(
                 text = "$azimuthInt°",
-                fontSize = 40.sp,
+                fontSize = if (compact) 34.sp else 40.sp,
                 fontWeight = FontWeight.Light,
                 color = oncompassBg
             )
@@ -846,7 +1145,8 @@ fun RadarSitesOverlay(
             detectTapGestures(
                 onTap = { tapOffset ->
                     val center = Offset(size.width / 2f, size.height / 2f)
-                    val compassRadius = 150.dp.toPx()
+                    val compassRadius = ((kotlin.math.min(size.width, size.height) - 100.dp.toPx()) / 2f)
+                        .coerceAtLeast(1f)
                     val drawRadius = compassRadius + 24.dp.toPx()
 
                     var closestCluster: List<RadarSite>? = null
@@ -879,7 +1179,8 @@ fun RadarSitesOverlay(
         }
     ) {
         val center = Offset(size.width / 2f, size.height / 2f)
-        val compassRadius = 150.dp.toPx()
+        val compassRadius = ((kotlin.math.min(size.width, size.height) - 100.dp.toPx()) / 2f)
+            .coerceAtLeast(1f)
         val drawRadius = compassRadius + 24.dp.toPx()
 
         clusters.forEach { cluster ->

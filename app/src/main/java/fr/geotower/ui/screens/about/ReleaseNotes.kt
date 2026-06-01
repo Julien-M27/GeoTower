@@ -26,20 +26,31 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_community_photos)) {
-        item(stringResource(R.string.appstrings_release_community_photo_viewer_navigation))
-        item(stringResource(R.string.appstrings_release_community_photo_zoomed_swipe_disabled))
-        item(stringResource(R.string.appstrings_release_community_photo_double_tap_zoom))
-        item(stringResource(R.string.appstrings_release_community_photo_viewer_layout))
+    section(stringResource(R.string.appstrings_release_section_interface)) {
+        item(stringResource(R.string.appstrings_release_interface_orientation_adapted))
+        item(stringResource(R.string.appstrings_release_interface_large_screens))
+        item(stringResource(R.string.appstrings_release_interface_two_pane_large_screens))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_compass)) {
+        item(stringResource(R.string.appstrings_release_compass_rotation_reliable))
+        item(stringResource(R.string.appstrings_release_compass_landscape_compact))
     }
 
     section(stringResource(R.string.appstrings_release_section_map)) {
-        item(stringResource(R.string.appstrings_release_map_nearby_emitters_dark_readability))
+        item(stringResource(R.string.appstrings_release_map_landscape_reorganized))
+        item(stringResource(R.string.appstrings_release_map_search_tools_easier))
+        item(stringResource(R.string.appstrings_release_map_buttons_consistent))
     }
 
-    section(stringResource(R.string.appstrings_release_section_signalquest)) {
-        item(stringResource(R.string.appstrings_release_signalquest_upload_privacy_clearer))
-        item(stringResource(R.string.appstrings_release_signalquest_exif_removal_default_off))
+    section(stringResource(R.string.appstrings_release_section_notifications)) {
+        item(stringResource(R.string.appstrings_release_notifications_live_visual))
+        item(stringResource(R.string.appstrings_release_notifications_live_text_clearer))
+        item(stringResource(R.string.appstrings_release_notifications_live_compatibility))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_global)) {
+        item(stringResource(R.string.appstrings_release_global_outage_label_down))
     }
 }
 

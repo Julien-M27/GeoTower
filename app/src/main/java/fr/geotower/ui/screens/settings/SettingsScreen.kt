@@ -240,7 +240,7 @@ fun SettingsScreen(
 
     val packageInfo = remember { try { context.packageManager.getPackageInfo(context.packageName, 0) } catch (e: Exception) { null } }
     val versionName = packageInfo?.versionName ?: "1.0.0"
-    val isWideScreen = configuration.screenWidthDp >= 600
+    val isWideScreen = minOf(configuration.screenWidthDp, configuration.screenHeightDp) >= 600
 
     val safeClick = rememberSafeClick()
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
@@ -1882,8 +1882,8 @@ fun SectionPreferences(
         }
     }
 
-    // ✅ NOUVEAU : Option Style d'affichage (Uniquement si écran >= 800px)
-    if (configuration.screenWidthDp >= 600) {
+    // ✅ NOUVEAU : Option Style d'affichage (uniquement sur grand écran réel)
+    if (minOf(configuration.screenWidthDp, configuration.screenHeightDp) >= 600) {
         val cardBg = if (useOneUi) bubbleColor else Color.Transparent
         Surface(onClick = { safeClick("display_styles_sheet") { showDisplayStylesSheet = true } }, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), shape = shape, border = border, color = cardBg) {
             Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {

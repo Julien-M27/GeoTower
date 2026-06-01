@@ -259,11 +259,11 @@ fun MapShareMenu(
 
     Surface(
         onClick = { safeClick { showShareSheet = true } },
-        shape = oneUiActionButtonShape(useOneUi, CircleShape),
+        shape = CircleShape,
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 4.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.size(48.dp)
+        modifier = Modifier.size(54.dp)
     ) {
         Box(contentAlignment = Alignment.Center) {
             Icon(Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)

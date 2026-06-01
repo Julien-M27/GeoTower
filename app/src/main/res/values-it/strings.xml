@@ -712,6 +712,7 @@
     <string name="appstrings_release_section_translations">Traduzioni</string>
     <string name="appstrings_release_section_signalquest">SignalQuest</string>
     <string name="appstrings_release_section_notifications">Notifiche</string>
+    <string name="appstrings_release_section_compass">Bussola</string>
     <string name="appstrings_release_section_database">Database</string>
     <string name="appstrings_release_section_live_tracking">Monitoraggio live</string>
     <string name="appstrings_release_section_statistics">Statistiche</string>
@@ -923,7 +924,7 @@
     <string name="appstrings_site_throughput_calculator_option">Pulsante calcolatore velocità</string>
     <string name="appstrings_sites_in_service_label">In servizio</string>
     <string name="appstrings_sites_label">Siti</string>
-    <string name="appstrings_sites_out_of_service_label">Fuori servizio</string>
+    <string name="appstrings_sites_out_of_service_label">Guasto</string>
     <string name="appstrings_spectrum_by_band">Spettro per banda di frequenza</string>
     <string name="appstrings_spectrum_title">Spettro</string>
     <string name="appstrings_speed_label">Velocità:\u0020</string>
@@ -1590,4 +1591,16 @@
     <string name="appstrings_release_map_nearby_emitters_dark_readability">Migliore leggibilità delle schede degli emettitori vicini nel tema scuro</string>
     <string name="appstrings_release_signalquest_upload_privacy_clearer">Impostazione della privacy delle foto più chiara nella schermata di invio</string>
     <string name="appstrings_release_signalquest_exif_removal_default_off">Rimozione dei dati EXIF disattivata per impostazione predefinita</string>
+    <string name="appstrings_release_interface_orientation_adapted">Migliore adattamento dell’app all’orientamento dello schermo</string>
+    <string name="appstrings_release_interface_large_screens">Home, Informazioni e Impostazioni meglio adattate agli schermi grandi</string>
+    <string name="appstrings_release_interface_two_pane_large_screens">Visualizzazione a doppio pannello migliorata sui veri schermi grandi</string>
+    <string name="appstrings_release_compass_rotation_reliable">Bussola più affidabile quando lo schermo ruota</string>
+    <string name="appstrings_release_compass_landscape_compact">Interfaccia orizzontale più compatta</string>
+    <string name="appstrings_release_map_landscape_reorganized">Interfaccia orizzontale riorganizzata</string>
+    <string name="appstrings_release_map_search_tools_easier">Ricerca e strumenti più facili da usare</string>
+    <string name="appstrings_release_map_buttons_consistent">Pulsanti della mappa più coerenti</string>
+    <string name="appstrings_release_notifications_live_visual">Notifiche live più visive con foto del sito o logo operatore</string>
+    <string name="appstrings_release_notifications_live_text_clearer">Testo delle notifiche più chiaro</string>
+    <string name="appstrings_release_notifications_live_compatibility">Migliore compatibilità secondo i dispositivi</string>
+    <string name="appstrings_release_global_outage_label_down">Etichetta “Fuori servizio” sostituita da “Non funzionante” nell’app e nelle traduzioni</string>
 </resources>
