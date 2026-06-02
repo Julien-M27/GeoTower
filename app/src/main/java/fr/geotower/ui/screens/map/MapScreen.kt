@@ -10,8 +10,11 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.os.Build
 import android.view.MotionEvent
+import android.view.Surface as AndroidSurface
 import android.view.View
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
@@ -84,10 +87,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableDoubleStateOf
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -117,6 +122,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
+import fr.geotower.data.api.GeoTowerDataCoverage
 import fr.geotower.data.api.NominatimApi
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.models.LocalisationEntity
@@ -134,9 +140,12 @@ import fr.geotower.utils.MapUtils
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.isNetworkAvailable
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import org.osmdroid.config.Configuration
+import org.osmdroid.events.MapEventsReceiver
 import org.osmdroid.events.MapListener
 import org.osmdroid.events.ScrollEvent
 import org.osmdroid.events.ZoomEvent
@@ -144,6 +153,7 @@ import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.CustomZoomButtonsController
 import org.osmdroid.views.MapView
 import org.osmdroid.views.overlay.FolderOverlay
+import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
 import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
@@ -259,6 +269,52 @@ private fun MapView.clearCityFilterAndReloadVisible(viewModel: MapViewModel) {
     val box = boundingBox
     val (lonWest, lonEast) = visibleLongitudeBounds()
     viewModel.clearCityFilterAndReload(zoomLevelDouble, box.latNorth, lonEast, box.latSouth, lonWest)
+}
+
+private fun encodeGeoPointPolygons(polygons: List<List<GeoPoint>>?): String? {
+    return polygons?.takeIf { it.isNotEmpty() }?.joinToString("|") { polygon ->
+        polygon.joinToString(";") { point -> "${point.latitude},${point.longitude}" }
+    }
+}
+
+private fun decodeGeoPointPolygons(encoded: String?): List<List<GeoPoint>>? {
+    if (encoded.isNullOrBlank()) return null
+    return encoded.split("|")
+        .mapNotNull { polygonText ->
+            val points = polygonText.split(";").mapNotNull { pointText ->
+                val parts = pointText.split(",", limit = 2)
+                val latitude = parts.getOrNull(0)?.toDoubleOrNull()
+                val longitude = parts.getOrNull(1)?.toDoubleOrNull()
+                if (latitude != null && longitude != null) GeoPoint(latitude, longitude) else null
+            }
+            points.takeIf { it.isNotEmpty() }
+        }
+        .takeIf { it.isNotEmpty() }
+}
+
+private fun encodeGeoPoints(points: List<GeoPoint>): String? {
+    return points.takeIf { it.isNotEmpty() }
+        ?.joinToString(";") { point -> "${point.latitude},${point.longitude}" }
+}
+
+private fun decodeGeoPoints(encoded: String?): List<GeoPoint> {
+    if (encoded.isNullOrBlank()) return emptyList()
+    return encoded.split(";").mapNotNull { pointText ->
+        val parts = pointText.split(",", limit = 2)
+        val latitude = parts.getOrNull(0)?.toDoubleOrNull()
+        val longitude = parts.getOrNull(1)?.toDoubleOrNull()
+        if (latitude != null && longitude != null) GeoPoint(latitude, longitude) else null
+    }
+}
+
+private fun encodeBooleanList(values: List<Boolean>): String? {
+    return values.takeIf { it.isNotEmpty() }
+        ?.joinToString(",") { value -> if (value) "1" else "0" }
+}
+
+private fun decodeBooleanList(encoded: String?): List<Boolean> {
+    if (encoded.isNullOrBlank()) return emptyList()
+    return encoded.split(",").map { value -> value == "1" }
 }
 
 private fun normalizedAnfrId(value: String): String {
@@ -405,6 +461,8 @@ fun MapScreen(
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
+    val screenRotation = currentDisplayRotation(context)
+    val currentScreenRotation by androidx.compose.runtime.rememberUpdatedState(screenRotation)
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current // ✅ AJOUT
     val isUltraCompact = configuration.screenWidthDp < 300 || configuration.screenHeightDp < 350 // ✅ AJOUT
     val scope = rememberCoroutineScope()
@@ -425,7 +483,12 @@ fun MapScreen(
     }
 
     // Mémorise les tracés de la ville sélectionnée pour le filtrage
-    var currentCityPolygons by remember { mutableStateOf<List<List<GeoPoint>>?>(null) }
+    var currentCityPolygonsEncoded by rememberSaveable { mutableStateOf<String?>(null) }
+    var currentCityPolygons by remember { mutableStateOf(decodeGeoPointPolygons(currentCityPolygonsEncoded)) }
+    fun setCurrentCityPolygons(polygons: List<List<GeoPoint>>?) {
+        currentCityPolygons = polygons
+        currentCityPolygonsEncoded = encodeGeoPointPolygons(polygons)
+    }
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val uiStyle = LocalGeoTowerUiStyle.current
@@ -458,28 +521,76 @@ fun MapScreen(
 
     val safeClick = rememberSafeClick()
 
-    var showSettingsSheet by remember { mutableStateOf(false) }
-    var showMapPageSettingsSheet by remember { mutableStateOf(false) }
-    var showLayerSheet by remember { mutableStateOf(false) }
+    var showSettingsSheet by rememberSaveable { mutableStateOf(false) }
+    var showMapPageSettingsSheet by rememberSaveable { mutableStateOf(false) }
+    var showLayerSheet by rememberSaveable { mutableStateOf(false) }
     val pageSettingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var mapViewRef by remember { mutableStateOf<MapView?>(null) }
     var locationOverlayRef by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
+    val mapViewUsable = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
 
     var currentZoom by remember { mutableDoubleStateOf(15.0) }
     var currentLat by remember { mutableDoubleStateOf(48.8584) }
-    var isMeasuringMode by remember { mutableStateOf(false) }
-    var trackNearestAll by remember { mutableStateOf(false) }
-    var trackNearestFav by remember { mutableStateOf(false) }
+    var isMeasuringMode by rememberSaveable { mutableStateOf(false) }
+    var trackNearestAll by rememberSaveable { mutableStateOf(false) }
+    var trackNearestFav by rememberSaveable { mutableStateOf(false) }
+    var measuredMapPointsStartFromLocation by rememberSaveable { mutableStateOf(true) }
+    var measuredMapPointsEncoded by rememberSaveable { mutableStateOf<String?>(null) }
+    var measuredMapPointLocationLinksEncoded by rememberSaveable { mutableStateOf<String?>(null) }
     val measuredSites = remember { mutableStateMapOf<String, LocalisationEntity>() }
+    val measuredMapPoints = remember {
+        mutableStateListOf<GeoPoint>().apply {
+            addAll(decodeGeoPoints(measuredMapPointsEncoded))
+        }
+    }
+    val measuredMapPointLocationLinks = remember {
+        mutableStateListOf<Boolean>().apply {
+            addAll(decodeBooleanList(measuredMapPointLocationLinksEncoded))
+        }
+    }
 
-    var isClosestSiteExpanded by remember { mutableStateOf(true) }
-    var isClosestFavSiteExpanded by remember { mutableStateOf(true) }
+    var isClosestSiteExpanded by rememberSaveable { mutableStateOf(true) }
+    var isClosestFavSiteExpanded by rememberSaveable { mutableStateOf(true) }
+
+    fun saveMeasureSelections() {
+        measuredMapPointsEncoded = encodeGeoPoints(measuredMapPoints)
+        measuredMapPointLocationLinksEncoded = encodeBooleanList(measuredMapPointLocationLinks)
+    }
+
+    fun clearMeasureSelections() {
+        measuredSites.clear()
+        measuredMapPoints.clear()
+        measuredMapPointLocationLinks.clear()
+        measuredMapPointsStartFromLocation = true
+        saveMeasureSelections()
+    }
+
+    fun addManualMeasurePoint(point: GeoPoint, startFromLocationIfFirst: Boolean) {
+        if (measuredMapPoints.isEmpty()) {
+            measuredMapPointsStartFromLocation = startFromLocationIfFirst
+        }
+        measuredMapPoints.add(point)
+        measuredMapPointLocationLinks.add(measuredMapPointsStartFromLocation)
+        saveMeasureSelections()
+    }
+
+    fun removeManualMeasurePoint(index: Int) {
+        if (index !in measuredMapPoints.indices) return
+        measuredMapPoints.removeAt(index)
+        if (index in measuredMapPointLocationLinks.indices) {
+            measuredMapPointLocationLinks.removeAt(index)
+        }
+        if (measuredMapPoints.isEmpty()) {
+            measuredMapPointsStartFromLocation = true
+        }
+        saveMeasureSelections()
+    }
 
     // Rétablit l'auto-ouverture à l'activation du mode mesure
     LaunchedEffect(isMeasuringMode, canUseMapMeasure) {
         if (!canUseMapMeasure && isMeasuringMode) {
             isMeasuringMode = false
-            measuredSites.clear()
+            clearMeasureSelections()
         }
         if (isMeasuringMode) {
             isClosestSiteExpanded = true
@@ -502,20 +613,20 @@ fun MapScreen(
 
     var myCurrentLoc by remember { mutableStateOf<GeoPoint?>(null) }
     var currentSpeedKmH by remember { mutableIntStateOf(0) }
-    var isToolboxExpanded by remember { mutableStateOf(false) }
+    var isToolboxExpanded by rememberSaveable { mutableStateOf(false) }
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
-    var operatorSearchPreviousOperatorKeys by remember { mutableStateOf<Set<String>?>(null) }
+    var operatorSearchPreviousOperatorKeys by rememberSaveable { mutableStateOf<List<String>?>(null) }
 
     fun applyOperatorSearchSelection(operatorKeys: Set<String>) {
         if (operatorSearchPreviousOperatorKeys == null) {
-            operatorSearchPreviousOperatorKeys = AppConfig.selectedOperatorKeys.value
+            operatorSearchPreviousOperatorKeys = AppConfig.selectedOperatorKeys.value.toList()
         }
         AppConfig.setSelectedOperatorKeys(operatorKeys)
     }
 
     fun restoreOperatorSearchSelection() {
         val previousOperatorKeys = operatorSearchPreviousOperatorKeys ?: return
-        AppConfig.setSelectedOperatorKeys(previousOperatorKeys)
+        AppConfig.setSelectedOperatorKeys(previousOperatorKeys.toSet())
         operatorSearchPreviousOperatorKeys = null
     }
 
@@ -523,7 +634,7 @@ fun MapScreen(
     androidx.activity.compose.BackHandler {
         if (isMeasuringMode) {
             isMeasuringMode = false
-            measuredSites.clear()
+            clearMeasureSelections()
         } else {
             restoreOperatorSearchSelection()
             safeBackNavigation.navigateBack()
@@ -627,18 +738,19 @@ fun MapScreen(
     var azimuth by remember { mutableFloatStateOf(0f) }
     var continuousAzimuth by remember { mutableFloatStateOf(0f) }
 
-    var isSearchActive by remember { mutableStateOf(false) }
-    var searchQuery by remember { mutableStateOf("") }
+    var isSearchActive by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
     val focusManager = androidx.compose.ui.platform.LocalFocusManager.current
-    var showCityStatsPopup by remember { mutableStateOf(false) }
-    var showCityStatsDetail by remember { mutableStateOf(false) }
-    var isTrackingActive by remember { mutableStateOf(false) }
-    var hasCenteredOnLocation by remember { mutableStateOf(false) }
+    var showCityStatsPopup by rememberSaveable { mutableStateOf(false) }
+    var showCityStatsDetail by rememberSaveable { mutableStateOf(false) }
+    var isTrackingActive by rememberSaveable { mutableStateOf(false) }
+    var hasCenteredOnLocation by rememberSaveable { mutableStateOf(false) }
 
     val txtMapTitle = stringResource(R.string.appstrings_map_title)
     val txtSearchCityOrId = stringResource(R.string.appstrings_search_city_or_id)
     val txtLocationNotFound = stringResource(R.string.appstrings_location_not_found)
     val txtNetworkErrorSearch = stringResource(R.string.appstrings_network_error_search)
+    val txtSearchDataUnavailable = stringResource(R.string.appstrings_search_data_unavailable)
     val txtDeleteTraces = stringResource(R.string.appstrings_delete_traces)
     val txtClosestSite = stringResource(R.string.appstrings_closest_site)
     val txtFilter = stringResource(R.string.appstrings_filter)
@@ -657,8 +769,8 @@ fun MapScreen(
     val txtUnderstood = stringResource(R.string.appstrings_understood)
 
     var hideColorWarning by remember { mutableStateOf(prefs.getBoolean("hide_light_color_warning", false)) }
-    var showColorWarningDialog by remember { mutableStateOf(false) }
-    var dontShowAgainChecked by remember { mutableStateOf(false) }
+    var showColorWarningDialog by rememberSaveable { mutableStateOf(false) }
+    var dontShowAgainChecked by rememberSaveable { mutableStateOf(false) }
     val lastTilesColorFilterMap = remember { arrayOfNulls<MapView>(1) }
     val lastTilesColorFilterInverted = remember { arrayOfNulls<Boolean>(1) }
 
@@ -668,29 +780,32 @@ fun MapScreen(
 
     DisposableEffect(lifecycleOwner) {
         val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        @Suppress("DEPRECATION")
         val rotationSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
+            ?: sensorManager?.getDefaultSensor(Sensor.TYPE_ORIENTATION)
 
         val sensorEventListener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
-                if (event.sensor.type == Sensor.TYPE_ROTATION_VECTOR) {
-                    val rMatrix = FloatArray(9)
-                    SensorManager.getRotationMatrixFromVector(rMatrix, event.values)
-
-                    val orientation = FloatArray(3)
-                    SensorManager.getOrientation(rMatrix, orientation)
-                    var rawAzimuth = Math.toDegrees(orientation[0].toDouble()).toFloat()
-
-                    rawAzimuth = (rawAzimuth + 360) % 360
-
-                    var delta = rawAzimuth - (continuousAzimuth % 360f)
-                    if (delta < -180f) delta += 360f
-                    else if (delta > 180f) delta -= 360f
-
-                    continuousAzimuth += delta * 0.15f
-
-                    if (Math.abs(continuousAzimuth - azimuth) > 0.5f) {
-                        azimuth = continuousAzimuth
+                var rawAzimuth = when {
+                    event.sensor.type == Sensor.TYPE_ROTATION_VECTOR -> {
+                        azimuthFromRotationVector(event.values, currentScreenRotation)
                     }
+                    isLegacyOrientationSensor(event.sensor) -> {
+                        correctLegacyAzimuthForDisplay(event.values[0], currentScreenRotation)
+                    }
+                    else -> return
+                }
+
+                rawAzimuth = (rawAzimuth + 360) % 360
+
+                var delta = rawAzimuth - (continuousAzimuth % 360f)
+                if (delta < -180f) delta += 360f
+                else if (delta > 180f) delta -= 360f
+
+                continuousAzimuth += delta * 0.15f
+
+                if (Math.abs(continuousAzimuth - azimuth) > 0.5f) {
+                    azimuth = continuousAzimuth
                 }
             }
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -702,7 +817,7 @@ fun MapScreen(
                     mapViewRef?.onResume()
                     locationOverlayRef?.enableMyLocation()
                     if (rotationSensor != null) {
-                        sensorManager.registerListener(sensorEventListener, rotationSensor, SensorManager.SENSOR_DELAY_UI)
+                        sensorManager?.registerListener(sensorEventListener, rotationSensor, SensorManager.SENSOR_DELAY_UI)
                     }
                 }
                 Lifecycle.Event.ON_PAUSE -> {
@@ -728,9 +843,15 @@ fun MapScreen(
             restoreOperatorSearchSelection()
             viewModel.resetCityLock()
             lifecycleOwner.lifecycle.removeObserver(observer)
+            searchJob?.cancel()
+            searchJob = null
             sensorManager?.unregisterListener(sensorEventListener)
+            mapViewUsable.set(false)
+            locationOverlayRef?.disableMyLocation()
             mapViewRef?.onPause()
             mapViewRef?.onDetach()
+            locationOverlayRef = null
+            mapViewRef = null
         }
     }
 
@@ -803,9 +924,80 @@ fun MapScreen(
 
     fun refreshMeasureLayers(map: MapView) {
         measureOverlay.items.clear()
-        val myLoc = myCurrentLoc ?: locationOverlayRef?.myLocation ?: return
+        val myLoc = myCurrentLoc ?: locationOverlayRef?.myLocation
+
+        fun formatMeasureDistance(dist: Double): String {
+            val isMi = AppConfig.distanceUnit.intValue == 1
+            return if (isMi) {
+                val distMiles = dist / 1609.34
+                if (distMiles < 0.1) {
+                    "${(dist * 3.28084).toInt()} ft"
+                } else {
+                    String.format(java.util.Locale.US, "%.2f mi", distMiles)
+                }
+            } else {
+                if (dist >= 1000) {
+                    String.format(java.util.Locale.US, "%.3f km", dist / 1000)
+                } else {
+                    "${dist.toInt()} m"
+                }
+            }
+        }
+
+        fun addMeasureSegment(startPoint: GeoPoint, endPoint: GeoPoint, onRemove: () -> Unit) {
+            val line = Polyline(map).apply {
+                setPoints(listOf(startPoint, endPoint))
+                outlinePaint.color = android.graphics.Color.parseColor("#3B5998")
+                outlinePaint.strokeWidth = 10f
+            }
+            line.setOnClickListener { _, _, _ ->
+                onRemove()
+                refreshMeasureLayers(map)
+                true
+            }
+            measureOverlay.add(line)
+
+            val labelMarker = Marker(map).apply {
+                position = GeoPoint(
+                    (startPoint.latitude + endPoint.latitude) / 2,
+                    (startPoint.longitude + endPoint.longitude) / 2
+                )
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                icon = createDistanceLabel(formatMeasureDistance(startPoint.distanceToAsDouble(endPoint)))
+                infoWindow = null
+            }
+            labelMarker.setOnMarkerClickListener { _, _ ->
+                onRemove()
+                refreshMeasureLayers(map)
+                true
+            }
+            measureOverlay.add(labelMarker)
+        }
+
+        if (measuredMapPoints.isNotEmpty()) {
+            if (myLoc != null) {
+                measuredMapPoints.forEachIndexed { pointIndex, point ->
+                    if (measuredMapPointLocationLinks.getOrNull(pointIndex) == true) {
+                        addMeasureSegment(myLoc, point) {
+                            if (measuredMapPoints.size > 1) {
+                                measuredMapPointLocationLinks[pointIndex] = false
+                            } else {
+                                removeManualMeasurePoint(pointIndex)
+                            }
+                        }
+                    }
+                }
+            }
+
+            measuredMapPoints.zipWithNext().forEachIndexed { segmentIndex, (startPoint, endPoint) ->
+                addMeasureSegment(startPoint, endPoint) {
+                    removeManualMeasurePoint(segmentIndex + 1)
+                }
+            }
+        }
 
         measuredSites.values.forEach { antenna ->
+            if (myLoc == null) return@forEach
             val antLoc = GeoPoint(antenna.latitude, antenna.longitude)
 
             val line = Polyline(map).apply {
@@ -855,6 +1047,25 @@ fun MapScreen(
         map.invalidate()
     }
 
+    val measureTapOverlay = remember {
+        MapEventsOverlay(object : MapEventsReceiver {
+            override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
+                if (!isMeasuringMode) return false
+                val map = mapViewRef ?: return true
+                myCurrentLoc ?: locationOverlayRef?.myLocation ?: return true
+
+                addManualMeasurePoint(
+                    GeoPoint(p.latitude, p.longitude),
+                    startFromLocationIfFirst = true
+                )
+                refreshMeasureLayers(map)
+                return true
+            }
+
+            override fun longPressHelper(p: GeoPoint): Boolean = false
+        })
+    }
+
     // ✅ AJOUT DU PARAMÈTRE sitesHsList
     fun openSupportDetailFromMap(map: MapView, antenna: LocalisationEntity) {
         val supportId = antenna.idAnfr.toLongOrNull()
@@ -883,11 +1094,21 @@ fun MapScreen(
         val selectedOperators = AppConfig.selectedOperatorKeys.value
         val showSitesInService = AppConfig.showSitesInService.value
         val showSitesOutOfService = AppConfig.showSitesOutOfService.value
+        fun ensureMapNotDisposed() {
+            if (!mapViewUsable.get()) {
+                throw java.util.concurrent.CancellationException("MapView disposed during marker refresh")
+            }
+        }
 
         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+            currentCoroutineContext().ensureActive()
+            ensureMapNotDisposed()
 
             if (antennasList.isEmpty()) {
+                currentCoroutineContext().ensureActive()
+                ensureMapNotDisposed()
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    if (!mapViewUsable.get() || mapViewRef !== map) return@withContext
                     macroOverlay.items.clear()
                     markersOverlay.items.clear()
                     markersOverlay.invalidate()
@@ -918,6 +1139,7 @@ fun MapScreen(
 
                     val mainAntenna = filteredSiteAntennas.first()
 
+                    ensureMapNotDisposed()
                     AntennaMarker(map, filteredSiteAntennas, safePrimaryColor).apply {
                         position = GeoPoint(mainAntenna.latitude, mainAntenna.longitude)
                         setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
@@ -960,8 +1182,10 @@ fun MapScreen(
 
                         setOnMarkerClickListener { _, _ ->
                             if (isMeasuringMode) {
-                                val id = mainAntenna.idAnfr
-                                if (measuredSites.containsKey(id)) measuredSites.remove(id) else if (myCurrentLoc != null) measuredSites[id] = mainAntenna
+                                addManualMeasurePoint(
+                                    GeoPoint(mainAntenna.latitude, mainAntenna.longitude),
+                                    startFromLocationIfFirst = myCurrentLoc != null || locationOverlayRef?.myLocation != null
+                                )
                                 refreshMeasureLayers(map)
                             } else {
                                 openSupportDetailFromMap(map, mainAntenna)
@@ -979,6 +1203,7 @@ fun MapScreen(
                 // ... (Ton code actuel MACRO reste identique)
                 val clusterMarkers = clusterAntennas.map { fakeAntenna ->
                     val count = fakeAntenna.idAnfr.removePrefix("CLUSTER_").toIntOrNull() ?: 1
+                    ensureMapNotDisposed()
                     org.osmdroid.views.overlay.Marker(map).apply {
                         position = GeoPoint(fakeAntenna.latitude, fakeAntenna.longitude)
                         setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
@@ -998,7 +1223,10 @@ fun MapScreen(
                     }
                 }
                 val directMarkers = buildAntennaMarkers(directAntennas)
+                currentCoroutineContext().ensureActive()
+                ensureMapNotDisposed()
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    if (!mapViewUsable.get() || mapViewRef !== map) return@withContext
                     markersOverlay.items.clear()
                     markersOverlay.items.addAll(directMarkers)
                     markersOverlay.invalidate()
@@ -1028,6 +1256,7 @@ fun MapScreen(
                     val mainAntenna = filteredSiteAntennas.first()
 
                     // Le marqueur UNIQUE (L'antenne)
+                    ensureMapNotDisposed()
                     AntennaMarker(map, filteredSiteAntennas, safePrimaryColor).apply {
                         position = GeoPoint(mainAntenna.latitude, mainAntenna.longitude)
                         setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
@@ -1079,8 +1308,10 @@ fun MapScreen(
                         // L'action de clic reste unique et propre !
                         setOnMarkerClickListener { _, _ ->
                             if (isMeasuringMode) {
-                                val id = mainAntenna.idAnfr
-                                if (measuredSites.containsKey(id)) measuredSites.remove(id) else if (myCurrentLoc != null) measuredSites[id] = mainAntenna
+                                addManualMeasurePoint(
+                                    GeoPoint(mainAntenna.latitude, mainAntenna.longitude),
+                                    startFromLocationIfFirst = myCurrentLoc != null || locationOverlayRef?.myLocation != null
+                                )
                                 refreshMeasureLayers(map)
                             } else {
                                 openSupportDetailFromMap(map, mainAntenna)
@@ -1090,7 +1321,10 @@ fun MapScreen(
                     } // Fin du apply (retourne 1 seul marqueur)
                 }
 
+                currentCoroutineContext().ensureActive()
+                ensureMapNotDisposed()
                 kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                    if (!mapViewUsable.get() || mapViewRef !== map) return@withContext
                     macroOverlay.items.clear()
                     markersOverlay.items.clear()
                     markersOverlay.items.addAll(newMarkers)
@@ -1152,10 +1386,17 @@ fun MapScreen(
     }
 
     LaunchedEffect(myCurrentLoc) {
-        if (isMeasuringMode && measuredSites.isNotEmpty()) {
+        if (isMeasuringMode && (measuredSites.isNotEmpty() || measuredMapPoints.isNotEmpty())) {
             mapViewRef?.let { refreshMeasureLayers(it) }
         }
     }
+
+    LaunchedEffect(isMeasuringMode, measuredMapPoints.size, measuredMapPointLocationLinks.size, mapViewRef) {
+        if (isMeasuringMode && measuredMapPoints.isNotEmpty()) {
+            mapViewRef?.let { refreshMeasureLayers(it) }
+        }
+    }
+
     val currentFilteredAntennas by androidx.compose.runtime.rememberUpdatedState(filteredAntennas)
     val currentLoc by androidx.compose.runtime.rememberUpdatedState(myCurrentLoc)
 
@@ -1271,6 +1512,17 @@ fun MapScreen(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
                 MapView(ctx).apply {
+                    mapViewUsable.set(true)
+                    addOnAttachStateChangeListener(object : View.OnAttachStateChangeListener {
+                        override fun onViewAttachedToWindow(v: View) {
+                            mapViewUsable.set(true)
+                        }
+
+                        override fun onViewDetachedFromWindow(v: View) {
+                            mapViewUsable.set(false)
+                        }
+                    })
+
                     if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) {
                         setLayerType(View.LAYER_TYPE_SOFTWARE, null)
                     } else {
@@ -1336,6 +1588,7 @@ fun MapScreen(
                     }
 
                     // ✅ ORDONNANCEMENT DES CALQUES
+                    overlays.add(measureTapOverlay)
                     overlays.add(measureOverlay)
                     overlays.add(searchBoundaryOverlay)
                     overlays.add(macroOverlay) // <-- Calque macro au fond
@@ -1573,7 +1826,7 @@ fun MapScreen(
 
                                 extractHolesAndOutlines(featureOverlay)
 
-                                currentCityPolygons = holesList
+                                setCurrentCityPolygons(holesList)
 
                                 viewModel.loadAntennasForCity(
                                     latNorth = nominatimArea.latNorth,
@@ -1644,6 +1897,10 @@ fun MapScreen(
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                         if (!results.isNullOrEmpty()) {
                             val addr = results[0]
+                            if (GeoTowerDataCoverage.isKnownUnsupportedCountryCode(addr.countryCode)) {
+                                Toast.makeText(context, txtSearchDataUnavailable, Toast.LENGTH_LONG).show()
+                                return@withContext
+                            }
                             mapViewRef?.let { map ->
                                 searchBoundaryOverlay.items.clear()
                                 map.controller.setZoom(15.0)
@@ -1958,13 +2215,17 @@ fun MapScreen(
             )
             Spacer(modifier = Modifier.height(deleteButtonSpacer))
 
-            AnimatedVisibility(visible = measuredSites.isNotEmpty(), enter = fadeIn(), exit = fadeOut()) {
+            AnimatedVisibility(
+                visible = measuredSites.isNotEmpty() || measuredMapPoints.isNotEmpty(),
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
                 Button(
                     onClick = {
                         // ✅ CORRECTION : On coupe tout !
                         trackNearestAll = false
                         trackNearestFav = false
-                        measuredSites.clear()
+                        clearMeasureSelections()
                         mapViewRef?.let { refreshMeasureLayers(it) }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
@@ -2010,7 +2271,7 @@ fun MapScreen(
                             isSearchActive = false
                             restoreOperatorSearchSelection()
                             searchQuery = ""
-                            currentCityPolygons = null
+                            setCurrentCityPolygons(null)
                             searchBoundaryOverlay.items.clear()
 
                             // ✅ CORRECTION DU NOM ET APPEL AVEC LE ZOOM
@@ -2020,7 +2281,7 @@ fun MapScreen(
 
                             trackNearestAll = false
                             trackNearestFav = false
-                            measuredSites.clear()
+                            clearMeasureSelections()
                             mapViewRef?.let { refreshMeasureLayers(it) }
                             mapViewRef?.invalidate()
                         }
@@ -2032,7 +2293,7 @@ fun MapScreen(
                         if (!isSearchActive) {
                             restoreOperatorSearchSelection()
                             searchQuery = ""
-                            currentCityPolygons = null
+                            setCurrentCityPolygons(null)
                             searchBoundaryOverlay.items.clear()
 
                             // ✅ CORRECTION DU NOM ET APPEL AVEC LE ZOOM
@@ -2051,7 +2312,7 @@ fun MapScreen(
                             if (!isMeasuringMode) {
                                 trackNearestAll = false
                                 trackNearestFav = false
-                                measuredSites.clear()
+                                clearMeasureSelections()
                                 mapViewRef?.let { refreshMeasureLayers(it) }
                             }
                         }
@@ -2741,6 +3002,68 @@ private fun MapSearchBar(
 private fun SmallFloatingButton(icon: ImageVector, desc: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(onClick = onClick, shape = CircleShape, color = MaterialTheme.colorScheme.surface, shadowElevation = 4.dp, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), modifier = modifier.size(MapControlButtonDiameter)) {
         Box(contentAlignment = Alignment.Center) { Icon(icon, desc) }
+    }
+}
+
+private fun currentDisplayRotation(context: Context): Int {
+    return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        context.display?.rotation ?: AndroidSurface.ROTATION_0
+    } else {
+        @Suppress("DEPRECATION")
+        val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        @Suppress("DEPRECATION")
+        windowManager.defaultDisplay.rotation
+    }
+}
+
+private fun azimuthFromRotationVector(values: FloatArray, displayRotation: Int): Float {
+    val rotationMatrix = FloatArray(9)
+    SensorManager.getRotationMatrixFromVector(rotationMatrix, values)
+
+    val adjustedMatrix = remapRotationMatrixForDisplay(rotationMatrix, displayRotation)
+    val orientation = FloatArray(3)
+    SensorManager.getOrientation(adjustedMatrix, orientation)
+    return Math.toDegrees(orientation[0].toDouble()).toFloat()
+}
+
+private fun remapRotationMatrixForDisplay(rotationMatrix: FloatArray, displayRotation: Int): FloatArray {
+    val remappedMatrix = FloatArray(9)
+    val remapped = when (displayRotation) {
+        AndroidSurface.ROTATION_90 -> SensorManager.remapCoordinateSystem(
+            rotationMatrix,
+            SensorManager.AXIS_Y,
+            SensorManager.AXIS_MINUS_X,
+            remappedMatrix
+        )
+        AndroidSurface.ROTATION_180 -> SensorManager.remapCoordinateSystem(
+            rotationMatrix,
+            SensorManager.AXIS_MINUS_X,
+            SensorManager.AXIS_MINUS_Y,
+            remappedMatrix
+        )
+        AndroidSurface.ROTATION_270 -> SensorManager.remapCoordinateSystem(
+            rotationMatrix,
+            SensorManager.AXIS_MINUS_Y,
+            SensorManager.AXIS_X,
+            remappedMatrix
+        )
+        else -> false
+    }
+
+    return if (remapped) remappedMatrix else rotationMatrix
+}
+
+@Suppress("DEPRECATION")
+private fun isLegacyOrientationSensor(sensor: Sensor): Boolean {
+    return sensor.type == Sensor.TYPE_ORIENTATION
+}
+
+private fun correctLegacyAzimuthForDisplay(azimuth: Float, displayRotation: Int): Float {
+    return when (displayRotation) {
+        AndroidSurface.ROTATION_90 -> azimuth + 90f
+        AndroidSurface.ROTATION_180 -> azimuth + 180f
+        AndroidSurface.ROTATION_270 -> azimuth - 90f
+        else -> azimuth
     }
 }
 

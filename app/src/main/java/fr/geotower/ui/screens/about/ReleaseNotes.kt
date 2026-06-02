@@ -26,31 +26,26 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_interface)) {
-        item(stringResource(R.string.appstrings_release_interface_orientation_adapted))
-        item(stringResource(R.string.appstrings_release_interface_large_screens))
-        item(stringResource(R.string.appstrings_release_interface_two_pane_large_screens))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_compass)) {
-        item(stringResource(R.string.appstrings_release_compass_rotation_reliable))
-        item(stringResource(R.string.appstrings_release_compass_landscape_compact))
+    section(stringResource(R.string.appstrings_release_section_search)) {
+        item(stringResource(R.string.appstrings_release_search_coverage_better))
+        item(stringResource(R.string.appstrings_release_search_unavailable_message_clearer))
     }
 
     section(stringResource(R.string.appstrings_release_section_map)) {
-        item(stringResource(R.string.appstrings_release_map_landscape_reorganized))
-        item(stringResource(R.string.appstrings_release_map_search_tools_easier))
-        item(stringResource(R.string.appstrings_release_map_buttons_consistent))
+        item(stringResource(R.string.appstrings_release_map_measurement_enriched))
+        item(stringResource(R.string.appstrings_release_map_measurement_multiple_points))
+        item(stringResource(R.string.appstrings_release_map_measurement_unit_choice))
+        item(stringResource(R.string.appstrings_release_map_measurement_remove_easier))
     }
 
-    section(stringResource(R.string.appstrings_release_section_notifications)) {
-        item(stringResource(R.string.appstrings_release_notifications_live_visual))
-        item(stringResource(R.string.appstrings_release_notifications_live_text_clearer))
-        item(stringResource(R.string.appstrings_release_notifications_live_compatibility))
+    section(stringResource(R.string.appstrings_release_section_antenna_details)) {
+        item(stringResource(R.string.appstrings_release_antenna_details_identical_panels))
+        item(stringResource(R.string.appstrings_release_antenna_details_panel_id_display))
+        item(stringResource(R.string.appstrings_release_antenna_details_panel_id_copy))
     }
 
-    section(stringResource(R.string.appstrings_release_section_global)) {
-        item(stringResource(R.string.appstrings_release_global_outage_label_down))
+    section(stringResource(R.string.appstrings_release_section_fh_details)) {
+        item(stringResource(R.string.appstrings_release_fh_details_missing_info_cleaner))
     }
 }
 

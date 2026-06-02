@@ -508,6 +508,7 @@
     <string name="appstrings_loading_operator_stats">Betreiber werden geladen...</string>
     <string name="appstrings_locate">Orten</string>
     <string name="appstrings_location_not_found">Ort nicht gefunden</string>
+    <string name="appstrings_search_data_unavailable">Daten f&#252;r diesen Bereich nicht verf&#252;gbar.</string>
     <string name="appstrings_logo_app">Anwendung</string>
     <string name="appstrings_logo_bouygues">Bouygues</string>
     <string name="appstrings_logo_drawing_auto">Automatisch</string>
@@ -684,6 +685,8 @@
     <string name="appstrings_pages_customization_desc">Passe die Anzeige der verschiedenen App-Seiten an</string>
     <string name="appstrings_pages_customization_title">Seiten anpassen</string>
     <string name="appstrings_panel_heights_title">Panelhöhen</string>
+    <string name="appstrings_panel_identifier">Panelkennung</string>
+    <string name="appstrings_panel_identifier_copied">Panelkennung kopiert</string>
     <string name="appstrings_permission_continue_anyway">Trotzdem fortfahren</string>
     <string name="appstrings_permissions_desc">Standort und Benachrichtigungen</string>
     <string name="appstrings_photo_exif_gps_position">GPS-Position</string>
@@ -713,6 +716,9 @@
     <string name="appstrings_release_section_signalquest">SignalQuest</string>
     <string name="appstrings_release_section_notifications">Benachrichtigungen</string>
     <string name="appstrings_release_section_compass">Kompass</string>
+    <string name="appstrings_release_section_search">Suche</string>
+    <string name="appstrings_release_section_antenna_details">Antennendetails</string>
+    <string name="appstrings_release_section_fh_details">FH-Details</string>
     <string name="appstrings_release_section_database">Datenbank</string>
     <string name="appstrings_release_section_live_tracking">Live-Tracking</string>
     <string name="appstrings_release_section_statistics">Statistiken</string>
@@ -1603,4 +1609,14 @@
     <string name="appstrings_release_notifications_live_text_clearer">Klarerer Benachrichtigungstext</string>
     <string name="appstrings_release_notifications_live_compatibility">Bessere Kompatibilität je nach Gerät</string>
     <string name="appstrings_release_global_outage_label_down">Bezeichnung „Außer Betrieb“ in App und Übersetzungen durch „Gestört“ ersetzt</string>
+    <string name="appstrings_release_search_coverage_better">Bessere Verwaltung der von der Adresssuche abgedeckten Gebiete</string>
+    <string name="appstrings_release_search_unavailable_message_clearer">Klarere Meldung, wenn Daten für ein Gebiet nicht verfügbar sind</string>
+    <string name="appstrings_release_map_measurement_enriched">Erweiterte Entfernungsmessung direkt auf der Karte</string>
+    <string name="appstrings_release_map_measurement_multiple_points">Mehrere Messpunkte hintereinander hinzufügen</string>
+    <string name="appstrings_release_map_measurement_unit_choice">Entfernungen werden in der gewählten Einheit angezeigt</string>
+    <string name="appstrings_release_map_measurement_remove_easier">Einfacheres Entfernen von Messungen</string>
+    <string name="appstrings_release_antenna_details_identical_panels">Identische Panels besser unterscheidbar</string>
+    <string name="appstrings_release_antenna_details_panel_id_display">Panel-Kennung wird angezeigt</string>
+    <string name="appstrings_release_antenna_details_panel_id_copy">Kennung schnell mit Bestätigung kopieren</string>
+    <string name="appstrings_release_fh_details_missing_info_cleaner">Sauberere Anzeige, wenn einige FH-Informationen fehlen</string>
 </resources>

@@ -9,6 +9,7 @@ import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.utils.AppLogger
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
+import java.util.Locale
 
 data class NominatimArea(
     val latNorth: Double,
@@ -24,10 +25,38 @@ data class NominatimGeoPoint(
     val longitude: Double
 )
 
+object GeoTowerDataCoverage {
+    private val supportedCountryCodes = setOf(
+        "FR",
+        "GP",
+        "MQ",
+        "GF",
+        "RE",
+        "YT",
+        "PM",
+        "NC",
+        "PF",
+        "WF",
+        "BL",
+        "MF"
+    )
+
+    val nominatimCountryCodes: String =
+        supportedCountryCodes.joinToString(",") { it.lowercase(Locale.US) }
+
+    fun isKnownUnsupportedCountryCode(countryCode: String?): Boolean {
+        val normalizedCountryCode = countryCode
+            ?.trim()
+            ?.uppercase(Locale.US)
+            .orEmpty()
+        return normalizedCountryCode.isNotEmpty() &&
+            normalizedCountryCode !in supportedCountryCodes
+    }
+}
+
 object NominatimApi {
     private const val TAG = "GeoTowerNominatim"
     private const val SEARCH_URL = "https://nominatim.openstreetmap.org/search"
-    private const val FRENCH_TERRITORY_COUNTRY_CODES = "fr,gp,mq,gf,re,yt,pm,nc,pf,wf,bl,mf"
     private val userAgent = "GeoTower/${BuildConfig.VERSION_NAME} (Android)"
 
     fun searchArea(query: String): NominatimArea? {
@@ -44,7 +73,7 @@ object NominatimApi {
             .addQueryParameter("q", trimmedQuery)
             .addQueryParameter("format", "json")
             .addQueryParameter("polygon_geojson", "1")
-            .addQueryParameter("countrycodes", FRENCH_TERRITORY_COUNTRY_CODES)
+            .addQueryParameter("countrycodes", GeoTowerDataCoverage.nominatimCountryCodes)
             .addQueryParameter("limit", "10")
             .build()
 

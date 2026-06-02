@@ -1,12 +1,22 @@
 package fr.geotower.data.api
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class NetworkingParsersTest {
+    @Test
+    fun dataCoverage_flagsKnownUnsupportedCountriesOnly() {
+        assertFalse(GeoTowerDataCoverage.isKnownUnsupportedCountryCode("FR"))
+        assertFalse(GeoTowerDataCoverage.isKnownUnsupportedCountryCode("gp"))
+        assertFalse(GeoTowerDataCoverage.isKnownUnsupportedCountryCode(null))
+        assertTrue(GeoTowerDataCoverage.isKnownUnsupportedCountryCode("BE"))
+        assertTrue(GeoTowerDataCoverage.nominatimCountryCodes.split(",").contains("fr"))
+    }
+
     @Test
     fun parseNominatimArea_validResult() {
         val json = """

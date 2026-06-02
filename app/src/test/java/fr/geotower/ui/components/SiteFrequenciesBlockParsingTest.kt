@@ -50,6 +50,25 @@ class SiteFrequenciesBlockParsingTest {
     }
 
     @Test
+    fun mobileBandKeepsDistinctPanelIdsInPhysicalDetails() {
+        val details = """
+            LTE 1800 (4G) : 1835-1850 MHz | En service | 2024-06-11 | Panneau : 120 deg (24,6m) [AER_ID: 7001]
+            LTE 1800 (4G) : 1835-1850 MHz | En service | 2024-06-11 | Panneau : 120 deg (24,6m) [AER_ID: 7002]
+        """.trimIndent()
+
+        val parsed = parseAndSortFrequencies(
+            freqStr = details,
+            txtUnknown = "Inconnu",
+            txtAzimuthNotSpecified = "Azimut non specifie"
+        )
+
+        val lte1800 = parsed.single { it.gen == 4 && it.value == 1800 }
+        assertEquals(2, lte1800.physDetails.size)
+        assertTrue(lte1800.physDetails.any { it.contains("[AER_ID: 7001]") })
+        assertTrue(lte1800.physDetails.any { it.contains("[AER_ID: 7002]") })
+    }
+
+    @Test
     fun microwaveFallbackAddsTableRowFromLocalisationAzimuths() {
         val enriched = addMicrowaveFallbackBands(
             bands = emptyList(),
@@ -62,6 +81,19 @@ class SiteFrequenciesBlockParsingTest {
         assertEquals(1, enriched.size)
         assertEquals("FH", enriched.single().rawFreq)
         assertEquals(listOf("FH : 40\u00B0 (-)", "FH : 220\u00B0 (-)"), enriched.single().physDetails)
+    }
+
+    @Test
+    fun microwaveFallbackDoesNotAddEmptyRowWithoutPhysicalDetails() {
+        val enriched = addMicrowaveFallbackBands(
+            bands = emptyList(),
+            info = localisation(azimutsFh = null),
+            technique = technique(technologies = "FH", statut = "Projet approuve", dateService = "1992-12-04"),
+            rawFreqs = null,
+            txtUnknown = "Inconnu"
+        )
+
+        assertTrue(enriched.isEmpty())
     }
 
     @Test

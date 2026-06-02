@@ -369,7 +369,8 @@ interface GeoTowerDao {
                     SELECT DISTINCT
                         COALESCE(ta.libelle, 'Type inconnu (' || COALESCE(CAST(a.tae_id AS TEXT), '') || ')') ||
                         ' : ' || COALESCE(CAST(a.azimut AS TEXT), 'N/A') ||
-                        '° (' || COALESCE(CAST(a.hauteur_bas AS TEXT), 'N/A') || 'm)' AS antenna_line
+                        '° (' || COALESCE(CAST(a.hauteur_bas AS TEXT), 'N/A') || 'm)' ||
+                        ' [AER_ID: ' || a.aer_id || ']' AS antenna_line
                     FROM antenne a
                     LEFT JOIN ref_type_antenne ta ON a.tae_id = ta.tae_id
                     WHERE a.id_anfr = s.id_anfr
@@ -449,7 +450,8 @@ interface GeoTowerDao {
                     SELECT DISTINCT
                         COALESCE(ta.libelle, 'Type inconnu (' || COALESCE(CAST(a.tae_id AS TEXT), '') || ')') ||
                         ' : ' || COALESCE(CAST(a.azimut AS TEXT), 'N/A') ||
-                        '° (' || COALESCE(CAST(a.hauteur_bas AS TEXT), 'N/A') || 'm)' AS antenna_line
+                        '° (' || COALESCE(CAST(a.hauteur_bas AS TEXT), 'N/A') || 'm)' ||
+                        ' [AER_ID: ' || a.aer_id || ']' AS antenna_line
                     FROM antenne a
                     LEFT JOIN ref_type_antenne ta ON a.tae_id = ta.tae_id
                     WHERE a.id_anfr = s.id_anfr
@@ -496,7 +498,8 @@ interface GeoTowerDao {
                     SELECT DISTINCT
                         COALESCE(ta.libelle, 'Type inconnu (' || COALESCE(CAST(a.tae_id AS TEXT), '') || ')') ||
                         ' : ' || COALESCE(CAST(a.azimut AS TEXT), 'N/A') ||
-                        '° (' || COALESCE(CAST(a.hauteur_bas AS TEXT), 'N/A') || 'm)' AS antenna_line
+                        '° (' || COALESCE(CAST(a.hauteur_bas AS TEXT), 'N/A') || 'm)' ||
+                        ' [AER_ID: ' || a.aer_id || ']' AS antenna_line
                     FROM antenne a
                     LEFT JOIN ref_type_antenne ta ON a.tae_id = ta.tae_id
                     WHERE a.id_anfr = s.id_anfr
@@ -994,7 +997,8 @@ interface GeoTowerDao {
                     SELECT DISTINCT
                         COALESCE(ta.libelle, 'Type inconnu (' || COALESCE(CAST(a.tae_id AS TEXT), '') || ')') ||
                         ' : ' || COALESCE(CAST(a.azimut AS TEXT), 'N/A') ||
-                        '° (' || COALESCE(CAST(a.hauteur_bas AS TEXT), 'N/A') || 'm)' AS antenna_line
+                        '° (' || COALESCE(CAST(a.hauteur_bas AS TEXT), 'N/A') || 'm)' ||
+                        ' [AER_ID: ' || a.aer_id || ']' AS antenna_line
                     FROM antenne a
                     LEFT JOIN ref_type_antenne ta ON a.tae_id = ta.tae_id
                     WHERE a.id_anfr = s.id_anfr

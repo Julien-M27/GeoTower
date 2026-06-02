@@ -46,7 +46,7 @@ class ThroughputSharedTest {
     fun buildThroughputRadioSystemsMapsBandsForRadioEngine() {
         val systems = buildThroughputRadioSystems(
             bands = listOf(
-                band(gen = 4, value = 1800, status = "En service", physDetails = listOf("Panel : 90\u00B0 (15m)")),
+                band(gen = 4, value = 1800, status = "En service", physDetails = listOf("Panel : 90\u00B0 (15m) [AER_ID: 9001]")),
                 band(gen = 5, value = 3500, status = "Projet approuvé", physDetails = listOf("Panel : 120\u00B0 (18m)")),
                 band(gen = 5, value = 1800)
             ),
@@ -61,6 +61,18 @@ class ThroughputSharedTest {
         assertEquals(15.0, systems[0].antennaHeightM ?: -1.0, 0.0)
         assertEquals(RadioTechnology.NR_5G, systems[1].technology)
         assertEquals(SiteRadioStatus.AUTHORIZED, systems[1].status)
+    }
+
+    @Test
+    fun throughputExtractorsIgnorePanelIdSuffix() {
+        val band = band(
+            gen = 4,
+            value = 1800,
+            physDetails = listOf("Panel : 90\u00B0 (15m) [AER_ID: 9001]")
+        )
+
+        assertEquals(listOf(90.0), extractThroughputAzimuths(band))
+        assertEquals(15.0, extractThroughputPanelHeightMeters(band, null) ?: -1.0, 0.0)
     }
 
     @Test

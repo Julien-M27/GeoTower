@@ -110,6 +110,10 @@ internal fun addMicrowaveFallbackBands(
         return enrichedBands
     }
 
+    if (fallbackPhysDetails.isEmpty()) {
+        return enrichedBands
+    }
+
     val fallbackStatus = technique?.statut?.takeIf { it.isNotBlank() }
         ?: info.statut?.takeIf { it.isNotBlank() }
         ?: txtUnknown

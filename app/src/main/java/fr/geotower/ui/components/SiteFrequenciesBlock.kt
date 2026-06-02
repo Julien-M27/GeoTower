@@ -1,11 +1,16 @@
 package fr.geotower.ui.components
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.*
@@ -21,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.utils.AnfrDisplayText
@@ -47,6 +53,7 @@ fun SiteFrequenciesBlock(
     cardBgColor: Color,
     blockShape: Shape
 ) {
+    val context = LocalContext.current
     val txtFrequenciesTitle = stringResource(R.string.appstrings_frequencies_title)
     val txtBandsNotSpecified = stringResource(R.string.appstrings_bands_not_specified)
     val txtInService = stringResource(R.string.appstrings_in_service)
@@ -60,6 +67,9 @@ fun SiteFrequenciesBlock(
     val txtActivatedOn = stringResource(R.string.appstrings_activated_on)
     val txtDateNotSpecifiedAnfr = stringResource(R.string.appstrings_date_not_specified_anfr)
     val txtAzimuthNotSpecified = stringResource(R.string.appstrings_azimuth_not_specified)
+    val txtPanelIdentifier = stringResource(R.string.appstrings_panel_identifier)
+    val txtPanelIdentifierCopied = stringResource(R.string.appstrings_panel_identifier_copied)
+    val txtCopy = stringResource(R.string.appstrings_copy)
 
     val rawFreqs = technique?.detailsFrequences ?: info.frequences
     val mapFrequencyFilter = FrequencyFilterSelection.fromMapConfig()
@@ -125,7 +135,8 @@ fun SiteFrequenciesBlock(
                         txtTechnically = txtTechnically,
                         txtProjectApproved = txtProjectApproved,
                         txtUnknownStatus = txtUnknownStatus,
-                        mapFrequencyFilter = mapFrequencyFilter
+                        mapFrequencyFilter = mapFrequencyFilter,
+                        txtPanelIdentifier = txtPanelIdentifier
                     )
                 } else {
                     // 👇 TON CODE ACTUEL COMMENCE ICI 👇
@@ -287,7 +298,7 @@ fun SiteFrequenciesBlock(
                                     Spacer(modifier = Modifier.height(6.dp))
                                     band.physDetails.forEach { physDetail ->
                                         Row(
-                                            verticalAlignment = Alignment.CenterVertically,
+                                            verticalAlignment = Alignment.Top,
                                             modifier = Modifier.padding(top = 4.dp)
                                         ) {
                                             Icon(
@@ -299,12 +310,14 @@ fun SiteFrequenciesBlock(
                                             Spacer(modifier = Modifier.width(6.dp))
 
                                             // ✅ SÉPARATION ET TRADUCTION DU TYPE D'ANTENNE (Version Ultra-Robuste)
+                                            val panelId = extractFrequencyPanelId(physDetail)
+                                            val displayPhysDetail = removeFrequencyPanelIdForDisplay(physDetail)
                                             val typePart =
-                                                if (physDetail.contains(":")) physDetail.substringBefore(
+                                                if (displayPhysDetail.contains(":")) displayPhysDetail.substringBefore(
                                                     ":"
-                                                ).trim() else physDetail.trim()
+                                                ).trim() else displayPhysDetail.trim()
                                             val restPart =
-                                                if (physDetail.contains(":")) physDetail.substringAfter(
+                                                if (displayPhysDetail.contains(":")) displayPhysDetail.substringAfter(
                                                     ":"
                                                 ).trim() else ""
 
@@ -317,12 +330,42 @@ fun SiteFrequenciesBlock(
                                             val finalPhysText =
                                                 if (restPart.isNotEmpty()) "$safeType : $restPart" else safeType
 
-                                            Text(
-                                                text = formatFrequencyPhysicalDetailsForUnit(finalPhysText), // Ex: "Panel : 120° (15.5m)"
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                fontWeight = FontWeight.Medium,
-                                                fontSize = 12.sp
-                                            )
+                                            Column {
+                                                Text(
+                                                    text = formatFrequencyPhysicalDetailsForUnit(finalPhysText), // Ex: "Panel : 120° (15.5m)"
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    fontWeight = FontWeight.Medium,
+                                                    fontSize = 12.sp
+                                                )
+                                                panelId?.let { id ->
+                                                    Row(
+                                                        verticalAlignment = Alignment.CenterVertically,
+                                                        modifier = Modifier.padding(top = 2.dp)
+                                                    ) {
+                                                        Text(
+                                                            text = "$txtPanelIdentifier : $id",
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                            fontWeight = FontWeight.Medium,
+                                                            fontSize = 12.sp
+                                                        )
+                                                        IconButton(
+                                                            onClick = {
+                                                                val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                                                clipboard.setPrimaryClip(ClipData.newPlainText(txtPanelIdentifier, id))
+                                                                Toast.makeText(context, txtPanelIdentifierCopied, Toast.LENGTH_SHORT).show()
+                                                            },
+                                                            modifier = Modifier.size(24.dp)
+                                                        ) {
+                                                            Icon(
+                                                                imageVector = Icons.Default.ContentCopy,
+                                                                contentDescription = txtCopy,
+                                                                tint = MaterialTheme.colorScheme.primary,
+                                                                modifier = Modifier.size(16.dp)
+                                                            )
+                                                        }
+                                                    }
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -379,11 +422,16 @@ private fun displayFrequencyBandLabel(band: FreqBand): String {
 }
 
 private fun formatFrequencyPhysicalDetailsForUnit(text: String): String {
-    if (AppConfig.distanceUnit.intValue != 1) return text
-    return frequencyHeightMetersRegex.replace(text) { match ->
+    val displayText = removeFrequencyPanelIdForDisplay(text)
+    if (AppConfig.distanceUnit.intValue != 1) return displayText
+    return frequencyHeightMetersRegex.replace(displayText) { match ->
         val meters = match.groupValues[1].replace(',', '.').toDoubleOrNull()
         "(${formatFrequencyHeightMeters(meters)})"
     }
+}
+
+private fun removeFrequencyPanelIdForDisplay(text: String): String {
+    return frequencyPanelIdRegex.replace(text, "").trim()
 }
 
 private fun formatFrequencyHeightForUnit(rawHeight: String): String {
@@ -400,6 +448,11 @@ private fun formatFrequencyHeightMeters(meters: Double?): String {
     return "${(meters * 3.28084).roundToInt()} ft"
 }
 
+private fun extractFrequencyPanelId(text: String): String? {
+    return frequencyPanelIdRegex.find(text)?.groupValues?.getOrNull(1)?.takeIf { it.isNotBlank() }
+}
+
+private val frequencyPanelIdRegex = Regex("""\[AER_ID:\s*([^\]\s]+)\]""")
 private val frequencyHeightMetersRegex = Regex("""\(([0-9]+(?:[.,][0-9]+)?)\s*m\)""", RegexOption.IGNORE_CASE)
 
 // ==========================================
@@ -414,7 +467,8 @@ fun FrequenciesGridView(
     txtTechnically: String,
     txtProjectApproved: String,
     txtUnknownStatus: String,
-    mapFrequencyFilter: FrequencyFilterSelection
+    mapFrequencyFilter: FrequencyFilterSelection,
+    txtPanelIdentifier: String
 ) {
     val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     val headerBgColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
@@ -540,6 +594,7 @@ fun FrequenciesGridView(
         val freqs: String,
         val gen: Int,
         val value: Int,
+        val panelId: String?,
         val isMuted: Boolean
     )
     val groupedAntennas = mutableMapOf<String, MutableMap<String, MutableList<AntennaRow>>>()
@@ -579,7 +634,7 @@ fun FrequenciesGridView(
         if (band.physDetails.isEmpty()) {
             groupedAntennas.getOrPut("-") { mutableMapOf() }
                 .getOrPut("-") { mutableListOf() }
-                .add(AntennaRow(technoName, bandEquivalent, displayFreqs, band.gen, band.value, isMutedByMapFilter))
+                .add(AntennaRow(technoName, bandEquivalent, displayFreqs, band.gen, band.value, null, isMutedByMapFilter))
         } else {
             band.physDetails.forEach { phys ->
                 // Séparation robuste: "Panneau : 60° (28.9m)" -> On récupère "60" et "28.9m"
@@ -595,7 +650,7 @@ fun FrequenciesGridView(
 
                 groupedAntennas.getOrPut(azimut) { mutableMapOf() }
                     .getOrPut(hauteur) { mutableListOf() }
-                    .add(AntennaRow(technoName, bandEquivalent, displayFreqs, band.gen, band.value, isMutedByMapFilter))
+                    .add(AntennaRow(technoName, bandEquivalent, displayFreqs, band.gen, band.value, extractFrequencyPanelId(phys), isMutedByMapFilter))
             }
         }
     }
@@ -677,6 +732,11 @@ fun FrequenciesGridView(
                         ""
                     ).toFloatOrNull() ?: 0f
                 }
+                val panelIds = azimutEntry.value.values
+                    .flatten()
+                    .mapNotNull { it.panelId }
+                    .distinct()
+                    .sorted()
 
                 Row(
                     modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)
@@ -687,14 +747,36 @@ fun FrequenciesGridView(
                         modifier = Modifier.weight(0.8f).fillMaxHeight(),
                         contentAlignment = Alignment.Center
                     ) {
-                        Text(
-                            azimutDisplay,
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Medium,
-                            textAlign = TextAlign.Center,
-                            maxLines = 1,
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier.padding(4.dp)
-                        )
+                        ) {
+                            Text(
+                                azimutDisplay,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Medium,
+                                textAlign = TextAlign.Center,
+                                maxLines = 1
+                            )
+                            if (panelIds.isNotEmpty()) {
+                                Spacer(modifier = Modifier.height(3.dp))
+                                Text(
+                                    text = txtPanelIdentifier,
+                                    fontSize = 9.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                    lineHeight = 10.sp
+                                )
+                                Text(
+                                    text = panelIds.joinToString("\n"),
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                    lineHeight = 10.sp
+                                )
+                            }
+                        }
                     }
                     VerticalDivider(color = borderColor)
 
