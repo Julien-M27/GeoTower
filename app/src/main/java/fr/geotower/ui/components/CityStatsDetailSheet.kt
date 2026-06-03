@@ -7,7 +7,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -67,14 +66,12 @@ fun CityStatsDetailSheet(
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val defaultOp = AppConfig.defaultOperator.value
 
-    val stats by produceState<List<OperatorStat>?>(initialValue = null, antennas, techniques, defaultOp) {
+    val stats by produceState<List<OperatorStat>?>(initialValue = null, antennas, techniques) {
         value = withContext(Dispatchers.Default) {
             buildCityOperatorStats(
                 antennas = antennas,
-                techniques = techniques,
-                defaultOp = defaultOp
+                techniques = techniques
             )
         }
     }
@@ -132,21 +129,20 @@ fun CityStatsDetailSheet(
                     val arrowRotation by animateFloatAsState(targetValue = if (isExpanded) 180f else 0f, label = "arrowAnim")
 
                     Card(
+                        onClick = {
+                            if (isExpanded) {
+                                expandedOps = expandedOps - stat.key
+                            } else {
+                                expandedOps = expandedOps + stat.key
+                                onRequestFrequencyStatus(stat.idAnfrs)
+                            }
+                        },
                         shape = RoundedCornerShape(16.dp),
                         // ✅ BANDEAU OPÉRATEUR : alpha = 0.5f
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                         ),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                if (isExpanded) {
-                                    expandedOps = expandedOps - stat.key
-                                } else {
-                                    expandedOps = expandedOps + stat.key
-                                    onRequestFrequencyStatus(stat.idAnfrs)
-                                }
-                            }
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Row(
@@ -192,26 +188,11 @@ fun CityStatsDetailSheet(
 
                                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f), thickness = 0.5.dp)
 
-                                    if (isFrequencyStatusLoading) {
-                                        Column(
-                                            modifier = Modifier.fillMaxWidth().padding(vertical = 24.dp, horizontal = 16.dp),
-                                            horizontalAlignment = Alignment.CenterHorizontally,
-                                            verticalArrangement = Arrangement.spacedBy(12.dp)
-                                        ) {
-                                            LoadingIndicator(
-                                                modifier = Modifier.size(40.dp),
-                                                color = stat.color
-                                            )
-                                            Text(
-                                                text = stringResource(R.string.appstrings_loading_frequencies),
-                                                style = MaterialTheme.typography.labelLarge,
-                                                fontWeight = FontWeight.SemiBold,
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                                            )
-                                        }
-                                    } else {
-                                        CartoradioGroupedTable(groupedData = stat.groupedFreqs, brandColor = stat.color)
-                                    }
+                                    CartoradioGroupedTable(
+                                        groupedData = stat.groupedFreqs,
+                                        brandColor = stat.color,
+                                        isLoadingActiveStatus = isFrequencyStatusLoading
+                                    )
                                 }
                             }
                         }
@@ -225,8 +206,7 @@ fun CityStatsDetailSheet(
 
 private fun buildCityOperatorStats(
     antennas: List<LocalisationEntity>,
-    techniques: Map<String, TechniqueEntity>,
-    defaultOp: String
+    techniques: Map<String, TechniqueEntity>
 ): List<OperatorStat> {
     val targetInsee = antennas.mapNotNull { normalizeCityStatsInsee(it.codeInsee)?.takeIf { c -> c.isNotBlank() } }
         .groupingBy { it }
@@ -302,13 +282,8 @@ private fun buildCityOperatorStats(
         )
     }
 
-    val defaultOpKey = OperatorColors.keyFor(defaultOp)
-    return rawList.filter { it.totalCount > 0 }.ifEmpty { rawList }.sortedWith { a, b ->
-        if (a.key == b.key) 0
-        else if (a.key == defaultOpKey) -1
-        else if (b.key == defaultOpKey) 1
-        else b.totalCount.compareTo(a.totalCount)
-    }
+    return rawList.filter { it.totalCount > 0 }.ifEmpty { rawList }
+        .sortedByDescending { it.totalCount }
 }
 
 private fun normalizeCityStatsInsee(code: String?): String? {
@@ -452,16 +427,25 @@ private fun frequencyRangeOverlaps(start: Double, end: Double, low: Double, high
 private val frequencyRangeRegex = Regex("""([0-9]+(?:[.,][0-9]+)?)\s*-\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]*Hz)?""")
 
 // LE TABLEAU
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun CartoradioGroupedTable(
     groupedData: Map<String, List<FrequencyStat>>,
-    brandColor: Color
+    brandColor: Color,
+    isLoadingActiveStatus: Boolean = false
 ) {
     val tableBgColor = MaterialTheme.colorScheme.surface
 
     if (groupedData.isEmpty()) {
         Box(modifier = Modifier.fillMaxWidth().background(tableBgColor).padding(16.dp), contentAlignment = Alignment.Center) {
-            Text(stringResource(R.string.appstrings_technical_data_unavailable), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (isLoadingActiveStatus) {
+                LoadingIndicator(
+                    modifier = Modifier.size(28.dp),
+                    color = brandColor
+                )
+            } else {
+                Text(stringResource(R.string.appstrings_technical_data_unavailable), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         return
     }
@@ -522,16 +506,51 @@ fun CartoradioGroupedTable(
                                 color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.weight(1f)
                             )
-                            Text(
-                                text = "${stat.activeCount}/${stat.totalCount}",
-                                fontSize = 16.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = brandColor
+                            FrequencySitesCount(
+                                activeCount = stat.activeCount,
+                                totalCount = stat.totalCount,
+                                brandColor = brandColor,
+                                isLoadingActiveStatus = isLoadingActiveStatus
                             )
                         }
                     }
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+private fun FrequencySitesCount(
+    activeCount: Int,
+    totalCount: Int,
+    brandColor: Color,
+    isLoadingActiveStatus: Boolean
+) {
+    Row(
+        modifier = Modifier.widthIn(min = 56.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.End
+    ) {
+        if (isLoadingActiveStatus) {
+            LoadingIndicator(
+                modifier = Modifier.size(16.dp),
+                color = brandColor
+            )
+            Text(
+                text = "/$totalCount",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = brandColor
+            )
+        } else {
+            Text(
+                text = "$activeCount/$totalCount",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = brandColor
+            )
         }
     }
 }
