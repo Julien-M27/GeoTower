@@ -640,24 +640,35 @@ class MainActivity : ComponentActivity() {
 
                             // --- 1. DÉTAIL DU SUPPORT (Le Pylône) ---
                             composable(
-                                route = "support_detail/{id}?operator={operator}",
+                                route = "support_detail/{id}?operator={operator}&fromMap={fromMap}",
                                 arguments = listOf(
                                     navArgument("id") { type = NavType.StringType },
                                     navArgument("operator") {
                                         type = NavType.StringType
                                         nullable = true
                                         defaultValue = null
+                                    },
+                                    navArgument("fromMap") {
+                                        type = NavType.BoolType
+                                        defaultValue = false
                                     }
                                 ),
                                 deepLinks = listOf(navDeepLink { uriPattern = "geotower://support/{id}" })
                             ) { backStackEntry ->
                                 val id = backStackEntry.arguments?.getString("id") ?: ""
                                 val highlightedOperatorKey = backStackEntry.arguments?.getString("operator")
+                                val applyMapFilters = backStackEntry.arguments?.getBoolean("fromMap") ?: false
                                 // Convertir en Long si ta BDD utilise un Long, ou adapter la query
                                 val idLong = id.toLongOrNull() ?: 0L
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SUPPORT_DETAIL)) {
-                                        fr.geotower.ui.screens.emitters.SupportSiteWrapperScreen(navController, repository, idLong, highlightedOperatorKey = highlightedOperatorKey)
+                                        fr.geotower.ui.screens.emitters.SupportSiteWrapperScreen(
+                                            navController,
+                                            repository,
+                                            idLong,
+                                            highlightedOperatorKey = highlightedOperatorKey,
+                                            applyMapFilters = applyMapFilters
+                                        )
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }
@@ -674,6 +685,19 @@ class MainActivity : ComponentActivity() {
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)) {
                                         SiteDetailToolWrapperScreen(navController, repository, id)
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
+                                }
+                            }
+                            composable(
+                                route = "site_detail_from_map/{id}",
+                                arguments = listOf(navArgument("id") { type = NavType.StringType })
+                            ) { backStackEntry ->
+                                val id = backStackEntry.arguments?.getString("id") ?: ""
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)) {
+                                        SiteDetailToolWrapperScreen(navController, repository, id, applyMapFilters = true)
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }

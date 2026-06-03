@@ -88,6 +88,7 @@ import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.ui.draw.scale
@@ -664,7 +665,10 @@ fun ConfigurableSwitchCard(
 
     Surface(shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(56.dp)
+                .padding(start = 16.dp, end = 16.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -675,13 +679,20 @@ fun ConfigurableSwitchCard(
                 maxLines = 2,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
-            IconButton(onClick = onSettingsClick) {
+            IconButton(
+                onClick = onSettingsClick,
+                modifier = Modifier.size(40.dp),
+                colors = IconButtonDefaults.iconButtonColors(
+                    contentColor = MaterialTheme.colorScheme.primary
+                )
+            ) {
                 Icon(
                     imageVector = Icons.Default.Settings,
                     contentDescription = stringResource(R.string.appstrings_settings_title),
-                    tint = MaterialTheme.colorScheme.primary
+                    modifier = Modifier.size(22.dp)
                 )
             }
+            Spacer(modifier = Modifier.width(8.dp))
             fr.geotower.ui.components.GeoTowerSwitch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,

@@ -142,7 +142,6 @@ fun AntennaMapToolBox(
             AnimatedVisibility(visible = isToolboxExpanded, enter = expandVertically(), exit = shrinkVertically()) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(top = 7.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     if (showSearch) {

@@ -51,7 +51,8 @@ fun SiteFrequenciesBlock(
     technique: TechniqueEntity?,
     formattedAzimuths: String,
     cardBgColor: Color,
-    blockShape: Shape
+    blockShape: Shape,
+    applyMapFilters: Boolean = false
 ) {
     val context = LocalContext.current
     val txtFrequenciesTitle = stringResource(R.string.appstrings_frequencies_title)
@@ -72,7 +73,7 @@ fun SiteFrequenciesBlock(
     val txtCopy = stringResource(R.string.appstrings_copy)
 
     val rawFreqs = technique?.detailsFrequences ?: info.frequences
-    val mapFrequencyFilter = FrequencyFilterSelection.fromMapConfig()
+    val mapFrequencyFilter = if (applyMapFilters) FrequencyFilterSelection.fromMapConfig() else null
 
     // ✅ ON INTÈGRE NOS NOUVEAUX FILTRES DYNAMIQUES
     val parsedBands = remember(
@@ -168,8 +169,9 @@ fun SiteFrequenciesBlock(
                     } else {
                         txtDateNotSpecifiedAnfr
                     }
-                    val isMutedByMapFilter = !mapFrequencyFilter.isFullyEnabled &&
-                        !mapFrequencyFilter.matchesBand(band.gen, band.value)
+                    val isMutedByMapFilter = mapFrequencyFilter?.let { filter ->
+                        !filter.isFullyEnabled && !filter.matchesBand(band.gen, band.value)
+                    } ?: false
 
                     Card(
                         shape = RoundedCornerShape(12.dp),
@@ -467,7 +469,7 @@ fun FrequenciesGridView(
     txtTechnically: String,
     txtProjectApproved: String,
     txtUnknownStatus: String,
-    mapFrequencyFilter: FrequencyFilterSelection,
+    mapFrequencyFilter: FrequencyFilterSelection?,
     txtPanelIdentifier: String
 ) {
     val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
@@ -546,8 +548,9 @@ fun FrequenciesGridView(
                     FrequencyStatusType.Approved -> txtProjectApproved
                     FrequencyStatusType.Unknown -> txtUnknownStatus
                 }
-                val isMutedByMapFilter = !mapFrequencyFilter.isFullyEnabled &&
-                    !mapFrequencyFilter.matchesBand(band.gen, band.value)
+                val isMutedByMapFilter = mapFrequencyFilter?.let { filter ->
+                    !filter.isFullyEnabled && !filter.matchesBand(band.gen, band.value)
+                } ?: false
 
                 Row(
                     modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)
@@ -628,8 +631,9 @@ fun FrequenciesGridView(
             "-"
         }
 
-        val isMutedByMapFilter = !mapFrequencyFilter.isFullyEnabled &&
-            !mapFrequencyFilter.matchesBand(band.gen, band.value)
+        val isMutedByMapFilter = mapFrequencyFilter?.let { filter ->
+            !filter.isFullyEnabled && !filter.matchesBand(band.gen, band.value)
+        } ?: false
 
         if (band.physDetails.isEmpty()) {
             groupedAntennas.getOrPut("-") { mutableMapOf() }

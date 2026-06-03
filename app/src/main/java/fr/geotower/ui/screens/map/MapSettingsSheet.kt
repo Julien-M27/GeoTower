@@ -52,6 +52,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.MutableState
 
 private val OperatorFilterButtonHeight = 76.dp
+private const val PREF_OPERATOR_FILTER_METRO_EXPANDED = "map_operator_filter_metro_expanded"
+private const val PREF_OPERATOR_FILTER_OVERSEAS_EXPANDED = "map_operator_filter_overseas_expanded"
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -134,15 +136,22 @@ fun MapSettingsSheet(
             val defaultOperatorKey = OperatorColors.keyFor(AppConfig.defaultOperator.value)
             val defaultOperatorIsMetro = metroOperators.any { it.key == defaultOperatorKey }
             val defaultOperatorIsOverseas = OperatorColors.overseas.any { it.key == defaultOperatorKey }
-            var isMetroExpanded by remember(defaultOperatorKey) { mutableStateOf(defaultOperatorIsMetro) }
-            var isOverseasExpanded by remember(defaultOperatorKey) { mutableStateOf(defaultOperatorIsOverseas) }
+            var isMetroExpanded by remember(defaultOperatorKey) {
+                mutableStateOf(prefs.getBoolean(PREF_OPERATOR_FILTER_METRO_EXPANDED, defaultOperatorIsMetro))
+            }
+            var isOverseasExpanded by remember(defaultOperatorKey) {
+                mutableStateOf(prefs.getBoolean(PREF_OPERATOR_FILTER_OVERSEAS_EXPANDED, defaultOperatorIsOverseas))
+            }
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OperatorFilterGroup(
                     title = stringResource(R.string.operator_region_metro),
                     operators = metroOperators,
                     selectedKeys = selectedOperatorKeys,
                     isExpanded = isMetroExpanded,
-                    onExpandedChange = { isMetroExpanded = it },
+                    onExpandedChange = {
+                        isMetroExpanded = it
+                        prefs.edit().putBoolean(PREF_OPERATOR_FILTER_METRO_EXPANDED, it).apply()
+                    },
                     onSelectionChange = ::saveOperatorSelection
                 )
 
@@ -151,7 +160,10 @@ fun MapSettingsSheet(
                     operators = OperatorColors.overseas,
                     selectedKeys = selectedOperatorKeys,
                     isExpanded = isOverseasExpanded,
-                    onExpandedChange = { isOverseasExpanded = it },
+                    onExpandedChange = {
+                        isOverseasExpanded = it
+                        prefs.edit().putBoolean(PREF_OPERATOR_FILTER_OVERSEAS_EXPANDED, it).apply()
+                    },
                     onSelectionChange = ::saveOperatorSelection
                 )
             }
@@ -195,17 +207,17 @@ fun MapSettingsSheet(
             // 2. TECHNOLOGIES
             SectionTitle(stringResource(R.string.appstrings_technologies_title))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                SelectableButton("2G", show2G, Modifier.weight(1f)) {
-                    show2G = it; prefs.edit().putBoolean("show_techno_2g", it).apply()
-                }
-                SelectableButton("3G", show3G, Modifier.weight(1f)) {
-                    show3G = it; prefs.edit().putBoolean("show_techno_3g", it).apply()
+                SelectableButton("5G", show5G, Modifier.weight(1f)) {
+                    show5G = it; prefs.edit().putBoolean("show_techno_5g", it).apply()
                 }
                 SelectableButton("4G", show4G, Modifier.weight(1f)) {
                     show4G = it; prefs.edit().putBoolean("show_techno_4g", it).apply()
                 }
-                SelectableButton("5G", show5G, Modifier.weight(1f)) {
-                    show5G = it; prefs.edit().putBoolean("show_techno_5g", it).apply()
+                SelectableButton("3G", show3G, Modifier.weight(1f)) {
+                    show3G = it; prefs.edit().putBoolean("show_techno_3g", it).apply()
+                }
+                SelectableButton("2G", show2G, Modifier.weight(1f)) {
+                    show2G = it; prefs.edit().putBoolean("show_techno_2g", it).apply()
                 }
                 SelectableButton("FH", showFH, Modifier.weight(1f)) {
                     showFH = it; prefs.edit().putBoolean("show_techno_fh", it).apply()

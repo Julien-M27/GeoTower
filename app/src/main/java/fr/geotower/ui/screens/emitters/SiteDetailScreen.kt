@@ -57,7 +57,6 @@ import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -81,6 +80,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
@@ -131,6 +131,8 @@ import fr.geotower.ui.screens.settings.SiteSettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.activeOperatorKeysForSiteStatusFilter
+import fr.geotower.utils.combineOperatorKeyFilters
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
 import fr.geotower.utils.SitePagePrefs
@@ -154,6 +156,7 @@ fun SiteDetailScreen(
     navController: NavController,
     repository: AnfrRepository,
     antennaId: String,
+    applyMapFilters: Boolean = false,
     isSplitScreen: Boolean = false,
     onCloseSplitScreen: () -> Unit = {},
     onOpenElevationProfile: ((String) -> Unit)? = null,
@@ -847,6 +850,25 @@ fun SiteDetailScreen(
                 info.operateur?.contains("SFR", true) == true -> "sfr"
                 else -> ""
             }
+            val operatorFilterKeys = if (applyMapFilters) {
+                AppConfig.selectedOperatorKeys.value
+                    .takeUnless { selectedKeys -> selectedKeys.containsAll(OperatorColors.defaultVisibleKeys) }
+            } else {
+                null
+            }
+            val siteStatusFilterKeys = if (applyMapFilters) {
+                activeOperatorKeysForSiteStatusFilter(
+                    antennas = listOf(info),
+                    sitesHs = hsDataMap.values,
+                    showSitesInService = AppConfig.showSitesInService.value,
+                    showSitesOutOfService = AppConfig.showSitesOutOfService.value
+                )
+            } else {
+                null
+            }
+            val activeOperatorKeys = combineOperatorKeyFilters(operatorFilterKeys, siteStatusFilterKeys)
+            val isOperatorMutedByFilter = activeOperatorKeys != null &&
+                OperatorColors.keysFor(info.operateur).none { operatorKey -> operatorKey in activeOperatorKeys }
 
             if (showCartoradioSheet) {
                 ModalBottomSheet(onDismissRequest = { showCartoradioSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
@@ -1111,7 +1133,13 @@ fun SiteDetailScreen(
                         }
                         "operator" -> {
                             if (showOperator) {
-                                Card(modifier = Modifier.fillMaxWidth(), shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
+                                Card(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .alpha(if (isOperatorMutedByFilter) 0.42f else 1f),
+                                    shape = blockShape,
+                                    colors = CardDefaults.cardColors(containerColor = cardBgColor)
+                                ) {
                                     Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
                                         val opNameDisplay = info.operateur ?: stringResource(R.string.appstrings_unknown)
                                         val logoRes = getDetailLogoRes(opNameDisplay)
@@ -1356,7 +1384,7 @@ fun SiteDetailScreen(
                                 )
                             }
                         }
-                        "freqs" -> { if (showFreqs && canUseSiteFrequencies) fr.geotower.ui.components.SiteFrequenciesBlock(info = info, technique = technique, formattedAzimuths = formattedAzimuths, cardBgColor = cardBgColor, blockShape = blockShape) }
+                        "freqs" -> { if (showFreqs && canUseSiteFrequencies) fr.geotower.ui.components.SiteFrequenciesBlock(info = info, technique = technique, formattedAzimuths = formattedAzimuths, cardBgColor = cardBgColor, blockShape = blockShape, applyMapFilters = applyMapFilters) }
                         "links" -> {
                             if (showLinks && canUseSiteExternalLinks && opNameUrl.isNotEmpty()) {
                                 fr.geotower.ui.components.SiteExternalLinksBlock(

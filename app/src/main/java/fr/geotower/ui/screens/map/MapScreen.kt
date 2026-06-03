@@ -184,6 +184,13 @@ private data class DeclaredSiteStats(
     val totalCount: Int
 )
 
+private data class SearchAreaBounds(
+    val latNorth: Double,
+    val lonEast: Double,
+    val latSouth: Double,
+    val lonWest: Double
+)
+
 private fun declaredSiteStats(antennas: List<LocalisationEntity>): DeclaredSiteStats {
     val siteGroups = antennas
         .asSequence()
@@ -290,6 +297,27 @@ private fun decodeGeoPointPolygons(encoded: String?): List<List<GeoPoint>>? {
             points.takeIf { it.isNotEmpty() }
         }
         .takeIf { it.isNotEmpty() }
+}
+
+private fun encodeSearchAreaBounds(bounds: SearchAreaBounds?): String? {
+    return bounds?.let { "${it.latNorth},${it.lonEast},${it.latSouth},${it.lonWest}" }
+}
+
+private fun decodeSearchAreaBounds(encoded: String?): SearchAreaBounds? {
+    if (encoded.isNullOrBlank()) return null
+    val parts = encoded.split(",", limit = 4)
+    if (parts.size != 4) return null
+
+    val latNorth = parts[0].toDoubleOrNull()
+    val lonEast = parts[1].toDoubleOrNull()
+    val latSouth = parts[2].toDoubleOrNull()
+    val lonWest = parts[3].toDoubleOrNull()
+
+    return if (latNorth != null && lonEast != null && latSouth != null && lonWest != null) {
+        SearchAreaBounds(latNorth, lonEast, latSouth, lonWest)
+    } else {
+        null
+    }
 }
 
 private fun encodeGeoPoints(points: List<GeoPoint>): String? {
@@ -485,9 +513,33 @@ fun MapScreen(
     // Mémorise les tracés de la ville sélectionnée pour le filtrage
     var currentCityPolygonsEncoded by rememberSaveable { mutableStateOf<String?>(null) }
     var currentCityPolygons by remember { mutableStateOf(decodeGeoPointPolygons(currentCityPolygonsEncoded)) }
-    fun setCurrentCityPolygons(polygons: List<List<GeoPoint>>?) {
+    var currentSearchAreaBoundsEncoded by rememberSaveable { mutableStateOf<String?>(null) }
+    var currentSearchAreaBounds by remember { mutableStateOf(decodeSearchAreaBounds(currentSearchAreaBoundsEncoded)) }
+    var loadedCitySearchKey by remember { mutableStateOf<String?>(null) }
+    fun setCurrentCitySearch(bounds: SearchAreaBounds?, polygons: List<List<GeoPoint>>?) {
+        currentSearchAreaBounds = bounds
+        currentSearchAreaBoundsEncoded = encodeSearchAreaBounds(bounds)
         currentCityPolygons = polygons
         currentCityPolygonsEncoded = encodeGeoPointPolygons(polygons)
+        if (bounds == null || polygons.isNullOrEmpty()) {
+            loadedCitySearchKey = null
+        }
+    }
+
+    fun loadCurrentCitySearchIfNeeded(force: Boolean = false) {
+        val bounds = currentSearchAreaBounds ?: return
+        val polygons = currentCityPolygons?.takeIf { it.isNotEmpty() } ?: return
+        val searchKey = "${currentSearchAreaBoundsEncoded.orEmpty()}|${currentCityPolygonsEncoded.orEmpty()}"
+        if (!force && loadedCitySearchKey == searchKey) return
+
+        loadedCitySearchKey = searchKey
+        viewModel.loadAntennasForCity(
+            latNorth = bounds.latNorth,
+            lonEast = bounds.lonEast,
+            latSouth = bounds.latSouth,
+            lonWest = bounds.lonWest,
+            polygons = polygons
+        )
     }
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
@@ -602,6 +654,66 @@ fun MapScreen(
     val searchBoundaryOverlay = remember { FolderOverlay() }
     // ✅ LE CALQUE MACRO POUR LA VUE DÉZOOMÉE
     val macroOverlay = remember { FolderOverlay() }
+
+    fun refreshSearchBoundaryOverlay(map: MapView, polygons: List<List<GeoPoint>>?) {
+        searchBoundaryOverlay.items.clear()
+        val boundaryPolygons = polygons
+            ?.map { polygon -> polygon.map { point -> GeoPoint(point.latitude, point.longitude) } }
+            ?.filter { it.size >= 3 }
+            .orEmpty()
+
+        if (boundaryPolygons.isEmpty()) {
+            map.invalidate()
+            return
+        }
+
+        val worldMask = object : org.osmdroid.views.overlay.Overlay() {
+            private val path = android.graphics.Path()
+
+            override fun draw(canvas: android.graphics.Canvas, projection: org.osmdroid.views.Projection) {
+                path.reset()
+                boundaryPolygons.forEach { geoPoints ->
+                    var first = true
+                    geoPoints.forEach { pt ->
+                        val px = projection.toPixels(pt, null)
+                        if (first) {
+                            path.moveTo(px.x.toFloat(), px.y.toFloat())
+                            first = false
+                        } else {
+                            path.lineTo(px.x.toFloat(), px.y.toFloat())
+                        }
+                    }
+                    path.close()
+                }
+
+                canvas.save()
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    canvas.clipOutPath(path)
+                } else {
+                    @Suppress("DEPRECATION")
+                    canvas.clipPath(path, android.graphics.Region.Op.DIFFERENCE)
+                }
+
+                canvas.drawColor(android.graphics.Color.parseColor("#66000000"))
+                canvas.restore()
+            }
+        }
+
+        val outlinesOverlay = org.osmdroid.views.overlay.FolderOverlay()
+        boundaryPolygons.forEach { polygon ->
+            val outline = Polyline(map).apply {
+                setPoints(polygon)
+                outlinePaint.color = android.graphics.Color.RED
+                outlinePaint.strokeWidth = 4f
+                outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 15f), 0f)
+            }
+            outlinesOverlay.add(outline)
+        }
+
+        searchBoundaryOverlay.add(worldMask)
+        searchBoundaryOverlay.add(outlinesOverlay)
+        map.invalidate()
+    }
 
     var showLocationBtn by remember { mutableStateOf(prefs.getBoolean("show_map_location", true)) }
     var showZoomBtns by remember { mutableStateOf(prefs.getBoolean("show_map_zoom", true)) }
@@ -1081,7 +1193,7 @@ fun MapScreen(
 
         map.post {
             try {
-                navController.navigate("support_detail/$supportId") {
+                navController.navigate("support_detail/$supportId?operator=&fromMap=true") {
                     launchSingleTop = true
                 }
             } catch (e: Exception) {
@@ -1352,6 +1464,13 @@ fun MapScreen(
     ) {
         mapViewRef?.let { map ->
             updateMarkers(map, filteredAntennas, sitesHs)
+        }
+    }
+
+    LaunchedEffect(mapViewRef, currentSearchAreaBoundsEncoded, currentCityPolygonsEncoded) {
+        mapViewRef?.let { map ->
+            refreshSearchBoundaryOverlay(map, currentCityPolygons)
+            loadCurrentCitySearchIfNeeded()
         }
     }
 
@@ -1783,97 +1902,24 @@ fun MapScreen(
                 if (nominatimArea != null) {
                     kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
                         mapViewRef?.let { map ->
-                            searchBoundaryOverlay.items.clear()
+                            val searchBounds = SearchAreaBounds(
+                                latNorth = nominatimArea.latNorth,
+                                lonEast = nominatimArea.lonEast,
+                                latSouth = nominatimArea.latSouth,
+                                lonWest = nominatimArea.lonWest
+                            )
+                            val searchPolygons = nominatimArea.polygons.map { polygon ->
+                                polygon.map { point -> GeoPoint(point.latitude, point.longitude) }
+                            }
 
-                            nominatimArea.geoJsonFeature?.let { geoJsonString ->
-                                val kmlDocument = org.osmdroid.bonuspack.kml.KmlDocument()
-                                kmlDocument.parseGeoJSON(geoJsonString)
-                                val featureOverlay = kmlDocument.mKmlRoot.buildOverlay(map, null, null, kmlDocument)
-
-                                val holesList = mutableListOf<List<GeoPoint>>()
-                                val outlinesOverlay = org.osmdroid.views.overlay.FolderOverlay()
-
-                                fun extractHolesAndOutlines(overlay: org.osmdroid.views.overlay.Overlay) {
-                                    when (overlay) {
-                                        is org.osmdroid.views.overlay.Polygon -> {
-                                            @Suppress("DEPRECATION")
-                                            val overlayPoints = overlay.points
-                                            holesList.add(overlayPoints)
-                                            val outline = org.osmdroid.views.overlay.Polyline(map).apply {
-                                                setPoints(overlayPoints)
-                                                outlinePaint.color = android.graphics.Color.RED
-                                                outlinePaint.strokeWidth = 4f
-                                                outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 15f), 0f)
-                                            }
-                                            outlinesOverlay.add(outline)
-                                        }
-                                        is org.osmdroid.views.overlay.Polyline -> {
-                                            @Suppress("DEPRECATION")
-                                            val overlayPoints = overlay.points
-                                            val outline = org.osmdroid.views.overlay.Polyline(map).apply {
-                                                setPoints(overlayPoints)
-                                                outlinePaint.color = android.graphics.Color.RED
-                                                outlinePaint.strokeWidth = 4f
-                                                outlinePaint.pathEffect = android.graphics.DashPathEffect(floatArrayOf(15f, 15f), 0f)
-                                            }
-                                            outlinesOverlay.add(outline)
-                                        }
-                                        is org.osmdroid.views.overlay.FolderOverlay -> {
-                                            overlay.items.forEach { extractHolesAndOutlines(it) }
-                                        }
-                                    }
-                                }
-
-                                extractHolesAndOutlines(featureOverlay)
-
-                                setCurrentCityPolygons(holesList)
-
-                                viewModel.loadAntennasForCity(
-                                    latNorth = nominatimArea.latNorth,
-                                    lonEast = nominatimArea.lonEast,
-                                    latSouth = nominatimArea.latSouth,
-                                    lonWest = nominatimArea.lonWest,
-                                    polygons = holesList
-                                )
-
+                            if (searchPolygons.isNotEmpty()) {
+                                setCurrentCitySearch(searchBounds, searchPolygons)
+                                refreshSearchBoundaryOverlay(map, searchPolygons)
+                                loadCurrentCitySearchIfNeeded(force = true)
                                 showCityStatsPopup = true
-
-                                val worldMask = object : org.osmdroid.views.overlay.Overlay() {
-                                    private val path = android.graphics.Path()
-
-                                    override fun draw(canvas: android.graphics.Canvas, projection: org.osmdroid.views.Projection) {
-                                        if (holesList.isEmpty()) return
-
-                                        path.reset()
-                                        holesList.forEach { geoPoints ->
-                                            var first = true
-                                            geoPoints.forEach { pt ->
-                                                val px = projection.toPixels(pt, null)
-                                                if (first) {
-                                                    path.moveTo(px.x.toFloat(), px.y.toFloat())
-                                                    first = false
-                                                } else {
-                                                    path.lineTo(px.x.toFloat(), px.y.toFloat())
-                                                }
-                                            }
-                                            path.close()
-                                        }
-
-                                        canvas.save()
-                                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
-                                            canvas.clipOutPath(path)
-                                        } else {
-                                            @Suppress("DEPRECATION")
-                                            canvas.clipPath(path, android.graphics.Region.Op.DIFFERENCE)
-                                        }
-
-                                        canvas.drawColor(android.graphics.Color.parseColor("#66000000"))
-                                        canvas.restore()
-                                    }
-                                }
-
-                                searchBoundaryOverlay.add(worldMask)
-                                searchBoundaryOverlay.add(outlinesOverlay)
+                            } else {
+                                setCurrentCitySearch(null, null)
+                                refreshSearchBoundaryOverlay(map, null)
                             }
 
                             val cityBounds = org.osmdroid.util.BoundingBox(
@@ -1902,6 +1948,7 @@ fun MapScreen(
                                 return@withContext
                             }
                             mapViewRef?.let { map ->
+                                setCurrentCitySearch(null, null)
                                 searchBoundaryOverlay.items.clear()
                                 map.controller.setZoom(15.0)
                                 map.controller.setCenter(GeoPoint(addr.latitude, addr.longitude))
@@ -2271,7 +2318,7 @@ fun MapScreen(
                             isSearchActive = false
                             restoreOperatorSearchSelection()
                             searchQuery = ""
-                            setCurrentCityPolygons(null)
+                            setCurrentCitySearch(null, null)
                             searchBoundaryOverlay.items.clear()
 
                             // ✅ CORRECTION DU NOM ET APPEL AVEC LE ZOOM
@@ -2293,7 +2340,7 @@ fun MapScreen(
                         if (!isSearchActive) {
                             restoreOperatorSearchSelection()
                             searchQuery = ""
-                            setCurrentCityPolygons(null)
+                            setCurrentCitySearch(null, null)
                             searchBoundaryOverlay.items.clear()
 
                             // ✅ CORRECTION DU NOM ET APPEL AVEC LE ZOOM

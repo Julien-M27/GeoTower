@@ -16,7 +16,8 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -38,12 +39,14 @@ private enum class SiteDetailSidePane {
     ThroughputCalculator
 }
 
+@OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun SupportSiteWrapperScreen(
     navController: NavController,
     repository: AnfrRepository,
     supportId: Long,
     highlightedOperatorKey: String? = null,
+    applyMapFilters: Boolean = false,
     isSplitScreen: Boolean = false,
     onCloseSplitScreen: () -> Unit = {},
     onOpenAntennaInHost: ((String) -> Unit)? = null
@@ -117,7 +120,7 @@ fun SupportSiteWrapperScreen(
                 .background(MaterialTheme.colorScheme.background),
             contentAlignment = Alignment.Center
         ) {
-            CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
+            LoadingIndicator(color = MaterialTheme.colorScheme.primary)
         }
         return
     }
@@ -138,6 +141,7 @@ fun SupportSiteWrapperScreen(
                     navController = navController,
                     repository = repository,
                     antennaId = selectedSiteId!!,
+                    applyMapFilters = applyMapFilters,
                     onClose = { selectedSidePane = null },
                     onOpenElevation = { selectedSidePane = SiteDetailSidePane.ElevationProfile },
                     onOpenThroughput = { selectedSidePane = SiteDetailSidePane.ThroughputCalculator }
@@ -148,6 +152,7 @@ fun SupportSiteWrapperScreen(
                     repository = repository,
                     siteId = supportId,
                     highlightedOperatorKey = highlightedOperatorKey,
+                    applyMapFilters = applyMapFilters,
                     isSplitScreen = isSplitScreen,
                     onCloseSplitScreen = onCloseSplitScreen,
                     onAntennaClick = { id ->
@@ -162,7 +167,12 @@ fun SupportSiteWrapperScreen(
                                 selectedSidePane = null
                             }
                         } else {
-                            navController.navigate("site_detail/${Uri.encode(id)}")
+                            val route = if (applyMapFilters) {
+                                "site_detail_from_map/${Uri.encode(id)}"
+                            } else {
+                                "site_detail/${Uri.encode(id)}"
+                            }
+                            navController.navigate(route)
                         }
                     }
                 )
@@ -188,6 +198,7 @@ fun SupportSiteWrapperScreen(
                     navController = navController,
                     repository = repository,
                     antennaId = siteId,
+                    applyMapFilters = applyMapFilters,
                     onClose = {
                         selectedSiteId = null
                         selectedSidePane = null
@@ -319,7 +330,8 @@ fun NearEmittersSupportWrapperScreen(
 fun SiteDetailToolWrapperScreen(
     navController: NavController,
     repository: AnfrRepository,
-    antennaId: String
+    antennaId: String,
+    applyMapFilters: Boolean = false
 ) {
     val displayStyle by AppConfig.displayStyle
     var selectedSidePane by remember(antennaId) { mutableStateOf<SiteDetailSidePane?>(null) }
@@ -336,6 +348,7 @@ fun SiteDetailToolWrapperScreen(
                 navController = navController,
                 repository = repository,
                 antennaId = antennaId,
+                applyMapFilters = applyMapFilters,
                 isSplitScreen = isSplitActive,
                 onCloseSplitScreen = { selectedSidePane = null },
                 onOpenElevationProfile = {
@@ -405,6 +418,7 @@ private fun SiteDetailPane(
     navController: NavController,
     repository: AnfrRepository,
     antennaId: String,
+    applyMapFilters: Boolean = false,
     onClose: () -> Unit,
     onOpenElevation: (String) -> Unit,
     onOpenThroughput: (String) -> Unit
@@ -413,6 +427,7 @@ private fun SiteDetailPane(
         navController = navController,
         repository = repository,
         antennaId = antennaId,
+        applyMapFilters = applyMapFilters,
         isSplitScreen = true,
         onCloseSplitScreen = onClose,
         onOpenElevationProfile = onOpenElevation,

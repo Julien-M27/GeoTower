@@ -80,6 +80,8 @@ import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.FrequencyFilterSelection
+import fr.geotower.utils.activeOperatorKeysForSiteStatusFilter
+import fr.geotower.utils.combineOperatorKeyFilters
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.SupportPagePrefs
 import java.util.Locale
@@ -98,6 +100,7 @@ fun SupportDetailScreen(
     repository: AnfrRepository,
     siteId: Long,
     highlightedOperatorKey: String? = null,
+    applyMapFilters: Boolean = false,
     isSplitScreen: Boolean = false,
     onCloseSplitScreen: () -> Unit = {},
     onAntennaClick: (String) -> Unit = {}
@@ -445,9 +448,9 @@ fun SupportDetailScreen(
     var showNav by remember { mutableStateOf(SupportPagePrefs.nav.read(prefs)) }
     var showShare by remember { mutableStateOf(SupportPagePrefs.share.read(prefs)) }
     var showOperators by remember { mutableStateOf(SupportPagePrefs.operators.read(prefs)) }
-    val mapFrequencyFilter = FrequencyFilterSelection.fromMapConfig()
+    val mapFrequencyFilter = if (applyMapFilters) FrequencyFilterSelection.fromMapConfig() else null
     val frequencyMatchedOperatorKeys = remember(antennas, mapFrequencyFilter) {
-        if (mapFrequencyFilter.isFullyEnabled) {
+        if (mapFrequencyFilter == null || mapFrequencyFilter.isFullyEnabled) {
             null
         } else {
             antennas
@@ -456,7 +459,28 @@ fun SupportDetailScreen(
                 .toSet()
         }
     }
-    val priorityOperatorKey = effectiveHighlightedOperatorKey ?: frequencyMatchedOperatorKeys?.singleOrNull()
+    val operatorMatchedKeys = if (applyMapFilters) {
+        AppConfig.selectedOperatorKeys.value
+            .takeUnless { selectedKeys -> selectedKeys.containsAll(OperatorColors.defaultVisibleKeys) }
+    } else {
+        null
+    }
+    val siteStatusMatchedOperatorKeys = if (applyMapFilters) {
+        activeOperatorKeysForSiteStatusFilter(
+            antennas = antennas,
+            sitesHs = hsDataMap.values,
+            showSitesInService = AppConfig.showSitesInService.value,
+            showSitesOutOfService = AppConfig.showSitesOutOfService.value
+        )
+    } else {
+        null
+    }
+    val activeOperatorKeys = combineOperatorKeyFilters(
+        frequencyMatchedOperatorKeys,
+        operatorMatchedKeys,
+        siteStatusMatchedOperatorKeys
+    )
+    val priorityOperatorKey = effectiveHighlightedOperatorKey ?: activeOperatorKeys?.singleOrNull()
 
     Scaffold(
         containerColor = mainBgColor,
@@ -521,7 +545,8 @@ fun SupportDetailScreen(
                                         focusOperator = effectiveHighlightedOperatorKey,
                                         userLocation = userLocation,
                                         defaultViewMode = miniMapDefaultMode,
-                                        showViewModeToggle = true
+                                        showViewModeToggle = true,
+                                        activeOperatorKeys = activeOperatorKeys
                                     )
                                 }
                             }
@@ -627,7 +652,7 @@ fun SupportDetailScreen(
                                         blockShape = blockShape,
                                         useOneUi = useOneUi,
                                         priorityOperatorKey = priorityOperatorKey,
-                                        activeOperatorKeys = frequencyMatchedOperatorKeys,
+                                        activeOperatorKeys = activeOperatorKeys,
                                         onAntennaClick = { idAnfr ->
                                             safeClick {
                                                 onAntennaClick(idAnfr)

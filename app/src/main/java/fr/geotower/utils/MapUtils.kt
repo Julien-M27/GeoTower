@@ -11,6 +11,7 @@ import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
 import org.osmdroid.util.MapTileIndex
 
 object MapUtils {
+    private val INACTIVE_OPERATOR_COLOR = android.graphics.Color.rgb(196, 199, 204)
 
     fun getInvertFilter(): ColorMatrixColorFilter = ColorMatrixColorFilter(floatArrayOf(-1f, 0f, 0f, 0f, 255f, 0f, -1f, 0f, 0f, 255f, 0f, 0f, -1f, 0f, 255f, 0f, 0f, 0f, 1f, 0f))
 
@@ -49,12 +50,14 @@ object MapUtils {
         context: Context,
         siteAntennas: List<LocalisationEntity>,
         showAzimuths: Boolean,
-        defaultOp: String
+        defaultOp: String,
+        inactiveOperatorKeys: Set<String> = emptySet()
     ): BitmapDrawable {
+        val inactiveSignature = inactiveOperatorKeys.sorted().joinToString(",")
         val markerSignature = siteAntennas.joinToString("|") { antenna ->
             "${antenna.idAnfr}:${antenna.operateur}:${antenna.azimuts}:${antenna.azimutsFh}"
         }
-        val cacheKey = "${markerSignature}_${showAzimuths}_${defaultOp}"
+        val cacheKey = "${markerSignature}_${showAzimuths}_${defaultOp}_${inactiveSignature}"
 
         markerIconCache.get(cacheKey)?.let { return it }
 
@@ -87,6 +90,13 @@ object MapUtils {
         baseOrder.forEach { if (!priorityList.contains(it)) priorityList.add(it) }
 
         val colorMap = OperatorColors.androidColorMap()
+        fun colorForOperator(op: String): Int {
+            return if (op in inactiveOperatorKeys) {
+                INACTIVE_OPERATOR_COLOR
+            } else {
+                colorMap[op] ?: android.graphics.Color.GRAY
+            }
+        }
 
         val operatorsOnSite = siteAntennas.mapNotNull { it.operateur }
             .flatMap { OperatorColors.keysFor(it) }
@@ -97,7 +107,8 @@ object MapUtils {
             val azimutMap = mutableMapOf<Int, MutableList<String>>()
 
             siteAntennas.forEach { antenna ->
-                val opClean = OperatorColors.keysFor(antenna.operateur).firstOrNull() ?: return@forEach
+                val operatorKeys = OperatorColors.keysFor(antenna.operateur)
+                if (operatorKeys.isEmpty()) return@forEach
 
                 val azStr = antenna.azimuts
                 if (!azStr.isNullOrBlank() && azStr != "null") {
@@ -108,8 +119,10 @@ object MapUtils {
                     matches.forEach { matchResult ->
                         val angle = matchResult.groupValues[1].toIntOrNull()
                         if (angle != null) {
-                            if (!azimutMap.getOrPut(angle) { mutableListOf() }.contains(opClean)) {
-                                azimutMap[angle]!!.add(opClean)
+                            operatorKeys.forEach { opClean ->
+                                if (!azimutMap.getOrPut(angle) { mutableListOf() }.contains(opClean)) {
+                                    azimutMap[angle]!!.add(opClean)
+                                }
                             }
                         }
                     }
@@ -134,7 +147,7 @@ object MapUtils {
                 paint.strokeCap = Paint.Cap.ROUND
 
                 sortedOpsForAz.forEachIndexed { index, op ->
-                    paint.color = colorMap[op] ?: android.graphics.Color.GRAY
+                    paint.color = colorForOperator(op)
                     val startY = center - innerRadius - (index * segmentLength)
                     val endY = startY - segmentLength
                     canvas.drawLine(center, startY, center, endY, paint)
@@ -155,7 +168,7 @@ object MapUtils {
             paint.color = android.graphics.Color.GRAY
             canvas.drawCircle(center, center, pieRadius, paint)
         } else {
-            drawOperatorSlices(canvas, rect, operatorsOnSite, colorMap, paint)
+            drawOperatorSlices(canvas, rect, operatorsOnSite, paint, ::colorForOperator)
         }
 
         paint.color = android.graphics.Color.WHITE
@@ -275,12 +288,12 @@ object MapUtils {
         canvas: Canvas,
         rect: android.graphics.RectF,
         operators: List<String>,
-        colorMap: Map<String, Int>,
-        paint: Paint
+        paint: Paint,
+        colorForOperator: (String) -> Int
     ) {
         val sweep = 360f / operators.size.coerceAtLeast(1)
         operators.forEachIndexed { index, op ->
-            paint.color = colorMap[op] ?: android.graphics.Color.GRAY
+            paint.color = colorForOperator(op)
             canvas.drawArc(rect, -90f + index * sweep, sweep, true, paint)
         }
     }

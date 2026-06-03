@@ -91,7 +91,8 @@ fun SharedMiniMapCard(
     initialZoom: Double = 17.5,
     onMapTap: ((Double, Double) -> Unit)? = null,
     allowGestures: Boolean = false,
-    fitSelectedPointRequest: Int = 0
+    fitSelectedPointRequest: Int = 0,
+    activeOperatorKeys: Set<String>? = null
 ) {
     val context = LocalContext.current
     val currentOnMapTap by rememberUpdatedState(onMapTap)
@@ -135,6 +136,13 @@ fun SharedMiniMapCard(
     }
     val effectiveViewMode = if (userLocation != null) viewMode else MiniMapViewMode.AntennaCentered
     val canUseUserView = userLocation != null
+    val inactiveOperatorKeys = remember(mappedAntennas, activeOperatorKeys) {
+        activeOperatorKeys?.let { activeKeys ->
+            mappedAntennas
+                .flatMap { OperatorColors.keysFor(it.operateur) }
+                .toSet() - activeKeys
+        }.orEmpty()
+    }
     val toggleContentDescription = if (effectiveViewMode == MiniMapViewMode.UserToAntenna) {
         stringResource(R.string.appstrings_mini_map_switch_to_antenna)
     } else {
@@ -176,7 +184,7 @@ fun SharedMiniMapCard(
                     overlays.add(MiniMapTapOverlay { currentOnMapTap })
 
                     // ✅ MODIFICATION : On utilise le nouveau marqueur personnalisé avec les azimuts
-                    val marker = MiniMapAntennaMarker(this, mappedAntennas, safePrimaryColor, focusOperator).apply { // 👈 AJOUTEZ focusOperator
+                    val marker = MiniMapAntennaMarker(this, mappedAntennas, safePrimaryColor, focusOperator, inactiveOperatorKeys).apply { // 👈 AJOUTEZ focusOperator
                         position = GeoPoint(centerLat, centerLon)
                         setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                         infoWindow = null
@@ -312,6 +320,7 @@ fun SharedMiniMapCard(
                 if (marker != null) {
                     marker.siteAntennas = mappedAntennas
                     marker.focusOperator = focusOperator
+                    marker.inactiveOperatorKeys = inactiveOperatorKeys
                     marker.showAzimuthLines = showAzimuthLines
                     marker.showAzimuthCones = showAzimuthCones
 
@@ -320,7 +329,8 @@ fun SharedMiniMapCard(
                         context,
                         mappedAntennas,
                         currentZoom >= 14.0 && showAzimuthLines,
-                        focusOperator ?: AppConfig.defaultOperator.value
+                        focusOperator ?: AppConfig.defaultOperator.value,
+                        inactiveOperatorKeys
                     )
 
                     // 🚨 LE MÊME CODE QUE MAPSCREEN : LOGIQUE DE FUSION SITES HS
@@ -823,11 +833,13 @@ class MiniMapAntennaMarker(
     private val mapView: MapView,
     initialSiteAntennas: List<LocalisationEntity>,
     private val primaryColor: Int,
-    initialFocusOperator: String? = null
+    initialFocusOperator: String? = null,
+    initialInactiveOperatorKeys: Set<String> = emptySet()
 ) : Marker(mapView) {
 
     private val density = mapView.context.resources.displayMetrics.density
     private val ptCenter = android.graphics.Point()
+    private val inactiveOperatorColor = android.graphics.Color.rgb(196, 199, 204)
 
     // Cache pour les pinceaux de couleur
     private val dotPaints = mutableMapOf<Int, android.graphics.Paint>()
@@ -866,6 +878,12 @@ class MiniMapAntennaMarker(
             recalculateAzimuths()
         }
 
+    var inactiveOperatorKeys: Set<String> = initialInactiveOperatorKeys
+        set(value) {
+            field = value
+            recalculateAzimuths()
+        }
+
     var showAzimuthLines: Boolean = AppConfig.showAzimuths.value
     var showAzimuthCones: Boolean = AppConfig.showAzimuthsCone.value
 
@@ -883,19 +901,23 @@ class MiniMapAntennaMarker(
         val angleToOperatorsFh = mutableMapOf<Float, MutableSet<String>>()
 
         siteAntennas.forEach { antenna ->
-            val opColorInt = getOpColorInt(antenna.operateur)
             val operatorKeys = OperatorColors.keysFor(antenna.operateur)
+            if (operatorKeys.isEmpty()) return@forEach
 
             if (!antenna.azimuts.isNullOrBlank()) {
                 antenna.azimuts.split(",").mapNotNull { it.trim().toFloatOrNull() }.forEach { az ->
-                    angleToColorsMobile.getOrPut(az) { mutableSetOf() }.add(opColorInt)
+                    operatorKeys.forEach { operatorKey ->
+                        angleToColorsMobile.getOrPut(az) { mutableSetOf() }.add(getOpColorInt(operatorKey))
+                    }
                     angleToOperatorsMobile.getOrPut(az) { mutableSetOf() }.addAll(operatorKeys)
                 }
             }
 
             if (AppConfig.showTechnoFH.value && !antenna.azimutsFh.isNullOrBlank()) {
                 antenna.azimutsFh.split(",").mapNotNull { it.trim().toFloatOrNull() }.forEach { az ->
-                    angleToColorsFh.getOrPut(az) { mutableSetOf() }.add(opColorInt)
+                    operatorKeys.forEach { operatorKey ->
+                        angleToColorsFh.getOrPut(az) { mutableSetOf() }.add(getOpColorInt(operatorKey))
+                    }
                     angleToOperatorsFh.getOrPut(az) { mutableSetOf() }.addAll(operatorKeys)
                 }
             }
@@ -906,7 +928,7 @@ class MiniMapAntennaMarker(
         val hasFocusedMobileAzimuths = focusOperatorKey != null && angleToOperatorsMobile.values.any { focusOperatorKey in it }
         val hasFocusedFhAzimuths = focusOperatorKey != null && angleToOperatorsFh.values.any { focusOperatorKey in it }
         val defOpName = focusOperatorKey ?: AppConfig.defaultOperator.value
-        val defOpColorInt = getOpColorInt(defOpName)
+        val defOpColorInt = OperatorColors.colorInt(defOpName, fallback = primaryColor)
 
         angleToColorsMobile.forEach { (az, colorsSet) ->
             val rad = Math.toRadians(az - 90.0)
@@ -914,7 +936,8 @@ class MiniMapAntennaMarker(
             val sin = Math.sin(rad).toFloat()
 
             // L'opérateur prioritaire donne sa couleur à la ligne
-            val sortedColors = colorsSet.toList().sortedByDescending { it == defOpColorInt }
+            val sortedColors = colorsSet.toList()
+                .sortedWith(compareByDescending<Int> { it != inactiveOperatorColor }.thenByDescending { it == defOpColorInt })
             val mainColor = sortedColors.first()
             val isMuted = hasFocusedMobileAzimuths && focusOperatorKey !in angleToOperatorsMobile[az].orEmpty()
             val lineAlpha = if (isMuted) 70 else 255
@@ -949,7 +972,8 @@ class MiniMapAntennaMarker(
             val cos = Math.cos(rad).toFloat()
             val sin = Math.sin(rad).toFloat()
 
-            val sortedColors = colorsSet.toList().sortedByDescending { it == defOpColorInt }
+            val sortedColors = colorsSet.toList()
+                .sortedWith(compareByDescending<Int> { it != inactiveOperatorColor }.thenByDescending { it == defOpColorInt })
             val mainColor = sortedColors.first()
             val isMuted = hasFocusedFhAzimuths && focusOperatorKey !in angleToOperatorsFh[az].orEmpty()
             val lineAlpha = if (isMuted) 70 else 200
@@ -968,7 +992,12 @@ class MiniMapAntennaMarker(
     }
 
     private fun getOpColorInt(name: String?): Int {
-        return OperatorColors.colorInt(name, fallback = primaryColor)
+        val operatorKey = OperatorColors.keyFor(name)
+        return if (operatorKey != null && operatorKey in inactiveOperatorKeys) {
+            inactiveOperatorColor
+        } else {
+            OperatorColors.colorInt(name, fallback = primaryColor)
+        }
     }
 
     override fun draw(canvas: android.graphics.Canvas, projection: org.osmdroid.views.Projection) {
