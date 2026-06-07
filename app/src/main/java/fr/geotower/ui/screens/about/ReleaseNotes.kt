@@ -26,26 +26,34 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_search)) {
-        item(stringResource(R.string.appstrings_release_search_coverage_better))
-        item(stringResource(R.string.appstrings_release_search_unavailable_message_clearer))
+    section(stringResource(R.string.appstrings_release_section_radio_data)) {
+        item(stringResource(R.string.appstrings_release_radio_data_annex_database))
+        item(stringResource(R.string.appstrings_release_radio_data_download_checks))
+        item(stringResource(R.string.appstrings_release_radio_data_about_version))
+        item(stringResource(R.string.appstrings_release_radio_data_settings))
     }
 
     section(stringResource(R.string.appstrings_release_section_map)) {
-        item(stringResource(R.string.appstrings_release_map_measurement_enriched))
-        item(stringResource(R.string.appstrings_release_map_measurement_multiple_points))
-        item(stringResource(R.string.appstrings_release_map_measurement_unit_choice))
-        item(stringResource(R.string.appstrings_release_map_measurement_remove_easier))
+        item(stringResource(R.string.appstrings_release_map_radio_markers))
+        item(stringResource(R.string.appstrings_release_map_radio_filters))
+        item(stringResource(R.string.appstrings_release_map_radio_readability))
+        item(stringResource(R.string.appstrings_release_map_radio_detail))
     }
 
-    section(stringResource(R.string.appstrings_release_section_antenna_details)) {
-        item(stringResource(R.string.appstrings_release_antenna_details_identical_panels))
-        item(stringResource(R.string.appstrings_release_antenna_details_panel_id_display))
-        item(stringResource(R.string.appstrings_release_antenna_details_panel_id_copy))
+    section(stringResource(R.string.appstrings_release_section_5g)) {
+        item(stringResource(R.string.appstrings_release_5g_new_frequencies))
+        item(stringResource(R.string.appstrings_release_5g_consistent_data))
     }
 
-    section(stringResource(R.string.appstrings_release_section_fh_details)) {
-        item(stringResource(R.string.appstrings_release_fh_details_missing_info_cleaner))
+    section(stringResource(R.string.appstrings_release_section_photos)) {
+        item(stringResource(R.string.appstrings_release_photos_android_share))
+        item(stringResource(R.string.appstrings_release_photos_map_draft))
+        item(stringResource(R.string.appstrings_release_photos_support_operator_choice))
+        item(stringResource(R.string.appstrings_release_photos_multi_operator_upload))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_community_photos)) {
+        item(stringResource(R.string.appstrings_release_community_photos_copy_download))
     }
 }
 
