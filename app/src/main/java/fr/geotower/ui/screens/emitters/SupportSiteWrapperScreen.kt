@@ -46,7 +46,7 @@ fun SupportSiteWrapperScreen(
     navController: NavController,
     repository: AnfrRepository,
     radioRepository: RadioRepository,
-    supportId: Long,
+    supportId: String,
     highlightedOperatorKey: String? = null,
     applyMapFilters: Boolean = false,
     photoDraftId: String? = null,
@@ -68,7 +68,7 @@ fun SupportSiteWrapperScreen(
                 val savedLat = prefs.getFloat("clicked_lat", 0f).toDouble()
                 val savedLon = prefs.getFloat("clicked_lon", 0f).toDouble()
 
-                val antennas = repository.getAntennasByExactId(supportId.toString())
+                val antennas = repository.getAntennasByExactId(supportId)
                 if (antennas.isNotEmpty()) {
                     var site = antennas.find {
                         Math.abs(it.latitude - savedLat) < 0.005 && Math.abs(it.longitude - savedLon) < 0.005
@@ -225,7 +225,7 @@ fun NearEmittersSupportWrapperScreen(
     radioRepository: RadioRepository
 ) {
     val displayStyle by AppConfig.displayStyle
-    var selectedSupportId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var selectedSupportId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSupportOperatorKey by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSiteId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSidePane by remember { mutableStateOf<SiteDetailSidePane?>(null) }
@@ -267,19 +267,20 @@ fun NearEmittersSupportWrapperScreen(
                     navController = navController,
                     repository = repository,
                     onSupportClick = { site, searchedOperatorKey ->
+                        val supportId = site.idSupport?.takeIf { it.isNotBlank() } ?: site.id.toString()
                         if (displayStyle == 1) {
-                            if (selectedSupportId == site.id && selectedSiteId == null) {
+                            if (selectedSupportId == supportId && selectedSiteId == null) {
                                 selectedSupportId = null
                                 selectedSupportOperatorKey = null
                             } else {
-                                selectedSupportId = site.id
+                                selectedSupportId = supportId
                                 selectedSupportOperatorKey = searchedOperatorKey
                             }
                             selectedSiteId = null
                             selectedSidePane = null
                         } else {
                             val highlightedOperatorParam = searchedOperatorKey?.let { "?operator=$it" }.orEmpty()
-                            navController.navigate("support_detail/${site.id}$highlightedOperatorParam")
+                            navController.navigate("support_detail/${Uri.encode(supportId)}$highlightedOperatorParam")
                         }
                     }
                 )

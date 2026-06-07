@@ -12,7 +12,7 @@ fun classifyFrequencyStatus(status: String): FrequencyStatusType {
         status.contains("En service", ignoreCase = true) -> FrequencyStatusType.InService
         status.contains("Techniquement", ignoreCase = true) -> FrequencyStatusType.TechnicallyOperational
         status.contains("Approuvé", ignoreCase = true) -> FrequencyStatusType.Approved
-        status.contains("ApprouvÃ©", ignoreCase = true) -> FrequencyStatusType.Approved
+        status.contains("Approuv\u00C3\u00A9", ignoreCase = true) -> FrequencyStatusType.Approved
         else -> FrequencyStatusType.Unknown
     }
 }

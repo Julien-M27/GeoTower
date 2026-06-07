@@ -7,6 +7,7 @@ import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -89,6 +90,7 @@ import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import fr.geotower.R
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.LiveDatabaseUsageWarningDialog
 import fr.geotower.ui.components.geoTowerLazyListFadingEdge
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.NominatimApi
@@ -212,6 +214,8 @@ fun NearEmittersScreen(
     BackHandler(enabled = !safeBackNavigation.isLocked) {
         safeBackNavigation.navigateBack()
     }
+
+    LiveDatabaseUsageWarningDialog(RemoteFeatureFlags.Features.LIVE_API_FR_NEARBY)
 
     var userLocation by remember { mutableStateOf<Location?>(null) }
     var searchCenter by remember { mutableStateOf<Location?>(null) }
@@ -382,7 +386,7 @@ fun NearEmittersScreen(
             .take(maxItemsToShow)
     }
 
-    // Recherche globale differee (base de donnees, coordonnees, ville, adresse, code postal).
+    // Recherche globale différée (base de données, coordonnées, ville, adresse, code postal).
     LaunchedEffect(searchCenter, searchQuery, nearbyFrequencyFilter) {
         val query = searchQuery.trim()
         if (query.isEmpty()) {
@@ -752,7 +756,7 @@ fun NearEmittersScreen(
                                             ),
                                             verticalArrangement = Arrangement.spacedBy(12.dp)
                                         ) {
-                                            items(filteredSites, key = { it.id }) { site ->
+                                            items(filteredSites, key = { it.idSupport ?: "${it.id}_${it.latitude}_${it.longitude}" }) { site ->
                                                 EmitterCard(
                                                     site = site,
                                                     useOneUi = useOneUi,
@@ -771,7 +775,8 @@ fun NearEmittersScreen(
                                                         onSupportClick(site, searchedOperatorKey)
                                                     } else {
                                                         val highlightedOperatorParam = searchedOperatorKey?.let { "?operator=$it" }.orEmpty()
-                                                        navController.navigate("support_detail/${site.id}$highlightedOperatorParam")
+                                                        val supportId = site.idSupport?.takeIf { it.isNotBlank() } ?: site.id.toString()
+                                                        navController.navigate("support_detail/${Uri.encode(supportId)}$highlightedOperatorParam")
                                                     }
                                                 }
                                             }

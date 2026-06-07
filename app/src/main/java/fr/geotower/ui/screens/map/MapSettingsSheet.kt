@@ -30,6 +30,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -44,12 +45,15 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.R
+import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColorSpec
 import fr.geotower.utils.OperatorColors
 import android.content.SharedPreferences
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.MutableState
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private val OperatorFilterButtonHeight = 76.dp
 private const val PREF_OPERATOR_FILTER_METRO_EXPANDED = "map_operator_filter_metro_expanded"
@@ -64,6 +68,14 @@ fun MapSettingsSheet(
     // ✅ AJOUT : Pour pouvoir sauvegarder le paramètre
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", android.content.Context.MODE_PRIVATE)
+    var hasRadioDatabase by remember(context) { mutableStateOf(false) }
+
+    LaunchedEffect(context) {
+        hasRadioDatabase = withContext(Dispatchers.IO) {
+            val dbPath = context.getDatabasePath(RadioDatabaseValidator.DB_NAME)
+            RadioDatabaseValidator.validateDatabaseFile(dbPath).isValid
+        }
+    }
 
     // Variables Opérateurs
     var selectedOperatorKeys by AppConfig.selectedOperatorKeys
@@ -302,67 +314,69 @@ fun MapSettingsSheet(
                 prefs.edit().putBoolean(AppConfig.PREF_SHOW_MAP_LOCATION_MARKER, it).apply()
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            if (hasRadioDatabase) {
+                Spacer(modifier = Modifier.height(12.dp))
 
-            SectionTitle("Filtres radio ANFR")
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                SelectableButton(
-                    label = "TV",
-                    isSelected = showRadioTv,
-                    modifier = Modifier.weight(1f),
-                    selectedColor = Color(0xFF8BC34A)
-                ) {
-                    showRadioTv = it
-                    saveRadioCategory(AppConfig.PREF_SHOW_RADIO_TV, it)
+                SectionTitle("Filtres radio ANFR")
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SelectableButton(
+                        label = "TV",
+                        isSelected = showRadioTv,
+                        modifier = Modifier.weight(1f),
+                        selectedColor = Color(0xFF8BC34A)
+                    ) {
+                        showRadioTv = it
+                        saveRadioCategory(AppConfig.PREF_SHOW_RADIO_TV, it)
+                    }
+                    SelectableButton(
+                        label = "Radio",
+                        isSelected = showRadioBroadcast,
+                        modifier = Modifier.weight(1f),
+                        selectedColor = Color(0xFFFDD835)
+                    ) {
+                        showRadioBroadcast = it
+                        saveRadioCategory(AppConfig.PREF_SHOW_RADIO_BROADCAST, it)
+                    }
                 }
-                SelectableButton(
-                    label = "Radio",
-                    isSelected = showRadioBroadcast,
-                    modifier = Modifier.weight(1f),
-                    selectedColor = Color(0xFFFDD835)
-                ) {
-                    showRadioBroadcast = it
-                    saveRadioCategory(AppConfig.PREF_SHOW_RADIO_BROADCAST, it)
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SelectableButton(
+                        label = "Réseaux mobiles privés",
+                        isSelected = showRadioPrivateMobile,
+                        modifier = Modifier.weight(1f),
+                        selectedColor = Color(0xFF006D77),
+                        minHeight = 68.dp,
+                        maxLines = 3
+                    ) {
+                        showRadioPrivateMobile = it
+                        saveRadioCategory(AppConfig.PREF_SHOW_RADIO_PRIVATE_MOBILE, it)
+                    }
+                    SelectableButton(
+                        label = "Faisceaux hertziens",
+                        isSelected = showRadioFh,
+                        modifier = Modifier.weight(1f),
+                        selectedColor = Color(0xFF0D47A1),
+                        minHeight = 68.dp,
+                        maxLines = 3
+                    ) {
+                        showRadioFh = it
+                        saveRadioCategory(AppConfig.PREF_SHOW_RADIO_FH, it)
+                    }
                 }
-            }
 
-            Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(12.dp))
 
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 SelectableButton(
-                    label = "Réseaux mobiles privés",
-                    isSelected = showRadioPrivateMobile,
-                    modifier = Modifier.weight(1f),
-                    selectedColor = Color(0xFF006D77),
-                    minHeight = 68.dp,
-                    maxLines = 3
+                    label = "Autres stations",
+                    isSelected = showRadioOther,
+                    modifier = Modifier.fillMaxWidth(),
+                    selectedColor = Color.Black
                 ) {
-                    showRadioPrivateMobile = it
-                    saveRadioCategory(AppConfig.PREF_SHOW_RADIO_PRIVATE_MOBILE, it)
+                    showRadioOther = it
+                    saveRadioCategory(AppConfig.PREF_SHOW_RADIO_OTHER, it)
                 }
-                SelectableButton(
-                    label = "Faisceaux hertziens",
-                    isSelected = showRadioFh,
-                    modifier = Modifier.weight(1f),
-                    selectedColor = Color(0xFF0D47A1),
-                    minHeight = 68.dp,
-                    maxLines = 3
-                ) {
-                    showRadioFh = it
-                    saveRadioCategory(AppConfig.PREF_SHOW_RADIO_FH, it)
-                }
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            SelectableButton(
-                label = "Autres stations",
-                isSelected = showRadioOther,
-                modifier = Modifier.fillMaxWidth(),
-                selectedColor = Color.Black
-            ) {
-                showRadioOther = it
-                saveRadioCategory(AppConfig.PREF_SHOW_RADIO_OTHER, it)
             }
 
             Spacer(modifier = Modifier.height(32.dp))

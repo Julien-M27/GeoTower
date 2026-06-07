@@ -50,6 +50,8 @@
     <string name="common_try_again">Réessayer</string>
     <string name="common_continue_anyway">Continuer quand même</string>
     <string name="common_finish">Terminer</string>
+    <string name="live_database_warning_title">Base de données en ligne utilisée</string>
+    <string name="live_database_warning_desc">GeoTower utilise actuellement la base de données en ligne car la base locale est absente ou invalide. Cet écran peut effectuer des requêtes réseau. Surveillez votre consommation de données mobiles.</string>
     <string name="onboarding_start_configuration">Commencer la configuration</string>
     <string name="onboarding_lets_go">C\'est parti !</string>
     <string name="onboarding_welcome_desc">Bienvenue sur GeoTower, l\'application pour localiser les antennes relais proches de vous et obtenir des informations à leur sujet.</string>
@@ -748,6 +750,10 @@
     <string name="appstrings_release_section_fh_details">Détails FH</string>
     <string name="appstrings_release_section_radio_data">Données radio</string>
     <string name="appstrings_release_section_5g">5G</string>
+    <string name="appstrings_release_section_online_data">Données en ligne</string>
+    <string name="appstrings_release_section_home_onboarding">Accueil et onboarding</string>
+    <string name="appstrings_release_section_map_details">Carte et détails</string>
+    <string name="appstrings_release_section_interface_translations">Interface et traductions</string>
     <string name="appstrings_release_section_database">Base de données</string>
     <string name="appstrings_release_section_live_tracking">Suivi en direct</string>
     <string name="appstrings_release_section_statistics">Statistiques</string>
@@ -1160,7 +1166,7 @@
     <string name="appstrings_unknown_status">Statut inconnu</string>
     <string name="appstrings_up_to_date">À jour</string>
     <string name="appstrings_update_db_banner_title">Mise à jour disponible</string>
-    <string name="appstrings_update_notif_setting_desc">Etre alerte quand une nouvelle base de donnees ou une nouvelle APK est disponible</string>
+    <string name="appstrings_update_notif_setting_desc">Être alerté quand une nouvelle base de données ou une nouvelle APK est disponible</string>
     <string name="appstrings_update_notif_setting_title">Notifications de mise à jour</string>
     <string name="appstrings_upload_confirm_title">Confirmation d\'envoi</string>
     <string name="appstrings_upload_error_warning">Certaines photos n\'ont pas pu être envoyées (problème réseau).</string>
@@ -1701,4 +1707,13 @@
     <string name="appstrings_release_photos_support_operator_choice">Choix du support et des opérateurs avant l’envoi SignalQuest</string>
     <string name="appstrings_release_photos_multi_operator_upload">Envoi photo possible vers plusieurs opérateurs</string>
     <string name="appstrings_release_community_photos_copy_download">Copie ou téléchargement des photos communautaires possibles</string>
+    <string name="appstrings_release_online_data_fallback_mode">Ajout d’un mode de secours quand la base locale est absente ou invalide</string>
+    <string name="appstrings_release_online_data_map_nearby_compass">Carte, proximité et boussole peuvent continuer à fonctionner avec les données en ligne</string>
+    <string name="appstrings_release_online_data_warning">Affichage d’un avertissement quand les données en ligne sont utilisées</string>
+    <string name="appstrings_release_home_onboarding_local_db_access">L’app ne bloque plus l’accès si la base locale n’est pas valide</string>
+    <string name="appstrings_release_home_onboarding_radio_db_download">L’onboarding propose aussi le téléchargement de la base radio ANFR</string>
+    <string name="appstrings_release_map_details_special_support_ids">Meilleure gestion de certains supports avec identifiants particuliers</string>
+    <string name="appstrings_release_map_details_online_results">Résultats en ligne mieux pris en charge dans les détails de site et de support</string>
+    <string name="appstrings_release_interface_encoding_accents">Corrections d’encodage et d’accents</string>
+    <string name="appstrings_release_interface_arcep_status_translations">Traductions complétées pour les pannes ARCEP et les statuts</string>
 </resources>

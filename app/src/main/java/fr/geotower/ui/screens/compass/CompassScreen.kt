@@ -89,7 +89,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.LiveDatabaseUsageWarningDialog
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.settings.CompassSettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
@@ -148,6 +150,8 @@ fun CompassScreen(
     BackHandler(enabled = !safeBackNavigation.isLocked) {
         safeBackNavigation.navigateBack()
     }
+
+    LiveDatabaseUsageWarningDialog(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)
 
     // --- VARIABLES BOUSSOLE ---
     var continuousAzimuth by remember { mutableFloatStateOf(0f) }

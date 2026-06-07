@@ -336,7 +336,7 @@ class MainActivity : ComponentActivity() {
             applyWidgetMapTarget(intent)
         }
 
-        // Verification quotidienne de mise a jour de base autour de 20h.
+        // Vérification quotidienne de mise à jour de la base autour de 20 h.
         UpdateCheckScheduler.reconcile(applicationContext)
 
         val widgetSiteId = intent.getStringExtra("widget_site_id")
@@ -756,15 +756,13 @@ class MainActivity : ComponentActivity() {
                                 val highlightedOperatorKey = backStackEntry.arguments?.getString("operator")
                                 val applyMapFilters = backStackEntry.arguments?.getBoolean("fromMap") ?: false
                                 val photoDraftId = backStackEntry.arguments?.getString("photoDraftId")
-                                // Convertir en Long si ta BDD utilise un Long, ou adapter la query
-                                val idLong = id.toLongOrNull() ?: 0L
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SUPPORT_DETAIL)) {
                                         fr.geotower.ui.screens.emitters.SupportSiteWrapperScreen(
                                             navController,
                                             repository,
                                             radioRepository,
-                                            idLong,
+                                            id,
                                             highlightedOperatorKey = highlightedOperatorKey,
                                             applyMapFilters = applyMapFilters,
                                             photoDraftId = photoDraftId

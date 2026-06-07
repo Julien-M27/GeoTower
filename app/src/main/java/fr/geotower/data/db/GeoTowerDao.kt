@@ -91,7 +91,7 @@ interface GeoTowerDao {
                 FROM support underground_support
                 LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
                 WHERE underground_support.id_anfr = l.id_anfr
-                AND underground_nature.libelle = 'IntÃ©rieur sous-terrain'
+                AND underground_nature.libelle = 'Intérieur sous-terrain'
             ) THEN 1 ELSE 0 END AS has_underground_support
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
@@ -179,7 +179,7 @@ interface GeoTowerDao {
         LEFT JOIN ref_statut st ON t.statut_id = st.id
         WHERE UPPER(COALESCE(o.libelle, '')) LIKE '%' || UPPER(:operatorName) || '%'
         AND (
-            COALESCE(st.libelle, '') IN ('En service', 'Techniquement opÃ©rationnel', 'Techniquement operationnel')
+            COALESCE(st.libelle, '') IN ('En service', 'Techniquement opérationnel', 'Techniquement operationnel')
             OR COALESCE(t.has_active, 0) = 1
         )
         ORDER BY (
@@ -304,7 +304,7 @@ interface GeoTowerDao {
                 FROM support underground_support
                 LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
                 WHERE underground_support.id_anfr = l.id_anfr
-                AND underground_nature.libelle = 'IntÃ©rieur sous-terrain'
+                AND underground_nature.libelle = 'Intérieur sous-terrain'
             ) THEN 1 ELSE 0 END AS has_underground_support
         FROM localisation l
         LEFT JOIN ref_operateur o ON l.operateur_id = o.id
@@ -922,7 +922,7 @@ interface GeoTowerDao {
         WHERE UPPER(TRIM(o.libelle)) IN (:operatorNames)
         AND (
             COALESCE(t.has_active, 0) = 1
-            OR COALESCE(st.libelle, '') IN ('En service', 'Techniquement opÃ©rationnel', 'Techniquement operationnel')
+            OR COALESCE(st.libelle, '') IN ('En service', 'Techniquement opérationnel', 'Techniquement operationnel')
         )
     """)
     suspend fun getActiveUniqueSupportCountByOperator(operatorNames: List<String>): Int

@@ -302,9 +302,6 @@ fun HomeScreen(navController: NavController) {
             // ---> 2. LE BANDEAU DE BASE DE DONNÉES (S'affiche juste en dessous si besoin) <---
             val isDbUnavailable = isDbChecked && localDbState != GeoTowerDatabaseValidator.LocalDatabaseState.VALID
             val isDbBannerVisible = isDbUnavailable || isUpdateAvailable || isSyncing
-            val isDbReady = localDbState != GeoTowerDatabaseValidator.LocalDatabaseState.MISSING &&
-                localDbState != GeoTowerDatabaseValidator.LocalDatabaseState.INVALID &&
-                !isSyncing
 
             DatabaseWarningBanner(
                 isMissing = isDbMissing,
@@ -418,7 +415,6 @@ fun HomeScreen(navController: NavController) {
                                         isOnline = isOnline && !isDbBannerVisible,
                                         logoResId = displayLogoResId,
                                         isExpanded = true,
-                                        isDbReady = isDbReady,
                                         isGrid = true,
                                         compact = true
                                     )
@@ -458,7 +454,7 @@ fun HomeScreen(navController: NavController) {
 
                                 if (isGrid) {
                                     // --- DISPOSITION EN GRILLE ---
-                                    MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !isDbBannerVisible, displayLogoResId, isExpanded, isDbReady = isDbReady, isGrid = true)
+                                    MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !isDbBannerVisible, displayLogoResId, isExpanded, isGrid = true)
                                 } else {
                                     // --- DISPOSITION CÔTE À CÔTE (Classique) ---
                                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -470,7 +466,7 @@ fun HomeScreen(navController: NavController) {
                                         }
                                         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                             // ✅ CORRECTION : On passe "isOnline && !isDbBannerVisible" pour forcer le masquage du logo sur tous les appareils si besoin
-                                            MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !isDbBannerVisible, displayLogoResId, isExpanded, isDbReady = isDbReady, isGrid = false)
+                                            MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !isDbBannerVisible, displayLogoResId, isExpanded, isGrid = false)
                                         }
                                     }
                                 }
@@ -513,7 +509,7 @@ fun HomeScreen(navController: NavController) {
                                     modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)
                                 )
                                 // ✅ CORRECTION : On passe la condition ici aussi pour le téléphone
-                                MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !isDbBannerVisible, displayLogoResId, isExpanded, isDbReady = isDbReady, isGrid = false)
+                                MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !isDbBannerVisible, displayLogoResId, isExpanded, isGrid = false)
                             }
 
                             Spacer(modifier = Modifier.weight(1f))
@@ -713,7 +709,6 @@ fun MenuButtonsList(
     isOnline: Boolean,
     logoResId: Int,
     isExpanded: Boolean,
-    isDbReady: Boolean = true, // ✅ NOUVEAU PARAMÈTRE
     isGrid: Boolean = false,
     compact: Boolean = false
 ) {
@@ -756,38 +751,31 @@ fun MenuButtonsList(
             }
             "nearby" -> {
                 if (showNearby) {
-                    // ✅ On bloque avec isDbReady
-                    buttons.add { MenuButton(nearAntennasLabel, Icons.Default.MyLocation, paleColor, onPaleColor, useOneUi, menuSize, isGrid, compact = compact, enabled = isDbReady) { navController.navigate("emitters") } }
+                    buttons.add { MenuButton(nearAntennasLabel, Icons.Default.MyLocation, paleColor, onPaleColor, useOneUi, menuSize, isGrid, compact = compact) { navController.navigate("emitters") } }
                 }
             }
             "map" -> {
                 if (showMap) {
-                    // ✅ On bloque avec isDbReady
-                    buttons.add { MenuButton(mapLabel, Icons.Default.Map, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, compact = compact, enabled = isDbReady) { navController.navigate("map") } }
+                    buttons.add { MenuButton(mapLabel, Icons.Default.Map, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, compact = compact) { navController.navigate("map") } }
                 }
             }
             "compass" -> {
                 if (showCompass && AppConfig.hasCompass.value) {
-                    // ✅ On bloque avec isDbReady
-                    buttons.add { MenuButton(compassLabel, Icons.Default.Explore, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, compact = compact, enabled = isDbReady) { navController.navigate("compass") } }
+                    buttons.add { MenuButton(compassLabel, Icons.Default.Explore, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, compact = compact) { navController.navigate("compass") } }
                 }
             }
             "stats" -> {
                 if (showStats) {
-                    val isStatsEnabled = isDbReady
-                    val alpha = if (isStatsEnabled) 1f else 0.5f
-
                     buttons.add {
                         MenuButton(
                             text = statsLabel,
                             icon = Icons.Default.BarChart,
-                            color = buttonBgColor.copy(alpha = alpha),
-                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = alpha),
+                            color = buttonBgColor,
+                            contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             useOneUi = useOneUi,
                             menuSize = menuSize,
                             fillWidth = isGrid,
                             compact = compact,
-                            enabled = isStatsEnabled,
                             onClick = { navController.navigate("stats") }
                         )
                     }

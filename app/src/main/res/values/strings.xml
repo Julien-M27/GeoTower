@@ -63,6 +63,8 @@
     <string name="common_try_again">Try again</string>
     <string name="common_continue_anyway">Continue anyway</string>
     <string name="common_finish">Finish</string>
+    <string name="live_database_warning_title">Online database in use</string>
+    <string name="live_database_warning_desc">GeoTower is currently using the online database because the local database is missing or invalid. This screen may make network requests. Please keep an eye on your mobile data usage.</string>
     <string name="onboarding_start_configuration">Start setup</string>
     <string name="onboarding_lets_go">Let\'s go!</string>
     <string name="onboarding_welcome_desc">Welcome to GeoTower, the app for locating nearby cell towers and getting information about them.</string>
@@ -766,6 +768,10 @@
     <string name="appstrings_release_section_fh_details">FH details</string>
     <string name="appstrings_release_section_radio_data">Radio data</string>
     <string name="appstrings_release_section_5g">5G</string>
+    <string name="appstrings_release_section_online_data">Online data</string>
+    <string name="appstrings_release_section_home_onboarding">Home and onboarding</string>
+    <string name="appstrings_release_section_map_details">Map and details</string>
+    <string name="appstrings_release_section_interface_translations">Interface and translations</string>
     <string name="appstrings_release_section_database">Database</string>
     <string name="appstrings_release_section_live_tracking">Live tracking</string>
     <string name="appstrings_release_section_statistics">Statistics</string>
@@ -1719,4 +1725,13 @@
     <string name="appstrings_release_photos_support_operator_choice">Choose the support and operators before sending to SignalQuest</string>
     <string name="appstrings_release_photos_multi_operator_upload">Photo upload is possible for several operators</string>
     <string name="appstrings_release_community_photos_copy_download">Community photos can now be copied or downloaded</string>
+    <string name="appstrings_release_online_data_fallback_mode">Added fallback mode when the local database is missing or invalid</string>
+    <string name="appstrings_release_online_data_map_nearby_compass">Map, nearby and compass can continue working with online data</string>
+    <string name="appstrings_release_online_data_warning">Warning displayed when online data is being used</string>
+    <string name="appstrings_release_home_onboarding_local_db_access">The app no longer blocks access if the local database is invalid</string>
+    <string name="appstrings_release_home_onboarding_radio_db_download">Onboarding also offers the ANFR radio database download</string>
+    <string name="appstrings_release_map_details_special_support_ids">Better handling of some supports with special identifiers</string>
+    <string name="appstrings_release_map_details_online_results">Online results are better supported in site and support details</string>
+    <string name="appstrings_release_interface_encoding_accents">Encoding and accent fixes</string>
+    <string name="appstrings_release_interface_arcep_status_translations">Translations completed for ARCEP outages and statuses</string>
 </resources>

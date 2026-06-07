@@ -172,7 +172,7 @@ fun RadioDatabaseDownloadCard(
                 }
                 Spacer(modifier = Modifier.width(textStartPadding))
                 Text(
-                    text = "Donnees radio ANFR",
+                    text = "Données radio ANFR",
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Start
@@ -284,7 +284,7 @@ fun RadioDatabaseDownloadCard(
                     }
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        text = if (isUpToDate) stringResource(R.string.database_up_to_date) else "Telecharger les radios",
+                        text = if (isUpToDate) stringResource(R.string.database_up_to_date) else "Télécharger les radios",
                         fontWeight = FontWeight.Bold
                     )
                 }

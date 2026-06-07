@@ -112,7 +112,7 @@ fun SupportDetailScreen(
     navController: NavController,
     repository: AnfrRepository,
     radioRepository: RadioRepository,
-    siteId: Long,
+    siteId: String,
     highlightedOperatorKey: String? = null,
     applyMapFilters: Boolean = false,
     photoDraftId: String? = null,
@@ -187,7 +187,7 @@ fun SupportDetailScreen(
                 val savedLat = prefs.getFloat("clicked_lat", 0f).toDouble()
                 val savedLon = prefs.getFloat("clicked_lon", 0f).toDouble()
 
-                val initialSearch = repository.getAntennasByExactId(siteId.toString())
+                val initialSearch = repository.getAntennasByExactId(siteId)
 
                 var lat = 0.0
                 var lon = 0.0
@@ -254,7 +254,7 @@ fun SupportDetailScreen(
                 if (antennas.isNotEmpty()) {
                     val fetchedPhysique = repository.getPhysiqueByAnfr(antennas.first().idAnfr).firstOrNull()
                     physique = fetchedPhysique
-                    val supportRadioId = fetchedPhysique?.idSupport ?: siteId.toString()
+                    val supportRadioId = fetchedPhysique?.idSupport ?: siteId
                     radioSupportMarkers = radioRepository.getMarkersForSupport(supportRadioId)
 
                     antennas.forEach { ant ->
@@ -262,7 +262,7 @@ fun SupportDetailScreen(
                         if (tech != null) techMap[ant.idAnfr] = tech
                     }
                 } else {
-                    radioSupportMarkers = radioRepository.getMarkersForSupport(siteId.toString())
+                    radioSupportMarkers = radioRepository.getMarkersForSupport(siteId)
                 }
                 techniquesMap = techMap
 
@@ -544,7 +544,7 @@ fun SupportDetailScreen(
             .distinctBy { it.uploadOperator }
         val firstOperator = selectedOperators.firstOrNull() ?: return
         val targetAntenna = firstOperator.antenna
-        val supportUploadId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId.toString()
+        val supportUploadId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId
         val encodedOperators = Uri.encode(selectedOperators.joinToString("|") { it.uploadOperator })
 
         navController.navigate(
@@ -1199,7 +1199,7 @@ private fun RadioOnlySupportDetailsSection(
     val isMi = AppConfig.distanceUnit.intValue == 1
     val supportId = marker.supportId.ifBlank { txtNotSpecified }
     val fullAddress = marker.addressSummary ?: txtNotSpecified
-    val gpsCoords = String.format(Locale.US, "%.5fÂ°, %.5fÂ°", marker.latitude, marker.longitude)
+    val gpsCoords = String.format(Locale.US, "%.5f\u00B0, %.5f\u00B0", marker.latitude, marker.longitude)
     val cleanGpsCoords = String.format(Locale.US, "%.5f, %.5f", marker.latitude, marker.longitude)
     val displayGpsCoords = String.format(
         Locale.US,

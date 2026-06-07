@@ -134,6 +134,7 @@ import fr.geotower.data.models.RadioMapMarker
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.data.models.isDeclaredActive
 import fr.geotower.data.models.physicalSiteKey
+import fr.geotower.ui.components.LiveDatabaseUsageWarningDialog
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
@@ -572,6 +573,8 @@ fun MapScreen(
     val isCityStatsTechniquesLoading by viewModel.isCityStatsTechniquesLoading.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     val featureFlags by RemoteFeatureFlags.config
+
+    LiveDatabaseUsageWarningDialog(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)
 
     val rawPrimaryColor = MaterialTheme.colorScheme.primary.toArgb()
     val isColorTooLight = ColorUtils.calculateLuminance(rawPrimaryColor) > 0.85
@@ -1269,9 +1272,9 @@ fun MapScreen(
 
     // ✅ AJOUT DU PARAMÈTRE sitesHsList
     fun openSupportDetailFromMap(map: MapView, antenna: LocalisationEntity) {
-        val supportId = antenna.idAnfr.toLongOrNull()
+        val supportId = antenna.idAnfr.takeIf { it.isNotBlank() }
         if (supportId == null) {
-            AppLogger.w("GeoTowerMap", "Cannot open support detail for non numeric idAnfr=${antenna.idAnfr}")
+            AppLogger.w("GeoTowerMap", "Cannot open support detail for blank idAnfr")
             return
         }
 
@@ -1285,7 +1288,7 @@ fun MapScreen(
                 val photoDraftParam = pendingSharedPhotoDraftId
                     ?.let { "&photoDraftId=${Uri.encode(it)}" }
                     .orEmpty()
-                navController.navigate("support_detail/$supportId?operator=&fromMap=true$photoDraftParam") {
+                navController.navigate("support_detail/${Uri.encode(supportId)}?operator=&fromMap=true$photoDraftParam") {
                     launchSingleTop = true
                 }
             } catch (e: Exception) {
@@ -1310,22 +1313,11 @@ fun MapScreen(
 
         map.post {
             try {
-                val numericSupportId = marker.supportId.toLongOrNull()
-                if (numericSupportId != null) {
-                    val photoDraftParam = pendingSharedPhotoDraftId
-                        ?.let { "&photoDraftId=${Uri.encode(it)}" }
-                        .orEmpty()
-                    navController.navigate("support_detail/$numericSupportId?operator=&fromMap=true$photoDraftParam") {
-                        launchSingleTop = true
-                    }
-                } else if (marker.stationId.isNotBlank()) {
-                    navController.navigate(
-                        "radio_site_detail/${Uri.encode(marker.stationId)}/${Uri.encode(marker.supportId)}"
-                    ) {
-                        launchSingleTop = true
-                    }
-                } else {
-                    AppLogger.w("GeoTowerMap", "Cannot open non-numeric radio support without stationId for marker=${marker.id}")
+                val photoDraftParam = pendingSharedPhotoDraftId
+                    ?.let { "&photoDraftId=${Uri.encode(it)}" }
+                    .orEmpty()
+                navController.navigate("support_detail/${Uri.encode(marker.supportId)}?operator=&fromMap=true$photoDraftParam") {
+                    launchSingleTop = true
                 }
             } catch (e: Exception) {
                 AppLogger.w("GeoTowerMap", "Radio marker navigation failed for marker=${marker.id}", e)

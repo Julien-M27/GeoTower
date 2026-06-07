@@ -120,7 +120,7 @@ data class RadioMapMarker(
     val azimuths: List<Float>
         get() = antennaLines
             .mapNotNull { line ->
-                val normalized = line.replace("Â°", "°")
+                val normalized = line.replace("\u00C2\u00B0", "\u00B0")
                 ANTENNA_AZIMUTH_REGEX.find(normalized)
                     ?.groupValues
                     ?.getOrNull(1)

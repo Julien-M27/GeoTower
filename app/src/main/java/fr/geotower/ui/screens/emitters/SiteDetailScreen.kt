@@ -1833,7 +1833,7 @@ fun RadioSiteDetailScreen(
         containerColor = mainBgColor,
         topBar = {
             GeoTowerBackTopBar(
-                title = "Detail radio ANFR",
+                title = "Détail radio ANFR",
                 onBack = { safeBackNavigation.navigateBack() },
                 backgroundColor = mainBgColor,
                 backEnabled = !safeBackNavigation.isLocked

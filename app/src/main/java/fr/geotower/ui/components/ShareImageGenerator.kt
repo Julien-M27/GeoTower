@@ -2994,7 +2994,7 @@ fun shareFullAntennaCapture(
 fun shareFullSiteCapture(
     context: Context,
     currentView: View,
-    siteId: Long,
+    siteId: String,
     mainInfo: LocalisationEntity,
     antennas: List<LocalisationEntity>,
     physique: PhysiqueEntity?,
@@ -3189,7 +3189,8 @@ fun shareFullSiteCapture(
 
                 val cachePath = File(context.cacheDir, "images")
                 cachePath.mkdirs()
-                val safeId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId.toString()
+                val safeId = (physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId)
+                    .replace(Regex("[^A-Za-z0-9._-]"), "_")
                 val file = File(cachePath, "Geotower_support_$safeId.png")
                 FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
 
@@ -3716,7 +3717,7 @@ fun AntennaShareMenu(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SupportShareMenu(
-    siteId: Long,
+    siteId: String,
     antennas: List<LocalisationEntity>,
     physique: PhysiqueEntity?,
     techniquesMap: Map<String, TechniqueEntity>,

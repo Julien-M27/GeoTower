@@ -237,6 +237,11 @@ object RemoteFeatureFlags {
         const val OUTAGES_SITE_STATUS = "outages.siteStatus"
         const val OFFLINE_MAPS_CATALOG = "offlineMaps.catalog"
         const val OFFLINE_MAPS_DOWNLOAD = "offlineMaps.download"
+        const val LIVE_API_FR = "liveApi.fr"
+        const val LIVE_API_FR_NEARBY = "liveApi.fr.nearby"
+        const val LIVE_API_FR_BBOX = "liveApi.fr.bbox"
+        const val LIVE_API_FR_SEARCH = "liveApi.fr.search"
+        const val LIVE_API_FR_SITE_DETAIL = "liveApi.fr.siteDetail"
         const val MAP_SEARCH_NOMINATIM = "map.search.nominatim"
         const val MAP_CITY_BOUNDARIES = "map.cityBoundaries"
         const val MAP_MEASURE = "map.measure"
@@ -329,6 +334,11 @@ object RemoteFeatureFlags {
         const val PHOTO_UPLOAD_MAX_SIZE_MB = "photoUploadMaxSizeMb"
         const val OFFLINE_MAP_MAX_PARALLEL_DOWNLOADS = "offlineMapMaxParallelDownloads"
         const val MAP_SEARCH_MIN_QUERY_LENGTH = "mapSearchMinQueryLength"
+        const val LIVE_API_NEARBY_MAX_LIMIT = "liveApiNearbyMaxLimit"
+        const val LIVE_API_NEARBY_MAX_RADIUS_KM = "liveApiNearbyMaxRadiusKm"
+        const val LIVE_API_BBOX_MAX_LIMIT = "liveApiBboxMaxLimit"
+        const val LIVE_API_BBOX_MAX_DEGREES = "liveApiBboxMaxDegrees"
+        const val LIVE_API_SEARCH_MAX_LIMIT = "liveApiSearchMaxLimit"
     }
 
     val defaultConfig = RemoteFeatureFlagConfig(
@@ -372,6 +382,11 @@ object RemoteFeatureFlags {
             Features.OUTAGES_SITE_STATUS to true,
             Features.OFFLINE_MAPS_CATALOG to true,
             Features.OFFLINE_MAPS_DOWNLOAD to true,
+            Features.LIVE_API_FR to false,
+            Features.LIVE_API_FR_NEARBY to false,
+            Features.LIVE_API_FR_BBOX to false,
+            Features.LIVE_API_FR_SEARCH to false,
+            Features.LIVE_API_FR_SITE_DETAIL to false,
             Features.MAP_SEARCH_NOMINATIM to true,
             Features.MAP_CITY_BOUNDARIES to true,
             Features.MAP_MEASURE to true,
@@ -458,7 +473,12 @@ object RemoteFeatureFlags {
             Limits.PHOTO_UPLOAD_MAX_COUNT to 20,
             Limits.PHOTO_UPLOAD_MAX_SIZE_MB to 10,
             Limits.OFFLINE_MAP_MAX_PARALLEL_DOWNLOADS to 1,
-            Limits.MAP_SEARCH_MIN_QUERY_LENGTH to 2
+            Limits.MAP_SEARCH_MIN_QUERY_LENGTH to 2,
+            Limits.LIVE_API_NEARBY_MAX_LIMIT to 200,
+            Limits.LIVE_API_NEARBY_MAX_RADIUS_KM to 50,
+            Limits.LIVE_API_BBOX_MAX_LIMIT to 1000,
+            Limits.LIVE_API_BBOX_MAX_DEGREES to 3,
+            Limits.LIVE_API_SEARCH_MAX_LIMIT to 100
         ),
         homeAnnouncement = RemoteHomeAnnouncement()
     )

@@ -183,7 +183,6 @@ fun FirstStartScreen(
     val useOneUi = AppConfig.useOneUiDesign
     var showOperatorSheet by remember { mutableStateOf(false) }
     var showWarningDialog by remember { mutableStateOf(false) } // État du pop-up d'avertissement
-    var showDbWarning by remember { mutableStateOf(false) }
     var showUnitSheet by remember { mutableStateOf(false) }
 
     // ✅ NOUVEAU : Variables pour gérer le pop-up de succès de fin de téléchargement
@@ -352,32 +351,15 @@ fun FirstStartScreen(
                             }
 
                             else -> {
-                                if (currentStep == 5 && !isSyncing && AppConfig.localDatabaseState.value == null) {
+                                if (currentStep == 5 && AppConfig.localDatabaseState.value == null) {
                                     coroutineScope.launch {
                                         val dbState = withContext(Dispatchers.IO) {
                                             GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context).state
                                         }
                                         AppConfig.localDatabaseState.value = dbState
-                                        if (dbState == GeoTowerDatabaseValidator.LocalDatabaseState.VALID) {
-                                            goToNextStep()
-                                        } else {
-                                            showDbWarning = true
-                                        }
                                     }
-                                    return@safeClick
                                 }
-
-                                val isDbDownloaded = AppConfig.localDatabaseState.value ==
-                                    GeoTowerDatabaseValidator.LocalDatabaseState.VALID
-
-                                // ✅ CORRECTION : On affiche l'avertissement UNIQUEMENT si ça ne télécharge pas ET que ce n'est pas installé
-                                if (currentStep == 5 && !isSyncing && !isDbDownloaded) {
-                                    // 🚨 Bloque sur la page 3 (Base de données) et affiche le pop-up
-                                    showDbWarning = true
-                                } else {
-                                    // ➡️ Passe à la page suivante normalement
-                                    goToNextStep()
-                                }
+                                goToNextStep()
                             }
                         }
                     }
@@ -511,41 +493,6 @@ fun FirstStartScreen(
         )
     }
 
-    // --- POP-UP D'AVERTISSEMENT SI BASE DE DONNÉES NON TÉLÉCHARGÉE ---
-    if (showDbWarning) {
-        AlertDialog(
-            onDismissRequest = { showDbWarning = false },
-            title = { Text(text = stringResource(R.string.onboarding_database_warning_title), fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    Text(stringResource(R.string.onboarding_database_warning_desc))
-                    Spacer(Modifier.height(8.dp))
-                    Text(stringResource(R.string.onboarding_database_warning_question))
-                }
-            },
-            shape = cardShape,
-            containerColor = MaterialTheme.colorScheme.surface,
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDbWarning = false
-                        // On force le passage à la page suivante !
-                        goToNextStep()
-                    }
-                ) {
-                    Text(stringResource(R.string.common_continue_anyway), color = MaterialTheme.colorScheme.error)
-                }
-            },
-            dismissButton = {
-                Button(
-                    onClick = { showDbWarning = false },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
-                ) {
-                    Text(stringResource(R.string.common_cancel), fontWeight = FontWeight.Bold)
-                }
-            }
-        )
-    }
     // --- POP-UP DE SUCCÈS FIN DE TÉLÉCHARGEMENT ---
     if (showSuccessDialog) {
         AlertDialog(
@@ -1102,6 +1049,17 @@ fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderSt
 
         // 🚀 APPEL DU NOUVEAU COMPOSANT PARTAGÉ
         fr.geotower.ui.components.DatabaseDownloadCard(
+            useOneUi = useOneUi,
+            shape = cardShape,
+            border = cardBorder,
+            bubbleColor = bubbleColor,
+            title = stringResource(R.string.settings_section_database),
+            onSafeClick = onSafeClick
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        fr.geotower.ui.components.RadioDatabaseDownloadCard(
             useOneUi = useOneUi,
             shape = cardShape,
             border = cardBorder,

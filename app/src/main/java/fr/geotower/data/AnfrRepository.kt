@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import fr.geotower.data.api.AnfrService
+import fr.geotower.data.api.LiveSitesClient
 import fr.geotower.data.db.AppDatabase
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.db.GeoTowerDao
@@ -15,6 +16,7 @@ import fr.geotower.data.models.DbCluster
 import fr.geotower.data.models.FaisceauxEntity
 import fr.geotower.data.models.FrequencyDetailsCodec
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.LiveSiteResponseDto
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.RadioFilterMasks
 import fr.geotower.data.models.TechniqueEntity
@@ -23,10 +25,19 @@ import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import fr.geotower.data.models.toLocalisationEntity
+import fr.geotower.data.models.toPhysiqueEntity
+import fr.geotower.data.models.toTechniqueEntity
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.atomic.AtomicInteger
 
 data class ActiveSupportRadioCounts(
     val techCounts: Map<String, Int>,
@@ -290,6 +301,39 @@ class AnfrRepository(
         val longitudeRanges: List<LongitudeRange>
     )
 
+    private data class ClusterBucket(val latDegrees: Double, val lonDegrees: Double)
+
+    private data class LiveCoverageBounds(
+        val minLat: Double,
+        val maxLat: Double,
+        val minLon: Double,
+        val maxLon: Double
+    )
+
+    private data class LiveBboxTile(
+        val south: Double,
+        val north: Double,
+        val west: Double,
+        val east: Double
+    )
+
+    private data class LiveBboxFetchResult(
+        val sites: List<LocalisationEntity>,
+        val mayBeTruncated: Boolean
+    )
+
+    private class LiveBboxRequestBudget(remaining: Int) {
+        private val remainingRequests = AtomicInteger(remaining)
+
+        fun tryConsume(): Boolean {
+            while (true) {
+                val current = remainingRequests.get()
+                if (current <= 0) return false
+                if (remainingRequests.compareAndSet(current, current - 1)) return true
+            }
+        }
+    }
+
     private val dao: GeoTowerDao
         get() = AppDatabase.getDatabase(context).geoTowerDao()
 
@@ -309,6 +353,243 @@ class AnfrRepository(
             refreshLocalDatabaseStatusAfterFailure()
             defaultValue
         }
+    }
+
+    private fun shouldUseLiveApiFallback(featureId: String): Boolean {
+        if (
+            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.LIVE_API_FR) ||
+            !RemoteFeatureFlags.isFeatureEnabled(featureId)
+        ) {
+            return false
+        }
+
+        val currentState = AppConfig.localDatabaseState.value
+        if (currentState != null) {
+            return currentState != GeoTowerDatabaseValidator.LocalDatabaseState.VALID
+        }
+
+        return GeoTowerDatabaseValidator
+            .getInstalledDatabaseFileStatus(context)
+            .state != GeoTowerDatabaseValidator.LocalDatabaseState.VALID
+    }
+
+    private fun liveNearbyRadiusKm(): Double {
+        return RemoteFeatureFlags
+            .limitOrDefault(RemoteFeatureFlags.Limits.LIVE_API_NEARBY_MAX_RADIUS_KM, 50)
+            .coerceAtLeast(1)
+            .toDouble()
+    }
+
+    private fun liveBboxMaxDegrees(): Double {
+        return RemoteFeatureFlags
+            .limitOrDefault(RemoteFeatureFlags.Limits.LIVE_API_BBOX_MAX_DEGREES, 3)
+            .coerceAtLeast(1)
+            .toDouble()
+    }
+
+    private fun buildLiveBboxTiles(
+        latNorth: Double,
+        lonEast: Double,
+        latSouth: Double,
+        lonWest: Double
+    ): List<LiveBboxTile> {
+        val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
+        val maxDegrees = liveBboxMaxDegrees()
+        val tiles = mutableListOf<LiveBboxTile>()
+
+        bounds.longitudeRanges.forEach { lonRange ->
+            liveCoverageBounds.forEach { coverage ->
+                val south = maxOf(bounds.minLat, coverage.minLat)
+                val north = minOf(bounds.maxLat, coverage.maxLat)
+                val west = maxOf(lonRange.min, coverage.minLon)
+                val east = minOf(lonRange.max, coverage.maxLon)
+                if (south >= north || west >= east) return@forEach
+
+                var tileSouth = south
+                while (tileSouth < north) {
+                    val tileNorth = minOf(tileSouth + maxDegrees, north)
+                    var tileWest = west
+                    while (tileWest < east) {
+                        val tileEast = minOf(tileWest + maxDegrees, east)
+                        tiles += LiveBboxTile(
+                            south = tileSouth,
+                            north = tileNorth,
+                            west = tileWest,
+                            east = tileEast
+                        )
+                        tileWest = tileEast
+                    }
+                    tileSouth = tileNorth
+                }
+            }
+        }
+
+        return tiles.take(LIVE_BBOX_TILE_REQUEST_LIMIT)
+    }
+
+    private fun canSplitLiveBboxTile(tile: LiveBboxTile): Boolean {
+        return (tile.north - tile.south) > LIVE_BBOX_MIN_TILE_DEGREES ||
+            (tile.east - tile.west) > LIVE_BBOX_MIN_TILE_DEGREES
+    }
+
+    private fun splitLiveBboxTile(tile: LiveBboxTile): List<LiveBboxTile> {
+        val midLat = (tile.south + tile.north) / 2.0
+        val midLon = (tile.west + tile.east) / 2.0
+        return listOf(
+            LiveBboxTile(south = tile.south, north = midLat, west = tile.west, east = midLon),
+            LiveBboxTile(south = tile.south, north = midLat, west = midLon, east = tile.east),
+            LiveBboxTile(south = midLat, north = tile.north, west = tile.west, east = midLon),
+            LiveBboxTile(south = midLat, north = tile.north, west = midLon, east = tile.east)
+        ).filter { child ->
+            child.south < child.north && child.west < child.east
+        }
+    }
+
+    private suspend fun getLiveSitesInTileRecursively(
+        tile: LiveBboxTile,
+        limit: Int,
+        budget: LiveBboxRequestBudget,
+        semaphore: Semaphore,
+        depth: Int = 0
+    ): List<LocalisationEntity> {
+        if (!budget.tryConsume()) return emptyList()
+
+        val result = semaphore.withPermit {
+            getLiveSitesInTile(tile, limit)
+        }
+        if (
+            result.mayBeTruncated &&
+            depth < LIVE_BBOX_MAX_SUBDIVISION_DEPTH &&
+            canSplitLiveBboxTile(tile)
+        ) {
+            val childSites = coroutineScope {
+                splitLiveBboxTile(tile)
+                    .map { child ->
+                        async {
+                            getLiveSitesInTileRecursively(
+                                tile = child,
+                                limit = limit,
+                                budget = budget,
+                                semaphore = semaphore,
+                                depth = depth + 1
+                            )
+                        }
+                    }
+                    .awaitAll()
+                    .flatten()
+            }
+            if (childSites.isNotEmpty()) return childSites
+        }
+
+        return result.sites
+    }
+
+    private suspend fun getLiveNearest(
+        lat: Double,
+        lon: Double,
+        limit: Int,
+        zbOnly: Boolean
+    ): List<LocalisationEntity> {
+        return try {
+            val response = LiveSitesClient.api.getNearbySites(
+                lat = lat,
+                lon = lon,
+                limit = limit.coerceAtLeast(1),
+                radiusKm = liveNearbyRadiusKm(),
+                zbOnly = zbOnly.takeIf { it },
+                activeOnly = null
+            )
+            if (!response.isSuccessful) return emptyList()
+            response.body()
+                ?.sites
+                ?.mapNotNull { it.toLocalisationEntity() }
+                .orEmpty()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG_DB, "Live sites nearby request failed", e)
+            emptyList()
+        }
+    }
+
+    private suspend fun getLiveSitesInBox(
+        latNorth: Double,
+        lonEast: Double,
+        latSouth: Double,
+        lonWest: Double
+    ): List<LocalisationEntity> {
+        val safeLimit = RemoteFeatureFlags
+            .limitOrDefault(RemoteFeatureFlags.Limits.LIVE_API_BBOX_MAX_LIMIT, 1000)
+            .coerceAtLeast(1)
+        val tiles = buildLiveBboxTiles(latNorth, lonEast, latSouth, lonWest)
+        if (tiles.isEmpty()) return emptyList()
+
+        val budget = LiveBboxRequestBudget(LIVE_BBOX_TILE_REQUEST_LIMIT)
+        val semaphore = Semaphore(LIVE_BBOX_MAX_PARALLEL_REQUESTS)
+        val sites = coroutineScope {
+            tiles
+                .map { tile ->
+                    async {
+                        getLiveSitesInTileRecursively(
+                            tile = tile,
+                            limit = safeLimit,
+                            budget = budget,
+                            semaphore = semaphore
+                        )
+                    }
+                }
+                .awaitAll()
+                .flatten()
+        }
+        return sites.distinctBy { it.idAnfr }
+    }
+
+    private suspend fun getLiveSitesInTile(tile: LiveBboxTile, limit: Int): LiveBboxFetchResult {
+        return try {
+            val response = LiveSitesClient.api.getSitesInBox(
+                north = tile.north,
+                south = tile.south,
+                east = tile.east,
+                west = tile.west,
+                limit = limit
+            )
+            if (!response.isSuccessful) return LiveBboxFetchResult(emptyList(), mayBeTruncated = false)
+            val sites = response.body()
+                ?.sites
+                ?.mapNotNull { it.toLocalisationEntity() }
+                .orEmpty()
+            LiveBboxFetchResult(
+                sites = sites,
+                mayBeTruncated = sites.size >= limit
+            )
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG_DB, "Live sites bbox request failed", e)
+            LiveBboxFetchResult(emptyList(), mayBeTruncated = false)
+        }
+    }
+
+    private suspend fun getLiveSite(siteId: String): LiveSiteResponseDto? {
+        if (siteId.isBlank()) return null
+        return try {
+            val response = LiveSitesClient.api.getSite(siteId)
+            if (!response.isSuccessful) return null
+            response.body()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG_DB, "Live site detail request failed", e)
+            null
+        }
+    }
+
+    private suspend fun getLiveSites(siteIds: List<String>): List<LiveSiteResponseDto> {
+        return siteIds
+            .filter { it.isNotBlank() }
+            .distinct()
+            .take(LIVE_DETAIL_LOOKUP_LIMIT)
+            .mapNotNull { id -> getLiveSite(id) }
     }
 
     private fun refreshLocalDatabaseStatusAfterFailure() {
@@ -395,6 +676,51 @@ class AnfrRepository(
         }
     }
 
+    private fun clusterBucketForZoom(zoom: Double): ClusterBucket {
+        return when {
+            zoom < 6.5 -> ClusterBucket(latDegrees = 2.5, lonDegrees = 3.0)
+            zoom < 8.0 -> ClusterBucket(latDegrees = 1.0, lonDegrees = 1.2)
+            zoom < 9.5 -> ClusterBucket(latDegrees = 0.4, lonDegrees = 0.5)
+            zoom < 10.5 -> ClusterBucket(latDegrees = 0.15, lonDegrees = 0.2)
+            zoom < 11.5 -> ClusterBucket(latDegrees = 0.1, lonDegrees = 0.1)
+            zoom < 12.5 -> ClusterBucket(latDegrees = 0.05, lonDegrees = 0.06)
+            else -> ClusterBucket(latDegrees = 0.02, lonDegrees = 0.025)
+        }
+    }
+
+    private fun buildLiveClusters(sites: List<LocalisationEntity>, zoom: Double): List<DbCluster> {
+        if (sites.isEmpty()) return emptyList()
+
+        val bucket = clusterBucketForZoom(zoom)
+        val clusters = sites
+            .groupBy { site ->
+                Math.round(site.latitude / bucket.latDegrees) to
+                    Math.round(site.longitude / bucket.lonDegrees)
+            }
+            .map { (_, group) ->
+                val distinctIds = group
+                    .map { it.idAnfr }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                val count = distinctIds.size.takeIf { it > 0 } ?: group.size
+                val operators = group
+                    .mapNotNull { it.operateur?.trim()?.takeIf(String::isNotBlank) }
+                    .distinct()
+                    .joinToString(", ")
+                    .takeIf { it.isNotBlank() }
+
+                DbCluster(
+                    centerLat = group.sumOf { it.latitude } / group.size,
+                    centerLon = group.sumOf { it.longitude } / group.size,
+                    count = count,
+                    operators = operators,
+                    singleIdAnfr = distinctIds.singleOrNull()?.takeIf { count == 1 }
+                )
+            }
+
+        return MacroClusterGrouper.mergeTargetedTerritories(clusters, zoom)
+    }
+
     // =================================================================
     // 1. POUR LA CARTE (Affichage ultra-rapide des points)
     // =================================================================
@@ -405,6 +731,10 @@ class AnfrRepository(
         lonWest: Double,
         detailBackedBandMask: Int = DETAIL_BACKED_5G_BANDS
     ): List<LocalisationEntity> {
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
+            return getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest)
+        }
+
         val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
         val localisations = queryLocalDatabase(emptyList()) {
             bounds.longitudeRanges
@@ -465,6 +795,10 @@ class AnfrRepository(
         limit: Int,
         detailBackedBandMask: Int = 0
     ): List<LocalisationEntity> {
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_NEARBY)) {
+            return getLiveNearest(lat, lon, limit, zbOnly = true)
+        }
+
         val localisations = queryLocalDatabase(emptyList()) {
             this.getNearestZb(lat, lon, limit.coerceAtLeast(1))
         }
@@ -477,6 +811,10 @@ class AnfrRepository(
         limit: Int,
         detailBackedBandMask: Int = 0
     ): List<LocalisationEntity> {
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_NEARBY)) {
+            return getLiveNearest(lat, lon, limit, zbOnly = false)
+        }
+
         val localisations = queryLocalDatabase(emptyList()) {
             val safeLimit = limit.coerceAtLeast(1)
             val radii = listOf(0.03, 0.08, 0.18, 0.45, 1.0, 2.5, 5.0)
@@ -507,6 +845,15 @@ class AnfrRepository(
     // 1.5 POUR LA CARTE (Mode Macro : Clustering progressif à 5 niveaux)
     // =================================================================
     suspend fun getClusteredAntennas(zoom: Double, latNorth: Double, lonEast: Double, latSouth: Double, lonWest: Double): List<DbCluster> {
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
+            val liveSites = getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest)
+                .filter { site ->
+                    (!AppConfig.showOnlyZbSites.value || site.isZb == 1) &&
+                        (!AppConfig.hideUndergroundSites.value || site.hasUndergroundSupport != 1)
+                }
+            return buildLiveClusters(liveSites, zoom)
+        }
+
         val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
         return queryLocalDatabase(emptyList()) {
             val clusters = bounds.longitudeRanges.flatMap { range ->
@@ -528,12 +875,20 @@ class AnfrRepository(
     // 2. POUR LES DÉTAILS (Quand on clique sur une antenne)
     // =================================================================
     suspend fun getTechniqueDetails(idAnfr: String): TechniqueEntity? {
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+            return getLiveSite(idAnfr)?.detail?.toTechniqueEntity()
+        }
+
         return queryLocalDatabase(null) {
             getTechniqueDetails(idAnfr)
         }
     }
 
     suspend fun getPhysiqueDetails(idAnfr: String): List<PhysiqueEntity> {
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+            return getLiveSite(idAnfr)?.supports?.mapNotNull { it.toPhysiqueEntity() }.orEmpty()
+        }
+
         return queryLocalDatabase(emptyList()) {
             getPhysiqueDetails(idAnfr)
         }
@@ -542,6 +897,12 @@ class AnfrRepository(
     suspend fun getTechniqueDetailsByIds(idAnfrs: List<String>): Map<String, TechniqueEntity> {
         val distinctIds = idAnfrs.filter { it.isNotBlank() }.distinct()
         if (distinctIds.isEmpty()) return emptyMap()
+
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+            return getLiveSites(distinctIds)
+                .mapNotNull { site -> site.detail?.toTechniqueEntity() }
+                .associateBy { it.idAnfr }
+        }
 
         return distinctIds.chunked(SQLITE_IN_CLAUSE_BATCH_SIZE)
             .flatMap { chunk ->
@@ -556,6 +917,12 @@ class AnfrRepository(
         val distinctIds = idAnfrs.filter { it.isNotBlank() }.distinct()
         if (distinctIds.isEmpty()) return emptyMap()
 
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+            return getLiveSites(distinctIds)
+                .mapNotNull { site -> site.detail?.toTechniqueEntity() }
+                .associateBy { it.idAnfr }
+        }
+
         return distinctIds.chunked(SQLITE_IN_CLAUSE_BATCH_SIZE)
             .flatMap { chunk ->
                 queryLocalDatabase(emptyList<TechniqueEntity>()) {
@@ -569,6 +936,12 @@ class AnfrRepository(
         val distinctIds = idAnfrs.filter { it.isNotBlank() }.distinct()
         if (distinctIds.isEmpty()) return emptyMap()
 
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+            return getLiveSites(distinctIds)
+                .flatMap { site -> site.supports.mapNotNull { it.toPhysiqueEntity() } }
+                .groupBy { it.idAnfr }
+        }
+
         return distinctIds.chunked(SQLITE_IN_CLAUSE_BATCH_SIZE)
             .flatMap { chunk ->
                 queryLocalDatabase(emptyList<PhysiqueEntity>()) {
@@ -581,6 +954,12 @@ class AnfrRepository(
     suspend fun getPhysiqueSummariesByIds(idAnfrs: List<String>): Map<String, List<PhysiqueEntity>> {
         val distinctIds = idAnfrs.filter { it.isNotBlank() }.distinct()
         if (distinctIds.isEmpty()) return emptyMap()
+
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+            return getLiveSites(distinctIds)
+                .flatMap { site -> site.supports.mapNotNull { it.toPhysiqueEntity() } }
+                .groupBy { it.idAnfr }
+        }
 
         return distinctIds.chunked(SQLITE_IN_CLAUSE_BATCH_SIZE)
             .flatMap { chunk ->
@@ -598,18 +977,30 @@ class AnfrRepository(
     }
 
     suspend fun getPhysiqueByAnfr(idAnfr: String): List<PhysiqueEntity> {
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+            return getLiveSite(idAnfr)?.supports?.mapNotNull { it.toPhysiqueEntity() }.orEmpty()
+        }
+
         return queryLocalDatabase(emptyList()) {
             getPhysiqueByAnfr(idAnfr)
         }
     }
 
     suspend fun getTechniqueByAnfr(idAnfr: String): List<TechniqueEntity> {
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+            return listOfNotNull(getLiveSite(idAnfr)?.detail?.toTechniqueEntity())
+        }
+
         return queryLocalDatabase(emptyList()) {
             getTechniqueByAnfr(idAnfr)
         }
     }
 
     suspend fun searchAntennasById(query: String): List<LocalisationEntity> {
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+            return getAntennasByExactId(query)
+        }
+
         val results = queryLocalDatabase(emptyList()) {
             searchAntennasById(query)
         }
@@ -631,6 +1022,13 @@ class AnfrRepository(
     }
 
     suspend fun getAntennasByExactId(exactId: String): List<LocalisationEntity> {
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_SITE_DETAIL)) {
+            return getLiveSite(exactId)
+                ?.matches
+                ?.mapNotNull { it.toLocalisationEntity() }
+                .orEmpty()
+        }
+
         val results = queryLocalDatabase(emptyList()) {
             getAntennasByExactId(exactId)
         }
@@ -902,5 +1300,19 @@ class AnfrRepository(
         const val TAG_DB = "GeoTowerDb"
         const val TAG_MAP = "GeoTowerMap"
         const val SQLITE_IN_CLAUSE_BATCH_SIZE = 900
+        const val LIVE_DETAIL_LOOKUP_LIMIT = 120
+        const val LIVE_BBOX_TILE_REQUEST_LIMIT = 96
+        const val LIVE_BBOX_MAX_PARALLEL_REQUESTS = 8
+        const val LIVE_BBOX_MAX_SUBDIVISION_DEPTH = 4
+        const val LIVE_BBOX_MIN_TILE_DEGREES = 0.2
+
+        private val liveCoverageBounds = listOf(
+            LiveCoverageBounds(minLat = 41.0, maxLat = 51.6, minLon = -5.8, maxLon = 10.1),
+            LiveCoverageBounds(minLat = 14.2, maxLat = 18.3, minLon = -63.4, maxLon = -60.6),
+            LiveCoverageBounds(minLat = 1.8, maxLat = 6.2, minLon = -54.9, maxLon = -51.2),
+            LiveCoverageBounds(minLat = -21.5, maxLat = -20.8, minLon = 55.1, maxLon = 55.9),
+            LiveCoverageBounds(minLat = -13.1, maxLat = -12.6, minLon = 44.9, maxLon = 45.4),
+            LiveCoverageBounds(minLat = 46.6, maxLat = 47.2, minLon = -56.6, maxLon = -55.8)
+        )
     }
 }
