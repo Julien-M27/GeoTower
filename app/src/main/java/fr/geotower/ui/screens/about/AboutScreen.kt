@@ -779,6 +779,7 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
     val context = LocalContext.current
     var appVersion by remember { mutableStateOf("-") }
     var dbVersion by remember { mutableStateOf("-") }
+    var radioDbVersion by remember { mutableStateOf("-") }
     var anfrDate by remember { mutableStateOf("-") }
     var quarterlyVersion by remember { mutableStateOf("-") }
     var rawMonthlyVersion by remember { mutableStateOf("-") } // ✅ Changé en "rawMonthlyVersion"
@@ -816,14 +817,7 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
 
                     if (cursor.moveToFirst()) {
                         // A. Version interne
-                        val rawVersion = cursor.getString(0)
-                        if (rawVersion != null && rawVersion.length == 13) {
-                            val dbDate = "${rawVersion.substring(6, 8)}/${rawVersion.substring(4, 6)}/${rawVersion.substring(0, 4)}"
-                            val dbTime = "${rawVersion.substring(9, 11)}:${rawVersion.substring(11, 13)}"
-                            dbVersion = "$dbDate\n$txtVersionTimeAt $dbTime"
-                        } else {
-                            dbVersion = rawVersion ?: "-"
-                        }
+                        dbVersion = formatAboutDatabaseVersion(cursor.getString(0), txtVersionTimeAt)
 
                         // B. Date Hebdo (ANFR)
                         if (cursor.columnCount > 1 && !cursor.isNull(1)) {
@@ -868,6 +862,31 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
             }
 
             // 3. Données des sites HS (depuis les préférences)
+            try {
+                val radioDbPath = context.getDatabasePath(fr.geotower.data.db.RadioDatabaseValidator.DB_NAME)
+                radioDbVersion = if (radioDbPath.exists()) {
+                    val validation = fr.geotower.data.db.RadioDatabaseValidator.validateDatabaseFile(radioDbPath)
+                    if (validation.isValid) {
+                        SQLiteDatabase.openDatabase(radioDbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { radioDb ->
+                            radioDb.rawQuery("SELECT version FROM metadata LIMIT 1", null).use { radioCursor ->
+                                if (radioCursor.moveToFirst()) {
+                                    formatAboutDatabaseVersion(radioCursor.getString(0), txtVersionTimeAt)
+                                } else {
+                                    "-"
+                                }
+                            }
+                        }
+                    } else {
+                        txtInvalidLocalDatabase
+                    }
+                } else {
+                    txtNotInstalled
+                }
+            } catch (e: Exception) {
+                radioDbVersion = "-"
+                AppLogger.w(TAG_ABOUT, "Radio database version info could not be read", e)
+            }
+
             val prefs = context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
             hsDate = prefs.getString("last_hs_update", "-") ?: "-"
         }
@@ -885,6 +904,7 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
             val versionRows = listOf(
                 stringResource(R.string.appstrings_version_app_label) to appVersion,
                 stringResource(R.string.appstrings_version_db_label) to dbVersion,
+                stringResource(R.string.appstrings_version_radio_db_label) to radioDbVersion,
                 stringResource(R.string.appstrings_version_weekly_label) to LocalizedDateLabels.formatWeeklyVersionWithWeekNumber(context, anfrDate),
                 stringResource(R.string.appstrings_version_monthly_label) to LocalizedDateLabels.formatMonthlyVersion(context, rawMonthlyVersion),
                 stringResource(R.string.appstrings_version_quarterly_label) to LocalizedDateLabels.formatQuarterlyVersion(context, quarterlyVersion),
@@ -942,6 +962,23 @@ private fun normalizeQuarterlyVersion(rawValue: String?): String {
         ?.let { return "${it.groupValues[2]}-T${it.groupValues[1]}" }
 
     return raw
+}
+
+private fun formatAboutDatabaseVersion(rawValue: String?, timeAtLabel: String): String {
+    val raw = rawValue?.trim().orEmpty()
+    if (raw.isBlank()) return "-"
+
+    val match = Regex("""(20\d{2})\D?(\d{2})\D?(\d{2})(?:\D?(\d{2})\D?(\d{2}))?""")
+        .find(raw)
+        ?: return raw
+    val date = "${match.groupValues[3]}/${match.groupValues[2]}/${match.groupValues[1]}"
+    val hour = match.groupValues.getOrNull(4).orEmpty()
+    val minute = match.groupValues.getOrNull(5).orEmpty()
+    return if (hour.isNotBlank() && minute.isNotBlank()) {
+        "$date\n$timeAtLabel $hour:$minute"
+    } else {
+        date
+    }
 }
 
 @Composable

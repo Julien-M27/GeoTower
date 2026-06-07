@@ -91,6 +91,44 @@ interface GeoTowerDao {
                 FROM support underground_support
                 LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
                 WHERE underground_support.id_anfr = l.id_anfr
+                AND underground_nature.libelle = 'IntÃ©rieur sous-terrain'
+            ) THEN 1 ELSE 0 END AS has_underground_support
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
+        LEFT JOIN ref_statut st ON t.statut_id = st.id
+        WHERE l.id_anfr IN (:idAnfrs)
+        AND l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+    """)
+    suspend fun getLocalisationsByIdsInBox(
+        idAnfrs: List<String>,
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double
+    ): List<LocalisationEntity>
+
+    @Query("""
+        SELECT
+            l.id_anfr,
+            COALESCE(o.libelle, 'Inconnu') AS operateur,
+            l.latitude,
+            l.longitude,
+            l.azimuts,
+            l.code_insee,
+            l.azimuts_fh,
+            l.tech_mask,
+            l.band_mask,
+            l.arcep_nidt,
+            l.is_zb,
+            COALESCE(st.libelle, '') AS statut,
+            COALESCE(t.has_active, 0) AS has_active,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM support underground_support
+                LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+                WHERE underground_support.id_anfr = l.id_anfr
                 AND underground_nature.libelle = 'Intérieur sous-terrain'
             ) THEN 1 ELSE 0 END AS has_underground_support
         FROM localisation l
@@ -767,10 +805,13 @@ interface GeoTowerDao {
            OR (UPPER(:query) LIKE '%700%' AND (l.band_mask & 1040) != 0)
            OR (UPPER(:query) LIKE '%800%' AND (l.band_mask & 32) != 0)
            OR (UPPER(:query) LIKE '%900%' AND (l.band_mask & 69) != 0)
+           OR (UPPER(:query) LIKE '%1400%' AND (l.band_mask & 2097152) != 0)
            OR (UPPER(:query) LIKE '%1800%' AND (l.band_mask & 130) != 0)
            OR (UPPER(:query) LIKE '%2100%' AND (l.band_mask & 2312) != 0)
            OR (UPPER(:query) LIKE '%2600%' AND (l.band_mask & 512) != 0)
            OR (UPPER(:query) LIKE '%3500%' AND (l.band_mask & 4096) != 0)
+           OR (UPPER(:query) LIKE '%4200%' AND (l.band_mask & 4194304) != 0)
+           OR ((UPPER(:query) LIKE '%26000%' OR UPPER(:query) LIKE '%26GHZ%' OR UPPER(:query) LIKE '%26 GHZ%') AND (l.band_mask & 8192) != 0)
            OR EXISTS (
                 SELECT 1
                 FROM antenne a

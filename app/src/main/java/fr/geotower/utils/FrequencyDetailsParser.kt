@@ -224,7 +224,93 @@ private fun frequencySortValue(systemName: String, rawFrequencies: String, isFh:
         systemName
     }
     val values = Regex("\\d+").findAll(source).mapNotNull { it.value.toIntOrNull() }.toList()
-    return if (isFh) values.firstOrNull() ?: 0 else values.maxOrNull() ?: 0
+    if (isFh) return values.firstOrNull() ?: 0
+
+    val generation = when {
+        systemName.contains("5G", true) || systemName.contains("NR", true) -> 5
+        systemName.contains("4G", true) || systemName.contains("LTE", true) -> 4
+        systemName.contains("3G", true) || systemName.contains("UMTS", true) -> 3
+        systemName.contains("2G", true) || systemName.contains("GSM", true) -> 2
+        else -> 0
+    }
+    val knownValues = mobileFrequencyValuesForGeneration(generation)
+    val systemValue = values
+        .filter { it in knownValues }
+        .maxOrNull()
+        ?: if (generation == 5 && values.contains(26)) 26000 else values.maxOrNull() ?: 0
+
+    if (systemValue in knownValues || systemValue == 26000) return systemValue
+
+    return mobileFrequencyValuesFromRanges(
+        generation,
+        rawFrequencies.substringAfter(":", "")
+    ).maxOrNull() ?: systemValue
+}
+
+private fun mobileFrequencyValuesForGeneration(gen: Int): Set<Int> = when (gen) {
+    5 -> setOf(700, 1400, 2100, 3500, 4200, 26000)
+    4 -> setOf(700, 800, 900, 1800, 2100, 2600)
+    3 -> setOf(900, 2100)
+    2 -> setOf(900, 1800)
+    else -> emptySet()
+}
+
+private fun mobileFrequencyValuesFromRanges(gen: Int, rawRanges: String): Set<Int> {
+    return spectrumRangeRegex.findAll(rawRanges)
+        .flatMap { match ->
+            val start = normalizeFrequencyToMhz(match.groupValues[1], match.groupValues[3])
+            val end = normalizeFrequencyToMhz(match.groupValues[2], match.groupValues[3])
+            frequencyValuesForRange(gen, start, end).asSequence()
+        }
+        .toSet()
+}
+
+private fun normalizeFrequencyToMhz(value: String, unit: String): Double? {
+    val number = value.replace(',', '.').toDoubleOrNull() ?: return null
+    val normalizedUnit = unit.lowercase()
+    return when {
+        normalizedUnit.contains("ghz") -> number * 1000.0
+        normalizedUnit.contains("khz") -> number / 1000.0
+        normalizedUnit.contains("hz") && !normalizedUnit.contains("mhz") -> number / 1_000_000.0
+        else -> number
+    }
+}
+
+private fun frequencyValuesForRange(gen: Int, start: Double?, end: Double?): Set<Int> {
+    if (start == null || end == null) return emptySet()
+    return when (gen) {
+        5 -> buildSet {
+            if (frequencyRangeOverlaps(start, end, 700.0, 790.0)) add(700)
+            if (frequencyRangeOverlaps(start, end, 1427.0, 1518.0)) add(1400)
+            if (frequencyRangeOverlaps(start, end, 1920.0, 2170.0)) add(2100)
+            if (frequencyRangeOverlaps(start, end, 3300.0, 3800.0)) add(3500)
+            if (frequencyRangeOverlaps(start, end, 3800.1, 4200.0)) add(4200)
+            if (frequencyRangeOverlaps(start, end, 24000.0, 27500.0)) add(26000)
+        }
+        4 -> buildSet {
+            if (frequencyRangeOverlaps(start, end, 700.0, 790.0)) add(700)
+            if (frequencyRangeOverlaps(start, end, 791.0, 862.0)) add(800)
+            if (frequencyRangeOverlaps(start, end, 880.0, 960.0)) add(900)
+            if (frequencyRangeOverlaps(start, end, 1710.0, 1880.0)) add(1800)
+            if (frequencyRangeOverlaps(start, end, 1920.0, 2170.0)) add(2100)
+            if (frequencyRangeOverlaps(start, end, 2500.0, 2690.0)) add(2600)
+        }
+        3 -> buildSet {
+            if (frequencyRangeOverlaps(start, end, 880.0, 960.0)) add(900)
+            if (frequencyRangeOverlaps(start, end, 1920.0, 2170.0)) add(2100)
+        }
+        2 -> buildSet {
+            if (frequencyRangeOverlaps(start, end, 880.0, 960.0)) add(900)
+            if (frequencyRangeOverlaps(start, end, 1710.0, 1880.0)) add(1800)
+        }
+        else -> emptySet()
+    }
+}
+
+private fun frequencyRangeOverlaps(start: Double, end: Double, low: Double, high: Double): Boolean {
+    val lowValue = minOf(start, end)
+    val highValue = maxOf(start, end)
+    return lowValue <= high && highValue >= low
 }
 
 private val spectrumRangeRegex = Regex("""([0-9]+(?:[.,][0-9]+)?)\s*-\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]*Hz)?""")

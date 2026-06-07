@@ -55,7 +55,11 @@ object SpectrumAllocationsFrMetro {
 
     fun normalizeBandLabel(raw: String): String {
         return when {
+            raw.contains("26", ignoreCase = true) && raw.contains("ghz", ignoreCase = true) -> "26000"
+            raw.contains("n258", ignoreCase = true) -> "26000"
             raw.contains("3500") || raw.contains("3.5") || raw.contains("3,5") || raw.contains("n78", ignoreCase = true) -> "3500"
+            raw.contains("4200") || raw.contains("4.2") || raw.contains("4,2") || raw.contains("n77", ignoreCase = true) -> "4200"
+            raw.contains("1400") || raw.contains("N75", ignoreCase = true) -> "1400"
             else -> raw.filter { it.isDigit() }
         }
     }

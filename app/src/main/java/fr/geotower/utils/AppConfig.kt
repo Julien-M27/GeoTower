@@ -4,6 +4,7 @@ import android.content.SharedPreferences
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import fr.geotower.data.db.GeoTowerDatabaseValidator
+import fr.geotower.data.models.RadioMapCategoryMasks
 
 object AppConfig {
     const val PREF_COLOR_PALETTE = "color_palette"
@@ -13,6 +14,12 @@ object AppConfig {
     const val PREF_SHOW_MAP_LOCATION_MARKER = "show_map_location_marker"
     const val PREF_SHOW_AZIMUTH_LINES = "show_azimuths"
     const val PREF_SHOW_AZIMUTH_CONES = "show_azimuths_cone"
+    const val PREF_SHOW_RADIO_SITES = "show_radio_sites"
+    const val PREF_SHOW_RADIO_TV = "show_radio_tv"
+    const val PREF_SHOW_RADIO_BROADCAST = "show_radio_broadcast"
+    const val PREF_SHOW_RADIO_PRIVATE_MOBILE = "show_radio_private_mobile"
+    const val PREF_SHOW_RADIO_FH = "show_radio_fh"
+    const val PREF_SHOW_RADIO_OTHER = "show_radio_other"
     const val PREF_HIDE_UNDERGROUND_SITES = "hide_underground_sites"
     const val PREF_SHOW_ONLY_ZB_SITES = "show_only_zb_sites"
     const val DEFAULT_SHOW_AZIMUTH_LINES = true
@@ -59,6 +66,12 @@ object AppConfig {
 
     var showSpeedometer = mutableStateOf(true)
     var showMapLocationMarker = mutableStateOf(true)
+    var showRadioSites = mutableStateOf(false)
+    var showRadioTv = mutableStateOf(false)
+    var showRadioBroadcast = mutableStateOf(false)
+    var showRadioPrivateMobile = mutableStateOf(false)
+    var showRadioFh = mutableStateOf(false)
+    var showRadioOther = mutableStateOf(false)
 
     // --- FILTRES : OPÉRATEURS ---
     var showOrange = mutableStateOf(true)
@@ -105,8 +118,10 @@ object AppConfig {
 
     // 5G NR
     var f5G_700 = mutableStateOf(true)
+    var f5G_1400 = mutableStateOf(true)
     var f5G_2100 = mutableStateOf(true)
     var f5G_3500 = mutableStateOf(true)
+    var f5G_4200 = mutableStateOf(true)
     var f5G_26000 = mutableStateOf(true)
 
     // --- FILTRES : FRÉQUENCES (DÉTAILS DU SITE) ---
@@ -127,8 +142,10 @@ object AppConfig {
     var siteF4G_2100 = mutableStateOf(true)
     var siteF4G_2600 = mutableStateOf(true)
     var siteF5G_700 = mutableStateOf(true)
+    var siteF5G_1400 = mutableStateOf(true)
     var siteF5G_2100 = mutableStateOf(true)
     var siteF5G_3500 = mutableStateOf(true)
+    var siteF5G_4200 = mutableStateOf(true)
     var siteF5G_26000 = mutableStateOf(true)
 
     var siteFreqGridDisplay = mutableStateOf(false)
@@ -141,7 +158,7 @@ object AppConfig {
     // --- ORDRE DES TECHNOLOGIES ET FRÉQUENCES (SITE) ---
     var siteTechnoOrder = mutableStateOf(listOf("5G", "4G", "3G", "2G", "FH"))
 
-    var siteFreqOrder5G = mutableStateOf(listOf("3500", "2100", "700"))
+    var siteFreqOrder5G = mutableStateOf(listOf("26000", "4200", "3500", "2100", "1400", "700"))
     var siteFreqOrder4G = mutableStateOf(listOf("2600", "2100", "1800", "900", "800", "700"))
     var siteFreqOrder3G = mutableStateOf(listOf("2100", "900"))
     var siteFreqOrder2G = mutableStateOf(listOf("1800", "900"))
@@ -196,6 +213,13 @@ object AppConfig {
         showAzimuths.value = MapDisplayPrefs.showAzimuthLines.read(prefs)
         showAzimuthsCone.value = MapDisplayPrefs.showAzimuthCones.read(prefs)
         showMapLocationMarker.value = MapDisplayPrefs.showLocationMarker.read(prefs)
+        val legacyShowRadioSites = MapDisplayPrefs.showRadioSites.read(prefs)
+        showRadioTv.value = prefs.getBoolean(PREF_SHOW_RADIO_TV, legacyShowRadioSites)
+        showRadioBroadcast.value = prefs.getBoolean(PREF_SHOW_RADIO_BROADCAST, legacyShowRadioSites)
+        showRadioPrivateMobile.value = prefs.getBoolean(PREF_SHOW_RADIO_PRIVATE_MOBILE, legacyShowRadioSites)
+        showRadioFh.value = prefs.getBoolean(PREF_SHOW_RADIO_FH, legacyShowRadioSites)
+        showRadioOther.value = prefs.getBoolean(PREF_SHOW_RADIO_OTHER, legacyShowRadioSites)
+        updateShowRadioSitesFromCategoryFilters()
         showSpeedometer.value = MapDisplayPrefs.showSpeedometer.read(prefs)
 
         showSitesInService.value = MapDisplayPrefs.showSitesInService.read(prefs)
@@ -223,8 +247,10 @@ object AppConfig {
         f4G_2600.value = MapDisplayPrefs.f4G2600.read(prefs)
 
         f5G_700.value = MapDisplayPrefs.f5G700.read(prefs)
+        f5G_1400.value = MapDisplayPrefs.f5G1400.read(prefs)
         f5G_2100.value = MapDisplayPrefs.f5G2100.read(prefs)
         f5G_3500.value = MapDisplayPrefs.f5G3500.read(prefs)
+        f5G_4200.value = MapDisplayPrefs.f5G4200.read(prefs)
         f5G_26000.value = MapDisplayPrefs.f5G26000.read(prefs)
     }
 
@@ -279,8 +305,10 @@ object AppConfig {
         siteF4G_2100.value = prefs.getBoolean("site_f4g_2100", true)
         siteF4G_2600.value = prefs.getBoolean("site_f4g_2600", true)
         siteF5G_700.value = prefs.getBoolean("site_f5g_700", true)
+        siteF5G_1400.value = prefs.getBoolean("site_f5g_1400", true)
         siteF5G_2100.value = prefs.getBoolean("site_f5g_2100", true)
         siteF5G_3500.value = prefs.getBoolean("site_f5g_3500", true)
+        siteF5G_4200.value = prefs.getBoolean("site_f5g_4200", true)
         siteF5G_26000.value = prefs.getBoolean("site_f5g_26000", true)
 
         //AFFICHAGE DES FREQUENCES EN GRILLE
@@ -308,11 +336,13 @@ object AppConfig {
         val tOrder = prefs.getString("site_techno_order", "5G,4G,3G,2G,FH")
         siteTechnoOrder.value = tOrder?.split(",") ?: listOf("5G", "4G", "3G", "2G", "FH")
 
-        val f5gOrder = prefs.getString("site_freq_5g_order", "3500,2100,700")
-        siteFreqOrder5G.value = f5gOrder?.split(",") ?: listOf("3500", "2100", "700")
+        val f5gDefaultOrder = listOf("26000", "4200", "3500", "2100", "1400", "700")
+        val f5gOrder = prefs.getString("site_freq_5g_order", f5gDefaultOrder.joinToString(","))
+        siteFreqOrder5G.value = normalizeSavedOrder(f5gOrder?.split(",") ?: f5gDefaultOrder, f5gDefaultOrder)
 
-        val f4gOrder = prefs.getString("site_freq_4g_order", "2600,2100,1800,900,800,700")
-        siteFreqOrder4G.value = f4gOrder?.split(",") ?: listOf("2600", "2100", "1800", "900", "800", "700")
+        val f4gDefaultOrder = listOf("2600", "2100", "1800", "900", "800", "700")
+        val f4gOrder = prefs.getString("site_freq_4g_order", f4gDefaultOrder.joinToString(","))
+        siteFreqOrder4G.value = normalizeSavedOrder(f4gOrder?.split(",") ?: f4gDefaultOrder, f4gDefaultOrder)
 
         val f3gOrder = prefs.getString("site_freq_3g_order", "2100,900")
         siteFreqOrder3G.value = f3gOrder?.split(",") ?: listOf("2100", "900")
@@ -357,6 +387,20 @@ object AppConfig {
             .apply()
     }
 
+    fun radioMapCategoryMask(): Int {
+        var mask = 0
+        if (showRadioTv.value) mask = mask or RadioMapCategoryMasks.TV
+        if (showRadioBroadcast.value) mask = mask or RadioMapCategoryMasks.RADIO
+        if (showRadioPrivateMobile.value) mask = mask or RadioMapCategoryMasks.PRIVATE_MOBILE
+        if (showRadioFh.value) mask = mask or RadioMapCategoryMasks.FH
+        if (showRadioOther.value) mask = mask or RadioMapCategoryMasks.OTHER
+        return mask
+    }
+
+    fun updateShowRadioSitesFromCategoryFilters() {
+        showRadioSites.value = radioMapCategoryMask() != 0
+    }
+
     private fun loadSelectedOperatorKeys(prefs: android.content.SharedPreferences): Set<String> {
         if (prefs.contains(PREF_SELECTED_OPERATORS)) {
             return prefs.getStringSet(PREF_SELECTED_OPERATORS, emptySet())
@@ -373,4 +417,30 @@ object AppConfig {
             addAll(OperatorColors.overseas.map { it.key })
         }
     }
+
+    private fun normalizeSavedOrder(savedOrder: List<String>, defaultOrder: List<String>): List<String> {
+        val known = defaultOrder.toSet()
+        val normalized = savedOrder
+            .map { it.trim() }
+            .filter { it in known }
+            .distinct()
+            .toMutableList()
+
+        val is5GOrder = known == setOf("26000", "4200", "3500", "2100", "1400", "700")
+        if (is5GOrder && normalized in legacy5GFrequencyOrders) {
+            return defaultOrder
+        }
+
+        defaultOrder.forEach { item ->
+            if (!normalized.contains(item)) normalized.add(item)
+        }
+
+        return normalized
+    }
+
+    private val legacy5GFrequencyOrders = setOf(
+        listOf("4200", "3500", "2100", "1400", "700", "26000"),
+        listOf("3500", "2100", "1400", "700", "26000"),
+        listOf("3500", "2100", "700")
+    )
 }

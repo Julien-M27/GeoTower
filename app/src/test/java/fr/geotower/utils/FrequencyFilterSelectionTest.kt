@@ -2,6 +2,7 @@ package fr.geotower.utils
 
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.RadioFilterMasks
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -52,6 +53,26 @@ class FrequencyFilterSelectionTest {
         assertFalse(only2G1800().matchesAntenna(unknown))
     }
 
+    @Test
+    fun fullyEnabledFilterDoesNotRequestDetailBackedMapEnrichment() {
+        assertEquals(0, fullyEnabled().detailBackedBandMaskForEnrichment())
+    }
+
+    @Test
+    fun selectedExperimental5GBandsRequestDetailBackedMapEnrichment() {
+        val filter = only5G26000()
+
+        assertEquals(RadioFilterMasks.BAND_5G_26000, filter.detailBackedBandMaskForEnrichment())
+    }
+
+    @Test
+    fun selected5G4200RequestsDetailBackedMapEnrichment() {
+        val filter = only5G4200()
+
+        assertTrue(filter.matchesBand(gen = 5, value = 4200))
+        assertEquals(RadioFilterMasks.BAND_5G_4200, filter.detailBackedBandMaskForEnrichment())
+    }
+
     private fun only2G1800(): FrequencyFilterSelection {
         return FrequencyFilterSelection(
             show2G = true,
@@ -70,8 +91,10 @@ class FrequencyFilterSelectionTest {
             f4G2100 = false,
             f4G2600 = false,
             f5G700 = false,
+            f5G1400 = false,
             f5G2100 = false,
             f5G3500 = false,
+            f5G4200 = false,
             f5G26000 = false
         )
     }
@@ -94,9 +117,63 @@ class FrequencyFilterSelectionTest {
             f4G2100 = true,
             f4G2600 = true,
             f5G700 = true,
+            f5G1400 = true,
             f5G2100 = true,
             f5G3500 = true,
+            f5G4200 = true,
             f5G26000 = true
+        )
+    }
+
+    private fun only5G26000(): FrequencyFilterSelection {
+        return FrequencyFilterSelection(
+            show2G = false,
+            show3G = false,
+            show4G = false,
+            show5G = true,
+            showFh = false,
+            f2G900 = false,
+            f2G1800 = false,
+            f3G900 = false,
+            f3G2100 = false,
+            f4G700 = false,
+            f4G800 = false,
+            f4G900 = false,
+            f4G1800 = false,
+            f4G2100 = false,
+            f4G2600 = false,
+            f5G700 = false,
+            f5G1400 = false,
+            f5G2100 = false,
+            f5G3500 = false,
+            f5G4200 = false,
+            f5G26000 = true
+        )
+    }
+
+    private fun only5G4200(): FrequencyFilterSelection {
+        return FrequencyFilterSelection(
+            show2G = false,
+            show3G = false,
+            show4G = false,
+            show5G = true,
+            showFh = false,
+            f2G900 = false,
+            f2G1800 = false,
+            f3G900 = false,
+            f3G2100 = false,
+            f4G700 = false,
+            f4G800 = false,
+            f4G900 = false,
+            f4G1800 = false,
+            f4G2100 = false,
+            f4G2600 = false,
+            f5G700 = false,
+            f5G1400 = false,
+            f5G2100 = false,
+            f5G3500 = false,
+            f5G4200 = true,
+            f5G26000 = false
         )
     }
 

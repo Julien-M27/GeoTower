@@ -41,13 +41,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material3.AlertDialog
@@ -58,6 +61,7 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -101,6 +105,7 @@ import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.RadioRepository
 import fr.geotower.data.api.CellularFrApi
 import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.api.SignalQuestSpeedtestSortMetric
@@ -110,13 +115,19 @@ import fr.geotower.data.api.filterBySignalQuestPlmn
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.RadioBroadcastProgram
 import fr.geotower.data.models.PhysiqueEntity
+import fr.geotower.data.models.RadioMapMarker
+import fr.geotower.data.models.RadioServiceMasks
+import fr.geotower.data.models.RadioSystemMasks
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.upload.SignalQuestUploadDraftStore
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadRules
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.MiniMapViewMode
+import fr.geotower.ui.components.RadioShareMenu
+import fr.geotower.ui.components.RadioUsageIcon
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.oneUiActionButtonShape
@@ -143,6 +154,8 @@ import java.util.UUID
 import kotlin.math.roundToInt
 import fr.geotower.ui.components.SpeedtestCard
 import androidx.compose.ui.res.stringResource
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private const val TAG_SITE_DETAIL = "GeoTower"
 private const val TAG_SPEEDTEST = "GeoTowerUpload"
@@ -1723,6 +1736,656 @@ fun SiteDetailScreen(
             }
         }
     }
+}
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
+@Composable
+fun RadioSiteDetailScreen(
+    navController: NavController,
+    radioRepository: RadioRepository,
+    stationId: String,
+    supportId: String
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val useOneUi = AppConfig.useOneUiDesign
+    val isSystemDark = isSystemInDarkTheme()
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemDark)
+    val mainBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.background
+    val cardBgColor = if (useOneUi && isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant
+    val blockShape = if (useOneUi) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
+    val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+    val buttonShape = oneUiActionButtonShape(useOneUi)
+    val safeClick = rememberSafeClick()
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "emitters")
+    val scrollState = rememberScrollState()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+
+    var marker by remember { mutableStateOf<RadioMapMarker?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+    var userLocation by remember { mutableStateOf<Location?>(null) }
+    var showNavigationSheet by remember { mutableStateOf(false) }
+    var globalMapRef by remember { mutableStateOf<org.osmdroid.views.MapView?>(null) }
+
+    LaunchedEffect(stationId, supportId) {
+        isLoading = true
+        marker = withContext(Dispatchers.IO) {
+            radioRepository.getMarkerForSite(stationId, supportId)
+        }
+        isLoading = false
+    }
+
+    DisposableEffect(Unit) {
+        val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
+        val locationListener = object : android.location.LocationListener {
+            override fun onLocationChanged(location: Location) { userLocation = location }
+            override fun onProviderEnabled(provider: String) {}
+            override fun onProviderDisabled(provider: String) {}
+            @Deprecated("Deprecated in Java")
+            override fun onStatusChanged(provider: String?, status: Int, extras: android.os.Bundle?) {}
+        }
+
+        if (ActivityCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) {
+            userLocation = getLocalLastKnownLocation(context)
+            try {
+                locationManager.requestLocationUpdates(LocationManager.GPS_PROVIDER, 1000L, 1f, locationListener)
+                locationManager.requestLocationUpdates(LocationManager.NETWORK_PROVIDER, 1000L, 1f, locationListener)
+            } catch (e: Exception) {
+                AppLogger.w(TAG_SITE_DETAIL, "Radio detail location updates could not start", e)
+            }
+        }
+
+        onDispose { locationManager.removeUpdates(locationListener) }
+    }
+
+    val distanceUnit = AppConfig.distanceUnit.intValue
+    val locationData = remember(userLocation, marker, distanceUnit) {
+        val site = marker
+        if (userLocation != null && site != null) {
+            val res = FloatArray(2)
+            Location.distanceBetween(userLocation!!.latitude, userLocation!!.longitude, site.latitude, site.longitude, res)
+            val distance = formatSiteDistanceMeters(res[0].toDouble(), distanceUnit)
+            var bearing = res[1]
+            if (bearing < 0) bearing += 360f
+            Triple(distance, String.format(Locale.US, "%.1f%s", bearing, "\u00B0"), res[0])
+        } else {
+            Triple("--", "--", null as Float?)
+        }
+    }
+    val distanceStr = locationData.first
+    val bearingStr = locationData.second
+    val distanceMeters = locationData.third
+
+    fun openMapAt(site: RadioMapMarker) {
+        context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+            .edit()
+            .putFloat("clicked_lat", site.latitude.toFloat())
+            .putFloat("clicked_lon", site.longitude.toFloat())
+            .putFloat("last_map_lat", site.latitude.toFloat())
+            .putFloat("last_map_lon", site.longitude.toFloat())
+            .putFloat("last_map_zoom", 18f)
+            .apply()
+        navController.navigate("map")
+    }
+
+    Scaffold(
+        containerColor = mainBgColor,
+        topBar = {
+            GeoTowerBackTopBar(
+                title = "Detail radio ANFR",
+                onBack = { safeBackNavigation.navigateBack() },
+                backgroundColor = mainBgColor,
+                backEnabled = !safeBackNavigation.isLocked
+            )
+        }
+    ) { padding ->
+        Box(
+            modifier = Modifier
+                .padding(top = padding.calculateTopPadding())
+                .fillMaxSize()
+                .background(mainBgColor)
+        ) {
+            val site = marker
+            when {
+                isLoading -> LoadingIndicator(modifier = Modifier.align(Alignment.Center))
+                site == null -> Text(
+                    text = stringResource(R.string.appstrings_no_data_found),
+                    modifier = Modifier.align(Alignment.Center),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                else -> Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .geoTowerFadingEdge(scrollState)
+                        .verticalScroll(scrollState)
+                        .navigationBarsPadding()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    RadioSiteHeaderCard(site, cardBgColor, blockShape)
+
+                    RadioSiteBearingHeightRow(
+                        marker = site,
+                        bearingStr = bearingStr,
+                        cardBgColor = cardBgColor,
+                        blockShape = blockShape
+                    )
+
+                    fr.geotower.ui.components.SharedMiniMapCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        centerLat = site.latitude,
+                        centerLon = site.longitude,
+                        mappedAntennas = emptyList(),
+                        radioMarkers = listOf(site),
+                        sitesHs = emptyList(),
+                        blockShape = blockShape,
+                        cardBorder = cardBorder,
+                        onMapReady = { globalMapRef = it },
+                        focusOperator = null,
+                        userLocation = userLocation,
+                        defaultViewMode = MiniMapViewMode.AntennaCentered,
+                        showViewModeToggle = true
+                    )
+
+                    RadioSiteSupportDetailsCard(
+                        marker = site,
+                        distanceStr = distanceStr,
+                        bearingStr = bearingStr,
+                        cardBgColor = cardBgColor,
+                        blockShape = blockShape
+                    )
+
+                    RadioSiteActionButtons(
+                        buttonShape = buttonShape,
+                        onOpenMap = { safeClick { openMapAt(site) } },
+                        onNavigate = { safeClick { showNavigationSheet = true } },
+                        shareButton = {
+                            RadioShareMenu(
+                                marker = site,
+                                distanceStr = distanceStr,
+                                bearingStr = bearingStr,
+                                useOneUi = useOneUi,
+                                buttonShape = buttonShape,
+                                globalMapRef = globalMapRef,
+                                outlinedButton = true
+                            )
+                        }
+                    )
+
+                    RadioSiteIdentifiersCard(
+                        marker = site,
+                        cardBgColor = cardBgColor,
+                        blockShape = blockShape
+                    )
+
+                    RadioSiteAddressCard(
+                        marker = site,
+                        distanceStr = distanceStr,
+                        cardBgColor = cardBgColor,
+                        blockShape = blockShape
+                    )
+
+                    RadioSiteInfoCard(
+                        title = "Radio",
+                        icon = Icons.Default.Info,
+                        cardBgColor = cardBgColor,
+                        blockShape = blockShape,
+                        leadingContent = {
+                            RadioUsageIcon(
+                                serviceMask = site.serviceMask,
+                                systemMask = site.systemMask,
+                                size = 22.dp
+                            )
+                        }
+                    ) {
+                        RadioSiteInfoLine("Categories", radioSiteUsageSummary(site))
+                        RadioSiteInfoLine("Famille", RadioServiceMasks.labelFor(site.serviceMask))
+                        RadioSiteInfoLine("Reseau", site.networkName)
+                        RadioSiteInfoLine("Systemes", site.systemSummary)
+                        RadioSiteInfoLine("Frequences", site.frequencySummary)
+                        RadioSiteInfoLine("Emetteurs", site.emitterCount.takeIf { it > 0 }?.toString())
+                        RadioSiteInfoLine("Antennes", site.antennaCount.takeIf { it > 0 }?.toString())
+                    }
+
+                    val broadcastPrograms = remember(site) { site.broadcastPrograms }
+                    if (broadcastPrograms.isNotEmpty()) {
+                        RadioSiteBroadcastProgramsCard(
+                            marker = site,
+                            programs = broadcastPrograms,
+                            cardBgColor = cardBgColor,
+                            blockShape = blockShape
+                        )
+                    }
+
+                    if (site.antennaLines.isNotEmpty()) {
+                        RadioSiteInfoCard(
+                            title = "Antennes et azimuts",
+                            icon = Icons.Default.Navigation,
+                            cardBgColor = cardBgColor,
+                            blockShape = blockShape
+                        ) {
+                            site.antennaLines.forEach { line ->
+                                RadioAntennaInfoLine(line)
+                            }
+                        }
+                    }
+
+                    val extraDetails = remember(site) { radioSiteExtraDetailLines(site) }
+                    if (extraDetails.isNotEmpty()) {
+                        RadioSiteInfoCard(
+                            title = "Details ANFR",
+                            icon = Icons.Default.Info,
+                            cardBgColor = cardBgColor,
+                            blockShape = blockShape
+                        ) {
+                            extraDetails.forEach { (label, value) ->
+                                RadioSiteInfoLine(label, value)
+                            }
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(20.dp))
+                }
+            }
+
+            if (showNavigationSheet && site != null) {
+                fr.geotower.ui.components.NavigationBottomSheet(
+                    latitude = site.latitude,
+                    longitude = site.longitude,
+                    onDismiss = { showNavigationSheet = false },
+                    sheetState = sheetState,
+                    useOneUi = useOneUi
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RadioSiteHeaderCard(
+    marker: RadioMapMarker,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape
+) {
+    Card(
+        shape = blockShape,
+        colors = CardDefaults.cardColors(containerColor = cardBgColor),
+        elevation = CardDefaults.cardElevation(0.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)),
+                contentAlignment = Alignment.Center
+            ) {
+                RadioUsageIcon(
+                    serviceMask = marker.serviceMask,
+                    systemMask = marker.systemMask,
+                    size = 48.dp
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = marker.networkName,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = marker.systemSummary ?: RadioServiceMasks.labelFor(marker.serviceMask),
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RadioSiteInfoCard(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape,
+    leadingContent: (@Composable () -> Unit)? = null,
+    content: @Composable () -> Unit
+) {
+    Card(
+        shape = blockShape,
+        colors = CardDefaults.cardColors(containerColor = cardBgColor),
+        elevation = CardDefaults.cardElevation(0.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (leadingContent != null) {
+                    leadingContent()
+                } else {
+                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = title, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 12.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+            content()
+        }
+    }
+}
+
+@Composable
+private fun RadioSiteBroadcastProgramsCard(
+    marker: RadioMapMarker,
+    programs: List<RadioBroadcastProgram>,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape
+) {
+    RadioSiteInfoCard(
+        title = "Radios diffusées",
+        icon = Icons.Default.Info,
+        cardBgColor = cardBgColor,
+        blockShape = blockShape,
+        leadingContent = {
+            RadioUsageIcon(
+                serviceMask = marker.serviceMask,
+                systemMask = marker.systemMask,
+                size = 22.dp
+            )
+        }
+    ) {
+        programs.forEach { program ->
+            RadioSiteInfoLine(
+                label = program.serviceName,
+                value = program.detailLabel ?: "Radio diffusée"
+            )
+        }
+    }
+}
+
+@Composable
+private fun RadioSiteBearingHeightRow(
+    marker: RadioMapMarker,
+    bearingStr: String,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        val rotation = bearingStr.removeSuffix("\u00B0").toFloatOrNull() ?: 0f
+        Card(
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            shape = blockShape,
+            colors = CardDefaults.cardColors(containerColor = cardBgColor),
+            elevation = CardDefaults.cardElevation(0.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp).fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Cap mesure", style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(8.dp))
+                Icon(
+                    Icons.Default.Navigation,
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp).rotate(rotation),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(bearingStr, fontWeight = FontWeight.Bold)
+            }
+        }
+
+        Card(
+            modifier = Modifier.weight(1f).fillMaxHeight(),
+            shape = blockShape,
+            colors = CardDefaults.cardColors(containerColor = cardBgColor),
+            elevation = CardDefaults.cardElevation(0.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp).fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("Hauteur support", style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(8.dp))
+                Icon(
+                    Icons.Default.VerticalAlignTop,
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(marker.supportHeightSummary ?: "--", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RadioSiteSupportDetailsCard(
+    marker: RadioMapMarker,
+    distanceStr: String,
+    bearingStr: String,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape
+) {
+    RadioSiteInfoCard(
+        title = "Details du support",
+        icon = Icons.Default.Info,
+        cardBgColor = cardBgColor,
+        blockShape = blockShape
+    ) {
+        RadioSiteInfoLine("Nature du support", marker.supportNatureSummary)
+        RadioSiteInfoLine("Proprietaire", marker.supportOwnerSummary)
+        RadioSiteInfoLine("Distance", "$distanceStr de vous")
+        RadioSiteInfoLine("Cap mesure", bearingStr)
+    }
+}
+
+@Composable
+private fun RadioSiteActionButtons(
+    buttonShape: androidx.compose.ui.graphics.Shape,
+    onOpenMap: () -> Unit,
+    onNavigate: () -> Unit,
+    shareButton: @Composable () -> Unit
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Button(
+            onClick = onOpenMap,
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = buttonShape,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(stringResource(R.string.appstrings_open_map), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        }
+
+        Button(
+            onClick = onNavigate,
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            shape = buttonShape,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.primary,
+                contentColor = MaterialTheme.colorScheme.onPrimary
+            )
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(24.dp))
+                Spacer(modifier = Modifier.width(12.dp))
+                Text(stringResource(R.string.appstrings_nav_to_site), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+            }
+        }
+
+        shareButton()
+    }
+}
+
+@Composable
+private fun RadioSiteIdentifiersCard(
+    marker: RadioMapMarker,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    RadioSiteInfoCard(
+        title = "Identifiants",
+        icon = Icons.Default.Tag,
+        cardBgColor = cardBgColor,
+        blockShape = blockShape
+    ) {
+        RadioSiteInfoLine(
+            label = "ID Support",
+            value = marker.supportId,
+            onCopy = {
+                copyRadioSiteValue(
+                    context = context,
+                    label = context.getString(R.string.appstrings_id_support_copy),
+                    value = marker.supportId,
+                    toastMessage = context.getString(R.string.appstrings_id_copied)
+                )
+            }
+        )
+        RadioSiteInfoLine(
+            label = "Numero de station ANFR",
+            value = marker.stationId,
+            onCopy = {
+                copyRadioSiteValue(
+                    context = context,
+                    label = "Station ANFR",
+                    value = marker.stationId,
+                    toastMessage = context.getString(R.string.appstrings_id_copied)
+                )
+            }
+        )
+    }
+}
+
+@Composable
+private fun RadioSiteAddressCard(
+    marker: RadioMapMarker,
+    distanceStr: String,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape
+) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val gpsCoords = formatRadioSiteGps(marker.latitude, marker.longitude)
+    val cleanGpsCoords = String.format(Locale.US, "%.5f, %.5f", marker.latitude, marker.longitude)
+
+    RadioSiteInfoCard(
+        title = "Adresse",
+        icon = Icons.Default.Info,
+        cardBgColor = cardBgColor,
+        blockShape = blockShape
+    ) {
+        RadioSiteInfoLine(
+            label = "Adresse",
+            value = marker.addressSummary,
+            onCopy = {
+                copyRadioSiteValue(
+                    context = context,
+                    label = context.getString(R.string.appstrings_address_copy),
+                    value = marker.addressSummary,
+                    toastMessage = context.getString(R.string.appstrings_address_copied)
+                )
+            }
+        )
+        RadioSiteInfoLine(
+            label = "GPS",
+            value = gpsCoords,
+            onCopy = {
+                copyRadioSiteValue(
+                    context = context,
+                    label = context.getString(R.string.appstrings_gps_coords_copy),
+                    value = cleanGpsCoords,
+                    toastMessage = context.getString(R.string.appstrings_coords_copied)
+                )
+            }
+        )
+        RadioSiteInfoLine("Distance", "$distanceStr de vous")
+    }
+}
+
+@Composable
+private fun RadioSiteInfoLine(label: String, value: String?, onCopy: (() -> Unit)? = null) {
+    val cleanValue = value?.takeIf { it.isNotBlank() } ?: return
+    fr.geotower.ui.components.InfoLine(label = "$label : ", value = cleanValue, onCopy = onCopy)
+}
+
+@Composable
+private fun RadioAntennaInfoLine(line: String) {
+    val label = line.substringBefore(":", missingDelimiterValue = "Antenne").trim()
+    val value = line.substringAfter(":", missingDelimiterValue = line).trim()
+    RadioSiteInfoLine(label.ifBlank { "Antenne" }, value)
+}
+
+private fun formatRadioSiteGps(latitude: Double, longitude: Double): String {
+    return String.format(Locale.US, "%.5f%s, %.5f%s", latitude, "\u00B0", longitude, "\u00B0")
+}
+
+private fun copyRadioSiteValue(
+    context: Context,
+    label: String,
+    value: String?,
+    toastMessage: String
+) {
+    val cleanValue = value?.takeIf { it.isNotBlank() } ?: return
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newPlainText(label, cleanValue))
+    Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
+}
+
+private fun radioSiteUsageSummary(marker: RadioMapMarker): String {
+    return buildList {
+        if ((marker.systemMask and RadioSystemMasks.TV) != 0) add("TV")
+        if ((marker.systemMask and RadioSystemMasks.RADIO) != 0) add("Radio")
+        if ((marker.serviceMask and (RadioServiceMasks.PRIVATE or RadioServiceMasks.RAIL or RadioServiceMasks.TRANSPORT)) != 0) {
+            add("Reseaux mobiles prives")
+        }
+        if ((marker.serviceMask and RadioServiceMasks.FH) != 0) add("Faisceaux hertziens")
+        if ((marker.serviceMask and (RadioServiceMasks.SATELLITE or RadioServiceMasks.RADAR or RadioServiceMasks.OTHER)) != 0 || isEmpty()) {
+            add("Autres stations")
+        }
+    }.distinct().joinToString(", ")
+}
+
+private fun radioSiteExtraDetailLines(marker: RadioMapMarker): List<Pair<String, String>> {
+    val alreadyDisplayed = setOf("adresse", "support", "systemes", "frequences", "programmes", "antennes")
+    return marker.detailText
+        ?.lineSequence()
+        ?.mapNotNull { rawLine ->
+            val label = rawLine.substringBefore(":", missingDelimiterValue = "").trim()
+            val value = rawLine.substringAfter(":", missingDelimiterValue = "").trim()
+            if (label.isBlank() || value.isBlank() || label.lowercase(Locale.ROOT) in alreadyDisplayed) {
+                null
+            } else {
+                label to value
+            }
+        }
+        ?.distinct()
+        ?.toList()
+        .orEmpty()
 }
 
 @Composable

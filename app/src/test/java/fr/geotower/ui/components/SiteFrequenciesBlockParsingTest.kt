@@ -50,6 +50,57 @@ class SiteFrequenciesBlockParsingTest {
     }
 
     @Test
+    fun nr26GhzExperimentalSystemNameUses26000BandValue() {
+        val details = """
+            5G NR 26 GHz Expe : 26,5-26,9 GHz | Techniquement operationnel | 2024-04-30 | Panneau : 120 deg (24m)
+        """.trimIndent()
+
+        val parsed = parseAndSortFrequencies(
+            freqStr = details,
+            txtUnknown = "Inconnu",
+            txtAzimuthNotSpecified = "Azimut non specifie"
+        )
+
+        val nr26 = parsed.single()
+        assertEquals(5, nr26.gen)
+        assertEquals(26000, nr26.value)
+        assertEquals(listOf("26,5-26,9 GHz"), nr26.spectrumLines)
+    }
+
+    @Test
+    fun nr4200SystemNameUses4200BandValue() {
+        val details = """
+            5G NR 4200 : 3800,1-4200 MHz | Techniquement operationnel | 2026-05-07 | Panneau : 120 deg (24m)
+        """.trimIndent()
+
+        val parsed = parseAndSortFrequencies(
+            freqStr = details,
+            txtUnknown = "Inconnu",
+            txtAzimuthNotSpecified = "Azimut non specifie"
+        )
+
+        val nr4200 = parsed.single()
+        assertEquals(5, nr4200.gen)
+        assertEquals(4200, nr4200.value)
+        assertEquals(listOf("3800,1-4200 MHz"), nr4200.spectrumLines)
+    }
+
+    @Test
+    fun nr4200RangeCanProvideBandValueWhenSystemNameIsGeneric() {
+        val details = """
+            5G NR : 3800,1-4200 MHz | Techniquement operationnel | 2026-05-07 | Panneau : 120 deg (24m)
+        """.trimIndent()
+
+        val parsed = parseAndSortFrequencies(
+            freqStr = details,
+            txtUnknown = "Inconnu",
+            txtAzimuthNotSpecified = "Azimut non specifie"
+        )
+
+        assertEquals(4200, parsed.single().value)
+    }
+
+    @Test
     fun mobileBandKeepsDistinctPanelIdsInPhysicalDetails() {
         val details = """
             LTE 1800 (4G) : 1835-1850 MHz | En service | 2024-06-11 | Panneau : 120 deg (24,6m) [AER_ID: 7001]

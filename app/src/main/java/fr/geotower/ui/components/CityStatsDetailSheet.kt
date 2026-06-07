@@ -32,6 +32,7 @@ import fr.geotower.data.models.physicalSiteKey
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
+import fr.geotower.utils.radioFrequencyLabel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.ui.res.pluralStringResource
@@ -349,10 +350,12 @@ private fun frequencyKeysFromRawDetails(rawFrequency: String): Set<String> {
     }
     if (gen !in 2..5) return emptySet()
 
+    val knownValues = mobileFrequencyValuesForGeneration(gen)
     val systemValue = Regex("\\d+").findAll(systemName)
         .mapNotNull { it.value.toIntOrNull() }
-        .lastOrNull()
-        ?.takeIf { it in mobileFrequencyValuesForGeneration(gen) }
+        .filter { it in knownValues }
+        .maxOrNull()
+        ?: if (gen == 5 && systemName.contains("26") && systemName.contains("GHZ")) 26000 else null
 
     if (systemValue != null) return setOf("${gen}G|$systemValue")
 
@@ -361,7 +364,7 @@ private fun frequencyKeysFromRawDetails(rawFrequency: String): Set<String> {
 }
 
 private fun mobileFrequencyValuesForGeneration(gen: Int): Set<Int> = when (gen) {
-    5 -> setOf(700, 2100, 3500, 26000)
+    5 -> setOf(700, 1400, 2100, 3500, 4200, 26000)
     4 -> setOf(700, 800, 900, 1800, 2100, 2600)
     3 -> setOf(900, 2100)
     2 -> setOf(900, 1800)
@@ -394,8 +397,10 @@ private fun frequencyValuesForRange(gen: Int, start: Double?, end: Double?): Set
     return when (gen) {
         5 -> buildSet {
             if (frequencyRangeOverlaps(start, end, 700.0, 790.0)) add(700)
+            if (frequencyRangeOverlaps(start, end, 1427.0, 1518.0)) add(1400)
             if (frequencyRangeOverlaps(start, end, 1920.0, 2170.0)) add(2100)
             if (frequencyRangeOverlaps(start, end, 3300.0, 3800.0)) add(3500)
+            if (frequencyRangeOverlaps(start, end, 3800.1, 4200.0)) add(4200)
             if (frequencyRangeOverlaps(start, end, 24000.0, 27500.0)) add(26000)
         }
         4 -> buildSet {
@@ -492,6 +497,11 @@ fun CartoradioGroupedTable(
 
                     sortedItems.forEachIndexed { index, stat ->
                         val isAlternate = index % 2 != 0
+                        val frequencyLabel = Regex("\\d+").findAll(stat.label)
+                            .mapNotNull { it.value.toIntOrNull() }
+                            .lastOrNull()
+                            ?.let(::radioFrequencyLabel)
+                            ?: stat.label
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -500,7 +510,14 @@ fun CartoradioGroupedTable(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                text = if (stat.label.contains("MHz", true)) stat.label else "${stat.label} MHz",
+                                text = if (
+                                    frequencyLabel.contains("MHz", true) ||
+                                    frequencyLabel.contains("GHz", true)
+                                ) {
+                                    frequencyLabel
+                                } else {
+                                    "$frequencyLabel MHz"
+                                },
                                 fontSize = 14.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface,

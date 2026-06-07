@@ -71,6 +71,11 @@ fun MapSettingsSheet(
     // Variables Azimuts
     var showAzimuths by AppConfig.showAzimuths
     var showMapLocationMarker by AppConfig.showMapLocationMarker
+    var showRadioTv by AppConfig.showRadioTv
+    var showRadioBroadcast by AppConfig.showRadioBroadcast
+    var showRadioPrivateMobile by AppConfig.showRadioPrivateMobile
+    var showRadioFh by AppConfig.showRadioFh
+    var showRadioOther by AppConfig.showRadioOther
 
     // Variables Affichage des sites
     var showSitesInService by AppConfig.showSitesInService
@@ -101,10 +106,19 @@ fun MapSettingsSheet(
     var f4G_2600 by AppConfig.f4G_2600
     // 5G
     var f5G_700 by AppConfig.f5G_700
+    var f5G_1400 by AppConfig.f5G_1400
     var f5G_2100 by AppConfig.f5G_2100
     var f5G_3500 by AppConfig.f5G_3500
+    var f5G_4200 by AppConfig.f5G_4200
     var f5G_26000 by AppConfig.f5G_26000
 
+    fun saveRadioCategory(prefKey: String, value: Boolean) {
+        AppConfig.updateShowRadioSitesFromCategoryFilters()
+        prefs.edit()
+            .putBoolean(prefKey, value)
+            .putBoolean(AppConfig.PREF_SHOW_RADIO_SITES, AppConfig.showRadioSites.value)
+            .apply()
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -229,20 +243,20 @@ fun MapSettingsSheet(
             // 3. FRÉQUENCES
             SectionTitle(stringResource(R.string.appstrings_frequencies_title))
 
-            // Ligne 5G
             AnimatedVisibility(visible = show5G) {
                 Column {
                     FreqRow("5G") {
                         FilterToggleButton("700 MHz", "f5g_700", AppConfig.f5G_700, prefs)
+                        FilterToggleButton("1400 MHz (exp)", "f5g_1400", AppConfig.f5G_1400, prefs)
                         FilterToggleButton("2100 MHz", "f5g_2100", AppConfig.f5G_2100, prefs)
                         FilterToggleButton("3500 MHz", "f5g_3500", AppConfig.f5G_3500, prefs)
-                        //FilterToggleButton("26 GHz", "f5g_26000", AppConfig.f5G_26000, prefs)
+                        FilterToggleButton("4200 MHz (exp)", "f5g_4200", AppConfig.f5G_4200, prefs)
+                        FilterToggleButton("26 GHz (exp)", "f5g_26000", AppConfig.f5G_26000, prefs)
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
 
-            // Ligne 4G
             AnimatedVisibility(visible = show4G) {
                 Column {
                     FreqRow("4G") {
@@ -257,7 +271,6 @@ fun MapSettingsSheet(
                 }
             }
 
-            // Ligne 3G
             AnimatedVisibility(visible = show3G) {
                 Column {
                     FreqRow("3G") {
@@ -268,7 +281,6 @@ fun MapSettingsSheet(
                 }
             }
 
-            // Ligne 2G
             AnimatedVisibility(visible = show2G) {
                 Column {
                     FreqRow("2G") {
@@ -288,6 +300,69 @@ fun MapSettingsSheet(
             ) {
                 showMapLocationMarker = it
                 prefs.edit().putBoolean(AppConfig.PREF_SHOW_MAP_LOCATION_MARKER, it).apply()
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            SectionTitle("Filtres radio ANFR")
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SelectableButton(
+                    label = "TV",
+                    isSelected = showRadioTv,
+                    modifier = Modifier.weight(1f),
+                    selectedColor = Color(0xFF8BC34A)
+                ) {
+                    showRadioTv = it
+                    saveRadioCategory(AppConfig.PREF_SHOW_RADIO_TV, it)
+                }
+                SelectableButton(
+                    label = "Radio",
+                    isSelected = showRadioBroadcast,
+                    modifier = Modifier.weight(1f),
+                    selectedColor = Color(0xFFFDD835)
+                ) {
+                    showRadioBroadcast = it
+                    saveRadioCategory(AppConfig.PREF_SHOW_RADIO_BROADCAST, it)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SelectableButton(
+                    label = "Réseaux mobiles privés",
+                    isSelected = showRadioPrivateMobile,
+                    modifier = Modifier.weight(1f),
+                    selectedColor = Color(0xFF006D77),
+                    minHeight = 68.dp,
+                    maxLines = 3
+                ) {
+                    showRadioPrivateMobile = it
+                    saveRadioCategory(AppConfig.PREF_SHOW_RADIO_PRIVATE_MOBILE, it)
+                }
+                SelectableButton(
+                    label = "Faisceaux hertziens",
+                    isSelected = showRadioFh,
+                    modifier = Modifier.weight(1f),
+                    selectedColor = Color(0xFF0D47A1),
+                    minHeight = 68.dp,
+                    maxLines = 3
+                ) {
+                    showRadioFh = it
+                    saveRadioCategory(AppConfig.PREF_SHOW_RADIO_FH, it)
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            SelectableButton(
+                label = "Autres stations",
+                isSelected = showRadioOther,
+                modifier = Modifier.fillMaxWidth(),
+                selectedColor = Color.Black
+            ) {
+                showRadioOther = it
+                saveRadioCategory(AppConfig.PREF_SHOW_RADIO_OTHER, it)
             }
 
             Spacer(modifier = Modifier.height(32.dp))
@@ -518,7 +593,7 @@ fun FreqButton(
         shape = RoundedCornerShape(8.dp),
         color = containerColor,
         contentColor = contentColor,
-        modifier = Modifier.size(width = 86.dp, height = 40.dp)
+        modifier = Modifier.size(width = if (label.length >= 12) 112.dp else 86.dp, height = 44.dp)
     ) {
         Box(
             contentAlignment = Alignment.Center,
@@ -527,9 +602,10 @@ fun FreqButton(
             Text(
                 text = label,
                 fontWeight = FontWeight.Medium,
-                fontSize = 13.sp,
+                fontSize = if (label.length >= 12) 12.sp else 13.sp,
                 textAlign = TextAlign.Center,
-                maxLines = 1
+                lineHeight = 14.sp,
+                maxLines = 2
             )
         }
     }

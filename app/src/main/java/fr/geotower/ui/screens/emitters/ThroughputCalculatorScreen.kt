@@ -120,6 +120,7 @@ import fr.geotower.utils.FreqBand
 import fr.geotower.utils.SitePagePrefs
 import fr.geotower.utils.ThroughputPrefs
 import fr.geotower.utils.parseAndSortFrequencies
+import fr.geotower.utils.radioFrequencyLabel
 import java.util.Locale
 import kotlin.math.PI
 import kotlin.math.asin
@@ -1835,7 +1836,7 @@ private fun calculateThroughput(
 
 private fun frequencyDetailsLabel(band: FreqBand): String {
     val detailed = band.rawFreq.substringAfter(":", "").trim()
-    return detailed.takeIf { it.isNotBlank() } ?: if (band.value > 0) "${band.value} MHz" else band.rawFreq
+    return detailed.takeIf { it.isNotBlank() } ?: if (band.value > 0) radioFrequencyLabel(band.value) else band.rawFreq
 }
 
 private fun engineProfileFor(

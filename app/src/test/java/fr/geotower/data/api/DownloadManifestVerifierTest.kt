@@ -27,6 +27,8 @@ class DownloadManifestVerifierTest {
         assertNotNull(manifest)
         assertEquals("geotower_fr.db", manifest?.database?.filename)
         assertEquals("1.0.0", manifest?.database?.version)
+        assertEquals("geotower_fr_radio.db", manifest?.radioDatabase?.filename)
+        assertEquals("20260228-radio-v1", manifest?.radioDatabase?.version)
         assertEquals(1, manifest?.maps?.size)
         assertEquals("alsace.map", manifest?.maps?.single()?.mapFilename)
     }
@@ -66,6 +68,15 @@ class DownloadManifestVerifierTest {
                 "schema_version": 7,
                 "country_code": "FR",
                 "version": "1.0.0"
+              },
+              "radio_db": {
+                "filename": "geotower_fr_radio.db",
+                "url": "https://api.cajejuma.fr/api/v2/download/radio_db",
+                "size_bytes": 2048,
+                "sha256": "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+                "schema_version": 1,
+                "country_code": "FR",
+                "version": "20260228-radio-v1"
               },
               "maps": [
                 {

@@ -20,8 +20,10 @@ data class FrequencyFilterSelection(
     val f4G2100: Boolean,
     val f4G2600: Boolean,
     val f5G700: Boolean,
+    val f5G1400: Boolean,
     val f5G2100: Boolean,
     val f5G3500: Boolean,
+    val f5G4200: Boolean,
     val f5G26000: Boolean
 ) {
     val isFullyEnabled: Boolean
@@ -33,7 +35,7 @@ data class FrequencyFilterSelection(
             f2G900 && f2G1800 &&
             f3G900 && f3G2100 &&
             f4G700 && f4G800 && f4G900 && f4G1800 && f4G2100 && f4G2600 &&
-            f5G700 && f5G2100 && f5G3500 && f5G26000
+            f5G700 && f5G1400 && f5G2100 && f5G3500 && f5G4200 && f5G26000
 
     fun matchesAntenna(antenna: LocalisationEntity): Boolean {
         val bandMask = antenna.bandMask
@@ -53,7 +55,7 @@ data class FrequencyFilterSelection(
                     (f3G2100 && bandMask has RadioFilterMasks.BAND_3G_2100)
                 )) ||
             (show4G && (
-                (f4G700 && bandMask has RadioFilterMasks.BAND_4G_700) ||
+                    (f4G700 && bandMask has RadioFilterMasks.BAND_4G_700) ||
                     (f4G800 && bandMask has RadioFilterMasks.BAND_4G_800) ||
                     (f4G900 && bandMask has RadioFilterMasks.BAND_4G_900) ||
                     (f4G1800 && bandMask has RadioFilterMasks.BAND_4G_1800) ||
@@ -62,8 +64,10 @@ data class FrequencyFilterSelection(
                 )) ||
             (show5G && (
                 (f5G700 && bandMask has RadioFilterMasks.BAND_5G_700) ||
+                    (f5G1400 && bandMask has RadioFilterMasks.BAND_5G_1400) ||
                     (f5G2100 && bandMask has RadioFilterMasks.BAND_5G_2100) ||
                     (f5G3500 && bandMask has RadioFilterMasks.BAND_5G_3500) ||
+                    (f5G4200 && bandMask has RadioFilterMasks.BAND_5G_4200) ||
                     (f5G26000 && bandMask has RadioFilterMasks.BAND_5G_26000)
                 )) ||
             (showFh && allMobileBandsEnabled && hasFh)
@@ -73,10 +77,12 @@ data class FrequencyFilterSelection(
         return when (gen) {
             5 -> show5G && when (value) {
                 700 -> f5G700
+                1400 -> f5G1400
                 2100 -> f5G2100
                 3500 -> f5G3500
+                4200 -> f5G4200
                 26000 -> f5G26000
-                else -> f5G700 || f5G2100 || f5G3500 || f5G26000
+                else -> f5G700 || f5G1400 || f5G2100 || f5G3500 || f5G4200 || f5G26000
             }
             4 -> show4G && when (value) {
                 700 -> f4G700
@@ -101,6 +107,16 @@ data class FrequencyFilterSelection(
         }
     }
 
+    fun detailBackedBandMaskForEnrichment(): Int {
+        if (isFullyEnabled || !show5G) return 0
+
+        var mask = 0
+        if (f5G1400) mask = mask or RadioFilterMasks.BAND_5G_1400
+        if (f5G4200) mask = mask or RadioFilterMasks.BAND_5G_4200
+        if (f5G26000) mask = mask or RadioFilterMasks.BAND_5G_26000
+        return mask
+    }
+
     private infix fun Int.has(bit: Int): Boolean = (this and bit) != 0
 
     companion object {
@@ -122,8 +138,10 @@ data class FrequencyFilterSelection(
                 f4G2100 = AppConfig.f4G_2100.value,
                 f4G2600 = AppConfig.f4G_2600.value,
                 f5G700 = AppConfig.f5G_700.value,
+                f5G1400 = AppConfig.f5G_1400.value,
                 f5G2100 = AppConfig.f5G_2100.value,
                 f5G3500 = AppConfig.f5G_3500.value,
+                f5G4200 = AppConfig.f5G_4200.value,
                 f5G26000 = AppConfig.f5G_26000.value
             )
         }

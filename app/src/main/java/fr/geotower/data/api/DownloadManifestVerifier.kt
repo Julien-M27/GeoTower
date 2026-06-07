@@ -16,6 +16,7 @@ data class DownloadManifest(
     val generatedAt: Long,
     val expiresAt: Long,
     val database: DownloadManifestDatabase?,
+    val radioDatabase: DownloadManifestDatabase?,
     val maps: List<OfflineMapDto>
 )
 
@@ -64,6 +65,7 @@ object DownloadManifestVerifier {
             generatedAt = generatedAt,
             expiresAt = expiresAt,
             database = payload.get("db").asJsonObjectOrNull()?.toDatabase(),
+            radioDatabase = payload.get("radio_db").asJsonObjectOrNull()?.toDatabase(),
             maps = payload.get("maps")
                 ?.takeIf { it.isJsonArray }
                 ?.asJsonArray

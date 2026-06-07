@@ -60,7 +60,7 @@ object StatsPreferences {
 
     fun defaultFrequencyOrder(tech: String): List<String> {
         return when (normalizeTech(tech)) {
-            "5G" -> listOf("3500", "2100", "700", "26000")
+            "5G" -> listOf("26000", "4200", "3500", "2100", "1400", "700")
             "4G" -> listOf("2600", "2100", "1800", "900", "800", "700")
             "3G" -> listOf("2100", "900")
             "2G" -> listOf("1800", "900")
@@ -87,18 +87,27 @@ object StatsPreferences {
             .filter { it in known }
             .distinct()
             .toMutableList()
+        if (normalizeTech(tech) == "5G" && normalized in legacy5GFrequencyOrders) {
+            return defaultOrder
+        }
         defaultOrder.forEach { frequencyId ->
             if (!normalized.contains(frequencyId)) normalized.add(frequencyId)
         }
         return normalized
     }
 
+    private val legacy5GFrequencyOrders = setOf(
+        listOf("4200", "3500", "2100", "1400", "700", "26000"),
+        listOf("3500", "2100", "1400", "700", "26000"),
+        listOf("3500", "2100", "700")
+    )
+
     fun normalizeTech(tech: String): String {
         return tech.trim().uppercase(Locale.ROOT)
     }
 
     fun frequencyLabel(frequencyId: String): String {
-        return if (frequencyId == "26000") "26 GHz" else "$frequencyId MHz"
+        return frequencyId.toIntOrNull()?.let(::radioFrequencyLabel) ?: "$frequencyId MHz"
     }
 
     private fun normalizeStatsBlockId(blockId: String): String {

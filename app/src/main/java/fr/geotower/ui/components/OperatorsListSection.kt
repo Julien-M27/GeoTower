@@ -48,7 +48,7 @@ fun OperatorsListSection(
     val s2G = AppConfig.siteShowTechno2G.value && (AppConfig.siteF2G_900.value || AppConfig.siteF2G_1800.value)
     val s3G = AppConfig.siteShowTechno3G.value && (AppConfig.siteF3G_900.value || AppConfig.siteF3G_2100.value)
     val s4G = AppConfig.siteShowTechno4G.value && (AppConfig.siteF4G_700.value || AppConfig.siteF4G_800.value || AppConfig.siteF4G_900.value || AppConfig.siteF4G_1800.value || AppConfig.siteF4G_2100.value || AppConfig.siteF4G_2600.value)
-    val s5G = AppConfig.siteShowTechno5G.value && (AppConfig.siteF5G_700.value || AppConfig.siteF5G_2100.value || AppConfig.siteF5G_3500.value || AppConfig.siteF5G_26000.value)
+    val s5G = AppConfig.siteShowTechno5G.value && (AppConfig.siteF5G_700.value || AppConfig.siteF5G_1400.value || AppConfig.siteF5G_2100.value || AppConfig.siteF5G_3500.value || AppConfig.siteF5G_4200.value || AppConfig.siteF5G_26000.value)
     val sFh = AppConfig.siteShowTechnoFH.value
 
     // ✅ 2. ON FILTRE LES OPÉRATEURS POUR CACHER CEUX SANS TECHNO ACTIVE
@@ -154,7 +154,7 @@ fun OperatorDetailItem(
                 val s2G = AppConfig.siteShowTechno2G.value && (AppConfig.siteF2G_900.value || AppConfig.siteF2G_1800.value)
                 val s3G = AppConfig.siteShowTechno3G.value && (AppConfig.siteF3G_900.value || AppConfig.siteF3G_2100.value)
                 val s4G = AppConfig.siteShowTechno4G.value && (AppConfig.siteF4G_700.value || AppConfig.siteF4G_800.value || AppConfig.siteF4G_900.value || AppConfig.siteF4G_1800.value || AppConfig.siteF4G_2100.value || AppConfig.siteF4G_2600.value)
-                val s5G = AppConfig.siteShowTechno5G.value && (AppConfig.siteF5G_700.value || AppConfig.siteF5G_2100.value || AppConfig.siteF5G_3500.value || AppConfig.siteF5G_26000.value)
+                val s5G = AppConfig.siteShowTechno5G.value && (AppConfig.siteF5G_700.value || AppConfig.siteF5G_1400.value || AppConfig.siteF5G_2100.value || AppConfig.siteF5G_3500.value || AppConfig.siteF5G_4200.value || AppConfig.siteF5G_26000.value)
                 val sFh = AppConfig.siteShowTechnoFH.value
 
                 // ✅ AFFICHAGE DES VRAIES TECHNOLOGIES FILTRÉES

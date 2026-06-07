@@ -141,6 +141,14 @@ object SignalQuestUploadDraftStore {
     fun take(draftId: String): List<String> {
         return drafts.remove(draftId).orEmpty()
     }
+
+    fun peek(draftId: String): List<String> {
+        return drafts[draftId].orEmpty()
+    }
+
+    fun discard(draftId: String) {
+        drafts.remove(draftId)
+    }
 }
 
 class SignalQuestUploadQueueException(message: String, cause: Throwable? = null) : Exception(message, cause)

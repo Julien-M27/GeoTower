@@ -56,6 +56,7 @@ object MapDisplayPrefs {
     val showFree = BooleanPreference("show_free", true)
     val showSpeedometer = BooleanPreference("show_speedometer", true)
     val showLocationMarker = BooleanPreference(AppConfig.PREF_SHOW_MAP_LOCATION_MARKER, true)
+    val showRadioSites = BooleanPreference(AppConfig.PREF_SHOW_RADIO_SITES, false)
     val showAzimuthLines = BooleanPreference(AppConfig.PREF_SHOW_AZIMUTH_LINES, AppConfig.DEFAULT_SHOW_AZIMUTH_LINES)
     val showAzimuthCones = BooleanPreference(AppConfig.PREF_SHOW_AZIMUTH_CONES, AppConfig.DEFAULT_SHOW_AZIMUTH_CONES)
     val showSitesInService = BooleanPreference("show_sites_in_service", true)
@@ -78,8 +79,10 @@ object MapDisplayPrefs {
     val f4G2100 = BooleanPreference("f4g_2100", true)
     val f4G2600 = BooleanPreference("f4g_2600", true)
     val f5G700 = BooleanPreference("f5g_700", true)
+    val f5G1400 = BooleanPreference("f5g_1400", true)
     val f5G2100 = BooleanPreference("f5g_2100", true)
     val f5G3500 = BooleanPreference("f5g_3500", true)
+    val f5G4200 = BooleanPreference("f5g_4200", true)
     val f5G26000 = BooleanPreference("f5g_26000", true)
 }
 

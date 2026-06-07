@@ -40,6 +40,7 @@ import fr.geotower.utils.formatSpectrumDisplayDetails
 import fr.geotower.utils.formatDateToFrench
 import fr.geotower.utils.parseAndSortFrequencies
 import fr.geotower.utils.radioBandCode
+import fr.geotower.utils.radioTechnologyFrequencyLabel
 import kotlin.math.roundToInt
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
@@ -90,7 +91,7 @@ fun SiteFrequenciesBlock(
         AppConfig.siteShowTechno2G.value, AppConfig.siteF2G_900.value, AppConfig.siteF2G_1800.value,
         AppConfig.siteShowTechno3G.value, AppConfig.siteF3G_900.value, AppConfig.siteF3G_2100.value,
         AppConfig.siteShowTechno4G.value, AppConfig.siteF4G_700.value, AppConfig.siteF4G_800.value, AppConfig.siteF4G_900.value, AppConfig.siteF4G_1800.value, AppConfig.siteF4G_2100.value, AppConfig.siteF4G_2600.value,
-        AppConfig.siteShowTechno5G.value, AppConfig.siteF5G_700.value, AppConfig.siteF5G_2100.value, AppConfig.siteF5G_3500.value, AppConfig.siteF5G_26000.value,
+        AppConfig.siteShowTechno5G.value, AppConfig.siteF5G_700.value, AppConfig.siteF5G_1400.value, AppConfig.siteF5G_2100.value, AppConfig.siteF5G_3500.value, AppConfig.siteF5G_4200.value, AppConfig.siteF5G_26000.value,
         AppConfig.siteShowTechnoFH.value
     ) {
         addMicrowaveFallbackBands(
@@ -187,7 +188,7 @@ fun SiteFrequenciesBlock(
                                 // ✅ NOUVEAU : Formatage propre "4G 700" ici aussi
                                 val bandCode = radioBandCode(band.gen, band.value)
                                 val mainBandLabel = if (band.gen in 2..5 && band.value > 0) {
-                                    "${band.gen}G ${band.value} MHz"
+                                    radioTechnologyFrequencyLabel(band.gen, band.value)
                                 } else {
                                     band.rawFreq.substringBefore(":").trim().ifBlank { band.rawFreq }
                                 }
@@ -387,8 +388,10 @@ private fun shouldDisplayFrequencyBand(band: FreqBand): Boolean {
     return when (band.gen) {
         5 -> AppConfig.siteShowTechno5G.value && when (band.value) {
             700 -> AppConfig.siteF5G_700.value
+            1400 -> AppConfig.siteF5G_1400.value
             2100 -> AppConfig.siteF5G_2100.value
             3500 -> AppConfig.siteF5G_3500.value
+            4200 -> AppConfig.siteF5G_4200.value
             26000 -> AppConfig.siteF5G_26000.value
             else -> true
         }
@@ -417,7 +420,7 @@ private fun shouldDisplayFrequencyBand(band: FreqBand): Boolean {
 
 private fun displayFrequencyBandLabel(band: FreqBand): String {
     if (band.gen in 2..5 && band.value > 0) {
-        val base = "${band.gen}G ${band.value} MHz"
+        val base = radioTechnologyFrequencyLabel(band.gen, band.value)
         return radioBandCode(band.gen, band.value)?.let { "$base ($it)" } ?: base
     }
     return band.rawFreq.substringBefore(":").trim().ifBlank { band.rawFreq }

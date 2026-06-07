@@ -16,6 +16,7 @@ import fr.geotower.ui.screens.emitters.calculateElevationLineObstruction
 import fr.geotower.ui.screens.emitters.elevationFresnelClearanceMeters
 import fr.geotower.ui.screens.emitters.elevationLineHeightAt
 import fr.geotower.ui.screens.emitters.formatElevationProfileDistance
+import fr.geotower.utils.radioFrequencyLabel
 import java.util.Locale
 import kotlin.math.floor
 import kotlin.math.max
@@ -137,7 +138,7 @@ fun createElevationProfileShareBitmap(
             value = arrivalHeightMeters?.let { "${it.roundToInt()} m" } ?: "--",
             detail = texts.siteAltitudeDetail
         ),
-        ProfileMetric(texts.frequency, "$frequencyMHz MHz")
+        ProfileMetric(texts.frequency, radioFrequencyLabel(frequencyMHz))
     )
 
     metrics.forEachIndexed { index, metric ->

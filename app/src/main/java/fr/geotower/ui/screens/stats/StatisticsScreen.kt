@@ -41,6 +41,7 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.StatsDisplayMode
 import fr.geotower.utils.StatsPreferences
+import fr.geotower.utils.radioFrequencyLabel
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
 import java.util.Locale
@@ -216,10 +217,12 @@ private fun frequencyBandsForTech(tech: String): List<FrequencyBandSpec> {
             FrequencyBandSpec("2600", "2600 MHz", RadioFilterMasks.BAND_4G_2600, "4G|2600")
         )
         "5G" -> listOf(
-            FrequencyBandSpec("700", "700 MHz", RadioFilterMasks.BAND_5G_700, "5G|700"),
-            FrequencyBandSpec("2100", "2100 MHz", RadioFilterMasks.BAND_5G_2100, "5G|2100"),
+            FrequencyBandSpec("26000", radioFrequencyLabel(26000), RadioFilterMasks.BAND_5G_26000, "5G|26000"),
+            FrequencyBandSpec("4200", radioFrequencyLabel(4200), RadioFilterMasks.BAND_5G_4200, "5G|4200"),
             FrequencyBandSpec("3500", "3500 MHz", RadioFilterMasks.BAND_5G_3500, "5G|3500"),
-            FrequencyBandSpec("26000", "26 GHz", RadioFilterMasks.BAND_5G_26000, "5G|26000")
+            FrequencyBandSpec("2100", "2100 MHz", RadioFilterMasks.BAND_5G_2100, "5G|2100"),
+            FrequencyBandSpec("1400", radioFrequencyLabel(1400), RadioFilterMasks.BAND_5G_1400, "5G|1400"),
+            FrequencyBandSpec("700", "700 MHz", RadioFilterMasks.BAND_5G_700, "5G|700")
         )
         else -> emptyList()
     }

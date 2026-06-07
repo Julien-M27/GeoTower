@@ -10,6 +10,7 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.FreqBand
 import fr.geotower.utils.ThroughputPrefs
 import fr.geotower.utils.radioBandCode
+import fr.geotower.utils.radioTechnologyFrequencyLabel
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
@@ -69,7 +70,7 @@ fun normalizeThroughputRangeWidthToMHz(width: Double, unit: String): Double {
 }
 
 fun isLikelyFddThroughputBand(band: FreqBand): Boolean {
-    return band.value !in setOf(3500, 26000)
+    return band.value !in setOf(3500, 4200, 26000)
 }
 
 fun defaultThroughputBandwidthMHz(gen: Int, value: Int): Double {
@@ -82,9 +83,11 @@ fun defaultThroughputBandwidthMHz(gen: Int, value: Int): Double {
         }
         5 -> when (value) {
             700 -> 10.0
+            1400 -> 20.0
             1800 -> 10.0
             2100 -> 15.0
             3500 -> 70.0
+            4200 -> 100.0
             26000 -> 200.0
             else -> 20.0
         }
@@ -223,7 +226,7 @@ private fun throughputLayerLabel(layers: Int): String {
 
 fun throughputBandLabel(band: FreqBand): String {
     return if (band.value > 0) {
-        val base = "${band.gen}G ${band.value} MHz"
+        val base = radioTechnologyFrequencyLabel(band.gen, band.value)
         radioBandCode(band.gen, band.value)?.let { "$base ($it)" } ?: base
     } else {
         band.rawFreq.substringBefore(":").ifBlank { "${band.gen}G" }

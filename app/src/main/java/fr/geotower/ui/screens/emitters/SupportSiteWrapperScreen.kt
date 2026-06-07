@@ -31,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.RadioRepository
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 
@@ -44,9 +45,11 @@ private enum class SiteDetailSidePane {
 fun SupportSiteWrapperScreen(
     navController: NavController,
     repository: AnfrRepository,
+    radioRepository: RadioRepository,
     supportId: Long,
     highlightedOperatorKey: String? = null,
     applyMapFilters: Boolean = false,
+    photoDraftId: String? = null,
     isSplitScreen: Boolean = false,
     onCloseSplitScreen: () -> Unit = {},
     onOpenAntennaInHost: ((String) -> Unit)? = null
@@ -150,9 +153,11 @@ fun SupportSiteWrapperScreen(
                 SupportDetailScreen(
                     navController = navController,
                     repository = repository,
+                    radioRepository = radioRepository,
                     siteId = supportId,
                     highlightedOperatorKey = highlightedOperatorKey,
                     applyMapFilters = applyMapFilters,
+                    photoDraftId = photoDraftId,
                     isSplitScreen = isSplitScreen,
                     onCloseSplitScreen = onCloseSplitScreen,
                     onAntennaClick = { id ->
@@ -216,7 +221,8 @@ private const val TAG_SUPPORT_WRAPPER = "GeoTower"
 @Composable
 fun NearEmittersSupportWrapperScreen(
     navController: NavController,
-    repository: AnfrRepository
+    repository: AnfrRepository,
+    radioRepository: RadioRepository
 ) {
     val displayStyle by AppConfig.displayStyle
     var selectedSupportId by rememberSaveable { mutableStateOf<Long?>(null) }
@@ -244,6 +250,7 @@ fun NearEmittersSupportWrapperScreen(
                 selectedSiteId != null && selectedSupportId != null -> SupportSiteWrapperScreen(
                     navController = navController,
                     repository = repository,
+                    radioRepository = radioRepository,
                     supportId = selectedSupportId!!,
                     highlightedOperatorKey = selectedSupportOperatorKey,
                     isSplitScreen = true,
@@ -286,6 +293,7 @@ fun NearEmittersSupportWrapperScreen(
                 siteId == null -> SupportSiteWrapperScreen(
                     navController = navController,
                     repository = repository,
+                    radioRepository = radioRepository,
                     supportId = supportId,
                     highlightedOperatorKey = selectedSupportOperatorKey,
                     isSplitScreen = true,

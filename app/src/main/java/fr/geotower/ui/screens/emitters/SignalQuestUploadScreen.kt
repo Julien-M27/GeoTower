@@ -124,11 +124,12 @@ fun SignalQuestUploadScreen(
     imageUris: List<String>,
     siteId: String,
     operatorName: String,
+    operatorNames: List<String> = listOf(operatorName),
     lat: Double,
     lon: Double,
     azimuts: String,
     onNavigateBack: () -> Unit,
-    onStartUpload: (List<String>, String, Boolean) -> Unit
+    onStartUpload: (List<String>, String, Boolean, List<String>) -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
 
@@ -150,6 +151,15 @@ fun SignalQuestUploadScreen(
 
     // --- 1. ÉTATS ---
     val currentUris = remember { mutableStateListOf<String>().apply { addAll(imageUris) } }
+    val targetOperatorNames = remember(operatorName, operatorNames) {
+        operatorNames
+            .ifEmpty { listOf(operatorName) }
+            .map { Uri.decode(it).trim() }
+            .filter { it.isNotBlank() }
+            .distinct()
+    }
+    val primaryTargetOperator = targetOperatorNames.firstOrNull() ?: operatorName
+    val targetOperatorLabel = targetOperatorNames.joinToString(", ").ifBlank { operatorName }
     var description by remember { mutableStateOf("") }
     var stripExifBeforeUpload by rememberSaveable { mutableStateOf(false) }
     var showConfirmDialog by remember { mutableStateOf(false) }
@@ -768,7 +778,11 @@ fun SignalQuestUploadScreen(
                     Spacer(Modifier.width(16.dp))
                     Column {
                         Text("${stringResource(R.string.appstrings_upload_sq_target_site)} $siteId", fontWeight = FontWeight.Bold, color = textColor)
-                        Text("${stringResource(R.string.appstrings_upload_sq_target_operator)} $operatorName", fontSize = 14.sp, color = textColor.copy(alpha = 0.7f))
+                        Text(
+                            "${stringResource(if (targetOperatorNames.size > 1) R.string.appstrings_upload_sq_target_operators else R.string.appstrings_upload_sq_target_operator)} $targetOperatorLabel",
+                            fontSize = 14.sp,
+                            color = textColor.copy(alpha = 0.7f)
+                        )
                     }
                 }
             }
@@ -892,10 +906,10 @@ fun SignalQuestUploadScreen(
                             val isColorTooLight = androidx.core.graphics.ColorUtils.calculateLuminance(rawPrimaryColor) > 0.85
                             val safePrimaryColor = if (isColorTooLight) android.graphics.Color.parseColor("#2196F3") else rawPrimaryColor
 
-                            val mappedAntennas = remember(siteId, operatorName, lat, lon, azimuts) {
+                            val mappedAntennas = remember(siteId, primaryTargetOperator, lat, lon, azimuts) {
                                 listOf(LocalisationEntity(
                                     idAnfr = siteId,
-                                    operateur = operatorName,
+                                    operateur = primaryTargetOperator,
                                     latitude = lat,
                                     longitude = lon,
                                     azimuts = azimuts,
@@ -922,7 +936,7 @@ fun SignalQuestUploadScreen(
                                             this,
                                             mappedAntennas,
                                             safePrimaryColor,
-                                            operatorName
+                                            primaryTargetOperator
                                         ).apply {
                                             position = GeoPoint(lat, lon)
                                             setAnchor(org.osmdroid.views.overlay.Marker.ANCHOR_CENTER, org.osmdroid.views.overlay.Marker.ANCHOR_CENTER)
@@ -990,7 +1004,7 @@ fun SignalQuestUploadScreen(
                                     // ✅ 3. ON MET À JOUR LE MARQUEUR PERSONNALISÉ
                                     val marker = map.overlays.filterIsInstance<fr.geotower.ui.components.MiniMapAntennaMarker>().firstOrNull()
                                     if (marker != null) {
-                                        marker.icon = MapUtils.createAdaptiveMarker(context, mappedAntennas, true, operatorName)
+                                        marker.icon = MapUtils.createAdaptiveMarker(context, mappedAntennas, true, primaryTargetOperator)
                                     }
                                     map.invalidate()
                                 }
@@ -1006,7 +1020,7 @@ fun SignalQuestUploadScreen(
                         onClick = {
                             safeClick {
                                 showConfirmDialog = false
-                                onStartUpload(currentUris.toList(), description, stripExifBeforeUpload)
+                                onStartUpload(currentUris.toList(), description, stripExifBeforeUpload, targetOperatorNames)
                             }
                         },
                         shape = buttonShape,

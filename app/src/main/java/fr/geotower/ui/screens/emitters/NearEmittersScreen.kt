@@ -3,6 +3,7 @@ package fr.geotower.ui.screens.emitters
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
+import android.content.SharedPreferences
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
@@ -14,6 +15,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -40,6 +42,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
@@ -53,10 +56,12 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SheetState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -91,10 +96,15 @@ import fr.geotower.data.api.NominatimGeoPoint
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
+import fr.geotower.ui.screens.map.FilterToggleButton
+import fr.geotower.ui.screens.map.FreqRow
+import fr.geotower.ui.screens.map.SectionTitle
+import fr.geotower.ui.screens.map.SelectableButton
 import fr.geotower.ui.screens.settings.NearbySettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.LocationHelper
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
@@ -226,7 +236,9 @@ fun NearEmittersScreen(
     var showNearbySites by remember { mutableStateOf(prefs.getBoolean("show_nearby_sites", true)) }
     var nearbyOrder by remember { mutableStateOf(prefs.getString("nearby_order", "search,sites")!!.split(",")) }
     var nearbySearchRadius by remember { mutableIntStateOf(prefs.getInt("nearby_search_radius", 5).coerceAtMost(nearbyMaxRadiusKm)) }
+    var showNearbyFrequencyFiltersSheet by remember { mutableStateOf(false) }
     var showNearbySettingsSheet by remember { mutableStateOf(false) }
+    val frequencyFiltersSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     LaunchedEffect(nearbyMaxRadiusKm) {
@@ -238,6 +250,7 @@ fun NearEmittersScreen(
     val currentSearchSpec = remember(searchQuery) {
         parseNearbySearchQuery(searchQuery)
     }
+    val nearbyFrequencyFilter = FrequencyFilterSelection.fromMapConfig()
     val isZbNearbySearch = currentSearchSpec.field == NearbySearchField.Zb
     val searchedOperatorKey = remember(searchQuery) {
         if (currentSearchSpec.field == NearbySearchField.Operator) {
@@ -299,32 +312,37 @@ fun NearEmittersScreen(
         }
     }
 
-    LaunchedEffect(searchCenter, maxItemsToShow, isZbNearbySearch) {
+    LaunchedEffect(searchCenter, maxItemsToShow, isZbNearbySearch, nearbyFrequencyFilter) {
         val currentLoc = searchCenter ?: return@LaunchedEffect
 
         isLoading = true
 
         withContext(Dispatchers.IO) {
             // A. RÉCUPÉRATION DES DONNÉES
+            val queryLimit = nearbyFrequencyQueryLimit(maxItemsToShow, nearbyFrequencyFilter)
+            val detailBackedBandMask = nearbyFrequencyFilter.detailBackedBandMaskForEnrichment()
             val newAntennas = if (isZbNearbySearch) {
                 repository.getNearestZb(
                     lat = currentLoc.latitude,
                     lon = currentLoc.longitude,
-                    limit = maxItemsToShow
+                    limit = queryLimit,
+                    detailBackedBandMask = detailBackedBandMask
                 )
             } else {
                 repository.getNearest(
                     lat = currentLoc.latitude,
                     lon = currentLoc.longitude,
-                    limit = maxItemsToShow
+                    limit = queryLimit,
+                    detailBackedBandMask = detailBackedBandMask
                 )
             }
+            val frequencyFilteredAntennas = filterNearbyAntennasByFrequency(newAntennas, nearbyFrequencyFilter)
 
             // B. TRAITEMENT ET FORMATAGE
-            val finalSites = if (newAntennas.isNotEmpty()) {
+            val finalSites = if (frequencyFilteredAntennas.isNotEmpty()) {
                 mapAntennasToUiSites(
                     repository = repository,
-                    antennas = newAntennas,
+                    antennas = frequencyFilteredAntennas,
                     referenceLocation = currentLoc,
                     unknownAddressText = unknownAddressText,
                     siteAnfrLabel = siteAnfrLabel
@@ -346,7 +364,7 @@ fun NearEmittersScreen(
 
     // ✅ 3. RECHERCHE LOCALE ET GLOBALE (Base de données, Coordonnées, Ville, Adresse, Code Postal)
     // Recherche locale instantanee; les resultats globaux arrivent ensuite depuis un cache separe.
-    LaunchedEffect(sites, searchQuery, maxItemsToShow, remoteSearchQuery, remoteSearchSites) {
+    LaunchedEffect(sites, searchQuery, maxItemsToShow, remoteSearchQuery, remoteSearchSites, nearbyFrequencyFilter) {
         val query = searchQuery.trim()
         if (query.isEmpty()) {
             filteredSites = sites.take(maxItemsToShow)
@@ -365,7 +383,7 @@ fun NearEmittersScreen(
     }
 
     // Recherche globale differee (base de donnees, coordonnees, ville, adresse, code postal).
-    LaunchedEffect(searchCenter, searchQuery) {
+    LaunchedEffect(searchCenter, searchQuery, nearbyFrequencyFilter) {
         val query = searchQuery.trim()
         if (query.isEmpty()) {
             remoteSearchQuery = ""
@@ -413,6 +431,8 @@ fun NearEmittersScreen(
             withContext(Dispatchers.IO) {
                 try {
                     val globalAntennas = mutableListOf<LocalisationEntity>()
+                    val detailBackedBandMask = nearbyFrequencyFilter.detailBackedBandMaskForEnrichment()
+                    val nearbySearchLimit = nearbyFrequencyQueryLimit(NEARBY_GLOBAL_MAPPING_LIMIT, nearbyFrequencyFilter)
                     var targetLat: Double? = null
                     var targetLon: Double? = null
                     var resultSortLat: Double? = referenceLocation?.latitude
@@ -467,7 +487,8 @@ fun NearEmittersScreen(
                                 latNorth = nominatimArea.latNorth,
                                 lonEast = nominatimArea.lonEast,
                                 latSouth = nominatimArea.latSouth,
-                                lonWest = nominatimArea.lonWest
+                                lonWest = nominatimArea.lonWest,
+                                detailBackedBandMask = detailBackedBandMask
                             )
                             val cityResults = if (nominatimArea.polygons.isNotEmpty()) {
                                 boxResults.filter { isNearbyPointInPolygons(it.latitude, it.longitude, nominatimArea.polygons) }
@@ -499,7 +520,8 @@ fun NearEmittersScreen(
                             repository.getNearest(
                                 lat = referenceLocation.latitude,
                                 lon = referenceLocation.longitude,
-                                limit = NEARBY_GLOBAL_MAPPING_LIMIT
+                                limit = nearbySearchLimit,
+                                detailBackedBandMask = detailBackedBandMask
                             )
                         )
                     }
@@ -510,7 +532,8 @@ fun NearEmittersScreen(
                         val nearestResults = repository.getNearest(
                             lat = targetLat,
                             lon = targetLon,
-                            limit = NEARBY_GLOBAL_MAPPING_LIMIT
+                            limit = nearbySearchLimit,
+                            detailBackedBandMask = detailBackedBandMask
                         )
                         globalAntennas.addAll(nearestResults)
                     }
@@ -531,10 +554,13 @@ fun NearEmittersScreen(
                         }
 
                     // --- FORMATAGE DES RÉSULTATS POUR L'UI ---
-                    if (uniqueGlobalAntennas.isNotEmpty()) {
+                    val frequencyFilteredGlobalAntennas =
+                        filterNearbyAntennasByFrequency(uniqueGlobalAntennas, nearbyFrequencyFilter)
+
+                    if (frequencyFilteredGlobalAntennas.isNotEmpty()) {
                         val mappedGlobal = mapAntennasToUiSites(
                             repository = repository,
-                            antennas = uniqueGlobalAntennas,
+                            antennas = frequencyFilteredGlobalAntennas,
                             referenceLocation = referenceLocation,
                             unknownAddressText = unknownAddressText,
                             siteAnfrLabel = siteAnfrLabel
@@ -616,7 +642,15 @@ fun NearEmittersScreen(
                 onBack = { safeBackNavigation.navigateBack() },
                 backgroundColor = mainBgColor,
                 backEnabled = !safeBackNavigation.isLocked,
+                actionsWidth = 96.dp,
                 actions = {
+                    IconButton(onClick = { safeClick { showNearbyFrequencyFiltersSheet = true } }) {
+                        Icon(
+                            Icons.Default.FilterList,
+                            contentDescription = stringResource(R.string.appstrings_filter),
+                            tint = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                     IconButton(onClick = { safeClick { showNearbySettingsSheet = true } }) {
                         Icon(
                             Icons.Default.Settings,
@@ -835,6 +869,14 @@ fun NearEmittersScreen(
         }
     }
 
+    if (showNearbyFrequencyFiltersSheet) {
+        NearbyFrequencyFilterSheet(
+            prefs = prefs,
+            sheetState = frequencyFiltersSheetState,
+            onDismiss = { showNearbyFrequencyFiltersSheet = false }
+        )
+    }
+
     if (showNearbySettingsSheet) {
         NearbySettingsSheet(
             nearbyOrder = nearbyOrder,
@@ -874,6 +916,105 @@ fun NearEmittersScreen(
 
 private const val NEAR_EMITTERS_SCROLL_MIN_STEP_ITEMS = 12
 private const val NEAR_EMITTERS_SCROLL_MAX_STEP_ITEMS = 32
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun NearbyFrequencyFilterSheet(
+    prefs: SharedPreferences,
+    sheetState: SheetState,
+    onDismiss: () -> Unit
+) {
+    var show2G by AppConfig.showTechno2G
+    var show3G by AppConfig.showTechno3G
+    var show4G by AppConfig.showTechno4G
+    var show5G by AppConfig.showTechno5G
+    var showFH by AppConfig.showTechnoFH
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 24.dp)
+                .padding(bottom = 48.dp)
+        ) {
+            SectionTitle(stringResource(R.string.appstrings_technologies_title))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                SelectableButton("5G", show5G, Modifier.weight(1f)) {
+                    show5G = it
+                    prefs.edit().putBoolean("show_techno_5g", it).apply()
+                }
+                SelectableButton("4G", show4G, Modifier.weight(1f)) {
+                    show4G = it
+                    prefs.edit().putBoolean("show_techno_4g", it).apply()
+                }
+                SelectableButton("3G", show3G, Modifier.weight(1f)) {
+                    show3G = it
+                    prefs.edit().putBoolean("show_techno_3g", it).apply()
+                }
+                SelectableButton("2G", show2G, Modifier.weight(1f)) {
+                    show2G = it
+                    prefs.edit().putBoolean("show_techno_2g", it).apply()
+                }
+                SelectableButton("FH", showFH, Modifier.weight(1f)) {
+                    showFH = it
+                    prefs.edit().putBoolean("show_techno_fh", it).apply()
+                }
+            }
+
+            Spacer(modifier = Modifier.height(28.dp))
+            SectionTitle(stringResource(R.string.appstrings_frequencies_title))
+
+            androidx.compose.animation.AnimatedVisibility(visible = show5G) {
+                Column {
+                    FreqRow("5G") {
+                        FilterToggleButton("700 MHz", "f5g_700", AppConfig.f5G_700, prefs)
+                        FilterToggleButton("1400 MHz (exp)", "f5g_1400", AppConfig.f5G_1400, prefs)
+                        FilterToggleButton("2100 MHz", "f5g_2100", AppConfig.f5G_2100, prefs)
+                        FilterToggleButton("3500 MHz", "f5g_3500", AppConfig.f5G_3500, prefs)
+                        FilterToggleButton("4200 MHz (exp)", "f5g_4200", AppConfig.f5G_4200, prefs)
+                        FilterToggleButton("26 GHz (exp)", "f5g_26000", AppConfig.f5G_26000, prefs)
+                    }
+                }
+            }
+
+            androidx.compose.animation.AnimatedVisibility(visible = show4G) {
+                Column {
+                    FreqRow("4G") {
+                        FilterToggleButton("700 MHz", "f4g_700", AppConfig.f4G_700, prefs)
+                        FilterToggleButton("800 MHz", "f4g_800", AppConfig.f4G_800, prefs)
+                        FilterToggleButton("900 MHz", "f4g_900", AppConfig.f4G_900, prefs)
+                        FilterToggleButton("1800 MHz", "f4g_1800", AppConfig.f4G_1800, prefs)
+                        FilterToggleButton("2100 MHz", "f4g_2100", AppConfig.f4G_2100, prefs)
+                        FilterToggleButton("2600 MHz", "f4g_2600", AppConfig.f4G_2600, prefs)
+                    }
+                }
+            }
+
+            androidx.compose.animation.AnimatedVisibility(visible = show3G) {
+                Column {
+                    FreqRow("3G") {
+                        FilterToggleButton("900 MHz", "f3g_900", AppConfig.f3G_900, prefs)
+                        FilterToggleButton("2100 MHz", "f3g_2100", AppConfig.f3G_2100, prefs)
+                    }
+                }
+            }
+
+            androidx.compose.animation.AnimatedVisibility(visible = show2G) {
+                Column {
+                    FreqRow("2G") {
+                        FilterToggleButton("900 MHz", "f2g_900", AppConfig.f2G_900, prefs)
+                        FilterToggleButton("1800 MHz", "f2g_1800", AppConfig.f2G_1800, prefs)
+                    }
+                }
+            }
+        }
+    }
+}
 
 private suspend fun LazyListState.animateScrollToItemSmoothly(targetIndex: Int) {
     val lastIndex = layoutInfo.totalItemsCount - 1
@@ -1227,6 +1368,24 @@ private fun shouldRefreshNearbySearchCenter(current: Location?, next: Location):
         next.latitude,
         next.longitude
     ) >= NEARBY_RELOAD_DISTANCE_METERS
+}
+
+private fun filterNearbyAntennasByFrequency(
+    antennas: List<LocalisationEntity>,
+    frequencyFilter: FrequencyFilterSelection
+): List<LocalisationEntity> {
+    if (frequencyFilter.isFullyEnabled) return antennas
+    return antennas.filter { antenna -> frequencyFilter.matchesAntenna(antenna) }
+}
+
+private fun nearbyFrequencyQueryLimit(
+    visibleLimit: Int,
+    frequencyFilter: FrequencyFilterSelection
+): Int {
+    if (frequencyFilter.isFullyEnabled) return visibleLimit.coerceAtLeast(1)
+    return (visibleLimit.coerceAtLeast(1) * 5)
+        .coerceAtMost(NEARBY_GLOBAL_MAPPING_LIMIT)
+        .coerceAtLeast(visibleLimit.coerceAtLeast(1))
 }
 
 private suspend fun mapAntennasToUiSites(

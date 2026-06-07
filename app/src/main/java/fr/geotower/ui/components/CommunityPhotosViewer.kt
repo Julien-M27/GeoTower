@@ -1,6 +1,17 @@
 package fr.geotower.ui.screens.emitters
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.ContentValues
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.net.Uri
+import android.os.Build
+import android.os.Environment
+import android.provider.MediaStore
+import android.webkit.MimeTypeMap
+import android.widget.Toast
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
@@ -43,6 +54,8 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Collections
+import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
@@ -71,6 +84,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -83,14 +97,24 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
+import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import fr.geotower.data.community.CommunityDataPreferences
+import fr.geotower.data.api.RetrofitClient
 import fr.geotower.ui.components.SharedMiniMapCard
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.AppLogger
 import fr.geotower.utils.LocalizedDateLabels
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.isNetworkAvailable
 import fr.geotower.data.api.SignalQuestOperators
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import okhttp3.Request
+import java.io.File
+import java.io.FileOutputStream
+import java.io.IOException
 import kotlin.math.abs
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.ui.res.painterResource // 🚨 Pour régler "painterResource"
@@ -118,6 +142,8 @@ data class CommunityPhoto(
 )
 
 private val favoritePhotoColor = Color(0xFFE53935)
+private const val TAG_PHOTO_EXPORT = "GeoTowerPhotos"
+private const val PHOTO_EXPORT_MAX_BYTES = 50L * 1024L * 1024L
 private const val PHOTO_VIEWER_MIN_SCALE = 1f
 private const val PHOTO_VIEWER_MAX_SCALE = 5f
 private const val PHOTO_VIEWER_DOUBLE_TAP_SCALE = 2.6f
@@ -491,6 +517,236 @@ private fun formatExifDistanceMeters(valueMeters: Double): String {
     }
 }
 
+private data class PhotoExportFile(
+    val file: File,
+    val uri: Uri,
+    val displayName: String,
+    val mimeType: String
+)
+
+private suspend fun copyCommunityPhotoToClipboard(context: Context, photo: CommunityPhoto) {
+    val exportFile = withContext(Dispatchers.IO) {
+        cacheRemotePhotoForExport(context, photo)
+    }
+    withContext(Dispatchers.Main) {
+        copyPhotoUriToClipboard(context, exportFile.uri, exportFile.displayName)
+    }
+}
+
+private suspend fun saveCommunityPhotoToGallery(context: Context, photo: CommunityPhoto) {
+    val exportFile = withContext(Dispatchers.IO) {
+        cacheRemotePhotoForExport(context, photo)
+    }
+    withContext(Dispatchers.IO) {
+        saveImageFileToGallery(context, exportFile.file, exportFile.displayName, exportFile.mimeType)
+    }
+}
+
+private suspend fun copyDrawablePhotoToClipboard(context: Context, drawableResId: Int) {
+    val exportFile = withContext(Dispatchers.IO) {
+        cacheDrawablePhotoForExport(context, drawableResId)
+    }
+    withContext(Dispatchers.Main) {
+        copyPhotoUriToClipboard(context, exportFile.uri, exportFile.displayName)
+    }
+}
+
+private suspend fun saveDrawablePhotoToGallery(context: Context, drawableResId: Int) {
+    val exportFile = withContext(Dispatchers.IO) {
+        cacheDrawablePhotoForExport(context, drawableResId)
+    }
+    withContext(Dispatchers.IO) {
+        saveImageFileToGallery(context, exportFile.file, exportFile.displayName, exportFile.mimeType)
+    }
+}
+
+private fun copyPhotoUriToClipboard(context: Context, uri: Uri, label: String) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    clipboard.setPrimaryClip(ClipData.newUri(context.contentResolver, label, uri))
+}
+
+private fun cacheRemotePhotoForExport(context: Context, photo: CommunityPhoto): PhotoExportFile {
+    val request = Request.Builder()
+        .url(photo.url)
+        .build()
+
+    RetrofitClient.currentClient.newCall(request).execute().use { response ->
+        if (!response.isSuccessful) {
+            throw IOException("Photo request failed: HTTP ${response.code}")
+        }
+
+        val body = response.body ?: throw IOException("Photo response is empty.")
+        val mimeType = sanitizedImageMimeType(body.contentType()?.toString())
+            ?: sanitizedImageMimeType(response.header("Content-Type"))
+            ?: mimeTypeFromUrl(photo.url)
+            ?: "image/jpeg"
+        if (!mimeType.startsWith("image/")) {
+            throw IOException("Unsupported photo MIME type: $mimeType")
+        }
+
+        val contentLength = body.contentLength()
+        if (contentLength > PHOTO_EXPORT_MAX_BYTES) {
+            throw IOException("Photo is too large to export.")
+        }
+
+        val extension = extensionForImage(mimeType, photo.url)
+        val displayName = photoExportDisplayName(photo.resolvedSourceId(), extension)
+        val file = File(photoExportCacheDir(context), displayName)
+
+        body.byteStream().use { input ->
+            FileOutputStream(file).use { output ->
+                copyStreamWithLimit(input, output)
+            }
+        }
+
+        return PhotoExportFile(
+            file = file,
+            uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file),
+            displayName = displayName,
+            mimeType = mimeType
+        )
+    }
+}
+
+private fun cacheDrawablePhotoForExport(context: Context, drawableResId: Int): PhotoExportFile {
+    val bitmap = drawableToBitmap(context, drawableResId)
+    val displayName = photoExportDisplayName("schema", "png")
+    val file = File(photoExportCacheDir(context), displayName)
+    FileOutputStream(file).use { output ->
+        if (!bitmap.compress(Bitmap.CompressFormat.PNG, 100, output)) {
+            throw IOException("Drawable photo compression failed.")
+        }
+    }
+    bitmap.recycle()
+
+    return PhotoExportFile(
+        file = file,
+        uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file),
+        displayName = displayName,
+        mimeType = "image/png"
+    )
+}
+
+private fun drawableToBitmap(context: Context, drawableResId: Int): Bitmap {
+    val drawable = ContextCompat.getDrawable(context, drawableResId)
+        ?: throw IOException("Drawable photo is unavailable.")
+    val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 1024
+    val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 1024
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    drawable.setBounds(0, 0, canvas.width, canvas.height)
+    drawable.draw(canvas)
+    return bitmap
+}
+
+private fun saveImageFileToGallery(
+    context: Context,
+    sourceFile: File,
+    displayName: String,
+    mimeType: String
+): Uri {
+    val resolver = context.contentResolver
+    val values = ContentValues().apply {
+        put(MediaStore.Images.Media.DISPLAY_NAME, displayName)
+        put(MediaStore.Images.Media.MIME_TYPE, mimeType)
+        put(MediaStore.Images.Media.DATE_ADDED, System.currentTimeMillis() / 1000L)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            put(MediaStore.Images.Media.RELATIVE_PATH, "${Environment.DIRECTORY_PICTURES}/GeoTower")
+            put(MediaStore.Images.Media.IS_PENDING, 1)
+        } else {
+            val picturesDir = File(
+                Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                "GeoTower"
+            )
+            picturesDir.mkdirs()
+            put(MediaStore.Images.Media.DATA, File(picturesDir, displayName).absolutePath)
+        }
+    }
+
+    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+        ?: throw IOException("Unable to create gallery photo.")
+
+    try {
+        sourceFile.inputStream().use { input ->
+            resolver.openOutputStream(uri, "w")?.use { output ->
+                input.copyTo(output)
+            } ?: throw IOException("Unable to write gallery photo.")
+        }
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val publishValues = ContentValues().apply {
+                put(MediaStore.Images.Media.IS_PENDING, 0)
+            }
+            resolver.update(uri, publishValues, null, null)
+        }
+        return uri
+    } catch (e: Exception) {
+        resolver.delete(uri, null, null)
+        throw e
+    }
+}
+
+private fun copyStreamWithLimit(
+    input: java.io.InputStream,
+    output: java.io.OutputStream
+) {
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    var totalBytes = 0L
+    while (true) {
+        val read = input.read(buffer)
+        if (read <= 0) break
+        totalBytes += read
+        if (totalBytes > PHOTO_EXPORT_MAX_BYTES) {
+            throw IOException("Photo is too large to export.")
+        }
+        output.write(buffer, 0, read)
+    }
+}
+
+private fun photoExportCacheDir(context: Context): File {
+    return File(context.cacheDir, "images").apply { mkdirs() }
+}
+
+private fun photoExportDisplayName(sourceId: String?, extension: String): String {
+    val cleanSource = sourceId
+        ?.lowercase(Locale.US)
+        ?.replace(Regex("[^a-z0-9]+"), "_")
+        ?.trim('_')
+        ?.takeIf { it.isNotBlank() }
+        ?: "photo"
+    return "geotower_${cleanSource}_${System.currentTimeMillis()}.$extension"
+}
+
+private fun sanitizedImageMimeType(rawMimeType: String?): String? {
+    return rawMimeType
+        ?.substringBefore(';')
+        ?.trim()
+        ?.lowercase(Locale.US)
+        ?.takeIf { it.startsWith("image/") }
+}
+
+private fun mimeTypeFromUrl(url: String): String? {
+    val extension = MimeTypeMap.getFileExtensionFromUrl(url).takeIf { it.isNotBlank() } ?: return null
+    return MimeTypeMap.getSingleton()
+        .getMimeTypeFromExtension(extension.lowercase(Locale.US))
+        ?.let(::sanitizedImageMimeType)
+}
+
+private fun extensionForImage(mimeType: String, url: String): String {
+    val fromMime = MimeTypeMap.getSingleton()
+        .getExtensionFromMimeType(mimeType)
+        ?.lowercase(Locale.US)
+        ?.takeIf { it.isNotBlank() }
+    val fromUrl = MimeTypeMap.getFileExtensionFromUrl(url)
+        ?.lowercase(Locale.US)
+        ?.takeIf { it.isNotBlank() && it.length <= 5 }
+
+    return when (fromMime ?: fromUrl) {
+        "jpeg" -> "jpg"
+        "png", "jpg", "webp", "gif", "heic", "heif" -> fromMime ?: fromUrl!!
+        else -> "jpg"
+    }
+}
+
 @Composable
 fun CommunityPhotosSectionShared(
     photos: List<CommunityPhoto>,
@@ -730,6 +986,30 @@ fun CommunityPhotosSectionShared(
     // 🚨 NOUVEAU : Si on n'a ni photos, ni schéma, ET qu'on ne peut pas uploader, on masque TOUT !
     if (filteredPhotos.isEmpty() && placeholderRes == null && (!canUpload || onAddPhotoClick == null)) {
         return // On ne dessine absolument rien, le bloc disparaît !
+    }
+
+    val photoExportScope = rememberCoroutineScope()
+    val txtPhotoCopy = stringResource(R.string.appstrings_photo_copy)
+    val txtPhotoDownload = stringResource(R.string.appstrings_photo_download)
+    val txtPhotoCopiedToClipboard = stringResource(R.string.appstrings_photo_copied_to_clipboard)
+    val txtPhotoSavedToGallery = stringResource(R.string.appstrings_photo_saved_to_gallery)
+    val txtPhotoExportFailed = stringResource(R.string.appstrings_photo_export_failed)
+    var photoExportInProgress by remember { mutableStateOf(false) }
+
+    fun runPhotoExport(successMessage: String, action: suspend () -> Unit) {
+        if (photoExportInProgress) return
+        photoExportInProgress = true
+        photoExportScope.launch {
+            try {
+                action()
+                Toast.makeText(context, successMessage, Toast.LENGTH_SHORT).show()
+            } catch (e: Exception) {
+                AppLogger.w(TAG_PHOTO_EXPORT, "Photo export failed", e)
+                Toast.makeText(context, txtPhotoExportFailed, Toast.LENGTH_SHORT).show()
+            } finally {
+                photoExportInProgress = false
+            }
+        }
     }
 
     Card(
@@ -1022,6 +1302,42 @@ fun CommunityPhotosSectionShared(
                     ) {
                         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_close), tint = viewerContentColor)
                     }
+
+                    Row(
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(
+                                start = 16.dp,
+                                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 12.dp
+                            ),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        PhotoViewerActionButton(
+                            imageVector = Icons.Default.ContentCopy,
+                            contentDescription = txtPhotoCopy,
+                            backgroundColor = overlayButtonBg,
+                            contentColor = viewerContentColor,
+                            enabled = !photoExportInProgress,
+                            onClick = {
+                                runPhotoExport(txtPhotoCopiedToClipboard) {
+                                    copyDrawablePhotoToClipboard(context, placeholderRes)
+                                }
+                            }
+                        )
+                        PhotoViewerActionButton(
+                            imageVector = Icons.Default.Download,
+                            contentDescription = txtPhotoDownload,
+                            backgroundColor = overlayButtonBg,
+                            contentColor = viewerContentColor,
+                            enabled = !photoExportInProgress,
+                            onClick = {
+                                runPhotoExport(txtPhotoSavedToGallery) {
+                                    saveDrawablePhotoToGallery(context, placeholderRes)
+                                }
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -1249,14 +1565,20 @@ fun CommunityPhotosSectionShared(
                         )
                     }
 
-                    if (canFavoriteCurrentPhoto) {
-                        PhotoFavoriteButton(
-                            isFavorite = isCurrentPhotoFavorite,
-                            modifier = Modifier.align(Alignment.TopStart).padding(top = 28.dp, start = 12.dp),
-                            backgroundColor = overlayButtonBg,
-                            contentColor = viewerContentColor,
-                            onClick = { toggleFavoritePhoto(currentPhoto) }
-                        )
+                    Row(
+                        modifier = Modifier.align(Alignment.TopStart).padding(top = 28.dp, start = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        if (canFavoriteCurrentPhoto) {
+                            PhotoFavoriteButton(
+                                isFavorite = isCurrentPhotoFavorite,
+                                modifier = Modifier,
+                                backgroundColor = overlayButtonBg,
+                                contentColor = viewerContentColor,
+                                onClick = { toggleFavoritePhoto(currentPhoto) }
+                            )
+                        }
                     }
 
                     IconButton(
@@ -1273,10 +1595,13 @@ fun CommunityPhotosSectionShared(
                     // --- AUTEUR ET DATE ---
                     val hasCurrentPhotoCaption = !currentPhoto.author.isNullOrBlank() || !currentPhoto.date.isNullOrBlank()
                     val hasCurrentPhotoInfo = showPhotoExif && currentPhoto.hasExifInfo() && currentPhotoSourceSize != null
-                    if (hasCurrentPhotoCaption || hasCurrentPhotoInfo) {
-                        Column(
-                            modifier = Modifier.align(Alignment.BottomStart).padding(bottom = photoBottomPadding, start = photoStartPadding),
-                            horizontalAlignment = Alignment.Start
+                    Column(
+                        modifier = Modifier.align(Alignment.BottomStart).padding(bottom = photoBottomPadding, start = photoStartPadding),
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (hasCurrentPhotoInfo) {
                                 PhotoInfoButton(
@@ -1286,21 +1611,43 @@ fun CommunityPhotosSectionShared(
                                     onClick = { exifDialogPhoto = currentPhoto }
                                 )
                             }
-                            if (hasCurrentPhotoCaption) {
-                                if (hasCurrentPhotoInfo) {
-                                    Spacer(modifier = Modifier.height(8.dp))
+                            PhotoViewerActionButton(
+                                imageVector = Icons.Default.ContentCopy,
+                                contentDescription = txtPhotoCopy,
+                                backgroundColor = overlayButtonBg,
+                                contentColor = viewerContentColor,
+                                enabled = !photoExportInProgress,
+                                onClick = {
+                                    runPhotoExport(txtPhotoCopiedToClipboard) {
+                                        copyCommunityPhotoToClipboard(context, currentPhoto)
+                                    }
                                 }
-                                Column(
-                                    modifier = Modifier.background(overlayButtonBg, badgeShape).padding(horizontal = 12.dp, vertical = 8.dp),
-                                    horizontalAlignment = Alignment.Start
-                                ) {
-                                    if (!currentPhoto.author.isNullOrBlank() && currentPhoto.author != "null") {
-                                        Text(text = stringResource(R.string.photo_by_author, currentPhoto.author), color = viewerContentColor, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                            )
+                            PhotoViewerActionButton(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = txtPhotoDownload,
+                                backgroundColor = overlayButtonBg,
+                                contentColor = viewerContentColor,
+                                enabled = !photoExportInProgress,
+                                onClick = {
+                                    runPhotoExport(txtPhotoSavedToGallery) {
+                                        saveCommunityPhotoToGallery(context, currentPhoto)
                                     }
-                                    val formattedDate = formatPhotoDate(currentPhoto.date)
-                                    if (formattedDate.isNotEmpty()) {
-                                        Text(text = stringResource(R.string.photo_on_date, formattedDate), color = viewerContentColor.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall)
-                                    }
+                                }
+                            )
+                        }
+                        if (hasCurrentPhotoCaption) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Column(
+                                modifier = Modifier.background(overlayButtonBg, badgeShape).padding(horizontal = 12.dp, vertical = 8.dp),
+                                horizontalAlignment = Alignment.Start
+                            ) {
+                                if (!currentPhoto.author.isNullOrBlank() && currentPhoto.author != "null") {
+                                    Text(text = stringResource(R.string.photo_by_author, currentPhoto.author), color = viewerContentColor, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                }
+                                val formattedDate = formatPhotoDate(currentPhoto.date)
+                                if (formattedDate.isNotEmpty()) {
+                                    Text(text = stringResource(R.string.photo_on_date, formattedDate), color = viewerContentColor.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall)
                                 }
                             }
                         }
@@ -1383,6 +1730,31 @@ fun CommunityPhotosSectionShared(
         PhotoExifDialog(
             photo = photo,
             onDismiss = { exifDialogPhoto = null }
+        )
+    }
+}
+
+@Composable
+private fun PhotoViewerActionButton(
+    imageVector: ImageVector,
+    contentDescription: String,
+    backgroundColor: Color,
+    contentColor: Color,
+    enabled: Boolean,
+    onClick: () -> Unit
+) {
+    IconButton(
+        onClick = onClick,
+        enabled = enabled,
+        modifier = Modifier
+            .size(32.dp)
+            .background(backgroundColor, CircleShape)
+    ) {
+        Icon(
+            imageVector = imageVector,
+            contentDescription = contentDescription,
+            tint = contentColor.copy(alpha = if (enabled) 1f else 0.38f),
+            modifier = Modifier.size(18.dp)
         )
     }
 }

@@ -108,6 +108,7 @@ import fr.geotower.utils.SitePagePrefs
 import fr.geotower.utils.SupportPagePrefs
 import fr.geotower.utils.ThroughputPrefs
 import fr.geotower.utils.ThroughputDisplayText
+import fr.geotower.utils.radioFrequencyLabel
 
 object SiteSpeedtestsPagePreferences {
     const val FILTER_MAJOR_ENB = "page_speedtests_filter_major_enb"
@@ -1588,8 +1589,11 @@ private val throughputBandDefaults = listOf(
     ThroughputBandDefaultGroup(
         title = "5G",
         bands = listOf(
+            ThroughputBandDefault("5g_26000", "26 GHz (exp) (N258)"),
+            ThroughputBandDefault("5g_4200", "4200 MHz (exp) (N77)"),
             ThroughputBandDefault("5g_3500", "3500 MHz (N78)"),
             ThroughputBandDefault("5g_2100", "2100 MHz (N1)"),
+            ThroughputBandDefault("5g_1400", "1400 MHz (exp) (N75)"),
             ThroughputBandDefault("5g_700", "700 MHz (N28)")
         )
     )
@@ -2351,7 +2355,7 @@ fun SiteFreqFiltersSheet(
     }
     fun getTotalActiveFrequenciesCount(): Int {
         return listOf(
-            AppConfig.siteF5G_3500.value, AppConfig.siteF5G_2100.value, AppConfig.siteF5G_700.value,
+            AppConfig.siteF5G_4200.value, AppConfig.siteF5G_3500.value, AppConfig.siteF5G_2100.value, AppConfig.siteF5G_1400.value, AppConfig.siteF5G_700.value,
             AppConfig.siteF4G_2600.value, AppConfig.siteF4G_2100.value, AppConfig.siteF4G_1800.value,
             AppConfig.siteF4G_900.value, AppConfig.siteF4G_800.value, AppConfig.siteF4G_700.value,
             AppConfig.siteF3G_2100.value, AppConfig.siteF3G_900.value,
@@ -2422,7 +2426,7 @@ fun SiteFreqFiltersSheet(
                     val isTechnoDragged = technoDragState.isDragged(technoId)
                     val technoDragOffset = technoDragState.offsetFor(technoId)
                     val technoData = when(technoId) {
-                        "5G" -> Triple("5G (NR)", AppConfig.siteShowTechno5G, "site_show_techno_5g") to (listOf("3500" to AppConfig.siteF5G_3500, "2100" to AppConfig.siteF5G_2100, "700" to AppConfig.siteF5G_700) to AppConfig.siteFreqOrder5G)
+                        "5G" -> Triple("5G (NR)", AppConfig.siteShowTechno5G, "site_show_techno_5g") to (listOf("26000" to AppConfig.siteF5G_26000, "4200" to AppConfig.siteF5G_4200, "3500" to AppConfig.siteF5G_3500, "2100" to AppConfig.siteF5G_2100, "1400" to AppConfig.siteF5G_1400, "700" to AppConfig.siteF5G_700) to AppConfig.siteFreqOrder5G)
                         "4G" -> Triple("4G (LTE)", AppConfig.siteShowTechno4G, "site_show_techno_4g") to (listOf("2600" to AppConfig.siteF4G_2600, "2100" to AppConfig.siteF4G_2100, "1800" to AppConfig.siteF4G_1800, "900" to AppConfig.siteF4G_900, "800" to AppConfig.siteF4G_800, "700" to AppConfig.siteF4G_700) to AppConfig.siteFreqOrder4G)
                         "3G" -> Triple("3G (UMTS)", AppConfig.siteShowTechno3G, "site_show_techno_3g") to (listOf("2100" to AppConfig.siteF3G_2100, "900" to AppConfig.siteF3G_900) to AppConfig.siteFreqOrder3G)
                         "2G" -> Triple("2G (GSM)", AppConfig.siteShowTechno2G, "site_show_techno_2g") to (listOf("1800" to AppConfig.siteF2G_1800, "900" to AppConfig.siteF2G_900) to AppConfig.siteFreqOrder2G)
@@ -2503,7 +2507,8 @@ fun SiteFreqFiltersSheet(
                                                         .padding(vertical = 4.dp, horizontal = 4.dp)
                                                 ) {
                                                     Icon(Icons.Default.DragHandle, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f))
-                                                    Text("$freqLabel MHz", modifier = Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.bodyMedium, fontWeight = if(isFreqDragged) FontWeight.Bold else FontWeight.Normal)
+                                                    val displayFreqLabel = freqLabel.toIntOrNull()?.let(::radioFrequencyLabel) ?: "$freqLabel MHz"
+                                                    Text(displayFreqLabel, modifier = Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.bodyMedium, fontWeight = if(isFreqDragged) FontWeight.Bold else FontWeight.Normal)
                                                     val onFreqChange = { newValue: Boolean ->
                                                         if (!newValue && getTotalActiveFrequenciesCount() <= 1) {
                                                             android.widget.Toast.makeText(context, txtMinOneFreq, android.widget.Toast.LENGTH_SHORT).show()
@@ -2592,13 +2597,13 @@ fun SiteFreqFiltersSheet(
             TextButton(
                 onClick = {
                     AppConfig.siteTechnoOrder.value = listOf("5G", "4G", "3G", "2G", "FH")
-                    AppConfig.siteFreqOrder5G.value = listOf("3500", "2100", "700")
+                    AppConfig.siteFreqOrder5G.value = listOf("26000", "4200", "3500", "2100", "1400", "700")
                     AppConfig.siteFreqOrder4G.value = listOf("2600", "2100", "1800", "900", "800", "700")
                     AppConfig.siteFreqOrder3G.value = listOf("2100", "900")
                     AppConfig.siteFreqOrder2G.value = listOf("1800", "900")
                     prefs.edit()
                         .putString("site_techno_order", "5G,4G,3G,2G,FH")
-                        .putString("site_freq_5g_order", "3500,2100,700")
+                        .putString("site_freq_5g_order", "26000,4200,3500,2100,1400,700")
                         .putString("site_freq_4g_order", "2600,2100,1800,900,800,700")
                         .putString("site_freq_3g_order", "2100,900")
                         .putString("site_freq_2g_order", "1800,900")
@@ -2609,8 +2614,11 @@ fun SiteFreqFiltersSheet(
                     saveBool("site_show_techno_2g", AppConfig.siteShowTechno2G, true)
                     saveBool("site_show_techno_fh", AppConfig.siteShowTechnoFH, true)
                     saveBool("site_f5g_3500", AppConfig.siteF5G_3500, true)
+                    saveBool("site_f5g_4200", AppConfig.siteF5G_4200, true)
                     saveBool("site_f5g_2100", AppConfig.siteF5G_2100, true)
+                    saveBool("site_f5g_1400", AppConfig.siteF5G_1400, true)
                     saveBool("site_f5g_700", AppConfig.siteF5G_700, true)
+                    saveBool("site_f5g_26000", AppConfig.siteF5G_26000, true)
                     saveBool("site_f4g_2600", AppConfig.siteF4G_2600, true)
                     saveBool("site_f4g_2100", AppConfig.siteF4G_2100, true)
                     saveBool("site_f4g_1800", AppConfig.siteF4G_1800, true)

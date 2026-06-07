@@ -29,6 +29,8 @@ object RadioFilterMasks {
     const val BAND_5G_3500 = 1 shl 12
     const val BAND_5G_26000 = 1 shl 13
     const val BAND_FH = 1 shl 14
+    const val BAND_5G_1400 = 1 shl 21
+    const val BAND_5G_4200 = 1 shl 22
 
     fun bandMaskToFilterString(mask: Int): String {
         if (mask == 0) return ""
@@ -44,8 +46,10 @@ object RadioFilterMasks {
             if (mask has BAND_4G_2100) add("4G2100")
             if (mask has BAND_4G_2600) add("4G2600")
             if (mask has BAND_5G_700) add("5G700")
+            if (mask has BAND_5G_1400) add("5G1400")
             if (mask has BAND_5G_2100) add("5G2100")
             if (mask has BAND_5G_3500) add("5G3500")
+            if (mask has BAND_5G_4200) add("5G4200")
             if (mask has BAND_5G_26000) add("5G26000")
             if (mask has BAND_FH) add("FH")
         }.joinToString(" ")

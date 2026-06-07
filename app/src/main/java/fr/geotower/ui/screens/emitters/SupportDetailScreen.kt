@@ -3,13 +3,18 @@ package fr.geotower.ui.screens.emitters
 
 import android.Manifest
 import android.annotation.SuppressLint
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Location
 import android.location.LocationManager
+import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,11 +31,14 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -52,21 +60,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.RadioRepository
 import fr.geotower.data.api.CellularFrApi
+import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
+import fr.geotower.data.models.RadioMapMarker
 import fr.geotower.data.models.TechniqueEntity
+import fr.geotower.data.upload.SignalQuestUploadDraftStore
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.InfoLine
 import fr.geotower.ui.components.MiniMapViewMode
+import fr.geotower.ui.components.RadioShareMenu
 import fr.geotower.ui.components.SupportShareMenu
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
@@ -98,16 +111,17 @@ private const val TAG_SUPPORT_DETAIL = "GeoTower"
 fun SupportDetailScreen(
     navController: NavController,
     repository: AnfrRepository,
+    radioRepository: RadioRepository,
     siteId: Long,
     highlightedOperatorKey: String? = null,
     applyMapFilters: Boolean = false,
+    photoDraftId: String? = null,
     isSplitScreen: Boolean = false,
     onCloseSplitScreen: () -> Unit = {},
     onAntennaClick: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-    val currentView = LocalView.current
     val uiStyle = LocalGeoTowerUiStyle.current
 
     val themeMode by AppConfig.themeMode
@@ -149,6 +163,7 @@ fun SupportDetailScreen(
     var antennas by remember { mutableStateOf<List<LocalisationEntity>>(emptyList()) }
     var physique by remember { mutableStateOf<PhysiqueEntity?>(null) }
     var techniquesMap by remember { mutableStateOf<Map<String, TechniqueEntity>>(emptyMap()) }
+    var radioSupportMarkers by remember { mutableStateOf<List<RadioMapMarker>>(emptyList()) }
     var hsDataMap by remember { mutableStateOf<Map<String, fr.geotower.data.models.SiteHsEntity>>(emptyMap()) } // 🚨 NOUVEAU
     var communityPhotos by remember { mutableStateOf<List<CommunityPhoto>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
@@ -237,12 +252,17 @@ fun SupportDetailScreen(
 
                 val techMap = mutableMapOf<String, TechniqueEntity>()
                 if (antennas.isNotEmpty()) {
-                    physique = repository.getPhysiqueByAnfr(antennas.first().idAnfr).firstOrNull()
+                    val fetchedPhysique = repository.getPhysiqueByAnfr(antennas.first().idAnfr).firstOrNull()
+                    physique = fetchedPhysique
+                    val supportRadioId = fetchedPhysique?.idSupport ?: siteId.toString()
+                    radioSupportMarkers = radioRepository.getMarkersForSupport(supportRadioId)
 
                     antennas.forEach { ant ->
                         val tech = repository.getTechniqueByAnfr(ant.idAnfr).firstOrNull()
                         if (tech != null) techMap[ant.idAnfr] = tech
                     }
+                } else {
+                    radioSupportMarkers = radioRepository.getMarkersForSupport(siteId.toString())
                 }
                 techniquesMap = techMap
 
@@ -362,15 +382,17 @@ fun SupportDetailScreen(
         }
     }
 
-    val locationData = remember(userLocation, antennas) {
-        if (userLocation != null && antennas.isNotEmpty()) {
-            val mainInfo = antennas.first()
+    val locationData = remember(userLocation, antennas, radioSupportMarkers) {
+        val target = antennas.firstOrNull()?.let { it.latitude to it.longitude }
+            ?: radioSupportMarkers.firstOrNull { !it.isCluster }?.let { it.latitude to it.longitude }
+
+        if (userLocation != null && target != null) {
             val res = FloatArray(2)
             Location.distanceBetween(
                 userLocation!!.latitude,
                 userLocation!!.longitude,
-                mainInfo.latitude,
-                mainInfo.longitude,
+                target.first,
+                target.second,
                 res
             )
 
@@ -423,8 +445,13 @@ fun SupportDetailScreen(
     val txtShareConfidentialDesc = stringResource(R.string.appstrings_share_confidential_desc)
     val txtGenerateImage = stringResource(R.string.appstrings_generate_image)
     val txtUnknown = stringResource(R.string.appstrings_unknown)
+    val txtInitError = stringResource(R.string.appstrings_init_error)
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val pendingPhotoDraftId = photoDraftId?.takeIf { it.isNotBlank() }
+    val pendingSharedPhotoUris = remember(pendingPhotoDraftId) {
+        pendingPhotoDraftId?.let { SignalQuestUploadDraftStore.peek(it) } ?: emptyList()
+    }
     var miniMapDefaultMode by remember {
         mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString(SupportPagePrefs.MINI_MAP_MODE, null)))
     }
@@ -437,7 +464,10 @@ fun SupportDetailScreen(
             .putFloat("last_map_lon", longitude.toFloat())
             .putFloat("last_map_zoom", 18f)
             .apply()
-        navController.navigate("map")
+        val route = pendingPhotoDraftId
+            ?.let { "map?photoDraftId=${Uri.encode(it)}" }
+            ?: "map"
+        navController.navigate(route)
     }
 
     var pageSupportOrder by remember { mutableStateOf(SupportPagePrefs.order(prefs)) }
@@ -481,6 +511,52 @@ fun SupportDetailScreen(
         siteStatusMatchedOperatorKeys
     )
     val priorityOperatorKey = effectiveHighlightedOperatorKey ?: activeOperatorKeys?.singleOrNull()
+    val navigationTarget = antennas.firstOrNull()?.let { it.latitude to it.longitude }
+        ?: radioSupportMarkers.firstOrNull { !it.isCluster }?.let { it.latitude to it.longitude }
+    val sharedPhotoUploadOperators = remember(antennas, featureFlags) {
+        supportSharedPhotoUploadOperators(antennas, prefs)
+    }
+    var selectedSharedPhotoOperatorKeys by remember(pendingPhotoDraftId, siteId) {
+        mutableStateOf<Set<String>>(emptySet())
+    }
+    val canUseSharedPhotoUpload =
+        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SIGNALQUEST_UPLOAD) &&
+            featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_PHOTO_UPLOAD) &&
+            featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD) &&
+            featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_SIGNALQUEST_UPLOAD) &&
+            featureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.SIGNALQUEST_UPLOAD)
+
+    LaunchedEffect(
+        pendingPhotoDraftId,
+        sharedPhotoUploadOperators.map { it.key }
+    ) {
+        selectedSharedPhotoOperatorKeys = if (pendingPhotoDraftId != null && sharedPhotoUploadOperators.size == 1) {
+            setOf(sharedPhotoUploadOperators.first().key)
+        } else {
+            emptySet()
+        }
+    }
+
+    fun openSharedPhotoUpload() {
+        val draftId = pendingPhotoDraftId ?: return
+        val selectedOperators = sharedPhotoUploadOperators
+            .filter { it.key in selectedSharedPhotoOperatorKeys }
+            .distinctBy { it.uploadOperator }
+        val firstOperator = selectedOperators.firstOrNull() ?: return
+        val targetAntenna = firstOperator.antenna
+        val supportUploadId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId.toString()
+        val encodedOperators = Uri.encode(selectedOperators.joinToString("|") { it.uploadOperator })
+
+        navController.navigate(
+            "sq_upload/${Uri.encode(supportUploadId)}/${Uri.encode(firstOperator.uploadOperator)}" +
+                "?draftId=${Uri.encode(draftId)}" +
+                "&lat=${targetAntenna.latitude}" +
+                "&lon=${targetAntenna.longitude}" +
+                "&azimuts=${Uri.encode(targetAntenna.azimuts ?: "")}" +
+                "&operatorNames=$encodedOperators" +
+                "&keepDraft=true"
+        )
+    }
 
     Scaffold(
         containerColor = mainBgColor,
@@ -514,8 +590,144 @@ fun SupportDetailScreen(
         Box(modifier = Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().background(mainBgColor)) {
             if (isLoading) {
                 LoadingIndicator(modifier = Modifier.align(Alignment.Center))
-            } else if (antennas.isEmpty()) {
+            } else if (antennas.isEmpty() && radioSupportMarkers.isEmpty()) {
                 Text(stringResource(R.string.appstrings_no_data_found), modifier = Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.onSurface)
+            } else if (antennas.isEmpty()) {
+                val mainRadio = radioSupportMarkers.firstOrNull { !it.isCluster } ?: radioSupportMarkers.first()
+                val radioMiniMapAntenna = remember(mainRadio) {
+                    LocalisationEntity(
+                        idAnfr = mainRadio.supportId.ifBlank { mainRadio.stationId.ifBlank { mainRadio.id } },
+                        operateur = mainRadio.networkName,
+                        latitude = mainRadio.latitude,
+                        longitude = mainRadio.longitude,
+                        azimuts = null,
+                        codeInsee = null,
+                        azimutsFh = null,
+                        techMask = 0,
+                        bandMask = 0
+                    )
+                }
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .geoTowerFadingEdge(scrollState)
+                        .verticalScroll(scrollState)
+                        .navigationBarsPadding()
+                        .padding(bottom = 32.dp)
+                ) {
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    pageSupportOrder.forEach { block ->
+                        when (block) {
+                            "map" -> {
+                                if (showMap) {
+                                    fr.geotower.ui.components.SharedMiniMapCard(
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                                        centerLat = mainRadio.latitude,
+                                        centerLon = mainRadio.longitude,
+                                        mappedAntennas = listOf(radioMiniMapAntenna),
+                                        radioMarkers = radioSupportMarkers,
+                                        sitesHs = emptyList(),
+                                        blockShape = blockShape,
+                                        cardBorder = cardBorder,
+                                        onMapReady = { globalMapRef = it },
+                                        focusOperator = null,
+                                        userLocation = userLocation,
+                                        defaultViewMode = miniMapDefaultMode,
+                                        showViewModeToggle = true,
+                                        activeOperatorKeys = null
+                                    )
+                                }
+                            }
+                            "details" -> {
+                                if (showDetails) {
+                                    RadioOnlySupportDetailsSection(
+                                        marker = mainRadio,
+                                        distanceMeters = distanceMeters,
+                                        bearingStr = bearingStr,
+                                        cardBgColor = cardBgColor,
+                                        blockShape = blockShape
+                                    )
+                                }
+                            }
+                            "open_map" -> {
+                                if (showOpenMap) {
+                                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                        Button(
+                                            onClick = { safeClick { openMapAt(mainRadio.latitude, mainRadio.longitude) } },
+                                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                                            shape = buttonShape,
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                            )
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(24.dp))
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Text(stringResource(R.string.appstrings_open_map), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            "nav" -> {
+                                if (showNav && canUseSupportNavigation) {
+                                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                        Button(
+                                            onClick = { safeClick { showNavigationSheet = true } },
+                                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                                            shape = buttonShape,
+                                            colors = ButtonDefaults.buttonColors(
+                                                containerColor = MaterialTheme.colorScheme.primary,
+                                                contentColor = MaterialTheme.colorScheme.onPrimary
+                                            )
+                                        ) {
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(24.dp))
+                                                Spacer(modifier = Modifier.width(12.dp))
+                                                Text(stringResource(R.string.appstrings_nav_to_site), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            "share" -> {
+                                if (showShare && canUseSupportShare) {
+                                    RadioShareMenu(
+                                        marker = mainRadio,
+                                        markers = radioSupportMarkers,
+                                        isSupportShare = true,
+                                        distanceStr = distanceStr,
+                                        bearingStr = bearingStr,
+                                        useOneUi = useOneUi,
+                                        buttonShape = buttonShape,
+                                        globalMapRef = globalMapRef,
+                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        fr.geotower.ui.components.SupportRadioPresenceCard(
+                            radioMarkers = radioSupportMarkers,
+                            cardBgColor = cardBgColor,
+                            blockShape = blockShape,
+                            onRadioClick = { marker ->
+                                safeClick {
+                                    if (marker.stationId.isNotBlank() && marker.supportId.isNotBlank()) {
+                                        navController.navigate(
+                                            "radio_site_detail/${Uri.encode(marker.stationId)}/${Uri.encode(marker.supportId)}"
+                                        )
+                                    }
+                                }
+                            }
+                        )
+                    }
+                }
             } else {
                 val mainInfo = antennas.first()
                 Column(
@@ -529,6 +741,25 @@ fun SupportDetailScreen(
                 ) {
                     Spacer(modifier = Modifier.height(8.dp))
 
+                    if (pendingPhotoDraftId != null && pendingSharedPhotoUris.isNotEmpty() && canUseSharedPhotoUpload) {
+                        SupportSharedPhotoUploadCard(
+                            photoCount = pendingSharedPhotoUris.size,
+                            operators = sharedPhotoUploadOperators,
+                            selectedOperatorKeys = selectedSharedPhotoOperatorKeys,
+                            onToggleOperator = { key ->
+                                selectedSharedPhotoOperatorKeys = if (key in selectedSharedPhotoOperatorKeys) {
+                                    selectedSharedPhotoOperatorKeys - key
+                                } else {
+                                    selectedSharedPhotoOperatorKeys + key
+                                }
+                            },
+                            onUpload = { safeClick { openSharedPhotoUpload() } },
+                            cardBgColor = cardBgColor,
+                            blockShape = blockShape,
+                            buttonShape = buttonShape
+                        )
+                    }
+
                     pageSupportOrder.forEach { block ->
                         when (block) {
                             "map" -> {
@@ -538,6 +769,7 @@ fun SupportDetailScreen(
                                         centerLat = mainInfo.latitude,
                                         centerLon = mainInfo.longitude,
                                         mappedAntennas = antennas,
+                                        radioMarkers = radioSupportMarkers,
                                         sitesHs = hsDataMap.values.toList(),
                                         blockShape = blockShape,
                                         cardBorder = cardBorder,
@@ -637,7 +869,8 @@ fun SupportDetailScreen(
                                             bearingStr = bearingStr,
                                             useOneUi = useOneUi,
                                             buttonShape = buttonShape,
-                                            globalMapRef = globalMapRef
+                                            globalMapRef = globalMapRef,
+                                            radioMarkers = radioSupportMarkers
                                         )
                                     }
                                 }
@@ -663,15 +896,33 @@ fun SupportDetailScreen(
                             }
                         }
                     }
+
+                    if (radioSupportMarkers.isNotEmpty()) {
+                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            fr.geotower.ui.components.SupportRadioPresenceCard(
+                                radioMarkers = radioSupportMarkers,
+                                cardBgColor = cardBgColor,
+                                blockShape = blockShape,
+                                onRadioClick = { marker ->
+                                    safeClick {
+                                        if (marker.stationId.isNotBlank() && marker.supportId.isNotBlank()) {
+                                            navController.navigate(
+                                                "radio_site_detail/${Uri.encode(marker.stationId)}/${Uri.encode(marker.supportId)}"
+                                            )
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        if (showNavigationSheet && antennas.isNotEmpty() && canUseSupportNavigation) {
-            val mainInfo = antennas.first()
+        if (showNavigationSheet && navigationTarget != null && canUseSupportNavigation) {
             fr.geotower.ui.components.NavigationBottomSheet(
-                latitude = mainInfo.latitude,
-                longitude = mainInfo.longitude,
+                latitude = navigationTarget.first,
+                longitude = navigationTarget.second,
                 onDismiss = { showNavigationSheet = false },
                 sheetState = sheetState,
                 useOneUi = useOneUi
@@ -780,6 +1031,247 @@ fun SupportDetailScreen(
                 useOneUi = uiStyle.useOneUi,
                 featureId = CommunityDataPreferences.FEATURE_PHOTOS
             )
+        }
+    }
+}
+
+private data class SupportSharedPhotoUploadOperator(
+    val key: String,
+    val label: String,
+    val uploadOperator: String,
+    val antenna: LocalisationEntity
+)
+
+private fun supportSharedPhotoUploadOperators(
+    antennas: List<LocalisationEntity>,
+    prefs: android.content.SharedPreferences
+): List<SupportSharedPhotoUploadOperator> {
+    val operatorsByKey = linkedMapOf<String, SupportSharedPhotoUploadOperator>()
+
+    antennas.forEach { antenna ->
+        OperatorColors.keysFor(antenna.operateur).forEach { key ->
+            if (key in operatorsByKey) return@forEach
+
+            val uploadOperator = SignalQuestOperators.operatorParamFor(key) ?: return@forEach
+            if (!CommunityDataPreferences.isSignalQuestPhotosEnabled(prefs, key)) return@forEach
+
+            operatorsByKey[key] = SupportSharedPhotoUploadOperator(
+                key = key,
+                label = OperatorColors.specForKey(key)?.label ?: uploadOperator,
+                uploadOperator = uploadOperator,
+                antenna = antenna
+            )
+        }
+    }
+
+    return OperatorColors.orderedKeys.mapNotNull { operatorsByKey[it] } +
+        operatorsByKey.values.filterNot { it.key in OperatorColors.orderedKeys }
+}
+
+@Composable
+private fun SupportSharedPhotoUploadCard(
+    photoCount: Int,
+    operators: List<SupportSharedPhotoUploadOperator>,
+    selectedOperatorKeys: Set<String>,
+    onToggleOperator: (String) -> Unit,
+    onUpload: () -> Unit,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape,
+    buttonShape: androidx.compose.ui.graphics.Shape
+) {
+    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(cardBgColor, blockShape)
+                .padding(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.PhotoLibrary,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(28.dp)
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = stringResource(R.string.shared_photo_support_title),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(R.string.shared_photo_support_desc, photoCount),
+                        fontSize = 13.sp,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            if (operators.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.shared_photo_support_no_operator),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp
+                )
+            } else {
+                operators.forEach { operator ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onToggleOperator(operator.key) }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(
+                            checked = operator.key in selectedOperatorKeys,
+                            onCheckedChange = { onToggleOperator(operator.key) }
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(10.dp)
+                                .background(Color(OperatorColors.colorArgbForKey(operator.key)), RoundedCornerShape(999.dp))
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = operator.label,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
+                if (selectedOperatorKeys.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.shared_photo_support_select_one),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Button(
+                onClick = onUpload,
+                enabled = operators.isNotEmpty() && selectedOperatorKeys.isNotEmpty(),
+                modifier = Modifier.fillMaxWidth().height(54.dp),
+                shape = buttonShape,
+                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+            ) {
+                Icon(Icons.Default.CloudUpload, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(stringResource(R.string.appstrings_upload_photos_prompt), fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RadioOnlySupportDetailsSection(
+    marker: RadioMapMarker,
+    distanceMeters: Float?,
+    bearingStr: String,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape
+) {
+    val context = LocalContext.current
+    val txtNotSpecified = stringResource(R.string.appstrings_not_specified)
+    val txtIdNumber = stringResource(R.string.appstrings_id_number)
+    val txtIdSupportCopy = stringResource(R.string.appstrings_id_support_copy)
+    val txtIdCopied = stringResource(R.string.appstrings_id_copied)
+    val txtIdUnavailable = stringResource(R.string.appstrings_id_unavailable)
+    val txtAddressLabel = stringResource(R.string.appstrings_address_label)
+    val txtAddressCopy = stringResource(R.string.appstrings_address_copy)
+    val txtAddressCopied = stringResource(R.string.appstrings_address_copied)
+    val txtGpsLabel = stringResource(R.string.appstrings_gps_label)
+    val txtGpsCoordsCopy = stringResource(R.string.appstrings_gps_coords_copy)
+    val txtCoordsCopied = stringResource(R.string.appstrings_coords_copied)
+    val txtSupportNature = stringResource(R.string.appstrings_support_nature)
+    val txtSupportHeight = stringResource(R.string.appstrings_support_height)
+    val txtOwner = stringResource(R.string.appstrings_owner)
+    val txtDistanceLabel = stringResource(R.string.appstrings_distance_label)
+    val txtFromMyPosition = stringResource(R.string.appstrings_from_my_position)
+    val txtBearingLabel = stringResource(R.string.appstrings_bearing_label)
+    val isMi = AppConfig.distanceUnit.intValue == 1
+    val supportId = marker.supportId.ifBlank { txtNotSpecified }
+    val fullAddress = marker.addressSummary ?: txtNotSpecified
+    val gpsCoords = String.format(Locale.US, "%.5fÂ°, %.5fÂ°", marker.latitude, marker.longitude)
+    val cleanGpsCoords = String.format(Locale.US, "%.5f, %.5f", marker.latitude, marker.longitude)
+    val displayGpsCoords = String.format(
+        Locale.US,
+        "%.5f%s, %.5f%s",
+        marker.latitude,
+        "\u00B0",
+        marker.longitude,
+        "\u00B0"
+    )
+    val distanceText = if (distanceMeters != null) {
+        if (isMi) {
+            val miles = distanceMeters / 1609.34f
+            if (miles < 0.1f) {
+                "${(distanceMeters * 3.28084f).toInt()} ft"
+            } else {
+                String.format(Locale.US, "%.2f mi", miles)
+            }
+        } else {
+            if (distanceMeters >= 1000f) {
+                String.format(Locale.US, "%.2f km", distanceMeters / 1000f)
+            } else {
+                "${distanceMeters.toInt()} m"
+            }
+        }
+    } else {
+        "--"
+    }
+
+    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(cardBgColor, blockShape)
+                .padding(16.dp)
+        ) {
+            InfoLine(
+                label = txtIdNumber,
+                value = supportId,
+                onCopy = {
+                    if (supportId != txtNotSpecified) {
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        clipboard.setPrimaryClip(ClipData.newPlainText(txtIdSupportCopy, supportId))
+                        Toast.makeText(context, txtIdCopied, Toast.LENGTH_SHORT).show()
+                    } else {
+                        Toast.makeText(context, txtIdUnavailable, Toast.LENGTH_SHORT).show()
+                    }
+                }
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            InfoLine(
+                label = txtAddressLabel,
+                value = fullAddress,
+                onCopy = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText(txtAddressCopy, fullAddress))
+                    Toast.makeText(context, txtAddressCopied, Toast.LENGTH_SHORT).show()
+                }
+            )
+            InfoLine(
+                label = txtGpsLabel,
+                value = displayGpsCoords,
+                onCopy = {
+                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                    clipboard.setPrimaryClip(ClipData.newPlainText(txtGpsCoordsCopy, cleanGpsCoords))
+                    Toast.makeText(context, txtCoordsCopied, Toast.LENGTH_SHORT).show()
+                }
+            )
+            InfoLine(label = txtSupportHeight, value = marker.supportHeightSummary ?: txtNotSpecified)
+            InfoLine(label = "$txtSupportNature : ", value = marker.supportNatureSummary ?: txtNotSpecified)
+            InfoLine(label = "$txtOwner : ", value = marker.supportOwnerSummary ?: txtNotSpecified)
+            InfoLine(label = txtDistanceLabel, value = "$distanceText $txtFromMyPosition")
+            InfoLine(label = txtBearingLabel, value = bearingStr)
         }
     }
 }

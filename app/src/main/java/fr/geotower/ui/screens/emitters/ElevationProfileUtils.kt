@@ -206,10 +206,12 @@ private fun normalizeElevationProfileFrequency(value: Int): Int? {
         in 650..760 -> 700
         in 791..860 -> 800
         in 870..960 -> 900
+        in 1427..1518 -> 1400
         in 1700..1900 -> 1800
         in 1901..2200 -> 2100
         in 2400..2700 -> 2600
         in 3300..3800 -> 3500
+        in 3801..4200 -> 4200
         in 24000..28000 -> 26000
         else -> null
     }
@@ -217,4 +219,4 @@ private fun normalizeElevationProfileFrequency(value: Int): Int? {
 
 const val ELEVATION_USER_EYE_HEIGHT_METERS = 1.5
 const val DEFAULT_ELEVATION_PROFILE_FREQUENCY_MHZ = 3500
-private val ELEVATION_PROFILE_FREQUENCY_ORDER = listOf(3500, 2600, 2100, 1800, 900, 800, 700, 26000)
+private val ELEVATION_PROFILE_FREQUENCY_ORDER = listOf(26000, 4200, 3500, 2600, 2100, 1800, 1400, 900, 800, 700)

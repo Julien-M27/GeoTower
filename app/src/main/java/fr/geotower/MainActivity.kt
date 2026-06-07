@@ -39,6 +39,7 @@ import kotlinx.coroutines.withContext
 
 // --- DONNÉES ---
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.RadioRepository
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLocale
 import fr.geotower.utils.AppUiMode
@@ -61,6 +62,7 @@ import fr.geotower.ui.screens.emitters.ElevationProfileScreen
 import fr.geotower.ui.screens.emitters.NearEmittersSupportWrapperScreen
 import fr.geotower.ui.screens.emitters.SiteSpeedtestsScreen
 import fr.geotower.ui.screens.emitters.SiteDetailToolWrapperScreen
+import fr.geotower.ui.screens.emitters.RadioSiteDetailScreen
 import fr.geotower.ui.screens.emitters.ThroughputCalculatorScreen
 import fr.geotower.ui.screens.stats.FrequencyStatsDetailScreen
 import fr.geotower.ui.screens.stats.StatisticsScreen
@@ -110,6 +112,14 @@ private fun DisabledFeatureRoute(navController: NavHostController, message: Stri
     }
 }
 
+private fun decodeUploadOperatorNames(raw: String?): List<String> {
+    return Uri.decode(raw.orEmpty())
+        .split("|")
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .distinct()
+}
+
 class MainActivity : ComponentActivity() {
 
     // 🌟 1. LE CANAL POUR LA NOTIFICATION
@@ -118,6 +128,68 @@ class MainActivity : ComponentActivity() {
         extraBufferCapacity = 1,
         onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST
     )
+
+    private fun sharedPhotoMapRoute(intent: Intent?): String? {
+        val draftId = sharedPhotoDraftId(intent) ?: return null
+        return "map?photoDraftId=${Uri.encode(draftId)}"
+    }
+
+    private fun sharedPhotoDraftId(intent: Intent?): String? {
+        val uris = sharedImageUris(intent)
+        if (uris.isEmpty()) return null
+
+        uris.forEach { uri ->
+            persistSharedImageReadPermission(intent, uri)
+        }
+
+        return SignalQuestUploadDraftStore.put(uris.map { it.toString() })
+    }
+
+    private fun persistSharedImageReadPermission(intent: Intent?, uri: Uri) {
+        if (!uri.scheme.equals("content", ignoreCase = true)) return
+        if (((intent?.flags ?: 0) and Intent.FLAG_GRANT_READ_URI_PERMISSION) == 0) return
+
+        runCatching {
+            contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+    }
+
+    private fun sharedImageUris(intent: Intent?): List<Uri> {
+        if (intent == null) return emptyList()
+        val action = intent.action
+        if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return emptyList()
+
+        val fromStream = when (action) {
+            Intent.ACTION_SEND -> listOfNotNull(intent.streamExtraUri())
+            Intent.ACTION_SEND_MULTIPLE -> intent.streamExtraUris()
+            else -> emptyList()
+        }
+
+        val fromClipData = intent.clipData?.let { clipData ->
+            (0 until clipData.itemCount).mapNotNull { index -> clipData.getItemAt(index).uri }
+        }.orEmpty()
+
+        return (fromStream + fromClipData)
+            .distinctBy { it.toString() }
+    }
+
+    private fun Intent.streamExtraUri(): Uri? {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            getParcelableExtra(Intent.EXTRA_STREAM)
+        }
+    }
+
+    private fun Intent.streamExtraUris(): List<Uri> {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+        } else {
+            @Suppress("DEPRECATION")
+            getParcelableArrayListExtra<Uri>(Intent.EXTRA_STREAM).orEmpty()
+        }
+    }
     // 🌟 2. ATTRAPER LE CLIC QUAND L'APP EST EN ARRIÈRE-PLAN
     override fun onResume() {
         super.onResume()
@@ -134,6 +206,11 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         handleGlobalPopupIntent(intent)
+
+        sharedPhotoMapRoute(intent)?.let { route ->
+            navigateToSiteFlow.tryEmit(route)
+            return
+        }
 
         intent.data?.let { uri ->
             if (uri.scheme == "geotower") {
@@ -206,6 +283,7 @@ class MainActivity : ComponentActivity() {
             api = RetrofitClient.apiService,
             context = applicationContext
         )
+        val radioRepository = RadioRepository(applicationContext)
 
         // Vérification premier lancement (CORRIGÉ : on utilise le fichier global)
         val sharedPref = getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
@@ -269,6 +347,7 @@ class MainActivity : ComponentActivity() {
         // 🌟 3. DÉTECTION DU LIEN (QR CODE OU NOTIFICATION)
         val deepLinkUri = intent.data
         val isDeepLink = deepLinkUri != null && deepLinkUri.scheme == "geotower"
+        val sharedPhotoRoute = if (isFirstRun) null else sharedPhotoMapRoute(intent)
 
         // 🎙️ Lecture de la commande vocale de Google Assistant (Défini dans shortcuts.xml)
         val assistantFeature = intent.getStringExtra("app_feature")
@@ -279,6 +358,8 @@ class MainActivity : ComponentActivity() {
         // On détermine la destination finale en fonction de la demande
         val destinationApresSplash = if (isFirstRun) {
             "first_start"
+        } else if (sharedPhotoRoute != null) {
+            sharedPhotoRoute
         } else if (isDeepLink) {
             "home" // ✅ On laisse le NavHost gérer la navigation profonde
         } else if (notifSiteId != null) {
@@ -305,7 +386,7 @@ class MainActivity : ComponentActivity() {
 
         // 🌟 Si on vient du widget, de l'assistant, de la notification OU d'un QR CODE, on saute le Splash Screen !
         val startRoute =
-            if ((widgetDest != null || assistantFeature != null || notifSiteId != null || isDeepLink) && !isFirstRun) destinationApresSplash else "splash"
+            if ((widgetDest != null || assistantFeature != null || notifSiteId != null || isDeepLink || sharedPhotoRoute != null) && !isFirstRun) destinationApresSplash else "splash"
         // ========================================================
 
         // --- LECTURE ET DÉTECTION DE LA LANGUE DÈS LE LANCEMENT ---
@@ -432,7 +513,7 @@ class MainActivity : ComponentActivity() {
                     containerColor = MaterialTheme.colorScheme.background
                 ) { innerPadding ->
 
-                    val mapFactory = MapViewModelFactory(repository)
+                    val mapFactory = MapViewModelFactory(repository, radioRepository)
                     val sharedMapViewModel: MapViewModel = viewModel(factory = mapFactory)
 
                     // ---> 2. ON ENVELOPPE TOUT DANS UNE BOX POUR SUPERPOSER <---
@@ -494,11 +575,22 @@ class MainActivity : ComponentActivity() {
                             }
 
                             // Carte
-                            composable("map") {
+                            composable(
+                                route = "map?photoDraftId={photoDraftId}",
+                                arguments = listOf(
+                                    navArgument("photoDraftId") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
+                                    }
+                                )
+                            ) { backStackEntry ->
+                                val photoDraftId = backStackEntry.arguments?.getString("photoDraftId")
                                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
                                     MapScreen(
                                         navController = navController,
-                                        viewModel = sharedMapViewModel
+                                        viewModel = sharedMapViewModel,
+                                        photoDraftId = photoDraftId
                                     )
                                 } else {
                                     DisabledFeatureRoute(navController, txtUnavailable)
@@ -580,7 +672,7 @@ class MainActivity : ComponentActivity() {
                             composable("emitters") {
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)) {
-                                        NearEmittersSupportWrapperScreen(navController, repository)
+                                        NearEmittersSupportWrapperScreen(navController, repository, radioRepository)
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }
@@ -640,7 +732,7 @@ class MainActivity : ComponentActivity() {
 
                             // --- 1. DÉTAIL DU SUPPORT (Le Pylône) ---
                             composable(
-                                route = "support_detail/{id}?operator={operator}&fromMap={fromMap}",
+                                route = "support_detail/{id}?operator={operator}&fromMap={fromMap}&photoDraftId={photoDraftId}",
                                 arguments = listOf(
                                     navArgument("id") { type = NavType.StringType },
                                     navArgument("operator") {
@@ -651,6 +743,11 @@ class MainActivity : ComponentActivity() {
                                     navArgument("fromMap") {
                                         type = NavType.BoolType
                                         defaultValue = false
+                                    },
+                                    navArgument("photoDraftId") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
                                     }
                                 ),
                                 deepLinks = listOf(navDeepLink { uriPattern = "geotower://support/{id}" })
@@ -658,6 +755,7 @@ class MainActivity : ComponentActivity() {
                                 val id = backStackEntry.arguments?.getString("id") ?: ""
                                 val highlightedOperatorKey = backStackEntry.arguments?.getString("operator")
                                 val applyMapFilters = backStackEntry.arguments?.getBoolean("fromMap") ?: false
+                                val photoDraftId = backStackEntry.arguments?.getString("photoDraftId")
                                 // Convertir en Long si ta BDD utilise un Long, ou adapter la query
                                 val idLong = id.toLongOrNull() ?: 0L
                                 Box(modifier = Modifier.padding(innerPadding)) {
@@ -665,9 +763,11 @@ class MainActivity : ComponentActivity() {
                                         fr.geotower.ui.screens.emitters.SupportSiteWrapperScreen(
                                             navController,
                                             repository,
+                                            radioRepository,
                                             idLong,
                                             highlightedOperatorKey = highlightedOperatorKey,
-                                            applyMapFilters = applyMapFilters
+                                            applyMapFilters = applyMapFilters,
+                                            photoDraftId = photoDraftId
                                         )
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
@@ -698,6 +798,29 @@ class MainActivity : ComponentActivity() {
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)) {
                                         SiteDetailToolWrapperScreen(navController, repository, id, applyMapFilters = true)
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
+                                }
+                            }
+                            composable(
+                                route = "radio_site_detail/{stationId}/{supportId}",
+                                arguments = listOf(
+                                    navArgument("stationId") { type = NavType.StringType },
+                                    navArgument("supportId") { type = NavType.StringType }
+                                ),
+                                deepLinks = listOf(navDeepLink { uriPattern = "geotower://radio/{stationId}/{supportId}" })
+                            ) { backStackEntry ->
+                                val stationId = backStackEntry.arguments?.getString("stationId") ?: ""
+                                val supportId = backStackEntry.arguments?.getString("supportId") ?: ""
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)) {
+                                        RadioSiteDetailScreen(
+                                            navController = navController,
+                                            radioRepository = radioRepository,
+                                            stationId = stationId,
+                                            supportId = supportId
+                                        )
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }
@@ -800,7 +923,7 @@ class MainActivity : ComponentActivity() {
                             // --- 3. ÉCRAN D'ENVOI SIGNAL QUEST ---
                             composable(
                                 // ✅ AJOUT DE &azimuts={azimuts} À LA FIN
-                                route = "sq_upload/{siteId}/{operatorName}?draftId={draftId}&lat={lat}&lon={lon}&azimuts={azimuts}",
+                                route = "sq_upload/{siteId}/{operatorName}?draftId={draftId}&lat={lat}&lon={lon}&azimuts={azimuts}&operatorNames={operatorNames}&keepDraft={keepDraft}",
                                 arguments = listOf(
                                     navArgument("siteId") { type = NavType.StringType },
                                     navArgument("operatorName") { type = NavType.StringType },
@@ -809,7 +932,9 @@ class MainActivity : ComponentActivity() {
                                     navArgument("lon") { type = NavType.StringType; defaultValue = "0.0" },
 
                                     // ✅ NOUVEAU ARGUMENT
-                                    navArgument("azimuts") { type = NavType.StringType; defaultValue = "" }
+                                    navArgument("azimuts") { type = NavType.StringType; defaultValue = "" },
+                                    navArgument("operatorNames") { type = NavType.StringType; defaultValue = "" },
+                                    navArgument("keepDraft") { type = NavType.BoolType; defaultValue = false }
                                 )
                             ) { backStackEntry ->
                                 val siteId = backStackEntry.arguments?.getString("siteId") ?: ""
@@ -821,9 +946,12 @@ class MainActivity : ComponentActivity() {
                                 // ✅ NOUVEAU : On récupère et décode les azimuts
                                 val azimutsStr = backStackEntry.arguments?.getString("azimuts") ?: ""
                                 val decodedAzimuts = android.net.Uri.decode(azimutsStr)
+                                val operatorNamesRaw = backStackEntry.arguments?.getString("operatorNames") ?: ""
+                                val operatorNames = decodeUploadOperatorNames(operatorNamesRaw).ifEmpty { listOf(operatorName) }
+                                val keepDraft = backStackEntry.arguments?.getBoolean("keepDraft") ?: false
 
                                 val uris = remember(draftId) {
-                                    if (draftId.isBlank()) emptyList() else SignalQuestUploadDraftStore.take(draftId)
+                                    if (draftId.isBlank()) emptyList() else SignalQuestUploadDraftStore.peek(draftId)
                                 }
 
                                 Box(modifier = Modifier.padding(innerPadding)) {
@@ -843,11 +971,12 @@ class MainActivity : ComponentActivity() {
                                         imageUris = uris,
                                         siteId = siteId,
                                         operatorName = operatorName,
+                                        operatorNames = operatorNames,
                                         lat = lat,
                                         lon = lon,
                                         azimuts = decodedAzimuts,
                                         onNavigateBack = { navController.popBackStack() },
-                                        onStartUpload = { finalUris, description, stripExifBeforeUpload ->
+                                        onStartUpload = { finalUris, description, stripExifBeforeUpload, targetOperators ->
                                             if (
                                                 !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD) ||
                                                 !RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_SIGNALQUEST_UPLOAD) ||
@@ -858,18 +987,24 @@ class MainActivity : ComponentActivity() {
                                             }
                                             lifecycleScope.launch {
                                                 try {
-                                                    val manifest = withContext(Dispatchers.IO) {
-                                                        SignalQuestUploadQueue.createUpload(
-                                                            context = applicationContext,
-                                                            siteId = siteId,
-                                                            operator = operatorName,
-                                                            description = description,
-                                                            uriStrings = finalUris,
-                                                            stripExifBeforeUpload = stripExifBeforeUpload
-                                                        )
+                                                    withContext(Dispatchers.IO) {
+                                                        targetOperators.ifEmpty { listOf(operatorName) }.forEach { targetOperator ->
+                                                            val manifest = SignalQuestUploadQueue.createUpload(
+                                                                context = applicationContext,
+                                                                siteId = siteId,
+                                                                operator = targetOperator,
+                                                                description = description,
+                                                                uriStrings = finalUris,
+                                                                stripExifBeforeUpload = stripExifBeforeUpload
+                                                            )
+
+                                                            SignalQuestUploadScheduler.enqueue(applicationContext, manifest)
+                                                        }
                                                     }
 
-                                                    SignalQuestUploadScheduler.enqueue(applicationContext, manifest)
+                                                    if (!keepDraft && draftId.isNotBlank()) {
+                                                        SignalQuestUploadDraftStore.discard(draftId)
+                                                    }
 
                                                     navController.popBackStack()
                                                 } catch (e: SignalQuestUploadQueueException) {

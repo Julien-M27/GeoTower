@@ -2268,6 +2268,15 @@ fun SectionDatabase(
             bubbleColor = bubbleColor,
             title = stringResource(R.string.settings_section_database)
         )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        fr.geotower.ui.components.RadioDatabaseDownloadCard(
+            useOneUi = useOneUi,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor
+        )
     }
 
     Spacer(modifier = Modifier.height(16.dp)) // Espace entre les deux cartes

@@ -58,6 +58,7 @@ import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.RadioMapMarker
 import fr.geotower.data.models.PhysiqueEntity // ✅ NOUVEAU
 import fr.geotower.data.models.TechniqueEntity // ✅ NOUVEAU
 import fr.geotower.ui.screens.emitters.DEFAULT_ELEVATION_PROFILE_FREQUENCY_MHZ
@@ -169,6 +170,1328 @@ private fun Bitmap.trimTransparentBottom(): Bitmap {
 
     if (bottom < 0 || bottom == height - 1) return this
     return Bitmap.createBitmap(this, 0, 0, width, bottom + 1)
+}
+
+private fun captureShareMapBitmap(mapView: org.osmdroid.views.MapView?): Bitmap? {
+    val map = mapView ?: return null
+    if (map.width <= 0 || map.height <= 0) return null
+    return runCatching {
+        Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888).also { bitmap ->
+            map.draw(Canvas(bitmap))
+        }
+    }.getOrNull()
+}
+
+private fun String.shareSafeFilePart(): String {
+    return replace(Regex("[^A-Za-z0-9_.-]+"), "_")
+        .trim('_')
+        .take(80)
+        .ifBlank { "radio" }
+}
+
+private fun String.shareLabelText(): String {
+    return trim().trimEnd(':').trim()
+}
+
+private const val RADIO_SHARE_HEADER = "header"
+private const val RADIO_SHARE_BEARING_HEIGHT = "bearing_height"
+private const val RADIO_SHARE_MAP = "map"
+private const val RADIO_SHARE_SUPPORT = "support"
+private const val RADIO_SHARE_IDS = "ids"
+private const val RADIO_SHARE_ADDRESS = "address"
+private const val RADIO_SHARE_RADIO = "radio"
+private const val RADIO_SHARE_PROGRAMS = "programs"
+private const val RADIO_SHARE_AZIMUTHS = "azimuths"
+private const val RADIO_SHARE_EXTRA = "extra"
+private const val RADIO_SHARE_SUPPORT_ENTRIES = "support_entries"
+private const val SUPPORT_SHARE_RADIO_ENTRIES = "radio_entries"
+
+private val DEFAULT_RADIO_SITE_SHARE_ORDER = listOf(
+    RADIO_SHARE_BEARING_HEIGHT,
+    RADIO_SHARE_MAP,
+    RADIO_SHARE_SUPPORT,
+    RADIO_SHARE_IDS,
+    RADIO_SHARE_ADDRESS,
+    RADIO_SHARE_RADIO,
+    RADIO_SHARE_PROGRAMS,
+    RADIO_SHARE_AZIMUTHS,
+    RADIO_SHARE_EXTRA
+)
+
+private val DEFAULT_RADIO_SUPPORT_SHARE_ORDER = listOf(
+    RADIO_SHARE_MAP,
+    RADIO_SHARE_SUPPORT,
+    RADIO_SHARE_SUPPORT_ENTRIES
+)
+
+private data class RadioShareBlock(
+    val id: String,
+    val label: String
+)
+
+private fun normalizeSupportShareOrder(
+    order: List<String>,
+    hasRadioEntries: Boolean
+): List<String> {
+    val defaultOrder = listOf("map", "support", "operators") +
+        if (hasRadioEntries) listOf(SUPPORT_SHARE_RADIO_ENTRIES) else emptyList()
+    val kept = order.filter { it in defaultOrder }.distinct()
+    val missing = defaultOrder.filter { it !in kept }
+    return (kept + missing).ifEmpty { defaultOrder }
+}
+
+private fun persistSupportShareOrder(prefs: android.content.SharedPreferences, order: List<String>) {
+    prefs.edit()
+        .putString(
+            SharePrefs.SUPPORT_ORDER,
+            order.filter { it != SUPPORT_SHARE_RADIO_ENTRIES }.joinToString(",")
+        )
+        .apply()
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RadioShareMenu(
+    marker: RadioMapMarker,
+    markers: List<RadioMapMarker> = listOf(marker),
+    isSupportShare: Boolean = false,
+    distanceStr: String,
+    bearingStr: String,
+    useOneUi: Boolean,
+    buttonShape: Shape,
+    globalMapRef: org.osmdroid.views.MapView?,
+    modifier: Modifier = Modifier,
+    outlinedButton: Boolean = false
+) {
+    val context = LocalContext.current
+    val currentView = LocalView.current
+    val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val safeClick = rememberSafeClick()
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+
+    val availableBlocks = radioShareAvailableBlocks(marker, markers, isSupportShare)
+    val availableIds = remember(availableBlocks) { availableBlocks.map { it.id }.toSet() }
+    var shareOrder by remember(marker.id, markers.size, isSupportShare) {
+        mutableStateOf(radioShareDefaultBlocks(isSupportShare))
+    }
+    var selectedBlockIds by remember(marker.id, markers.size, isSupportShare) {
+        mutableStateOf(availableIds)
+    }
+    LaunchedEffect(availableIds) {
+        shareOrder = radioShareNormalizeOrder(shareOrder, availableIds, isSupportShare)
+        selectedBlockIds = selectedBlockIds.intersect(availableIds).ifEmpty {
+            radioShareDefaultSelectedBlocks(isSupportShare, availableIds)
+        }
+    }
+
+    var showThemeSheet by remember { mutableStateOf(false) }
+    var showContentSheet by remember { mutableStateOf(false) }
+    var selectedShareTheme by remember { mutableStateOf(isDark) }
+    var isGeneratingShare by remember { mutableStateOf(false) }
+    var incQrCode by remember(marker.id, isSupportShare) { mutableStateOf(true) }
+    var incConfidential by remember(marker.id, isSupportShare) {
+        mutableStateOf(
+            if (isSupportShare) {
+                SharePrefs.supportConfidentialEnabled.read(prefs)
+            } else {
+                SharePrefs.siteConfidentialEnabled.read(prefs)
+            }
+        )
+    }
+
+    val txtShareSite = stringResource(R.string.appstrings_share_site)
+    val txtShareAs = stringResource(R.string.appstrings_share_as)
+    val txtThemeLight = stringResource(R.string.appstrings_theme_light)
+    val txtLightModeDesc = stringResource(R.string.appstrings_light_mode_desc)
+    val txtThemeDark = stringResource(R.string.appstrings_theme_dark)
+    val txtDarkModeDesc = stringResource(R.string.appstrings_dark_mode_desc)
+    val txtImageContent = stringResource(R.string.appstrings_image_content)
+    val txtGenerateImage = stringResource(R.string.appstrings_generate_image)
+    val txtShareSiteVia = stringResource(R.string.appstrings_share_site_via)
+    val txtGeneratedBy = stringResource(R.string.appstrings_generated_by)
+    val txtInitError = stringResource(R.string.appstrings_init_error)
+    val txtPreparing = stringResource(R.string.appstrings_share_image_preparing_in_progress)
+    val txtMove = stringResource(R.string.appstrings_move)
+    val txtShareConfidentialOption = stringResource(R.string.appstrings_share_confidential_option)
+    val txtShareConfidentialDesc = stringResource(R.string.appstrings_share_confidential_desc)
+
+    LaunchedEffect(showThemeSheet) {
+        if (showThemeSheet) {
+            incConfidential = if (isSupportShare) {
+                SharePrefs.supportConfidentialEnabled.read(prefs)
+            } else {
+                SharePrefs.siteConfidentialEnabled.read(prefs)
+            }
+        }
+    }
+
+    if (outlinedButton) {
+        OutlinedButton(
+            onClick = { safeClick { showThemeSheet = true } },
+            modifier = modifier.fillMaxWidth().height(56.dp),
+            shape = buttonShape,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.35f))
+        ) {
+            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(22.dp))
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(txtShareSite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        }
+    } else {
+        Button(
+            onClick = { safeClick { showThemeSheet = true } },
+            modifier = modifier.fillMaxWidth().height(56.dp),
+            shape = buttonShape,
+            colors = ButtonDefaults.buttonColors(
+                containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+            )
+        ) {
+            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(24.dp))
+            Spacer(modifier = Modifier.width(12.dp))
+            Text(txtShareSite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+        }
+    }
+
+    if (isGeneratingShare) {
+        ShareGenerationDialog(txtPreparing)
+    }
+
+    if (showThemeSheet) {
+        ModalBottomSheet(onDismissRequest = { showThemeSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 16.dp, end = 16.dp)) {
+                Text(txtShareAs, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 24.dp))
+                ThemeOptionItem(iconVector = Icons.Outlined.LightMode, label = txtThemeLight, subLabel = txtLightModeDesc, useOneUi = useOneUi) {
+                    safeClick {
+                        selectedShareTheme = false
+                        showThemeSheet = false
+                        showContentSheet = true
+                    }
+                }
+                Spacer(modifier = Modifier.height(12.dp))
+                ThemeOptionItem(iconVector = Icons.Outlined.DarkMode, label = txtThemeDark, subLabel = txtDarkModeDesc, useOneUi = useOneUi) {
+                    safeClick {
+                        selectedShareTheme = true
+                        showThemeSheet = false
+                        showContentSheet = true
+                    }
+                }
+            }
+        }
+    }
+
+    if (showContentSheet) {
+        ModalBottomSheet(onDismissRequest = { showContentSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
+            Box(modifier = Modifier.fillMaxWidth().fillMaxHeight()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(
+                            start = 24.dp,
+                            end = 24.dp,
+                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 112.dp
+                        )
+                ) {
+                    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        IconButton(onClick = { safeClick { showContentSheet = false; showThemeSheet = true } }) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null)
+                        }
+                        Text(text = txtImageContent, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                        Spacer(modifier = Modifier.width(48.dp))
+                    }
+
+                    val itemHeight = 48.dp
+                    val reorderState = rememberReorderableDragState(
+                        items = shareOrder,
+                        itemHeight = itemHeight,
+                        onOrderChange = { newOrder ->
+                            shareOrder = radioShareNormalizeOrder(newOrder, availableIds, isSupportShare)
+                        }
+                    )
+
+                    Column(verticalArrangement = Arrangement.spacedBy(0.dp)) {
+                        shareOrder.forEach { blockId ->
+                            val block = availableBlocks.firstOrNull { it.id == blockId } ?: return@forEach
+                            key(blockId) {
+                                val isDragged = reorderState.isDragged(blockId)
+                                val dragModifier = reorderState.dragModifier(blockId)
+                                val dragOffset = reorderState.offsetFor(blockId)
+
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .height(itemHeight)
+                                        .zIndex(if (isDragged) 10f else 0f)
+                                        .graphicsLayer { translationY = if (isDragged) dragOffset else 0f; scaleX = if (isDragged) 1.02f else 1f; scaleY = if (isDragged) 1.02f else 1f; shadowElevation = if (isDragged) 8.dp.toPx() else 0f }
+                                        .background(if (isDragged) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent, RoundedCornerShape(8.dp))
+                                        .then(dragModifier)
+                                        .padding(start = 8.dp)
+                                ) {
+                                    Icon(Icons.Default.DragHandle, contentDescription = txtMove, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                                    Spacer(modifier = Modifier.width(12.dp))
+                                    Text(block.label, modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
+                                    GeoTowerSwitch(
+                                        checked = block.id in selectedBlockIds,
+                                        onCheckedChange = { checked ->
+                                            selectedBlockIds = if (checked) {
+                                                selectedBlockIds + block.id
+                                            } else {
+                                                selectedBlockIds - block.id
+                                            }
+                                        },
+                                        modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                                        useOneUi = useOneUi
+                                    )
+                                }
+                            }
+                        }
+
+                        TextButton(
+                            onClick = {
+                                shareOrder = radioShareDefaultBlocks(isSupportShare).filter { it in availableIds }
+                                selectedBlockIds = radioShareDefaultSelectedBlocks(isSupportShare, availableIds)
+                                incQrCode = true
+                            },
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        ) {
+                            Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                        }
+
+                        HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Text(stringResource(R.string.brand_qr_code), modifier = Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
+                            GeoTowerSwitch(
+                                checked = incQrCode,
+                                onCheckedChange = { incQrCode = it },
+                                modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                                useOneUi = useOneUi
+                            )
+                        }
+
+                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(txtShareConfidentialOption, fontWeight = FontWeight.Bold, color = if (incConfidential) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                                Text(txtShareConfidentialDesc, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            GeoTowerSwitch(
+                                checked = incConfidential,
+                                onCheckedChange = { incConfidential = it },
+                                modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
+                                useOneUi = useOneUi
+                            )
+                        }
+                    }
+                }
+
+                Button(
+                    onClick = {
+                        if (isGeneratingShare || (isSupportShare && selectedBlockIds.isEmpty())) return@Button
+                        isGeneratingShare = true
+                        showContentSheet = false
+                        currentView.postDelayed({
+                            if (isSupportShare) {
+                                shareRadioSupportCapture(
+                                    context = context,
+                                    currentView = currentView,
+                                    markers = markers,
+                                    distanceStr = distanceStr,
+                                    bearingStr = bearingStr,
+                                    forceDarkTheme = selectedShareTheme,
+                                    txtShareSiteVia = txtShareSiteVia,
+                                    txtGeneratedBy = txtGeneratedBy,
+                                    txtInitError = txtInitError,
+                                    mapView = globalMapRef,
+                                    useOneUi = useOneUi,
+                                    shareOrder = shareOrder,
+                                    includedBlocks = selectedBlockIds,
+                                    incQrCode = incQrCode,
+                                    incConfidential = incConfidential,
+                                    onComplete = { isGeneratingShare = false }
+                                )
+                            } else {
+                                shareRadioSiteCapture(
+                                    context = context,
+                                    currentView = currentView,
+                                    marker = marker,
+                                    distanceStr = distanceStr,
+                                    bearingStr = bearingStr,
+                                    forceDarkTheme = selectedShareTheme,
+                                    txtShareSiteVia = txtShareSiteVia,
+                                    txtGeneratedBy = txtGeneratedBy,
+                                    txtInitError = txtInitError,
+                                    mapView = globalMapRef,
+                                    useOneUi = useOneUi,
+                                    shareOrder = shareOrder,
+                                    includedBlocks = selectedBlockIds,
+                                    incQrCode = incQrCode,
+                                    incConfidential = incConfidential,
+                                    onComplete = { isGeneratingShare = false }
+                                )
+                            }
+                        }, 250)
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(
+                            start = 24.dp,
+                            end = 24.dp,
+                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
+                        )
+                        .fillMaxWidth()
+                        .widthIn(max = 420.dp)
+                        .height(56.dp),
+                    shape = CircleShape,
+                    enabled = selectedBlockIds.isNotEmpty() && !isGeneratingShare
+                ) {
+                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(txtGenerateImage, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+fun shareRadioSiteCapture(
+    context: Context,
+    currentView: View,
+    marker: RadioMapMarker,
+    distanceStr: String,
+    bearingStr: String,
+    forceDarkTheme: Boolean,
+    txtShareSiteVia: String,
+    txtGeneratedBy: String,
+    txtInitError: String,
+    mapView: org.osmdroid.views.MapView?,
+    useOneUi: Boolean = AppConfig.useOneUiDesign,
+    shareOrder: List<String> = DEFAULT_RADIO_SITE_SHARE_ORDER,
+    includedBlocks: Set<String> = shareOrder.toSet(),
+    incQrCode: Boolean = true,
+    incConfidential: Boolean = false,
+    onComplete: (() -> Unit)? = null
+) {
+    shareRadioCapture(
+        context = context,
+        currentView = currentView,
+        title = context.getString(R.string.appstrings_site_detail_title),
+        mainMarker = marker,
+        markers = listOf(marker),
+        distanceStr = distanceStr,
+        bearingStr = bearingStr,
+        forceDarkTheme = forceDarkTheme,
+        txtShareSiteVia = txtShareSiteVia,
+        txtGeneratedBy = txtGeneratedBy,
+        txtInitError = txtInitError,
+        mapView = mapView,
+        useOneUi = useOneUi,
+        isSupportShare = false,
+        shareOrder = shareOrder,
+        includedBlocks = includedBlocks,
+        incQrCode = incQrCode,
+        incConfidential = incConfidential,
+        filePrefix = "Geotower_radio_site",
+        onComplete = onComplete
+    )
+}
+
+fun shareRadioSupportCapture(
+    context: Context,
+    currentView: View,
+    markers: List<RadioMapMarker>,
+    distanceStr: String,
+    bearingStr: String,
+    forceDarkTheme: Boolean,
+    txtShareSiteVia: String,
+    txtGeneratedBy: String,
+    txtInitError: String,
+    mapView: org.osmdroid.views.MapView?,
+    useOneUi: Boolean = AppConfig.useOneUiDesign,
+    shareOrder: List<String> = DEFAULT_RADIO_SUPPORT_SHARE_ORDER,
+    includedBlocks: Set<String> = shareOrder.toSet(),
+    incQrCode: Boolean = true,
+    incConfidential: Boolean = false,
+    onComplete: (() -> Unit)? = null
+) {
+    val mainMarker = markers.firstOrNull { !it.isCluster } ?: markers.firstOrNull() ?: run {
+        onComplete?.invoke()
+        return
+    }
+    shareRadioCapture(
+        context = context,
+        currentView = currentView,
+        title = context.getString(R.string.appstrings_support_detail_title),
+        mainMarker = mainMarker,
+        markers = markers.filterNot { it.isCluster },
+        distanceStr = distanceStr,
+        bearingStr = bearingStr,
+        forceDarkTheme = forceDarkTheme,
+        txtShareSiteVia = txtShareSiteVia,
+        txtGeneratedBy = txtGeneratedBy,
+        txtInitError = txtInitError,
+        mapView = mapView,
+        useOneUi = useOneUi,
+        isSupportShare = true,
+        shareOrder = shareOrder,
+        includedBlocks = includedBlocks,
+        incQrCode = incQrCode,
+        incConfidential = incConfidential,
+        filePrefix = "Geotower_radio_support",
+        onComplete = onComplete
+    )
+}
+
+private fun shareRadioCapture(
+    context: Context,
+    currentView: View,
+    title: String,
+    mainMarker: RadioMapMarker,
+    markers: List<RadioMapMarker>,
+    distanceStr: String,
+    bearingStr: String,
+    forceDarkTheme: Boolean,
+    txtShareSiteVia: String,
+    txtGeneratedBy: String,
+    txtInitError: String,
+    mapView: org.osmdroid.views.MapView?,
+    useOneUi: Boolean,
+    isSupportShare: Boolean,
+    shareOrder: List<String>,
+    includedBlocks: Set<String>,
+    incQrCode: Boolean,
+    incConfidential: Boolean,
+    filePrefix: String,
+    onComplete: (() -> Unit)?
+) {
+    val mapBitmap = if (RADIO_SHARE_MAP in includedBlocks) captureShareMapBitmap(mapView) else null
+    val visibleMarkers = markers.ifEmpty { listOf(mainMarker) }
+    try {
+        val composeView = ComposeView(context).apply {
+            setViewTreeLifecycleOwner(currentView.findViewTreeLifecycleOwner())
+            setViewTreeSavedStateRegistryOwner(currentView.findViewTreeSavedStateRegistryOwner())
+            setViewTreeViewModelStoreOwner(currentView.findViewTreeViewModelStoreOwner())
+
+            setContent {
+                val colors = if (forceDarkTheme) darkColorScheme() else lightColorScheme()
+                MaterialTheme(colorScheme = colors) {
+                    RadioShareCaptureContent(
+                        title = title,
+                        mainMarker = mainMarker,
+                        markers = visibleMarkers,
+                        distanceStr = distanceStr,
+                        bearingStr = bearingStr,
+                        mapBitmap = mapBitmap,
+                        txtGeneratedBy = txtGeneratedBy,
+                        useOneUi = useOneUi,
+                        forceDarkTheme = forceDarkTheme,
+                        isSupportShare = isSupportShare,
+                        shareOrder = shareOrder,
+                        includedBlocks = includedBlocks,
+                        incQrCode = incQrCode,
+                        incConfidential = incConfidential
+                    )
+                }
+            }
+        }
+
+        val rootView = currentView.rootView as? ViewGroup ?: run {
+            onComplete?.invoke()
+            return
+        }
+        composeView.translationX = 10000f
+        rootView.addView(composeView)
+
+        composeView.post {
+            try {
+                val widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(420.dpToPx(context), View.MeasureSpec.EXACTLY)
+                val heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+                composeView.measure(widthMeasureSpec, heightMeasureSpec)
+                composeView.layout(0, 0, composeView.measuredWidth, composeView.measuredHeight)
+
+                val bitmap = Bitmap.createBitmap(composeView.measuredWidth, composeView.measuredHeight, Bitmap.Config.ARGB_8888)
+                composeView.draw(Canvas(bitmap))
+                rootView.removeView(composeView)
+
+                val cachePath = File(context.cacheDir, "images")
+                cachePath.mkdirs()
+                val safeId = listOf(mainMarker.supportId, mainMarker.stationId, mainMarker.id)
+                    .firstOrNull { it.isNotBlank() }
+                    .orEmpty()
+                    .shareSafeFilePart()
+                val file = File(cachePath, "${filePrefix}_$safeId.png")
+                FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+
+                val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                    putExtra(Intent.EXTRA_STREAM, uri)
+                    type = "image/png"
+                    clipData = ClipData.newUri(context.contentResolver, "Capture", uri)
+                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                context.startActivity(Intent.createChooser(shareIntent, txtShareSiteVia))
+                onComplete?.invoke()
+            } catch (e: Exception) {
+                AppLogger.w(TAG_SHARE_IMAGE, "Radio share capture failed", e)
+                Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
+                if (composeView.parent != null) rootView.removeView(composeView)
+                onComplete?.invoke()
+            }
+        }
+    } catch (e: Exception) {
+        AppLogger.w(TAG_SHARE_IMAGE, "Radio share initialization failed", e)
+        Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
+        onComplete?.invoke()
+    }
+}
+
+@Composable
+private fun RadioShareCaptureContent(
+    title: String,
+    mainMarker: RadioMapMarker,
+    markers: List<RadioMapMarker>,
+    distanceStr: String,
+    bearingStr: String,
+    mapBitmap: Bitmap?,
+    txtGeneratedBy: String,
+    useOneUi: Boolean,
+    forceDarkTheme: Boolean,
+    isSupportShare: Boolean,
+    shareOrder: List<String>,
+    includedBlocks: Set<String>,
+    incQrCode: Boolean,
+    incConfidential: Boolean
+) {
+    val txtSupportDetails = stringResource(R.string.appstrings_support_details_title)
+    val txtIdSupport = stringResource(R.string.appstrings_id_support_label).shareLabelText()
+    val txtStationAnfr = stringResource(R.string.appstrings_anfr_station_number).shareLabelText()
+    val txtAddress = stringResource(R.string.appstrings_address_label).shareLabelText()
+    val txtGps = stringResource(R.string.appstrings_gps_label).shareLabelText()
+    val txtSupportHeight = stringResource(R.string.appstrings_support_height).shareLabelText()
+    val txtSupportNature = stringResource(R.string.appstrings_support_nature).shareLabelText()
+    val txtOwner = stringResource(R.string.appstrings_owner).shareLabelText()
+    val txtDistance = stringResource(R.string.appstrings_distance_label).shareLabelText()
+    val txtFromMyPosition = stringResource(R.string.appstrings_from_my_position)
+    val txtBearing = stringResource(R.string.appstrings_bearing_label).shareLabelText()
+    val txtFrequencies = stringResource(R.string.appstrings_frequencies_title)
+    val txtRadioTitle = stringResource(R.string.appstrings_radio_share_radio_title)
+    val txtCategories = stringResource(R.string.appstrings_radio_share_categories)
+    val txtNetwork = stringResource(R.string.appstrings_radio_share_network)
+    val txtSystems = stringResource(R.string.appstrings_radio_share_systems)
+    val txtEmitters = stringResource(R.string.appstrings_radio_share_emitters)
+    val txtAntennas = stringResource(R.string.appstrings_radio_share_antennas)
+    val txtAzimuths = stringResource(R.string.appstrings_radio_share_block_azimuths)
+    val txtDetailsAnfr = stringResource(R.string.appstrings_radio_share_block_extra)
+    val txtPrograms = stringResource(R.string.appstrings_radio_share_block_programs)
+    val txtProgramFallback = stringResource(R.string.appstrings_radio_share_program_fallback)
+    val txtOther = stringResource(R.string.appstrings_radio_share_other)
+    val txtSupportEntriesTitle = stringResource(R.string.appstrings_radio_share_block_support_entries)
+    val txtCapMeasured = stringResource(R.string.appstrings_radio_share_cap_measured_short)
+    val txtSupportHeightShort = stringResource(R.string.appstrings_radio_share_support_height_short)
+    val txtElements = stringResource(R.string.appstrings_radio_share_elements)
+    val blockShape = if (useOneUi) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
+    val cardBgColor = if (useOneUi && forceDarkTheme) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant
+
+    Surface(color = MaterialTheme.colorScheme.background) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .wrapContentHeight()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+
+            if (!isSupportShare) {
+                RadioShareHeaderBlock(mainMarker, cardBgColor, blockShape)
+            }
+
+            shareOrder.forEach { blockId ->
+                if (blockId !in includedBlocks) return@forEach
+                when (blockId) {
+                    RADIO_SHARE_HEADER -> Unit
+                    RADIO_SHARE_BEARING_HEIGHT -> if (!isSupportShare) {
+                        RadioShareBearingHeightBlock(
+                            marker = mainMarker,
+                            bearingStr = bearingStr,
+                            txtCapMeasured = txtCapMeasured,
+                            txtSupportHeightShort = txtSupportHeightShort,
+                            incConfidential = incConfidential,
+                            cardBgColor = cardBgColor,
+                            blockShape = blockShape
+                        )
+                    }
+                    RADIO_SHARE_MAP -> {
+                        RadioShareMapBlock(mapBitmap, cardBgColor, blockShape)
+                    }
+                    RADIO_SHARE_SUPPORT -> {
+                        RadioShareSupportBlock(
+                            marker = mainMarker,
+                            isSupportShare = isSupportShare,
+                            distanceStr = distanceStr,
+                            bearingStr = bearingStr,
+                            txtSupportDetails = txtSupportDetails,
+                            txtIdSupport = txtIdSupport,
+                            txtAddress = txtAddress,
+                            txtGps = txtGps,
+                            txtSupportHeight = txtSupportHeight,
+                            txtSupportNature = txtSupportNature,
+                            txtOwner = txtOwner,
+                            txtDistance = txtDistance,
+                            txtFromMyPosition = txtFromMyPosition,
+                            txtBearing = txtBearing,
+                            incConfidential = incConfidential,
+                            cardBgColor = cardBgColor,
+                            blockShape = blockShape
+                        )
+                    }
+                    RADIO_SHARE_IDS -> if (!isSupportShare) {
+                        RadioShareInfoCard(
+                            title = stringResource(R.string.appstrings_identifiers),
+                            icon = Icons.Default.Tag,
+                            cardBgColor = cardBgColor,
+                            blockShape = blockShape
+                        ) {
+                            RadioShareInfoLine(txtIdSupport, mainMarker.supportId.ifBlank { "--" })
+                            RadioShareInfoLine(txtStationAnfr, mainMarker.stationId.ifBlank { "--" })
+                        }
+                    }
+                    RADIO_SHARE_ADDRESS -> if (!isSupportShare) {
+                        RadioShareInfoCard(
+                            title = txtAddress,
+                            icon = Icons.Default.Info,
+                            cardBgColor = cardBgColor,
+                            blockShape = blockShape
+                        ) {
+                            RadioShareInfoLine(txtAddress, mainMarker.addressSummary)
+                            RadioShareInfoLine(txtGps, formatRadioShareGps(mainMarker.latitude, mainMarker.longitude))
+                            if (incConfidential) {
+                                Text(
+                                    stringResource(R.string.appstrings_distance_hidden),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            } else {
+                                RadioShareInfoLine(txtDistance, "$distanceStr $txtFromMyPosition")
+                            }
+                        }
+                    }
+                    RADIO_SHARE_RADIO -> {
+                        RadioShareRadioBlock(
+                            marker = mainMarker,
+                            txtRadioTitle = txtRadioTitle,
+                            txtCategories = txtCategories,
+                            txtNetwork = txtNetwork,
+                            txtSystems = txtSystems,
+                            txtFrequencies = txtFrequencies,
+                            txtEmitters = txtEmitters,
+                            txtAntennas = txtAntennas,
+                            cardBgColor = cardBgColor,
+                            blockShape = blockShape
+                        )
+                    }
+                    RADIO_SHARE_PROGRAMS -> {
+                        RadioShareProgramsBlock(
+                            marker = mainMarker,
+                            txtPrograms = txtPrograms,
+                            txtProgramFallback = txtProgramFallback,
+                            txtOther = txtOther,
+                            cardBgColor = cardBgColor,
+                            blockShape = blockShape
+                        )
+                    }
+                    RADIO_SHARE_AZIMUTHS -> {
+                        RadioShareAzimuthsBlock(mainMarker, txtAzimuths, txtOther, txtAntennas, cardBgColor, blockShape)
+                    }
+                    RADIO_SHARE_EXTRA -> {
+                        RadioShareExtraDetailsBlock(mainMarker, txtDetailsAnfr, cardBgColor, blockShape)
+                    }
+                    RADIO_SHARE_SUPPORT_ENTRIES -> if (isSupportShare) {
+                        RadioShareSupportEntriesBlock(markers, txtSupportEntriesTitle, txtOther, txtElements, cardBgColor, blockShape)
+                    }
+                }
+            }
+
+            if (incQrCode) {
+                RadioShareQrBlock(mainMarker = mainMarker, isSupportShare = isSupportShare)
+            }
+
+            Text(
+                text = txtGeneratedBy,
+                fontSize = 12.sp,
+                color = Color.Gray,
+                modifier = Modifier.align(Alignment.CenterHorizontally)
+            )
+        }
+    }
+}
+
+@Composable
+private fun RadioShareHeaderBlock(
+    marker: RadioMapMarker,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape
+) {
+    Card(
+        shape = blockShape,
+        colors = CardDefaults.cardColors(containerColor = cardBgColor),
+        elevation = CardDefaults.cardElevation(0.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)),
+                contentAlignment = Alignment.Center
+            ) {
+                RadioUsageIcon(
+                    serviceMask = marker.serviceMask,
+                    systemMask = marker.systemMask,
+                    size = 48.dp
+                )
+            }
+            Spacer(modifier = Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = marker.networkName,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = marker.systemSummary ?: marker.subtitle,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun RadioShareBearingHeightBlock(
+    marker: RadioMapMarker,
+    bearingStr: String,
+    txtCapMeasured: String,
+    txtSupportHeightShort: String,
+    incConfidential: Boolean,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        val rotation = bearingStr.removeSuffix("\u00B0").toFloatOrNull() ?: 0f
+        if (!incConfidential) {
+            Card(
+                modifier = Modifier.weight(1f).fillMaxHeight(),
+                shape = blockShape,
+                colors = CardDefaults.cardColors(containerColor = cardBgColor),
+                elevation = CardDefaults.cardElevation(0.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp).fillMaxSize(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(txtCapMeasured, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
+                    Spacer(Modifier.height(8.dp))
+                    Icon(
+                        Icons.Default.Navigation,
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp).rotate(rotation),
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                    Spacer(Modifier.height(8.dp))
+                    Text(bearingStr, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Card(
+            modifier = (if (incConfidential) Modifier.fillMaxWidth() else Modifier.weight(1f)).fillMaxHeight(),
+            shape = blockShape,
+            colors = CardDefaults.cardColors(containerColor = cardBgColor),
+            elevation = CardDefaults.cardElevation(0.dp)
+        ) {
+            Column(
+                modifier = Modifier.padding(16.dp).fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(txtSupportHeightShort, style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
+                Spacer(Modifier.height(8.dp))
+                Icon(
+                    Icons.Default.VerticalAlignTop,
+                    contentDescription = null,
+                    modifier = Modifier.size(40.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(Modifier.height(8.dp))
+                Text(marker.supportHeightSummary ?: "--", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@Composable
+private fun RadioShareMapBlock(
+    mapBitmap: Bitmap?,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape
+) {
+    if (mapBitmap == null) return
+    Card(
+        shape = blockShape,
+        colors = CardDefaults.cardColors(containerColor = cardBgColor),
+        elevation = CardDefaults.cardElevation(0.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Image(
+            bitmap = mapBitmap.asImageBitmap(),
+            contentDescription = null,
+            modifier = Modifier.fillMaxWidth().height(180.dp),
+            contentScale = ContentScale.Crop
+        )
+    }
+}
+
+@Composable
+private fun RadioShareInfoCard(
+    title: String,
+    icon: ImageVector,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape,
+    leadingContent: (@Composable () -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    Card(
+        shape = blockShape,
+        colors = CardDefaults.cardColors(containerColor = cardBgColor),
+        elevation = CardDefaults.cardElevation(0.dp),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (leadingContent != null) {
+                    leadingContent()
+                } else {
+                    Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(title, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 12.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
+            )
+            content()
+        }
+    }
+}
+
+@Composable
+private fun RadioShareSupportBlock(
+    marker: RadioMapMarker,
+    isSupportShare: Boolean,
+    distanceStr: String,
+    bearingStr: String,
+    txtSupportDetails: String,
+    txtIdSupport: String,
+    txtAddress: String,
+    txtGps: String,
+    txtSupportHeight: String,
+    txtSupportNature: String,
+    txtOwner: String,
+    txtDistance: String,
+    txtFromMyPosition: String,
+    txtBearing: String,
+    incConfidential: Boolean,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape
+) {
+    RadioShareInfoCard(
+        title = txtSupportDetails,
+        icon = Icons.Default.Info,
+        cardBgColor = cardBgColor,
+        blockShape = blockShape
+    ) {
+        if (isSupportShare) {
+            RadioShareInfoLine(txtIdSupport, marker.supportId.ifBlank { "--" })
+            RadioShareInfoLine(txtAddress, marker.addressSummary)
+            RadioShareInfoLine(txtGps, formatRadioShareGps(marker.latitude, marker.longitude))
+            RadioShareInfoLine(txtSupportHeight, marker.supportHeightSummary)
+        }
+        RadioShareInfoLine(txtSupportNature, marker.supportNatureSummary)
+        RadioShareInfoLine(txtOwner, marker.supportOwnerSummary)
+        if (incConfidential) {
+            Text(
+                stringResource(R.string.appstrings_distance_hidden),
+                fontSize = 12.sp,
+                color = MaterialTheme.colorScheme.primary,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(top = 4.dp)
+            )
+        } else {
+            RadioShareInfoLine(txtDistance, "$distanceStr $txtFromMyPosition")
+            RadioShareInfoLine(txtBearing, bearingStr)
+        }
+    }
+}
+
+@Composable
+private fun RadioShareRadioBlock(
+    marker: RadioMapMarker,
+    txtRadioTitle: String,
+    txtCategories: String,
+    txtNetwork: String,
+    txtSystems: String,
+    txtFrequencies: String,
+    txtEmitters: String,
+    txtAntennas: String,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape
+) {
+    RadioShareInfoCard(
+        title = txtRadioTitle,
+        icon = Icons.Default.Info,
+        cardBgColor = cardBgColor,
+        blockShape = blockShape,
+        leadingContent = {
+            RadioUsageIcon(
+                serviceMask = marker.serviceMask,
+                systemMask = marker.systemMask,
+                size = 22.dp
+            )
+        }
+    ) {
+        RadioShareInfoLine(txtCategories, radioShareUsageSummary(marker))
+        RadioShareInfoLine(txtNetwork, marker.networkName)
+        RadioShareInfoLine(txtSystems, marker.systemSummary)
+        RadioShareInfoLine(txtFrequencies, marker.frequencySummary)
+        RadioShareInfoLine(txtEmitters, marker.emitterCount.takeIf { it > 0 }?.toString())
+        RadioShareInfoLine(txtAntennas, marker.antennaCount.takeIf { it > 0 }?.toString())
+    }
+}
+
+@Composable
+private fun RadioShareProgramsBlock(
+    marker: RadioMapMarker,
+    txtPrograms: String,
+    txtProgramFallback: String,
+    txtOther: String,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape
+) {
+    val programs = marker.broadcastPrograms
+    if (programs.isEmpty()) return
+    RadioShareInfoCard(
+        title = txtPrograms,
+        icon = Icons.Default.Info,
+        cardBgColor = cardBgColor,
+        blockShape = blockShape,
+        leadingContent = {
+            RadioUsageIcon(
+                serviceMask = marker.serviceMask,
+                systemMask = marker.systemMask,
+                size = 22.dp
+            )
+        }
+    ) {
+        programs.take(12).forEach { program ->
+            RadioShareInfoLine(program.serviceName, program.detailLabel ?: txtProgramFallback)
+        }
+        if (programs.size > 12) {
+            RadioShareInfoLine(txtOther, "+${programs.size - 12} ${txtPrograms.lowercase(Locale.ROOT)}")
+        }
+    }
+}
+
+@Composable
+private fun RadioShareAzimuthsBlock(
+    marker: RadioMapMarker,
+    txtAzimuths: String,
+    txtOther: String,
+    txtAntennas: String,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape
+) {
+    if (marker.antennaLines.isEmpty()) return
+    RadioShareInfoCard(
+        title = txtAzimuths,
+        icon = Icons.Default.Navigation,
+        cardBgColor = cardBgColor,
+        blockShape = blockShape
+    ) {
+        marker.antennaLines.take(12).forEach { line ->
+            val label = line.substringBefore(":", txtAntennas).trim().ifBlank { txtAntennas }
+            val value = line.substringAfter(":", line).trim()
+            RadioShareInfoLine(label, value)
+        }
+        if (marker.antennaLines.size > 12) {
+            RadioShareInfoLine(txtOther, "+${marker.antennaLines.size - 12} ${txtAntennas.lowercase(Locale.ROOT)}")
+        }
+    }
+}
+
+@Composable
+private fun RadioShareExtraDetailsBlock(
+    marker: RadioMapMarker,
+    txtDetailsAnfr: String,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape
+) {
+    val details = radioShareExtraDetailLines(marker)
+    if (details.isEmpty()) return
+    RadioShareInfoCard(
+        title = txtDetailsAnfr,
+        icon = Icons.Default.Info,
+        cardBgColor = cardBgColor,
+        blockShape = blockShape
+    ) {
+        details.forEach { (label, value) ->
+            RadioShareInfoLine(label, value)
+        }
+    }
+}
+
+@Composable
+private fun RadioShareSupportEntriesBlock(
+    markers: List<RadioMapMarker>,
+    txtSupportEntriesTitle: String,
+    txtOther: String,
+    txtElements: String,
+    cardBgColor: Color,
+    blockShape: RoundedCornerShape
+) {
+    if (markers.isEmpty()) return
+    RadioShareInfoCard(
+        title = txtSupportEntriesTitle,
+        icon = Icons.Default.WifiTethering,
+        cardBgColor = cardBgColor,
+        blockShape = blockShape
+    ) {
+        markers.take(16).forEach { marker ->
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(54.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    RadioUsageIcon(
+                        serviceMask = marker.serviceMask,
+                        systemMask = marker.systemMask,
+                        size = 34.dp
+                    )
+                }
+                Spacer(modifier = Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = marker.networkName,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 16.sp
+                    )
+                    Text(
+                        text = marker.broadcastProgramSummary ?: marker.systemSummary ?: marker.subtitle,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+        if (markers.size > 16) {
+            RadioShareInfoLine(txtOther, "+${markers.size - 16} $txtElements")
+        }
+    }
+}
+
+@Composable
+private fun RadioShareQrBlock(
+    mainMarker: RadioMapMarker,
+    isSupportShare: Boolean
+) {
+    val qrUri = remember(mainMarker.stationId, mainMarker.supportId, isSupportShare) {
+        radioShareQrUri(mainMarker, isSupportShare)
+    }
+    val qrBitmap = remember(qrUri) { generateQrCodeBitmap(qrUri, 200) }
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        if (qrBitmap != null) {
+            Image(
+                bitmap = qrBitmap.asImageBitmap(),
+                contentDescription = stringResource(R.string.brand_qr_code),
+                modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+        }
+        Column(horizontalAlignment = Alignment.Start) {
+            Text(text = stringResource(R.string.appstrings_scan_to_open), fontSize = 11.sp, color = Color.Gray)
+            Text(
+                text = stringResource(R.string.appstrings_geo_tower_app),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
+@Composable
+private fun RadioShareInfoLine(
+    label: String,
+    value: String?
+) {
+    val cleanValue = value?.takeIf { it.isNotBlank() } ?: return
+    Text(
+        buildAnnotatedString {
+            withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) {
+                append("$label : ")
+            }
+            withStyle(SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) {
+                append(cleanValue)
+            }
+        },
+        fontSize = 14.sp,
+        lineHeight = 19.sp,
+        modifier = Modifier.padding(vertical = 2.dp)
+    )
+}
+
+private fun formatRadioShareGps(latitude: Double, longitude: Double): String {
+    return String.format(Locale.US, "%.5f%s, %.5f%s", latitude, "\u00B0", longitude, "\u00B0")
+}
+
+@Composable
+private fun radioShareUsageSummary(marker: RadioMapMarker): String {
+    val tv = stringResource(R.string.appstrings_radio_category_tv)
+    val radio = stringResource(R.string.appstrings_radio_category_radio)
+    val privateMobile = stringResource(R.string.appstrings_radio_category_private_mobile)
+    val fh = stringResource(R.string.appstrings_radio_category_fh)
+    val other = stringResource(R.string.appstrings_radio_category_other)
+    return radioUsageKindsFor(marker.serviceMask, marker.systemMask)
+        .map { kind ->
+            when (kind) {
+                RadioUsageKind.Tv -> tv
+                RadioUsageKind.Radio -> radio
+                RadioUsageKind.PrivateMobile -> privateMobile
+                RadioUsageKind.Fh -> fh
+                RadioUsageKind.Other -> other
+            }
+        }
+        .distinct()
+        .joinToString(", ")
+}
+
+@Composable
+private fun radioShareAvailableBlocks(
+    marker: RadioMapMarker,
+    markers: List<RadioMapMarker>,
+    isSupportShare: Boolean
+): List<RadioShareBlock> {
+    val order = radioShareDefaultBlocks(isSupportShare)
+    return order.mapNotNull { blockId ->
+        when (blockId) {
+            RADIO_SHARE_HEADER -> null
+            RADIO_SHARE_BEARING_HEIGHT -> if (!isSupportShare) RadioShareBlock(blockId, stringResource(R.string.appstrings_radio_share_block_bearing_height)) else null
+            RADIO_SHARE_MAP -> RadioShareBlock(blockId, stringResource(R.string.appstrings_radio_share_block_map))
+            RADIO_SHARE_SUPPORT -> RadioShareBlock(blockId, stringResource(R.string.appstrings_share_support_option))
+            RADIO_SHARE_IDS -> if (!isSupportShare) RadioShareBlock(blockId, stringResource(R.string.appstrings_share_ids_option)) else null
+            RADIO_SHARE_ADDRESS -> if (!isSupportShare) RadioShareBlock(blockId, stringResource(R.string.appstrings_share_address_option)) else null
+            RADIO_SHARE_RADIO -> if (!isSupportShare) RadioShareBlock(blockId, stringResource(R.string.appstrings_radio_share_block_radio_freqs)) else null
+            RADIO_SHARE_PROGRAMS -> if (!isSupportShare && marker.broadcastPrograms.isNotEmpty()) RadioShareBlock(blockId, stringResource(R.string.appstrings_radio_share_block_programs)) else null
+            RADIO_SHARE_AZIMUTHS -> if (!isSupportShare && marker.antennaLines.isNotEmpty()) RadioShareBlock(blockId, stringResource(R.string.appstrings_radio_share_block_azimuths)) else null
+            RADIO_SHARE_EXTRA -> if (!isSupportShare && radioShareExtraDetailLines(marker).isNotEmpty()) RadioShareBlock(blockId, stringResource(R.string.appstrings_radio_share_block_extra)) else null
+            RADIO_SHARE_SUPPORT_ENTRIES -> if (isSupportShare && markers.isNotEmpty()) RadioShareBlock(blockId, stringResource(R.string.appstrings_radio_share_block_support_entries)) else null
+            else -> null
+        }
+    }
+}
+
+private fun radioShareDefaultBlocks(isSupportShare: Boolean): List<String> {
+    return if (isSupportShare) DEFAULT_RADIO_SUPPORT_SHARE_ORDER else DEFAULT_RADIO_SITE_SHARE_ORDER
+}
+
+private fun radioShareDefaultSelectedBlocks(
+    isSupportShare: Boolean,
+    availableIds: Set<String>
+): Set<String> {
+    return radioShareDefaultBlocks(isSupportShare)
+        .filter { it in availableIds }
+        .toSet()
+        .ifEmpty { availableIds }
+}
+
+private fun radioShareNormalizeOrder(
+    currentOrder: List<String>,
+    availableIds: Set<String>,
+    isSupportShare: Boolean
+): List<String> {
+    val defaultOrder = radioShareDefaultBlocks(isSupportShare)
+    val kept = currentOrder.filter { it in availableIds }.distinct()
+    val missing = defaultOrder.filter { it in availableIds && it !in kept }
+    return (kept + missing).ifEmpty { defaultOrder.filter { it in availableIds } }
+}
+
+private fun radioShareQrUri(marker: RadioMapMarker, isSupportShare: Boolean): String {
+    val supportId = marker.supportId.ifBlank { marker.id }
+    return if (isSupportShare || marker.stationId.isBlank()) {
+        "geotower://support/${Uri.encode(supportId)}"
+    } else {
+        "geotower://radio/${Uri.encode(marker.stationId)}/${Uri.encode(supportId)}"
+    }
+}
+
+private fun radioShareExtraDetailLines(marker: RadioMapMarker): List<Pair<String, String>> {
+    val alreadyDisplayed = setOf("adresse", "support", "systemes", "frequences", "programmes", "antennes")
+    return marker.detailText
+        ?.lineSequence()
+        ?.mapNotNull { rawLine ->
+            val label = rawLine.substringBefore(":", missingDelimiterValue = "").trim()
+            val value = rawLine.substringAfter(":", missingDelimiterValue = "").trim()
+            if (label.isBlank() || value.isBlank() || label.lowercase(Locale.ROOT) in alreadyDisplayed) {
+                null
+            } else {
+                label to value
+            }
+        }
+        ?.distinct()
+        ?.toList()
+        .orEmpty()
 }
 
 @Composable
@@ -925,7 +2248,7 @@ fun shareFullAntennaCapture(
                                             ).filter { band ->
                                                 when (band.gen) {
                                                     5 -> AppConfig.siteShowTechno5G.value && when (band.value) {
-                                                        700 -> AppConfig.siteF5G_700.value; 2100 -> AppConfig.siteF5G_2100.value; 3500 -> AppConfig.siteF5G_3500.value; 26000 -> AppConfig.siteF5G_26000.value; else -> true
+                                                        700 -> AppConfig.siteF5G_700.value; 1400 -> AppConfig.siteF5G_1400.value; 2100 -> AppConfig.siteF5G_2100.value; 3500 -> AppConfig.siteF5G_3500.value; 4200 -> AppConfig.siteF5G_4200.value; 26000 -> AppConfig.siteF5G_26000.value; else -> true
                                                     }
 
                                                     4 -> AppConfig.siteShowTechno4G.value && when (band.value) {
@@ -1325,7 +2648,7 @@ fun shareFullAntennaCapture(
                                     ).filter { band ->
                                         when (band.gen) {
                                             5 -> AppConfig.siteShowTechno5G.value && when (band.value) {
-                                                700 -> AppConfig.siteF5G_700.value; 2100 -> AppConfig.siteF5G_2100.value; 3500 -> AppConfig.siteF5G_3500.value; 26000 -> AppConfig.siteF5G_26000.value; else -> true
+                                                700 -> AppConfig.siteF5G_700.value; 1400 -> AppConfig.siteF5G_1400.value; 2100 -> AppConfig.siteF5G_2100.value; 3500 -> AppConfig.siteF5G_3500.value; 4200 -> AppConfig.siteF5G_4200.value; 26000 -> AppConfig.siteF5G_26000.value; else -> true
                                             }
 
                                             4 -> AppConfig.siteShowTechno4G.value && when (band.value) {
@@ -1702,6 +3025,8 @@ fun shareFullSiteCapture(
     incConfidential: Boolean,
     incQrCode: Boolean,
     shareOrder: List<String>,
+    radioMarkers: List<RadioMapMarker> = emptyList(),
+    incRadioEntries: Boolean = radioMarkers.isNotEmpty(),
     onComplete: (() -> Unit)? = null
 ) {
     try {
@@ -1797,6 +3122,18 @@ fun shareFullSiteCapture(
                                                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
                                                 }
                                             }
+                                        }
+                                    }
+                                    SUPPORT_SHARE_RADIO_ENTRIES -> {
+                                        if (incRadioEntries && radioMarkers.isNotEmpty()) {
+                                            RadioShareSupportEntriesBlock(
+                                                markers = radioMarkers,
+                                                txtSupportEntriesTitle = stringResource(R.string.appstrings_radio_share_block_support_entries),
+                                                txtOther = stringResource(R.string.appstrings_radio_share_other),
+                                                txtElements = stringResource(R.string.appstrings_radio_share_elements),
+                                                cardBgColor = MaterialTheme.colorScheme.surfaceVariant,
+                                                blockShape = RoundedCornerShape(12.dp)
+                                            )
                                         }
                                     }
                                 }
@@ -2388,7 +3725,8 @@ fun SupportShareMenu(
     bearingStr: String,
     useOneUi: Boolean,
     buttonShape: Shape,
-    globalMapRef: org.osmdroid.views.MapView?
+    globalMapRef: org.osmdroid.views.MapView?,
+    radioMarkers: List<RadioMapMarker> = emptyList()
 ) {
     val context = LocalContext.current
     val currentView = LocalView.current
@@ -2412,8 +3750,12 @@ fun SupportShareMenu(
     var incSupport by remember { mutableStateOf(SharePrefs.supportDetailsEnabled.read(prefs)) }
     var incOperators by remember { mutableStateOf(SharePrefs.supportOperatorsEnabled.read(prefs)) }
     var incConfidential by remember { mutableStateOf(SharePrefs.supportConfidentialEnabled.read(prefs)) }
+    val hasRadioEntries = radioMarkers.isNotEmpty()
     var incQrCode by remember { mutableStateOf(SharePrefs.supportQrEnabled.read(prefs)) } // ✅ NOUVELLE VARIABLE
-    var shareOrder by remember { mutableStateOf(SharePrefs.supportOrder(prefs)) }
+    var incRadioEntries by remember(hasRadioEntries) { mutableStateOf(hasRadioEntries) }
+    var shareOrder by remember(hasRadioEntries) {
+        mutableStateOf(normalizeSupportShareOrder(SharePrefs.supportOrder(prefs), hasRadioEntries))
+    }
 
     // ✅ FORCE LE RECHARGEMENT À CHAQUE OUVERTURE
     LaunchedEffect(showShareSheet) {
@@ -2423,7 +3765,8 @@ fun SupportShareMenu(
             incOperators = SharePrefs.supportOperatorsEnabled.read(prefs)
             incConfidential = SharePrefs.supportConfidentialEnabled.read(prefs)
             incQrCode = SharePrefs.supportQrEnabled.read(prefs) // ✅ RECHARGEMENT
-            shareOrder = SharePrefs.supportOrder(prefs)
+            incRadioEntries = hasRadioEntries
+            shareOrder = normalizeSupportShareOrder(SharePrefs.supportOrder(prefs), hasRadioEntries)
         }
     }
 
@@ -2454,6 +3797,7 @@ fun SupportShareMenu(
     val txtShareImagePreparingInProgress = stringResource(R.string.appstrings_share_image_preparing_in_progress)
     val txtMove = stringResource(R.string.appstrings_move)
     val txtInitError = stringResource(R.string.appstrings_init_error)
+    val txtRadioEntriesTitle = stringResource(R.string.appstrings_radio_share_block_support_entries)
 
     Button(
         onClick = { safeClick { showShareSheet = true } },
@@ -2508,8 +3852,9 @@ fun SupportShareMenu(
                     items = shareOrder,
                     itemHeight = itemHeight,
                     onOrderChange = { newOrder ->
-                        shareOrder = newOrder
-                        prefs.edit().putString(SharePrefs.SUPPORT_ORDER, newOrder.joinToString(",")).apply()
+                        val normalizedOrder = normalizeSupportShareOrder(newOrder, hasRadioEntries)
+                        shareOrder = normalizedOrder
+                        persistSupportShareOrder(prefs, normalizedOrder)
                     }
                 )
 
@@ -2525,6 +3870,7 @@ fun SupportShareMenu(
                                 "map" -> Triple(stringResource(R.string.appstrings_share_map_option), incMap, { it: Boolean -> incMap = it })
                                 "support" -> Triple(stringResource(R.string.appstrings_share_support_option), incSupport, { it: Boolean -> incSupport = it })
                                 "operators" -> Triple(stringResource(R.string.appstrings_operators_title), incOperators, { it: Boolean -> incOperators = it })
+                                SUPPORT_SHARE_RADIO_ENTRIES -> Triple(txtRadioEntriesTitle, incRadioEntries, { it: Boolean -> incRadioEntries = it })
                                 else -> Triple("", false, { _: Boolean -> })
                             }
 
@@ -2558,9 +3904,10 @@ fun SupportShareMenu(
                     // ✅ AJOUT DU BOUTON RÉINITIALISER
                     TextButton(
                         onClick = {
-                            shareOrder = listOf("map", "support", "operators")
-                            prefs.edit().putString(SharePrefs.SUPPORT_ORDER, shareOrder.joinToString(",")).apply()
-                            incMap = true; incSupport = true; incOperators = true; incQrCode = true
+                            val normalizedOrder = normalizeSupportShareOrder(listOf("map", "support", "operators"), hasRadioEntries)
+                            shareOrder = normalizedOrder
+                            persistSupportShareOrder(prefs, normalizedOrder)
+                            incMap = true; incSupport = true; incOperators = true; incRadioEntries = hasRadioEntries; incQrCode = true
                         },
                         modifier = Modifier.align(Alignment.CenterHorizontally)
                     ) {
@@ -2615,6 +3962,8 @@ fun SupportShareMenu(
                                         txtSupportDetailTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtOperatorsTitle, txtGeneratedBy, txtShareSiteVia, txtIdNumber,
                                         txtInitError, txtSupportNature, txtOwner, mapBmp,
                                         incMap, incSupport, incOperators, incConfidential, incQrCode, shareOrder,
+                                        radioMarkers = radioMarkers,
+                                        incRadioEntries = incRadioEntries,
                                         onComplete = { isGeneratingShare = false }
                                     )
                                 } catch (e: Exception) {

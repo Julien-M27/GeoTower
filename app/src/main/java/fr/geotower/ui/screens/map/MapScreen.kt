@@ -10,6 +10,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
+import android.net.Uri
 import android.os.Build
 import android.view.MotionEvent
 import android.view.Surface as AndroidSurface
@@ -50,10 +51,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.NearMe
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Smartphone
@@ -122,10 +125,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.navigation.NavController
+import fr.geotower.data.upload.SignalQuestUploadDraftStore
 import fr.geotower.data.api.GeoTowerDataCoverage
 import fr.geotower.data.api.NominatimApi
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.RadioMapMarker
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.data.models.isDeclaredActive
 import fr.geotower.data.models.physicalSiteKey
@@ -138,6 +143,7 @@ import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.MapDisplayPrefs
 import fr.geotower.utils.MapUtils
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.filteredAzimuthsForFrequencySelection
 import fr.geotower.utils.isNetworkAvailable
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.currentCoroutineContext
@@ -168,6 +174,7 @@ import java.io.File
 import java.text.Normalizer
 import java.util.Locale
 import android.os.Environment
+import kotlin.math.abs
 import kotlin.math.log2
 import kotlin.math.roundToInt
 import androidx.compose.ui.res.stringResource
@@ -178,10 +185,30 @@ private const val INITIAL_LOCATION_ZOOM = 16.0
 private const val MOUSE_WHEEL_ZOOM_STEP = 1.0
 private const val MOUSE_WHEEL_ZOOM_ANIMATION_MS = 80L
 private const val WEB_MERCATOR_WORLD_TILE_SIZE_PX = 256.0
+private const val MAP_AZIMUTH_DETAIL_LIMIT = 6000
+private const val RADIO_MAP_MARKER_LIMIT = 4500
+private const val MAP_RELOAD_DEBOUNCE_MS = 180L
+private const val MAP_RELOAD_MIN_ZOOM_DELTA = 0.08
+private const val MAP_RELOAD_MIN_VIEWPORT_SHIFT_RATIO = 0.10
+private const val MAP_MARKER_REDRAW_DEBOUNCE_MS = 40L
+private const val MAP_COMPASS_UPDATE_INTERVAL_MS = 80L
+
+private val hsBadgeDrawableCache = android.util.LruCache<Int, BitmapDrawable>(4)
+private val hsMarkerIconCache = android.util.LruCache<String, BitmapDrawable>(500)
 
 private data class DeclaredSiteStats(
     val activeCount: Int,
     val totalCount: Int
+)
+
+private data class MapViewportSnapshot(
+    val zoom: Double,
+    val latNorth: Double,
+    val lonEast: Double,
+    val latSouth: Double,
+    val lonWest: Double,
+    val centerLat: Double,
+    val centerLon: Double
 )
 
 private data class SearchAreaBounds(
@@ -266,10 +293,50 @@ private fun MapView.visibleLongitudeBounds(): Pair<Double, Double> {
     }
 }
 
-private fun MapView.loadVisibleAntennas(viewModel: MapViewModel) {
+private fun MapView.visibleViewportSnapshot(): MapViewportSnapshot {
     val box = boundingBox
     val (lonWest, lonEast) = visibleLongitudeBounds()
-    viewModel.loadAntennasInBox(zoomLevelDouble, box.latNorth, lonEast, box.latSouth, lonWest)
+    return MapViewportSnapshot(
+        zoom = zoomLevelDouble,
+        latNorth = box.latNorth,
+        lonEast = lonEast,
+        latSouth = box.latSouth,
+        lonWest = lonWest,
+        centerLat = mapCenter.latitude,
+        centerLon = mapCenter.longitude
+    )
+}
+
+private fun longitudeDeltaDegrees(a: Double, b: Double): Double {
+    return abs(((a - b + 540.0) % 360.0) - 180.0)
+}
+
+private fun longitudeSpanDegrees(lonEast: Double, lonWest: Double): Double {
+    val rawSpan = lonEast - lonWest
+    return if (rawSpan < 0.0) rawSpan + 360.0 else rawSpan
+}
+
+private fun MapViewportSnapshot.isCloseTo(other: MapViewportSnapshot): Boolean {
+    if (abs(zoom - other.zoom) >= MAP_RELOAD_MIN_ZOOM_DELTA) return false
+
+    val latSpan = abs(latNorth - latSouth).coerceAtLeast(0.001)
+    val lonSpan = longitudeSpanDegrees(lonEast, lonWest).coerceAtLeast(0.001)
+    val maxLatShift = latSpan * MAP_RELOAD_MIN_VIEWPORT_SHIFT_RATIO
+    val maxLonShift = lonSpan * MAP_RELOAD_MIN_VIEWPORT_SHIFT_RATIO
+
+    return abs(centerLat - other.centerLat) < maxLatShift &&
+        longitudeDeltaDegrees(centerLon, other.centerLon) < maxLonShift
+}
+
+private fun MapView.loadVisibleAntennas(viewModel: MapViewModel) {
+    val snapshot = visibleViewportSnapshot()
+    viewModel.loadAntennasInBox(
+        snapshot.zoom,
+        snapshot.latNorth,
+        snapshot.lonEast,
+        snapshot.latSouth,
+        snapshot.lonWest
+    )
 }
 
 private fun MapView.clearCityFilterAndReloadVisible(viewModel: MapViewModel) {
@@ -485,7 +552,8 @@ private fun hasVisibleHsOperator(
 @Composable
 fun MapScreen(
     navController: NavController,
-    viewModel: MapViewModel
+    viewModel: MapViewModel,
+    photoDraftId: String? = null
 ) {
     val context = LocalContext.current
     val resources = LocalResources.current
@@ -497,6 +565,7 @@ fun MapScreen(
     val uriHandler = LocalUriHandler.current
     val density = LocalDensity.current
     val antennas by viewModel.antennas.collectAsState()
+    val radioMarkers by viewModel.radioMarkers.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val sitesHs by viewModel.sitesHs.collectAsState()
     val cityStatsTechniques by viewModel.cityStatsTechniques.collectAsState()
@@ -544,6 +613,11 @@ fun MapScreen(
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val uiStyle = LocalGeoTowerUiStyle.current
+    val pendingSharedPhotoDraftId = photoDraftId?.takeIf { it.isNotBlank() }
+    val pendingSharedPhotoCount = remember(pendingSharedPhotoDraftId) {
+        pendingSharedPhotoDraftId?.let { SignalQuestUploadDraftStore.peek(it).size } ?: 0
+    }
+    val isSharedPhotoSelectionMode = pendingSharedPhotoDraftId != null && pendingSharedPhotoCount > 0
 
     fun isMapProviderEnabled(providerId: Int): Boolean {
         return when (providerId) {
@@ -654,6 +728,7 @@ fun MapScreen(
     val searchBoundaryOverlay = remember { FolderOverlay() }
     // ✅ LE CALQUE MACRO POUR LA VUE DÉZOOMÉE
     val macroOverlay = remember { FolderOverlay() }
+    val radioOverlay = remember { FolderOverlay() }
 
     fun refreshSearchBoundaryOverlay(map: MapView, polygons: List<List<GeoPoint>>?) {
         searchBoundaryOverlay.items.clear()
@@ -742,11 +817,19 @@ fun MapScreen(
         operatorSearchPreviousOperatorKeys = null
     }
 
+    fun cancelSharedPhotoSelection() {
+        pendingSharedPhotoDraftId?.let { SignalQuestUploadDraftStore.discard(it) }
+        restoreOperatorSearchSelection()
+        safeBackNavigation.navigateBack()
+    }
+
     // ✅ CORRECTION : Gère le geste "Retour" physique du téléphone
     androidx.activity.compose.BackHandler {
         if (isMeasuringMode) {
             isMeasuringMode = false
             clearMeasureSelections()
+        } else if (isSharedPhotoSelectionMode) {
+            cancelSharedPhotoSelection()
         } else {
             restoreOperatorSearchSelection()
             safeBackNavigation.navigateBack()
@@ -848,7 +931,7 @@ fun MapScreen(
     val shouldInvertColors = ((mapProvider == 0 || mapProvider == 1) && ignStyle == 1)
 
     var azimuth by remember { mutableFloatStateOf(0f) }
-    var continuousAzimuth by remember { mutableFloatStateOf(0f) }
+    val continuousAzimuth = remember { floatArrayOf(0f) }
 
     var isSearchActive by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -895,6 +978,7 @@ fun MapScreen(
         @Suppress("DEPRECATION")
         val rotationSensor = sensorManager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
             ?: sensorManager?.getDefaultSensor(Sensor.TYPE_ORIENTATION)
+        var lastAzimuthUiUpdateMs = 0L
 
         val sensorEventListener = object : SensorEventListener {
             override fun onSensorChanged(event: SensorEvent) {
@@ -910,14 +994,19 @@ fun MapScreen(
 
                 rawAzimuth = (rawAzimuth + 360) % 360
 
-                var delta = rawAzimuth - (continuousAzimuth % 360f)
+                var delta = rawAzimuth - (continuousAzimuth[0] % 360f)
                 if (delta < -180f) delta += 360f
                 else if (delta > 180f) delta -= 360f
 
-                continuousAzimuth += delta * 0.15f
+                val smoothedAzimuth = continuousAzimuth[0] + delta * 0.15f
+                continuousAzimuth[0] = smoothedAzimuth
 
-                if (Math.abs(continuousAzimuth - azimuth) > 0.5f) {
-                    azimuth = continuousAzimuth
+                val now = System.currentTimeMillis()
+                if (abs(smoothedAzimuth - azimuth) > 0.75f &&
+                    now - lastAzimuthUiUpdateMs >= MAP_COMPASS_UPDATE_INTERVAL_MS
+                ) {
+                    lastAzimuthUiUpdateMs = now
+                    azimuth = smoothedAzimuth
                 }
             }
             override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
@@ -976,7 +1065,7 @@ fun MapScreen(
         AppConfig.showTechnoFH.value, AppConfig.showTechno2G.value, AppConfig.showTechno3G.value, AppConfig.showTechno4G.value, AppConfig.showTechno5G.value,
         AppConfig.f2G_900.value, AppConfig.f2G_1800.value, AppConfig.f3G_900.value, AppConfig.f3G_2100.value,
         AppConfig.f4G_700.value, AppConfig.f4G_800.value, AppConfig.f4G_900.value, AppConfig.f4G_1800.value, AppConfig.f4G_2100.value, AppConfig.f4G_2600.value,
-        AppConfig.f5G_700.value, AppConfig.f5G_2100.value, AppConfig.f5G_3500.value, AppConfig.f5G_26000.value,
+        AppConfig.f5G_700.value, AppConfig.f5G_1400.value, AppConfig.f5G_2100.value, AppConfig.f5G_3500.value, AppConfig.f5G_4200.value, AppConfig.f5G_26000.value,
         AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value, AppConfig.showOnlyZbSites.value, sitesHs, currentCityPolygons
     ) {
         val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
@@ -1193,7 +1282,10 @@ fun MapScreen(
 
         map.post {
             try {
-                navController.navigate("support_detail/$supportId?operator=&fromMap=true") {
+                val photoDraftParam = pendingSharedPhotoDraftId
+                    ?.let { "&photoDraftId=${Uri.encode(it)}" }
+                    .orEmpty()
+                navController.navigate("support_detail/$supportId?operator=&fromMap=true$photoDraftParam") {
                     launchSingleTop = true
                 }
             } catch (e: Exception) {
@@ -1202,10 +1294,171 @@ fun MapScreen(
         }
     }
 
+    fun openRadioSupportDetailFromMap(map: MapView, marker: RadioMapMarker) {
+        if (marker.supportId.isBlank()) {
+            AppLogger.w("GeoTowerMap", "Cannot open radio support detail for marker=${marker.id}")
+            return
+        }
+
+        prefs.edit()
+            .putFloat("clicked_lat", marker.latitude.toFloat())
+            .putFloat("clicked_lon", marker.longitude.toFloat())
+            .putFloat("last_map_lat", marker.latitude.toFloat())
+            .putFloat("last_map_lon", marker.longitude.toFloat())
+            .putFloat("last_map_zoom", 18f)
+            .apply()
+
+        map.post {
+            try {
+                val numericSupportId = marker.supportId.toLongOrNull()
+                if (numericSupportId != null) {
+                    val photoDraftParam = pendingSharedPhotoDraftId
+                        ?.let { "&photoDraftId=${Uri.encode(it)}" }
+                        .orEmpty()
+                    navController.navigate("support_detail/$numericSupportId?operator=&fromMap=true$photoDraftParam") {
+                        launchSingleTop = true
+                    }
+                } else if (marker.stationId.isNotBlank()) {
+                    navController.navigate(
+                        "radio_site_detail/${Uri.encode(marker.stationId)}/${Uri.encode(marker.supportId)}"
+                    ) {
+                        launchSingleTop = true
+                    }
+                } else {
+                    AppLogger.w("GeoTowerMap", "Cannot open non-numeric radio support without stationId for marker=${marker.id}")
+                }
+            } catch (e: Exception) {
+                AppLogger.w("GeoTowerMap", "Radio marker navigation failed for marker=${marker.id}", e)
+            }
+        }
+    }
+
+    fun updateRadioMarkers(map: MapView, markers: List<RadioMapMarker>) {
+        radioOverlay.items.clear()
+
+        if (AppConfig.radioMapCategoryMask() == 0 || markers.isEmpty()) {
+            map.invalidate()
+            return
+        }
+
+        val mobileSupportLocationKeys = filteredAntennas
+            .asSequence()
+            .filterNot { it.idAnfr.startsWith("CLUSTER_") }
+            .filter { OperatorColors.keysFor(it.operateur).isNotEmpty() }
+            .map { mapLocationKey(it.latitude, it.longitude) }
+            .toSet()
+
+        fun radioSupportGroupKey(marker: RadioMapMarker): String {
+            return marker.supportId
+                .takeIf { it.isNotBlank() }
+                ?.let { "support:$it" }
+                ?: "location:${mapLocationKey(marker.latitude, marker.longitude)}"
+        }
+
+        fun aggregateRadioSupportMarkers(group: List<RadioMapMarker>): RadioMapMarker {
+            val primary = group.maxWithOrNull(
+                compareBy<RadioMapMarker> { it.emitterCount }
+                    .thenBy { it.antennaCount }
+            ) ?: group.first()
+            val actorLabels = group.mapNotNull { it.actorLabel?.takeIf { label -> label.isNotBlank() } }.distinct()
+            return primary.copy(
+                id = "RADIO_SUPPORT_${primary.supportId.ifBlank { mapLocationKey(primary.latitude, primary.longitude) }}",
+                serviceMask = group.fold(0) { acc, marker -> acc or marker.serviceMask },
+                systemMask = group.fold(0) { acc, marker -> acc or marker.systemMask },
+                actorLabel = actorLabels.singleOrNull(),
+                emitterCount = group.sumOf { it.emitterCount },
+                antennaCount = group.sumOf { it.antennaCount },
+                minFreqKhz = group.mapNotNull { it.minFreqKhz }.minOrNull(),
+                maxFreqKhz = group.mapNotNull { it.maxFreqKhz }.maxOrNull(),
+                clusterCount = 1,
+                detailText = null
+            )
+        }
+
+        fun addRadioAzimuthMarker(item: RadioMapMarker) {
+            if (item.isCluster || item.azimuths.isEmpty()) return
+            val azimuthMarker = RadioMarker(map, item, showCircle = false).apply {
+                position = GeoPoint(item.latitude, item.longitude)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                icon = MapUtils.createTransparentMarkerIcon(context)
+                infoWindow = null
+            }
+            radioOverlay.add(azimuthMarker)
+        }
+
+        val displayEntries: List<Pair<RadioMapMarker, List<RadioMapMarker>>> = buildList {
+            val limitedMarkers = markers.take(RADIO_MAP_MARKER_LIMIT)
+            limitedMarkers
+                .filter { it.isCluster }
+                .forEach { cluster -> add(cluster to listOf(cluster)) }
+            limitedMarkers
+                .filterNot { it.isCluster }
+                .groupBy(::radioSupportGroupKey)
+                .values
+                .forEach { group -> add(aggregateRadioSupportMarkers(group) to group) }
+        }
+
+        displayEntries.forEach { (item, members) ->
+            val hasMobileOnSameSupport = !item.isCluster &&
+                mapLocationKey(item.latitude, item.longitude) in mobileSupportLocationKeys
+            val showRadioCircle = item.isCluster || !hasMobileOnSameSupport
+            val hasRadioAzimuths = members.any { it.azimuths.isNotEmpty() }
+            if (!showRadioCircle && !hasRadioAzimuths) return@forEach
+
+            members.forEach(::addRadioAzimuthMarker)
+            if (!showRadioCircle) return@forEach
+
+            val marker = RadioMarker(map, item, showRadioCircle).apply {
+                position = GeoPoint(item.latitude, item.longitude)
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                icon = MapUtils.createRadioMarkerIcon(context, item.serviceMask, item.systemMask, item.clusterCount)
+                title = item.title
+                snippet = item.subtitle
+                setOnMarkerClickListener { clickedMarker, mapView ->
+                    if (isMeasuringMode) {
+                        addManualMeasurePoint(
+                            GeoPoint(item.latitude, item.longitude),
+                            startFromLocationIfFirst = myCurrentLoc != null || locationOverlayRef?.myLocation != null
+                        )
+                        refreshMeasureLayers(map)
+                    } else if (item.isCluster) {
+                        val targetPoint = GeoPoint(item.latitude, item.longitude)
+                        mapView.post {
+                            mapView.controller.stopAnimation(false)
+                            mapView.controller.setZoom(mapView.zoomLevelDouble + 1.5)
+                            mapView.controller.setCenter(targetPoint)
+                        }
+                    } else {
+                        openRadioSupportDetailFromMap(map, item)
+                    }
+                    true
+                }
+            }
+            radioOverlay.add(marker)
+        }
+
+        map.invalidate()
+    }
+
     suspend fun updateMarkers(map: MapView, antennasList: List<LocalisationEntity>, sitesHsList: List<SiteHsEntity> = emptyList()) {
         val selectedOperators = AppConfig.selectedOperatorKeys.value
         val showSitesInService = AppConfig.showSitesInService.value
         val showSitesOutOfService = AppConfig.showSitesOutOfService.value
+        val frequencyFilter = FrequencyFilterSelection.fromMapConfig()
+        val shouldFilterAzimuthsByFrequency =
+            !frequencyFilter.isFullyEnabled && (AppConfig.showAzimuths.value || AppConfig.showAzimuthsCone.value)
+        val azimuthTechniquesById = if (shouldFilterAzimuthsByFrequency) {
+            val detailIds = antennasList.asSequence()
+                .filterNot { it.idAnfr.startsWith("CLUSTER_") }
+                .filter { !it.azimuts.isNullOrBlank() }
+                .map { it.idAnfr }
+                .distinct()
+                .take(MAP_AZIMUTH_DETAIL_LIMIT)
+                .toList()
+            viewModel.getMapAzimuthTechniqueDetails(detailIds)
+        } else {
+            emptyMap()
+        }
         fun ensureMapNotDisposed() {
             if (!mapViewUsable.get()) {
                 throw java.util.concurrent.CancellationException("MapView disposed during marker refresh")
@@ -1232,6 +1485,25 @@ fun MapScreen(
             // Table de correspondance ANFR -> operateurs declares HS.
             val hsOperatorMap = buildHsOperatorMap(sitesHsList)
 
+            fun visibleAntennaForMap(
+                antenna: LocalisationEntity,
+                activeOperatorKeys: List<String>
+            ): LocalisationEntity {
+                val filteredAzimuths = if (shouldFilterAzimuthsByFrequency) {
+                    filteredAzimuthsForFrequencySelection(
+                        detailsFrequences = azimuthTechniquesById[antenna.idAnfr]?.detailsFrequences,
+                        filter = frequencyFilter
+                    )
+                } else {
+                    null
+                }
+
+                return antenna.copy(
+                    operateur = activeOperatorKeys.joinToString(", "),
+                    azimuts = filteredAzimuths ?: antenna.azimuts
+                )
+            }
+
             fun buildAntennaMarkers(antennas: List<LocalisationEntity>): List<AntennaMarker> {
                 val groupedSites = antennas.groupBy { "${it.latitude}_${it.longitude}" }.values.take(6000)
 
@@ -1245,11 +1517,14 @@ fun MapScreen(
                             selectedOperatorKeys = selectedOperators
                         )
 
-                        if (activeOps.isEmpty()) null else antenna.copy(operateur = activeOps.joinToString(", "))
+                        if (activeOps.isEmpty()) null else visibleAntennaForMap(antenna, activeOps)
                     }
                     if (filteredSiteAntennas.isEmpty()) return@mapNotNull null
 
                     val mainAntenna = filteredSiteAntennas.first()
+                    val isHs = filteredSiteAntennas.any { antenna ->
+                        hasVisibleHsOperator(antenna, hsOperatorMap)
+                    }
 
                     ensureMapNotDisposed()
                     AntennaMarker(map, filteredSiteAntennas, safePrimaryColor).apply {
@@ -1263,31 +1538,10 @@ fun MapScreen(
                             .distinct()
                         relatedObject = operatorsOnSite
 
-                        val baseIcon = MapUtils.createAdaptiveMarker(context, filteredSiteAntennas, map.zoomLevelDouble >= 13.0 && AppConfig.showAzimuths.value, AppConfig.defaultOperator.value)
-
-                        val isHs = filteredSiteAntennas.any { antenna ->
-                            hasVisibleHsOperator(antenna, hsOperatorMap)
-                        }
+                        val baseIcon = MapUtils.createAdaptiveMarker(context, filteredSiteAntennas, false, AppConfig.defaultOperator.value)
 
                         if (isHs) {
-                            val badgeIcon = createHsBadge(context)
-
-                            val combinedBitmap = android.graphics.Bitmap.createBitmap(
-                                baseIcon.intrinsicWidth,
-                                baseIcon.intrinsicHeight,
-                                android.graphics.Bitmap.Config.ARGB_8888
-                            )
-                            val canvas = android.graphics.Canvas(combinedBitmap)
-
-                            baseIcon.setBounds(0, 0, canvas.width, canvas.height)
-                            baseIcon.draw(canvas)
-
-                            val offsetX = (canvas.width - badgeIcon.intrinsicWidth) / 2
-                            val offsetY = (canvas.height - badgeIcon.intrinsicHeight) / 2
-                            badgeIcon.setBounds(offsetX, offsetY, offsetX + badgeIcon.intrinsicWidth, offsetY + badgeIcon.intrinsicHeight)
-                            badgeIcon.draw(canvas)
-
-                            icon = android.graphics.drawable.BitmapDrawable(context.resources, combinedBitmap)
+                            icon = createHsMarkerIcon(context, baseIcon)
                         } else {
                             icon = baseIcon
                         }
@@ -1361,11 +1615,14 @@ fun MapScreen(
                             selectedOperatorKeys = selectedOperators
                         )
 
-                        if (activeOps.isEmpty()) null else antenna.copy(operateur = activeOps.joinToString(", "))
+                        if (activeOps.isEmpty()) null else visibleAntennaForMap(antenna, activeOps)
                     }
                     if (filteredSiteAntennas.isEmpty()) return@mapNotNull null
 
                     val mainAntenna = filteredSiteAntennas.first()
+                    val isHs = filteredSiteAntennas.any { antenna ->
+                        hasVisibleHsOperator(antenna, hsOperatorMap)
+                    }
 
                     // Le marqueur UNIQUE (L'antenne)
                     ensureMapNotDisposed()
@@ -1381,37 +1638,19 @@ fun MapScreen(
                         relatedObject = operatorsOnSite
 
                         // 1. On génère l'icône de base (avec la bordure de couleur de l'opérateur)
-                        val baseIcon = MapUtils.createAdaptiveMarker(context, filteredSiteAntennas, map.zoomLevelDouble >= 13.0 && AppConfig.showAzimuths.value, AppConfig.defaultOperator.value)
+                        val baseIcon = MapUtils.createAdaptiveMarker(context, filteredSiteAntennas, false, AppConfig.defaultOperator.value)
 
                         // 2. LOGIQUE DE FUSION : On vérifie TOUTES les antennes du pylône partagé !
-                        val isHs = filteredSiteAntennas.any { antenna ->
-                            hasVisibleHsOperator(antenna, hsOperatorMap)
-                        }
-
                         if (isHs) {
 
-                            val badgeIcon = createHsBadge(context) // Notre point d'exclamation
+                            val cachedHsIcon = createHsMarkerIcon(context, baseIcon)
 
                             // A. Création d'une "toile" vide de la taille de l'icône de base
-                            val combinedBitmap = android.graphics.Bitmap.createBitmap(
-                                baseIcon.intrinsicWidth,
-                                baseIcon.intrinsicHeight,
-                                android.graphics.Bitmap.Config.ARGB_8888
-                            )
-                            val canvas = android.graphics.Canvas(combinedBitmap)
+                            icon = cachedHsIcon
 
                             // B. On dessine l'icône colorée de l'opérateur au fond
-                            baseIcon.setBounds(0, 0, canvas.width, canvas.height)
-                            baseIcon.draw(canvas)
-
                             // C. On dessine le point d'exclamation parfaitement centré par-dessus
-                            val offsetX = (canvas.width - badgeIcon.intrinsicWidth) / 2
-                            val offsetY = (canvas.height - badgeIcon.intrinsicHeight) / 2
-                            badgeIcon.setBounds(offsetX, offsetY, offsetX + badgeIcon.intrinsicWidth, offsetY + badgeIcon.intrinsicHeight)
-                            badgeIcon.draw(canvas)
-
                             // D. On applique l'image fusionnée au marqueur
-                            icon = android.graphics.drawable.BitmapDrawable(context.resources, combinedBitmap)
                         } else {
                             // Si pas en panne, on applique l'icône normale
                             icon = baseIcon
@@ -1460,10 +1699,44 @@ fun MapScreen(
         AppConfig.showSitesInService.value,
         AppConfig.showSitesOutOfService.value,
         AppConfig.hideUndergroundSites.value,
-        AppConfig.showOnlyZbSites.value
+        AppConfig.showOnlyZbSites.value,
+        AppConfig.showTechnoFH.value,
+        AppConfig.showTechno2G.value,
+        AppConfig.showTechno3G.value,
+        AppConfig.showTechno4G.value,
+        AppConfig.showTechno5G.value,
+        AppConfig.f2G_900.value,
+        AppConfig.f2G_1800.value,
+        AppConfig.f3G_900.value,
+        AppConfig.f3G_2100.value,
+        AppConfig.f4G_700.value,
+        AppConfig.f4G_800.value,
+        AppConfig.f4G_900.value,
+        AppConfig.f4G_1800.value,
+        AppConfig.f4G_2100.value,
+        AppConfig.f4G_2600.value,
+        AppConfig.f5G_700.value,
+        AppConfig.f5G_1400.value,
+        AppConfig.f5G_2100.value,
+        AppConfig.f5G_3500.value,
+        AppConfig.f5G_4200.value,
+        AppConfig.f5G_26000.value
     ) {
+        delay(MAP_MARKER_REDRAW_DEBOUNCE_MS)
         mapViewRef?.let { map ->
             updateMarkers(map, filteredAntennas, sitesHs)
+        }
+    }
+
+    LaunchedEffect(radioMarkers, filteredAntennas, AppConfig.radioMapCategoryMask(), isMeasuringMode) {
+        mapViewRef?.let { map ->
+            updateRadioMarkers(map, radioMarkers)
+        }
+    }
+
+    LaunchedEffect(AppConfig.radioMapCategoryMask()) {
+        mapViewRef?.let { map ->
+            map.loadVisibleAntennas(viewModel)
         }
     }
 
@@ -1475,6 +1748,7 @@ fun MapScreen(
     }
 
     LaunchedEffect(
+        sitesHs,
         AppConfig.showSitesInService.value,
         AppConfig.showSitesOutOfService.value,
         AppConfig.hideUndergroundSites.value,
@@ -1495,8 +1769,10 @@ fun MapScreen(
         AppConfig.f4G_2100.value,
         AppConfig.f4G_2600.value,
         AppConfig.f5G_700.value,
+        AppConfig.f5G_1400.value,
         AppConfig.f5G_2100.value,
         AppConfig.f5G_3500.value,
+        AppConfig.f5G_4200.value,
         AppConfig.f5G_26000.value
     ) {
         mapViewRef?.let { map ->
@@ -1711,12 +1987,14 @@ fun MapScreen(
                     overlays.add(measureOverlay)
                     overlays.add(searchBoundaryOverlay)
                     overlays.add(macroOverlay) // <-- Calque macro au fond
+                    overlays.add(radioOverlay)
                     overlays.add(markersOverlay) // <-- Calque micro au milieu
                     overlays.add(locationOverlay) // <-- Curseur devant
 
                     locationOverlayRef = locationOverlay
 
                     var lastRadius = 250
+                    var lastLoadedViewport: MapViewportSnapshot? = null
                     addMapListener(object : MapListener {
                         override fun onScroll(event: ScrollEvent?): Boolean {
                             // La poursuite GPS garde le controle pendant les scrolls generes par le suivi.
@@ -1726,15 +2004,16 @@ fun MapScreen(
                         override fun onZoom(event: ZoomEvent?): Boolean { updateInfo(); return true }
                         private fun updateInfo() {
                             // ✅ 1. MISE À JOUR INSTANTANÉE POUR L'ÉCHELLE (Avant le delay !)
-                            currentZoom = zoomLevelDouble
-                            currentLat = mapCenter.latitude
-
                             // ✅ 2. LE RESTE DU CALCUL AVEC SON PETIT DÉLAI ANTI-LAG
                             searchJob?.cancel()
                             searchJob = scope.launch {
-                                delay(100)
+                                delay(MAP_RELOAD_DEBOUNCE_MS)
 
-                                val z = zoomLevelDouble
+                                val snapshot = visibleViewportSnapshot()
+                                currentZoom = snapshot.zoom
+                                currentLat = snapshot.centerLat
+
+                                val z = snapshot.zoom
 
                                 // ---> AIMANT PLUS FORT POUR LES ZONES DENSES <---
                                 val targetRadius = when {
@@ -1750,11 +2029,21 @@ fun MapScreen(
                                     mapViewRef?.invalidate()
                                 }
 
+                                if (lastLoadedViewport?.isCloseTo(snapshot) == true) {
+                                    return@launch
+                                }
+                                lastLoadedViewport = snapshot
                                 this@apply.loadVisibleAntennas(viewModel)
                             }
                         }
                     })
-                    post { this@apply.loadVisibleAntennas(viewModel) }
+                    post {
+                        val snapshot = visibleViewportSnapshot()
+                        lastLoadedViewport = snapshot
+                        currentZoom = snapshot.zoom
+                        currentLat = snapshot.centerLat
+                        this@apply.loadVisibleAntennas(viewModel)
+                    }
                     mapViewRef = this
                 }
             },
@@ -2225,8 +2514,12 @@ fun MapScreen(
                     desc = stringResource(R.string.appstrings_back),
                     modifier = Modifier.align(Alignment.CenterStart)
                 ) {
-                    restoreOperatorSearchSelection()
-                    safeBackNavigation.navigateBack()
+                    if (isSharedPhotoSelectionMode) {
+                        cancelSharedPhotoSelection()
+                    } else {
+                        restoreOperatorSearchSelection()
+                        safeBackNavigation.navigateBack()
+                    }
                 }
                 Surface(modifier = Modifier.align(Alignment.Center), shape = RoundedCornerShape(32.dp), color = MaterialTheme.colorScheme.surface, shadowElevation = 4.dp, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
                     Text(txtMapTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
@@ -2282,6 +2575,50 @@ fun MapScreen(
                     Icon(Icons.Default.DeleteSweep, null, modifier = Modifier.size(18.dp))
                     Spacer(Modifier.width(8.dp))
                     Text(txtDeleteTraces, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        if (isSharedPhotoSelectionMode) {
+            Surface(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(start = 16.dp, end = 16.dp, top = 112.dp)
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                color = MaterialTheme.colorScheme.primaryContainer,
+                shadowElevation = 6.dp,
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        Icons.Default.PhotoLibrary,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.shared_photo_map_title),
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            text = stringResource(R.string.shared_photo_map_desc, pendingSharedPhotoCount),
+                            fontSize = 13.sp,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
+                        )
+                    }
+                    IconButton(onClick = { safeClick { cancelSharedPhotoSelection() } }) {
+                        Icon(
+                            Icons.Default.Close,
+                            contentDescription = stringResource(R.string.appstrings_cancel),
+                            tint = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
                 }
             }
         }
@@ -3332,38 +3669,63 @@ class AntennaMarker(
         }
     }
 
+    private fun sortAzimuthOperatorKeys(
+        operatorKeys: Set<String>,
+        defaultOperatorKey: String?
+    ): List<String> {
+        val baseOrder = listOf(
+            OperatorColors.ORANGE_KEY,
+            OperatorColors.BOUYGUES_KEY,
+            OperatorColors.SFR_KEY,
+            OperatorColors.FREE_KEY
+        )
+        val ordered = mutableListOf<String>()
+        if (defaultOperatorKey != null && defaultOperatorKey in operatorKeys) {
+            ordered += defaultOperatorKey
+        }
+        baseOrder.forEach { key ->
+            if (key in operatorKeys && key !in ordered) ordered += key
+        }
+        OperatorColors.orderedKeys.forEach { key ->
+            if (key in operatorKeys && key !in ordered) ordered += key
+        }
+        return ordered.ifEmpty { operatorKeys.toList() }
+    }
+
     init {
         // 1. On prépare des dictionnaires pour regrouper : Angle -> Liste de Couleurs (Opérateurs)
-        val angleToColorsMobile = mutableMapOf<Float, MutableSet<Int>>()
-        val angleToColorsFh = mutableMapOf<Float, MutableSet<Int>>()
+        val angleToOperatorsMobile = mutableMapOf<Float, MutableSet<String>>()
+        val angleToOperatorsFh = mutableMapOf<Float, MutableSet<String>>()
 
         siteAntennas.forEach { antenna ->
-            val opColorInt = getOpColorInt(antenna.operateur)
+            val operatorKeys = OperatorColors.keysFor(antenna.operateur)
+            if (operatorKeys.isEmpty()) return@forEach
 
             if (!antenna.azimuts.isNullOrBlank()) {
                 antenna.azimuts.split(",").mapNotNull { it.trim().toFloatOrNull() }.forEach { az ->
-                    angleToColorsMobile.getOrPut(az) { mutableSetOf() }.add(opColorInt)
+                    angleToOperatorsMobile.getOrPut(az) { mutableSetOf() }.addAll(operatorKeys)
                 }
             }
 
             if (fr.geotower.utils.AppConfig.showTechnoFH.value && !antenna.azimutsFh.isNullOrBlank()) {
                 antenna.azimutsFh.split(",").mapNotNull { it.trim().toFloatOrNull() }.forEach { az ->
-                    angleToColorsFh.getOrPut(az) { mutableSetOf() }.add(opColorInt)
+                    angleToOperatorsFh.getOrPut(az) { mutableSetOf() }.addAll(operatorKeys)
                 }
             }
         }
 
         // L'opérateur par défaut qu'il faut prioriser pour la couleur du trait
-        val defOpColorInt = getOpColorInt(fr.geotower.utils.AppConfig.defaultOperator.value.uppercase())
+        val defaultOperatorKey = OperatorColors.keyFor(fr.geotower.utils.AppConfig.defaultOperator.value)
 
         // 2. On transforme ces groupes en données de dessin (Cos/Sin précalculés)
-        angleToColorsMobile.forEach { (az, colorsSet) ->
+        angleToOperatorsMobile.forEach { (az, operatorKeys) ->
             val rad = Math.toRadians(az - 90.0)
             val cos = Math.cos(rad).toFloat()
             val sin = Math.sin(rad).toFloat()
 
             // On trie pour que la couleur de l'opérateur favori soit en premier (prioritaire)
-            val sortedColors = colorsSet.toList().sortedByDescending { it == defOpColorInt }
+            val sortedColors = sortAzimuthOperatorKeys(operatorKeys, defaultOperatorKey)
+                .map { OperatorColors.colorIntForKey(it, fallback = primaryColor) }
             val mainColor = sortedColors.first()
 
             val linePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
@@ -3390,12 +3752,13 @@ class AntennaMarker(
         }
 
         // Pareil pour les faisceaux hertziens (FH)
-        angleToColorsFh.forEach { (az, colorsSet) ->
+        angleToOperatorsFh.forEach { (az, operatorKeys) ->
             val rad = Math.toRadians(az - 90.0)
             val cos = Math.cos(rad).toFloat()
             val sin = Math.sin(rad).toFloat()
 
-            val sortedColors = colorsSet.toList().sortedByDescending { it == defOpColorInt }
+            val sortedColors = sortAzimuthOperatorKeys(operatorKeys, defaultOperatorKey)
+                .map { OperatorColors.colorIntForKey(it, fallback = primaryColor) }
             val mainColor = sortedColors.first()
 
             val dashedPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
@@ -3528,6 +3891,90 @@ class AntennaMarker(
         }
     }
 }
+
+class RadioMarker(
+    private val mapView: org.osmdroid.views.MapView,
+    private val radioMarker: RadioMapMarker,
+    private val showCircle: Boolean
+) : org.osmdroid.views.overlay.Marker(mapView) {
+
+    private data class RadioAzimuthLine(
+        val cos: Float,
+        val sin: Float
+    )
+
+    private val density = mapView.context.resources.displayMetrics.density
+    private val ptCenter = android.graphics.Point()
+    private val color = MapUtils.radioMarkerColor(radioMarker.serviceMask, radioMarker.systemMask)
+    private val azimuthLines = radioMarker.azimuths.map { azimuth ->
+        val rad = Math.toRadians(azimuth - 90.0)
+        RadioAzimuthLine(
+            cos = Math.cos(rad).toFloat(),
+            sin = Math.sin(rad).toFloat()
+        )
+    }
+    private val linePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        style = android.graphics.Paint.Style.STROKE
+        color = androidx.core.graphics.ColorUtils.setAlphaComponent(this@RadioMarker.color, 210)
+        strokeWidth = 2.35f * density
+        strokeCap = android.graphics.Paint.Cap.ROUND
+    }
+    private val dotPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        style = android.graphics.Paint.Style.FILL
+        color = androidx.core.graphics.ColorUtils.setAlphaComponent(this@RadioMarker.color, 230)
+    }
+
+    override fun hitTest(event: android.view.MotionEvent, mapView: org.osmdroid.views.MapView): Boolean {
+        if (!showCircle) return false
+        val pj = mapView.projection
+        val screenCoords = android.graphics.Point()
+        pj.toPixels(position, screenCoords)
+
+        val dx = event.x - screenCoords.x
+        val dy = event.y - screenCoords.y
+        val clickRadius = 18f * density
+        return (dx * dx + dy * dy) <= (clickRadius * clickRadius)
+    }
+
+    override fun draw(canvas: android.graphics.Canvas, projection: org.osmdroid.views.Projection) {
+        val zoom = mapView.zoomLevelDouble
+        if (
+            !radioMarker.isCluster &&
+            zoom >= 14.0 &&
+            AppConfig.showAzimuths.value &&
+            azimuthLines.isNotEmpty()
+        ) {
+            projection.toPixels(mPosition, ptCenter)
+
+            val beamLengthPx = when {
+                zoom >= 18.0 -> 56f * density
+                zoom >= 17.0 -> 47f * density
+                zoom >= 16.0 -> 38f * density
+                zoom >= 15.0 -> 29f * density
+                else -> 23f * density
+            }
+            val circleOffsetPx = 17f * density
+            val totalRadiusPx = circleOffsetPx + beamLengthPx
+            val dotRadius = 2.8f * density
+
+            azimuthLines.forEach { data ->
+                val startX = ptCenter.x + circleOffsetPx * data.cos
+                val startY = ptCenter.y + circleOffsetPx * data.sin
+                val endX = ptCenter.x + totalRadiusPx * data.cos
+                val endY = ptCenter.y + totalRadiusPx * data.sin
+
+                canvas.drawLine(startX, startY, endX, endY, linePaint)
+                canvas.drawCircle(endX, endY, dotRadius, dotPaint)
+            }
+        }
+        super.draw(canvas, projection)
+    }
+}
+
+private fun mapLocationKey(latitude: Double, longitude: Double): String {
+    return "${(latitude * 1_000_000.0).roundToInt()}_${(longitude * 1_000_000.0).roundToInt()}"
+}
+
 private fun isPointInPolygon(lat: Double, lon: Double, polygon: List<GeoPoint>): Boolean {
     var isInside = false
     var j = polygon.size - 1
@@ -3550,7 +3997,8 @@ fun createHsBadge(context: Context): android.graphics.drawable.BitmapDrawable {
 
     // ✅ ON AGRANDIT ENCORE : 32 au lieu de 26 pour être sûr de tout masquer !
     // (Vous pouvez ajuster ce chiffre librement : 30, 32, 34...)
-    val size = (32 * density).toInt()
+    val size = (32 * density).roundToInt().coerceAtLeast(1)
+    hsBadgeDrawableCache.get(size)?.let { return it }
     val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
     val canvas = android.graphics.Canvas(bitmap)
 
@@ -3572,5 +4020,32 @@ fun createHsBadge(context: Context): android.graphics.drawable.BitmapDrawable {
 
     canvas.drawText("!", size / 2f, size / 2f - (textPaint.ascent() + textPaint.descent()) / 2f, textPaint)
 
-    return android.graphics.drawable.BitmapDrawable(context.resources, bitmap)
+    return android.graphics.drawable.BitmapDrawable(context.resources, bitmap).also { drawable ->
+        hsBadgeDrawableCache.put(size, drawable)
+    }
+}
+
+private fun createHsMarkerIcon(context: Context, baseIcon: BitmapDrawable): BitmapDrawable {
+    val cacheKey = "${System.identityHashCode(baseIcon)}_${baseIcon.intrinsicWidth}x${baseIcon.intrinsicHeight}"
+    hsMarkerIconCache.get(cacheKey)?.let { return it }
+
+    val badgeIcon = createHsBadge(context)
+    val combinedBitmap = android.graphics.Bitmap.createBitmap(
+        baseIcon.intrinsicWidth,
+        baseIcon.intrinsicHeight,
+        android.graphics.Bitmap.Config.ARGB_8888
+    )
+    val canvas = android.graphics.Canvas(combinedBitmap)
+
+    baseIcon.setBounds(0, 0, canvas.width, canvas.height)
+    baseIcon.draw(canvas)
+
+    val offsetX = (canvas.width - badgeIcon.intrinsicWidth) / 2
+    val offsetY = (canvas.height - badgeIcon.intrinsicHeight) / 2
+    badgeIcon.setBounds(offsetX, offsetY, offsetX + badgeIcon.intrinsicWidth, offsetY + badgeIcon.intrinsicHeight)
+    badgeIcon.draw(canvas)
+
+    return android.graphics.drawable.BitmapDrawable(context.resources, combinedBitmap).also { drawable ->
+        hsMarkerIconCache.put(cacheKey, drawable)
+    }
 }

@@ -41,6 +41,9 @@ private data class ActiveRadioKeys(
 private val activeStatsFrequencyRangeRegex =
     Regex("""(\d+(?:[.,]\d+)?)\s*-\s*(\d+(?:[.,]\d+)?)\s*(kHz|MHz|GHz|Hz)?""", RegexOption.IGNORE_CASE)
 
+private const val DETAIL_BACKED_5G_BANDS =
+    RadioFilterMasks.BAND_5G_1400 or RadioFilterMasks.BAND_5G_4200 or RadioFilterMasks.BAND_5G_26000
+
 private fun buildActiveSupportRadioCounts(rows: List<SupportRadioStatsRow>): ActiveSupportRadioCounts {
     val techSupportIds = mutableMapOf<String, MutableSet<String>>()
     val bandSupportIds = mutableMapOf<String, MutableSet<String>>()
@@ -106,6 +109,23 @@ private fun activeRadioKeysFromDetails(details: String?): ActiveRadioKeys {
     return ActiveRadioKeys(techKeys, bandKeys)
 }
 
+internal fun radioBandMaskFromFrequencyDetails(details: String?): Int {
+    if (details.isNullOrBlank()) return 0
+
+    var mask = 0
+    details.lineSequence()
+        .map { it.trim() }
+        .filter { it.isNotBlank() }
+        .forEach { line ->
+            val rawFrequency = line.split("|", limit = 2).firstOrNull().orEmpty().trim()
+            frequencyKeysFromRawDetails(rawFrequency).forEach { key ->
+                mask = mask or radioBandMaskForKey(key)
+            }
+        }
+
+    return mask
+}
+
 private fun isActiveFrequencyStatus(status: String): Boolean {
     val normalized = status.lowercase(Locale.ROOT)
     return normalized.contains("en service") || normalized.contains("techniquement")
@@ -127,10 +147,14 @@ private fun frequencyKeysFromRawDetails(rawFrequency: String): Set<String> {
     val techKey = rawFrequencyToTechKey(rawFrequency) ?: return emptySet()
     val gen = techKey.removeSuffix("G").toIntOrNull() ?: return emptySet()
     val systemName = rawFrequency.substringBefore(":").trim().uppercase(Locale.ROOT)
-    val systemValue = Regex("\\d+").findAll(systemName)
+    val knownValues = mobileFrequencyValuesForGeneration(gen)
+    val systemNumbers = Regex("\\d+").findAll(systemName)
         .mapNotNull { it.value.toIntOrNull() }
-        .lastOrNull()
-        ?.takeIf { it in mobileFrequencyValuesForGeneration(gen) }
+        .toList()
+    val systemValue = systemNumbers
+        .filter { it in knownValues }
+        .maxOrNull()
+        ?: if (gen == 5 && systemNumbers.contains(26)) 26000 else null
 
     if (systemValue != null) return setOf("$techKey|$systemValue")
 
@@ -139,7 +163,7 @@ private fun frequencyKeysFromRawDetails(rawFrequency: String): Set<String> {
 }
 
 private fun mobileFrequencyValuesForGeneration(gen: Int): Set<Int> = when (gen) {
-    5 -> setOf(700, 2100, 3500, 26000)
+    5 -> setOf(700, 1400, 2100, 3500, 4200, 26000)
     4 -> setOf(700, 800, 900, 1800, 2100, 2600)
     3 -> setOf(900, 2100)
     2 -> setOf(900, 1800)
@@ -172,8 +196,10 @@ private fun frequencyValuesForRange(gen: Int, start: Double?, end: Double?): Set
     return when (gen) {
         5 -> buildSet {
             if (frequencyRangeOverlaps(start, end, 700.0, 790.0)) add(700)
+            if (frequencyRangeOverlaps(start, end, 1427.0, 1518.0)) add(1400)
             if (frequencyRangeOverlaps(start, end, 1920.0, 2170.0)) add(2100)
             if (frequencyRangeOverlaps(start, end, 3300.0, 3800.0)) add(3500)
+            if (frequencyRangeOverlaps(start, end, 3800.1, 4200.0)) add(4200)
             if (frequencyRangeOverlaps(start, end, 24000.0, 27500.0)) add(26000)
         }
         4 -> buildSet {
@@ -221,9 +247,33 @@ private fun bandKeysFromMask(mask: Int): Set<String> = buildSet {
     if ((mask and RadioFilterMasks.BAND_4G_2100) != 0) add("4G|2100")
     if ((mask and RadioFilterMasks.BAND_4G_2600) != 0) add("4G|2600")
     if ((mask and RadioFilterMasks.BAND_5G_700) != 0) add("5G|700")
+    if ((mask and RadioFilterMasks.BAND_5G_1400) != 0) add("5G|1400")
     if ((mask and RadioFilterMasks.BAND_5G_2100) != 0) add("5G|2100")
     if ((mask and RadioFilterMasks.BAND_5G_3500) != 0) add("5G|3500")
+    if ((mask and RadioFilterMasks.BAND_5G_4200) != 0) add("5G|4200")
     if ((mask and RadioFilterMasks.BAND_5G_26000) != 0) add("5G|26000")
+}
+
+private fun radioBandMaskForKey(key: String): Int {
+    return when (key) {
+        "2G|900" -> RadioFilterMasks.BAND_2G_900
+        "2G|1800" -> RadioFilterMasks.BAND_2G_1800
+        "3G|900" -> RadioFilterMasks.BAND_3G_900
+        "3G|2100" -> RadioFilterMasks.BAND_3G_2100
+        "4G|700" -> RadioFilterMasks.BAND_4G_700
+        "4G|800" -> RadioFilterMasks.BAND_4G_800
+        "4G|900" -> RadioFilterMasks.BAND_4G_900
+        "4G|1800" -> RadioFilterMasks.BAND_4G_1800
+        "4G|2100" -> RadioFilterMasks.BAND_4G_2100
+        "4G|2600" -> RadioFilterMasks.BAND_4G_2600
+        "5G|700" -> RadioFilterMasks.BAND_5G_700
+        "5G|1400" -> RadioFilterMasks.BAND_5G_1400
+        "5G|2100" -> RadioFilterMasks.BAND_5G_2100
+        "5G|3500" -> RadioFilterMasks.BAND_5G_3500
+        "5G|4200" -> RadioFilterMasks.BAND_5G_4200
+        "5G|26000" -> RadioFilterMasks.BAND_5G_26000
+        else -> 0
+    }
 }
 
 class AnfrRepository(
@@ -316,6 +366,15 @@ class AnfrRepository(
         return MapQueryBounds(minLat = minLat, maxLat = maxLat, longitudeRanges = longitudeRanges)
     }
 
+    private fun databaseAnfrIdCandidates(value: String): List<String> {
+        val trimmed = value.trim()
+        if (trimmed.isBlank()) return emptyList()
+        if (!trimmed.all { it.isDigit() }) return listOf(trimmed)
+
+        val compact = trimmed.trimStart('0').ifEmpty { "0" }
+        return listOf(trimmed, compact, trimmed.padStart(10, '0')).distinct()
+    }
+
     private suspend fun GeoTowerDao.getClustersForZoom(
         zoom: Double,
         minLat: Double,
@@ -339,9 +398,15 @@ class AnfrRepository(
     // =================================================================
     // 1. POUR LA CARTE (Affichage ultra-rapide des points)
     // =================================================================
-    suspend fun getAntennasInBox(latNorth: Double, lonEast: Double, latSouth: Double, lonWest: Double): List<LocalisationEntity> {
+    suspend fun getAntennasInBox(
+        latNorth: Double,
+        lonEast: Double,
+        latSouth: Double,
+        lonWest: Double,
+        detailBackedBandMask: Int = DETAIL_BACKED_5G_BANDS
+    ): List<LocalisationEntity> {
         val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
-        return queryLocalDatabase(emptyList()) {
+        val localisations = queryLocalDatabase(emptyList()) {
             bounds.longitudeRanges
                 .flatMap { range ->
                     getLocalisationsInBox(
@@ -353,20 +418,66 @@ class AnfrRepository(
                 }
                 .distinctBy { it.idAnfr }
         }
+        return enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask)
+    }
+
+    suspend fun getAntennasByIdsInBox(
+        idAnfrs: List<String>,
+        latNorth: Double,
+        lonEast: Double,
+        latSouth: Double,
+        lonWest: Double,
+        detailBackedBandMask: Int = DETAIL_BACKED_5G_BANDS
+    ): List<LocalisationEntity> {
+        val distinctIds = idAnfrs
+            .flatMap(::databaseAnfrIdCandidates)
+            .distinct()
+        if (distinctIds.isEmpty()) return emptyList()
+
+        val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
+        val localisations = distinctIds.chunked(SQLITE_IN_CLAUSE_BATCH_SIZE)
+            .flatMap { chunk ->
+                queryLocalDatabase(emptyList<LocalisationEntity>()) {
+                    bounds.longitudeRanges
+                        .flatMap { range ->
+                            getLocalisationsByIdsInBox(
+                                idAnfrs = chunk,
+                                minLat = bounds.minLat,
+                                maxLat = bounds.maxLat,
+                                minLon = range.min,
+                                maxLon = range.max
+                            )
+                        }
+                }
+            }
+            .distinctBy { it.idAnfr }
+
+        return enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask)
     }
 
     suspend fun getNearest100(lat: Double, lon: Double): List<LocalisationEntity> {
         return getNearest(lat, lon, 100)
     }
 
-    suspend fun getNearestZb(lat: Double, lon: Double, limit: Int): List<LocalisationEntity> {
-        return queryLocalDatabase(emptyList()) {
+    suspend fun getNearestZb(
+        lat: Double,
+        lon: Double,
+        limit: Int,
+        detailBackedBandMask: Int = 0
+    ): List<LocalisationEntity> {
+        val localisations = queryLocalDatabase(emptyList()) {
             this.getNearestZb(lat, lon, limit.coerceAtLeast(1))
         }
+        return enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask)
     }
 
-    suspend fun getNearest(lat: Double, lon: Double, limit: Int): List<LocalisationEntity> {
-        return queryLocalDatabase(emptyList()) {
+    suspend fun getNearest(
+        lat: Double,
+        lon: Double,
+        limit: Int,
+        detailBackedBandMask: Int = 0
+    ): List<LocalisationEntity> {
+        val localisations = queryLocalDatabase(emptyList()) {
             val safeLimit = limit.coerceAtLeast(1)
             val radii = listOf(0.03, 0.08, 0.18, 0.45, 1.0, 2.5, 5.0)
             var bestResult = emptyList<LocalisationEntity>()
@@ -389,6 +500,7 @@ class AnfrRepository(
 
             this.getNearest(lat, lon, safeLimit).ifEmpty { bestResult }
         }
+        return enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask)
     }
 
     // =================================================================
@@ -498,26 +610,67 @@ class AnfrRepository(
     }
 
     suspend fun searchAntennasById(query: String): List<LocalisationEntity> {
-        return queryLocalDatabase(emptyList()) {
+        val results = queryLocalDatabase(emptyList()) {
             searchAntennasById(query)
         }
+        return enrichRadioBandMasksFromDetails(results)
     }
 
     suspend fun searchAntennasByText(query: String, limit: Int = 200): List<LocalisationEntity> {
-        return queryLocalDatabase(emptyList()) {
+        val results = queryLocalDatabase(emptyList()) {
             searchAntennasByText(query, limit)
         }
+        return enrichRadioBandMasksFromDetails(results)
     }
 
     suspend fun searchAntennasByAddress(query: String, limit: Int = 5000): List<LocalisationEntity> {
-        return queryLocalDatabase(emptyList()) {
+        val results = queryLocalDatabase(emptyList()) {
             searchAntennasByAddress(query, limit)
         }
+        return enrichRadioBandMasksFromDetails(results)
     }
 
     suspend fun getAntennasByExactId(exactId: String): List<LocalisationEntity> {
-        return queryLocalDatabase(emptyList()) {
+        val results = queryLocalDatabase(emptyList()) {
             getAntennasByExactId(exactId)
+        }
+        return enrichRadioBandMasksFromDetails(results)
+    }
+
+    suspend fun enrichRadioBandMasksFromDetails(
+        antennas: List<LocalisationEntity>,
+        detailBackedBandMask: Int = DETAIL_BACKED_5G_BANDS
+    ): List<LocalisationEntity> {
+        val requestedDetailBackedBands = detailBackedBandMask and DETAIL_BACKED_5G_BANDS
+        if (requestedDetailBackedBands == 0) return antennas
+
+        val idsNeedingFallback = antennas
+            .filter { antenna ->
+                !antenna.idAnfr.startsWith("CLUSTER_") &&
+                    ((antenna.techMask and RadioFilterMasks.TECH_5G) != 0 ||
+                        (antenna.bandMask and requestedDetailBackedBands) != 0) &&
+                    (antenna.bandMask and requestedDetailBackedBands) != requestedDetailBackedBands
+            }
+            .map { it.idAnfr }
+            .distinct()
+
+        if (idsNeedingFallback.isEmpty()) return antennas
+
+        val techniquesById = getTechniqueDetailsByIds(idsNeedingFallback)
+        if (techniquesById.isEmpty()) return antennas
+
+        return antennas.map { antenna ->
+            val detailsMask = radioBandMaskFromFrequencyDetails(
+                techniquesById[antenna.idAnfr]?.detailsFrequences ?: antenna.frequences
+            )
+            val enrichedBandMask = antenna.bandMask or detailsMask
+            if (enrichedBandMask == antenna.bandMask) {
+                antenna
+            } else {
+                antenna.copy(bandMask = enrichedBandMask).also { copy ->
+                    copy.frequences = antenna.frequences
+                }
+            }
         }
     }
 

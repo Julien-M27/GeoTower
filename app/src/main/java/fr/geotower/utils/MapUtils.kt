@@ -7,11 +7,17 @@ import android.graphics.ColorMatrixColorFilter
 import android.graphics.Paint
 import android.graphics.drawable.BitmapDrawable
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.RadioServiceMasks
+import fr.geotower.data.models.RadioSystemMasks
 import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase
 import org.osmdroid.util.MapTileIndex
 
 object MapUtils {
     private val INACTIVE_OPERATOR_COLOR = android.graphics.Color.rgb(196, 199, 204)
+    private val markerAzimuthWithUnitRegex = Regex(
+        "([0-9]{1,3}(?:[.,][0-9]+)?)\\s*(?:\\u00B0|\\u00C2\\u00B0|deg(?:res|ree|rees)?|degrees?)",
+        RegexOption.IGNORE_CASE
+    )
 
     fun getInvertFilter(): ColorMatrixColorFilter = ColorMatrixColorFilter(floatArrayOf(-1f, 0f, 0f, 0f, 255f, 0f, -1f, 0f, 0f, 255f, 0f, 0f, -1f, 0f, 255f, 0f, 0f, 0f, 1f, 0f))
 
@@ -45,6 +51,7 @@ object MapUtils {
 
     val markerIconCache = android.util.LruCache<String, BitmapDrawable>(500)
     val clusterIconCache = android.util.LruCache<String, BitmapDrawable>(200)
+    val radioIconCache = android.util.LruCache<String, BitmapDrawable>(300)
 
     fun createAdaptiveMarker(
         context: Context,
@@ -112,17 +119,10 @@ object MapUtils {
 
                 val azStr = antenna.azimuts
                 if (!azStr.isNullOrBlank() && azStr != "null") {
-                    // NOUVEAU : On extrait uniquement les chiffres avant le symbole °
-                    val regex = Regex("(\\d+)°")
-                    val matches = regex.findAll(azStr)
-
-                    matches.forEach { matchResult ->
-                        val angle = matchResult.groupValues[1].toIntOrNull()
-                        if (angle != null) {
-                            operatorKeys.forEach { opClean ->
-                                if (!azimutMap.getOrPut(angle) { mutableListOf() }.contains(opClean)) {
-                                    azimutMap[angle]!!.add(opClean)
-                                }
+                    parseMarkerAzimuths(azStr).forEach { angle ->
+                        operatorKeys.forEach { opClean ->
+                            if (!azimutMap.getOrPut(angle) { mutableListOf() }.contains(opClean)) {
+                                azimutMap[angle]!!.add(opClean)
                             }
                         }
                     }
@@ -132,7 +132,6 @@ object MapUtils {
             val innerRadius = pieRadius + 4f
             val outerRadius = pieRadius + 60f
             val strokeWidth = 6f
-            val dotRadius = strokeWidth * 1.5f
 
             azimutMap.forEach { (angle, ops) ->
                 val sortedOpsForAz = ops.sortedBy { priorityList.indexOf(it) }
@@ -152,10 +151,6 @@ object MapUtils {
                     val endY = startY - segmentLength
                     canvas.drawLine(center, startY, center, endY, paint)
                 }
-
-                paint.style = Paint.Style.FILL
-                paint.color = android.graphics.Color.WHITE
-                canvas.drawCircle(center, center - outerRadius, dotRadius, paint)
 
                 canvas.restore()
             }
@@ -215,6 +210,182 @@ object MapUtils {
         markerIconCache.put(cacheKey, finalDrawable)
 
         return finalDrawable
+    }
+
+    private fun parseMarkerAzimuths(rawAzimuths: String): List<Int> {
+        val explicitAngles = markerAzimuthWithUnitRegex.findAll(rawAzimuths)
+            .mapNotNull { match -> normalizeMarkerAzimuth(match.groupValues.getOrNull(1)) }
+            .toList()
+        if (explicitAngles.isNotEmpty()) return explicitAngles.distinct()
+
+        return rawAzimuths.split(",")
+            .mapNotNull { value -> normalizeMarkerAzimuth(value.trim()) }
+            .distinct()
+    }
+
+    private fun normalizeMarkerAzimuth(rawValue: String?): Int? {
+        val angle = rawValue
+            ?.replace(',', '.')
+            ?.toDoubleOrNull()
+            ?.toInt()
+            ?: return null
+        if (angle !in 0..360) return null
+        return if (angle == 360) 0 else angle
+    }
+
+    fun createRadioMarkerIcon(context: Context, serviceMask: Int, systemMask: Int, count: Int): BitmapDrawable {
+        val safeCount = count.coerceAtLeast(1)
+        val cacheKey = "radio_v4_${serviceMask}_${systemMask}_$safeCount"
+        radioIconCache.get(cacheKey)?.let { return it }
+
+        val density = context.resources.displayMetrics.density
+        val isCluster = safeCount > 1
+        val size = ((if (isCluster) 46 else 105) * density).toInt().coerceAtLeast(24)
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+            isAntiAlias = true
+            style = Paint.Style.FILL
+            color = radioMarkerColor(serviceMask, systemMask)
+        }
+
+        if (isCluster) {
+            val centerPoint = size / 2f
+            drawRadioClusterRing(canvas, size.toFloat(), radioMarkerColors(serviceMask, systemMask), paint)
+
+            paint.style = Paint.Style.FILL
+            paint.color = android.graphics.Color.WHITE
+            canvas.drawCircle(centerPoint, centerPoint, centerPoint * 0.80f, paint)
+
+            paint.color = android.graphics.Color.parseColor("#37474F")
+            paint.isFakeBoldText = true
+            paint.textAlign = Paint.Align.CENTER
+            val text = safeCount.toString()
+            paint.textSize = when (text.length) {
+                1, 2 -> size * 0.36f
+                3 -> size * 0.30f
+                4 -> size * 0.24f
+                else -> size * 0.19f
+            }
+            val textOffset = (paint.descent() + paint.ascent()) / 2f
+            canvas.drawText(text, centerPoint, centerPoint - textOffset, paint)
+        } else {
+            val scale = size / 230f
+            canvas.scale(scale, scale)
+
+            val center = 115f
+            val pieRadius = 45f
+            val radioColors = radioMarkerColors(serviceMask, systemMask)
+            val rect = android.graphics.RectF(center - pieRadius, center - pieRadius, center + pieRadius, center + pieRadius)
+            if (radioColors.size <= 1) {
+                paint.color = radioColors.firstOrNull() ?: radioMarkerColor(serviceMask, systemMask)
+                canvas.drawCircle(center, center, pieRadius, paint)
+            } else {
+                drawRadioMarkerSlices(canvas, rect, radioColors, paint)
+            }
+
+            paint.style = Paint.Style.FILL
+            paint.color = android.graphics.Color.WHITE
+            canvas.drawCircle(center, center, pieRadius * 0.40f, paint)
+
+            paint.color = android.graphics.Color.parseColor("#EBEBEB")
+            canvas.drawCircle(center, center, pieRadius * 0.80f, paint)
+
+            val iconScale = 100f
+            val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply {
+                isAntiAlias = true
+                style = Paint.Style.STROKE
+                strokeWidth = iconScale * 0.035f
+                strokeCap = Paint.Cap.ROUND
+                strokeJoin = Paint.Join.ROUND
+                color = android.graphics.Color.parseColor("#34404A")
+            }
+
+            val cx = center
+            val cy = center + (iconScale * 0.04f)
+            val u = iconScale / 200f
+
+            val tower = android.graphics.Path()
+            tower.moveTo(cx - 20f * u, cy + 45f * u); tower.lineTo(cx - 6f * u, cy - 5f * u)
+            tower.moveTo(cx + 20f * u, cy + 45f * u); tower.lineTo(cx + 6f * u, cy - 5f * u)
+            tower.moveTo(cx - 6f * u, cy - 5f * u); tower.lineTo(cx + 6f * u, cy - 5f * u)
+            val hY = cy + 20f * u; val hX = 13f * u
+            tower.moveTo(cx - hX, hY); tower.lineTo(cx + hX, hY)
+            tower.moveTo(cx - 20f * u, cy + 45f * u); tower.lineTo(cx + hX, hY)
+            tower.moveTo(cx + 20f * u, cy + 45f * u); tower.lineTo(cx - hX, hY)
+            canvas.drawPath(tower, iconPaint)
+
+            val dy = cy - 22f * u; val dr = 6.5f * u
+            val diamond = android.graphics.Path()
+            diamond.moveTo(cx, dy - dr); diamond.lineTo(cx + dr, dy); diamond.lineTo(cx, dy + dr); diamond.lineTo(cx - dr, dy); diamond.close()
+            canvas.drawPath(diamond, iconPaint)
+
+            val dotPaint = Paint(iconPaint).apply { style = Paint.Style.FILL }
+            canvas.drawCircle(cx, dy, 2.5f * u, dotPaint)
+
+            val waveInner = 17f * u
+            val waveOuter = 29f * u
+            val rectInner = android.graphics.RectF(cx - waveInner, dy - waveInner, cx + waveInner, dy + waveInner)
+            val rectOuter = android.graphics.RectF(cx - waveOuter, dy - waveOuter, cx + waveOuter, dy + waveOuter)
+            listOf(0f, 180f).forEach { start ->
+                canvas.drawArc(
+                    rectInner,
+                    start - 55f,
+                    110f,
+                    false,
+                    iconPaint
+                )
+                canvas.drawArc(
+                    rectOuter,
+                    start - 55f,
+                    110f,
+                    false,
+                    iconPaint
+                )
+            }
+        }
+
+        val drawable = BitmapDrawable(context.resources, bitmap)
+        radioIconCache.put(cacheKey, drawable)
+        return drawable
+    }
+
+    fun createTransparentMarkerIcon(context: Context): BitmapDrawable {
+        val bitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+        return BitmapDrawable(context.resources, bitmap)
+    }
+
+    fun radioMarkerColor(serviceMask: Int, systemMask: Int): Int {
+        return when {
+            (serviceMask and RadioServiceMasks.FH) != 0 -> android.graphics.Color.parseColor("#0D47A1")
+            (systemMask and RadioSystemMasks.TV) != 0 -> android.graphics.Color.parseColor("#8BC34A")
+            (systemMask and RadioSystemMasks.RADIO) != 0 -> android.graphics.Color.parseColor("#FDD835")
+            (serviceMask and (RadioServiceMasks.PRIVATE or RadioServiceMasks.RAIL or RadioServiceMasks.TRANSPORT)) != 0 ->
+                android.graphics.Color.parseColor("#006D77")
+            else -> android.graphics.Color.parseColor("#111111")
+        }
+    }
+
+    private fun radioMarkerColors(serviceMask: Int, systemMask: Int): List<Int> {
+        val colors = mutableListOf<Int>()
+        if ((systemMask and RadioSystemMasks.TV) != 0) {
+            colors += android.graphics.Color.parseColor("#8BC34A")
+        }
+        if ((systemMask and RadioSystemMasks.RADIO) != 0) {
+            colors += android.graphics.Color.parseColor("#FDD835")
+        }
+        if ((serviceMask and (RadioServiceMasks.PRIVATE or RadioServiceMasks.RAIL or RadioServiceMasks.TRANSPORT)) != 0) {
+            colors += android.graphics.Color.parseColor("#006D77")
+        }
+        if ((serviceMask and RadioServiceMasks.FH) != 0) {
+            colors += android.graphics.Color.parseColor("#0D47A1")
+        }
+        if ((serviceMask and (RadioServiceMasks.SATELLITE or RadioServiceMasks.RADAR or RadioServiceMasks.OTHER)) != 0 ||
+            colors.isEmpty()
+        ) {
+            colors += android.graphics.Color.parseColor("#111111")
+        }
+        return colors.distinct()
     }
 
     fun createClusterIcon(context: Context, operators: List<String>, count: Int, defaultOp: String): BitmapDrawable {
@@ -327,5 +498,53 @@ object MapUtils {
         }
 
         paint.style = Paint.Style.FILL
+    }
+
+    private fun drawRadioClusterRing(
+        canvas: Canvas,
+        size: Float,
+        colors: List<Int>,
+        paint: Paint
+    ) {
+        val center = size / 2f
+        val strokeWidth = size * 0.22f
+        val radius = center - strokeWidth / 2f
+        val ringRect = android.graphics.RectF(
+            center - radius,
+            center - radius,
+            center + radius,
+            center + radius
+        )
+        val safeColors = colors.ifEmpty { listOf(android.graphics.Color.parseColor("#111111")) }
+        val sweep = 360f / safeColors.size.coerceAtLeast(1)
+        val overlap = if (safeColors.size > 1) 0.8f else 0f
+
+        paint.style = Paint.Style.STROKE
+        paint.strokeWidth = strokeWidth
+        paint.strokeCap = Paint.Cap.BUTT
+
+        safeColors.forEachIndexed { index, color ->
+            paint.color = color
+            canvas.drawArc(ringRect, -90f + index * sweep, sweep + overlap, false, paint)
+        }
+
+        paint.style = Paint.Style.FILL
+    }
+
+    private fun drawRadioMarkerSlices(
+        canvas: Canvas,
+        rect: android.graphics.RectF,
+        colors: List<Int>,
+        paint: Paint
+    ) {
+        val safeColors = colors.ifEmpty { listOf(android.graphics.Color.parseColor("#111111")) }
+        val sweep = 360f / safeColors.size.coerceAtLeast(1)
+        val overlap = if (safeColors.size > 1) 0.8f else 0f
+
+        paint.style = Paint.Style.FILL
+        safeColors.forEachIndexed { index, color ->
+            paint.color = color
+            canvas.drawArc(rect, -90f + index * sweep, sweep + overlap, true, paint)
+        }
     }
 }

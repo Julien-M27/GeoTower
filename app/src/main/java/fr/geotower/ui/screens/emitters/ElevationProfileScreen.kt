@@ -81,6 +81,7 @@ import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.isNetworkAvailable
+import fr.geotower.utils.radioFrequencyLabel
 import fr.geotower.utils.rememberNetworkAvailableState
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -631,7 +632,7 @@ private fun ProfileStatsCard(
                 value = arrivalHeightMeters?.let { "${it.roundToInt()} m" } ?: "--",
                 detail = stringResource(R.string.appstrings_elevation_profile_site_altitude_detail)
             )
-            ProfileInfoRow(stringResource(R.string.appstrings_elevation_profile_frequency), "$frequencyMHz MHz")
+            ProfileInfoRow(stringResource(R.string.appstrings_elevation_profile_frequency), radioFrequencyLabel(frequencyMHz))
             calculationInfo?.let { info ->
                 val gpsValue = formatProfileGps(info.fromLatitude, info.fromLongitude)
                 ProfileInfoRow(stringResource(R.string.appstrings_elevation_profile_calculated_at), formatProfileCalculationTime(info.calculatedAtMillis))
@@ -1003,11 +1004,7 @@ private fun fresnelClearanceMeters(
 }
 
 private fun formatFrequencyLabel(frequencyMHz: Int): String {
-    return if (frequencyMHz >= 10_000) {
-        "${frequencyMHz / 1000} GHz"
-    } else {
-        "$frequencyMHz MHz"
-    }
+    return radioFrequencyLabel(frequencyMHz)
 }
 
 private fun formatProfileCalculationTime(timestampMillis: Long): String {

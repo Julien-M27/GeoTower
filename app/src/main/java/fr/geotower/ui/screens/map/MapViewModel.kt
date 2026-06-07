@@ -4,7 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.RadioRepository
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.RadioMapMarker
 import fr.geotower.data.models.TechniqueEntity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -19,10 +21,16 @@ import fr.geotower.utils.AppLogger
 import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.OperatorColors
 
-class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
+class MapViewModel(
+    private val repository: AnfrRepository,
+    private val radioRepository: RadioRepository
+) : ViewModel() {
 
     private val _antennas = MutableStateFlow<List<LocalisationEntity>>(emptyList())
     val antennas = _antennas.asStateFlow()
+
+    private val _radioMarkers = MutableStateFlow<List<RadioMapMarker>>(emptyList())
+    val radioMarkers = _radioMarkers.asStateFlow()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
@@ -36,6 +44,7 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
     private var searchJob: Job? = null
     private var cityStatsTechniquesJob: Job? = null
     private var loadedCityStatsTechniqueIds: Set<String> = emptySet()
+    private val mapAzimuthTechniqueCache = mutableMapOf<String, TechniqueEntity>()
     private var cityPolygons: List<List<GeoPoint>>? = null
     private var isCityLocked = false
 
@@ -47,10 +56,19 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
         searchJob = viewModelScope.launch {
             _isLoading.value = true
             try {
-                val apiMarkers = repository.getAntennasInBox(latNorth, lonEast, latSouth, lonWest)
+                val frequencyFilter = FrequencyFilterSelection.fromMapConfig()
+                val apiMarkers = repository.getAntennasInBox(
+                    latNorth,
+                    lonEast,
+                    latSouth,
+                    lonWest,
+                    detailBackedBandMask = frequencyFilter.detailBackedBandMaskForEnrichment()
+                )
                 val filteredMarkers = apiMarkers.filter { isPointInPolygon(it.latitude, it.longitude, polygons) }
 
                 _antennas.value = filteredMarkers
+                _radioMarkers.value = loadRadioMarkers(13.0, latNorth, lonEast, latSouth, lonWest)
+                    .filter { isPointInPolygon(it.latitude, it.longitude, polygons) }
                 AppLogger.d(TAG, "City map markers filtered=${filteredMarkers.size} total=${apiMarkers.size}")
             } catch (e: CancellationException) {
                 throw e
@@ -71,8 +89,28 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
             _isLoading.value = true
             try {
                 // ✅ 2. ON EMPÊCHE LE CLUSTERING GLOBAL SI UNE VILLE EST RECHERCHÉE
-                val hasSiteDisplayFilter = !AppConfig.showSitesInService.value ||
-                    !AppConfig.showSitesOutOfService.value
+                val showSitesInService = AppConfig.showSitesInService.value
+                val showSitesOutOfService = AppConfig.showSitesOutOfService.value
+                val showOnlySitesOutOfService = !showSitesInService && showSitesOutOfService
+                val hsOnlyIds = if (showOnlySitesOutOfService) {
+                    sitesHsAnfrIds(_sitesHs.value)
+                } else {
+                    emptyList()
+                }
+
+                if (!showSitesInService && !showSitesOutOfService) {
+                    _antennas.value = emptyList()
+                    _radioMarkers.value = loadRadioMarkers(zoom, latNorth, lonEast, latSouth, lonWest)
+                    return@launch
+                }
+
+                if (showOnlySitesOutOfService && hsOnlyIds.isEmpty()) {
+                    _antennas.value = emptyList()
+                    _radioMarkers.value = loadRadioMarkers(zoom, latNorth, lonEast, latSouth, lonWest)
+                    return@launch
+                }
+
+                val hasSiteDisplayFilter = !showSitesInService || !showSitesOutOfService
                 val hasFrequencyFilter = !FrequencyFilterSelection.fromMapConfig().isFullyEnabled
 
                 if (zoom < 13.0 && cityPolygons == null && !hasSiteDisplayFilter && !hasFrequencyFilter) {
@@ -98,7 +136,25 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
                     _antennas.value = fakeAntennas
                 } else {
                     // Si on a zoomé, on charge les vraies antennes détaillées de la zone
-                    val rawAntennas = repository.getAntennasInBox(latNorth, lonEast, latSouth, lonWest)
+                    val detailBackedBandMask = FrequencyFilterSelection.fromMapConfig().detailBackedBandMaskForEnrichment()
+                    val rawAntennas = if (showOnlySitesOutOfService) {
+                        repository.getAntennasByIdsInBox(
+                            hsOnlyIds,
+                            latNorth,
+                            lonEast,
+                            latSouth,
+                            lonWest,
+                            detailBackedBandMask = detailBackedBandMask
+                        )
+                    } else {
+                        repository.getAntennasInBox(
+                            latNorth,
+                            lonEast,
+                            latSouth,
+                            lonWest,
+                            detailBackedBandMask = detailBackedBandMask
+                        )
+                    }
 
                     // ✅ 3. SI UNE VILLE EST CIBLÉE, ON LA GARDE STRICTEMENT FILTRÉE !
                     if (cityPolygons != null) {
@@ -107,15 +163,48 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
                         _antennas.value = rawAntennas
                     }
                 }
+                _radioMarkers.value = loadRadioMarkers(zoom, latNorth, lonEast, latSouth, lonWest)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 AppLogger.w(TAG, "Map markers request failed", e)
                 _antennas.value = emptyList()
+                _radioMarkers.value = emptyList()
             } finally {
                 _isLoading.value = false
             }
         }
+    }
+
+    private suspend fun loadRadioMarkers(
+        zoom: Double,
+        latNorth: Double,
+        lonEast: Double,
+        latSouth: Double,
+        lonWest: Double
+    ): List<RadioMapMarker> {
+        val categoryMask = AppConfig.radioMapCategoryMask()
+        return if (categoryMask != 0) {
+            radioRepository.getVisibleMarkers(
+                zoom = zoom,
+                latNorth = latNorth,
+                lonEast = lonEast,
+                latSouth = latSouth,
+                lonWest = lonWest,
+                categoryMask = categoryMask
+            )
+        } else {
+            emptyList()
+        }
+    }
+
+    private fun sitesHsAnfrIds(sitesHs: List<SiteHsEntity>): List<String> {
+        return sitesHs
+            .asSequence()
+            .filter { it.idAnfr.isNotBlank() }
+            .map { it.idAnfr }
+            .distinct()
+            .toList()
     }
 
     // =================================================================
@@ -180,12 +269,35 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
         loadedCityStatsTechniqueIds = emptySet()
     }
 
+    suspend fun getMapAzimuthTechniqueDetails(idAnfrs: List<String>): Map<String, TechniqueEntity> {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val requestedIds = idAnfrs
+                .filter { it.isNotBlank() && !it.startsWith("CLUSTER_") }
+                .distinct()
+            if (requestedIds.isEmpty()) return@withContext emptyMap()
+
+            val missingIds = requestedIds.filterNot { mapAzimuthTechniqueCache.containsKey(it) }
+            if (missingIds.isNotEmpty()) {
+                missingIds
+                    .chunked(MAP_AZIMUTH_TECHNIQUE_BATCH_SIZE)
+                    .forEach { chunk ->
+                        mapAzimuthTechniqueCache += repository.getTechniqueDetailsByIds(chunk)
+                    }
+            }
+
+            requestedIds.mapNotNull { id ->
+                mapAzimuthTechniqueCache[id]?.let { technique -> id to technique }
+            }.toMap()
+        }
+    }
+
     // =================================================================
 
     fun clearCityFilterAndReload(zoom: Double, latNorth: Double, lonEast: Double, latSouth: Double, lonWest: Double) {
         isCityLocked = false // ✅ ON DÉVERROUILLE
         cityPolygons = null
         _antennas.value = emptyList()
+        _radioMarkers.value = emptyList()
         loadAntennasInBox(zoom, latNorth, lonEast, latSouth, lonWest)
     }
 
@@ -194,6 +306,7 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
         isCityLocked = false // ✅ ON DÉVERROUILLE
         cityPolygons = null
         _antennas.value = emptyList()
+        _radioMarkers.value = emptyList()
     }
 
     suspend fun searchSiteById(query: String): LocalisationEntity? {
@@ -227,11 +340,14 @@ class MapViewModel(private val repository: AnfrRepository) : ViewModel() {
     }
 }
 
-class MapViewModelFactory(private val repository: AnfrRepository) : ViewModelProvider.Factory {
+class MapViewModelFactory(
+    private val repository: AnfrRepository,
+    private val radioRepository: RadioRepository
+) : ViewModelProvider.Factory {
     override fun <T : ViewModel> create(modelClass: Class<T>): T {
         if (modelClass.isAssignableFrom(MapViewModel::class.java)) {
             @Suppress("UNCHECKED_CAST")
-            return MapViewModel(repository) as T
+            return MapViewModel(repository, radioRepository) as T
         }
         throw IllegalArgumentException("Unknown ViewModel class")
     }
@@ -239,3 +355,4 @@ class MapViewModelFactory(private val repository: AnfrRepository) : ViewModelPro
 
 private const val TAG = "GeoTowerMap"
 private const val CITY_STATS_TECHNIQUE_BATCH_SIZE = 400
+private const val MAP_AZIMUTH_TECHNIQUE_BATCH_SIZE = 400
