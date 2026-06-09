@@ -277,6 +277,7 @@ private fun colorPaletteName(palette: AppColorPalette): String = when (palette) 
     AppColorPalette.Rose -> stringResource(R.string.appstrings_color_palette_rose_title)
     AppColorPalette.Amber -> stringResource(R.string.appstrings_color_palette_amber_title)
     AppColorPalette.Graphite -> stringResource(R.string.appstrings_color_palette_graphite_title)
+    AppColorPalette.Custom -> stringResource(R.string.appstrings_color_palette_custom_title)
 }
 
 @Composable
@@ -292,6 +293,7 @@ private fun colorPaletteDescription(palette: AppColorPalette): String = when (pa
     AppColorPalette.Rose -> stringResource(R.string.appstrings_color_palette_rose_desc)
     AppColorPalette.Amber -> stringResource(R.string.appstrings_color_palette_amber_desc)
     AppColorPalette.Graphite -> stringResource(R.string.appstrings_color_palette_graphite_desc)
+    AppColorPalette.Custom -> stringResource(R.string.appstrings_color_palette_custom_desc)
 }
 
 @Composable

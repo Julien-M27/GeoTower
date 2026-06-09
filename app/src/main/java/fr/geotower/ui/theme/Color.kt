@@ -18,7 +18,8 @@ enum class AppColorPalette(val storageKey: String) {
     Indigo("indigo"),
     Rose("rose"),
     Amber("amber"),
-    Graphite("graphite");
+    Graphite("graphite"),
+    Custom("custom");
 
     companion object {
         fun fromKey(key: String?): AppColorPalette {
@@ -39,7 +40,8 @@ val AppColorPaletteOptions = listOf(
     AppColorPalette.Indigo,
     AppColorPalette.Rose,
     AppColorPalette.Amber,
-    AppColorPalette.Graphite
+    AppColorPalette.Graphite,
+    AppColorPalette.Custom
 )
 
 fun appPalettePreviewColors(palette: AppColorPalette): List<Color> = when (palette) {
@@ -54,6 +56,7 @@ fun appPalettePreviewColors(palette: AppColorPalette): List<Color> = when (palet
     AppColorPalette.Rose -> listOf(Color(0xFF984061), Color(0xFF7B2949), Color(0xFF5E1533), Color(0xFFFFD8E5))
     AppColorPalette.Amber -> listOf(Color(0xFF7C5900), Color(0xFF624500), Color(0xFF4A3300), Color(0xFFF4E1BC))
     AppColorPalette.Graphite -> listOf(Color(0xFF5E6068), Color(0xFF575C63), Color(0xFF3F424A), Color(0xFFE3E4EC))
+    AppColorPalette.Custom -> listOf(Color(0xFFAEC5FD), Color(0xFFBDC5D9), Color(0xFFDDBADB), Color(0xFF41444D))
 }
 
 fun appStaticColorScheme(palette: AppColorPalette, darkTheme: Boolean): ColorScheme {
@@ -72,6 +75,7 @@ fun appStaticColorScheme(palette: AppColorPalette, darkTheme: Boolean): ColorSch
         AppColorPalette.Rose -> if (darkTheme) RoseDarkColorScheme else RoseLightColorScheme
         AppColorPalette.Amber -> if (darkTheme) AmberDarkColorScheme else AmberLightColorScheme
         AppColorPalette.Graphite -> if (darkTheme) GraphiteDarkColorScheme else GraphiteLightColorScheme
+        AppColorPalette.Custom -> if (darkTheme) CustomDarkColorScheme else CustomLightColorScheme
     }
 }
 
@@ -593,4 +597,59 @@ private val GraphiteDarkColorScheme = darkColorScheme(
     inverseSurface = Color(0xFFE5E1E6),
     inverseOnSurface = Color(0xFF303034),
     inversePrimary = Color(0xFF5E6068)
+)
+
+// Palette personnalisee (couleurs fournies par l'utilisateur) : bleu lavande, gris-bleu, rose.
+// Les 4 couleurs donnees sont des tons clairs sur fond sombre -> elles pilotent le mode sombre
+// (accents + surface #41444D), et le mode clair en derive avec des accents assombris.
+private val CustomLightColorScheme = lightColorScheme(
+    primary = Color(0xFF4A5C92),
+    onPrimary = Color.White,
+    primaryContainer = Color(0xFFDBE1FF),
+    onPrimaryContainer = Color(0xFF001A41),
+    secondary = Color(0xFF565E71),
+    onSecondary = Color.White,
+    secondaryContainer = Color(0xFFDAE2F9),
+    onSecondaryContainer = Color(0xFF131C2B),
+    tertiary = Color(0xFF834D80),
+    onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFFFD6F8),
+    onTertiaryContainer = Color(0xFF360039),
+    background = Color(0xFFFEFBFF),
+    onBackground = Color(0xFF1B1B21),
+    surface = Color(0xFFFEFBFF),
+    onSurface = Color(0xFF1B1B21),
+    surfaceVariant = Color(0xFFE2E1EC),
+    onSurfaceVariant = Color(0xFF45464F),
+    outline = Color(0xFF767680),
+    outlineVariant = Color(0xFFC6C5D0),
+    inverseSurface = Color(0xFF303036),
+    inverseOnSurface = Color(0xFFF2F0F7),
+    inversePrimary = Color(0xFFAEC5FD)
+)
+
+private val CustomDarkColorScheme = darkColorScheme(
+    primary = Color(0xFFAEC5FD),
+    onPrimary = Color(0xFF152E60),
+    primaryContainer = Color(0xFF324474),
+    onPrimaryContainer = Color(0xFFDBE1FF),
+    secondary = Color(0xFFBDC5D9),
+    onSecondary = Color(0xFF283041),
+    secondaryContainer = Color(0xFF3E4758),
+    onSecondaryContainer = Color(0xFFDAE2F9),
+    tertiary = Color(0xFFDDBADB),
+    onTertiary = Color(0xFF4D2949),
+    tertiaryContainer = Color(0xFF663F61),
+    onTertiaryContainer = Color(0xFFFFD6F8),
+    background = Color(0xFF1B1B21),
+    onBackground = Color(0xFFE4E1E9),
+    surface = Color(0xFF1B1B21),
+    onSurface = Color(0xFFE4E1E9),
+    surfaceVariant = Color(0xFF41444D),
+    onSurfaceVariant = Color(0xFFC6C6D0),
+    outline = Color(0xFF90909A),
+    outlineVariant = Color(0xFF45464F),
+    inverseSurface = Color(0xFFE4E1E9),
+    inverseOnSurface = Color(0xFF303036),
+    inversePrimary = Color(0xFF4A5C92)
 )

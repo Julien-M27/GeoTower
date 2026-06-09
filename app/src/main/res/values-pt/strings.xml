@@ -334,6 +334,8 @@
     <string name="appstrings_color_palette_dynamic_desc">Usa automaticamente as cores do sistema do telemóvel (Material You).</string>
     <string name="appstrings_color_palette_dynamic_title">Dinâmico (papel de parede)</string>
     <string name="appstrings_color_palette_graphite_desc">Paleta de sistema grafite Material 3</string>
+    <string name="appstrings_color_palette_custom_title">Personalizada</string>
+    <string name="appstrings_color_palette_custom_desc">Azul lavanda, cinza-azulado e rosa</string>
     <string name="appstrings_color_palette_graphite_title">Material Graphite</string>
     <string name="appstrings_color_palette_green_desc">Paleta de sistema verde Material 3</string>
     <string name="appstrings_color_palette_green_title">Material Green</string>

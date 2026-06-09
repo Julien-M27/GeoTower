@@ -347,6 +347,8 @@
     <string name="appstrings_color_palette_dynamic_desc">Automatically uses the phone system colors (Material You).</string>
     <string name="appstrings_color_palette_dynamic_title">Dynamic (wallpaper)</string>
     <string name="appstrings_color_palette_graphite_desc">Material 3 graphite system palette</string>
+    <string name="appstrings_color_palette_custom_title">Custom</string>
+    <string name="appstrings_color_palette_custom_desc">Lavender blue, blue-grey and pink</string>
     <string name="appstrings_color_palette_graphite_title">Material Graphite</string>
     <string name="appstrings_color_palette_green_desc">Material 3 green system palette</string>
     <string name="appstrings_color_palette_green_title">Material Green</string>
