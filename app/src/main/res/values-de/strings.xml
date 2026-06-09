@@ -253,6 +253,9 @@
     <string name="live_tracking_no_antenna_found">Keine %1$s-Antenne in der Nähe gefunden.</string>
     <string name="live_tracking_antenna_distance">%1$s-Antenne: %2$s</string>
     <string name="live_tracking_drawer_primary">%1$s • %2$s</string>
+    <string-array name="live_cardinal_directions">
+        <item>N</item><item>NO</item><item>O</item><item>SO</item><item>S</item><item>SW</item><item>W</item><item>NW</item>
+    </string-array>
     <!-- Migrated legacy UI string resources. -->
     <string name="appstrings_about">Über</string>
     <string name="appstrings_about_database_not_installed">Nicht installiert</string>
@@ -1716,4 +1719,8 @@
     <string name="appstrings_release_map_details_online_results">Online-Ergebnisse werden in Standort- und Trägerdetails besser unterstützt</string>
     <string name="appstrings_release_interface_encoding_accents">Korrekturen bei Kodierung und Akzenten</string>
     <string name="appstrings_release_interface_arcep_status_translations">Übersetzungen für ARCEP-Störungen und Status ergänzt</string>
+    <string name="appstrings_release_section_live_notification">Live-Tracking-Benachrichtigung</string>
+    <string name="appstrings_release_live_notification_nowbar_oneui85">Anzeige in der Now Bar auf neueren Samsung-Geräten korrigiert (One UI 8.5)</string>
+    <string name="appstrings_release_live_notification_operator_logo">Betreiberlogo in der reduzierten Benachrichtigung angezeigt (Samsung)</string>
+    <string name="appstrings_release_live_notification_orientation_i18n">Himmelsrichtungen der Ausrichtung folgen jetzt der App-Sprache</string>
 </resources>

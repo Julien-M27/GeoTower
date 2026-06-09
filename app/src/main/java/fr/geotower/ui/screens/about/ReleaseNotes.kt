@@ -26,25 +26,10 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_online_data)) {
-        item(stringResource(R.string.appstrings_release_online_data_fallback_mode))
-        item(stringResource(R.string.appstrings_release_online_data_map_nearby_compass))
-        item(stringResource(R.string.appstrings_release_online_data_warning))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_home_onboarding)) {
-        item(stringResource(R.string.appstrings_release_home_onboarding_local_db_access))
-        item(stringResource(R.string.appstrings_release_home_onboarding_radio_db_download))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_map_details)) {
-        item(stringResource(R.string.appstrings_release_map_details_special_support_ids))
-        item(stringResource(R.string.appstrings_release_map_details_online_results))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_interface_translations)) {
-        item(stringResource(R.string.appstrings_release_interface_encoding_accents))
-        item(stringResource(R.string.appstrings_release_interface_arcep_status_translations))
+    section(stringResource(R.string.appstrings_release_section_live_notification)) {
+        item(stringResource(R.string.appstrings_release_live_notification_nowbar_oneui85))
+        item(stringResource(R.string.appstrings_release_live_notification_operator_logo))
+        item(stringResource(R.string.appstrings_release_live_notification_orientation_i18n))
     }
 }
 

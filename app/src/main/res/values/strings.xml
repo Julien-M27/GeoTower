@@ -266,6 +266,9 @@
     <string name="live_tracking_no_antenna_found">No %1$s antenna found nearby.</string>
     <string name="live_tracking_antenna_distance">%1$s antenna: %2$s</string>
     <string name="live_tracking_drawer_primary">%1$s • %2$s</string>
+    <string-array name="live_cardinal_directions">
+        <item>N</item><item>NE</item><item>E</item><item>SE</item><item>S</item><item>SW</item><item>W</item><item>NW</item>
+    </string-array>
     <!-- Migrated legacy UI string resources. -->
     <string name="appstrings_about">About</string>
     <string name="appstrings_about_database_not_installed">Not installed</string>
@@ -1734,4 +1737,8 @@
     <string name="appstrings_release_map_details_online_results">Online results are better supported in site and support details</string>
     <string name="appstrings_release_interface_encoding_accents">Encoding and accent fixes</string>
     <string name="appstrings_release_interface_arcep_status_translations">Translations completed for ARCEP outages and statuses</string>
+    <string name="appstrings_release_section_live_notification">Live tracking notification</string>
+    <string name="appstrings_release_live_notification_nowbar_oneui85">Fixed display in the Now Bar on recent Samsung devices (One UI 8.5)</string>
+    <string name="appstrings_release_live_notification_operator_logo">Operator logo shown in the collapsed notification (Samsung)</string>
+    <string name="appstrings_release_live_notification_orientation_i18n">Compass directions in the orientation now follow the app language</string>
 </resources>

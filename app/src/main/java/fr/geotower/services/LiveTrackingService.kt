@@ -281,9 +281,9 @@ class LiveTrackingService : Service() {
                 val baseDistanceStr = formatDistance(minDistance)
                 var bearing = bearingToClosest
                 if (bearing < 0) bearing += 360f
-                val directions = arrayOf("N", "NE", "E", "SE", "S", "SO", "O", "NO")
+                val directions = applicationContext.resources.getStringArray(R.array.live_cardinal_directions)
                 val index = Math.round(bearing / 45.0).toInt() % 8
-                val directionStr = directions[index]
+                val directionStr = directions.getOrElse(index) { "N" }
                 val degreeStr = "${Math.round(bearing)}°"
                 val distanceWithDirectionStr = "$baseDistanceStr • $directionStr ($degreeStr)"
 
@@ -751,6 +751,12 @@ class LiveTrackingService : Service() {
                 ).build()
             )
         NotificationIconResources.applyTo(builder, this)
+        // Chip de la notif repliée : sur Samsung, le chip coloré rend bien le logo opérateur.
+        // Sur les autres surfaces Android, la petite icône est tintée en monochrome → un logo
+        // opérateur donnerait un carré plein moche, donc on garde l'icône monochrome de l'app.
+        if (DeviceProfile.isSamsungDevice) {
+            OperatorLogos.drawableRes(operator)?.let { builder.setSmallIcon(it) }
+        }
         (sitePhotoBitmap ?: operatorLogoBitmap(operator))?.let { bitmap ->
             builder.setLargeIcon(Icon.createWithBitmap(bitmap))
         }
@@ -773,20 +779,13 @@ class LiveTrackingService : Service() {
             }
         }
 
+        // One UI 8.5 : les extras propriétaires android.ongoingActivityNoti.* (style legacy)
+        // placent la notif en section TimeOrder et la rendent invisible dans la Now Bar.
+        // On s'appuie sur l'API standard (ProgressStyle + setRequestPromotedOngoing) → section
+        // OngoingActivity, affichage fiable sur 8.0 et 8.5.
         return builder.build().apply {
             extras.putBoolean("android.requestPromotedOngoing", true)
             shortCriticalText?.let { extras.putString("android.shortCriticalText", it) }
-            extras.putAll(
-                samsungOngoingActivityExtras(
-                    operator = operator,
-                    progress = progress,
-                    primaryInfo = livePrimaryInfo,
-                    secondaryInfo = liveContentText,
-                    shortCriticalText = shortCriticalText,
-                    sitePhotoBitmap = sitePhotoBitmap,
-                    mirrorTrackerIcon = mirrorTrackerIcon
-                )
-            )
         }
     }
 
@@ -999,7 +998,7 @@ class LiveTrackingService : Service() {
     }
 
     private fun liveOrientationText(text: String): String? {
-        return Regex("""(?:^|[\s\u2022])([NSEO]{1,2}\s*\(\s*\d{1,3}\s*\u00B0\s*\)(?:\s*\u2022\s*HS)?)""")
+        return Regex("""(?:^|[\s\u2022])([NSEOW]{1,2}\s*\(\s*\d{1,3}\s*\u00B0\s*\)(?:\s*\u2022\s*HS)?)""")
             .find(text)
             ?.groupValues
             ?.getOrNull(1)

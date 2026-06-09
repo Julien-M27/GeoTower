@@ -253,6 +253,9 @@
     <string name="live_tracking_no_antenna_found">No se encontró ninguna antena %1$s cercana.</string>
     <string name="live_tracking_antenna_distance">Antena %1$s: %2$s</string>
     <string name="live_tracking_drawer_primary">%1$s • %2$s</string>
+    <string-array name="live_cardinal_directions">
+        <item>N</item><item>NE</item><item>E</item><item>SE</item><item>S</item><item>SO</item><item>O</item><item>NO</item>
+    </string-array>
     <!-- Migrated legacy UI string resources. -->
     <string name="appstrings_about">Acerca de</string>
     <string name="appstrings_about_database_not_installed">No instalado</string>
@@ -1716,4 +1719,8 @@
     <string name="appstrings_release_map_details_online_results">Resultados en línea mejor compatibles en los detalles de sitio y soporte</string>
     <string name="appstrings_release_interface_encoding_accents">Correcciones de codificación y acentos</string>
     <string name="appstrings_release_interface_arcep_status_translations">Traducciones completadas para averías ARCEP y estados</string>
+    <string name="appstrings_release_section_live_notification">Notificación de seguimiento en directo</string>
+    <string name="appstrings_release_live_notification_nowbar_oneui85">Corregida la visualización en la Now Bar en dispositivos Samsung recientes (One UI 8.5)</string>
+    <string name="appstrings_release_live_notification_operator_logo">Logotipo del operador mostrado en la notificación contraída (Samsung)</string>
+    <string name="appstrings_release_live_notification_orientation_i18n">Puntos cardinales de la orientación traducidos al idioma de la aplicación</string>
 </resources>
