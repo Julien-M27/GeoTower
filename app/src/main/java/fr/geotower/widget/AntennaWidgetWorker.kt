@@ -52,6 +52,12 @@ class AntennaWidgetWorker(
         ) {
             return Result.success()
         }
+        // Aucun widget posé : on n'interroge PAS la localisation et on annule la tâche périodique
+        // (couvre tous les chemins de planification, y compris un reset des réglages).
+        if (!WidgetUpdateScheduler.hasAnyWidget(context)) {
+            WidgetUpdateScheduler.cancelPeriodicUpdateIfNoWidgetsRemain(context)
+            return Result.success()
+        }
         val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
         val timeFormat = java.text.SimpleDateFormat("HH:mm", Locale.getDefault())
 

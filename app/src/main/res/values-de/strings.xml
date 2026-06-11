@@ -1653,6 +1653,12 @@
     <string name="appstrings_which_map">Welche Karte anzeigen?</string>
     <string name="appstrings_widget_refresh_title">Widget-Aktualisierung</string>
     <string name="appstrings_widget_refresh_warning">Warnung: Eine hohe Frequenz (30 min) kann den Akkuverbrauch im Hintergrund erhöhen.</string>
+    <string name="appstrings_widget_refresh_disabled_no_widget">Es ist kein Widget installiert. Fügen Sie ein GeoTower-Widget zu Ihrem Startbildschirm hinzu, um die Aktualisierungsfrequenz festzulegen.</string>
+    <string name="appstrings_widget_add_button_title">Widget hinzufügen</string>
+    <string name="appstrings_widget_add_button_desc">Platzieren Sie ein GeoTower-Widget auf Ihrem Startbildschirm.</string>
+    <string name="appstrings_widget_size_compact">Kompakt (2 × 1)</string>
+    <string name="appstrings_widget_size_medium">Mittel (2 × 2)</string>
+    <string name="appstrings_widget_size_large">Groß (4 × 2)</string>
     <string name="appstrings_widget_title">📍 Antennen in der Nähe</string>
     <string name="appstrings_yes">Ja</string>
     <string name="appstrings_your_data_desc">GeoTower sammelt keine personenbezogenen Daten. Deine Einstellungen und Favoriten bleiben nur auf deinem Gerät.</string>
@@ -1725,4 +1731,8 @@
     <string name="appstrings_release_live_notification_nowbar_oneui85">Anzeige in der Now Bar auf neueren Samsung-Geräten korrigiert (One UI 8.5)</string>
     <string name="appstrings_release_live_notification_operator_logo">Betreiberlogo in der reduzierten Benachrichtigung angezeigt (Samsung)</string>
     <string name="appstrings_release_live_notification_orientation_i18n">Himmelsrichtungen der Ausrichtung folgen jetzt der App-Sprache</string>
+    <string name="appstrings_release_widget_add_button">Neue Schaltfläche in den Einstellungen, um ein GeoTower-Widget (kompakt, mittel, groß oder Karte) zum Startbildschirm hinzuzufügen</string>
+    <string name="appstrings_release_widget_frequency_gated">Die Aktualisierungsfrequenz lässt sich jetzt nur einstellen, wenn ein Widget installiert ist</string>
+    <string name="appstrings_release_widget_battery">Akkuschonung: Die Standortermittlung im Hintergrund läuft nicht mehr, wenn kein Widget platziert ist</string>
+    <string name="appstrings_release_onboarding_language_first">Die Sprache kann jetzt direkt auf dem ersten Begrüßungsbildschirm gewählt werden</string>
 </resources>

@@ -263,7 +263,14 @@ fun FirstStartScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         when (page) {
-                            0 -> StepWelcomeDesign()
+                            0 -> StepWelcomeDesign(
+                                useOneUi = useOneUi,
+                                cardShape = cardShape,
+                                cardBorder = cardBorder,
+                                bubbleColor = bubbleColor,
+                                onOpenLanguageSheet = { showLanguageSheet = true },
+                                onSafeClick = safeClick
+                            )
                             1 -> StepLocationPermissionDesign()
                             2 -> StepNotificationsPermissionDesign()
                             // ✅ NOUVELLE PAGE INSÉRÉE ICI :
@@ -277,7 +284,6 @@ fun FirstStartScreen(
                                 cardBorder = cardBorder,
                                 bubbleColor = bubbleColor,
                                 onOpenOperatorSheet = { showOperatorSheet = true },
-                                onOpenLanguageSheet = { showLanguageSheet = true },
                                 onOpenUnitSheet = { showUnitSheet = true },
                                 onSafeClick = safeClick
                             )
@@ -582,7 +588,6 @@ fun StepPreferencesDesign(
     cardBorder: BorderStroke?,
     bubbleColor: Color,
     onOpenOperatorSheet: () -> Unit,
-    onOpenLanguageSheet: () -> Unit,
     onOpenUnitSheet: () -> Unit,
     onSafeClick: SafeClick
 ) {
@@ -590,7 +595,6 @@ fun StepPreferencesDesign(
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
     var defaultOperator by AppConfig.defaultOperator
-    val appLanguage by AppConfig.appLanguage
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         Spacer(modifier = Modifier.height(16.dp))
@@ -618,25 +622,6 @@ fun StepPreferencesDesign(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // --- CARTE LANGUE ---
-        val flag = AppLocale.languageFlag(appLanguage)
-        val displayLanguage = stringResource(AppLocale.languageDisplayNameRes(appLanguage))
-
-        Surface(onClick = { onSafeClick("onboarding_language") { onOpenLanguageSheet() } }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
-            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.settings_app_language), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(stringResource(R.string.common_current_value, displayLanguage), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) { Text(text = flag, fontSize = 24.sp) }
-                    Spacer(Modifier.width(8.dp))
-                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                }
-            }
-        }
         Spacer(modifier = Modifier.height(16.dp))
         // --- CARTE UNITÉS ---
         Surface(onClick = { onSafeClick("onboarding_unit") { onOpenUnitSheet() } }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
@@ -687,11 +672,20 @@ private fun OnboardingPermissionDeniedDialog(
 }
 
 @Composable
-fun StepWelcomeDesign() {
+fun StepWelcomeDesign(
+    useOneUi: Boolean,
+    cardShape: Shape,
+    cardBorder: BorderStroke?,
+    bubbleColor: Color,
+    onOpenLanguageSheet: () -> Unit,
+    onSafeClick: SafeClick
+) {
     // --- NOUVEAU : On récupère dynamiquement l'icône actuelle ! ---
     val context = LocalContext.current
     val currentIconRes by fr.geotower.utils.AppIconManager.currentIconRes
     val displayIcon = if (currentIconRes != 0) currentIconRes else fr.geotower.utils.AppIconManager.getLogoResId(context)
+
+    val appLanguage by AppConfig.appLanguage
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         Spacer(modifier = Modifier.height(16.dp))
@@ -710,7 +704,26 @@ fun StepWelcomeDesign() {
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // --- CARTE LANGUE (déplacée ici pour le choix dès le 1er écran) ---
+        val flag = AppLocale.languageFlag(appLanguage)
+        val displayLanguage = stringResource(AppLocale.languageDisplayNameRes(appLanguage))
+        Surface(onClick = { onSafeClick("onboarding_language") { onOpenLanguageSheet() } }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(stringResource(R.string.settings_app_language), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.common_current_value, displayLanguage), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) { Text(text = flag, fontSize = 24.sp) }
+                    Spacer(Modifier.width(8.dp))
+                    Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
 
         Column(
             modifier = Modifier.fillMaxWidth(),

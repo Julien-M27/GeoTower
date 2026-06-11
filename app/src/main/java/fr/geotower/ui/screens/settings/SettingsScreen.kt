@@ -43,6 +43,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Menu
@@ -182,7 +183,12 @@ private fun resetSettingsToDefaultsAndRestart(context: Context, prefs: SharedPre
 
     UpdateCheckScheduler.reconcile(appContext)
 
-    WidgetUpdateScheduler.schedulePeriodicUpdate(appContext, WidgetPrefs.DEFAULT_SYNC_MINUTES)
+    // Ne replanifie la tâche de localisation que si un widget est réellement posé.
+    if (WidgetUpdateScheduler.hasAnyWidget(appContext)) {
+        WidgetUpdateScheduler.schedulePeriodicUpdate(appContext, WidgetPrefs.DEFAULT_SYNC_MINUTES)
+    } else {
+        WidgetUpdateScheduler.cancelPeriodicUpdateIfNoWidgetsRemain(appContext)
+    }
 
     val intent = appContext.packageManager.getLaunchIntentForPackage(appContext.packageName)
     intent?.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -1829,6 +1835,23 @@ fun SectionPreferences(
         mutableIntStateOf(WidgetPrefs.syncFrequencyMinutes(prefs))
     }
 
+    // Présence d'au moins un widget GeoTower posé : conditionne l'activation du curseur de fréquence
+    // (réévaluée à chaque retour au premier plan, l'utilisateur pouvant ajouter/retirer un widget entre-temps).
+    var hasWidgetInstalled by remember {
+        mutableStateOf(fr.geotower.widget.WidgetUpdateScheduler.hasAnyWidget(context))
+    }
+    val widgetLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(widgetLifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                hasWidgetInstalled = fr.geotower.widget.WidgetUpdateScheduler.hasAnyWidget(context)
+            }
+        }
+        widgetLifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { widgetLifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    var showWidgetPickerSheet by remember { mutableStateOf(false) }
+
     // ✅ AJOUT POUR LE STYLE D'AFFICHAGE
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current
     var displayStyle by remember { mutableIntStateOf(prefs.getInt("display_style", 0)) }
@@ -2207,6 +2230,7 @@ fun SectionPreferences(
         steps = listOf(30, 45, 60, 120, 240, 480, 720, 1440),
         labels = listOf("30 min", "45 min", "1 h", "2 h", "4 h", "8 h", "12 h", "24 h"),
         onValueChange = { newFreq ->
+            if (!hasWidgetInstalled) return@CustomSliderCard
             widgetFrequency = newFreq
             prefs.edit().putInt(WidgetPrefs.SYNC_FREQUENCY_MINUTES, newFreq).apply()
 
@@ -2217,8 +2241,105 @@ fun SectionPreferences(
         border = border,
         bubbleColor = bubbleColor,
         useOneUi = useOneUi,
-        footerText = stringResource(R.string.appstrings_widget_refresh_warning)
+        enabled = hasWidgetInstalled,
+        footerText = if (hasWidgetInstalled) {
+            stringResource(R.string.appstrings_widget_refresh_warning)
+        } else {
+            stringResource(R.string.appstrings_widget_refresh_disabled_no_widget)
+        }
     )
+
+    // Bouton « Ajouter un widget » : visible uniquement quand aucun widget n'est posé
+    // et que le launcher sait épingler (One UI, etc.). Il déclenche la boîte de dialogue système.
+    val canPinWidget = remember { fr.geotower.widget.WidgetUpdateScheduler.canPinWidget(context) }
+    if (!hasWidgetInstalled && canPinWidget) {
+        Spacer(Modifier.height(12.dp))
+        PreferenceActionCard(
+            title = stringResource(R.string.appstrings_widget_add_button_title),
+            desc = stringResource(R.string.appstrings_widget_add_button_desc),
+            onClick = { showWidgetPickerSheet = true },
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick,
+            icon = Icons.Default.Add
+        )
+    }
+
+    if (showWidgetPickerSheet) {
+        WidgetFormatPickerSheet(
+            useOneUi = useOneUi,
+            onPick = { receiver ->
+                fr.geotower.widget.WidgetUpdateScheduler.requestPinWidget(context, receiver)
+                showWidgetPickerSheet = false
+            },
+            onDismiss = { showWidgetPickerSheet = false }
+        )
+    }
+}
+
+/** Format de widget proposé à l'épinglage : libellé, taille et receiver cible. */
+private data class WidgetFormatOption(
+    val labelRes: Int,
+    val sizeRes: Int,
+    val receiver: Class<*>
+)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun WidgetFormatPickerSheet(
+    useOneUi: Boolean,
+    onPick: (Class<*>) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+
+    val formats = listOf(
+        WidgetFormatOption(R.string.antenna_widget_label, R.string.appstrings_widget_size_compact, fr.geotower.widget.AntennaWidgetReceiver::class.java),
+        WidgetFormatOption(R.string.antenna_widget_label, R.string.appstrings_widget_size_medium, fr.geotower.widget.AntennaWidgetMediumReceiver::class.java),
+        WidgetFormatOption(R.string.antenna_widget_label, R.string.appstrings_widget_size_large, fr.geotower.widget.AntennaWidgetLargeReceiver::class.java),
+        WidgetFormatOption(R.string.antenna_map_widget_label, R.string.appstrings_widget_size_medium, fr.geotower.widget.AntennaMapWidgetReceiver::class.java)
+    )
+
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = sheetBgColor) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp)
+        ) {
+            Text(
+                text = stringResource(R.string.appstrings_widget_add_button_title),
+                style = MaterialTheme.typography.titleLarge,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+            formats.forEachIndexed { index, format ->
+                if (index > 0) Spacer(modifier = Modifier.height(12.dp))
+                val cardBg = if (useOneUi) MaterialTheme.colorScheme.surface else Color.Transparent
+                val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                Surface(
+                    onClick = { onPick(format.receiver) },
+                    shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp),
+                    border = cardBorder,
+                    color = cardBg,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text(stringResource(format.labelRes), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Text(stringResource(format.sizeRes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable

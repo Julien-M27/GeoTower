@@ -1653,6 +1653,12 @@
     <string name="appstrings_which_map">Quale mappa consultare?</string>
     <string name="appstrings_widget_refresh_title">Aggiornamento widget</string>
     <string name="appstrings_widget_refresh_warning">Attenzione: una frequenza alta (30 min) può aumentare il consumo della batteria in background.</string>
+    <string name="appstrings_widget_refresh_disabled_no_widget">Nessun widget è installato. Aggiungi un widget GeoTower alla schermata Home per impostarne la frequenza di aggiornamento.</string>
+    <string name="appstrings_widget_add_button_title">Aggiungi un widget</string>
+    <string name="appstrings_widget_add_button_desc">Posiziona un widget GeoTower sulla schermata Home.</string>
+    <string name="appstrings_widget_size_compact">Compatto (2 × 1)</string>
+    <string name="appstrings_widget_size_medium">Medio (2 × 2)</string>
+    <string name="appstrings_widget_size_large">Grande (4 × 2)</string>
     <string name="appstrings_widget_title">📍 Antenne vicine</string>
     <string name="appstrings_yes">Sì</string>
     <string name="appstrings_your_data_desc">GeoTower non raccoglie dati personali. Le impostazioni e i preferiti restano solo sul tuo dispositivo.</string>
@@ -1725,4 +1731,8 @@
     <string name="appstrings_release_live_notification_nowbar_oneui85">Corretta la visualizzazione nella Now Bar sui Samsung recenti (One UI 8.5)</string>
     <string name="appstrings_release_live_notification_operator_logo">Logo dell’operatore mostrato nella notifica compatta (Samsung)</string>
     <string name="appstrings_release_live_notification_orientation_i18n">Punti cardinali dell’orientamento tradotti nella lingua dell’app</string>
+    <string name="appstrings_release_widget_add_button">Nuovo pulsante nelle impostazioni per aggiungere un widget GeoTower (compatto, medio, grande o mappa) alla schermata Home</string>
+    <string name="appstrings_release_widget_frequency_gated">La frequenza di aggiornamento ora può essere regolata solo quando è installato un widget</string>
+    <string name="appstrings_release_widget_battery">Risparmio della batteria: la localizzazione in background non viene più eseguita quando non è presente alcun widget</string>
+    <string name="appstrings_release_onboarding_language_first">La lingua ora può essere scelta già dalla prima schermata di benvenuto</string>
 </resources>

@@ -26,10 +26,13 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_live_notification)) {
-        item(stringResource(R.string.appstrings_release_live_notification_nowbar_oneui85))
-        item(stringResource(R.string.appstrings_release_live_notification_operator_logo))
-        item(stringResource(R.string.appstrings_release_live_notification_orientation_i18n))
+    section(stringResource(R.string.appstrings_release_section_widgets)) {
+        item(stringResource(R.string.appstrings_release_widget_add_button))
+        item(stringResource(R.string.appstrings_release_widget_frequency_gated))
+        item(stringResource(R.string.appstrings_release_widget_battery))
+    }
+    section(stringResource(R.string.appstrings_release_section_home_onboarding)) {
+        item(stringResource(R.string.appstrings_release_onboarding_language_first))
     }
 }
 

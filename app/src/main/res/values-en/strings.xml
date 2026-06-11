@@ -1653,6 +1653,12 @@
     <string name="appstrings_which_map">Which map to consult?</string>
     <string name="appstrings_widget_refresh_title">Widget refresh rate</string>
     <string name="appstrings_widget_refresh_warning">Warning: A high frequency (30 min) may increase background battery consumption.</string>
+    <string name="appstrings_widget_refresh_disabled_no_widget">No widget is installed. Add a GeoTower widget to your home screen to set its refresh frequency.</string>
+    <string name="appstrings_widget_add_button_title">Add a widget</string>
+    <string name="appstrings_widget_add_button_desc">Place a GeoTower widget on your home screen.</string>
+    <string name="appstrings_widget_size_compact">Compact (2 × 1)</string>
+    <string name="appstrings_widget_size_medium">Medium (2 × 2)</string>
+    <string name="appstrings_widget_size_large">Large (4 × 2)</string>
     <string name="appstrings_widget_title">📍 Nearby antennas</string>
     <string name="appstrings_yes">Yes</string>
     <string name="appstrings_your_data_desc">GeoTower does not collect any personal data. Your settings and favorites are stored only on your device.</string>
@@ -1725,4 +1731,8 @@
     <string name="appstrings_release_live_notification_nowbar_oneui85">Fixed display in the Now Bar on recent Samsung devices (One UI 8.5)</string>
     <string name="appstrings_release_live_notification_operator_logo">Operator logo shown in the collapsed notification (Samsung)</string>
     <string name="appstrings_release_live_notification_orientation_i18n">Compass directions in the orientation now follow the app language</string>
+    <string name="appstrings_release_widget_add_button">New button in settings to add a GeoTower widget (compact, medium, large or map) to your home screen</string>
+    <string name="appstrings_release_widget_frequency_gated">The refresh frequency can now be adjusted only when a widget is installed</string>
+    <string name="appstrings_release_widget_battery">Battery savings: background location no longer runs when no widget is placed</string>
+    <string name="appstrings_release_onboarding_language_first">The language can now be chosen right from the first welcome screen</string>
 </resources>

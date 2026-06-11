@@ -12,6 +12,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -79,14 +80,15 @@ fun CustomSliderCard(
     border: BorderStroke?,
     bubbleColor: Color,
     useOneUi: Boolean,
-    footerText: String? = null
+    footerText: String? = null,
+    enabled: Boolean = true
 ) {
     var currentIndex by remember { mutableFloatStateOf(steps.indexOf(currentValue).coerceAtLeast(0).toFloat()) }
     val accentColor = MaterialTheme.colorScheme.primary
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
 
     Surface(shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(16.dp).alpha(if (enabled) 1f else 0.5f)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(labels[currentIndex.toInt()], style = MaterialTheme.typography.titleMedium, color = accentColor, fontWeight = FontWeight.Bold)
@@ -96,6 +98,7 @@ fun CustomSliderCard(
             if (useOneUi) {
                 Slider(
                     value = currentIndex,
+                    enabled = enabled,
                     onValueChange = { currentIndex = it },
                     onValueChangeFinished = { onValueChange(steps[currentIndex.toInt()]) },
                     valueRange = 0f..(steps.size - 1).toFloat(),
@@ -121,7 +124,7 @@ fun CustomSliderCard(
                 )
             } else {
                 Slider(
-                    value = currentIndex, onValueChange = { currentIndex = it }, onValueChangeFinished = { onValueChange(steps[currentIndex.toInt()]) },
+                    value = currentIndex, enabled = enabled, onValueChange = { currentIndex = it }, onValueChangeFinished = { onValueChange(steps[currentIndex.toInt()]) },
                     valueRange = 0f..(steps.size - 1).toFloat(), steps = steps.size - 2
                 )
             }
