@@ -193,6 +193,7 @@ private const val MAP_RELOAD_MIN_ZOOM_DELTA = 0.08
 private const val MAP_RELOAD_MIN_VIEWPORT_SHIFT_RATIO = 0.10
 private const val MAP_MARKER_REDRAW_DEBOUNCE_MS = 40L
 private const val MAP_COMPASS_UPDATE_INTERVAL_MS = 80L
+private const val MAP_ACTIVE_FILTER_LIST_LIMIT = 3
 
 private val hsBadgeDrawableCache = android.util.LruCache<Int, BitmapDrawable>(4)
 private val hsMarkerIconCache = android.util.LruCache<String, BitmapDrawable>(500)
@@ -546,6 +547,204 @@ private fun hasVisibleHsOperator(
 ): Boolean {
     val operators = extractOperatorKeys(antenna.operateur)
     return operators.any { operatorKey -> isOperatorDeclaredHs(antenna, operatorKey, hsOperatorMap) }
+}
+
+private fun compactActiveFilterValues(
+    values: List<String>,
+    moreLabel: (Int) -> String
+): String {
+    val cleanedValues = values.filter { it.isNotBlank() }
+    if (cleanedValues.size <= MAP_ACTIVE_FILTER_LIST_LIMIT) {
+        return cleanedValues.joinToString(", ")
+    }
+
+    return (cleanedValues.take(MAP_ACTIVE_FILTER_LIST_LIMIT) +
+        moreLabel(cleanedValues.size - MAP_ACTIVE_FILTER_LIST_LIMIT))
+        .joinToString(", ")
+}
+
+private fun summarizedActiveFilterSelection(
+    selectedValues: List<String>,
+    hiddenValues: List<String>,
+    noneLabel: String,
+    exceptLabel: (String) -> String,
+    moreLabel: (Int) -> String
+): String {
+    if (selectedValues.isEmpty()) return noneLabel
+
+    return if (hiddenValues.isNotEmpty() && hiddenValues.size < selectedValues.size) {
+        exceptLabel(compactActiveFilterValues(hiddenValues, moreLabel))
+    } else {
+        compactActiveFilterValues(selectedValues, moreLabel)
+    }
+}
+
+private fun buildActiveMapFilterSummary(
+    selectedOperatorKeys: Set<String>,
+    frequencyFilter: FrequencyFilterSelection,
+    showSitesInService: Boolean,
+    showSitesOutOfService: Boolean,
+    hideUndergroundSites: Boolean,
+    showOnlyZbSites: Boolean,
+    showRadioTv: Boolean,
+    showRadioBroadcast: Boolean,
+    showRadioPrivateMobile: Boolean,
+    showRadioFh: Boolean,
+    showRadioOther: Boolean,
+    operatorsLabel: String,
+    technologiesLabel: String,
+    frequenciesLabel: String,
+    siteDisplayLabel: String,
+    radioLabel: String,
+    inServiceLabel: String,
+    outOfServiceLabel: String,
+    hideUndergroundLabel: String,
+    onlyZbLabel: String,
+    radioTvLabel: String,
+    radioBroadcastLabel: String,
+    radioPrivateMobileLabel: String,
+    radioFhLabel: String,
+    radioOtherLabel: String,
+    noneLabel: String,
+    exceptLabel: (String) -> String,
+    moreLabel: (Int) -> String
+): String? {
+    val activeFilters = mutableListOf<String>()
+
+    if (selectedOperatorKeys != OperatorColors.defaultVisibleKeys) {
+        val selectedOperators = OperatorColors.all
+            .filter { it.key in selectedOperatorKeys }
+            .map { it.label }
+        val hiddenOperators = OperatorColors.all
+            .filter { it.key !in selectedOperatorKeys }
+            .map { it.label }
+
+        activeFilters += "$operatorsLabel: " + summarizedActiveFilterSelection(
+            selectedValues = selectedOperators,
+            hiddenValues = hiddenOperators,
+            noneLabel = noneLabel,
+            exceptLabel = exceptLabel,
+            moreLabel = moreLabel
+        )
+    }
+
+    if (!frequencyFilter.isFullyEnabled) {
+        val technologyFilters = listOf(
+            "2G" to frequencyFilter.show2G,
+            "3G" to frequencyFilter.show3G,
+            "4G" to frequencyFilter.show4G,
+            "5G" to frequencyFilter.show5G,
+            "FH" to frequencyFilter.showFh
+        )
+        val selectedTechnologies = technologyFilters.filter { it.second }.map { it.first }
+        val hiddenTechnologies = technologyFilters.filterNot { it.second }.map { it.first }
+        if (selectedTechnologies.size != technologyFilters.size) {
+            activeFilters += "$technologiesLabel: " + summarizedActiveFilterSelection(
+                selectedValues = selectedTechnologies,
+                hiddenValues = hiddenTechnologies,
+                noneLabel = noneLabel,
+                exceptLabel = exceptLabel,
+                moreLabel = moreLabel
+            )
+        }
+
+        val frequencyBandFilters = mutableListOf<Pair<String, Boolean>>()
+        fun addBands(showTechnology: Boolean, technology: String, bands: List<Pair<String, Boolean>>) {
+            if (showTechnology) {
+                bands.forEach { (label, isSelected) -> frequencyBandFilters += "$technology $label" to isSelected }
+            }
+        }
+
+        addBands(
+            frequencyFilter.show2G,
+            "2G",
+            listOf(
+                "900 MHz" to frequencyFilter.f2G900,
+                "1800 MHz" to frequencyFilter.f2G1800
+            )
+        )
+        addBands(
+            frequencyFilter.show3G,
+            "3G",
+            listOf(
+                "900 MHz" to frequencyFilter.f3G900,
+                "2100 MHz" to frequencyFilter.f3G2100
+            )
+        )
+        addBands(
+            frequencyFilter.show4G,
+            "4G",
+            listOf(
+                "700 MHz" to frequencyFilter.f4G700,
+                "800 MHz" to frequencyFilter.f4G800,
+                "900 MHz" to frequencyFilter.f4G900,
+                "1800 MHz" to frequencyFilter.f4G1800,
+                "2100 MHz" to frequencyFilter.f4G2100,
+                "2600 MHz" to frequencyFilter.f4G2600
+            )
+        )
+        addBands(
+            frequencyFilter.show5G,
+            "5G",
+            listOf(
+                "700 MHz" to frequencyFilter.f5G700,
+                "1400 MHz" to frequencyFilter.f5G1400,
+                "2100 MHz" to frequencyFilter.f5G2100,
+                "3500 MHz" to frequencyFilter.f5G3500,
+                "4200 MHz" to frequencyFilter.f5G4200,
+                "26 GHz" to frequencyFilter.f5G26000
+            )
+        )
+
+        val selectedBands = frequencyBandFilters.filter { it.second }.map { it.first }
+        val hiddenBands = frequencyBandFilters.filterNot { it.second }.map { it.first }
+        if (frequencyBandFilters.isNotEmpty() && selectedBands.size != frequencyBandFilters.size) {
+            activeFilters += "$frequenciesLabel: " + summarizedActiveFilterSelection(
+                selectedValues = selectedBands,
+                hiddenValues = hiddenBands,
+                noneLabel = noneLabel,
+                exceptLabel = exceptLabel,
+                moreLabel = moreLabel
+            )
+        }
+    }
+
+    val radioFilters = listOfNotNull(
+        radioTvLabel.takeIf { showRadioTv },
+        radioBroadcastLabel.takeIf { showRadioBroadcast },
+        radioPrivateMobileLabel.takeIf { showRadioPrivateMobile },
+        radioFhLabel.takeIf { showRadioFh },
+        radioOtherLabel.takeIf { showRadioOther }
+    )
+    if (radioFilters.isNotEmpty()) {
+        activeFilters += "$radioLabel: ${compactActiveFilterValues(radioFilters, moreLabel)}"
+    }
+
+    val siteFilters = mutableListOf<String>()
+    if (showSitesInService != showSitesOutOfService) {
+        val selectedStatuses = listOfNotNull(
+            inServiceLabel.takeIf { showSitesInService },
+            outOfServiceLabel.takeIf { showSitesOutOfService }
+        )
+        val hiddenStatuses = listOfNotNull(
+            inServiceLabel.takeIf { !showSitesInService },
+            outOfServiceLabel.takeIf { !showSitesOutOfService }
+        )
+        siteFilters += summarizedActiveFilterSelection(
+            selectedValues = selectedStatuses,
+            hiddenValues = hiddenStatuses,
+            noneLabel = noneLabel,
+            exceptLabel = exceptLabel,
+            moreLabel = moreLabel
+        )
+    }
+    if (showOnlyZbSites) siteFilters += onlyZbLabel
+    if (hideUndergroundSites) siteFilters += hideUndergroundLabel
+    if (siteFilters.isNotEmpty()) {
+        activeFilters += "$siteDisplayLabel: ${compactActiveFilterValues(siteFilters, moreLabel)}"
+    }
+
+    return activeFilters.takeIf { it.isNotEmpty() }?.joinToString(" | ")
 }
 
 
@@ -960,6 +1159,52 @@ fun MapScreen(
     val txtMapMapLibre = stringResource(R.string.appstrings_map_map_libre)
     val txtMapTopo = stringResource(R.string.appstrings_map_topo)
     val txtMapOfflineLayer = stringResource(R.string.appstrings_map_offline_layer)
+
+    val txtOperatorsTitle = stringResource(R.string.appstrings_operators_title)
+    val txtTechnologiesTitle = stringResource(R.string.appstrings_technologies_title)
+    val txtFrequenciesTitle = stringResource(R.string.appstrings_frequencies_title)
+    val txtSiteDisplayTitle = stringResource(R.string.appstrings_site_display_title)
+    val txtRadioTitle = stringResource(R.string.appstrings_radio_share_radio_title)
+    val txtInService = stringResource(R.string.appstrings_sites_in_service_label)
+    val txtOutOfService = stringResource(R.string.appstrings_sites_out_of_service_label)
+    val txtHideUndergroundSites = stringResource(R.string.appstrings_hide_underground_sites_label)
+    val txtOnlyZbSites = stringResource(R.string.appstrings_show_only_zb_sites_label)
+    val txtRadioTv = stringResource(R.string.appstrings_radio_category_tv)
+    val txtRadioBroadcast = stringResource(R.string.appstrings_radio_category_radio)
+    val txtRadioPrivateMobile = stringResource(R.string.appstrings_radio_category_private_mobile)
+    val txtRadioFh = stringResource(R.string.appstrings_radio_category_fh)
+    val txtRadioOther = stringResource(R.string.appstrings_radio_category_other)
+    val txtNoActiveFilterValue = stringResource(R.string.appstrings_map_active_filters_none)
+    val activeMapFilterSummary = buildActiveMapFilterSummary(
+        selectedOperatorKeys = AppConfig.selectedOperatorKeys.value,
+        frequencyFilter = FrequencyFilterSelection.fromMapConfig(),
+        showSitesInService = AppConfig.showSitesInService.value,
+        showSitesOutOfService = AppConfig.showSitesOutOfService.value,
+        hideUndergroundSites = AppConfig.hideUndergroundSites.value,
+        showOnlyZbSites = AppConfig.showOnlyZbSites.value,
+        showRadioTv = AppConfig.showRadioTv.value,
+        showRadioBroadcast = AppConfig.showRadioBroadcast.value,
+        showRadioPrivateMobile = AppConfig.showRadioPrivateMobile.value,
+        showRadioFh = AppConfig.showRadioFh.value,
+        showRadioOther = AppConfig.showRadioOther.value,
+        operatorsLabel = txtOperatorsTitle,
+        technologiesLabel = txtTechnologiesTitle,
+        frequenciesLabel = txtFrequenciesTitle,
+        siteDisplayLabel = txtSiteDisplayTitle,
+        radioLabel = txtRadioTitle,
+        inServiceLabel = txtInService,
+        outOfServiceLabel = txtOutOfService,
+        hideUndergroundLabel = txtHideUndergroundSites,
+        onlyZbLabel = txtOnlyZbSites,
+        radioTvLabel = txtRadioTv,
+        radioBroadcastLabel = txtRadioBroadcast,
+        radioPrivateMobileLabel = txtRadioPrivateMobile,
+        radioFhLabel = txtRadioFh,
+        radioOtherLabel = txtRadioOther,
+        noneLabel = txtNoActiveFilterValue,
+        exceptLabel = { value -> context.getString(R.string.appstrings_map_active_filters_except, value) },
+        moreLabel = { count -> context.getString(R.string.appstrings_map_active_filters_more, count) }
+    )
 
     val txtWarningTitle = stringResource(R.string.appstrings_warning_title)
     val txtLightColorWarning = stringResource(R.string.appstrings_light_color_warning)
@@ -2541,6 +2786,19 @@ fun MapScreen(
                 }
             }
 
+            AnimatedVisibility(
+                visible = activeMapFilterSummary != null && !isSearchActive && !isSharedPhotoSelectionMode,
+                enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+                exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top)
+            ) {
+                ActiveMapFiltersBanner(
+                    summary = activeMapFilterSummary.orEmpty(),
+                    modifier = Modifier
+                        .padding(start = 88.dp, top = 10.dp, end = 88.dp)
+                        .fillMaxWidth()
+                )
+            }
+
             val deleteButtonSpacer by animateDpAsState(
                 targetValue = if (isSearchActive) 93.dp else 19.dp,
                 label = "deleteButtonAnim"
@@ -3440,6 +3698,33 @@ private fun correctLegacyAzimuthForDisplay(azimuth: Float, displayRotation: Int)
         AndroidSurface.ROTATION_180 -> azimuth + 180f
         AndroidSurface.ROTATION_270 -> azimuth - 90f
         else -> azimuth
+    }
+}
+
+@Composable
+private fun ActiveMapFiltersBanner(
+    summary: String,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.94f),
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        shadowElevation = 4.dp,
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.12f)
+        )
+    ) {
+        Text(
+            text = stringResource(R.string.appstrings_map_active_filters_message, summary),
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }
 

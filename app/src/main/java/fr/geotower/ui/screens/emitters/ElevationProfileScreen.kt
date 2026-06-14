@@ -32,6 +32,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.Terrain
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -76,6 +77,8 @@ import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.GeoTowerBreadcrumbItem
+import fr.geotower.ui.components.GeoTowerNavigationBreadcrumbBar
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
@@ -296,15 +299,45 @@ fun ElevationProfileScreen(
         isProfileLoading = false
     }
 
+    val txtSiteDetailsTitle = stringResource(R.string.appstrings_site_detail_title)
+    val txtElevationProfileTitle = stringResource(R.string.appstrings_elevation_profile_title)
+
     Scaffold(
         containerColor = mainBgColor,
         topBar = {
-            GeoTowerBackTopBar(
-                title = stringResource(R.string.appstrings_elevation_profile_title),
-                onBack = { handleBackNavigation() },
-                backgroundColor = mainBgColor,
-                backEnabled = isSplitScreen || !safeBackNavigation.isLocked
-            )
+            Column(modifier = Modifier.background(mainBgColor)) {
+                GeoTowerBackTopBar(
+                    title = txtElevationProfileTitle,
+                    onBack = { handleBackNavigation() },
+                    backgroundColor = mainBgColor,
+                    backEnabled = isSplitScreen || !safeBackNavigation.isLocked
+                )
+                GeoTowerNavigationBreadcrumbBar(
+                    navController = navController,
+                    currentItem = GeoTowerBreadcrumbItem(
+                        label = txtElevationProfileTitle,
+                        icon = Icons.Default.Terrain,
+                        key = "elevation_profile"
+                    ),
+                    currentRouteKeys = setOf("elevation_profile"),
+                    impliedParentItems = if (isSplitScreen) {
+                        listOf(
+                            GeoTowerBreadcrumbItem(
+                                label = txtSiteDetailsTitle,
+                                icon = Icons.Default.Tag,
+                                onClick = onCloseSplitScreen,
+                                key = "site_detail"
+                            )
+                        )
+                    } else {
+                        emptyList()
+                    },
+                    onBackStackItemClick = {
+                        if (isSplitScreen) onCloseSplitScreen()
+                    },
+                    backgroundColor = if (useOneUi) cardBgColor else MaterialTheme.colorScheme.surfaceContainer
+                )
+            }
         }
     ) { padding ->
         val scrollState = rememberScrollState()

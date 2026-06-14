@@ -10,7 +10,6 @@ import android.provider.Settings
 import androidx.core.content.ContextCompat
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.utils.AppLogger
-import fr.geotower.utils.OperatorColors
 
 object LiveTrackingController {
 
@@ -73,9 +72,11 @@ object LiveTrackingController {
     }
 
     fun eligibility(context: Context): StartResult {
+        // Plus d'exigence d'opérateur : sans opérateur choisi, le suivi se rabat sur
+        // l'antenne la plus proche (tous opérateurs). On garde StartResult.MissingOperator
+        // dans l'enum pour compatibilité, mais l'éligibilité ne le renvoie plus.
         return when {
             !RemoteFeatureFlags.isPlatformEnabled(RemoteFeatureFlags.Platform.LIVE_TRACKING) -> StartResult.Stopped
-            currentOperator(context) == "AUCUN" -> StartResult.MissingOperator
             !hasPreciseLocationPermission(context) -> StartResult.MissingPreciseLocation
             !hasPostNotificationsPermission(context) -> StartResult.MissingNotifications
             else -> StartResult.Started
@@ -122,12 +123,6 @@ object LiveTrackingController {
                 context,
                 Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
-    }
-
-    private fun currentOperator(context: Context): String {
-        val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-        val rawOp = prefs.getString("default_operator", "Aucun") ?: "Aucun"
-        return OperatorColors.keyFor(rawOp) ?: "AUCUN"
     }
 
     private fun startLiveTrackingService(context: Context, serviceIntent: Intent): StartResult {

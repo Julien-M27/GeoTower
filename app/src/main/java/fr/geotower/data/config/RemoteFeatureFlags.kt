@@ -242,6 +242,7 @@ object RemoteFeatureFlags {
         const val LIVE_API_FR_BBOX = "liveApi.fr.bbox"
         const val LIVE_API_FR_SEARCH = "liveApi.fr.search"
         const val LIVE_API_FR_SITE_DETAIL = "liveApi.fr.siteDetail"
+        const val LIVE_API_FR_STATS = "liveApi.fr.stats"
         const val MAP_SEARCH_NOMINATIM = "map.search.nominatim"
         const val MAP_CITY_BOUNDARIES = "map.cityBoundaries"
         const val MAP_MEASURE = "map.measure"
@@ -387,6 +388,7 @@ object RemoteFeatureFlags {
             Features.LIVE_API_FR_BBOX to false,
             Features.LIVE_API_FR_SEARCH to false,
             Features.LIVE_API_FR_SITE_DETAIL to false,
+            Features.LIVE_API_FR_STATS to false,
             Features.MAP_SEARCH_NOMINATIM to true,
             Features.MAP_CITY_BOUNDARIES to true,
             Features.MAP_MEASURE to true,

@@ -1,11 +1,14 @@
  package fr.geotower.utils
 
+import android.app.Activity
 import android.app.LocaleManager
 import android.content.Context
+import android.content.ContextWrapper
 import android.content.res.Configuration
 import android.os.Build
 import android.os.LocaleList
 import androidx.annotation.StringRes
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.compose.LocalOnBackPressedDispatcherOwner
 import androidx.compose.runtime.Composable
@@ -108,20 +111,32 @@ fun GeoTowerLocaleProvider(
     val localizedContext = remember(baseContext, language, baseConfiguration) {
         AppLocale.localizedContext(baseContext, language)
     }
+    // On capture l'Activity AVANT que LocalContext ne soit remplacé par un createConfigurationContext()
+    // (qui renvoie un ContextImpl ne contenant plus l'Activity dans sa chaîne). Sans ça, en aval,
+    // LocalActivity.current et `LocalContext as? Activity` valent tous deux null dès qu'une langue est forcée.
+    val activity = remember(baseContext) { baseContext.findActivity() }
 
     if (activityResultRegistryOwner != null && onBackPressedDispatcherOwner != null) {
         CompositionLocalProvider(
             LocalActivityResultRegistryOwner provides activityResultRegistryOwner,
             LocalOnBackPressedDispatcherOwner provides onBackPressedDispatcherOwner,
+            LocalActivity provides activity,
             LocalContext provides localizedContext,
             LocalConfiguration provides localizedConfiguration,
             content = content
         )
     } else {
         CompositionLocalProvider(
+            LocalActivity provides activity,
             LocalContext provides localizedContext,
             LocalConfiguration provides localizedConfiguration,
             content = content
         )
     }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

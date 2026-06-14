@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.Tag
 import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -50,7 +51,6 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -93,6 +93,9 @@ import fr.geotower.radio.ThroughputProfile
 import fr.geotower.radio.ThroughputProfiles
 import fr.geotower.ui.components.buildThroughputRadioSystems
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.GeoTowerBreadcrumbItem
+import fr.geotower.ui.components.GeoTowerLoadingMessage
+import fr.geotower.ui.components.GeoTowerNavigationBreadcrumbBar
 import fr.geotower.ui.components.MiniMapConeOverlayData
 import fr.geotower.ui.components.MiniMapStrongPoint
 import fr.geotower.ui.components.SharedMiniMapCard
@@ -314,25 +317,54 @@ fun ThroughputCalculatorScreen(
             supportHeightMeters = supportHeightMeters
         )
     }
+    val txtSiteDetailsTitle = stringResource(R.string.appstrings_site_detail_title)
+    val txtThroughputCalculatorTitle = stringResource(R.string.appstrings_throughput_calculator_title)
 
     Scaffold(
         containerColor = mainBgColor,
         topBar = {
-            GeoTowerBackTopBar(
-                title = stringResource(R.string.appstrings_throughput_calculator_title),
-                onBack = { handleBackNavigation() },
-                backgroundColor = mainBgColor,
-                backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
-                actions = {
-                    IconButton(onClick = { showThroughputSettingsSheet = true }) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.settings_pages_customization_title),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
+            Column(modifier = Modifier.background(mainBgColor)) {
+                GeoTowerBackTopBar(
+                    title = txtThroughputCalculatorTitle,
+                    onBack = { handleBackNavigation() },
+                    backgroundColor = mainBgColor,
+                    backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
+                    actions = {
+                        IconButton(onClick = { showThroughputSettingsSheet = true }) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.settings_pages_customization_title),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
-                }
-            )
+                )
+                GeoTowerNavigationBreadcrumbBar(
+                    navController = navController,
+                    currentItem = GeoTowerBreadcrumbItem(
+                        label = txtThroughputCalculatorTitle,
+                        icon = Icons.Default.Speed,
+                        key = "throughput_calculator"
+                    ),
+                    currentRouteKeys = setOf("throughput_calculator"),
+                    impliedParentItems = if (isSplitScreen) {
+                        listOf(
+                            GeoTowerBreadcrumbItem(
+                                label = txtSiteDetailsTitle,
+                                icon = Icons.Default.Tag,
+                                onClick = onCloseSplitScreen,
+                                key = "site_detail"
+                            )
+                        )
+                    } else {
+                        emptyList()
+                    },
+                    onBackStackItemClick = {
+                        if (isSplitScreen) onCloseSplitScreen()
+                    },
+                    backgroundColor = if (useOneUiDesign) cardBgColor else MaterialTheme.colorScheme.surfaceContainer
+                )
+            }
         }
     ) { padding ->
         when {
@@ -482,7 +514,10 @@ private fun LoadingPane(padding: PaddingValues, mainBgColor: Color) {
             .background(mainBgColor),
         contentAlignment = Alignment.Center
     ) {
-        LoadingIndicator()
+        GeoTowerLoadingMessage(
+            title = stringResource(R.string.appstrings_throughput_loading_title),
+            detail = stringResource(R.string.appstrings_throughput_loading_desc)
+        )
     }
 }
 

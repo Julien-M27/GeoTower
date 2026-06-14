@@ -36,10 +36,10 @@ import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -77,6 +77,9 @@ import fr.geotower.data.models.RadioMapMarker
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.upload.SignalQuestUploadDraftStore
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.GeoTowerBreadcrumbItem
+import fr.geotower.ui.components.GeoTowerLoadingMessage
+import fr.geotower.ui.components.GeoTowerNavigationBreadcrumbBar
 import fr.geotower.ui.components.InfoLine
 import fr.geotower.ui.components.MiniMapViewMode
 import fr.geotower.ui.components.RadioShareMenu
@@ -561,35 +564,54 @@ fun SupportDetailScreen(
     Scaffold(
         containerColor = mainBgColor,
         topBar = {
-            GeoTowerBackTopBar(
-                title = stringResource(R.string.appstrings_support_detail_title),
-                onBack = {
-                    if (isSplitScreen) {
-                        onCloseSplitScreen()
-                    } else {
-                        safeBackNavigation.navigateBack()
+            Column(modifier = Modifier.background(mainBgColor)) {
+                GeoTowerBackTopBar(
+                    title = txtSupportDetailTitle,
+                    onBack = {
+                        if (isSplitScreen) {
+                            onCloseSplitScreen()
+                        } else {
+                            safeBackNavigation.navigateBack()
+                        }
+                    },
+                    backgroundColor = mainBgColor,
+                    backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
+                    actions = {
+                        IconButton(
+                            onClick = { safeClick { showSupportSettingsSheet = true } }
+                        ) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.appstrings_settings_title),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
-                },
-                backgroundColor = mainBgColor,
-                backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
-                actions = {
-                    IconButton(
-                        onClick = { safeClick { showSupportSettingsSheet = true } }
-                    ) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.appstrings_settings_title),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
-                }
-            )
+                )
+                GeoTowerNavigationBreadcrumbBar(
+                    navController = navController,
+                    currentItem = GeoTowerBreadcrumbItem(
+                        label = txtSupportDetailTitle,
+                        icon = Icons.Default.VerticalAlignTop,
+                        key = "support_detail"
+                    ),
+                    currentRouteKeys = setOf("support_detail"),
+                    onBackStackItemClick = {
+                        if (isSplitScreen) onCloseSplitScreen()
+                    },
+                    backgroundColor = if (useOneUi) cardBgColor else MaterialTheme.colorScheme.surfaceContainer
+                )
+            }
         }
     ) { padding ->
         // 🚨 CORRECTION : On applique UNIQUEMENT le padding du haut (top) pour passer sous les boutons en bas !
         Box(modifier = Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().background(mainBgColor)) {
             if (isLoading) {
-                LoadingIndicator(modifier = Modifier.align(Alignment.Center))
+                GeoTowerLoadingMessage(
+                    title = stringResource(R.string.appstrings_support_detail_loading_title),
+                    detail = stringResource(R.string.appstrings_support_detail_loading_desc),
+                    modifier = Modifier.align(Alignment.Center)
+                )
             } else if (antennas.isEmpty() && radioSupportMarkers.isEmpty()) {
                 Text(stringResource(R.string.appstrings_no_data_found), modifier = Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.onSurface)
             } else if (antennas.isEmpty()) {

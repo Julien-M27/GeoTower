@@ -2,6 +2,8 @@ package fr.geotower.data.api
 
 import fr.geotower.data.models.LiveSiteResponseDto
 import fr.geotower.data.models.LiveSitesListResponseDto
+import fr.geotower.data.models.LiveRadioStatsResponseDto
+import fr.geotower.data.models.LiveWeeklyRadioStatsResponseDto
 import retrofit2.Response
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -35,6 +37,16 @@ interface LiveSitesApiService {
     suspend fun getSite(
         @Path("siteId") siteId: String
     ): Response<LiveSiteResponseDto>
+
+    @GET("api/v2/live/fr/stats/current")
+    suspend fun getCurrentRadioStats(
+        @Query("operator") operators: List<String>
+    ): Response<LiveRadioStatsResponseDto>
+
+    @GET("api/v2/live/fr/stats/weekly")
+    suspend fun getWeeklyRadioStats(
+        @Query("operator") operators: List<String>
+    ): Response<LiveWeeklyRadioStatsResponseDto>
 }
 
 object LiveSitesClient {

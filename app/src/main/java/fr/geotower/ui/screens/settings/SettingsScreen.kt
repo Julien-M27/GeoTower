@@ -362,6 +362,7 @@ fun SettingsScreen(
     var shareMapSpeedometer by remember { mutableStateOf(SharePrefs.mapSpeedometer.read(prefs)) }
     var shareMapScale by remember { mutableStateOf(SharePrefs.mapScale.read(prefs)) }
     var shareMapAttribution by remember { mutableStateOf(SharePrefs.mapAttribution.read(prefs)) }
+    var shareMapQrEnabled by remember { mutableStateOf(SharePrefs.mapQrEnabled.read(prefs)) }
     var shareMapConfidential by remember { mutableStateOf(SharePrefs.mapConfidential.read(prefs)) }
 
     // 1. Variables de l'Antenne (Site)
@@ -851,11 +852,9 @@ fun SettingsScreen(
                 { selectedOperator ->
                     defaultOperator = selectedOperator
                     prefs.edit().putString("default_operator", selectedOperator).apply()
-                    if (selectedOperator == "Aucun") {
-                        AppConfig.enableLiveNotifications.value = false
-                        prefs.edit().putBoolean("enable_live_notifications", false).apply()
-                        LiveTrackingController.stop(context)
-                    } else if (AppConfig.enableLiveNotifications.value) {
+                    // La notif live ne dépend plus d'un opérateur : on la relance pour qu'elle
+                    // suive soit l'opérateur choisi, soit l'antenne la plus proche si « Aucun ».
+                    if (AppConfig.enableLiveNotifications.value) {
                         LiveTrackingController.startIfEligible(context)
                     }
                 },
@@ -1621,6 +1620,10 @@ fun SettingsScreen(
                 shareMapAttribution = it; prefs.edit().putBoolean(SharePrefs.mapAttribution.key, it).apply()
                 AppConfig.shareMapAttribution.value = it
             },
+            qrEnabled = shareMapQrEnabled,
+            onQrChange = {
+                shareMapQrEnabled = it; prefs.edit().putBoolean(SharePrefs.mapQrEnabled.key, it).apply()
+            },
             statusEnabled = AppConfig.shareSiteStatus.value, // 🚨 C'EST ICI QU'IL MANQUAIT LES VARIABLES !
             onStatusChange = {
                 AppConfig.shareSiteStatus.value = it; prefs.edit().putBoolean("share_site_status", it).apply()
@@ -2004,19 +2007,10 @@ fun SectionPreferences(
     val liveNotifsEnabled by AppConfig.enableLiveNotifications
     val isOperatorSelected = op != "Aucun"
 
-    // Si on change d'opérateur pour "Aucun", on désactive de force la notification live
-    LaunchedEffect(isOperatorSelected) {
-        if (!isOperatorSelected && liveNotifsEnabled) {
-            AppConfig.enableLiveNotifications.value = false
-            prefs.edit().putBoolean("enable_live_notifications", false).apply()
-            LiveTrackingController.stop(context)
-        }
-    }
-
     fr.geotower.ui.components.LiveNotificationCard(
         title = stringResource(R.string.appstrings_live_notification_title),
-        desc = if (isOperatorSelected) stringResource(R.string.appstrings_live_notification_desc) else stringResource(R.string.appstrings_live_notification_requires_op),
-        checked = liveNotifsEnabled && isOperatorSelected,
+        desc = if (isOperatorSelected) stringResource(R.string.appstrings_live_notification_desc) else stringResource(R.string.appstrings_live_notification_desc_nearest),
+        checked = liveNotifsEnabled,
         onCheckedChange = { isChecked ->
             if (isChecked) {
                 val eligibility = LiveTrackingController.eligibility(context)
@@ -2048,7 +2042,7 @@ fun SectionPreferences(
                 LiveTrackingController.stop(context)
             }
         },
-        enabled = isOperatorSelected,
+        enabled = true,
         shape = shape,
         border = border,
         bubbleColor = bubbleColor,

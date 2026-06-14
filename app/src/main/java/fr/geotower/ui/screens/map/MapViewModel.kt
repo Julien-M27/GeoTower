@@ -110,8 +110,9 @@ class MapViewModel(
                     return@launch
                 }
 
+                val frequencyFilter = FrequencyFilterSelection.fromMapConfig()
                 val hasSiteDisplayFilter = !showSitesInService || !showSitesOutOfService
-                val hasFrequencyFilter = !FrequencyFilterSelection.fromMapConfig().isFullyEnabled
+                val hasFrequencyFilter = !frequencyFilter.isFullyEnabled
 
                 if (zoom < 13.0 && cityPolygons == null && !hasSiteDisplayFilter && !hasFrequencyFilter) {
                     val clusters = repository.getClusteredAntennas(zoom, latNorth, lonEast, latSouth, lonWest)
@@ -136,7 +137,7 @@ class MapViewModel(
                     _antennas.value = fakeAntennas
                 } else {
                     // Si on a zoomé, on charge les vraies antennes détaillées de la zone
-                    val detailBackedBandMask = FrequencyFilterSelection.fromMapConfig().detailBackedBandMaskForEnrichment()
+                    val detailBackedBandMask = frequencyFilter.detailBackedBandMaskForEnrichment()
                     val rawAntennas = if (showOnlySitesOutOfService) {
                         repository.getAntennasByIdsInBox(
                             hsOnlyIds,
@@ -145,6 +146,14 @@ class MapViewModel(
                             latSouth,
                             lonWest,
                             detailBackedBandMask = detailBackedBandMask
+                        )
+                    } else if (hasFrequencyFilter) {
+                        repository.getAntennasInBoxForFrequencyFilter(
+                            latNorth = latNorth,
+                            lonEast = lonEast,
+                            latSouth = latSouth,
+                            lonWest = lonWest,
+                            frequencyFilter = frequencyFilter
                         )
                     } else {
                         repository.getAntennasInBox(

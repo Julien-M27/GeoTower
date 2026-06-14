@@ -117,6 +117,37 @@ data class FrequencyFilterSelection(
         return mask
     }
 
+    fun selectedMobileBandMask(): Int {
+        var mask = 0
+        if (show2G) {
+            if (f2G900) mask = mask or RadioFilterMasks.BAND_2G_900
+            if (f2G1800) mask = mask or RadioFilterMasks.BAND_2G_1800
+        }
+        if (show3G) {
+            if (f3G900) mask = mask or RadioFilterMasks.BAND_3G_900
+            if (f3G2100) mask = mask or RadioFilterMasks.BAND_3G_2100
+        }
+        if (show4G) {
+            if (f4G700) mask = mask or RadioFilterMasks.BAND_4G_700
+            if (f4G800) mask = mask or RadioFilterMasks.BAND_4G_800
+            if (f4G900) mask = mask or RadioFilterMasks.BAND_4G_900
+            if (f4G1800) mask = mask or RadioFilterMasks.BAND_4G_1800
+            if (f4G2100) mask = mask or RadioFilterMasks.BAND_4G_2100
+            if (f4G2600) mask = mask or RadioFilterMasks.BAND_4G_2600
+        }
+        if (show5G) {
+            if (f5G700) mask = mask or RadioFilterMasks.BAND_5G_700
+            if (f5G1400) mask = mask or RadioFilterMasks.BAND_5G_1400
+            if (f5G2100) mask = mask or RadioFilterMasks.BAND_5G_2100
+            if (f5G3500) mask = mask or RadioFilterMasks.BAND_5G_3500
+            if (f5G4200) mask = mask or RadioFilterMasks.BAND_5G_4200
+            if (f5G26000) mask = mask or RadioFilterMasks.BAND_5G_26000
+        }
+        return mask
+    }
+
+    fun includesFh(): Boolean = showFh && allMobileBandsEnabled
+
     private infix fun Int.has(bit: Int): Boolean = (this and bit) != 0
 
     companion object {

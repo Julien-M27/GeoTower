@@ -216,6 +216,7 @@ object SharePrefs {
     val mapSpeedometer = BooleanPreference("share_map_speedometer", true)
     val mapScale = BooleanPreference("share_map_scale", true)
     val mapAttribution = BooleanPreference("share_map_attribution", true)
+    val mapQrEnabled = BooleanPreference("share_map_qr_enabled", true)
     val mapConfidential = BooleanPreference("share_map_confidential", false)
 
     fun siteOrder(prefs: SharedPreferences): List<String> {

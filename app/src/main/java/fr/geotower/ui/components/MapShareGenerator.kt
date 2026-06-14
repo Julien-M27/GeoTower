@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.net.Uri
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
@@ -54,8 +55,33 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
+import java.util.Locale
 
 private const val TAG_MAP_SHARE = "GeoTowerMap"
+
+private fun buildMapDeepLink(lat: Double, lon: Double, zoom: Double): String? {
+    if (!lat.isUsableMapNumber() || !lon.isUsableMapNumber() || !zoom.isUsableMapNumber()) return null
+    if (lat !in -90.0..90.0 || lon !in -180.0..180.0) return null
+
+    return Uri.Builder()
+        .scheme("geotower")
+        .authority("map")
+        .appendQueryParameter("lat", formatMapDeepLinkNumber(lat, 6))
+        .appendQueryParameter("lon", formatMapDeepLinkNumber(lon, 6))
+        .appendQueryParameter("zoom", formatMapDeepLinkNumber(zoom, 2))
+        .build()
+        .toString()
+}
+
+private fun formatMapDeepLinkNumber(value: Double, decimals: Int): String {
+    return String.format(Locale.US, "%.${decimals}f", value)
+        .trimEnd('0')
+        .trimEnd('.')
+}
+
+private fun Double.isUsableMapNumber(): Boolean {
+    return !isNaN() && !isInfinite()
+}
 
 fun shareFullMapCapture(
     context: Context,
@@ -72,6 +98,8 @@ fun shareFullMapCapture(
     incScale: Boolean, // ✅ AJOUT
     currentZoom: Double, // ✅ AJOUT
     currentLat: Double, // ✅ AJOUT
+    incQrCode: Boolean,
+    qrUri: String?,
     txtInitError: String
 ) {
     try {
@@ -141,6 +169,10 @@ fun shareFullMapCapture(
                                 }
                             }
 
+                            if (incQrCode && qrUri != null) {
+                                MapShareQrBlock(qrUri)
+                            }
+
                             Text(text = txtGeneratedBy, fontSize = 12.sp, color = Color.Gray, modifier = Modifier.align(Alignment.CenterHorizontally))
                         }
                     }
@@ -187,6 +219,35 @@ fun shareFullMapCapture(
     } catch (e: Exception) { AppLogger.w(TAG_MAP_SHARE, "Map share initialization failed", e) }
 }
 
+@Composable
+private fun MapShareQrBlock(qrUri: String) {
+    val qrBitmap = remember(qrUri) { generateQrCodeBitmap(qrUri, 200) }
+
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        if (qrBitmap != null) {
+            Image(
+                bitmap = qrBitmap.asImageBitmap(),
+                contentDescription = stringResource(R.string.brand_qr_code),
+                modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
+            )
+            Spacer(modifier = Modifier.width(16.dp))
+        }
+        Column(horizontalAlignment = Alignment.Start) {
+            Text(text = stringResource(R.string.appstrings_scan_to_open), fontSize = 11.sp, color = Color.Gray)
+            Text(
+                text = stringResource(R.string.appstrings_geo_tower_app),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MapShareMenu(
@@ -218,6 +279,7 @@ fun MapShareMenu(
     var incSpeedometer by remember { mutableStateOf(SharePrefs.mapSpeedometer.read(prefs)) }
     var incScale by remember { mutableStateOf(SharePrefs.mapScale.read(prefs)) }
     var incAttribution by remember { mutableStateOf(SharePrefs.mapAttribution.read(prefs)) }
+    var incQrCode by remember { mutableStateOf(SharePrefs.mapQrEnabled.read(prefs)) }
     var incConfidential by remember { mutableStateOf(SharePrefs.mapConfidential.read(prefs)) }
 
     LaunchedEffect(showShareSheet) {
@@ -226,6 +288,7 @@ fun MapShareMenu(
             incSpeedometer = SharePrefs.mapSpeedometer.read(prefs)
             incScale = SharePrefs.mapScale.read(prefs)
             incAttribution = SharePrefs.mapAttribution.read(prefs)
+            incQrCode = SharePrefs.mapQrEnabled.read(prefs)
             incConfidential = SharePrefs.mapConfidential.read(prefs)
         }
     }
@@ -248,6 +311,7 @@ fun MapShareMenu(
     val txtSpeedometer = stringResource(R.string.appstrings_share_map_speedometer_option)
     val txtScale = stringResource(R.string.appstrings_share_map_scale_option)
     val txtAttributionOption = stringResource(R.string.appstrings_share_map_attribution_option)
+    val txtQrCode = stringResource(R.string.brand_qr_code)
 
     val txtAttributionDesc = when(AppConfig.mapProvider.intValue) {
         0 -> stringResource(R.string.appstrings_src_ign_desc)
@@ -321,6 +385,10 @@ fun MapShareMenu(
                         Text(txtAttributionOption, modifier = Modifier.weight(1f))
                         GeoTowerSwitch(checked = incAttribution, onCheckedChange = { incAttribution = it }, useOneUi = useOneUi)
                     }
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Text(txtQrCode, modifier = Modifier.weight(1f))
+                        GeoTowerSwitch(checked = incQrCode, onCheckedChange = { incQrCode = it }, useOneUi = useOneUi)
+                    }
 
                     HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
@@ -369,6 +437,13 @@ fun MapShareMenu(
                                         bmp
                                     }
                                 } catch (e: Exception) { null }
+                                val mapDeepLink = globalMapRef?.let { map ->
+                                    buildMapDeepLink(
+                                        lat = map.mapCenter.latitude,
+                                        lon = map.mapCenter.longitude,
+                                        zoom = map.zoomLevelDouble
+                                    )
+                                }
 
                                 // ✅ 3. RESTAURATION : On remet les azimuts et les calques comme avant !
                                 if (!incAzimuths) {
@@ -394,6 +469,8 @@ fun MapShareMenu(
                                     incScale = incScale,
                                     currentZoom = currentZoom,
                                     currentLat = currentLat,
+                                    incQrCode = incQrCode,
+                                    qrUri = mapDeepLink,
                                     txtInitError = txtInitError
                                 )
                             }, 300)

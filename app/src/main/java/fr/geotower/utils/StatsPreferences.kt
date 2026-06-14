@@ -60,7 +60,7 @@ object StatsPreferences {
 
     fun defaultFrequencyOrder(tech: String): List<String> {
         return when (normalizeTech(tech)) {
-            "5G" -> listOf("26000", "4200", "3500", "2100", "1400", "700")
+            "5G" -> listOf("3500", "2100", "700", "1400", "4200", "26000")
             "4G" -> listOf("2600", "2100", "1800", "900", "800", "700")
             "3G" -> listOf("2100", "900")
             "2G" -> listOf("1800", "900")
@@ -97,6 +97,7 @@ object StatsPreferences {
     }
 
     private val legacy5GFrequencyOrders = setOf(
+        listOf("26000", "4200", "3500", "2100", "1400", "700"),
         listOf("4200", "3500", "2100", "1400", "700", "26000"),
         listOf("3500", "2100", "1400", "700", "26000"),
         listOf("3500", "2100", "700")

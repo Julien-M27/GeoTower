@@ -118,6 +118,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.SiteHsEntity
 import androidx.compose.runtime.saveable.rememberSaveable
 import java.text.Normalizer
 import java.util.Locale
@@ -150,6 +151,7 @@ data class UiSite(
     val technicalText: String = "",
     val supportText: String = "",
     val isZb: Boolean = false,
+    val hasUnderground: Boolean = false,
     val searchText: String = ""
 )
 
@@ -256,6 +258,22 @@ fun NearEmittersScreen(
     }
     val nearbyFrequencyFilter = FrequencyFilterSelection.fromMapConfig()
     val isZbNearbySearch = currentSearchSpec.field == NearbySearchField.Zb
+
+    // Filtres « Affichage des sites » partagés avec la carte (zone blanche, hors service, souterrains)
+    val showSitesInService by AppConfig.showSitesInService
+    val showSitesOutOfService by AppConfig.showSitesOutOfService
+    val showOnlyZbSites by AppConfig.showOnlyZbSites
+    val hideUndergroundSites by AppConfig.hideUndergroundSites
+
+    // Base des sites hors service (HS), comme la carte, pour le filtre « En service / Hors service »
+    var sitesHs by remember { mutableStateOf<List<SiteHsEntity>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        sitesHs = withContext(Dispatchers.IO) {
+            runCatching { repository.getSitesHs() }.getOrDefault(emptyList())
+        }
+    }
+    val hsOperatorMap = remember(sitesHs) { buildNearbyHsOperatorMap(sitesHs) }
+    val showOnlyOutOfServiceSites = showSitesOutOfService && !showSitesInService
     val searchedOperatorKey = remember(searchQuery) {
         if (currentSearchSpec.field == NearbySearchField.Operator) {
             OperatorColors.keyFor(currentSearchSpec.value)
@@ -316,7 +334,7 @@ fun NearEmittersScreen(
         }
     }
 
-    LaunchedEffect(searchCenter, maxItemsToShow, isZbNearbySearch, nearbyFrequencyFilter) {
+    LaunchedEffect(searchCenter, maxItemsToShow, isZbNearbySearch, nearbyFrequencyFilter, showOnlyOutOfServiceSites, sitesHs) {
         val currentLoc = searchCenter ?: return@LaunchedEffect
 
         isLoading = true
@@ -325,15 +343,23 @@ fun NearEmittersScreen(
             // A. RÉCUPÉRATION DES DONNÉES
             val queryLimit = nearbyFrequencyQueryLimit(maxItemsToShow, nearbyFrequencyFilter)
             val detailBackedBandMask = nearbyFrequencyFilter.detailBackedBandMaskForEnrichment()
-            val newAntennas = if (isZbNearbySearch) {
-                repository.getNearestZb(
+            val newAntennas = when {
+                // « Hors service uniquement » : on cible directement les sites HS proches (comme la carte),
+                // sinon le filtre vide souvent la liste des N sites les plus proches.
+                showOnlyOutOfServiceSites -> getNearestHsAntennas(
+                    repository = repository,
+                    sitesHs = sitesHs,
+                    center = currentLoc,
+                    limit = queryLimit,
+                    detailBackedBandMask = detailBackedBandMask
+                )
+                isZbNearbySearch -> repository.getNearestZb(
                     lat = currentLoc.latitude,
                     lon = currentLoc.longitude,
                     limit = queryLimit,
                     detailBackedBandMask = detailBackedBandMask
                 )
-            } else {
-                repository.getNearest(
+                else -> repository.getNearest(
                     lat = currentLoc.latitude,
                     lon = currentLoc.longitude,
                     limit = queryLimit,
@@ -349,7 +375,8 @@ fun NearEmittersScreen(
                     antennas = frequencyFilteredAntennas,
                     referenceLocation = currentLoc,
                     unknownAddressText = unknownAddressText,
-                    siteAnfrLabel = siteAnfrLabel
+                    siteAnfrLabel = siteAnfrLabel,
+                    siteLimit = maxItemsToShow
                 ).sortedBy { it.distance }
             } else {
                 emptyList()
@@ -368,10 +395,15 @@ fun NearEmittersScreen(
 
     // ✅ 3. RECHERCHE LOCALE ET GLOBALE (Base de données, Coordonnées, Ville, Adresse, Code Postal)
     // Recherche locale instantanee; les resultats globaux arrivent ensuite depuis un cache separe.
-    LaunchedEffect(sites, searchQuery, maxItemsToShow, remoteSearchQuery, remoteSearchSites, nearbyFrequencyFilter) {
+    LaunchedEffect(
+        sites, searchQuery, maxItemsToShow, remoteSearchQuery, remoteSearchSites, nearbyFrequencyFilter,
+        showSitesInService, showSitesOutOfService, showOnlyZbSites, hideUndergroundSites, hsOperatorMap
+    ) {
         val query = searchQuery.trim()
         if (query.isEmpty()) {
-            filteredSites = sites.take(maxItemsToShow)
+            filteredSites = sites
+                .applyNearbyDisplayFilters(showSitesInService, showSitesOutOfService, showOnlyZbSites, hideUndergroundSites, hsOperatorMap)
+                .take(maxItemsToShow)
             return@LaunchedEffect
         }
 
@@ -382,6 +414,7 @@ fun NearEmittersScreen(
         val matchingRemoteSites = if (remoteSearchQuery == query) remoteSearchSites else emptyList()
         filteredSites = (localMatches + matchingRemoteSites)
             .distinctBy { it.id }
+            .applyNearbyDisplayFilters(showSitesInService, showSitesOutOfService, showOnlyZbSites, hideUndergroundSites, hsOperatorMap)
             .sortedBy { it.distance }
             .take(maxItemsToShow)
     }
@@ -646,15 +679,8 @@ fun NearEmittersScreen(
                 onBack = { safeBackNavigation.navigateBack() },
                 backgroundColor = mainBgColor,
                 backEnabled = !safeBackNavigation.isLocked,
-                actionsWidth = 96.dp,
+                actionsWidth = 48.dp,
                 actions = {
-                    IconButton(onClick = { safeClick { showNearbyFrequencyFiltersSheet = true } }) {
-                        Icon(
-                            Icons.Default.FilterList,
-                            contentDescription = stringResource(R.string.appstrings_filter),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
-                    }
                     IconButton(onClick = { safeClick { showNearbySettingsSheet = true } }) {
                         Icon(
                             Icons.Default.Settings,
@@ -716,12 +742,26 @@ fun NearEmittersScreen(
                                 }
 
                                 if (!isLoading && filteredSites.isNotEmpty()) {
-                                    Text(
-                                        text = pluralStringResource(R.plurals.sites_found, filteredSites.size, filteredSites.size),
-                                        style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.secondary,
-                                        modifier = Modifier.padding(start = 32.dp, top = 8.dp)
-                                    )
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(start = 32.dp, end = 8.dp, top = 8.dp),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = pluralStringResource(R.plurals.sites_found, filteredSites.size, filteredSites.size),
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.secondary
+                                        )
+                                        Spacer(modifier = Modifier.weight(1f))
+                                        IconButton(onClick = { safeClick { showNearbyFrequencyFiltersSheet = true } }) {
+                                            Icon(
+                                                Icons.Default.FilterList,
+                                                contentDescription = stringResource(R.string.appstrings_filter),
+                                                tint = MaterialTheme.colorScheme.onSurface
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -738,7 +778,29 @@ fun NearEmittersScreen(
                                         }
                                     }
                                     isLoading -> {
-                                        LoadingIndicator(modifier = Modifier.align(Alignment.Center))
+                                        Column(
+                                            modifier = Modifier
+                                                .align(Alignment.Center)
+                                                .padding(horizontal = 32.dp),
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            LoadingIndicator()
+                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Text(
+                                                text = stringResource(R.string.appstrings_nearby_loading_title),
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = MaterialTheme.colorScheme.onSurface,
+                                                textAlign = TextAlign.Center
+                                            )
+                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(
+                                                text = stringResource(R.string.appstrings_nearby_loading_desc),
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                textAlign = TextAlign.Center
+                                            )
+                                        }
                                     }
                                     filteredSites.isEmpty() -> {
                                         Text(stringResource(R.string.appstrings_no_sites_found), modifier = Modifier.align(Alignment.Center), color = MaterialTheme.colorScheme.secondary)
@@ -919,9 +981,6 @@ fun NearEmittersScreen(
     }
 }
 
-private const val NEAR_EMITTERS_SCROLL_MIN_STEP_ITEMS = 12
-private const val NEAR_EMITTERS_SCROLL_MAX_STEP_ITEMS = 32
-
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun NearbyFrequencyFilterSheet(
@@ -934,6 +993,11 @@ private fun NearbyFrequencyFilterSheet(
     var show4G by AppConfig.showTechno4G
     var show5G by AppConfig.showTechno5G
     var showFH by AppConfig.showTechnoFH
+
+    var showSitesInService by AppConfig.showSitesInService
+    var showSitesOutOfService by AppConfig.showSitesOutOfService
+    var showOnlyZbSites by AppConfig.showOnlyZbSites
+    var hideUndergroundSites by AppConfig.hideUndergroundSites
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1017,6 +1081,52 @@ private fun NearbyFrequencyFilterSheet(
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(28.dp))
+            SectionTitle(stringResource(R.string.appstrings_site_display_title))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                SelectableButton(
+                    label = stringResource(R.string.appstrings_sites_in_service_label),
+                    isSelected = showSitesInService,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    showSitesInService = it
+                    prefs.edit().putBoolean("show_sites_in_service", it).apply()
+                }
+
+                SelectableButton(
+                    label = stringResource(R.string.appstrings_sites_out_of_service_label),
+                    isSelected = showSitesOutOfService,
+                    modifier = Modifier.weight(1f),
+                    selectedColor = MaterialTheme.colorScheme.error
+                ) {
+                    showSitesOutOfService = it
+                    prefs.edit().putBoolean("show_sites_out_of_service", it).apply()
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            SelectableButton(
+                label = stringResource(R.string.appstrings_show_only_zb_sites_label),
+                isSelected = showOnlyZbSites,
+                modifier = Modifier.fillMaxWidth(),
+                selectedColor = MaterialTheme.colorScheme.tertiary
+            ) {
+                showOnlyZbSites = it
+                prefs.edit().putBoolean(AppConfig.PREF_SHOW_ONLY_ZB_SITES, it).apply()
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            SelectableButton(
+                label = stringResource(R.string.appstrings_hide_underground_sites_label),
+                isSelected = hideUndergroundSites,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                hideUndergroundSites = it
+                prefs.edit().putBoolean(AppConfig.PREF_HIDE_UNDERGROUND_SITES, it).apply()
+            }
         }
     }
 }
@@ -1025,56 +1135,20 @@ private suspend fun LazyListState.animateScrollToItemSmoothly(targetIndex: Int) 
     val lastIndex = layoutInfo.totalItemsCount - 1
     if (lastIndex < 0) return
 
-    val boundedTargetIndex = targetIndex.coerceIn(0, lastIndex)
-    val scrollingDown = boundedTargetIndex > firstVisibleItemIndex
+    val target = targetIndex.coerceIn(0, lastIndex)
 
-    if (scrollingDown) {
-        while (canScrollForward && firstVisibleItemIndex < boundedTargetIndex) {
-            val startIndex = firstVisibleItemIndex
-            val startOffset = firstVisibleItemScrollOffset
-            val step = nearEmittersScrollStep(
-                remainingItems = boundedTargetIndex - firstVisibleItemIndex
-            )
-            val nextIndex = minOf(
-                firstVisibleItemIndex + step,
-                boundedTargetIndex
-            )
+    // Longueur du « ralenti » final, en nombre d'items animés jusqu'à la cible.
+    val tailItems = 10
+    val current = firstVisibleItemIndex
 
-            animateScrollToItem(nextIndex)
-
-            if (firstVisibleItemIndex == startIndex && firstVisibleItemScrollOffset == startOffset) break
-        }
-    } else {
-        while (
-            canScrollBackward &&
-            (firstVisibleItemIndex > boundedTargetIndex || firstVisibleItemScrollOffset > 0)
-        ) {
-            val startIndex = firstVisibleItemIndex
-            val startOffset = firstVisibleItemScrollOffset
-            val step = nearEmittersScrollStep(
-                remainingItems = firstVisibleItemIndex - boundedTargetIndex
-            )
-            val nextIndex = maxOf(
-                firstVisibleItemIndex - step,
-                boundedTargetIndex
-            )
-
-            animateScrollToItem(nextIndex)
-
-            if (firstVisibleItemIndex == startIndex && firstVisibleItemScrollOffset == startOffset) break
-        }
+    // 1) On saute quasi tout instantanément, jusqu'à quelques items avant la cible...
+    if (kotlin.math.abs(target - current) > tailItems) {
+        val jumpTo = if (target > current) target - tailItems else target + tailItems
+        scrollToItem(jumpTo.coerceIn(0, lastIndex))
     }
 
-    if (!scrollingDown || canScrollForward) {
-        animateScrollToItem(boundedTargetIndex)
-    }
-}
-
-private fun nearEmittersScrollStep(remainingItems: Int): Int {
-    return (remainingItems / 4).coerceIn(
-        NEAR_EMITTERS_SCROLL_MIN_STEP_ITEMS,
-        NEAR_EMITTERS_SCROLL_MAX_STEP_ITEMS
-    )
+    // 2) ...puis animation de ralenti (décélération) sur les derniers éléments jusqu'à la cible.
+    animateScrollToItem(target)
 }
 
 
@@ -1383,14 +1457,22 @@ private fun filterNearbyAntennasByFrequency(
     return antennas.filter { antenna -> frequencyFilter.matchesAntenna(antenna) }
 }
 
+// Une antenne = une ligne (opérateur/ANFR). Plusieurs lignes au même point se regroupent en
+// UN site affiché. On sur-échantillonne donc pour qu'il reste assez de sites après regroupement.
+private const val NEARBY_ANTENNAS_PER_SITE = 4
+
 private fun nearbyFrequencyQueryLimit(
     visibleLimit: Int,
     frequencyFilter: FrequencyFilterSelection
 ): Int {
-    if (frequencyFilter.isFullyEnabled) return visibleLimit.coerceAtLeast(1)
-    return (visibleLimit.coerceAtLeast(1) * 5)
+    val safe = visibleLimit.coerceAtLeast(1)
+    // 1) Compense le regroupement par site (plusieurs opérateurs sur un même pylône).
+    val forGrouping = safe * NEARBY_ANTENNAS_PER_SITE
+    // 2) Le filtre fréquence retire encore des antennes : on élargit davantage.
+    val withFrequency = if (frequencyFilter.isFullyEnabled) forGrouping else forGrouping * 5
+    return withFrequency
         .coerceAtMost(NEARBY_GLOBAL_MAPPING_LIMIT)
-        .coerceAtLeast(visibleLimit.coerceAtLeast(1))
+        .coerceAtLeast(safe)
 }
 
 private suspend fun mapAntennasToUiSites(
@@ -1398,16 +1480,31 @@ private suspend fun mapAntennasToUiSites(
     antennas: List<LocalisationEntity>,
     referenceLocation: Location?,
     unknownAddressText: String,
-    siteAnfrLabel: String
+    siteAnfrLabel: String,
+    siteLimit: Int? = null
 ): List<UiSite> {
     val groupedSites = antennas.groupBy {
         "${String.format(Locale.US, "%.4f", it.latitude)}_${String.format(Locale.US, "%.4f", it.longitude)}"
     }
-    val idAnfrs = antennas.map { it.idAnfr }.filter { it.isNotBlank() }.distinct()
+
+    // On regroupe d'abord (cheap), puis on ne garde que les N sites les plus proches AVANT
+    // l'enrichissement : inutile d'enrichir les centaines d'antennes sur-échantillonnées.
+    val selectedGroups = if (siteLimit != null && referenceLocation != null) {
+        groupedSites.values
+            .sortedBy { group ->
+                val main = group.first()
+                calculateDistance(referenceLocation.latitude, referenceLocation.longitude, main.latitude, main.longitude)
+            }
+            .take(siteLimit.coerceAtLeast(1))
+    } else {
+        groupedSites.values.toList()
+    }
+
+    val idAnfrs = selectedGroups.flatten().map { it.idAnfr }.filter { it.isNotBlank() }.distinct()
     val techniquesById = repository.getTechniqueSummariesByIds(idAnfrs)
     val physiquesById = repository.getPhysiqueSummariesByIds(idAnfrs)
 
-    return groupedSites.values.map { list ->
+    return selectedGroups.map { list ->
         val main = list.first()
         val dist = referenceLocation?.let {
             calculateDistance(it.latitude, it.longitude, main.latitude, main.longitude)
@@ -1417,6 +1514,7 @@ private suspend fun mapAntennasToUiSites(
             .flatMap { OperatorColors.keysFor(it) }
             .distinct()
         val isZb = list.any { it.isZb == 1 }
+        val hasUnderground = list.any { it.hasUndergroundSupport == 1 }
 
         val techniques = list.mapNotNull { techniquesById[it.idAnfr] }
         val physiques = list.flatMap { physiquesById[it.idAnfr].orEmpty() }
@@ -1483,9 +1581,95 @@ private suspend fun mapAntennasToUiSites(
             technicalText = technicalText,
             supportText = supportText,
             isZb = isZb,
+            hasUnderground = hasUnderground,
             searchText = searchText
         )
     }
+}
+
+private const val NEARBY_HS_OPERATOR_WILDCARD = "*"
+
+private fun normalizeNearbyAnfrId(value: String): String {
+    val trimmed = value.trim()
+    return trimmed.toLongOrNull()?.toString() ?: trimmed
+}
+
+/** Construit la table ANFR -> opérateurs déclarés hors service, à partir de la base HS (comme la carte). */
+private fun buildNearbyHsOperatorMap(sitesHs: List<SiteHsEntity>): Map<String, Set<String>> {
+    val result = mutableMapOf<String, MutableSet<String>>()
+    sitesHs.forEach { hs ->
+        val id = normalizeNearbyAnfrId(hs.idAnfr)
+        if (id.isBlank()) return@forEach
+        val parsedOperators = OperatorColors.keysFor(hs.operateur)
+        val operators = if (parsedOperators.isEmpty()) listOf(NEARBY_HS_OPERATOR_WILDCARD) else parsedOperators
+        result.getOrPut(id) { mutableSetOf() }.addAll(operators)
+    }
+    return result
+}
+
+/**
+ * Récupère les antennes des sites HS les plus proches du centre de recherche.
+ * On part des coordonnées de la base HS pour trouver les ANFR proches, puis on charge
+ * leurs vraies localisations via [AnfrRepository.getAntennasByIdsInBox] (comme la carte).
+ */
+private suspend fun getNearestHsAntennas(
+    repository: AnfrRepository,
+    sitesHs: List<SiteHsEntity>,
+    center: Location,
+    limit: Int,
+    detailBackedBandMask: Int
+): List<LocalisationEntity> {
+    val nearestHs = sitesHs
+        .asSequence()
+        .filter { it.idAnfr.isNotBlank() && it.latitude != 0.0 && it.longitude != 0.0 }
+        .distinctBy { normalizeNearbyAnfrId(it.idAnfr) }
+        .sortedBy { calculateDistance(center.latitude, center.longitude, it.latitude, it.longitude) }
+        .take(limit.coerceAtLeast(1))
+        .toList()
+    if (nearestHs.isEmpty()) return emptyList()
+
+    val ids = nearestHs.map { it.idAnfr }
+    // Boîte englobant les sites HS retenus (petite marge pour absorber les écarts de coordonnées).
+    val margin = 0.02
+    return repository.getAntennasByIdsInBox(
+        idAnfrs = ids,
+        latNorth = nearestHs.maxOf { it.latitude } + margin,
+        lonEast = nearestHs.maxOf { it.longitude } + margin,
+        latSouth = nearestHs.minOf { it.latitude } - margin,
+        lonWest = nearestHs.minOf { it.longitude } - margin,
+        detailBackedBandMask = detailBackedBandMask
+    )
+}
+
+/** Opérateurs du site déclarés hors service dans la base HS (le joker couvre tous les opérateurs du site). */
+private fun nearbyHsOperatorsForSite(site: UiSite, hsOperatorMap: Map<String, Set<String>>): Set<String> {
+    if (hsOperatorMap.isEmpty()) return emptySet()
+    val matched = site.anfrIds.mapNotNull { hsOperatorMap[normalizeNearbyAnfrId(it)] }
+    if (matched.isEmpty()) return emptySet()
+    if (matched.any { NEARBY_HS_OPERATOR_WILDCARD in it }) return site.operators.toSet()
+    return matched.flatten().toSet()
+}
+
+private fun List<UiSite>.applyNearbyDisplayFilters(
+    showInService: Boolean,
+    showOutOfService: Boolean,
+    showOnlyZb: Boolean,
+    hideUnderground: Boolean,
+    hsOperatorMap: Map<String, Set<String>>
+): List<UiSite> = filter { site ->
+    val statusOk = when {
+        showInService && showOutOfService -> true
+        !showInService && !showOutOfService -> false
+        else -> {
+            val hsOperators = nearbyHsOperatorsForSite(site, hsOperatorMap)
+            val hasInServiceOperator = site.operators.any { it !in hsOperators }
+            val hasOutOfServiceOperator = site.operators.any { it in hsOperators }
+            if (showInService) hasInServiceOperator else hasOutOfServiceOperator
+        }
+    }
+    statusOk &&
+        (!showOnlyZb || site.isZb) &&
+        (!hideUnderground || !site.hasUnderground)
 }
 
 private data class NearbyAddressParts(

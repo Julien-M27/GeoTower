@@ -26,13 +26,35 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_widgets)) {
-        item(stringResource(R.string.appstrings_release_widget_add_button))
-        item(stringResource(R.string.appstrings_release_widget_frequency_gated))
-        item(stringResource(R.string.appstrings_release_widget_battery))
+    section(stringResource(R.string.appstrings_release_section_map)) {
+        item(stringResource(R.string.appstrings_release_map_active_filters_banner))
+        item(stringResource(R.string.appstrings_release_map_share_qr_deeplink))
+        item(stringResource(R.string.appstrings_release_map_open_position_link))
     }
-    section(stringResource(R.string.appstrings_release_section_home_onboarding)) {
-        item(stringResource(R.string.appstrings_release_onboarding_language_first))
+
+    section(stringResource(R.string.appstrings_release_section_live_tracking)) {
+        item(stringResource(R.string.appstrings_release_live_tracking_no_default_operator))
+        item(stringResource(R.string.appstrings_release_live_tracking_nearest_active_site))
+        item(stringResource(R.string.appstrings_release_live_tracking_context_texts))
+        item(stringResource(R.string.appstrings_release_live_tracking_home_stop))
+        item(stringResource(R.string.appstrings_release_live_tracking_onboarding_earlier))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_navigation_loading)) {
+        item(stringResource(R.string.appstrings_release_navigation_breadcrumbs))
+        item(stringResource(R.string.appstrings_release_loading_messages_enriched))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_nearby)) {
+        item(stringResource(R.string.appstrings_release_nearby_map_filters_aligned))
+        item(stringResource(R.string.appstrings_release_nearby_status_zb_underground_filters))
+        item(stringResource(R.string.appstrings_release_nearby_grouping_improved))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_statistics_data)) {
+        item(stringResource(R.string.appstrings_release_statistics_online_data))
+        item(stringResource(R.string.appstrings_release_statistics_frequency_active_sites_filters))
+        item(stringResource(R.string.appstrings_release_statistics_5g_experimental_order))
     }
 }
 

@@ -256,6 +256,8 @@ fun MapSharePreferencesSheet(
     onScaleChange: (Boolean) -> Unit,
     attributionEnabled: Boolean,
     onAttributionChange: (Boolean) -> Unit,
+    qrEnabled: Boolean,
+    onQrChange: (Boolean) -> Unit,
     statusEnabled: Boolean,
     onStatusChange: (Boolean) -> Unit,
     confidentialEnabled: Boolean,
@@ -316,6 +318,7 @@ fun MapSharePreferencesSheet(
                 SimpleSwitchCard(stringResource(R.string.appstrings_share_map_speedometer_option), speedometerEnabled, onSpeedometerChange, shape, border, bubbleColor, useOneUi)
                 SimpleSwitchCard(stringResource(R.string.appstrings_share_map_scale_option), scaleEnabled, onScaleChange, shape, border, bubbleColor, useOneUi)
                 SimpleSwitchCard(stringResource(R.string.appstrings_share_map_attribution_option), attributionEnabled, onAttributionChange, shape, border, bubbleColor, useOneUi)
+                SimpleSwitchCard(stringResource(R.string.brand_qr_code), qrEnabled, onQrChange, shape, border, bubbleColor, useOneUi)
             }
 
             Spacer(modifier = Modifier.height(24.dp))
@@ -325,6 +328,7 @@ fun MapSharePreferencesSheet(
                     onSpeedometerChange(true)
                     onScaleChange(true)
                     onAttributionChange(true)
+                    onQrChange(true)
                 }
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)

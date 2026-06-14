@@ -78,9 +78,10 @@
     <string name="onboarding_notifications_control_title">Alertes utiles seulement</string>
     <string name="onboarding_notifications_control_desc">Aucune notification sociale ou publicité : uniquement les opérations longues et les données importantes.</string>
     <string name="onboarding_live_notifications_title">Notifications live</string>
-    <string name="onboarding_live_notifications_desc">Activez un suivi discret pour garder l\'antenne la plus proche de votre opérateur visible en notification.</string>
-    <string name="onboarding_live_notifications_operator_title">Lié à votre opérateur</string>
-    <string name="onboarding_live_notifications_operator_desc">Le suivi live utilise l\'opérateur par défaut choisi juste avant pour afficher une information pertinente.</string>
+    <string name="onboarding_live_notifications_desc">Activez un suivi discret pour garder l\'antenne la plus proche visible en notification.</string>
+    <string name="onboarding_live_notifications_operator_title">Opérateur ou antenne la plus proche</string>
+    <string name="onboarding_live_notifications_operator_desc">Si vous choisissez un opérateur par défaut, le suivi live se concentre dessus. Sinon, il affiche l\'antenne la plus proche.</string>
+    <string name="onboarding_live_notifications_nearest_mode">Aucun opérateur choisi : l\'antenne la plus proche sera suivie.</string>
     <string name="onboarding_live_notifications_nearest_title">Antenne proche en direct</string>
     <string name="onboarding_live_notifications_nearest_desc">La notification peut se mettre à jour pendant vos déplacements pour indiquer le site le plus proche.</string>
     <string name="onboarding_live_notifications_control_title">Toujours désactivable</string>
@@ -251,6 +252,7 @@
     <string name="live_tracking_searching">Recherche en cours...</string>
     <string name="live_tracking_stop_action">Quitter</string>
     <string name="live_tracking_no_antenna_found">Aucune antenne %1$s trouvée à proximité.</string>
+    <string name="live_tracking_no_antenna_found_nearest">Aucune antenne trouvée à proximité.</string>
     <string name="live_tracking_antenna_distance">Antenne %1$s : %2$s</string>
     <string name="live_tracking_drawer_primary">%1$s • %2$s</string>
     <string-array name="live_cardinal_directions">
@@ -278,6 +280,7 @@
     <string name="appstrings_anfr_station_number">Numéro de station ANFR :\u0020</string>
     <string name="appstrings_arcep_identifier_label">Identifiant ARCEP :\u0020</string>
     <string name="appstrings_arcep_nidt_label">Identifiant ARCEP (NIDT) :\u0020</string>
+    <string name="appstrings_alert_arcep_action">J\'alerte l\'ARCEP</string>
     <string name="appstrings_antenna_type">Type d\'antenne</string>
     <string name="appstrings_antennas_table_title">Antennes</string>
     <string name="appstrings_api_detail_incident">Incident en cours</string>
@@ -453,6 +456,10 @@
     <string name="appstrings_external_links_settings_title">Liens externes</string>
     <string name="appstrings_external_photo_files">Fichiers / disque externe</string>
     <string name="appstrings_filter">Filtres</string>
+    <string name="appstrings_map_active_filters_message">Filtres actifs : %1$s</string>
+    <string name="appstrings_map_active_filters_except">sauf %1$s</string>
+    <string name="appstrings_map_active_filters_more">+%1$d</string>
+    <string name="appstrings_map_active_filters_none">aucun</string>
     <string name="appstrings_freq_grid_display_option">Afficher les fréquences en grille</string>
     <string name="appstrings_frequencies_and_techs">Technologies / Fréquences</string>
     <string name="appstrings_frequencies_title">Fréquences</string>
@@ -479,6 +486,7 @@
     <string name="appstrings_hide">Masquer</string>
     <string name="appstrings_home_help_position_settings">Position du bouton Aides</string>
     <string name="appstrings_home_help_settings">Aides</string>
+    <string name="appstrings_home_quit_app">Quitter sans notification live</string>
     <string name="appstrings_home_logo_setting_title">Logo de la page d\'accueil</string>
     <string name="appstrings_id_copied">Numéro d\'identification copié</string>
     <string name="appstrings_id_number">Numéro d\'identification :\u0020</string>
@@ -512,6 +520,7 @@
     <string name="appstrings_light_mode_desc">Idéal pour les emails ou messages</string>
     <string name="appstrings_likely_network_vendor">Équipementier réseau probable</string>
     <string name="appstrings_live_notification_desc">Activez les notifications en temps réel pour être informé de l\'antenne de votre opérateur par défaut la plus proche de vous</string>
+    <string name="appstrings_live_notification_desc_nearest">Suivez l\'antenne la plus proche en temps réel, quel que soit son opérateur.</string>
     <string name="appstrings_live_notification_requires_op">Nécessite de choisir un opérateur par défaut</string>
     <string name="appstrings_live_notification_title">Notification Live</string>
     <string name="appstrings_load_more_sites">Afficher plus de sites</string>
@@ -605,6 +614,8 @@
     <string name="appstrings_nearby_search_suggestion_roof">Toit</string>
     <string name="appstrings_nearby_search_suggestions_option">Suggestions rapides</string>
     <string name="appstrings_nearby_sites_option">Sites les plus proches</string>
+    <string name="appstrings_nearby_loading_title">Recherche des sites proches...</string>
+    <string name="appstrings_nearby_loading_desc">GeoTower localise la zone, charge les sites proches et applique vos filtres.</string>
     <string name="appstrings_network_error_search">Erreur réseau lors de la recherche</string>
     <string name="appstrings_next">Suivant</string>
     <string name="appstrings_no">Non</string>
@@ -759,6 +770,9 @@
     <string name="appstrings_release_section_home_onboarding">Accueil et onboarding</string>
     <string name="appstrings_release_section_map_details">Carte et détails</string>
     <string name="appstrings_release_section_interface_translations">Interface et traductions</string>
+    <string name="appstrings_release_section_navigation_loading">Navigation et chargement</string>
+    <string name="appstrings_release_section_nearby">Proximité</string>
+    <string name="appstrings_release_section_statistics_data">Statistiques et données</string>
     <string name="appstrings_release_section_database">Base de données</string>
     <string name="appstrings_release_section_live_tracking">Suivi en direct</string>
     <string name="appstrings_release_section_statistics">Statistiques</string>
@@ -1735,4 +1749,27 @@
     <string name="appstrings_release_widget_frequency_gated">La fréquence de rafraîchissement ne se règle désormais que lorsqu’un widget est installé</string>
     <string name="appstrings_release_widget_battery">Économie de batterie : la localisation en arrière-plan ne s’exécute plus si aucun widget n’est posé</string>
     <string name="appstrings_release_onboarding_language_first">Le choix de la langue est désormais proposé dès le premier écran de bienvenue</string>
+    <string name="appstrings_site_detail_loading_title">Chargement du détail du site...</string>
+    <string name="appstrings_site_detail_loading_desc">GeoTower sélectionne la bonne antenne, charge les données techniques, les fréquences, les photos et les pannes.</string>
+    <string name="appstrings_support_detail_loading_title">Chargement du détail du support...</string>
+    <string name="appstrings_support_detail_loading_desc">GeoTower rassemble les antennes, les données du support, les entrées radio, les photos et les filtres d’état.</string>
+    <string name="appstrings_throughput_loading_title">Préparation du calcul de débit...</string>
+    <string name="appstrings_throughput_loading_desc">GeoTower charge les bandes, les hauteurs d’antennes et vos réglages de calcul par défaut.</string>
+    <string name="appstrings_stats_loading_title">Chargement des statistiques...</string>
+    <string name="appstrings_release_map_active_filters_banner">Ajout d’un bandeau pour voir les filtres actifs</string>
+    <string name="appstrings_release_map_share_qr_deeplink">Partage de carte enrichi avec QR code et lien direct</string>
+    <string name="appstrings_release_map_open_position_link">Ouverture directe d’une position sur la carte depuis un lien</string>
+    <string name="appstrings_release_live_tracking_no_default_operator">Fonctionne même sans opérateur par défaut</string>
+    <string name="appstrings_release_live_tracking_nearest_active_site">Suit automatiquement l’antenne active la plus proche</string>
+    <string name="appstrings_release_live_tracking_context_texts">Textes plus clairs selon la situation</string>
+    <string name="appstrings_release_live_tracking_home_stop">Arrêt du suivi plus simple depuis l’accueil</string>
+    <string name="appstrings_release_live_tracking_onboarding_earlier">Option présentée plus tôt pendant l’onboarding</string>
+    <string name="appstrings_release_navigation_breadcrumbs">Ajout d’un fil d’Ariane sur les écrans de détail</string>
+    <string name="appstrings_release_loading_messages_enriched">Messages de chargement plus complets sur plusieurs écrans</string>
+    <string name="appstrings_release_nearby_map_filters_aligned">Recherche à proximité mieux alignée avec les filtres de la carte</string>
+    <string name="appstrings_release_nearby_status_zb_underground_filters">Prise en compte des sites en service, en panne, zone blanche et souterrains</string>
+    <string name="appstrings_release_nearby_grouping_improved">Regroupement des résultats amélioré</string>
+    <string name="appstrings_release_statistics_online_data">Statistiques plus robustes avec prise en charge des données en ligne</string>
+    <string name="appstrings_release_statistics_frequency_active_sites_filters">Filtres de fréquence et sites actifs mieux pris en compte</string>
+    <string name="appstrings_release_statistics_5g_experimental_order">Ordre des bandes 5G amélioré avec les bandes expérimentales en fin de liste</string>
 </resources>

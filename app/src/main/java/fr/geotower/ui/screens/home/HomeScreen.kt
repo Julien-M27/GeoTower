@@ -24,6 +24,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ExitToApp
 import androidx.compose.material.icons.automirrored.filled.Help
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.BarChart
@@ -46,6 +47,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -74,6 +76,7 @@ import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.config.RemoteHomeAnnouncement
 import fr.geotower.data.db.DatabaseVersionPolicy
 import fr.geotower.data.db.GeoTowerDatabaseValidator
+import fr.geotower.services.LiveTrackingController
 import androidx.compose.ui.draw.clip
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -105,6 +108,18 @@ fun HomeScreen(navController: NavController) {
     val scope = rememberCoroutineScope() // ✅ AJOUT CRUCIAL ICI
     val logoResId by AppIconManager.currentIconRes
     val safeClick = rememberSafeClick()
+
+    // ---> BOUTON QUITTER : on arrête le suivi en direct (donc plus de notif live) puis on ferme l'app <---
+    // NB : on récupère l'Activity via LocalActivity et non via un cast de LocalContext, car le
+    // GeoTowerLocaleProvider remplace LocalContext par un createConfigurationContext() qui ne
+    // contient plus l'Activity dans sa chaîne (le cast renverrait null dès qu'une langue est forcée).
+    val activity = LocalActivity.current
+    val onQuit: () -> Unit = {
+        safeClick {
+            LiveTrackingController.stop(context)
+            activity?.finishAndRemoveTask()
+        }
+    }
 
     // ---> 1. LECTURE DU CHOIX DU LOGO D'ACCUEIL <---
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
@@ -343,13 +358,21 @@ fun HomeScreen(navController: NavController) {
                 val isHelpButtonAtBottom = helpButtonPosition.startsWith("bottom")
                 val showBottomHelpButton = showHelpButton && isHelpButtonAtBottom
                 val isBottomHelpButtonStart = helpButtonPosition == "bottom_start"
-                val helpButtonPadding = if (isHelpButtonAtBottom) {
-                    PaddingValues(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 2.dp)
-                } else {
-                    PaddingValues(20.dp)
+                val helpButtonPadding = when {
+                    isHelpButtonAtBottom -> PaddingValues(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 2.dp)
+                    helpButtonPosition == "top_end" -> PaddingValues(start = 20.dp, top = 72.dp, end = 20.dp, bottom = 20.dp)
+                    else -> PaddingValues(20.dp)
                 }
 
                 Box(modifier = Modifier.fillMaxSize()) {
+                    HomeQuitButton(
+                        onClick = onQuit,
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 12.dp, end = 12.dp)
+                            .zIndex(3f)
+                    )
+
                     if (isLandscape) {
                         Row(
                             modifier = Modifier
@@ -548,6 +571,23 @@ fun HomeScreen(navController: NavController) {
 }
 
 // --- SOUS-COMPOSANTS ---
+
+@Composable
+private fun HomeQuitButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = modifier
+    ) {
+        Icon(
+            Icons.AutoMirrored.Filled.ExitToApp,
+            contentDescription = stringResource(R.string.appstrings_home_quit_app),
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
 
 @Composable
 private fun HomeAnnouncementBanner(
@@ -818,6 +858,11 @@ fun AboutSection(
     helpContentColor: Color = Color.Unspecified,
     onHelpClick: (() -> Unit)? = null
 ) {
+    val helpContent = if (helpContentColor == Color.Unspecified) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        helpContentColor
+    }
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -833,17 +878,34 @@ fun AboutSection(
             }
             Text(text = version, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
         }
-        if (showBottomHelpButton && onHelpClick != null) {
+
+        // En bas à gauche : le bouton Aides s'il est configuré à gauche
+        Row(
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(top = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            if (showBottomHelpButton && onHelpClick != null && alignHelpStart) {
+                FloatingActionButton(
+                    onClick = onHelpClick,
+                    containerColor = paleColor,
+                    contentColor = helpContent
+                ) {
+                    Icon(Icons.AutoMirrored.Filled.Help, contentDescription = stringResource(R.string.appstrings_home_help_settings))
+                }
+            }
+        }
+
+        // En bas à droite : le bouton Aides s'il est positionné à droite
+        if (showBottomHelpButton && onHelpClick != null && !alignHelpStart) {
             FloatingActionButton(
                 onClick = onHelpClick,
                 containerColor = paleColor,
-                contentColor = if (helpContentColor == Color.Unspecified) {
-                    MaterialTheme.colorScheme.onPrimaryContainer
-                } else {
-                    helpContentColor
-                },
+                contentColor = helpContent,
                 modifier = Modifier
-                    .align(if (alignHelpStart) Alignment.TopStart else Alignment.TopEnd)
+                    .align(Alignment.TopEnd)
                     .padding(top = 12.dp)
             ) {
                 Icon(Icons.AutoMirrored.Filled.Help, contentDescription = stringResource(R.string.appstrings_home_help_settings))

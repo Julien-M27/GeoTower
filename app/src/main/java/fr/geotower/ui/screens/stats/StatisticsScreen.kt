@@ -217,12 +217,12 @@ private fun frequencyBandsForTech(tech: String): List<FrequencyBandSpec> {
             FrequencyBandSpec("2600", "2600 MHz", RadioFilterMasks.BAND_4G_2600, "4G|2600")
         )
         "5G" -> listOf(
-            FrequencyBandSpec("26000", radioFrequencyLabel(26000), RadioFilterMasks.BAND_5G_26000, "5G|26000"),
-            FrequencyBandSpec("4200", radioFrequencyLabel(4200), RadioFilterMasks.BAND_5G_4200, "5G|4200"),
             FrequencyBandSpec("3500", "3500 MHz", RadioFilterMasks.BAND_5G_3500, "5G|3500"),
             FrequencyBandSpec("2100", "2100 MHz", RadioFilterMasks.BAND_5G_2100, "5G|2100"),
+            FrequencyBandSpec("700", "700 MHz", RadioFilterMasks.BAND_5G_700, "5G|700"),
             FrequencyBandSpec("1400", radioFrequencyLabel(1400), RadioFilterMasks.BAND_5G_1400, "5G|1400"),
-            FrequencyBandSpec("700", "700 MHz", RadioFilterMasks.BAND_5G_700, "5G|700")
+            FrequencyBandSpec("4200", radioFrequencyLabel(4200), RadioFilterMasks.BAND_5G_4200, "5G|4200"),
+            FrequencyBandSpec("26000", radioFrequencyLabel(26000), RadioFilterMasks.BAND_5G_26000, "5G|26000")
         )
         else -> emptyList()
     }
@@ -758,10 +758,18 @@ private fun StatCard(
             Spacer(modifier = Modifier.height(18.dp))
             if (isLoading) {
                 Box(modifier = Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
-                    LoadingIndicator(
-                        modifier = Modifier.size(48.dp),
-                        color = MaterialTheme.colorScheme.primary
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        LoadingIndicator(
+                            modifier = Modifier.size(48.dp),
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            text = stringResource(R.string.appstrings_stats_loading_title),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
                 }
             } else {
                 SupportBarChart(data = data, displayMode = displayMode)

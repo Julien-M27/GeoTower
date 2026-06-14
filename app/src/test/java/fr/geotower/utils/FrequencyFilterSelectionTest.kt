@@ -73,12 +73,23 @@ class FrequencyFilterSelectionTest {
         assertEquals(RadioFilterMasks.BAND_5G_4200, filter.detailBackedBandMaskForEnrichment())
     }
 
+    @Test
+    fun selectedMobileBandMaskIncludesOnlyEnabledBandsForEnabledTechnologies() {
+        val filter = only5G4200()
+
+        assertEquals(RadioFilterMasks.BAND_5G_4200, filter.selectedMobileBandMask())
+        assertFalse(filter.isFullyEnabled)
+    }
+
+    @Test
+    fun includesFhMatchesAntennaFhGate() {
+        assertFalse(baseSelection(showFh = true, f5G4200 = false).includesFh())
+        assertTrue(fullyEnabled().includesFh())
+        assertFalse(baseSelection(showFh = false).includesFh())
+    }
+
     private fun only2G1800(): FrequencyFilterSelection {
-        return FrequencyFilterSelection(
-            show2G = true,
-            show3G = true,
-            show4G = true,
-            show5G = true,
+        return baseSelection(
             showFh = false,
             f2G900 = false,
             f2G1800 = true,
@@ -100,37 +111,14 @@ class FrequencyFilterSelectionTest {
     }
 
     private fun fullyEnabled(): FrequencyFilterSelection {
-        return FrequencyFilterSelection(
-            show2G = true,
-            show3G = true,
-            show4G = true,
-            show5G = true,
-            showFh = true,
-            f2G900 = true,
-            f2G1800 = true,
-            f3G900 = true,
-            f3G2100 = true,
-            f4G700 = true,
-            f4G800 = true,
-            f4G900 = true,
-            f4G1800 = true,
-            f4G2100 = true,
-            f4G2600 = true,
-            f5G700 = true,
-            f5G1400 = true,
-            f5G2100 = true,
-            f5G3500 = true,
-            f5G4200 = true,
-            f5G26000 = true
-        )
+        return baseSelection()
     }
 
     private fun only5G26000(): FrequencyFilterSelection {
-        return FrequencyFilterSelection(
+        return baseSelection(
             show2G = false,
             show3G = false,
             show4G = false,
-            show5G = true,
             showFh = false,
             f2G900 = false,
             f2G1800 = false,
@@ -152,11 +140,10 @@ class FrequencyFilterSelectionTest {
     }
 
     private fun only5G4200(): FrequencyFilterSelection {
-        return FrequencyFilterSelection(
+        return baseSelection(
             show2G = false,
             show3G = false,
             show4G = false,
-            show5G = true,
             showFh = false,
             f2G900 = false,
             f2G1800 = false,
@@ -174,6 +161,54 @@ class FrequencyFilterSelectionTest {
             f5G3500 = false,
             f5G4200 = true,
             f5G26000 = false
+        )
+    }
+
+    private fun baseSelection(
+        show2G: Boolean = true,
+        show3G: Boolean = true,
+        show4G: Boolean = true,
+        show5G: Boolean = true,
+        showFh: Boolean = true,
+        f2G900: Boolean = true,
+        f2G1800: Boolean = true,
+        f3G900: Boolean = true,
+        f3G2100: Boolean = true,
+        f4G700: Boolean = true,
+        f4G800: Boolean = true,
+        f4G900: Boolean = true,
+        f4G1800: Boolean = true,
+        f4G2100: Boolean = true,
+        f4G2600: Boolean = true,
+        f5G700: Boolean = true,
+        f5G1400: Boolean = true,
+        f5G2100: Boolean = true,
+        f5G3500: Boolean = true,
+        f5G4200: Boolean = true,
+        f5G26000: Boolean = true
+    ): FrequencyFilterSelection {
+        return FrequencyFilterSelection(
+            show2G = show2G,
+            show3G = show3G,
+            show4G = show4G,
+            show5G = show5G,
+            showFh = showFh,
+            f2G900 = f2G900,
+            f2G1800 = f2G1800,
+            f3G900 = f3G900,
+            f3G2100 = f3G2100,
+            f4G700 = f4G700,
+            f4G800 = f4G800,
+            f4G900 = f4G900,
+            f4G1800 = f4G1800,
+            f4G2100 = f4G2100,
+            f4G2600 = f4G2600,
+            f5G700 = f5G700,
+            f5G1400 = f5G1400,
+            f5G2100 = f5G2100,
+            f5G3500 = f5G3500,
+            f5G4200 = f5G4200,
+            f5G26000 = f5G26000
         )
     }
 

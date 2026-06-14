@@ -103,6 +103,7 @@ class RemoteFeatureFlagsTest {
         requireNotNull(config)
         assertTrue(config.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_PHOTOS))
         assertFalse(config.isFeatureEnabled(RemoteFeatureFlags.Features.CELLULARFR_PHOTOS))
+        assertFalse(config.isFeatureEnabled(RemoteFeatureFlags.Features.LIVE_API_FR_STATS))
         assertTrue(config.isActionEnabled(RemoteFeatureFlags.Actions.SHARE_MAP))
         assertTrue(config.isProviderEnabled(RemoteFeatureFlags.Providers.MAP_IGN))
         assertTrue(config.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_UPDATE_CHECK))

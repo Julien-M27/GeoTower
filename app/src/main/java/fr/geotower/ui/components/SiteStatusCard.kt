@@ -1,6 +1,7 @@
 package fr.geotower.ui.components
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
@@ -66,7 +67,8 @@ fun SiteStatusCard(
     outageStartDate: String? = null,
     outageExpectedRestorationDate: String? = null,
     techStatus: Map<String, ServiceStatus> = emptyMap(),
-    outageDetails: SiteHsEntity? = null
+    outageDetails: SiteHsEntity? = null,
+    onAlertArcep: (() -> Unit)? = null
 ) {
     // Couleurs
     val colorOk = Color(0xFF4CAF50) // Vert
@@ -175,6 +177,25 @@ fun SiteStatusCard(
 
             if (isOutage && outageDetails != null) {
                 OutageDetailsSection(outageDetails, techStatus)
+            }
+
+            if (onAlertArcep != null) {
+                Spacer(modifier = Modifier.height(12.dp))
+                OutlinedButton(
+                    onClick = onAlertArcep,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Launch,
+                        contentDescription = null,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = stringResource(R.string.appstrings_alert_arcep_action),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(16.dp))

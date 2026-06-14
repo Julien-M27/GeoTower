@@ -121,6 +121,10 @@ private fun decodeUploadOperatorNames(raw: String?): List<String> {
 }
 
 class MainActivity : ComponentActivity() {
+    private companion object {
+        const val MAP_DEEP_LINK_MIN_ZOOM = 2.0
+        const val MAP_DEEP_LINK_MAX_ZOOM = 22.0
+    }
 
     // 🌟 1. LE CANAL POUR LA NOTIFICATION
     private val navigateToSiteFlow = MutableSharedFlow<String>(
@@ -143,6 +147,30 @@ class MainActivity : ComponentActivity() {
         }
 
         return SignalQuestUploadDraftStore.put(uris.map { it.toString() })
+    }
+
+    private fun mapDeepLinkDestination(intent: Intent?): String? {
+        val uri = intent?.data ?: return null
+        if (uri.scheme != "geotower" || uri.host != "map") return null
+
+        val lat = uri.getQueryParameter("lat")?.toDoubleOrNull() ?: return null
+        val lon = uri.getQueryParameter("lon")?.toDoubleOrNull() ?: return null
+        val zoom = uri.getQueryParameter("zoom")?.toDoubleOrNull() ?: return null
+        if (!lat.isUsableMapNumber() || !lon.isUsableMapNumber() || !zoom.isUsableMapNumber()) return null
+        if (lat !in -90.0..90.0 || lon !in -180.0..180.0) return null
+
+        getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+            .edit()
+            .putFloat("last_map_lat", lat.toFloat())
+            .putFloat("last_map_lon", lon.toFloat())
+            .putFloat("last_map_zoom", zoom.coerceIn(MAP_DEEP_LINK_MIN_ZOOM, MAP_DEEP_LINK_MAX_ZOOM).toFloat())
+            .apply()
+
+        return "map"
+    }
+
+    private fun Double.isUsableMapNumber(): Boolean {
+        return !isNaN() && !isInfinite()
     }
 
     private fun persistSharedImageReadPermission(intent: Intent?, uri: Uri) {
@@ -208,6 +236,11 @@ class MainActivity : ComponentActivity() {
         handleGlobalPopupIntent(intent)
 
         sharedPhotoMapRoute(intent)?.let { route ->
+            navigateToSiteFlow.tryEmit(route)
+            return
+        }
+
+        mapDeepLinkDestination(intent)?.let { route ->
             navigateToSiteFlow.tryEmit(route)
             return
         }
@@ -348,6 +381,7 @@ class MainActivity : ComponentActivity() {
         val deepLinkUri = intent.data
         val isDeepLink = deepLinkUri != null && deepLinkUri.scheme == "geotower"
         val sharedPhotoRoute = if (isFirstRun) null else sharedPhotoMapRoute(intent)
+        val mapDeepLinkRoute = if (isFirstRun) null else mapDeepLinkDestination(intent)
 
         // 🎙️ Lecture de la commande vocale de Google Assistant (Défini dans shortcuts.xml)
         val assistantFeature = intent.getStringExtra("app_feature")
@@ -360,6 +394,8 @@ class MainActivity : ComponentActivity() {
             "first_start"
         } else if (sharedPhotoRoute != null) {
             sharedPhotoRoute
+        } else if (mapDeepLinkRoute != null) {
+            mapDeepLinkRoute
         } else if (isDeepLink) {
             "home" // ✅ On laisse le NavHost gérer la navigation profonde
         } else if (notifSiteId != null) {

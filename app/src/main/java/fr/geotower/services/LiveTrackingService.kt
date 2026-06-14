@@ -128,7 +128,6 @@ class LiveTrackingService : Service() {
 
         val defaultOp = currentOperator
         if (
-            defaultOp == "AUCUN" ||
             !LiveTrackingController.hasPreciseLocationPermission(this) ||
             !LiveTrackingController.hasPostNotificationsPermission(this)
         ) {
@@ -209,10 +208,6 @@ class LiveTrackingService : Service() {
 
     private fun processLocationUpdate(location: Location) {
         val defaultOp = currentOperator
-        if (defaultOp == "AUCUN") {
-            stopTrackingAndSelf()
-            return
-        }
 
         if (!shouldProcessLocation(location)) return
         lastProcessedLocation = Location(location)
@@ -227,8 +222,13 @@ class LiveTrackingService : Service() {
 
                 if (opAntennas.isEmpty()) {
                     lastDistanceToLockedAntenna = null
+                    val emptyText = if (defaultOp == "AUCUN") {
+                        applicationContext.getString(R.string.live_tracking_no_antenna_found_nearest)
+                    } else {
+                        applicationContext.getString(R.string.live_tracking_no_antenna_found, defaultOp)
+                    }
                     updateNotification(
-                        text = applicationContext.getString(R.string.live_tracking_no_antenna_found, defaultOp),
+                        text = emptyText,
                         userLoc = null,
                         antLoc = null,
                         operator = defaultOp,
@@ -256,6 +256,15 @@ class LiveTrackingService : Service() {
                         closestAntenna = ant
                         bearingToClosest = results[1]
                     }
+                }
+
+                // En mode « aucun opérateur », on suit l'antenne la plus proche tous opérateurs
+                // confondus : l'affichage (nom, couleur, logo, photo) reflète l'opérateur réel
+                // de cette antenne. Quand un opérateur est choisi, on conserve son identité.
+                val displayOperator = if (defaultOp == "AUCUN") {
+                    OperatorColors.keyFor(closestAntenna.operateur) ?: closestAntenna.operateur ?: defaultOp
+                } else {
+                    defaultOp
                 }
 
                 val currentId = closestAntenna.idAnfr
@@ -288,7 +297,7 @@ class LiveTrackingService : Service() {
                 val distanceWithDirectionStr = "$baseDistanceStr • $directionStr ($degreeStr)"
 
                 requestLiveOutageRefreshIfNeeded()
-                val hsSuffix = liveOutageTitleSuffixFor(closestAntenna, defaultOp)
+                val hsSuffix = liveOutageTitleSuffixFor(closestAntenna, displayOperator)
 
                 val technique = repository.getTechniqueDetails(closestAntenna.idAnfr)
                 val sitePhotoId = repository.getPhysiqueDetails(closestAntenna.idAnfr)
@@ -299,17 +308,17 @@ class LiveTrackingService : Service() {
                 val fullAddress = technique?.adresse ?: ""
                 val notificationText = applicationContext.getString(
                     R.string.live_tracking_antenna_distance,
-                    defaultOp,
+                    displayOperator,
                     distanceWithDirectionStr + hsSuffix
                 )
-                val photoCacheKey = liveSitePhotoCacheKey(defaultOp, sitePhotoId)
+                val photoCacheKey = liveSitePhotoCacheKey(displayOperator, sitePhotoId)
                 val liveSitePhotoBitmap = cachedLiveSitePhotoBitmap(photoCacheKey)
 
                 updateNotification(
                     text = notificationText,
                     userLoc = location,
                     antLoc = closestAntenna,
-                    operator = defaultOp,
+                    operator = displayOperator,
                     progress = progress,
                     address = fullAddress,
                     sitePhotoBitmap = liveSitePhotoBitmap,
@@ -319,7 +328,8 @@ class LiveTrackingService : Service() {
                 requestLiveSitePhotoBitmapIfNeeded(
                     cacheKey = photoCacheKey,
                     siteId = sitePhotoId,
-                    operator = defaultOp,
+                    operator = displayOperator,
+                    trackingOperator = defaultOp,
                     text = notificationText,
                     userLoc = location,
                     antLoc = closestAntenna,
@@ -348,23 +358,35 @@ class LiveTrackingService : Service() {
         operator: String
     ): List<LocalisationEntity> {
         val safeCos = max(0.1, abs(cos(Math.toRadians(location.latitude))))
-        val operatorQueryNames = OperatorColors.searchLabelsFor(operator)
+        // « AUCUN » = aucun opérateur choisi → on cherche l'antenne active la plus proche,
+        // tous opérateurs confondus, sans filtre par nom d'opérateur.
+        val isNearestMode = operator == "AUCUN"
+        val operatorQueryNames = if (isNearestMode) emptyList() else OperatorColors.searchLabelsFor(operator)
 
         SEARCH_RADII_KM.forEach { radiusKm ->
             val radiusMeters = (radiusKm * 1000.0).toFloat()
             val offsetLat = radiusKm / KM_PER_LATITUDE_DEGREE
             val offsetLon = offsetLat / safeCos
-            val candidates = operatorQueryNames
-                .flatMap { operatorQueryName ->
-                    dao.getActiveLocalisationsInBoxByOperator(
-                        operatorName = operatorQueryName,
-                        minLat = location.latitude - offsetLat,
-                        maxLat = location.latitude + offsetLat,
-                        minLon = location.longitude - offsetLon,
-                        maxLon = location.longitude + offsetLon
-                    )
-                }
-                .distinctBy { it.idAnfr }
+            val candidates = if (isNearestMode) {
+                dao.getActiveLocalisationsInBox(
+                    minLat = location.latitude - offsetLat,
+                    maxLat = location.latitude + offsetLat,
+                    minLon = location.longitude - offsetLon,
+                    maxLon = location.longitude + offsetLon
+                )
+            } else {
+                operatorQueryNames
+                    .flatMap { operatorQueryName ->
+                        dao.getActiveLocalisationsInBoxByOperator(
+                            operatorName = operatorQueryName,
+                            minLat = location.latitude - offsetLat,
+                            maxLat = location.latitude + offsetLat,
+                            minLon = location.longitude - offsetLon,
+                            maxLon = location.longitude + offsetLon
+                        )
+                    }
+                    .distinctBy { it.idAnfr }
+            }
 
             val insideRadius = candidates.filter { antenna ->
                 val results = FloatArray(1)
@@ -380,16 +402,24 @@ class LiveTrackingService : Service() {
             if (insideRadius.isNotEmpty()) return insideRadius
         }
 
-        return operatorQueryNames
-            .flatMap { operatorQueryName ->
-                dao.getNearestActiveLocalisationsByOperator(
-                    operatorName = operatorQueryName,
-                    lat = location.latitude,
-                    lon = location.longitude,
-                    limit = GLOBAL_OPERATOR_FALLBACK_LIMIT
-                )
-            }
-            .distinctBy { it.idAnfr }
+        return if (isNearestMode) {
+            dao.getNearestActiveLocalisations(
+                lat = location.latitude,
+                lon = location.longitude,
+                limit = GLOBAL_OPERATOR_FALLBACK_LIMIT
+            )
+        } else {
+            operatorQueryNames
+                .flatMap { operatorQueryName ->
+                    dao.getNearestActiveLocalisationsByOperator(
+                        operatorName = operatorQueryName,
+                        lat = location.latitude,
+                        lon = location.longitude,
+                        limit = GLOBAL_OPERATOR_FALLBACK_LIMIT
+                    )
+                }
+                .distinctBy { it.idAnfr }
+        }
     }
 
     private fun requestLiveOutageRefreshIfNeeded(force: Boolean = false) {
@@ -493,6 +523,7 @@ class LiveTrackingService : Service() {
         cacheKey: String,
         siteId: String,
         operator: String,
+        trackingOperator: String,
         text: String,
         userLoc: Location?,
         antLoc: LocalisationEntity,
@@ -513,7 +544,7 @@ class LiveTrackingService : Service() {
                 if (
                     bitmap != null &&
                     lockedAntennaId == antLoc.idAnfr &&
-                    currentOperator == operator
+                    currentOperator == trackingOperator
                 ) {
                     updateNotification(
                         text = text,

@@ -25,9 +25,12 @@ import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.data.models.toLocalisationEntity
 import fr.geotower.data.models.toPhysiqueEntity
+import fr.geotower.data.models.toRadioStatRow
 import fr.geotower.data.models.toTechniqueEntity
+import fr.geotower.data.models.toWeeklyRadioStatRow
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -592,6 +595,38 @@ class AnfrRepository(
             .mapNotNull { id -> getLiveSite(id) }
     }
 
+    private suspend fun getLiveCurrentRadioStatsByOperator(operatorNames: List<String>): List<RadioStatRow> {
+        return try {
+            val response = LiveSitesClient.api.getCurrentRadioStats(operatorNames)
+            if (!response.isSuccessful) return emptyList()
+            response.body()
+                ?.rows
+                ?.mapNotNull { it.toRadioStatRow() }
+                .orEmpty()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG_DB, "Live current stats request failed", e)
+            emptyList()
+        }
+    }
+
+    private suspend fun getLiveWeeklyRadioStatsByOperator(operatorNames: List<String>): List<WeeklyRadioStatRow> {
+        return try {
+            val response = LiveSitesClient.api.getWeeklyRadioStats(operatorNames)
+            if (!response.isSuccessful) return emptyList()
+            response.body()
+                ?.rows
+                ?.mapNotNull { it.toWeeklyRadioStatRow() }
+                .orEmpty()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG_DB, "Live weekly stats request failed", e)
+            emptyList()
+        }
+    }
+
     private fun refreshLocalDatabaseStatusAfterFailure() {
         try {
             val status = GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context)
@@ -744,6 +779,58 @@ class AnfrRepository(
                         maxLat = bounds.maxLat,
                         minLon = range.min,
                         maxLon = range.max
+                    )
+                }
+                .distinctBy { it.idAnfr }
+        }
+        return enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask)
+    }
+
+    suspend fun getAntennasInBoxForFrequencyFilter(
+        latNorth: Double,
+        lonEast: Double,
+        latSouth: Double,
+        lonWest: Double,
+        frequencyFilter: FrequencyFilterSelection
+    ): List<LocalisationEntity> {
+        val detailBackedBandMask = frequencyFilter.detailBackedBandMaskForEnrichment()
+        if (frequencyFilter.isFullyEnabled) {
+            return getAntennasInBox(
+                latNorth = latNorth,
+                lonEast = lonEast,
+                latSouth = latSouth,
+                lonWest = lonWest,
+                detailBackedBandMask = detailBackedBandMask
+            )
+        }
+
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
+            val liveSites = getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest)
+            return if (detailBackedBandMask != 0 && liveSites.size <= LIVE_DETAIL_LOOKUP_LIMIT) {
+                enrichRadioBandMasksFromDetails(liveSites, detailBackedBandMask)
+            } else {
+                liveSites
+            }
+        }
+
+        val selectedBandMask = frequencyFilter.selectedMobileBandMask()
+        val includeFh = frequencyFilter.includesFh()
+        if (selectedBandMask == 0 && detailBackedBandMask == 0 && !includeFh) {
+            return emptyList()
+        }
+
+        val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
+        val localisations = queryLocalDatabase(emptyList()) {
+            bounds.longitudeRanges
+                .flatMap { range ->
+                    getLocalisationsInBoxForRadioFilter(
+                        minLat = bounds.minLat,
+                        maxLat = bounds.maxLat,
+                        minLon = range.min,
+                        maxLon = range.max,
+                        selectedBandMask = selectedBandMask,
+                        detailBackedBandMask = detailBackedBandMask,
+                        includeFh = includeFh
                     )
                 }
                 .distinctBy { it.idAnfr }
@@ -1156,6 +1243,10 @@ class AnfrRepository(
         val normalizedNames = normalizeOperatorNames(operatorNames)
         if (normalizedNames.isEmpty()) return emptyList()
 
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_STATS)) {
+            return getLiveCurrentRadioStatsByOperator(normalizedNames)
+        }
+
         return queryLocalDatabase(emptyList()) {
             getCurrentRadioStatsByOperator(normalizedNames)
         }
@@ -1164,6 +1255,10 @@ class AnfrRepository(
     suspend fun getWeeklyRadioStatsByOperator(operatorNames: List<String>): List<WeeklyRadioStatRow> {
         val normalizedNames = normalizeOperatorNames(operatorNames)
         if (normalizedNames.isEmpty()) return emptyList()
+
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_STATS)) {
+            return getLiveWeeklyRadioStatsByOperator(normalizedNames)
+        }
 
         return queryLocalDatabase(emptyList()) {
             getWeeklyRadioStatsByOperator(normalizedNames)

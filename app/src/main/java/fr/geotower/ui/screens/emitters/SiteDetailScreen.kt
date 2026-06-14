@@ -125,6 +125,9 @@ import fr.geotower.data.upload.SignalQuestUploadDraftStore
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadRules
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.GeoTowerBreadcrumbItem
+import fr.geotower.ui.components.GeoTowerLoadingMessage
+import fr.geotower.ui.components.GeoTowerNavigationBreadcrumbBar
 import fr.geotower.ui.components.MiniMapViewMode
 import fr.geotower.ui.components.RadioShareMenu
 import fr.geotower.ui.components.RadioUsageIcon
@@ -162,6 +165,7 @@ private const val TAG_SPEEDTEST = "GeoTowerUpload"
 private const val SIGNAL_QUEST_PACKAGE_NAME = "com.sfrmap.android"
 private const val SIGNAL_QUEST_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.sfrmap.android"
 private const val SIGNALQUEST_SPEEDTEST_PAGE_SIZE = 100
+private const val ARCEP_ALERT_URL = "https://jalerte.arcep.fr/"
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -220,7 +224,10 @@ fun SiteDetailScreen(
 
     if (!isReady) {
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
-            LoadingIndicator(color = MaterialTheme.colorScheme.primary)
+            GeoTowerLoadingMessage(
+                title = stringResource(R.string.appstrings_site_detail_loading_title),
+                detail = stringResource(R.string.appstrings_site_detail_loading_desc)
+            )
         }
         return
     }
@@ -819,21 +826,22 @@ fun SiteDetailScreen(
     Scaffold(
         containerColor = mainBgColor,
         topBar = {
-            GeoTowerBackTopBar(
-                onBack = { handleBackNavigation() },
-                backgroundColor = mainBgColor,
-                backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
-                actions = {
-                    IconButton(onClick = { safeClick { showSiteSettingsSheet = true } }) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.appstrings_settings_title),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
+            Column(modifier = Modifier.background(mainBgColor)) {
+                GeoTowerBackTopBar(
+                    onBack = { handleBackNavigation() },
+                    backgroundColor = mainBgColor,
+                    backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
+                    actions = {
+                        IconButton(onClick = { safeClick { showSiteSettingsSheet = true } }) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.appstrings_settings_title),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
-                }
-            ) {
-                Text(
+                ) {
+                    Text(
                         text = txtSiteDetailsTitle,
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold,
@@ -845,12 +853,31 @@ fun SiteDetailScreen(
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             Toast.makeText(context, "$txtIdCopied : $antennaId", Toast.LENGTH_SHORT).show()
                         }.padding(horizontal = 16.dp, vertical = 4.dp)
+                    )
+                }
+                GeoTowerNavigationBreadcrumbBar(
+                    navController = navController,
+                    currentItem = GeoTowerBreadcrumbItem(
+                        label = txtSiteDetailsTitle,
+                        icon = Icons.Default.Tag,
+                        key = "site_detail"
+                    ),
+                    currentRouteKeys = setOf("site_detail", "site_detail_from_map"),
+                    onBackStackItemClick = {
+                        if (isSplitScreen) onCloseSplitScreen()
+                    },
+                    backgroundColor = if (useOneUi) cardBgColor else MaterialTheme.colorScheme.surfaceContainer
                 )
             }
         }
     ) { padding ->
         if (antenna == null) {
-            Box(Modifier.fillMaxSize().padding(padding).background(mainBgColor), contentAlignment = Alignment.Center) { LoadingIndicator() }
+            Box(Modifier.fillMaxSize().padding(padding).background(mainBgColor), contentAlignment = Alignment.Center) {
+                GeoTowerLoadingMessage(
+                    title = stringResource(R.string.appstrings_site_detail_loading_title),
+                    detail = stringResource(R.string.appstrings_site_detail_loading_desc)
+                )
+            }
         } else {
             val info = antenna!!
             val scrollState = rememberScrollState()
@@ -1141,7 +1168,12 @@ fun SiteDetailScreen(
                                 cardBgColor = cardBgColor,
                                 blockShape = blockShape,
                                 techStatus = realTechStatus,
-                                outageDetails = hsEntity
+                                outageDetails = hsEntity,
+                                onAlertArcep = if (canUseSiteExternalLinks) {
+                                    { safeClick("alert_arcep_${info.idAnfr}") { openWebsiteUrl(ARCEP_ALERT_URL) } }
+                                } else {
+                                    null
+                                }
                             )
                         }
                         "operator" -> {

@@ -66,11 +66,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -172,7 +169,6 @@ fun FirstStartScreen(
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE) }
     val defaultOperator by AppConfig.defaultOperator // Récupération de l'opérateur actuel
-    val liveNotifsEnabled by AppConfig.enableLiveNotifications
 
     LaunchedEffect(Unit) {
         AppConfig.localDatabaseState.value = withContext(Dispatchers.IO) {
@@ -258,7 +254,7 @@ fun FirstStartScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .then(if (page == 3) Modifier.colorPaletteFadingEdge(pageScrollState) else Modifier)
+                            .then(if (page == 4) Modifier.colorPaletteFadingEdge(pageScrollState) else Modifier)
                             .verticalScroll(pageScrollState),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -273,12 +269,20 @@ fun FirstStartScreen(
                             )
                             1 -> StepLocationPermissionDesign()
                             2 -> StepNotificationsPermissionDesign()
-                            // ✅ NOUVELLE PAGE INSÉRÉE ICI :
-                            3 -> StepThemeDesign(useOneUi, cardShape, cardBorder, bubbleColor, onSafeClick = safeClick)
-                            // L'ancienne page 3 devient la 4 :
-                            4 -> StepMapDesign(useOneUi, bubbleColor, onSafeClick = safeClick)
-                            5 -> StepDatabaseDesign(useOneUi, cardShape, cardBorder, bubbleColor, onSafeClick = safeClick)
-                            6 -> StepPreferencesDesign(
+                            // ✅ La notif live ne nécessite plus d'opérateur : on la place juste
+                            // après l'étape des notifications.
+                            3 -> StepLiveNotificationsDesign(
+                                shape = cardShape,
+                                border = cardBorder,
+                                bubbleColor = bubbleColor,
+                                useOneUi = useOneUi,
+                                defaultOperator = defaultOperator,
+                                onOpenOperatorSheet = { showOperatorSheet = true }
+                            )
+                            4 -> StepThemeDesign(useOneUi, cardShape, cardBorder, bubbleColor, onSafeClick = safeClick)
+                            5 -> StepMapDesign(useOneUi, bubbleColor, onSafeClick = safeClick)
+                            6 -> StepDatabaseDesign(useOneUi, cardShape, cardBorder, bubbleColor, onSafeClick = safeClick)
+                            7 -> StepPreferencesDesign(
                                 useOneUi = useOneUi,
                                 cardShape = cardShape,
                                 cardBorder = cardBorder,
@@ -286,14 +290,6 @@ fun FirstStartScreen(
                                 onOpenOperatorSheet = { showOperatorSheet = true },
                                 onOpenUnitSheet = { showUnitSheet = true },
                                 onSafeClick = safeClick
-                            )
-                            7 -> StepLiveNotificationsDesign(
-                                shape = cardShape,
-                                border = cardBorder,
-                                bubbleColor = bubbleColor,
-                                useOneUi = useOneUi,
-                                defaultOperator = defaultOperator,
-                                onOpenOperatorSheet = { showOperatorSheet = true }
                             )
                         }
                     }
@@ -357,7 +353,7 @@ fun FirstStartScreen(
                             }
 
                             else -> {
-                                if (currentStep == 5 && AppConfig.localDatabaseState.value == null) {
+                                if (currentStep == 6 && AppConfig.localDatabaseState.value == null) {
                                     coroutineScope.launch {
                                         val dbState = withContext(Dispatchers.IO) {
                                             GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context).state
@@ -435,37 +431,6 @@ fun FirstStartScreen(
             text = {
                 Column {
                     Text(stringResource(R.string.onboarding_warning_no_operator_desc))
-                    if (liveNotifsEnabled) {
-                        Spacer(Modifier.height(8.dp))
-                        val liveWarningLead = stringResource(R.string.onboarding_warning_live_notifications_lead)
-                        val liveWarningLabel = stringResource(R.string.onboarding_warning_live_notifications_label)
-                        val liveWarningMiddle = stringResource(R.string.onboarding_warning_live_notifications_middle)
-                        val liveWarningHighlight = stringResource(R.string.onboarding_warning_live_notifications_highlight)
-                        val liveWarningSuffix = stringResource(R.string.onboarding_warning_live_notifications_suffix)
-                        Text(
-                            buildAnnotatedString {
-                                append(liveWarningLead)
-                                withStyle(
-                                    SpanStyle(
-                                        color = MaterialTheme.colorScheme.error,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                ) {
-                                    append(liveWarningLabel)
-                                }
-                                append(liveWarningMiddle)
-                                withStyle(
-                                    SpanStyle(
-                                        color = MaterialTheme.colorScheme.error,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                ) {
-                                    append(liveWarningHighlight)
-                                }
-                                append(liveWarningSuffix)
-                            }
-                        )
-                    }
                 }
             },
             shape = cardShape,
@@ -474,11 +439,6 @@ fun FirstStartScreen(
                 TextButton(
                     onClick = {
                         showWarningDialog = false
-                        if (liveNotifsEnabled) {
-                            AppConfig.enableLiveNotifications.value = false
-                            prefs.edit().putBoolean("enable_live_notifications", false).apply()
-                            LiveTrackingController.stop(context)
-                        }
                         onFinished() // L'utilisateur force la continuation
                     }
                 ) {
@@ -518,8 +478,14 @@ fun FirstStartScreen(
                         // ✅ NOUVEAU : On désactive le pop-up global pour qu'il n'apparaisse pas sur l'accueil
                         fr.geotower.AppGlobalState.showDbSuccessPopup.value = false
 
-                        // On débloque et on fait glisser la page automatiquement vers l'étape suivante !
-                        goToNextStep()
+                        // On n'avance automatiquement que si l'utilisateur est encore sur l'étape de
+                        // téléchargement (6). Le téléchargement tourne en arrière-plan : s'il se termine
+                        // alors que l'utilisateur a déjà glissé plus loin (ex. dernière étape), appeler
+                        // goToNextStep() finirait l'onboarding et renverrait vers l'accueil sans attendre.
+                        // Dans ce cas on se contente de fermer le pop-up.
+                        if (currentStep == 6) {
+                            goToNextStep()
+                        }
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                 ) {
@@ -858,16 +824,6 @@ fun StepLiveNotificationsDesign(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        if (!hasOperator) {
-            Spacer(Modifier.height(12.dp))
-            Text(
-                text = stringResource(R.string.onboarding_live_notifications_requires_operator),
-                textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.error
-            )
-        }
-
         Spacer(Modifier.height(24.dp))
 
         Column(
@@ -898,41 +854,34 @@ fun StepLiveNotificationsDesign(
             desc = if (hasOperator) {
                 stringResource(R.string.onboarding_live_notifications_selected_operator, defaultOperator)
             } else {
-                stringResource(R.string.onboarding_live_notifications_requires_operator)
+                stringResource(R.string.onboarding_live_notifications_nearest_mode)
             },
             checked = liveNotifsEnabled,
             onCheckedChange = { isChecked ->
                 if (isChecked) {
                     val eligibility = LiveTrackingController.eligibility(context)
 
-                    if (eligibility == LiveTrackingController.StartResult.MissingOperator) {
+                    if (
+                        eligibility == LiveTrackingController.StartResult.MissingNotifications &&
+                        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
+                    ) {
+                        (context as? android.app.Activity)?.requestPermissions(
+                            arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                            1004
+                        )
+                    }
+
+                    if (eligibility == LiveTrackingController.StartResult.Started) {
                         AppConfig.enableLiveNotifications.value = true
                         prefs.edit().putBoolean("enable_live_notifications", true).apply()
-                        LiveTrackingController.stop(context)
-                        onOpenOperatorSheet()
+                        if (LiveTrackingController.shouldOpenPromotedNotificationSettings(context)) {
+                            LiveTrackingController.openPromotedNotificationSettings(context)
+                        }
+                        LiveTrackingController.startIfEligible(context)
                     } else {
-                        if (
-                            eligibility == LiveTrackingController.StartResult.MissingNotifications &&
-                            android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
-                        ) {
-                            (context as? android.app.Activity)?.requestPermissions(
-                                arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
-                                1004
-                            )
-                        }
-
-                        if (eligibility == LiveTrackingController.StartResult.Started) {
-                            AppConfig.enableLiveNotifications.value = true
-                            prefs.edit().putBoolean("enable_live_notifications", true).apply()
-                            if (LiveTrackingController.shouldOpenPromotedNotificationSettings(context)) {
-                                LiveTrackingController.openPromotedNotificationSettings(context)
-                            }
-                            LiveTrackingController.startIfEligible(context)
-                        } else {
-                            AppConfig.enableLiveNotifications.value = false
-                            prefs.edit().putBoolean("enable_live_notifications", false).apply()
-                            LiveTrackingController.stop(context)
-                        }
+                        AppConfig.enableLiveNotifications.value = false
+                        prefs.edit().putBoolean("enable_live_notifications", false).apply()
+                        LiveTrackingController.stop(context)
                     }
                 } else {
                     AppConfig.enableLiveNotifications.value = false
