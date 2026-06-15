@@ -421,9 +421,9 @@
     <string name="appstrings_elevation_profile_distance">Distancia</string>
     <string name="appstrings_elevation_profile_error">No se puede cargar el perfil altimétrico.</string>
     <string name="appstrings_elevation_profile_frequency">Frecuencia</string>
-    <string name="appstrings_elevation_profile_fresnel_blocked">60%% Fresnel obstruido</string>
-    <string name="appstrings_elevation_profile_fresnel_clear">60%% Fresnel despejado</string>
-    <string name="appstrings_elevation_profile_fresnel_explanation">La zona de Fresnel es el volumen alrededor del trayecto radio. Para un enlace más fiable, normalmente se mantiene libre al menos el 60%% de esta zona, por lo que el relieve puede afectar a la señal aunque no corte exactamente el trayecto directo.</string>
+    <string name="appstrings_elevation_profile_fresnel_blocked" formatted="false">60% Fresnel obstruido</string>
+    <string name="appstrings_elevation_profile_fresnel_clear" formatted="false">60% Fresnel despejado</string>
+    <string name="appstrings_elevation_profile_fresnel_explanation" formatted="false">La zona de Fresnel es el volumen alrededor del trayecto radio. Para un enlace más fiable, normalmente se mantiene libre al menos el 60% de esta zona, por lo que el relieve puede afectar a la señal aunque no corte exactamente el trayecto directo.</string>
     <string name="appstrings_elevation_profile_fresnel_label">Zona de Fresnel</string>
     <string name="appstrings_elevation_profile_ign_source">Fuente: IGN Geoplataforma - RGE ALTI</string>
     <string name="appstrings_elevation_profile_line_blocked">El terreno puede cortar el trayecto directo</string>

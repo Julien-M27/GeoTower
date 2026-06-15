@@ -421,9 +421,9 @@
     <string name="appstrings_elevation_profile_distance">Entfernung</string>
     <string name="appstrings_elevation_profile_error">Höhenprofil kann nicht geladen werden.</string>
     <string name="appstrings_elevation_profile_frequency">Frequenz</string>
-    <string name="appstrings_elevation_profile_fresnel_blocked">60%% Fresnel verdeckt</string>
-    <string name="appstrings_elevation_profile_fresnel_clear">60%% Fresnel frei</string>
-    <string name="appstrings_elevation_profile_fresnel_explanation">Die Fresnel-Zone ist das Volumen um den Funkpfad. Für eine zuverlässigere Verbindung bleiben normalerweise mindestens 60%% dieser Zone frei, daher kann Gelände das Signal beeinflussen, selbst wenn es den direkten Pfad nicht exakt schneidet.</string>
+    <string name="appstrings_elevation_profile_fresnel_blocked" formatted="false">60% Fresnel verdeckt</string>
+    <string name="appstrings_elevation_profile_fresnel_clear" formatted="false">60% Fresnel frei</string>
+    <string name="appstrings_elevation_profile_fresnel_explanation" formatted="false">Die Fresnel-Zone ist das Volumen um den Funkpfad. Für eine zuverlässigere Verbindung bleiben normalerweise mindestens 60% dieser Zone frei, daher kann Gelände das Signal beeinflussen, selbst wenn es den direkten Pfad nicht exakt schneidet.</string>
     <string name="appstrings_elevation_profile_fresnel_label">Fresnelzone</string>
     <string name="appstrings_elevation_profile_ign_source">Quelle: IGN Geoplattform - RGE ALTI</string>
     <string name="appstrings_elevation_profile_line_blocked">Das Gelände kann den direkten Pfad schneiden</string>

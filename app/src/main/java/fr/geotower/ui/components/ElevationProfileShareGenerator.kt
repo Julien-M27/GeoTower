@@ -265,23 +265,6 @@ private fun drawElevationProfileOperatorBanner(
 
     drawRoundedCard(canvas, rect, colors.card)
 
-    val clipPath = Path().apply {
-        addRoundRect(rect, 30f, 30f, Path.Direction.CW)
-    }
-    canvas.save()
-    canvas.clipPath(clipPath)
-    canvas.drawRect(
-        rect.left,
-        rect.top,
-        rect.left + 14f,
-        rect.bottom,
-        Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = operatorColor
-            style = Paint.Style.FILL
-        }
-    )
-    canvas.restore()
-
     val logoOuterRect = RectF(rect.left + 42f, rect.top + 28f, rect.left + 142f, rect.top + 128f)
     val logoBitmap = drawableBitmap(context, OperatorLogos.drawableRes(operatorName))
     if (logoBitmap != null) {

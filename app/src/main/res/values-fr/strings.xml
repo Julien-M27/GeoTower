@@ -421,9 +421,9 @@
     <string name="appstrings_elevation_profile_distance">Distance</string>
     <string name="appstrings_elevation_profile_error">Impossible de charger le profil altimétrique.</string>
     <string name="appstrings_elevation_profile_frequency">Fréquence</string>
-    <string name="appstrings_elevation_profile_fresnel_blocked">Fresnel 60 %% obstrué</string>
-    <string name="appstrings_elevation_profile_fresnel_clear">Fresnel 60 %% dégagé</string>
-    <string name="appstrings_elevation_profile_fresnel_explanation">La zone de Fresnel est le volume autour du trajet radio. Pour une liaison plus fiable, on cherche généralement à garder au moins 60 %% de cette zone sans obstacle : un relief peut donc gêner le signal même s\'il ne coupe pas exactement le trajet direct.</string>
+    <string name="appstrings_elevation_profile_fresnel_blocked" formatted="false">Fresnel 60 % obstrué</string>
+    <string name="appstrings_elevation_profile_fresnel_clear" formatted="false">Fresnel 60 % dégagé</string>
+    <string name="appstrings_elevation_profile_fresnel_explanation" formatted="false">La zone de Fresnel est le volume autour du trajet radio. Pour une liaison plus fiable, on cherche généralement à garder au moins 60 % de cette zone sans obstacle : un relief peut donc gêner le signal même s\'il ne coupe pas exactement le trajet direct.</string>
     <string name="appstrings_elevation_profile_fresnel_label">Zone de Fresnel</string>
     <string name="appstrings_elevation_profile_ign_source">Source : IGN Géoplateforme - RGE ALTI</string>
     <string name="appstrings_elevation_profile_line_blocked">Le relief coupe potentiellement le trajet direct</string>

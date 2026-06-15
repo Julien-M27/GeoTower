@@ -421,9 +421,9 @@
     <string name="appstrings_elevation_profile_distance">Distance</string>
     <string name="appstrings_elevation_profile_error">Unable to load elevation profile.</string>
     <string name="appstrings_elevation_profile_frequency">Frequency</string>
-    <string name="appstrings_elevation_profile_fresnel_blocked">60%% Fresnel obstructed</string>
-    <string name="appstrings_elevation_profile_fresnel_clear">60%% Fresnel clear</string>
-    <string name="appstrings_elevation_profile_fresnel_explanation">The Fresnel zone is the volume around the radio path. For a more reliable link, at least 60%% of this zone is usually kept clear, so terrain can affect the signal even if it does not exactly cut the direct path.</string>
+    <string name="appstrings_elevation_profile_fresnel_blocked" formatted="false">60% Fresnel obstructed</string>
+    <string name="appstrings_elevation_profile_fresnel_clear" formatted="false">60% Fresnel clear</string>
+    <string name="appstrings_elevation_profile_fresnel_explanation" formatted="false">The Fresnel zone is the volume around the radio path. For a more reliable link, at least 60% of this zone is usually kept clear, so terrain can affect the signal even if it does not exactly cut the direct path.</string>
     <string name="appstrings_elevation_profile_fresnel_label">Fresnel zone</string>
     <string name="appstrings_elevation_profile_ign_source">Source: IGN Geoplatform - RGE ALTI</string>
     <string name="appstrings_elevation_profile_line_blocked">Terrain may cut the direct path</string>
