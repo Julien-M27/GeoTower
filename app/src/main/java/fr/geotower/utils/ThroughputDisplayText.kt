@@ -40,13 +40,7 @@ object ThroughputTextKey {
 
 object ThroughputDisplayText {
     @Composable
-    fun headerSite(siteId: String, supportHeightLabel: String?): String {
-        return if (supportHeightLabel.isNullOrBlank()) {
-            stringResource(R.string.throughput_header_site, siteId)
-        } else {
-            stringResource(R.string.throughput_header_site_support, siteId, supportHeightLabel)
-        }
-    }
+    fun headerSite(siteId: String): String = stringResource(R.string.throughput_header_site, siteId)
 
     @Composable fun includedBandsCount(included: Int, total: Int) = stringResource(R.string.throughput_included_bands_count, included, total)
     @Composable fun mainZoneEstimated(near: String, far: String) = stringResource(R.string.throughput_main_zone_estimated, near, far)

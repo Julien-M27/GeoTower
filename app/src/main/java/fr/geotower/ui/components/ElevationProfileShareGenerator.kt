@@ -1,5 +1,6 @@
 package fr.geotower.ui.components
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color as AndroidColor
@@ -8,6 +9,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
+import androidx.core.content.ContextCompat
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.ui.screens.emitters.ELEVATION_USER_EYE_HEIGHT_METERS
 import fr.geotower.ui.screens.emitters.ElevationProfileDataResult
@@ -16,6 +18,9 @@ import fr.geotower.ui.screens.emitters.calculateElevationLineObstruction
 import fr.geotower.ui.screens.emitters.elevationFresnelClearanceMeters
 import fr.geotower.ui.screens.emitters.elevationLineHeightAt
 import fr.geotower.ui.screens.emitters.formatElevationProfileDistance
+import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.OperatorLogos
+import fr.geotower.utils.formatTechnologies
 import fr.geotower.utils.radioFrequencyLabel
 import java.util.Locale
 import kotlin.math.floor
@@ -51,15 +56,17 @@ private data class ProfileMetric(
 )
 
 fun createElevationProfileShareBitmap(
+    context: Context,
     info: LocalisationEntity,
     profile: ElevationProfileDataResult,
     supportHeightMeters: Double?,
     frequencyMHz: Int,
     forceDarkTheme: Boolean,
-    texts: ElevationProfileShareTexts
+    texts: ElevationProfileShareTexts,
+    operatorTechnologies: String? = null
 ): Bitmap {
     val width = 1080
-    val height = 2300
+    val height = 2460
     val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
     val canvas = Canvas(bitmap)
 
@@ -101,10 +108,20 @@ fun createElevationProfileShareBitmap(
 
     var y = 64f
     canvas.drawText(texts.title, 48f, y, titlePaint)
-    y += 42f
-    canvas.drawText("${info.operateur ?: texts.unknown} - ${info.idAnfr}", 48f, y, subtitlePaint)
+    y += 36f
 
-    val chartRect = RectF(48f, 150f, width - 48f, 720f)
+    val bannerRect = RectF(48f, y + 22f, width - 48f, y + 178f)
+    drawElevationProfileOperatorBanner(
+        canvas = canvas,
+        context = context,
+        rect = bannerRect,
+        info = info,
+        operatorTechnologies = operatorTechnologies,
+        colors = colors,
+        unknownText = texts.unknown
+    )
+
+    val chartRect = RectF(48f, bannerRect.bottom + 34f, width - 48f, bannerRect.bottom + 604f)
     drawRoundedCard(canvas, chartRect, colors.card)
     drawElevationProfileChart(
         canvas = canvas,
@@ -115,7 +132,7 @@ fun createElevationProfileShareBitmap(
         colors = colors
     )
 
-    y = 780f
+    y = chartRect.bottom + 60f
     val metricCardHeight = 170f
     val metricGap = 20f
     val metricWidth = (width - 96f - metricGap) / 2f
@@ -233,6 +250,76 @@ fun createElevationProfileShareBitmap(
     return bitmap
 }
 
+private fun drawElevationProfileOperatorBanner(
+    canvas: Canvas,
+    context: Context,
+    rect: RectF,
+    info: LocalisationEntity,
+    operatorTechnologies: String?,
+    colors: ShareProfileColors,
+    unknownText: String
+) {
+    val operatorName = info.operateur?.trim()?.takeIf { it.isNotEmpty() } ?: unknownText
+    val operatorColor = OperatorColors.colorInt(operatorName, fallback = AndroidColor.GRAY)
+    val technologies = formatTechnologies(operatorTechnologies ?: info.frequences, unknownText)
+
+    drawRoundedCard(canvas, rect, colors.card)
+
+    val clipPath = Path().apply {
+        addRoundRect(rect, 30f, 30f, Path.Direction.CW)
+    }
+    canvas.save()
+    canvas.clipPath(clipPath)
+    canvas.drawRect(
+        rect.left,
+        rect.top,
+        rect.left + 14f,
+        rect.bottom,
+        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = operatorColor
+            style = Paint.Style.FILL
+        }
+    )
+    canvas.restore()
+
+    val logoOuterRect = RectF(rect.left + 42f, rect.top + 28f, rect.left + 142f, rect.top + 128f)
+    val logoBitmap = drawableBitmap(context, OperatorLogos.drawableRes(operatorName))
+    if (logoBitmap != null) {
+        drawRoundedCard(canvas, logoOuterRect, AndroidColor.WHITE)
+        val logoInset = 8f
+        canvas.drawBitmap(
+            logoBitmap,
+            null,
+            RectF(
+                logoOuterRect.left + logoInset,
+                logoOuterRect.top + logoInset,
+                logoOuterRect.right - logoInset,
+                logoOuterRect.bottom - logoInset
+            ),
+            null
+        )
+    } else {
+        drawRoundedCard(canvas, logoOuterRect, operatorColor)
+        val initialPaint = textPaint(AndroidColor.WHITE, 46f, Typeface.BOLD).apply {
+            textAlign = Paint.Align.CENTER
+        }
+        val initial = operatorName.take(1).uppercase(Locale.ROOT).ifBlank { "?" }
+        val centerY = logoOuterRect.centerY() - (initialPaint.descent() + initialPaint.ascent()) / 2f
+        canvas.drawText(initial, logoOuterRect.centerX(), centerY, initialPaint)
+    }
+
+    val textLeft = logoOuterRect.right + 28f
+    val textRight = rect.right - 30f
+    val maxTextWidth = textRight - textLeft
+    val operatorPaint = textPaint(colors.text, 40f, Typeface.BOLD)
+    val techPaint = textPaint(colors.secondaryText, 26f, Typeface.NORMAL)
+    val anfrPaint = textPaint(operatorColor, 24f, Typeface.BOLD)
+
+    drawSingleLineText(canvas, operatorName, textLeft, rect.top + 60f, maxTextWidth, operatorPaint)
+    drawSingleLineText(canvas, technologies, textLeft, rect.top + 98f, maxTextWidth, techPaint)
+    drawSingleLineText(canvas, "ANFR ${info.idAnfr}", textLeft, rect.top + 130f, maxTextWidth, anfrPaint)
+}
+
 private fun drawElevationProfileChart(
     canvas: Canvas,
     rect: RectF,
@@ -344,6 +431,17 @@ private fun drawElevationProfileChart(
     canvas.drawLine(x(0f), y(startLineHeight), x(totalDistance), y(endLineHeight), signalPaint)
 }
 
+private fun drawableBitmap(context: Context, drawableRes: Int?): Bitmap? {
+    val drawable = drawableRes?.let { ContextCompat.getDrawable(context, it) } ?: return null
+    val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 128
+    val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 128
+    val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+    val canvas = Canvas(bitmap)
+    drawable.setBounds(0, 0, canvas.width, canvas.height)
+    drawable.draw(canvas)
+    return bitmap
+}
+
 private fun drawRoundedCard(canvas: Canvas, rect: RectF, color: Int) {
     val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         this.color = color
@@ -358,6 +456,28 @@ private fun textPaint(color: Int, size: Float, typefaceStyle: Int): Paint {
         textSize = size
         typeface = Typeface.create(Typeface.DEFAULT, typefaceStyle)
     }
+}
+
+private fun drawSingleLineText(
+    canvas: Canvas,
+    text: String,
+    x: Float,
+    y: Float,
+    maxWidth: Float,
+    paint: Paint
+) {
+    val cleanText = text.trim()
+    if (paint.measureText(cleanText) <= maxWidth) {
+        canvas.drawText(cleanText, x, y, paint)
+        return
+    }
+
+    val ellipsis = "..."
+    var truncated = cleanText
+    while (truncated.isNotEmpty() && paint.measureText(truncated + ellipsis) > maxWidth) {
+        truncated = truncated.dropLast(1).trimEnd()
+    }
+    canvas.drawText(if (truncated.isBlank()) ellipsis else truncated + ellipsis, x, y, paint)
 }
 
 private fun drawWrappedText(

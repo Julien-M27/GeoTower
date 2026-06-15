@@ -390,3 +390,26 @@ object WidgetPrefs {
         return prefs.getInt(SYNC_FREQUENCY_MINUTES, DEFAULT_SYNC_MINUTES).coerceAtLeast(MIN_SYNC_MINUTES)
     }
 }
+
+object LiveTrackingPrefs {
+    const val LOCATION_UPDATE_INTERVAL_SECONDS = "live_tracking_location_update_interval_seconds"
+    const val DEFAULT_LOCATION_UPDATE_INTERVAL_SECONDS = 5
+    val LOCATION_UPDATE_INTERVAL_OPTIONS_SECONDS = listOf(5, 10, 15, 20)
+
+    fun locationUpdateIntervalSeconds(prefs: SharedPreferences): Int {
+        val rawValue = try {
+            prefs.getInt(LOCATION_UPDATE_INTERVAL_SECONDS, DEFAULT_LOCATION_UPDATE_INTERVAL_SECONDS)
+        } catch (_: ClassCastException) {
+            DEFAULT_LOCATION_UPDATE_INTERVAL_SECONDS
+        }
+        return normalizeLocationUpdateIntervalSeconds(rawValue)
+    }
+
+    fun normalizeLocationUpdateIntervalSeconds(value: Int): Int {
+        return if (value in LOCATION_UPDATE_INTERVAL_OPTIONS_SECONDS) {
+            value
+        } else {
+            DEFAULT_LOCATION_UPDATE_INTERVAL_SECONDS
+        }
+    }
+}

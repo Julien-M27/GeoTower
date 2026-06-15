@@ -71,6 +71,21 @@ object LiveTrackingController {
         }
     }
 
+    fun refreshLocationSettings(context: Context) {
+        if (!LiveTrackingService.isRunning) return
+        val appContext = context.applicationContext
+        val serviceIntent = Intent(appContext, LiveTrackingService::class.java).apply {
+            action = LiveTrackingService.ACTION_REFRESH_LOCATION_SETTINGS
+        }
+        try {
+            appContext.startService(serviceIntent)
+        } catch (e: SecurityException) {
+            AppLogger.w(TAG, "Live tracking location settings refresh blocked by permissions", e)
+        } catch (e: IllegalStateException) {
+            AppLogger.w(TAG, "Live tracking location settings refresh blocked by app state", e)
+        }
+    }
+
     fun eligibility(context: Context): StartResult {
         // Plus d'exigence d'opérateur : sans opérateur choisi, le suivi se rabat sur
         // l'antenne la plus proche (tous opérateurs). On garde StartResult.MissingOperator

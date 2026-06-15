@@ -78,6 +78,7 @@ import fr.geotower.data.api.SqSpeedtestData
 import fr.geotower.data.api.filterBySignalQuestPlmn
 import fr.geotower.data.api.sortedBySignalQuestMetric
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.GeoTowerPullToRefreshBox
 import fr.geotower.ui.components.geoTowerLazyListFadingEdge
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
@@ -222,6 +223,9 @@ fun SiteSpeedtestsScreen(
     var isInitialLoading by remember(cleanSiteId, cleanAnfrCode, cleanOperator, cleanMarket, mcc, mnc) {
         mutableStateOf(true)
     }
+    var isRefreshing by remember(cleanSiteId, cleanAnfrCode, cleanOperator, cleanMarket, mcc, mnc) {
+        mutableStateOf(false)
+    }
     var isLoadingMore by remember(cleanSiteId, cleanAnfrCode, cleanOperator, cleanMarket, mcc, mnc) {
         mutableStateOf(false)
     }
@@ -231,20 +235,27 @@ fun SiteSpeedtestsScreen(
     var reloadNonce by remember { mutableIntStateOf(0) }
     val listState = rememberLazyListState()
 
-    suspend fun loadSpeedtests(reset: Boolean) {
+    suspend fun loadSpeedtests(reset: Boolean, keepPreviousItems: Boolean = false) {
         if (cleanSiteId == null && cleanAnfrCode == null) {
             errorMessage = speedtestsErrorMessage
             isInitialLoading = false
+            isRefreshing = false
             isLoadingMore = false
             return
         }
 
         if (reset) {
-            isInitialLoading = true
-            speedtests = emptyList()
-            totalCount = null
-            nextOffset = 0
-            lastRawPageSize = 0
+            if (keepPreviousItems) {
+                isRefreshing = true
+            } else {
+                isInitialLoading = true
+                speedtests = emptyList()
+            }
+            if (!keepPreviousItems) {
+                totalCount = null
+                nextOffset = 0
+                lastRawPageSize = 0
+            }
         } else {
             isLoadingMore = true
         }
@@ -291,6 +302,7 @@ fun SiteSpeedtestsScreen(
             errorMessage = speedtestsErrorMessage
         } finally {
             isInitialLoading = false
+            isRefreshing = false
             isLoadingMore = false
         }
     }
@@ -332,17 +344,30 @@ fun SiteSpeedtestsScreen(
             )
         }
     ) { paddingValues ->
-        LazyColumn(
-            state = listState,
+        GeoTowerPullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                if (!isRefreshing && !isInitialLoading) {
+                    scope.launch {
+                        loadSpeedtests(reset = true, keepPreviousItems = true)
+                    }
+                }
+            },
+            enabled = !isInitialLoading && !isLoadingMore,
             modifier = Modifier
                 .fillMaxSize()
                 .background(mainBgColor)
                 .padding(paddingValues)
-                .navigationBarsPadding()
-                .geoTowerLazyListFadingEdge(listState),
-            contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .navigationBarsPadding()
+                    .geoTowerLazyListFadingEdge(listState),
+                contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 24.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
             item {
                 SiteSpeedtestsBanner(
                     operator = cleanOperator,
@@ -451,6 +476,7 @@ fun SiteSpeedtestsScreen(
                 }
             }
         }
+    }
     }
 
     if (showSettingsSheet) {

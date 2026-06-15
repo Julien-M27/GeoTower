@@ -37,10 +37,7 @@ import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.radio.MobileOperator
 import fr.geotower.radio.RadioThroughputEngine
-import fr.geotower.radio.RatAssumptions
-import fr.geotower.radio.ThroughputProfile
 import fr.geotower.radio.ThroughputProfiles
-import java.util.Locale
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
 import fr.geotower.utils.FreqBand
@@ -66,17 +63,6 @@ fun ShareThroughputCalculatorBlock(
     val parsedBands = remember(rawFrequencies, txtUnknown, txtAzimuthNotSpecified) {
         parseAndSortFrequencies(rawFrequencies, txtUnknown, txtAzimuthNotSpecified)
     }
-    val preset = remember(prefs) {
-        shareThroughputPresetFromPreference(prefs.getString(ThroughputPrefs.DEFAULT_PRESET, ThroughputPrefs.DEFAULT_PRESET_VALUE))
-    }
-    val customSettings = remember(prefs) {
-        ShareCustomModulationSettings(
-            lteDownIndex = prefs.getInt(ThroughputPrefs.CUSTOM_LTE_DOWN, 3).coerceIn(0, shareLteDownModulationOptions.lastIndex),
-            lteUpIndex = prefs.getInt(ThroughputPrefs.CUSTOM_LTE_UP, 2).coerceIn(0, shareLteUpModulationOptions.lastIndex),
-            nrDownIndex = prefs.getInt(ThroughputPrefs.CUSTOM_NR_DOWN, 3).coerceIn(0, shareNrDownModulationOptions.lastIndex),
-            nrUpIndex = prefs.getInt(ThroughputPrefs.CUSTOM_NR_UP, 2).coerceIn(0, shareNrUpModulationOptions.lastIndex)
-        )
-    }
     val include4G = remember(prefs) { ThroughputPrefs.include4G.read(prefs) }
     val include5G = remember(prefs) { ThroughputPrefs.include5G.read(prefs) }
     val includePlanned = remember(prefs) { ThroughputPrefs.includePlanned.read(prefs) }
@@ -89,8 +75,6 @@ fun ShareThroughputCalculatorBlock(
     val result = remember(
         parsedBands,
         info.operateur,
-        preset,
-        customSettings,
         include4G,
         include5G,
         includePlanned,
@@ -100,8 +84,6 @@ fun ShareThroughputCalculatorBlock(
         calculateShareThroughput(
             bands = parsedBands,
             operatorName = info.operateur,
-            preset = preset,
-            customSettings = customSettings,
             include4G = include4G,
             include5G = include5G,
             includePlanned = includePlanned,
@@ -173,11 +155,7 @@ fun ShareThroughputCalculatorBlock(
 
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
             Text(
-                text = ThroughputDisplayText.shareBandsSummary(
-                    shareThroughputPresetLabel(preset),
-                    result.includedBands.size,
-                    result.bands.size
-                ),
+                text = ThroughputDisplayText.includedBandsCount(result.includedBands.size, result.bands.size),
                 fontSize = 12.sp,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -266,8 +244,6 @@ private fun ShareThroughputBandLine(band: ShareThroughputBandResult) {
 private fun calculateShareThroughput(
     bands: List<FreqBand>,
     operatorName: String?,
-    preset: ShareThroughputPreset,
-    customSettings: ShareCustomModulationSettings,
     include4G: Boolean,
     include5G: Boolean,
     includePlanned: Boolean,
@@ -275,7 +251,7 @@ private fun calculateShareThroughput(
     supportHeightMeters: Double?
 ): ShareThroughputResult {
     val operator = MobileOperator.fromLabel(operatorName)
-    val engineProfile = shareEngineProfileFor(preset, customSettings)
+    val engineProfile = ThroughputProfiles.prudent
     val engineResult = if (operator != null) {
         val systems = buildThroughputRadioSystems(bands, operator, supportHeightMeters)
         RadioThroughputEngine.estimate(systems, engineProfile)
@@ -327,99 +303,6 @@ private fun calculateShareThroughput(
 
     return ShareThroughputResult(bands = calculatedBands)
 }
-
-private fun shareThroughputPresetFromPreference(raw: String?): ShareThroughputPreset {
-    return when (raw?.lowercase(Locale.ROOT)) {
-        "conservative", "prudent" -> ShareThroughputPreset.Conservative
-        "ideal", "maximum" -> ShareThroughputPreset.Maximum
-        "custom" -> ShareThroughputPreset.Custom
-        else -> ShareThroughputPreset.Standard
-    }
-}
-
-@Composable
-private fun shareThroughputPresetLabel(preset: ShareThroughputPreset): String {
-    return when (preset) {
-        ShareThroughputPreset.Conservative -> ThroughputDisplayText.presetLabel("conservative")
-        ShareThroughputPreset.Standard -> ThroughputDisplayText.presetLabel("standard")
-        ShareThroughputPreset.Maximum -> ThroughputDisplayText.presetLabel("ideal")
-        ShareThroughputPreset.Custom -> ThroughputDisplayText.presetLabel("custom")
-    }
-}
-
-private fun shareEngineProfileFor(
-    preset: ShareThroughputPreset,
-    customSettings: ShareCustomModulationSettings
-): ThroughputProfile {
-    return when (preset) {
-        ShareThroughputPreset.Conservative -> ThroughputProfiles.prudent
-        ShareThroughputPreset.Standard -> ThroughputProfiles.standard
-        ShareThroughputPreset.Maximum -> ThroughputProfiles.ideal
-        ShareThroughputPreset.Custom -> shareCustomProfile(customSettings)
-    }
-}
-
-private fun shareCustomProfile(customSettings: ShareCustomModulationSettings): ThroughputProfile {
-    val lteDown = shareLteDownModulationOptions[customSettings.lteDownIndex.coerceIn(0, shareLteDownModulationOptions.lastIndex)]
-    val lteUp = shareLteUpModulationOptions[customSettings.lteUpIndex.coerceIn(0, shareLteUpModulationOptions.lastIndex)]
-    val nrDown = shareNrDownModulationOptions[customSettings.nrDownIndex.coerceIn(0, shareNrDownModulationOptions.lastIndex)]
-    val nrUp = shareNrUpModulationOptions[customSettings.nrUpIndex.coerceIn(0, shareNrUpModulationOptions.lastIndex)]
-
-    return ThroughputProfile(
-        id = "CUSTOM",
-        label = ThroughputTextKey.THROUGHPUT_PROFILE_CUSTOM_LABEL,
-        description = ThroughputTextKey.THROUGHPUT_PROFILE_CUSTOM_SHORT_DESC,
-        lte = RatAssumptions(
-            dlModulationOrder = lteDown.modulationOrder,
-            ulModulationOrder = lteUp.modulationOrder,
-            dlMimoLayers = 2,
-            ulMimoLayers = 1,
-            maxCaComponents = 5
-        ),
-        nr = RatAssumptions(
-            dlModulationOrder = nrDown.modulationOrder,
-            ulModulationOrder = nrUp.modulationOrder,
-            dlMimoLayers = 4,
-            ulMimoLayers = 2,
-            maxCaComponents = 1,
-            scsKHz = 30,
-            tddDlRatio = 0.70,
-            tddUlRatio = 0.20,
-            overheadDl = 0.14,
-            overheadUl = 0.08
-        )
-    )
-}
-
-private enum class ShareThroughputPreset {
-    Conservative,
-    Standard,
-    Maximum,
-    Custom
-}
-
-private data class ShareCustomModulationSettings(
-    val lteDownIndex: Int = 3,
-    val lteUpIndex: Int = 2,
-    val nrDownIndex: Int = 3,
-    val nrUpIndex: Int = 2
-)
-
-private data class ShareModulationOption(
-    val label: String,
-    val modulationOrder: Int
-)
-
-private val shareLteDownModulationOptions = listOf(
-    ShareModulationOption("QPSK", 2),
-    ShareModulationOption("16-QAM", 4),
-    ShareModulationOption("64-QAM", 6),
-    ShareModulationOption("256-QAM", 8)
-)
-
-private val shareLteUpModulationOptions = shareLteDownModulationOptions
-private val shareNrDownModulationOptions = shareLteDownModulationOptions
-private val shareNrUpModulationOptions = shareLteDownModulationOptions
 
 private data class ShareThroughputResult(
     val bands: List<ShareThroughputBandResult>

@@ -523,6 +523,8 @@
     <string name="appstrings_live_notification_desc_nearest">Acompanhe a antena mais próxima em tempo real, seja qual for o operador.</string>
     <string name="appstrings_live_notification_requires_op">Requer a escolha de uma operadora padrão</string>
     <string name="appstrings_live_notification_title">Notificação au vivo</string>
+    <string name="appstrings_live_location_refresh_title">Atualização GPS em direto</string>
+    <string name="appstrings_live_location_refresh_footer">Um intervalo mais curto torna o acompanhamento mais responsivo, mas pode consumir mais bateria.</string>
     <string name="appstrings_load_more_sites">Carregar mais sites</string>
     <string name="appstrings_loading_app">A carregar...</string>
     <string name="appstrings_loading_frequencies">A carregar frequências...</string>
@@ -773,6 +775,9 @@
     <string name="appstrings_release_section_navigation_loading">Navegação e carregamento</string>
     <string name="appstrings_release_section_nearby">Proximidade</string>
     <string name="appstrings_release_section_statistics_data">Estatísticas e dados</string>
+    <string name="appstrings_release_section_image_sharing">Partilha de imagens</string>
+    <string name="appstrings_release_section_refresh">Atualização</string>
+    <string name="appstrings_release_section_throughput_calculator">Cálculo de débito</string>
     <string name="appstrings_release_section_database">Base de dados</string>
     <string name="appstrings_release_section_live_tracking">Seguimento em direto</string>
     <string name="appstrings_release_section_statistics">Estatísticas</string>
@@ -1360,7 +1365,7 @@
     <string name="anfr_owner_etat_ministere">Estado / Ministério</string>
     <string name="anfr_owner_aviation_civile">Aviação Civil</string>
     <string name="throughput_header_site">Site %1$s</string>
-    <string name="throughput_header_site_support">Site %1$s - suporte %2$s</string>
+    <string name="throughput_header_site_support">Site %1$s - Suporte %2$s</string>
     <string name="throughput_included_bands_count">%1$d banda(s) incluída(s) de %2$d</string>
     <string name="throughput_main_zone_estimated">Zona principal estimada: %1$s a %2$s</string>
     <string name="throughput_estimated_cone">Cone estimado: %1$s (%2$s-%3$s)</string>
@@ -1474,7 +1479,7 @@
     <string name="help_topic_subtitle_support">Tudo sobre o poste, telhado, operadoras e sites associados.</string>
     <string name="help_topic_subtitle_site">Frequências, azimutes, altura, estado, fotos, ligações, partilha e ferramentas avançadas.</string>
     <string name="help_topic_subtitle_elevation">Relevo, linha de vista, zona de Fresnel, recálculo e limites de rede.</string>
-    <string name="help_topic_subtitle_throughput">Modos prudente/ideal/personalizado, bandas, modulações, MIMO e distância ideal.</string>
+    <string name="help_topic_subtitle_throughput">Bandas, frequências, MIMO, upload do telemóvel e distância ideal.</string>
     <string name="help_topic_subtitle_photos">Carrossel, ecrã inteiro, envio SignalQuest, descrições e operadora alvo.</string>
     <string name="help_topic_subtitle_share">Opções de imagem, suporte, frequências, datas, speedtest, débito e perfil altimétrico.</string>
     <string name="help_topic_subtitle_settings">Aparência, One UI, unidades, ecrã dividido, personalização, base, mapas offline e notificações.</string>
@@ -1532,8 +1537,8 @@
     <string name="help_section_body_site_info">A ficha de site descreve a instalação de uma operadora: faixa da operadora, suporte, altura, azimutes, frequências, tecnologias, estado de ativação e ligações externas.</string>
     <string name="help_section_body_site_tools">Os botões de ação abrem ferramentas ligadas ao site. Alguns blocos podem ser ocultados ou movidos na personalização da página de site.</string>
     <string name="help_section_body_elevation_use">O perfil altimétrico compara a tua posição atual com o site selecionado. Ajuda a estimar se o relevo pode prejudicar o sinal. O cálculo depende da posição GPS e de dados de altitude online.</string>
-    <string name="help_section_body_throughput_assumptions">O cálculo dá um débito teórico. O modo prudente reduz expectativas, o modo ideal mostra um cenário favorável e o modo personalizado permite ajustar bandas, tecnologias e modulações. O upload considera que um telefone transmite com muito menos potência do que uma antena.</string>
-    <string name="help_section_body_throughput_controls">Os botões 4G, 5G e projetos escolhem as tecnologias consideradas. As caixas de bandas selecionam frequências. Os sliders de modulação escolhem QPSK, 16 QAM, 64 QAM ou 256 QAM conforme o nível rádio previsto.</string>
+    <string name="help_section_body_throughput_assumptions">O cálculo dá um débito teórico a partir das frequências declaradas, das alocações do operador e de hipóteses rádio realistas. Podes ativar ou desativar 4G, 5G, bandas planeadas e frequências individuais. O upload considera que um telefone transmite com muito menos potência do que uma antena.</string>
+    <string name="help_section_body_throughput_controls">Os botões 4G, 5G e bandas planeadas escolhem as tecnologias incluídas. As caixas de bandas selecionam frequências. O cartão mostra depois o débito estimado por banda e a distância ideal quando os dados o permitem.</string>
     <string name="help_section_body_photos_view">O carrossel mostra as fotos comunitárias disponíveis. Em ecrã inteiro, os controlos permitem fechar, mudar de foto e inspecionar a imagem com mais conforto.</string>
     <string name="help_section_body_photos_upload">O envio SignalQuest permite associar imagens a um suporte ou site. Seleciona ficheiros, verifica a operadora alvo, adiciona uma descrição se necessário e inicia o envio. O envio requer ligação de rede.</string>
     <string name="help_section_body_share_create">A partir de uma ficha, o botão Partilhar abre opções. Podes incluir detalhes do suporte, frequências, datas de ativação, melhor speedtest, calculadora de débito e por vezes o perfil altimétrico.</string>
@@ -1635,7 +1640,7 @@
     <string name="help_visual_label_elevation_1">Trajeto entre a tua posição e o site.</string>
     <string name="help_visual_label_elevation_2">Relevo e visibilidade rádio estimada.</string>
     <string name="help_visual_label_elevation_3">Recálculo imediato ou adiado.</string>
-    <string name="help_visual_label_throughput_1">Modo prudente, ideal ou personalizado.</string>
+    <string name="help_visual_label_throughput_1">Seleção de tecnologias e frequências.</string>
     <string name="help_visual_label_throughput_2">Bandas, tecnologias e modulação.</string>
     <string name="help_visual_label_throughput_3">Distância ideal e mini-mapa.</string>
     <string name="help_visual_label_photos_1">Carrossel das fotos disponíveis.</string>
@@ -1772,4 +1777,15 @@
     <string name="appstrings_release_statistics_online_data">Estatísticas mais robustas com suporte para dados online</string>
     <string name="appstrings_release_statistics_frequency_active_sites_filters">Filtros de frequência e sites ativos melhor considerados</string>
     <string name="appstrings_release_statistics_5g_experimental_order">Ordem das bandas 5G melhorada, com as bandas experimentais no fim da lista</string>
+    <string name="appstrings_release_image_sharing_copy_action">Adicionada uma ação de copiar para imagens partilhadas</string>
+    <string name="appstrings_release_image_sharing_supported_pages">Disponível para mapa, sites, suportes, rádio e perfis altimétricos</string>
+    <string name="appstrings_release_elevation_profile_operator_banner">Capturas de perfil altimétrico incluem agora um banner da operadora com logótipo, tecnologias e ID ANFR</string>
+    <string name="appstrings_release_refresh_pull_to_refresh">Adicionada atualização ao puxar para baixo em proximidade, detalhe do site, detalhe do suporte e speedtests</string>
+    <string name="appstrings_release_refresh_keeps_visible_data">Os dados já apresentados permanecem visíveis durante a atualização</string>
+    <string name="appstrings_release_nearby_radius_load_more">A pesquisa de proximidade gere melhor o raio, carregar mais e grandes volumes após filtros</string>
+    <string name="appstrings_release_nearby_large_filtered_results">Carregamento mais fiável quando muitos resultados correspondem aos filtros</string>
+    <string name="appstrings_release_live_tracking_gps_frequency">A frequência GPS do seguimento live pode ser definida para 5, 10, 15 ou 20 segundos</string>
+    <string name="appstrings_release_live_tracking_frequency_live_apply">As alterações aplicam-se ao seguimento já em curso</string>
+    <string name="appstrings_release_throughput_simplified_profile">O cálculo de débito fica mais simples com um único perfil prudente</string>
+    <string name="appstrings_release_throughput_modes_removed">Os modos avançados foram removidos da interface, das definições e da ajuda</string>
 </resources>

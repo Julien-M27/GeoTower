@@ -87,6 +87,27 @@ class TypedPreferencesTest {
 
         assertEquals(WidgetPrefs.MIN_SYNC_MINUTES, WidgetPrefs.syncFrequencyMinutes(prefs))
     }
+
+    @Test
+    fun liveTrackingPrefsKeepDiscreteGpsIntervals() {
+        val prefs = FakeSharedPreferences()
+
+        assertEquals(
+            LiveTrackingPrefs.DEFAULT_LOCATION_UPDATE_INTERVAL_SECONDS,
+            LiveTrackingPrefs.locationUpdateIntervalSeconds(prefs)
+        )
+
+        prefs.edit().putInt(LiveTrackingPrefs.LOCATION_UPDATE_INTERVAL_SECONDS, 15).apply()
+
+        assertEquals(15, LiveTrackingPrefs.locationUpdateIntervalSeconds(prefs))
+
+        prefs.edit().putInt(LiveTrackingPrefs.LOCATION_UPDATE_INTERVAL_SECONDS, 12).apply()
+
+        assertEquals(
+            LiveTrackingPrefs.DEFAULT_LOCATION_UPDATE_INTERVAL_SECONDS,
+            LiveTrackingPrefs.locationUpdateIntervalSeconds(prefs)
+        )
+    }
 }
 
 private class FakeSharedPreferences(

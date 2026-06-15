@@ -41,8 +41,10 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -128,6 +130,7 @@ import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.GeoTowerBreadcrumbItem
 import fr.geotower.ui.components.GeoTowerLoadingMessage
 import fr.geotower.ui.components.GeoTowerNavigationBreadcrumbBar
+import fr.geotower.ui.components.GeoTowerPullToRefreshBox
 import fr.geotower.ui.components.MiniMapViewMode
 import fr.geotower.ui.components.RadioShareMenu
 import fr.geotower.ui.components.RadioUsageIcon
@@ -280,6 +283,8 @@ fun SiteDetailScreen(
     var communityPhotos by remember { mutableStateOf<List<CommunityPhoto>>(emptyList()) }
 
     var refreshPhotosTrigger by remember { mutableIntStateOf(0) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var refreshTrigger by remember { mutableIntStateOf(0) }
     val completedWorkIds = remember { mutableSetOf<UUID>() }
 
     val currentUploadSiteId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: antenna?.idAnfr.orEmpty()
@@ -566,7 +571,8 @@ fun SiteDetailScreen(
     val isCellularFrInstalled = remember { isPackageInstalled(context, "com.luisbaker.cellularfr") }
     val isRncMobileInstalled = remember { isPackageInstalled(context, "org.rncteam.rncfreemobile") }
 
-    LaunchedEffect(antennaId, refreshPhotosTrigger, featureFlags) {
+    LaunchedEffect(antennaId, refreshPhotosTrigger, refreshTrigger, featureFlags) {
+        try {
         val lat = prefs.getFloat("clicked_lat", 0f).toDouble()
         val lon = prefs.getFloat("clicked_lon", 0f).toDouble()
 
@@ -581,7 +587,9 @@ fun SiteDetailScreen(
             localData = box.firstOrNull { it.latitude.toFloat() == lat.toFloat() && it.longitude.toFloat() == lon.toFloat() && it.idAnfr.matchesRequestedAnfrId(antennaId) }
                 ?: box.firstOrNull { it.latitude.toFloat() == lat.toFloat() && it.longitude.toFloat() == lon.toFloat() }
         }
-        antenna = localData
+        if (localData != null || antenna == null) {
+            antenna = localData
+        }
 
         if (localData != null) {
             physique = repository.getPhysiqueByAnfr(localData.idAnfr).firstOrNull()
@@ -662,10 +670,13 @@ fun SiteDetailScreen(
         } else if (!canUseSitePhotos) {
             communityPhotos = emptyList()
         }
+        } finally {
+            isRefreshing = false
+        }
     }
 
     // 🚀 CHARGEMENT DU SPEEDTEST (Signal Quest) - Séparé pour plus de stabilité
-    LaunchedEffect(antenna?.idAnfr, antenna?.operateur, physique?.idSupport, speedtestBestMetric, featureFlags) {
+    LaunchedEffect(antenna?.idAnfr, antenna?.operateur, physique?.idSupport, speedtestBestMetric, refreshTrigger, featureFlags) {
         val currentAntenna = antenna
         val currentPhysique = physique
         if (currentAntenna == null || currentAntenna.idAnfr.isBlank()) return@LaunchedEffect
@@ -792,6 +803,9 @@ fun SiteDetailScreen(
     val bearingStr = locationData.second
     val distanceMeters = locationData.third
 
+    val txtHomeTitle = stringResource(R.string.help_topic_title_home)
+    val txtNearbyTitle = stringResource(R.string.nav_near_antennas)
+    val txtSupportDetailTitle = stringResource(R.string.appstrings_support_detail_title)
     val txtSiteDetailsTitle = stringResource(R.string.appstrings_site_detail_title)
     val txtIdCopied = stringResource(R.string.appstrings_id_copied)
     stringResource(R.string.appstrings_distance_label)
@@ -807,7 +821,44 @@ fun SiteDetailScreen(
     val txtWhichMap = stringResource(R.string.appstrings_which_map)
     val txtIdSupportCopy = stringResource(R.string.appstrings_id_support_copy)
 
-    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "support_detail/$antennaId")
+    val supportDetailRoute = remember(
+        physique?.idSupport,
+        antenna?.idAnfr,
+        antenna?.operateur,
+        applyMapFilters,
+        antennaId
+    ) {
+        val supportId = physique?.idSupport?.takeIf { it.isNotBlank() }
+            ?: antenna?.idAnfr?.takeIf { it.isNotBlank() }
+            ?: antennaId
+        val queryParams = mutableListOf<String>()
+        OperatorColors.keyFor(antenna?.operateur)?.let { operatorKey ->
+            queryParams += "operator=${Uri.encode(operatorKey)}"
+        }
+        if (applyMapFilters) {
+            queryParams += "fromMap=true"
+        }
+
+        buildString {
+            append("support_detail/")
+            append(Uri.encode(supportId))
+            if (queryParams.isNotEmpty()) {
+                append("?")
+                append(queryParams.joinToString("&"))
+            }
+        }
+    }
+
+    fun navigateToBreadcrumbParent(route: String) {
+        if (isSplitScreen) {
+            onCloseSplitScreen()
+        }
+        navController.navigate(route) {
+            launchSingleTop = true
+        }
+    }
+
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = supportDetailRoute)
 
     // ✅ 1. ON PLACE LA FONCTION ICI POUR QU'ELLE SOIT VISIBLE PAR TOUT L'ÉCRAN
     fun handleBackNavigation() {
@@ -863,6 +914,26 @@ fun SiteDetailScreen(
                         key = "site_detail"
                     ),
                     currentRouteKeys = setOf("site_detail", "site_detail_from_map"),
+                    impliedParentItems = listOf(
+                        GeoTowerBreadcrumbItem(
+                            label = txtHomeTitle,
+                            icon = Icons.Default.Home,
+                            onClick = { navigateToBreadcrumbParent("home") },
+                            key = "home"
+                        ),
+                        GeoTowerBreadcrumbItem(
+                            label = txtNearbyTitle,
+                            icon = Icons.Default.MyLocation,
+                            onClick = { navigateToBreadcrumbParent("emitters") },
+                            key = "emitters"
+                        ),
+                        GeoTowerBreadcrumbItem(
+                            label = txtSupportDetailTitle,
+                            icon = Icons.Default.VerticalAlignTop,
+                            onClick = { navigateToBreadcrumbParent(supportDetailRoute) },
+                            key = "support_detail"
+                        )
+                    ),
                     onBackStackItemClick = {
                         if (isSplitScreen) onCloseSplitScreen()
                     },
@@ -1060,10 +1131,21 @@ fun SiteDetailScreen(
                 fr.geotower.ui.components.NavigationBottomSheet(latitude = info.latitude, longitude = info.longitude, onDismiss = { showNavigationSheet = false }, sheetState = sheetState, useOneUi = useOneUi)
             }
 
-            Column(
-                modifier = Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().background(mainBgColor).geoTowerFadingEdge(scrollState).verticalScroll(scrollState).padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+            GeoTowerPullToRefreshBox(
+                isRefreshing = isRefreshing,
+                onRefresh = {
+                    if (!isRefreshing) {
+                        isRefreshing = true
+                        refreshTrigger++
+                    }
+                },
+                enabled = antenna != null,
+                modifier = Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().background(mainBgColor)
             ) {
+                Column(
+                    modifier = Modifier.fillMaxSize().geoTowerFadingEdge(scrollState).verticalScroll(scrollState).padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
                 val formattedAzimuths = remember(info.azimuts) {
                     if (info.azimuts.isNullOrBlank()) ""
                     else {
@@ -1461,6 +1543,7 @@ fun SiteDetailScreen(
                     }
                 }
                 Spacer(modifier = Modifier.height(24.dp).navigationBarsPadding())
+            }
             }
 
             if (showSiteSettingsSheet) {

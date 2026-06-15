@@ -1,6 +1,7 @@
 package fr.geotower.ui.components
 
 import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -90,6 +91,102 @@ import fr.geotower.R
 
 private const val TAG_SHARE_IMAGE = "GeoTower"
 
+enum class ShareImageDestination {
+    Share,
+    Clipboard
+}
+
+private fun shareOrCopyImageUris(
+    context: Context,
+    uris: List<Uri>,
+    label: String,
+    chooserTitle: String,
+    destination: ShareImageDestination,
+    copiedMessage: String
+) {
+    if (uris.isEmpty()) return
+    val clipData = imageClipData(context, label, uris)
+    when (destination) {
+        ShareImageDestination.Share -> {
+            val sendMultipleImages = uris.size > 1
+            val intent = Intent(if (sendMultipleImages) Intent.ACTION_SEND_MULTIPLE else Intent.ACTION_SEND).apply {
+                type = "image/png"
+                if (sendMultipleImages) {
+                    putParcelableArrayListExtra(Intent.EXTRA_STREAM, java.util.ArrayList(uris))
+                } else {
+                    putExtra(Intent.EXTRA_STREAM, uris.first())
+                }
+                this.clipData = clipData
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(intent, chooserTitle))
+        }
+        ShareImageDestination.Clipboard -> {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(clipData)
+            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+        }
+    }
+}
+
+private fun imageClipData(context: Context, label: String, uris: List<Uri>): ClipData {
+    val clipData = ClipData.newUri(context.contentResolver, label, uris.first())
+    for (i in 1 until uris.size) {
+        clipData.addItem(ClipData.Item(uris[i]))
+    }
+    return clipData
+}
+
+@Composable
+private fun ShareImageActionButtons(
+    modifier: Modifier = Modifier,
+    enabled: Boolean,
+    txtCopyImage: String,
+    txtGenerateImage: String,
+    onCopyClick: () -> Unit,
+    onShareClick: () -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 6.dp,
+        shadowElevation = 6.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            FilledTonalButton(
+                onClick = onCopyClick,
+                modifier = Modifier.weight(1f).height(56.dp),
+                shape = CircleShape,
+                enabled = enabled,
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                )
+            ) {
+                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(txtCopyImage, fontWeight = FontWeight.Bold, maxLines = 1)
+            }
+            Button(
+                onClick = onShareClick,
+                modifier = Modifier.weight(1f).height(56.dp),
+                shape = CircleShape,
+                enabled = enabled
+            ) {
+                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(txtGenerateImage, fontWeight = FontWeight.Bold, maxLines = 1)
+            }
+        }
+    }
+}
+
 private fun Int.dpToPx(context: Context): Int = (this * context.resources.displayMetrics.density).toInt()
 
 private fun formatShareHeightMeters(heightMeters: Double?): String {
@@ -142,20 +239,23 @@ private fun shareElevationProfileBitmapOnly(
     context: Context,
     info: LocalisationEntity,
     bitmap: Bitmap,
-    txtShareSiteVia: String
+    txtShareSiteVia: String,
+    destination: ShareImageDestination = ShareImageDestination.Share,
+    txtCopiedToClipboard: String = ""
 ) {
     val imagesDir = File(context.cacheDir, "images")
     imagesDir.mkdirs()
     val file = File(imagesDir, "Geotower_site_${info.idAnfr}_profil_altimetrique.png")
     FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-    val intent = Intent(Intent.ACTION_SEND).apply {
-        type = "image/png"
-        putExtra(Intent.EXTRA_STREAM, uri)
-        clipData = ClipData.newUri(context.contentResolver, "Profil altimetrique", uri)
-        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    }
-    context.startActivity(Intent.createChooser(intent, txtShareSiteVia))
+    shareOrCopyImageUris(
+        context = context,
+        uris = listOf(uri),
+        label = "Profil altimetrique",
+        chooserTitle = txtShareSiteVia,
+        destination = destination,
+        copiedMessage = txtCopiedToClipboard
+    )
 }
 
 private fun Bitmap.trimTransparentBottom(): Bitmap {
@@ -318,6 +418,8 @@ fun RadioShareMenu(
     val txtMove = stringResource(R.string.appstrings_move)
     val txtShareConfidentialOption = stringResource(R.string.appstrings_share_confidential_option)
     val txtShareConfidentialDesc = stringResource(R.string.appstrings_share_confidential_desc)
+    val txtCopyImage = stringResource(R.string.appstrings_photo_copy)
+    val txtPhotoCopiedToClipboard = stringResource(R.string.appstrings_photo_copied_to_clipboard)
 
     LaunchedEffect(showThemeSheet) {
         if (showThemeSheet) {
@@ -491,53 +593,58 @@ fun RadioShareMenu(
                     }
                 }
 
-                Button(
-                    onClick = {
-                        if (isGeneratingShare || (isSupportShare && selectedBlockIds.isEmpty())) return@Button
-                        isGeneratingShare = true
-                        showContentSheet = false
-                        currentView.postDelayed({
-                            if (isSupportShare) {
-                                shareRadioSupportCapture(
-                                    context = context,
-                                    currentView = currentView,
-                                    markers = markers,
-                                    distanceStr = distanceStr,
-                                    bearingStr = bearingStr,
-                                    forceDarkTheme = selectedShareTheme,
-                                    txtShareSiteVia = txtShareSiteVia,
-                                    txtGeneratedBy = txtGeneratedBy,
-                                    txtInitError = txtInitError,
-                                    mapView = globalMapRef,
-                                    useOneUi = useOneUi,
-                                    shareOrder = shareOrder,
-                                    includedBlocks = selectedBlockIds,
-                                    incQrCode = incQrCode,
-                                    incConfidential = incConfidential,
-                                    onComplete = { isGeneratingShare = false }
-                                )
-                            } else {
-                                shareRadioSiteCapture(
-                                    context = context,
-                                    currentView = currentView,
-                                    marker = marker,
-                                    distanceStr = distanceStr,
-                                    bearingStr = bearingStr,
-                                    forceDarkTheme = selectedShareTheme,
-                                    txtShareSiteVia = txtShareSiteVia,
-                                    txtGeneratedBy = txtGeneratedBy,
-                                    txtInitError = txtInitError,
-                                    mapView = globalMapRef,
-                                    useOneUi = useOneUi,
-                                    shareOrder = shareOrder,
-                                    includedBlocks = selectedBlockIds,
-                                    incQrCode = incQrCode,
-                                    incConfidential = incConfidential,
-                                    onComplete = { isGeneratingShare = false }
-                                )
-                            }
-                        }, 250)
-                    },
+                fun startRadioImageExport(destination: ShareImageDestination) {
+                    if (isGeneratingShare || (isSupportShare && selectedBlockIds.isEmpty())) return
+                    isGeneratingShare = true
+                    showContentSheet = false
+                    currentView.postDelayed({
+                        if (isSupportShare) {
+                            shareRadioSupportCapture(
+                                context = context,
+                                currentView = currentView,
+                                markers = markers,
+                                distanceStr = distanceStr,
+                                bearingStr = bearingStr,
+                                forceDarkTheme = selectedShareTheme,
+                                txtShareSiteVia = txtShareSiteVia,
+                                txtGeneratedBy = txtGeneratedBy,
+                                txtInitError = txtInitError,
+                                mapView = globalMapRef,
+                                useOneUi = useOneUi,
+                                shareOrder = shareOrder,
+                                includedBlocks = selectedBlockIds,
+                                incQrCode = incQrCode,
+                                incConfidential = incConfidential,
+                                destination = destination,
+                                txtCopiedToClipboard = txtPhotoCopiedToClipboard,
+                                onComplete = { isGeneratingShare = false }
+                            )
+                        } else {
+                            shareRadioSiteCapture(
+                                context = context,
+                                currentView = currentView,
+                                marker = marker,
+                                distanceStr = distanceStr,
+                                bearingStr = bearingStr,
+                                forceDarkTheme = selectedShareTheme,
+                                txtShareSiteVia = txtShareSiteVia,
+                                txtGeneratedBy = txtGeneratedBy,
+                                txtInitError = txtInitError,
+                                mapView = globalMapRef,
+                                useOneUi = useOneUi,
+                                shareOrder = shareOrder,
+                                includedBlocks = selectedBlockIds,
+                                incQrCode = incQrCode,
+                                incConfidential = incConfidential,
+                                destination = destination,
+                                txtCopiedToClipboard = txtPhotoCopiedToClipboard,
+                                onComplete = { isGeneratingShare = false }
+                            )
+                        }
+                    }, 250)
+                }
+
+                ShareImageActionButtons(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(
@@ -546,15 +653,13 @@ fun RadioShareMenu(
                             bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
                         )
                         .fillMaxWidth()
-                        .widthIn(max = 420.dp)
-                        .height(56.dp),
-                    shape = CircleShape,
-                    enabled = selectedBlockIds.isNotEmpty() && !isGeneratingShare
-                ) {
-                    Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(txtGenerateImage, fontWeight = FontWeight.Bold)
-                }
+                        .widthIn(max = 420.dp),
+                    enabled = selectedBlockIds.isNotEmpty() && !isGeneratingShare,
+                    txtCopyImage = txtCopyImage,
+                    txtGenerateImage = txtGenerateImage,
+                    onCopyClick = { startRadioImageExport(ShareImageDestination.Clipboard) },
+                    onShareClick = { startRadioImageExport(ShareImageDestination.Share) }
+                )
             }
         }
     }
@@ -576,6 +681,8 @@ fun shareRadioSiteCapture(
     includedBlocks: Set<String> = shareOrder.toSet(),
     incQrCode: Boolean = true,
     incConfidential: Boolean = false,
+    destination: ShareImageDestination = ShareImageDestination.Share,
+    txtCopiedToClipboard: String = "",
     onComplete: (() -> Unit)? = null
 ) {
     shareRadioCapture(
@@ -598,6 +705,8 @@ fun shareRadioSiteCapture(
         incQrCode = incQrCode,
         incConfidential = incConfidential,
         filePrefix = "Geotower_radio_site",
+        destination = destination,
+        txtCopiedToClipboard = txtCopiedToClipboard,
         onComplete = onComplete
     )
 }
@@ -618,6 +727,8 @@ fun shareRadioSupportCapture(
     includedBlocks: Set<String> = shareOrder.toSet(),
     incQrCode: Boolean = true,
     incConfidential: Boolean = false,
+    destination: ShareImageDestination = ShareImageDestination.Share,
+    txtCopiedToClipboard: String = "",
     onComplete: (() -> Unit)? = null
 ) {
     val mainMarker = markers.firstOrNull { !it.isCluster } ?: markers.firstOrNull() ?: run {
@@ -644,6 +755,8 @@ fun shareRadioSupportCapture(
         incQrCode = incQrCode,
         incConfidential = incConfidential,
         filePrefix = "Geotower_radio_support",
+        destination = destination,
+        txtCopiedToClipboard = txtCopiedToClipboard,
         onComplete = onComplete
     )
 }
@@ -668,6 +781,8 @@ private fun shareRadioCapture(
     incQrCode: Boolean,
     incConfidential: Boolean,
     filePrefix: String,
+    destination: ShareImageDestination,
+    txtCopiedToClipboard: String,
     onComplete: (() -> Unit)?
 ) {
     val mapBitmap = if (RADIO_SHARE_MAP in includedBlocks) captureShareMapBitmap(mapView) else null
@@ -729,13 +844,14 @@ private fun shareRadioCapture(
                 FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
 
                 val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    type = "image/png"
-                    clipData = ClipData.newUri(context.contentResolver, "Capture", uri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                context.startActivity(Intent.createChooser(shareIntent, txtShareSiteVia))
+                shareOrCopyImageUris(
+                    context = context,
+                    uris = listOf(uri),
+                    label = "Capture",
+                    chooserTitle = txtShareSiteVia,
+                    destination = destination,
+                    copiedMessage = txtCopiedToClipboard
+                )
                 onComplete?.invoke()
             } catch (e: Exception) {
                 AppLogger.w(TAG_SHARE_IMAGE, "Radio share capture failed", e)
@@ -1570,6 +1686,8 @@ fun shareFullAntennaCapture(
     incSplitImage: Boolean,
     shareOrder: List<String>,
     elevationProfileBitmap: Bitmap? = null,
+    destination: ShareImageDestination = ShareImageDestination.Share,
+    txtCopiedToClipboard: String = "",
     onComplete: (() -> Unit)? = null
 ) {
     val composeView = ComposeView(context).apply {
@@ -2959,7 +3077,17 @@ fun shareFullAntennaCapture(
                 }
 
                 // Lancement de l'intention de partage
-                val sendMultipleImages = urisToShare.size > 1
+                if (destination == ShareImageDestination.Clipboard) {
+                    shareOrCopyImageUris(
+                        context = context,
+                        uris = urisToShare,
+                        label = "Capture",
+                        chooserTitle = txtShareSiteVia,
+                        destination = destination,
+                        copiedMessage = txtCopiedToClipboard
+                    )
+                } else {
+                    val sendMultipleImages = urisToShare.size > 1
                 val intent = Intent(if (sendMultipleImages) Intent.ACTION_SEND_MULTIPLE else Intent.ACTION_SEND).apply {
                     type = "image/png"
                     if (sendMultipleImages) {
@@ -2977,7 +3105,8 @@ fun shareFullAntennaCapture(
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
 
-                context.startActivity(Intent.createChooser(intent, txtShareSiteVia))
+                    context.startActivity(Intent.createChooser(intent, txtShareSiteVia))
+                }
                 onComplete?.invoke()
             } else {
                 rootView.removeView(composeView)
@@ -3027,6 +3156,8 @@ fun shareFullSiteCapture(
     shareOrder: List<String>,
     radioMarkers: List<RadioMapMarker> = emptyList(),
     incRadioEntries: Boolean = radioMarkers.isNotEmpty(),
+    destination: ShareImageDestination = ShareImageDestination.Share,
+    txtCopiedToClipboard: String = "",
     onComplete: (() -> Unit)? = null
 ) {
     try {
@@ -3195,13 +3326,14 @@ fun shareFullSiteCapture(
                 FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
 
                 val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    type = "image/png"
-                    clipData = ClipData.newUri(context.contentResolver, "Capture", uri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                context.startActivity(Intent.createChooser(shareIntent, txtShareSiteVia))
+                shareOrCopyImageUris(
+                    context = context,
+                    uris = listOf(uri),
+                    label = "Capture",
+                    chooserTitle = txtShareSiteVia,
+                    destination = destination,
+                    copiedMessage = txtCopiedToClipboard
+                )
                 onComplete?.invoke()
             } catch (e: Exception) {
                 AppLogger.w(TAG_SHARE_IMAGE, "Support share capture failed", e)
@@ -3392,12 +3524,14 @@ fun AntennaShareMenu(
     val txtShareConfidentialOption = stringResource(R.string.appstrings_share_confidential_option)
     val txtShareConfidentialDesc = stringResource(R.string.appstrings_share_confidential_desc)
     val txtGenerateImage = stringResource(R.string.appstrings_generate_image)
+    val txtCopyImage = stringResource(R.string.appstrings_photo_copy)
     val txtMove = stringResource(R.string.appstrings_move)
     val txtInitError = stringResource(R.string.appstrings_init_error)
     val txtUnknown = stringResource(R.string.appstrings_unknown)
     val txtShareImageGenerationInProgress = stringResource(R.string.appstrings_share_image_generation_in_progress)
     val txtShareImagePreparingInProgress = stringResource(R.string.appstrings_share_image_preparing_in_progress)
     val txtShareElevationProfileOnlyUnavailable = stringResource(R.string.appstrings_share_elevation_profile_only_unavailable)
+    val txtPhotoCopiedToClipboard = stringResource(R.string.appstrings_photo_copied_to_clipboard)
     val txtElevationProfileTitle = stringResource(R.string.appstrings_elevation_profile_title)
     val txtElevationProfileLoading = stringResource(R.string.appstrings_elevation_profile_loading)
     val txtElevationProfileDistance = stringResource(R.string.appstrings_elevation_profile_distance)
@@ -3581,134 +3715,144 @@ fun AntennaShareMenu(
                 }
             }
 
-            Button(
-                        onClick = {
-                            if (isGeneratingShare) return@Button
-                            isGeneratingShare = true
-                            generationMessage = txtShareImageGenerationInProgress
-                            showSelectionSheet = false
-                            val shareOnlyElevationProfile = isOnlyElevationProfileSelected(
-                                shareOrder = shareOrder,
-                                incElevationProfile = incElevationProfile,
-                                incMap = incMap,
-                                incSupport = incSupport,
-                                incIds = incIds,
-                                incDates = incDates,
-                                incAddress = incAddress,
-                                incFreqs = incFreqs,
-                                incSpeedtest = incSpeedtest,
-                                incThroughput = incThroughput
-                            )
-                            val elevationProfileTexts = ElevationProfileShareTexts(
-                                title = txtElevationProfileTitle,
-                                distance = txtElevationProfileDistance,
-                                supportHeight = txtElevationProfileSupportHeight,
-                                supportHeightDetail = txtElevationProfileSupportHeightDetail,
-                                startAltitude = txtElevationProfileStartAltitude,
-                                startAltitudeDetail = txtElevationProfileStartAltitudeDetail,
-                                siteAltitude = txtElevationProfileSiteAltitude,
-                                siteAltitudeDetail = txtElevationProfileSiteAltitudeDetail,
-                                frequency = txtElevationProfileFrequency,
-                                directLine = txtElevationProfileDirectLineLabel,
-                                fresnelZone = txtElevationProfileFresnelLabel,
-                                lineClear = txtElevationProfileLineClear,
-                                lineBlocked = txtElevationProfileLineBlocked,
-                                fresnelClear = txtElevationProfileFresnelClear,
-                                fresnelBlocked = txtElevationProfileFresnelBlocked,
-                                fresnelExplanation = txtElevationProfileFresnelExplanation,
-                                ignSource = txtElevationProfileIgnSource,
-                                generatedBy = txtGeneratedBy,
-                                unknown = txtUnknown
-                            )
+            fun startAntennaImageExport(destination: ShareImageDestination) {
+                if (isGeneratingShare) return
+                isGeneratingShare = true
+                generationMessage = txtShareImageGenerationInProgress
+                showSelectionSheet = false
+                val shareOnlyElevationProfile = isOnlyElevationProfileSelected(
+                    shareOrder = shareOrder,
+                    incElevationProfile = incElevationProfile,
+                    incMap = incMap,
+                    incSupport = incSupport,
+                    incIds = incIds,
+                    incDates = incDates,
+                    incAddress = incAddress,
+                    incFreqs = incFreqs,
+                    incSpeedtest = incSpeedtest,
+                    incThroughput = incThroughput
+                )
+                val elevationProfileTexts = ElevationProfileShareTexts(
+                    title = txtElevationProfileTitle,
+                    distance = txtElevationProfileDistance,
+                    supportHeight = txtElevationProfileSupportHeight,
+                    supportHeightDetail = txtElevationProfileSupportHeightDetail,
+                    startAltitude = txtElevationProfileStartAltitude,
+                    startAltitudeDetail = txtElevationProfileStartAltitudeDetail,
+                    siteAltitude = txtElevationProfileSiteAltitude,
+                    siteAltitudeDetail = txtElevationProfileSiteAltitudeDetail,
+                    frequency = txtElevationProfileFrequency,
+                    directLine = txtElevationProfileDirectLineLabel,
+                    fresnelZone = txtElevationProfileFresnelLabel,
+                    lineClear = txtElevationProfileLineClear,
+                    lineBlocked = txtElevationProfileLineBlocked,
+                    fresnelClear = txtElevationProfileFresnelClear,
+                    fresnelBlocked = txtElevationProfileFresnelBlocked,
+                    fresnelExplanation = txtElevationProfileFresnelExplanation,
+                    ignSource = txtElevationProfileIgnSource,
+                    generatedBy = txtGeneratedBy,
+                    unknown = txtUnknown
+                )
 
-                            scope.launch {
-                                val elevationProfileBitmap = if (
-                                    incElevationProfile &&
-                                    shareOrder.contains("elevation_profile") &&
-                                    !incConfidential
-                                ) {
-                                    generationMessage = txtElevationProfileLoading
-                                    runCatching {
-                                        val userLocation = withContext(Dispatchers.IO) {
-                                            getElevationProfileLastKnownLocation(context)
-                                        } ?: return@runCatching null
-                                        val rawElevationProfileFrequencies = technique?.detailsFrequences?.takeIf { it.isNotBlank() } ?: info.frequences
-                                        val frequency = extractElevationProfileFrequencies(rawElevationProfileFrequencies).firstOrNull() ?: DEFAULT_ELEVATION_PROFILE_FREQUENCY_MHZ
-                                        val antennaHeight = extractElevationProfileAntennaHeightsByFrequency(rawElevationProfileFrequencies)[frequency]
-                                        val profile = withContext(Dispatchers.IO) {
-                                            fetchIgnElevationProfileData(
-                                                fromLatitude = userLocation.latitude,
-                                                fromLongitude = userLocation.longitude,
-                                                toLatitude = info.latitude,
-                                                toLongitude = info.longitude
-                                            )
-                                        }
-                                        createElevationProfileShareBitmap(
-                                            info = info,
-                                            profile = profile,
-                                            supportHeightMeters = antennaHeight ?: physique?.hauteur,
-                                            frequencyMHz = frequency,
-                                            forceDarkTheme = selectedShareTheme,
-                                            texts = elevationProfileTexts
-                                        )
-                                    }.getOrNull()
-                                } else {
-                                    null
-                                }
-
-                                if (shareOnlyElevationProfile && elevationProfileBitmap == null) {
-                                    Toast.makeText(context, txtShareElevationProfileOnlyUnavailable, Toast.LENGTH_SHORT).show()
-                                    isGeneratingShare = false
-                                    return@launch
-                                }
-
-                                generationMessage = txtShareImagePreparingInProgress
-                                currentView.postDelayed({
-                                    try {
-                                        if (shareOnlyElevationProfile && elevationProfileBitmap != null) {
-                                            shareElevationProfileBitmapOnly(context, info, elevationProfileBitmap, txtShareSiteVia)
-                                            isGeneratingShare = false
-                                        } else {
-                                            val mapBmp = if (incMap) { globalMapRef?.let { map -> try { val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888); map.draw(Canvas(bmp)); bmp } catch (e: Exception) { null } } } else null
-                                            shareFullAntennaCapture(
-                                                context, currentView, info,
-                                                physique, technique,
-                                                hsDataMap,
-                                                speedtestData,
-                                                distanceStr, bearingStr, selectedShareTheme,
-                                                txtSiteDetailsTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtGeneratedBy, txtShareSiteVia, txtimplementation, txtLastModification, txtIdentifiers, txtIdNumber, txtFrequenciesTitle, txtBandsNotSpecified, txtInService, txtTechnically, txtUnknownStatus, txtAnfrStationNumber, txtDates, txtError, txtProjectApproved, txtActivatedOn, txtDateNotSpecifiedAnfr, txtPanelHeightsTitle, txtAzimuths, txtIdSupportLabel, txtSupportDetailsTitle, txtSupportNature, txtOwner, txtExploitant, txtAntennaType,
-                                                mapBmp, txtInitError, emptyList(), txtCommunityPhotosTitle,
-                                                incMap, incSupport, incHeights, incIds, incDates, incAddress, incFreqs, incSpeedtest, incThroughput, incConfidential, incQrCode,
-                                                incSplitImage,
-                                                shareOrder,
-                                                elevationProfileBitmap = elevationProfileBitmap,
-                                                onComplete = { isGeneratingShare = false }
-                                            )
-                                        }
-                                    } catch (e: Exception) {
-                                        AppLogger.w(TAG_SHARE_IMAGE, "Site share generation failed", e)
-                                        isGeneratingShare = false
-                                    }
-                                }, 300)
-                            }
-                        },
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(
-                                start = 24.dp,
-                                end = 24.dp,
-                                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
-                            )
-                            .fillMaxWidth()
-                            .widthIn(max = 420.dp)
-                            .height(56.dp),
-                        shape = CircleShape,
-                        enabled = !isGeneratingShare
+                scope.launch {
+                    val elevationProfileBitmap = if (
+                        incElevationProfile &&
+                        shareOrder.contains("elevation_profile") &&
+                        !incConfidential
                     ) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(txtGenerateImage, fontWeight = FontWeight.Bold)
+                        generationMessage = txtElevationProfileLoading
+                        runCatching {
+                            val userLocation = withContext(Dispatchers.IO) {
+                                getElevationProfileLastKnownLocation(context)
+                            } ?: return@runCatching null
+                            val rawElevationProfileFrequencies = technique?.detailsFrequences?.takeIf { it.isNotBlank() } ?: info.frequences
+                            val frequency = extractElevationProfileFrequencies(rawElevationProfileFrequencies).firstOrNull() ?: DEFAULT_ELEVATION_PROFILE_FREQUENCY_MHZ
+                            val antennaHeight = extractElevationProfileAntennaHeightsByFrequency(rawElevationProfileFrequencies)[frequency]
+                            val profile = withContext(Dispatchers.IO) {
+                                fetchIgnElevationProfileData(
+                                    fromLatitude = userLocation.latitude,
+                                    fromLongitude = userLocation.longitude,
+                                    toLatitude = info.latitude,
+                                    toLongitude = info.longitude
+                                )
+                            }
+                            createElevationProfileShareBitmap(
+                                context = context,
+                                info = info,
+                                profile = profile,
+                                supportHeightMeters = antennaHeight ?: physique?.hauteur,
+                                frequencyMHz = frequency,
+                                forceDarkTheme = selectedShareTheme,
+                                texts = elevationProfileTexts,
+                                operatorTechnologies = technique?.technologies?.takeIf { it.isNotBlank() } ?: info.frequences
+                            )
+                        }.getOrNull()
+                    } else {
+                        null
                     }
+
+                    if (shareOnlyElevationProfile && elevationProfileBitmap == null) {
+                        Toast.makeText(context, txtShareElevationProfileOnlyUnavailable, Toast.LENGTH_SHORT).show()
+                        isGeneratingShare = false
+                        return@launch
+                    }
+
+                    generationMessage = txtShareImagePreparingInProgress
+                    currentView.postDelayed({
+                        try {
+                            if (shareOnlyElevationProfile && elevationProfileBitmap != null) {
+                                shareElevationProfileBitmapOnly(
+                                    context = context,
+                                    info = info,
+                                    bitmap = elevationProfileBitmap,
+                                    txtShareSiteVia = txtShareSiteVia,
+                                    destination = destination,
+                                    txtCopiedToClipboard = txtPhotoCopiedToClipboard
+                                )
+                                isGeneratingShare = false
+                            } else {
+                                val mapBmp = if (incMap) { globalMapRef?.let { map -> try { val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888); map.draw(Canvas(bmp)); bmp } catch (e: Exception) { null } } } else null
+                                shareFullAntennaCapture(
+                                    context, currentView, info,
+                                    physique, technique,
+                                    hsDataMap,
+                                    speedtestData,
+                                    distanceStr, bearingStr, selectedShareTheme,
+                                    txtSiteDetailsTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtGeneratedBy, txtShareSiteVia, txtimplementation, txtLastModification, txtIdentifiers, txtIdNumber, txtFrequenciesTitle, txtBandsNotSpecified, txtInService, txtTechnically, txtUnknownStatus, txtAnfrStationNumber, txtDates, txtError, txtProjectApproved, txtActivatedOn, txtDateNotSpecifiedAnfr, txtPanelHeightsTitle, txtAzimuths, txtIdSupportLabel, txtSupportDetailsTitle, txtSupportNature, txtOwner, txtExploitant, txtAntennaType,
+                                    mapBmp, txtInitError, emptyList(), txtCommunityPhotosTitle,
+                                    incMap, incSupport, incHeights, incIds, incDates, incAddress, incFreqs, incSpeedtest, incThroughput, incConfidential, incQrCode,
+                                    incSplitImage,
+                                    shareOrder,
+                                    elevationProfileBitmap = elevationProfileBitmap,
+                                    destination = destination,
+                                    txtCopiedToClipboard = txtPhotoCopiedToClipboard,
+                                    onComplete = { isGeneratingShare = false }
+                                )
+                            }
+                        } catch (e: Exception) {
+                            AppLogger.w(TAG_SHARE_IMAGE, "Site share generation failed", e)
+                            isGeneratingShare = false
+                        }
+                    }, 300)
+                }
+            }
+
+            ShareImageActionButtons(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(
+                        start = 24.dp,
+                        end = 24.dp,
+                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
+                    )
+                    .fillMaxWidth()
+                    .widthIn(max = 420.dp),
+                enabled = !isGeneratingShare,
+                txtCopyImage = txtCopyImage,
+                txtGenerateImage = txtGenerateImage,
+                onCopyClick = { startAntennaImageExport(ShareImageDestination.Clipboard) },
+                onShareClick = { startAntennaImageExport(ShareImageDestination.Share) }
+            )
             }
         }
     }
@@ -3795,7 +3939,9 @@ fun SupportShareMenu(
     val txtShareConfidentialOption = stringResource(R.string.appstrings_share_confidential_option)
     val txtShareConfidentialDesc = stringResource(R.string.appstrings_share_confidential_desc)
     val txtGenerateImage = stringResource(R.string.appstrings_generate_image)
+    val txtCopyImage = stringResource(R.string.appstrings_photo_copy)
     val txtShareImagePreparingInProgress = stringResource(R.string.appstrings_share_image_preparing_in_progress)
+    val txtPhotoCopiedToClipboard = stringResource(R.string.appstrings_photo_copied_to_clipboard)
     val txtMove = stringResource(R.string.appstrings_move)
     val txtInitError = stringResource(R.string.appstrings_init_error)
     val txtRadioEntriesTitle = stringResource(R.string.appstrings_radio_share_block_support_entries)
@@ -3945,51 +4091,52 @@ fun SupportShareMenu(
                 }
             }
 
-            Button(
-                        onClick = {
-                            if (isGeneratingShare) return@Button
-                            isGeneratingShare = true
-                            generationMessage = txtShareImagePreparingInProgress
-                            showSelectionSheet = false
-                            globalMapRef?.let { map -> map.controller.setZoom(17.5); map.controller.setCenter(org.osmdroid.util.GeoPoint(mainInfo.latitude, mainInfo.longitude)) }
-                            currentView.postDelayed({
-                                try {
-                                    val mapBmp = if (incMap) { try { globalMapRef?.let { map -> val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888); map.draw(Canvas(bmp)); bmp } } catch (e: Exception) { null } } else null
-                                    shareFullSiteCapture(
-                                        context, currentView, siteId, antennas.first(), antennas,
-                                        physique, techniquesMap,
-                                        hsDataMap,
-                                        distanceStr, bearingStr, selectedShareTheme,
-                                        txtSupportDetailTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtOperatorsTitle, txtGeneratedBy, txtShareSiteVia, txtIdNumber,
-                                        txtInitError, txtSupportNature, txtOwner, mapBmp,
-                                        incMap, incSupport, incOperators, incConfidential, incQrCode, shareOrder,
-                                        radioMarkers = radioMarkers,
-                                        incRadioEntries = incRadioEntries,
-                                        onComplete = { isGeneratingShare = false }
-                                    )
-                                } catch (e: Exception) {
-                                    AppLogger.w(TAG_SHARE_IMAGE, "Support share generation failed", e)
-                                    isGeneratingShare = false
-                                }
-                            }, 300)
-                        },
-                        modifier = Modifier
-                            .align(Alignment.BottomCenter)
-                            .padding(
-                                start = 24.dp,
-                                end = 24.dp,
-                                bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
-                            )
-                            .fillMaxWidth()
-                            .widthIn(max = 420.dp)
-                            .height(56.dp),
-                        shape = CircleShape,
-                        enabled = !isGeneratingShare
-                    ) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(txtGenerateImage, fontWeight = FontWeight.Bold)
+            fun startSupportImageExport(destination: ShareImageDestination) {
+                if (isGeneratingShare) return
+                isGeneratingShare = true
+                generationMessage = txtShareImagePreparingInProgress
+                showSelectionSheet = false
+                globalMapRef?.let { map -> map.controller.setZoom(17.5); map.controller.setCenter(org.osmdroid.util.GeoPoint(mainInfo.latitude, mainInfo.longitude)) }
+                currentView.postDelayed({
+                    try {
+                        val mapBmp = if (incMap) { try { globalMapRef?.let { map -> val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888); map.draw(Canvas(bmp)); bmp } } catch (e: Exception) { null } } else null
+                        shareFullSiteCapture(
+                            context, currentView, siteId, antennas.first(), antennas,
+                            physique, techniquesMap,
+                            hsDataMap,
+                            distanceStr, bearingStr, selectedShareTheme,
+                            txtSupportDetailTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtOperatorsTitle, txtGeneratedBy, txtShareSiteVia, txtIdNumber,
+                            txtInitError, txtSupportNature, txtOwner, mapBmp,
+                            incMap, incSupport, incOperators, incConfidential, incQrCode, shareOrder,
+                            radioMarkers = radioMarkers,
+                            incRadioEntries = incRadioEntries,
+                            destination = destination,
+                            txtCopiedToClipboard = txtPhotoCopiedToClipboard,
+                            onComplete = { isGeneratingShare = false }
+                        )
+                    } catch (e: Exception) {
+                        AppLogger.w(TAG_SHARE_IMAGE, "Support share generation failed", e)
+                        isGeneratingShare = false
                     }
+                }, 300)
+            }
+
+            ShareImageActionButtons(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(
+                        start = 24.dp,
+                        end = 24.dp,
+                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
+                    )
+                    .fillMaxWidth()
+                    .widthIn(max = 420.dp),
+                enabled = !isGeneratingShare,
+                txtCopyImage = txtCopyImage,
+                txtGenerateImage = txtGenerateImage,
+                onCopyClick = { startSupportImageExport(ShareImageDestination.Clipboard) },
+                onShareClick = { startSupportImageExport(ShareImageDestination.Share) }
+            )
             }
         }
     }

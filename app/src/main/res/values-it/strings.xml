@@ -523,6 +523,8 @@
     <string name="appstrings_live_notification_desc_nearest">Segui l\'antenna più vicina in tempo reale, qualunque sia il suo operatore.</string>
     <string name="appstrings_live_notification_requires_op">Richiede la scelta di un operatore predefinito</string>
     <string name="appstrings_live_notification_title">Notifica live</string>
+    <string name="appstrings_live_location_refresh_title">Aggiornamento GPS live</string>
+    <string name="appstrings_live_location_refresh_footer">Un intervallo più breve rende il monitoraggio più reattivo, ma può consumare più batteria.</string>
     <string name="appstrings_load_more_sites">Carica altri siti</string>
     <string name="appstrings_loading_app">Caricamento...</string>
     <string name="appstrings_loading_frequencies">Caricamento frequenze...</string>
@@ -773,6 +775,9 @@
     <string name="appstrings_release_section_navigation_loading">Navigazione e caricamento</string>
     <string name="appstrings_release_section_nearby">Prossimità</string>
     <string name="appstrings_release_section_statistics_data">Statistiche e dati</string>
+    <string name="appstrings_release_section_image_sharing">Condivisione immagini</string>
+    <string name="appstrings_release_section_refresh">Aggiornamento</string>
+    <string name="appstrings_release_section_throughput_calculator">Calcolo della velocità</string>
     <string name="appstrings_release_section_database">Database</string>
     <string name="appstrings_release_section_live_tracking">Monitoraggio live</string>
     <string name="appstrings_release_section_statistics">Statistiche</string>
@@ -1360,7 +1365,7 @@
     <string name="anfr_owner_etat_ministere">State / Ministry</string>
     <string name="anfr_owner_aviation_civile">Civil Aviation</string>
     <string name="throughput_header_site">Site %1$s</string>
-    <string name="throughput_header_site_support">Site %1$s - supporto %2$s</string>
+    <string name="throughput_header_site_support">Site %1$s - Supporto %2$s</string>
     <string name="throughput_included_bands_count">%1$d band(s) included out of %2$d</string>
     <string name="throughput_main_zone_estimated">Estimated main zone: %1$s to %2$s</string>
     <string name="throughput_estimated_cone">Estimated cone: %1$s (%2$s-%3$s)</string>
@@ -1474,7 +1479,7 @@
     <string name="help_topic_subtitle_support">Everything about the tower, roof, operators and linked sites.</string>
     <string name="help_topic_subtitle_site">Frequencies, azimuths, height, status, photos, links, sharing and advanced tools.</string>
     <string name="help_topic_subtitle_elevation">Terrain, line of sight, Fresnel zone, recalculation and network limits.</string>
-    <string name="help_topic_subtitle_throughput">Conservative/ideal/custom modes, bands, modulations, MIMO and optimal distance.</string>
+    <string name="help_topic_subtitle_throughput">Bande, frequenze, MIMO, upload del telefono e distanza ottimale.</string>
     <string name="help_topic_subtitle_photos">Carousel, full screen, SignalQuest upload, descriptions and target operator.</string>
     <string name="help_topic_subtitle_share">Image options, support, frequencies, dates, speedtest, throughput and elevation profile.</string>
     <string name="help_topic_subtitle_settings">Appearance, One UI, units, split screen, customization, database, offline maps and notifications.</string>
@@ -1532,8 +1537,8 @@
     <string name="help_section_body_site_info">The site page describes an operator installation: operator banner, support, height, azimuths, frequencies, technologies, activation status and external links.</string>
     <string name="help_section_body_site_tools">Action buttons open tools related to the site. Some blocks can be hidden or moved from site page customization.</string>
     <string name="help_section_body_elevation_use">The elevation profile compares your current position to the selected site. It helps estimate whether terrain may block the signal. The calculation depends on GPS position and online elevation data.</string>
-    <string name="help_section_body_throughput_assumptions">The calculation gives theoretical throughput. Conservative mode lowers expectations, ideal mode shows a favorable scenario, and custom mode lets you adjust bands, technologies and modulations. Upload accounts for the fact that a phone transmits with far less power than an antenna.</string>
-    <string name="help_section_body_throughput_controls">The 4G, 5G and project buttons choose which technologies are included. Band checkboxes select frequencies. Modulation sliders choose QPSK, 16 QAM, 64 QAM or 256 QAM depending on the expected radio level.</string>
+    <string name="help_section_body_throughput_assumptions">Il calcolo fornisce una velocità teorica a partire dalle frequenze dichiarate, dalle allocazioni dell\'operatore e da ipotesi radio realistiche. Puoi attivare o disattivare 4G, 5G, bande pianificate e singole frequenze. L\'upload tiene conto del fatto che un telefono trasmette con molta meno potenza di un\'antenna.</string>
+    <string name="help_section_body_throughput_controls">I pulsanti 4G, 5G e bande pianificate scelgono le tecnologie incluse. Le caselle delle bande selezionano le frequenze. La scheda mostra poi la velocità stimata per banda e la distanza ottimale quando i dati lo permettono.</string>
     <string name="help_section_body_photos_view">The carousel shows available community photos. In full screen, controls let you close, switch photos and inspect the image more comfortably.</string>
     <string name="help_section_body_photos_upload">SignalQuest upload lets you attach images to a support or site. Select files, check the target operator, add a description if needed, then start the upload. Upload requires a network connection.</string>
     <string name="help_section_body_share_create">From a detail page, the Share button opens options. You can include support details, frequencies, activation dates, best speedtest, throughput calculator and sometimes the elevation profile.</string>
@@ -1635,7 +1640,7 @@
     <string name="help_visual_label_elevation_1">Route between your position and the site.</string>
     <string name="help_visual_label_elevation_2">Terrain and estimated radio visibility.</string>
     <string name="help_visual_label_elevation_3">Immediate or deferred recalculation.</string>
-    <string name="help_visual_label_throughput_1">Conservative, ideal or custom mode.</string>
+    <string name="help_visual_label_throughput_1">Selezione di tecnologie e frequenze.</string>
     <string name="help_visual_label_throughput_2">Bands, technologies and modulation.</string>
     <string name="help_visual_label_throughput_3">Optimal distance and mini-map.</string>
     <string name="help_visual_label_photos_1">Available photo carousel.</string>
@@ -1772,4 +1777,15 @@
     <string name="appstrings_release_statistics_online_data">Statistiche più robuste con supporto dei dati online</string>
     <string name="appstrings_release_statistics_frequency_active_sites_filters">Filtri di frequenza e siti attivi meglio considerati</string>
     <string name="appstrings_release_statistics_5g_experimental_order">Ordine delle bande 5G migliorato, con le bande sperimentali in fondo all’elenco</string>
+    <string name="appstrings_release_image_sharing_copy_action">Aggiunta un’azione copia per le immagini condivise</string>
+    <string name="appstrings_release_image_sharing_supported_pages">Disponibile per mappa, siti, supporti, radio e profili altimetrici</string>
+    <string name="appstrings_release_elevation_profile_operator_banner">Le catture del profilo altimetrico ora includono un banner operatore con logo, tecnologie e ID ANFR</string>
+    <string name="appstrings_release_refresh_pull_to_refresh">Aggiunto il pull-to-refresh su prossimità, dettaglio sito, dettaglio supporto e speedtest</string>
+    <string name="appstrings_release_refresh_keeps_visible_data">I dati già visualizzati restano visibili durante l’aggiornamento</string>
+    <string name="appstrings_release_nearby_radius_load_more">La ricerca nelle vicinanze gestisce meglio raggio, carica altro e grandi volumi dopo i filtri</string>
+    <string name="appstrings_release_nearby_large_filtered_results">Caricamento più affidabile quando molti risultati corrispondono ai filtri</string>
+    <string name="appstrings_release_live_tracking_gps_frequency">La frequenza GPS del monitoraggio live può essere impostata su 5, 10, 15 o 20 secondi</string>
+    <string name="appstrings_release_live_tracking_frequency_live_apply">Le modifiche si applicano al monitoraggio già in corso</string>
+    <string name="appstrings_release_throughput_simplified_profile">Il calcolo della velocità è semplificato con un unico profilo prudente</string>
+    <string name="appstrings_release_throughput_modes_removed">Le modalità avanzate sono state rimosse da interfaccia, impostazioni e aiuto</string>
 </resources>

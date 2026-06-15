@@ -1,6 +1,7 @@
 package fr.geotower.ui.components
 
 import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -20,6 +21,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.LightMode
@@ -59,6 +61,89 @@ import java.util.Locale
 
 private const val TAG_MAP_SHARE = "GeoTowerMap"
 
+private enum class MapShareDestination {
+    Share,
+    Clipboard
+}
+
+private fun shareOrCopyMapImageUri(
+    context: Context,
+    uri: Uri,
+    label: String,
+    chooserTitle: String,
+    destination: MapShareDestination,
+    copiedMessage: String
+) {
+    val clipData = ClipData.newUri(context.contentResolver, label, uri)
+    when (destination) {
+        MapShareDestination.Share -> {
+            val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                putExtra(Intent.EXTRA_STREAM, uri)
+                type = "image/png"
+                this.clipData = clipData
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            }
+            context.startActivity(Intent.createChooser(shareIntent, chooserTitle))
+        }
+        MapShareDestination.Clipboard -> {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboard.setPrimaryClip(clipData)
+            Toast.makeText(context, copiedMessage, Toast.LENGTH_SHORT).show()
+        }
+    }
+}
+
+@Composable
+private fun MapShareActionButtons(
+    modifier: Modifier = Modifier,
+    txtCopyImage: String,
+    txtGenerateImage: String,
+    onCopyClick: () -> Unit,
+    onShareClick: () -> Unit
+) {
+    Surface(
+        modifier = modifier,
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        tonalElevation = 6.dp,
+        shadowElevation = 6.dp
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            FilledTonalButton(
+                onClick = onCopyClick,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(56.dp),
+                shape = CircleShape,
+                colors = ButtonDefaults.filledTonalButtonColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
+                )
+            ) {
+                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(txtCopyImage, fontWeight = FontWeight.Bold, maxLines = 1)
+            }
+            Button(
+                onClick = onShareClick,
+                modifier = Modifier
+                    .weight(1f)
+                    .height(56.dp),
+                shape = CircleShape
+            ) {
+                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(txtGenerateImage, fontWeight = FontWeight.Bold, maxLines = 1)
+            }
+        }
+    }
+}
+
 private fun buildMapDeepLink(lat: Double, lon: Double, zoom: Double): String? {
     if (!lat.isUsableMapNumber() || !lon.isUsableMapNumber() || !zoom.isUsableMapNumber()) return null
     if (lat !in -90.0..90.0 || lon !in -180.0..180.0) return null
@@ -83,7 +168,7 @@ private fun Double.isUsableMapNumber(): Boolean {
     return !isNaN() && !isInfinite()
 }
 
-fun shareFullMapCapture(
+private fun shareFullMapCapture(
     context: Context,
     currentView: View,
     mapBitmap: Bitmap?,
@@ -100,7 +185,9 @@ fun shareFullMapCapture(
     currentLat: Double, // ✅ AJOUT
     incQrCode: Boolean,
     qrUri: String?,
-    txtInitError: String
+    txtInitError: String,
+    destination: MapShareDestination = MapShareDestination.Share,
+    txtCopiedToClipboard: String = ""
 ) {
     try {
         val composeView = ComposeView(context).apply {
@@ -203,13 +290,14 @@ fun shareFullMapCapture(
                 FileOutputStream(file).use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
 
                 val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-                val shareIntent = Intent(Intent.ACTION_SEND).apply {
-                    putExtra(Intent.EXTRA_STREAM, uri)
-                    type = "image/png"
-                    clipData = ClipData.newUri(context.contentResolver, "Capture", uri)
-                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                }
-                context.startActivity(Intent.createChooser(shareIntent, txtShareSiteVia))
+                shareOrCopyMapImageUri(
+                    context = context,
+                    uri = uri,
+                    label = "Capture",
+                    chooserTitle = txtShareSiteVia,
+                    destination = destination,
+                    copiedMessage = txtCopiedToClipboard
+                )
             } catch (e: Exception) {
                 AppLogger.w(TAG_MAP_SHARE, "Map share capture failed", e)
                 Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
@@ -305,6 +393,8 @@ fun MapShareMenu(
     val txtShareConfidentialOption = stringResource(R.string.appstrings_share_confidential_option)
     val txtShareConfidentialDesc = stringResource(R.string.appstrings_share_confidential_desc)
     val txtGenerateImage = stringResource(R.string.appstrings_generate_image)
+    val txtCopyImage = stringResource(R.string.appstrings_photo_copy)
+    val txtPhotoCopiedToClipboard = stringResource(R.string.appstrings_photo_copied_to_clipboard)
     val txtInitError = stringResource(R.string.appstrings_init_error)
 
     val txtAzimuths = stringResource(R.string.appstrings_share_map_azimuths_option)
@@ -403,6 +493,93 @@ fun MapShareMenu(
                 }
             }
 
+            fun startMapImageExport(destination: MapShareDestination) {
+                showSelectionSheet = false
+
+                val originalStates = mutableMapOf<org.osmdroid.views.overlay.Overlay, Boolean>()
+                val originalAzimuthState = AppConfig.showAzimuths.value
+                if (!incAzimuths) {
+                    AppConfig.showAzimuths.value = false
+                }
+
+                measureOverlay?.let { overlay ->
+                    originalStates[overlay] = overlay.isEnabled
+                    if (incConfidential) overlay.isEnabled = false
+                }
+
+                globalMapRef?.overlays?.forEach { overlay ->
+                    if (overlay is org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay) {
+                        originalStates[overlay] = overlay.isEnabled
+                        overlay.isEnabled = !incConfidential
+                    }
+                }
+                globalMapRef?.invalidate()
+
+                currentView.postDelayed({
+                    val mapBmp = try {
+                        globalMapRef?.let { map ->
+                            val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888)
+                            map.draw(Canvas(bmp))
+                            bmp
+                        }
+                    } catch (e: Exception) { null }
+                    val mapDeepLink = globalMapRef?.let { map ->
+                        buildMapDeepLink(
+                            lat = map.mapCenter.latitude,
+                            lon = map.mapCenter.longitude,
+                            zoom = map.zoomLevelDouble
+                        )
+                    }
+
+                    if (!incAzimuths) {
+                        AppConfig.showAzimuths.value = originalAzimuthState
+                    }
+                    originalStates.forEach { (overlay, state) ->
+                        overlay.isEnabled = state
+                    }
+                    globalMapRef?.invalidate()
+
+                    shareFullMapCapture(
+                        context = context,
+                        currentView = currentView,
+                        mapBitmap = mapBmp,
+                        forceDarkTheme = selectedShareTheme,
+                        txtTitle = txtTitle,
+                        txtGeneratedBy = txtGeneratedBy,
+                        txtShareSiteVia = txtShareSiteVia,
+                        incAttribution = incAttribution,
+                        txtAttribution = txtAttributionDesc,
+                        incSpeedometer = incSpeedometer,
+                        currentSpeed = currentSpeed,
+                        incScale = incScale,
+                        currentZoom = currentZoom,
+                        currentLat = currentLat,
+                        incQrCode = incQrCode,
+                        qrUri = mapDeepLink,
+                        txtInitError = txtInitError,
+                        destination = destination,
+                        txtCopiedToClipboard = txtPhotoCopiedToClipboard
+                    )
+                }, 300)
+            }
+
+            MapShareActionButtons(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(
+                        start = 24.dp,
+                        end = 24.dp,
+                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
+                    )
+                    .fillMaxWidth()
+                    .widthIn(max = 420.dp),
+                txtCopyImage = txtCopyImage,
+                txtGenerateImage = txtGenerateImage,
+                onCopyClick = { safeClick { startMapImageExport(MapShareDestination.Clipboard) } },
+                onShareClick = { safeClick { startMapImageExport(MapShareDestination.Share) } }
+            )
+
+            /*
             Button(
                         onClick = {
                             showSelectionSheet = false
@@ -491,6 +668,7 @@ fun MapShareMenu(
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(txtGenerateImage, fontWeight = FontWeight.Bold)
                     }
+            */
             }
         }
     }

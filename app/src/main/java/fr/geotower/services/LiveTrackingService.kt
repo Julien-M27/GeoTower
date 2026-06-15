@@ -47,9 +47,11 @@ import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.DeviceProfile
+import fr.geotower.utils.LiveTrackingPrefs
 import fr.geotower.utils.NotificationIconResources
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
+import fr.geotower.utils.PreferenceStores
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.util.Locale
@@ -141,6 +143,12 @@ class LiveTrackingService : Service() {
             return START_STICKY
         }
 
+        if (intent?.action == ACTION_REFRESH_LOCATION_SETTINGS) {
+            startLocationUpdates()
+            refreshFromLastProcessedLocation()
+            return START_STICKY
+        }
+
         if (operatorChanged && refreshFromLastProcessedLocation()) {
             return START_STICKY
         }
@@ -182,7 +190,10 @@ class LiveTrackingService : Service() {
         }
 
         stopLocationUpdates()
-        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, 5000L).build()
+        val updateIntervalMs = liveLocationUpdateIntervalMillis()
+        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, updateIntervalMs)
+            .setMinUpdateIntervalMillis(updateIntervalMs)
+            .build()
 
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(locationResult: LocationResult) {
@@ -204,6 +215,12 @@ class LiveTrackingService : Service() {
             this,
             Manifest.permission.ACCESS_FINE_LOCATION
         ) == PackageManager.PERMISSION_GRANTED
+    }
+
+    private fun liveLocationUpdateIntervalMillis(): Long {
+        val prefs = getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+        val seconds = LiveTrackingPrefs.locationUpdateIntervalSeconds(prefs)
+        return TimeUnit.SECONDS.toMillis(seconds.toLong())
     }
 
     private fun processLocationUpdate(location: Location) {
@@ -1236,6 +1253,7 @@ class LiveTrackingService : Service() {
 
         private const val ACTION_STOP_SERVICE = "ACTION_STOP_SERVICE"
         internal const val ACTION_REFRESH_NOTIFICATION = "ACTION_REFRESH_NOTIFICATION"
+        internal const val ACTION_REFRESH_LOCATION_SETTINGS = "ACTION_REFRESH_LOCATION_SETTINGS"
         private const val STOP_ACTION_REQUEST_CODE = 1
         private const val MIN_PROCESS_INTERVAL_MS = 30_000L
         private const val MIN_PROCESS_DISTANCE_METERS = 15f

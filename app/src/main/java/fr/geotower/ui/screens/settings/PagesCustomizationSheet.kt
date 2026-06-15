@@ -1311,11 +1311,6 @@ fun ThroughputCalculationDefaultsSheet(
     val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
     val scrollState = rememberScrollState()
 
-    var preset by remember { mutableStateOf(prefs.getString(ThroughputPrefs.DEFAULT_PRESET, ThroughputPrefs.DEFAULT_PRESET_VALUE) ?: ThroughputPrefs.DEFAULT_PRESET_VALUE) }
-    var lteDownIndex by remember { mutableStateOf(prefs.getInt(ThroughputPrefs.CUSTOM_LTE_DOWN, 3).coerceIn(0, throughputModulationLabels.lastIndex)) }
-    var lteUpIndex by remember { mutableStateOf(prefs.getInt(ThroughputPrefs.CUSTOM_LTE_UP, 2).coerceIn(0, throughputModulationLabels.lastIndex)) }
-    var nrDownIndex by remember { mutableStateOf(prefs.getInt(ThroughputPrefs.CUSTOM_NR_DOWN, 3).coerceIn(0, throughputModulationLabels.lastIndex)) }
-    var nrUpIndex by remember { mutableStateOf(prefs.getInt(ThroughputPrefs.CUSTOM_NR_UP, 2).coerceIn(0, throughputModulationLabels.lastIndex)) }
     var include4G by remember { mutableStateOf(ThroughputPrefs.include4G.read(prefs)) }
     var include5G by remember { mutableStateOf(ThroughputPrefs.include5G.read(prefs)) }
     var includePlanned by remember { mutableStateOf(ThroughputPrefs.includePlanned.read(prefs)) }
@@ -1325,17 +1320,6 @@ fun ThroughputCalculationDefaultsSheet(
                 .flatMap { it.bands }
                 .associate { band -> band.prefSuffix to prefs.getBoolean(ThroughputPrefs.bandVisiblePrefKey(band.prefSuffix), true) }
         )
-    }
-
-    fun savePreset(value: String) {
-        preset = value
-        prefs.edit().putString(ThroughputPrefs.DEFAULT_PRESET, value).apply()
-    }
-
-    fun saveInt(key: String, value: Int, update: (Int) -> Unit) {
-        val coerced = value.coerceIn(0, throughputModulationLabels.lastIndex)
-        update(coerced)
-        prefs.edit().putInt(key, coerced).apply()
     }
 
     fun saveBool(key: String, value: Boolean, update: (Boolean) -> Unit) {
@@ -1369,54 +1353,6 @@ fun ThroughputCalculationDefaultsSheet(
                 )
                 Spacer(Modifier.width(48.dp))
             }
-
-            Text(
-                stringResource(R.string.appstrings_throughput_default_mode_title),
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
-            )
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                throughputPresetDefaults.forEach { option ->
-                    FilterChip(
-                        selected = preset == option.id,
-                        onClick = { savePreset(option.id) },
-                        label = { Text(option.label()) }
-                    )
-                }
-            }
-
-            AnimatedVisibility(visible = preset == "custom") {
-                Column(
-                    modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        stringResource(R.string.appstrings_throughput_custom_modulation_title),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    ThroughputDefaultModulationSlider(stringResource(R.string.appstrings_throughput4g_download_label), lteDownIndex, useOneUi) {
-                        saveInt(ThroughputPrefs.CUSTOM_LTE_DOWN, it) { value -> lteDownIndex = value }
-                    }
-                    ThroughputDefaultModulationSlider(stringResource(R.string.appstrings_throughput4g_upload_label), lteUpIndex, useOneUi) {
-                        saveInt(ThroughputPrefs.CUSTOM_LTE_UP, it) { value -> lteUpIndex = value }
-                    }
-                    ThroughputDefaultModulationSlider(stringResource(R.string.appstrings_throughput5g_download_label), nrDownIndex, useOneUi) {
-                        saveInt(ThroughputPrefs.CUSTOM_NR_DOWN, it) { value -> nrDownIndex = value }
-                    }
-                    ThroughputDefaultModulationSlider(stringResource(R.string.appstrings_throughput5g_upload_label), nrUpIndex, useOneUi) {
-                        saveInt(ThroughputPrefs.CUSTOM_NR_UP, it) { value -> nrUpIndex = value }
-                    }
-                }
-            }
-
-            Spacer(Modifier.height(20.dp))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-            Spacer(Modifier.height(12.dp))
 
             SimpleSwitchCard(stringResource(R.string.appstrings_throughput_include4g), include4G, { saveBool(ThroughputPrefs.include4G.key, it) { value -> include4G = value } }, shape, border, bubbleColor, useOneUi)
             Spacer(Modifier.height(8.dp))
@@ -1455,11 +1391,6 @@ fun ThroughputCalculationDefaultsSheet(
 
             Spacer(modifier = Modifier.height(16.dp))
             TextButton(onClick = {
-                preset = ThroughputPrefs.DEFAULT_PRESET_VALUE
-                lteDownIndex = 3
-                lteUpIndex = 2
-                nrDownIndex = 3
-                nrUpIndex = 2
                 include4G = true
                 include5G = true
                 includePlanned = false
@@ -1487,74 +1418,6 @@ fun ThroughputCalculationDefaultsSheet(
     }
 }
 
-@Composable
-private fun ThroughputDefaultModulationSlider(
-    label: String,
-    selectedIndex: Int,
-    useOneUi: Boolean,
-    onSelectedIndexChange: (Int) -> Unit
-) {
-    val coercedIndex = selectedIndex.coerceIn(0, throughputModulationLabels.lastIndex)
-    val onSliderChange: (Float) -> Unit = { value ->
-        onSelectedIndexChange(value.roundToInt().coerceIn(0, throughputModulationLabels.lastIndex))
-    }
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-        Text(
-            text = "$label : ${throughputModulationLabels[coercedIndex]}",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        if (useOneUi) {
-            Slider(
-                value = coercedIndex.toFloat(),
-                onValueChange = onSliderChange,
-                valueRange = 0f..throughputModulationLabels.lastIndex.toFloat(),
-                steps = (throughputModulationLabels.size - 2).coerceAtLeast(0),
-                thumb = {
-                    Box(
-                        modifier = Modifier
-                            .size(24.dp)
-                            .background(MaterialTheme.colorScheme.surface, CircleShape)
-                            .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                    )
-                },
-                track = { _ ->
-                    Canvas(modifier = Modifier.fillMaxWidth().height(14.dp)) {
-                        val centerY = size.height / 2
-                        drawLine(
-                            color = Color.Gray.copy(alpha = 0.3f),
-                            start = Offset(0f, centerY),
-                            end = Offset(size.width, centerY),
-                            strokeWidth = 14.dp.toPx(),
-                            cap = StrokeCap.Round
-                        )
-                        val stepWidth = size.width / throughputModulationLabels.lastIndex.coerceAtLeast(1)
-                        throughputModulationLabels.indices.forEach { index ->
-                            drawCircle(
-                                color = Color.Gray.copy(alpha = 0.6f),
-                                radius = 4.dp.toPx(),
-                                center = Offset(index * stepWidth, centerY)
-                            )
-                        }
-                    }
-                }
-            )
-        } else {
-            Slider(
-                value = coercedIndex.toFloat(),
-                onValueChange = onSliderChange,
-                valueRange = 0f..throughputModulationLabels.lastIndex.toFloat(),
-                steps = (throughputModulationLabels.size - 2).coerceAtLeast(0)
-            )
-        }
-    }
-}
-
-private data class ThroughputPresetDefault(
-    val id: String,
-    val label: @Composable () -> String
-)
-
 private data class ThroughputBandDefaultGroup(
     val title: String,
     val bands: List<ThroughputBandDefault>
@@ -1563,15 +1426,6 @@ private data class ThroughputBandDefaultGroup(
 private data class ThroughputBandDefault(
     val prefSuffix: String,
     val label: String
-)
-
-private val throughputModulationLabels = listOf("QPSK", "16-QAM", "64-QAM", "256-QAM")
-
-private val throughputPresetDefaults = listOf(
-    ThroughputPresetDefault("conservative") { ThroughputDisplayText.presetLabel("conservative") },
-    ThroughputPresetDefault("standard") { ThroughputDisplayText.presetLabel("standard") },
-    ThroughputPresetDefault("ideal") { ThroughputDisplayText.presetLabel("ideal") },
-    ThroughputPresetDefault("custom") { ThroughputDisplayText.presetLabel("custom") }
 )
 
 private val throughputBandDefaults = listOf(

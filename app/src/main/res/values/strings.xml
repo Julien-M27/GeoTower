@@ -536,6 +536,8 @@
     <string name="appstrings_live_notification_desc_nearest">Track the nearest antenna in real time, whatever its operator.</string>
     <string name="appstrings_live_notification_requires_op">Requires choosing a default operator</string>
     <string name="appstrings_live_notification_title">Live Notification</string>
+    <string name="appstrings_live_location_refresh_title">Live GPS refresh rate</string>
+    <string name="appstrings_live_location_refresh_footer">Shorter intervals make tracking more responsive, but can use more battery.</string>
     <string name="appstrings_load_more_sites">Load more sites</string>
     <string name="appstrings_loading_app">Loading...</string>
     <string name="appstrings_loading_frequencies">Loading frequencies...</string>
@@ -791,6 +793,9 @@
     <string name="appstrings_release_section_navigation_loading">Navigation and loading</string>
     <string name="appstrings_release_section_nearby">Nearby</string>
     <string name="appstrings_release_section_statistics_data">Statistics and data</string>
+    <string name="appstrings_release_section_image_sharing">Image sharing</string>
+    <string name="appstrings_release_section_refresh">Refresh</string>
+    <string name="appstrings_release_section_throughput_calculator">Throughput calculator</string>
     <string name="appstrings_release_section_database">Database</string>
     <string name="appstrings_release_section_live_tracking">Live tracking</string>
     <string name="appstrings_release_section_statistics">Statistics</string>
@@ -1378,7 +1383,7 @@
     <string name="anfr_owner_etat_ministere">State / Ministry</string>
     <string name="anfr_owner_aviation_civile">Civil Aviation</string>
     <string name="throughput_header_site">Site %1$s</string>
-    <string name="throughput_header_site_support">Site %1$s - support %2$s</string>
+    <string name="throughput_header_site_support">Site %1$s - Support %2$s</string>
     <string name="throughput_included_bands_count">%1$d band(s) included out of %2$d</string>
     <string name="throughput_main_zone_estimated">Estimated main zone: %1$s to %2$s</string>
     <string name="throughput_estimated_cone">Estimated cone: %1$s (%2$s-%3$s)</string>
@@ -1492,7 +1497,7 @@
     <string name="help_topic_subtitle_support">Everything about the tower, roof, operators and linked sites.</string>
     <string name="help_topic_subtitle_site">Frequencies, azimuths, height, status, photos, links, sharing and advanced tools.</string>
     <string name="help_topic_subtitle_elevation">Terrain, line of sight, Fresnel zone, recalculation and network limits.</string>
-    <string name="help_topic_subtitle_throughput">Conservative/ideal/custom modes, bands, modulations, MIMO and optimal distance.</string>
+    <string name="help_topic_subtitle_throughput">Bands, frequencies, MIMO, phone upload and optimal distance.</string>
     <string name="help_topic_subtitle_photos">Carousel, full screen, SignalQuest upload, descriptions and target operator.</string>
     <string name="help_topic_subtitle_share">Image options, support, frequencies, dates, speedtest, throughput and elevation profile.</string>
     <string name="help_topic_subtitle_settings">Appearance, One UI, units, split screen, customization, database, offline maps and notifications.</string>
@@ -1550,8 +1555,8 @@
     <string name="help_section_body_site_info">The site page describes an operator installation: operator banner, support, height, azimuths, frequencies, technologies, activation status and external links.</string>
     <string name="help_section_body_site_tools">Action buttons open tools related to the site. Some blocks can be hidden or moved from site page customization.</string>
     <string name="help_section_body_elevation_use">The elevation profile compares your current position to the selected site. It helps estimate whether terrain may block the signal. The calculation depends on GPS position and online elevation data.</string>
-    <string name="help_section_body_throughput_assumptions">The calculation gives theoretical throughput. Conservative mode lowers expectations, ideal mode shows a favorable scenario, and custom mode lets you adjust bands, technologies and modulations. Upload accounts for the fact that a phone transmits with far less power than an antenna.</string>
-    <string name="help_section_body_throughput_controls">The 4G, 5G and project buttons choose which technologies are included. Band checkboxes select frequencies. Modulation sliders choose QPSK, 16 QAM, 64 QAM or 256 QAM depending on the expected radio level.</string>
+    <string name="help_section_body_throughput_assumptions">The calculation gives theoretical throughput from declared frequencies, operator allocations and realistic radio assumptions. You can enable or disable 4G, 5G, planned bands and individual frequencies. Upload accounts for the fact that a phone transmits with far less power than an antenna.</string>
+    <string name="help_section_body_throughput_controls">The 4G, 5G and planned-band buttons choose which technologies are included. Band checkboxes select frequencies. The result card then shows the estimated throughput per band and optimal distance when data allows.</string>
     <string name="help_section_body_photos_view">The carousel shows available community photos. In full screen, controls let you close, switch photos and inspect the image more comfortably.</string>
     <string name="help_section_body_photos_upload">SignalQuest upload lets you attach images to a support or site. Select files, check the target operator, add a description if needed, then start the upload. Upload requires a network connection.</string>
     <string name="help_section_body_share_create">From a detail page, the Share button opens options. You can include support details, frequencies, activation dates, best speedtest, throughput calculator and sometimes the elevation profile.</string>
@@ -1653,7 +1658,7 @@
     <string name="help_visual_label_elevation_1">Route between your position and the site.</string>
     <string name="help_visual_label_elevation_2">Terrain and estimated radio visibility.</string>
     <string name="help_visual_label_elevation_3">Immediate or deferred recalculation.</string>
-    <string name="help_visual_label_throughput_1">Conservative, ideal or custom mode.</string>
+    <string name="help_visual_label_throughput_1">Technology and frequency selection.</string>
     <string name="help_visual_label_throughput_2">Bands, technologies and modulation.</string>
     <string name="help_visual_label_throughput_3">Optimal distance and mini-map.</string>
     <string name="help_visual_label_photos_1">Available photo carousel.</string>
@@ -1790,4 +1795,15 @@
     <string name="appstrings_release_statistics_online_data">More robust statistics with online data support</string>
     <string name="appstrings_release_statistics_frequency_active_sites_filters">Frequency filters and active sites are better taken into account</string>
     <string name="appstrings_release_statistics_5g_experimental_order">Improved 5G band order, with experimental bands at the end</string>
+    <string name="appstrings_release_image_sharing_copy_action">Added a copy action for shared images</string>
+    <string name="appstrings_release_image_sharing_supported_pages">Available for map, site, support, radio and elevation profile captures</string>
+    <string name="appstrings_release_elevation_profile_operator_banner">Elevation profile captures now include an operator banner with logo, technologies and ANFR ID</string>
+    <string name="appstrings_release_refresh_pull_to_refresh">Added pull-to-refresh on nearby, site details, support details and speedtests</string>
+    <string name="appstrings_release_refresh_keeps_visible_data">Refresh keeps already displayed data visible</string>
+    <string name="appstrings_release_nearby_radius_load_more">Nearby search handles radius, load more and large filtered result sets better</string>
+    <string name="appstrings_release_nearby_large_filtered_results">More reliable loading when many nearby results match the filters</string>
+    <string name="appstrings_release_live_tracking_gps_frequency">GPS refresh frequency can be set to 5, 10, 15 or 20 seconds</string>
+    <string name="appstrings_release_live_tracking_frequency_live_apply">Changes apply to live tracking already running</string>
+    <string name="appstrings_release_throughput_simplified_profile">Throughput calculation is simpler with a single conservative profile</string>
+    <string name="appstrings_release_throughput_modes_removed">Advanced modes removed from the interface, settings and help</string>
 </resources>

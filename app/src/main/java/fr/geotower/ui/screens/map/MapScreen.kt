@@ -2987,9 +2987,12 @@ fun MapScreen(
             }
 
             if (showZoomBtns) {
+                val zoomControlShape = RoundedCornerShape(MapControlButtonDiameter / 2f)
                 Surface(
-                    modifier = Modifier.width(MapControlButtonDiameter),
-                    shape = RoundedCornerShape(MapControlButtonDiameter / 2f),
+                    modifier = Modifier
+                        .width(MapControlButtonDiameter)
+                        .clip(zoomControlShape),
+                    shape = zoomControlShape,
                     color = MaterialTheme.colorScheme.surface,
                     shadowElevation = 6.dp,
                     border = BorderStroke(
@@ -2999,20 +3002,34 @@ fun MapScreen(
                 ) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        modifier = Modifier.padding(vertical = 4.dp)
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(zoomControlShape)
                     ) {
-                        IconButton(
-                            onClick = { mapViewRef?.controller?.zoomIn() },
-                            modifier = Modifier.size(MapControlButtonDiameter)
-                        ) { Icon(Icons.Default.Add, null, modifier = Modifier.size(26.dp)) }
+                        ZoomControlSegmentButton(
+                            icon = Icons.Default.Add,
+                            shape = RoundedCornerShape(
+                                topStart = MapControlButtonDiameter / 2f,
+                                topEnd = MapControlButtonDiameter / 2f,
+                                bottomStart = 10.dp,
+                                bottomEnd = 10.dp
+                            ),
+                            onClick = { mapViewRef?.controller?.zoomIn() }
+                        )
                         HorizontalDivider(
                             modifier = Modifier.width(32.dp),
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
                         )
-                        IconButton(
-                            onClick = { mapViewRef?.controller?.zoomOut() },
-                            modifier = Modifier.size(MapControlButtonDiameter)
-                        ) { Icon(Icons.Default.Remove, null, modifier = Modifier.size(26.dp)) }
+                        ZoomControlSegmentButton(
+                            icon = Icons.Default.Remove,
+                            shape = RoundedCornerShape(
+                                topStart = 10.dp,
+                                topEnd = 10.dp,
+                                bottomStart = MapControlButtonDiameter / 2f,
+                                bottomEnd = MapControlButtonDiameter / 2f
+                            ),
+                            onClick = { mapViewRef?.controller?.zoomOut() }
+                        )
                     }
                 }
             }
@@ -3636,6 +3653,28 @@ private fun MapSearchBar(
 private fun SmallFloatingButton(icon: ImageVector, desc: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Surface(onClick = onClick, shape = CircleShape, color = MaterialTheme.colorScheme.surface, shadowElevation = 4.dp, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), modifier = modifier.size(MapControlButtonDiameter)) {
         Box(contentAlignment = Alignment.Center) { Icon(icon, desc) }
+    }
+}
+
+@Composable
+private fun ZoomControlSegmentButton(
+    icon: ImageVector,
+    shape: androidx.compose.ui.graphics.Shape,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(MapControlButtonDiameter)
+            .clip(shape),
+        shape = shape,
+        color = Color.Transparent,
+        contentColor = MaterialTheme.colorScheme.onSurface
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(icon, contentDescription = null, modifier = Modifier.size(26.dp))
+        }
     }
 }
 

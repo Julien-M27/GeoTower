@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -40,7 +41,6 @@ import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Tag
-import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -76,7 +76,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import com.google.android.gms.location.LocationServices
@@ -120,6 +122,7 @@ import fr.geotower.ui.screens.settings.ThroughputCalculatorSettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.FreqBand
+import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.SitePagePrefs
 import fr.geotower.utils.ThroughputPrefs
 import fr.geotower.utils.parseAndSortFrequencies
@@ -183,7 +186,6 @@ fun ThroughputCalculatorScreen(
     var physique by remember { mutableStateOf<PhysiqueEntity?>(null) }
     var technique by remember { mutableStateOf<TechniqueEntity?>(null) }
     var isLoading by remember { mutableStateOf(true) }
-    var selectedPreset by remember { mutableStateOf(presetFromPreference(prefs.getString(ThroughputPrefs.DEFAULT_PRESET, ThroughputPrefs.DEFAULT_PRESET_VALUE))) }
     var customSettings by remember {
         mutableStateOf(
             CustomModulationSettings(
@@ -304,11 +306,11 @@ fun ThroughputCalculatorScreen(
     }
     val effectiveEnabledBandKeys = if (bandKeysInitialized) enabledBandKeys else availableBandKeys
     val supportHeightMeters = physique?.hauteur
-    val result = remember(parsedBands, site?.operateur, selectedPreset, customSettings, include4G, include5G, includePlanned, supportHeightMeters, effectiveEnabledBandKeys) {
+    val result = remember(parsedBands, site?.operateur, customSettings, include4G, include5G, includePlanned, supportHeightMeters, effectiveEnabledBandKeys) {
         calculateThroughput(
             bands = parsedBands,
             operatorName = site?.operateur,
-            preset = selectedPreset,
+            preset = ThroughputPreset.Conservative,
             customSettings = customSettings,
             include4G = include4G,
             include5G = include5G,
@@ -381,11 +383,8 @@ fun ThroughputCalculatorScreen(
                 mainBgColor = mainBgColor,
                 cardBgColor = cardBgColor,
                 blockShape = blockShape,
-                selectedPreset = selectedPreset,
-                onPresetChange = { selectedPreset = it },
                 customSettings = customSettings,
                 onCustomSettingsChange = ::updateCustomSettings,
-                useOneUi = useOneUiDesign,
                 include4G = include4G,
                 onInclude4GChange = { include4G = it },
                 include5G = include5G,
@@ -406,7 +405,6 @@ fun ThroughputCalculatorScreen(
     }
 
     fun refreshThroughputDefaultsFromPrefs() {
-        selectedPreset = presetFromPreference(prefs.getString(ThroughputPrefs.DEFAULT_PRESET, ThroughputPrefs.DEFAULT_PRESET_VALUE))
         customSettings = CustomModulationSettings(
             lteDownIndex = prefs.getInt(ThroughputPrefs.CUSTOM_LTE_DOWN, 3).coerceIn(0, lteDownModulationOptions.lastIndex),
             lteUpIndex = prefs.getInt(ThroughputPrefs.CUSTOM_LTE_UP, 2).coerceIn(0, lteUpModulationOptions.lastIndex),
@@ -548,11 +546,8 @@ private fun ThroughputContent(
     mainBgColor: Color,
     cardBgColor: Color,
     blockShape: Shape,
-    selectedPreset: ThroughputPreset,
-    onPresetChange: (ThroughputPreset) -> Unit,
     customSettings: CustomModulationSettings,
     onCustomSettingsChange: (CustomModulationSettings) -> Unit,
-    useOneUi: Boolean,
     include4G: Boolean,
     onInclude4GChange: (Boolean) -> Unit,
     include5G: Boolean,
@@ -594,11 +589,6 @@ private fun ThroughputContent(
                 ThroughputBlock.Controls -> ThroughputControlsCard(
                     cardBgColor = cardBgColor,
                     blockShape = blockShape,
-                    selectedPreset = selectedPreset,
-                    onPresetChange = onPresetChange,
-                    customSettings = customSettings,
-                    onCustomSettingsChange = onCustomSettingsChange,
-                    useOneUi = useOneUi,
                     include4G = include4G,
                     onInclude4GChange = onInclude4GChange,
                     include5G = include5G,
@@ -622,7 +612,7 @@ private fun ThroughputContent(
                         ThroughputBandsCard(result, cardBgColor, blockShape)
                     }
                 }
-                ThroughputBlock.Assumptions -> ThroughputAssumptionsCard(selectedPreset, result, cardBgColor, blockShape)
+                ThroughputBlock.Assumptions -> ThroughputAssumptionsCard(result, cardBgColor, blockShape)
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -637,37 +627,70 @@ private fun ThroughputHeaderCard(
     blockShape: Shape
 ) {
     val supportHeightLabel = physique?.hauteur?.let { formatHeightMeters(it) }
-    Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
+    val unknown = stringResource(R.string.appstrings_unknown)
+    val supportLabel = stringResource(R.string.appstrings_speedtests_support_label)
+    val operatorName = site.operateur?.trim()?.takeIf { it.isNotEmpty() } ?: unknown
+    val operatorColor = OperatorColors.keyFor(operatorName)
+        ?.let { Color(OperatorColors.colorArgbForKey(it)) }
+        ?: MaterialTheme.colorScheme.primary
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .heightIn(min = 112.dp),
+        shape = blockShape,
+        colors = CardDefaults.cardColors(containerColor = cardBgColor)
+    ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(horizontal = 20.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             OperatorLogoOrFallback(
-                operatorName = site.operateur,
-                modifier = Modifier.size(44.dp)
+                operatorName = operatorName,
+                operatorColor = operatorColor,
+                modifier = Modifier.size(72.dp)
             )
-            Spacer(Modifier.width(12.dp))
+            Spacer(Modifier.width(18.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = site.operateur ?: stringResource(R.string.appstrings_unknown),
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+                    text = operatorName,
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Black,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+                Spacer(Modifier.height(4.dp))
                 Text(
-                    text = ThroughputDisplayText.headerSite(site.idAnfr, supportHeightLabel),
+                    text = ThroughputDisplayText.headerSite(site.idAnfr),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
+                supportHeightLabel?.let { supportHeight ->
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "$supportLabel $supportHeight",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = operatorColor,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }
 }
 
 @Composable
-private fun OperatorLogoOrFallback(operatorName: String?, modifier: Modifier = Modifier) {
+private fun OperatorLogoOrFallback(
+    operatorName: String?,
+    operatorColor: Color,
+    modifier: Modifier = Modifier
+) {
     val logoRes = getDetailLogoRes(operatorName)
     if (logoRes != null) {
         Image(
@@ -679,14 +702,14 @@ private fun OperatorLogoOrFallback(operatorName: String?, modifier: Modifier = M
         Box(
             modifier = modifier
                 .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer),
+                .background(operatorColor),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                Icons.Default.WifiTethering,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                modifier = Modifier.size(26.dp)
+            Text(
+                text = operatorName?.take(1)?.uppercase()?.ifBlank { "?" } ?: "?",
+                color = Color.White,
+                fontWeight = FontWeight.Bold,
+                fontSize = 28.sp
             )
         }
     }
@@ -1073,11 +1096,6 @@ private fun PositionAnalysisSummary(
 private fun ThroughputControlsCard(
     cardBgColor: Color,
     blockShape: Shape,
-    selectedPreset: ThroughputPreset,
-    onPresetChange: (ThroughputPreset) -> Unit,
-    customSettings: CustomModulationSettings,
-    onCustomSettingsChange: (CustomModulationSettings) -> Unit,
-    useOneUi: Boolean,
     include4G: Boolean,
     onInclude4GChange: (Boolean) -> Unit,
     include5G: Boolean,
@@ -1091,32 +1109,11 @@ private fun ThroughputControlsCard(
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(
-                text = stringResource(R.string.appstrings_throughput_radio_assumption),
+                text = stringResource(R.string.appstrings_throughput_frequencies_label),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                ThroughputPreset.values().forEach { preset ->
-                    FilterChip(
-                        selected = selectedPreset == preset,
-                        onClick = { onPresetChange(preset) },
-                        label = { Text(presetLabel(preset)) }
-                    )
-                }
-            }
-            if (selectedPreset == ThroughputPreset.Custom) {
-                CustomModulationControls(
-                    settings = customSettings,
-                    onSettingsChange = onCustomSettingsChange,
-                    useOneUi = useOneUi
-                )
-            }
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -1669,7 +1666,6 @@ private fun ThroughputDetailLine(label: String, value: String, color: Color) {
 
 @Composable
 private fun ThroughputAssumptionsCard(
-    selectedPreset: ThroughputPreset,
     result: ThroughputResult,
     cardBgColor: Color,
     blockShape: Shape
@@ -1685,11 +1681,6 @@ private fun ThroughputAssumptionsCard(
             Text(
                 text = stringResource(R.string.appstrings_throughput_disclaimer),
                 style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = presetDescription(selectedPreset),
-                style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (result.warnings.isNotEmpty()) {
@@ -1730,35 +1721,6 @@ private fun localizedThroughputAssumptions(assumptions: List<String>): String {
         translated += ThroughputDisplayText.translateAssumption(assumption)
     }
     return translated.joinToString(" | ")
-}
-
-@Composable
-private fun presetLabel(preset: ThroughputPreset): String {
-    return when (preset) {
-        ThroughputPreset.Conservative -> ThroughputDisplayText.presetLabel("conservative")
-        ThroughputPreset.Standard -> ThroughputDisplayText.presetLabel("standard")
-        ThroughputPreset.Maximum -> ThroughputDisplayText.presetLabel("ideal")
-        ThroughputPreset.Custom -> ThroughputDisplayText.presetLabel("custom")
-    }
-}
-
-@Composable
-private fun presetDescription(preset: ThroughputPreset): String {
-    return when (preset) {
-        ThroughputPreset.Conservative -> ThroughputDisplayText.presetDescription("conservative")
-        ThroughputPreset.Standard -> ThroughputDisplayText.presetDescription("standard")
-        ThroughputPreset.Maximum -> ThroughputDisplayText.presetDescription("ideal")
-        ThroughputPreset.Custom -> ThroughputDisplayText.presetDescription("custom")
-    }
-}
-
-private fun presetFromPreference(raw: String?): ThroughputPreset {
-    return when (raw?.lowercase(Locale.ROOT)) {
-        "conservative", "prudent" -> ThroughputPreset.Conservative
-        "ideal", "maximum" -> ThroughputPreset.Maximum
-        "custom" -> ThroughputPreset.Custom
-        else -> ThroughputPreset.Standard
-    }
 }
 
 private suspend fun loadThroughputSite(
@@ -1861,11 +1823,26 @@ private fun calculateThroughput(
 
     return ThroughputResult(
         bands = aggregationAwareBands,
-        warnings = (engineResult?.warnings.orEmpty() + aggregationWarnings + uplinkAggregationWarning).distinct(),
-        assumptions = engineResult?.assumptions.orEmpty(),
+        warnings = (engineResult?.warnings.orEmpty().filterNot(::isThroughputProfileWarning) + aggregationWarnings + uplinkAggregationWarning).distinct(),
+        assumptions = engineResult?.assumptions.orEmpty().filterNot(::isThroughputProfileAssumption).distinct(),
         confidenceScore = engineResult?.confidenceScore ?: 35,
         calculationVersion = engineResult?.calculationVersion ?: fr.geotower.radio.THROUGHPUT_CALCULATION_VERSION,
         sourceSummary = engineResult?.sourceSummary ?: ThroughputTextKey.THROUGHPUT_SOURCE_SUMMARY_DEFAULT
+    )
+}
+
+private fun isThroughputProfileWarning(warning: String): Boolean {
+    return warning.startsWith(ThroughputTextKey.THROUGHPUT_WARNING_PROFILE_PREFIX) &&
+        warning.endsWith(ThroughputTextKey.THROUGHPUT_WARNING_PROFILE_SUFFIX)
+}
+
+private fun isThroughputProfileAssumption(assumption: String): Boolean {
+    return assumption in setOf(
+        ThroughputTextKey.THROUGHPUT_PROFILE_PRUDENT_DESC,
+        ThroughputTextKey.THROUGHPUT_PROFILE_STANDARD_DESC,
+        ThroughputTextKey.THROUGHPUT_PROFILE_IDEAL_DESC,
+        ThroughputTextKey.THROUGHPUT_PROFILE_CUSTOM_DESC,
+        ThroughputTextKey.THROUGHPUT_PROFILE_CUSTOM_SHORT_DESC
     )
 }
 

@@ -937,7 +937,7 @@ private fun helpTopicSpecs(): List<HelpTopicSpec> {
             keywords = listOf("debit", "throughput", "qam", "mimo", "4g", "5g", "distance", "cone"),
             sections = listOf(
                 HelpSectionSpec("throughput_assumptions", visual = HelpVisual.Throughput),
-                HelpSectionSpec("throughput_controls", listOf("custom", "optimal_distance", "mini_map"))
+                HelpSectionSpec("throughput_controls", listOf("optimal_distance", "mini_map"))
             )
         ),
         HelpTopicSpec(

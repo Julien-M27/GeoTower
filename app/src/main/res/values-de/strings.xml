@@ -523,6 +523,8 @@
     <string name="appstrings_live_notification_desc_nearest">Verfolge die nächstgelegene Antenne in Echtzeit, unabhängig vom Betreiber.</string>
     <string name="appstrings_live_notification_requires_op">Erfordert einen Standardbetreiber</string>
     <string name="appstrings_live_notification_title">Live-Benachrichtigung</string>
+    <string name="appstrings_live_location_refresh_title">Live-GPS-Aktualisierung</string>
+    <string name="appstrings_live_location_refresh_footer">Kürzere Intervalle machen die Verfolgung reaktionsschneller, können aber mehr Akku verbrauchen.</string>
     <string name="appstrings_load_more_sites">Mehr Standorte laden</string>
     <string name="appstrings_loading_app">Wird geladen...</string>
     <string name="appstrings_loading_frequencies">Frequenzen werden geladen...</string>
@@ -773,6 +775,9 @@
     <string name="appstrings_release_section_navigation_loading">Navigation und Laden</string>
     <string name="appstrings_release_section_nearby">Umgebung</string>
     <string name="appstrings_release_section_statistics_data">Statistiken und Daten</string>
+    <string name="appstrings_release_section_image_sharing">Bildfreigabe</string>
+    <string name="appstrings_release_section_refresh">Aktualisierung</string>
+    <string name="appstrings_release_section_throughput_calculator">Durchsatzberechnung</string>
     <string name="appstrings_release_section_database">Datenbank</string>
     <string name="appstrings_release_section_live_tracking">Live-Tracking</string>
     <string name="appstrings_release_section_statistics">Statistiken</string>
@@ -1474,7 +1479,7 @@
     <string name="help_topic_subtitle_support">Everything about the tower, roof, operators and linked sites.</string>
     <string name="help_topic_subtitle_site">Frequencies, azimuths, height, status, photos, links, sharing and advanced tools.</string>
     <string name="help_topic_subtitle_elevation">Terrain, line of sight, Fresnel zone, recalculation and network limits.</string>
-    <string name="help_topic_subtitle_throughput">Conservative/ideal/custom modes, bands, modulations, MIMO and optimal distance.</string>
+    <string name="help_topic_subtitle_throughput">Bänder, Frequenzen, MIMO, Telefon-Upload und optimale Entfernung.</string>
     <string name="help_topic_subtitle_photos">Carousel, full screen, SignalQuest upload, descriptions and target operator.</string>
     <string name="help_topic_subtitle_share">Image options, support, frequencies, dates, speedtest, throughput and elevation profile.</string>
     <string name="help_topic_subtitle_settings">Appearance, One UI, units, split screen, customization, database, offline maps and notifications.</string>
@@ -1532,8 +1537,8 @@
     <string name="help_section_body_site_info">The site page describes an operator installation: operator banner, support, height, azimuths, frequencies, technologies, activation status and external links.</string>
     <string name="help_section_body_site_tools">Action buttons open tools related to the site. Some blocks can be hidden or moved from site page customization.</string>
     <string name="help_section_body_elevation_use">The elevation profile compares your current position to the selected site. It helps estimate whether terrain may block the signal. The calculation depends on GPS position and online elevation data.</string>
-    <string name="help_section_body_throughput_assumptions">The calculation gives theoretical throughput. Conservative mode lowers expectations, ideal mode shows a favorable scenario, and custom mode lets you adjust bands, technologies and modulations. Upload accounts for the fact that a phone transmits with far less power than an antenna.</string>
-    <string name="help_section_body_throughput_controls">The 4G, 5G and project buttons choose which technologies are included. Band checkboxes select frequencies. Modulation sliders choose QPSK, 16 QAM, 64 QAM or 256 QAM depending on the expected radio level.</string>
+    <string name="help_section_body_throughput_assumptions">Die Berechnung liefert einen theoretischen Durchsatz aus deklarierten Frequenzen, Betreiberzuteilungen und realistischen Funkannahmen. Du kannst 4G, 5G, geplante Bänder und einzelne Frequenzen aktivieren oder deaktivieren. Der Upload berücksichtigt, dass ein Telefon mit deutlich weniger Leistung sendet als eine Antenne.</string>
+    <string name="help_section_body_throughput_controls">Die Schalter für 4G, 5G und geplante Bänder wählen die berücksichtigten Technologien. Band-Kontrollkästchen wählen die Frequenzen. Die Ergebnis-Karte zeigt anschließend den geschätzten Durchsatz pro Band und die optimale Entfernung, wenn die Daten es erlauben.</string>
     <string name="help_section_body_photos_view">The carousel shows available community photos. In full screen, controls let you close, switch photos and inspect the image more comfortably.</string>
     <string name="help_section_body_photos_upload">SignalQuest upload lets you attach images to a support or site. Select files, check the target operator, add a description if needed, then start the upload. Upload requires a network connection.</string>
     <string name="help_section_body_share_create">From a detail page, the Share button opens options. You can include support details, frequencies, activation dates, best speedtest, throughput calculator and sometimes the elevation profile.</string>
@@ -1635,7 +1640,7 @@
     <string name="help_visual_label_elevation_1">Route between your position and the site.</string>
     <string name="help_visual_label_elevation_2">Terrain and estimated radio visibility.</string>
     <string name="help_visual_label_elevation_3">Immediate or deferred recalculation.</string>
-    <string name="help_visual_label_throughput_1">Conservative, ideal or custom mode.</string>
+    <string name="help_visual_label_throughput_1">Auswahl von Technologien und Frequenzen.</string>
     <string name="help_visual_label_throughput_2">Bands, technologies and modulation.</string>
     <string name="help_visual_label_throughput_3">Optimal distance and mini-map.</string>
     <string name="help_visual_label_photos_1">Available photo carousel.</string>
@@ -1772,4 +1777,15 @@
     <string name="appstrings_release_statistics_online_data">Robustere Statistiken mit Unterstützung für Online-Daten</string>
     <string name="appstrings_release_statistics_frequency_active_sites_filters">Frequenzfilter und aktive Standorte werden besser berücksichtigt</string>
     <string name="appstrings_release_statistics_5g_experimental_order">Verbesserte Reihenfolge der 5G-Bänder, experimentelle Bänder stehen am Ende</string>
+    <string name="appstrings_release_image_sharing_copy_action">Kopieraktion für geteilte Bilder hinzugefügt</string>
+    <string name="appstrings_release_image_sharing_supported_pages">Verfügbar für Karte, Standort, Support, Funk und Höhenprofil</string>
+    <string name="appstrings_release_elevation_profile_operator_banner">Höhenprofil-Aufnahmen enthalten jetzt ein Betreiberbanner mit Logo, Technologien und ANFR-ID</string>
+    <string name="appstrings_release_refresh_pull_to_refresh">Pull-to-refresh für Umgebung, Standortdetails, Supportdetails und Speedtests hinzugefügt</string>
+    <string name="appstrings_release_refresh_keeps_visible_data">Bereits angezeigte Daten bleiben während der Aktualisierung sichtbar</string>
+    <string name="appstrings_release_nearby_radius_load_more">Umgebungssuche verarbeitet Radius, Mehr laden und große gefilterte Ergebnismengen besser</string>
+    <string name="appstrings_release_nearby_large_filtered_results">Zuverlässigeres Laden, wenn viele Ergebnisse zu den Filtern passen</string>
+    <string name="appstrings_release_live_tracking_gps_frequency">GPS-Frequenz des Live-Trackings kann auf 5, 10, 15 oder 20 Sekunden gesetzt werden</string>
+    <string name="appstrings_release_live_tracking_frequency_live_apply">Änderungen gelten für bereits laufendes Live-Tracking</string>
+    <string name="appstrings_release_throughput_simplified_profile">Durchsatzberechnung ist mit einem einzigen konservativen Profil einfacher</string>
+    <string name="appstrings_release_throughput_modes_removed">Erweiterte Modi wurden aus Oberfläche, Einstellungen und Hilfe entfernt</string>
 </resources>

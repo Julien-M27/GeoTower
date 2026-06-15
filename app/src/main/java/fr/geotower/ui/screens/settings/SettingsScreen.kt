@@ -117,6 +117,7 @@ import fr.geotower.utils.AppLogoDrawingResources
 import fr.geotower.utils.AppUiMode
 import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.HomePrefs
+import fr.geotower.utils.LiveTrackingPrefs
 import fr.geotower.utils.MapDisplayPrefs
 import fr.geotower.utils.PreferenceStores
 import kotlinx.coroutines.launch
@@ -1837,6 +1838,9 @@ fun SectionPreferences(
     var widgetFrequency by remember {
         mutableIntStateOf(WidgetPrefs.syncFrequencyMinutes(prefs))
     }
+    var liveLocationIntervalSeconds by remember {
+        mutableIntStateOf(LiveTrackingPrefs.locationUpdateIntervalSeconds(prefs))
+    }
 
     // Présence d'au moins un widget GeoTower posé : conditionne l'activation du curseur de fréquence
     // (réévaluée à chaque retour au premier plan, l'utilisateur pouvant ajouter/retirer un widget entre-temps).
@@ -2048,6 +2052,33 @@ fun SectionPreferences(
         bubbleColor = bubbleColor,
         useOneUi = useOneUi
     )
+
+    if (liveNotifsEnabled) {
+        Spacer(Modifier.height(12.dp))
+        fr.geotower.ui.components.CustomSliderCard(
+            title = stringResource(R.string.appstrings_live_location_refresh_title),
+            currentValue = liveLocationIntervalSeconds,
+            steps = LiveTrackingPrefs.LOCATION_UPDATE_INTERVAL_OPTIONS_SECONDS,
+            labels = LiveTrackingPrefs.LOCATION_UPDATE_INTERVAL_OPTIONS_SECONDS.map { "$it s" },
+            onValueChange = { newIntervalSeconds ->
+                val normalizedIntervalSeconds =
+                    LiveTrackingPrefs.normalizeLocationUpdateIntervalSeconds(newIntervalSeconds)
+                liveLocationIntervalSeconds = normalizedIntervalSeconds
+                prefs.edit()
+                    .putInt(
+                        LiveTrackingPrefs.LOCATION_UPDATE_INTERVAL_SECONDS,
+                        normalizedIntervalSeconds
+                    )
+                    .apply()
+                LiveTrackingController.refreshLocationSettings(context)
+            },
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            footerText = stringResource(R.string.appstrings_live_location_refresh_footer)
+        )
+    }
     Spacer(Modifier.height(12.dp))
 
     PreferenceOperatorCard(stringResource(R.string.settings_default_operator), op, onOp, shape, border, bubbleColor, useOneUi, safeClick)

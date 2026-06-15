@@ -11,6 +11,7 @@ import android.location.LocationManager
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -56,6 +57,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
@@ -66,9 +68,12 @@ import androidx.compose.ui.graphics.nativeCanvas
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import fr.geotower.data.AnfrRepository
@@ -83,6 +88,9 @@ import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.OperatorLogos
+import fr.geotower.utils.formatTechnologies
 import fr.geotower.utils.isNetworkAvailable
 import fr.geotower.utils.radioFrequencyLabel
 import fr.geotower.utils.rememberNetworkAvailableState
@@ -435,6 +443,14 @@ fun ElevationProfileScreen(
                     val fresnelObstruction = remember(profile, supportHeight, frequency) {
                         calculateFresnelObstruction(profile!!, supportHeight, frequency)
                     }
+                    site?.let { currentSite ->
+                        ElevationProfileOperatorBanner(
+                            site = currentSite,
+                            technique = technique,
+                            bgColor = cardBgColor,
+                            shape = blockShape
+                        )
+                    }
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = blockShape,
@@ -531,6 +547,92 @@ fun ElevationProfileScreen(
                 }
             }
         )
+    }
+}
+
+@Composable
+private fun ElevationProfileOperatorBanner(
+    site: LocalisationEntity,
+    technique: TechniqueEntity?,
+    bgColor: Color,
+    shape: RoundedCornerShape
+) {
+    val unknown = stringResource(R.string.appstrings_unknown)
+    val operatorName = site.operateur?.trim()?.takeIf { it.isNotEmpty() } ?: unknown
+    val operatorColor = OperatorColors.keyFor(operatorName)
+        ?.let { Color(OperatorColors.colorArgbForKey(it)) }
+        ?: MaterialTheme.colorScheme.primary
+    val logoRes = OperatorLogos.drawableRes(operatorName)
+    val technologies = formatTechnologies(
+        technique?.technologies?.takeIf { it.isNotBlank() } ?: site.frequences,
+        unknown
+    )
+
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = shape,
+        colors = CardDefaults.cardColors(containerColor = bgColor)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (logoRes != null) {
+                Image(
+                    painter = painterResource(id = logoRes),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .size(72.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
+                        .background(operatorColor, RoundedCornerShape(8.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = operatorName.take(1).uppercase().ifBlank { "?" },
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 26.sp
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(16.dp))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = operatorName,
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = technologies,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = "ANFR ${site.idAnfr}",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = operatorColor,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
     }
 }
 

@@ -52,6 +52,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -80,6 +81,7 @@ import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.GeoTowerBreadcrumbItem
 import fr.geotower.ui.components.GeoTowerLoadingMessage
 import fr.geotower.ui.components.GeoTowerNavigationBreadcrumbBar
+import fr.geotower.ui.components.GeoTowerPullToRefreshBox
 import fr.geotower.ui.components.InfoLine
 import fr.geotower.ui.components.MiniMapViewMode
 import fr.geotower.ui.components.RadioShareMenu
@@ -170,6 +172,8 @@ fun SupportDetailScreen(
     var hsDataMap by remember { mutableStateOf<Map<String, fr.geotower.data.models.SiteHsEntity>>(emptyMap()) } // 🚨 NOUVEAU
     var communityPhotos by remember { mutableStateOf<List<CommunityPhoto>>(emptyList()) }
     var isLoading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var refreshTrigger by remember { mutableIntStateOf(0) }
     var userLocation by remember { mutableStateOf<Location?>(null) }
 
     var showNavigationSheet by remember { mutableStateOf(false) }
@@ -181,10 +185,12 @@ fun SupportDetailScreen(
     var showCommunityDataSettingsSheet by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
 
-    LaunchedEffect(siteId, effectiveHighlightedOperatorKey, featureFlags) {
+    LaunchedEffect(siteId, effectiveHighlightedOperatorKey, featureFlags, refreshTrigger) {
         // 1️⃣ CHARGEMENT RAPIDE (Base de données) -> Bloque l'écran une fraction de seconde
         try {
-            isLoading = true
+            if (!isRefreshing) {
+                isLoading = true
+            }
             withContext(Dispatchers.IO) {
                 val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
                 val savedLat = prefs.getFloat("clicked_lat", 0f).toDouble()
@@ -298,6 +304,7 @@ fun SupportDetailScreen(
         launch(Dispatchers.IO) {
             if (!canUseSupportPhotos) {
                 communityPhotos = emptyList()
+                isRefreshing = false
                 return@launch
             }
             try {
@@ -354,6 +361,8 @@ fun SupportDetailScreen(
                 communityPhotos = photosTemp
             } catch (e: Exception) {
                 AppLogger.w(TAG_SUPPORT_DETAIL, "Support photos refresh failed", e)
+            } finally {
+                isRefreshing = false
             }
         }
     }
@@ -605,7 +614,17 @@ fun SupportDetailScreen(
         }
     ) { padding ->
         // 🚨 CORRECTION : On applique UNIQUEMENT le padding du haut (top) pour passer sous les boutons en bas !
-        Box(modifier = Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().background(mainBgColor)) {
+        GeoTowerPullToRefreshBox(
+            isRefreshing = isRefreshing,
+            onRefresh = {
+                if (!isRefreshing) {
+                    isRefreshing = true
+                    refreshTrigger++
+                }
+            },
+            enabled = !isLoading,
+            modifier = Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().background(mainBgColor)
+        ) {
             if (isLoading) {
                 GeoTowerLoadingMessage(
                     title = stringResource(R.string.appstrings_support_detail_loading_title),

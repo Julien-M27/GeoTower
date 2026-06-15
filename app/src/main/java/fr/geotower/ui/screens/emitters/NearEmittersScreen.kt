@@ -90,6 +90,7 @@ import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import fr.geotower.R
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.GeoTowerPullToRefreshBox
 import fr.geotower.ui.components.LiveDatabaseUsageWarningDialog
 import fr.geotower.ui.components.geoTowerLazyListFadingEdge
 import fr.geotower.data.AnfrRepository
@@ -130,6 +131,8 @@ private const val NEARBY_RELOAD_DISTANCE_METERS = 100f
 private const val NEARBY_REMOTE_SEARCH_DEBOUNCE_MS = 450L
 private const val NEARBY_ADDRESS_SEARCH_LIMIT = 1000
 private const val NEARBY_GLOBAL_MAPPING_LIMIT = 800
+private const val NEARBY_VISIBLE_PAGE_SIZE = 100
+private const val NEARBY_RADIUS_UNBOUNDED = 0
 
 data class UiSite(
     val id: Long,
@@ -221,9 +224,13 @@ fun NearEmittersScreen(
 
     var userLocation by remember { mutableStateOf<Location?>(null) }
     var searchCenter by remember { mutableStateOf<Location?>(null) }
+    var isResolvingInitialLocation by remember { mutableStateOf(hasNearbyLocationPermission(context)) }
     var isLoading by remember { mutableStateOf(true) }
+    var isRefreshing by remember { mutableStateOf(false) }
+    var refreshTrigger by remember { mutableIntStateOf(0) }
     var sites by remember { mutableStateOf<List<UiSite>>(emptyList()) }
-    var filteredSites by remember { mutableStateOf<List<UiSite>>(emptyList()) }
+    var hasMoreNearbySites by remember { mutableStateOf(false) }
+    var hasMoreNearbySitesBeyondRadius by remember { mutableStateOf(false) }
     var remoteSearchQuery by remember { mutableStateOf("") }
     var remoteSearchSites by remember { mutableStateOf<List<UiSite>>(emptyList()) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
@@ -242,6 +249,7 @@ fun NearEmittersScreen(
     var showNearbySites by remember { mutableStateOf(prefs.getBoolean("show_nearby_sites", true)) }
     var nearbyOrder by remember { mutableStateOf(prefs.getString("nearby_order", "search,sites")!!.split(",")) }
     var nearbySearchRadius by remember { mutableIntStateOf(prefs.getInt("nearby_search_radius", 5).coerceAtMost(nearbyMaxRadiusKm)) }
+    var activeNearbySearchRadius by rememberSaveable { mutableIntStateOf(nearbySearchRadius) }
     var showNearbyFrequencyFiltersSheet by remember { mutableStateOf(false) }
     var showNearbySettingsSheet by remember { mutableStateOf(false) }
     val frequencyFiltersSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
@@ -250,6 +258,7 @@ fun NearEmittersScreen(
     LaunchedEffect(nearbyMaxRadiusKm) {
         if (nearbySearchRadius > nearbyMaxRadiusKm) {
             nearbySearchRadius = nearbyMaxRadiusKm
+            activeNearbySearchRadius = nearbyMaxRadiusKm
             prefs.edit().putInt("nearby_search_radius", nearbyMaxRadiusKm).apply()
         }
     }
@@ -283,20 +292,27 @@ fun NearEmittersScreen(
     }
 
     LaunchedEffect(Unit) {
-        if (!hasNearbyLocationPermission(context)) return@LaunchedEffect
-
-        val locationHelper = LocationHelper(context)
-        val cachedLocation = locationHelper.getLastLocation()
-            ?: withContext(Dispatchers.IO) { getLastKnownLocation(context) }
-        if (cachedLocation != null) {
-            userLocation = cachedLocation
+        if (!hasNearbyLocationPermission(context)) {
+            isResolvingInitialLocation = false
+            return@LaunchedEffect
         }
 
-        val freshLocation = withTimeoutOrNull(2_500L) {
-            locationHelper.getCurrentLocation()
-        }
-        if (freshLocation != null) {
-            userLocation = freshLocation
+        try {
+            val locationHelper = LocationHelper(context)
+            val cachedLocation = locationHelper.getLastLocation()
+                ?: withContext(Dispatchers.IO) { getLastKnownLocation(context) }
+            if (cachedLocation != null) {
+                userLocation = cachedLocation
+            }
+
+            val freshLocation = withTimeoutOrNull(2_500L) {
+                locationHelper.getCurrentLocation()
+            }
+            if (freshLocation != null) {
+                userLocation = freshLocation
+            }
+        } finally {
+            isResolvingInitialLocation = false
         }
     }
 
@@ -334,14 +350,22 @@ fun NearEmittersScreen(
         }
     }
 
-    LaunchedEffect(searchCenter, maxItemsToShow, isZbNearbySearch, nearbyFrequencyFilter, showOnlyOutOfServiceSites, sitesHs) {
+    LaunchedEffect(searchCenter, maxItemsToShow, isZbNearbySearch, nearbyFrequencyFilter, showOnlyOutOfServiceSites, sitesHs, activeNearbySearchRadius, refreshTrigger) {
         val currentLoc = searchCenter ?: return@LaunchedEffect
 
-        isLoading = true
+        if (!isRefreshing) {
+            isLoading = true
+        }
 
+        try {
         withContext(Dispatchers.IO) {
             // A. RÉCUPÉRATION DES DONNÉES
-            val queryLimit = nearbyFrequencyQueryLimit(maxItemsToShow, nearbyFrequencyFilter)
+            val loadedSiteLimit = maxItemsToShow + NEARBY_VISIBLE_PAGE_SIZE
+            val queryLimit = nearbyFrequencyQueryLimit(
+                visibleLimit = loadedSiteLimit,
+                frequencyFilter = nearbyFrequencyFilter,
+                maxQueryLimit = Int.MAX_VALUE
+            )
             val detailBackedBandMask = nearbyFrequencyFilter.detailBackedBandMaskForEnrichment()
             val newAntennas = when {
                 // « Hors service uniquement » : on cible directement les sites HS proches (comme la carte),
@@ -367,16 +391,26 @@ fun NearEmittersScreen(
                 )
             }
             val frequencyFilteredAntennas = filterNearbyAntennasByFrequency(newAntennas, nearbyFrequencyFilter)
+            val activeRadiusKm = activeNearbySearchRadius.takeIf { it != NEARBY_RADIUS_UNBOUNDED }
+            val radiusMeters = activeRadiusKm?.coerceAtLeast(1)?.times(1000f)
+            val radiusFilteredAntennas = radiusMeters?.let { maxDistanceMeters ->
+                frequencyFilteredAntennas.filter { antenna ->
+                    calculateDistance(currentLoc.latitude, currentLoc.longitude, antenna.latitude, antenna.longitude) <= maxDistanceMeters
+                }
+            } ?: frequencyFilteredAntennas
+            val hasAntennasBeyondRadius = radiusMeters != null && frequencyFilteredAntennas.any { antenna ->
+                calculateDistance(currentLoc.latitude, currentLoc.longitude, antenna.latitude, antenna.longitude) > radiusMeters
+            }
 
             // B. TRAITEMENT ET FORMATAGE
-            val finalSites = if (frequencyFilteredAntennas.isNotEmpty()) {
+            val finalSites = if (radiusFilteredAntennas.isNotEmpty()) {
                 mapAntennasToUiSites(
                     repository = repository,
-                    antennas = frequencyFilteredAntennas,
+                    antennas = radiusFilteredAntennas,
                     referenceLocation = currentLoc,
                     unknownAddressText = unknownAddressText,
                     siteAnfrLabel = siteAnfrLabel,
-                    siteLimit = maxItemsToShow
+                    siteLimit = loadedSiteLimit
                 ).sortedBy { it.distance }
             } else {
                 emptyList()
@@ -384,35 +418,44 @@ fun NearEmittersScreen(
 
             withContext(Dispatchers.Main) {
                 sites = finalSites
+                hasMoreNearbySites = finalSites.size > maxItemsToShow ||
+                    radiusFilteredAntennas.size >= queryLimit
+                hasMoreNearbySitesBeyondRadius = hasAntennasBeyondRadius
             }
 
             // C. ON ARRÊTE LE CHARGEMENT (Garanti de s'exécuter à 100%)
             withContext(Dispatchers.Main) {
                 isLoading = false
+                isRefreshing = false
             }
+        }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG_NEAR_EMITTERS, "Nearby search refresh failed", e)
+        } finally {
+            isLoading = false
+            isRefreshing = false
         }
     }
 
     // ✅ 3. RECHERCHE LOCALE ET GLOBALE (Base de données, Coordonnées, Ville, Adresse, Code Postal)
     // Recherche locale instantanee; les resultats globaux arrivent ensuite depuis un cache separe.
-    LaunchedEffect(
-        sites, searchQuery, maxItemsToShow, remoteSearchQuery, remoteSearchSites, nearbyFrequencyFilter,
+    val filteredSites = remember(
+        sites, searchQuery, maxItemsToShow, remoteSearchQuery, remoteSearchSites,
         showSitesInService, showSitesOutOfService, showOnlyZbSites, hideUndergroundSites, hsOperatorMap
     ) {
         val query = searchQuery.trim()
         if (query.isEmpty()) {
-            filteredSites = sites
+            return@remember sites
                 .applyNearbyDisplayFilters(showSitesInService, showSitesOutOfService, showOnlyZbSites, hideUndergroundSites, hsOperatorMap)
                 .take(maxItemsToShow)
-            return@LaunchedEffect
         }
 
         val searchSpec = parseNearbySearchQuery(query)
-        val localMatches = withContext(Dispatchers.Default) {
-            sites.filter { siteMatchesSearch(it, searchSpec) }
-        }
+        val localMatches = sites.filter { siteMatchesSearch(it, searchSpec) }
         val matchingRemoteSites = if (remoteSearchQuery == query) remoteSearchSites else emptyList()
-        filteredSites = (localMatches + matchingRemoteSites)
+        (localMatches + matchingRemoteSites)
             .distinctBy { it.id }
             .applyNearbyDisplayFilters(showSitesInService, showSitesOutOfService, showOnlyZbSites, hideUndergroundSites, hsOperatorMap)
             .sortedBy { it.distance }
@@ -420,7 +463,7 @@ fun NearEmittersScreen(
     }
 
     // Recherche globale différée (base de données, coordonnées, ville, adresse, code postal).
-    LaunchedEffect(searchCenter, searchQuery, nearbyFrequencyFilter) {
+    LaunchedEffect(searchCenter, searchQuery, nearbyFrequencyFilter, refreshTrigger) {
         val query = searchQuery.trim()
         if (query.isEmpty()) {
             remoteSearchQuery = ""
@@ -768,7 +811,17 @@ fun NearEmittersScreen(
                     }
                     "sites" -> {
                         if (showNearbySites) {
-                            Box(modifier = Modifier.weight(1f).fillMaxWidth()) {
+                            GeoTowerPullToRefreshBox(
+                                isRefreshing = isRefreshing,
+                                onRefresh = {
+                                    if (!isRefreshing && searchCenter != null) {
+                                        isRefreshing = true
+                                        refreshTrigger++
+                                    }
+                                },
+                                enabled = searchCenter != null && !isLoading,
+                                modifier = Modifier.weight(1f).fillMaxWidth()
+                            ) {
                                 when {
                                     searchCenter == null -> {
                                         Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -777,7 +830,7 @@ fun NearEmittersScreen(
                                             Text(stringResource(R.string.appstrings_search_gps), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                                         }
                                     }
-                                    isLoading -> {
+                                    isLoading || (isResolvingInitialLocation && filteredSites.isEmpty()) -> {
                                         Column(
                                             modifier = Modifier
                                                 .align(Alignment.Center)
@@ -844,29 +897,27 @@ fun NearEmittersScreen(
                                             }
 
                                             item {
-                                                if (sites.size > maxItemsToShow) {
+                                                val canRemoveRadiusLimit = hasMoreNearbySitesBeyondRadius && (searchQuery.isEmpty() || isZbNearbySearch)
+                                                val hasHiddenLoadedSites = sites.size > filteredSites.size
+                                                val canShowMoreSites = hasMoreNearbySites ||
+                                                    canRemoveRadiusLimit ||
+                                                    filteredSites.size >= maxItemsToShow ||
+                                                    remoteSearchSites.size >= maxItemsToShow
+                                                if (canShowMoreSites) {
                                                     OutlinedButton(
-                                                        onClick = { safeClick { maxItemsToShow += 100 } },
+                                                        onClick = {
+                                                            safeClick("nearby_load_more_sites") {
+                                                                if (!hasHiddenLoadedSites && canRemoveRadiusLimit) {
+                                                                    activeNearbySearchRadius = NEARBY_RADIUS_UNBOUNDED
+                                                                }
+                                                                maxItemsToShow += NEARBY_VISIBLE_PAGE_SIZE
+                                                            }
+                                                        },
                                                         modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp),
                                                         shape = RoundedCornerShape(16.dp),
                                                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                                                     ) {
                                                         Text(stringResource(R.string.appstrings_load_more_sites), fontWeight = FontWeight.Bold)
-                                                    }
-                                                } else if (searchCenter != null && (searchQuery.isEmpty() || isZbNearbySearch) && sites.size >= maxItemsToShow) {
-                                                    OutlinedButton(
-                                                        onClick = {
-                                                            safeClick {
-                                                                maxItemsToShow += 100
-                                                            }
-                                                        },
-                                                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp),
-                                                        shape = RoundedCornerShape(16.dp),
-                                                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.secondary)
-                                                    ) {
-                                                        Icon(Icons.Default.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                                                        Spacer(modifier = Modifier.width(8.dp))
-                                                        Text(stringResource(R.string.appstrings_show_more_sites), fontWeight = FontWeight.Bold)
                                                     }
                                                 }
                                             }
@@ -970,6 +1021,7 @@ fun NearEmittersScreen(
             onRadiusChange = {
                 val safeRadius = it.coerceAtMost(nearbyMaxRadiusKm)
                 nearbySearchRadius = safeRadius
+                activeNearbySearchRadius = safeRadius
                 prefs.edit().putInt("nearby_search_radius", safeRadius).apply()
             },
             onDismiss = { showNearbySettingsSheet = false },
@@ -1463,16 +1515,19 @@ private const val NEARBY_ANTENNAS_PER_SITE = 4
 
 private fun nearbyFrequencyQueryLimit(
     visibleLimit: Int,
-    frequencyFilter: FrequencyFilterSelection
+    frequencyFilter: FrequencyFilterSelection,
+    maxQueryLimit: Int = NEARBY_GLOBAL_MAPPING_LIMIT
 ): Int {
     val safe = visibleLimit.coerceAtLeast(1)
     // 1) Compense le regroupement par site (plusieurs opérateurs sur un même pylône).
-    val forGrouping = safe * NEARBY_ANTENNAS_PER_SITE
+    val forGrouping = safe.toLong() * NEARBY_ANTENNAS_PER_SITE
     // 2) Le filtre fréquence retire encore des antennes : on élargit davantage.
     val withFrequency = if (frequencyFilter.isFullyEnabled) forGrouping else forGrouping * 5
     return withFrequency
-        .coerceAtMost(NEARBY_GLOBAL_MAPPING_LIMIT)
-        .coerceAtLeast(safe)
+        .coerceAtMost(maxQueryLimit.toLong())
+        .coerceAtLeast(safe.toLong())
+        .coerceAtMost(Int.MAX_VALUE.toLong())
+        .toInt()
 }
 
 private suspend fun mapAntennasToUiSites(
