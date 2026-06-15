@@ -32,7 +32,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CloudUpload
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
@@ -198,40 +200,39 @@ fun SupportDetailScreen(
 
                 val initialSearch = repository.getAntennasByExactId(siteId)
 
-                var lat = 0.0
-                var lon = 0.0
+                var lat = savedLat
+                var lon = savedLon
 
-                if (initialSearch.isNotEmpty()) {
-                    var site = initialSearch.find {
-                        Math.abs(it.latitude - savedLat) < 0.005 && Math.abs(it.longitude - savedLon) < 0.005
-                    }
+                val selectedSite = initialSearch.selectSupportAnchor(
+                    savedLat = savedLat,
+                    savedLon = savedLon,
+                    userLocation = getLocalLastKnownLocation(context)
+                )
 
-                    if (site == null) {
-                        val userLoc = getLocalLastKnownLocation(context)
-                        site = if (userLoc != null) {
-                            initialSearch.minByOrNull {
-                                val dLat = it.latitude - userLoc.latitude
-                                val dLon = it.longitude - userLoc.longitude
-                                (dLat * dLat) + (dLon * dLon)
-                            }
-                        } else {
-                            initialSearch.first()
-                        }
-                    }
-
-                    lat = site!!.latitude
-                    lon = site.longitude
+                if (selectedSite != null) {
+                    lat = selectedSite.latitude
+                    lon = selectedSite.longitude
 
                     prefs.edit()
                         .putFloat("clicked_lat", lat.toFloat())
                         .putFloat("clicked_lon", lon.toFloat())
                         .apply()
-                } else {
-                    lat = savedLat
-                    lon = savedLon
                 }
 
-                val fetchedAntennas = if (lat != 0.0 && lon != 0.0) {
+                val selectedPhysiques = selectedSite
+                    ?.let { repository.getPhysiqueByAnfr(it.idAnfr) }
+                    .orEmpty()
+                val selectedPhysique = selectedPhysiques.firstOrNull { it.idSupport.matchesSupportRouteId(siteId) }
+                    ?: selectedPhysiques.firstOrNull()
+                val canonicalSupportId = selectedPhysique?.idSupport?.takeIf { it.isNotBlank() }
+                val supportAntennas = canonicalSupportId
+                    ?.let { supportId ->
+                        repository.getAntennasByExactId(supportId)
+                            .filterBySupportId(repository, supportId)
+                    }
+                    .orEmpty()
+
+                val coordinateAntennas = if (lat != 0.0 && lon != 0.0) {
                     repository.getAntennasInBox(
                         latNorth = lat + 0.0005,
                         lonEast = lon + 0.0005,
@@ -240,6 +241,12 @@ fun SupportDetailScreen(
                     ).filter { it.latitude.toFloat() == lat.toFloat() && it.longitude.toFloat() == lon.toFloat() }
                 } else {
                     emptyList()
+                }
+
+                val fetchedAntennas = when {
+                    supportAntennas.isNotEmpty() -> supportAntennas
+                    initialSearch.size > 1 -> initialSearch
+                    else -> coordinateAntennas
                 }
 
                 val defaultOp = AppConfig.defaultOperator.value.uppercase()
@@ -253,20 +260,28 @@ fun SupportDetailScreen(
                 addPriorityOperator(OperatorColors.keyFor(defaultOp))
                 baseOrder.forEach { if (!priorityList.contains(it)) priorityList.add(it) }
 
-                antennas = fetchedAntennas.sortedBy { antenna ->
+                val sortedAntennas = fetchedAntennas.distinctBy { it.idAnfr }.sortedBy { antenna ->
                     val matchedOp = OperatorColors.keysFor(antenna.operateur)
                         .minByOrNull { key -> priorityList.indexOf(key).takeIf { it >= 0 } ?: 99 }
                     if (matchedOp != null) priorityList.indexOf(matchedOp) else 99
                 }
+                antennas = sortedAntennas
 
                 val techMap = mutableMapOf<String, TechniqueEntity>()
-                if (antennas.isNotEmpty()) {
-                    val fetchedPhysique = repository.getPhysiqueByAnfr(antennas.first().idAnfr).firstOrNull()
+                if (sortedAntennas.isNotEmpty()) {
+                    val fetchedPhysique = selectedPhysique
+                        ?: canonicalSupportId?.let { supportId ->
+                            sortedAntennas.firstNotNullOfOrNull { antenna ->
+                                repository.getPhysiqueByAnfr(antenna.idAnfr)
+                                    .firstOrNull { it.idSupport.matchesSupportRouteId(supportId) }
+                            }
+                        }
+                        ?: repository.getPhysiqueByAnfr(sortedAntennas.first().idAnfr).firstOrNull()
                     physique = fetchedPhysique
-                    val supportRadioId = fetchedPhysique?.idSupport ?: siteId
+                    val supportRadioId = fetchedPhysique?.idSupport ?: canonicalSupportId ?: siteId
                     radioSupportMarkers = radioRepository.getMarkersForSupport(supportRadioId)
 
-                    antennas.forEach { ant ->
+                    sortedAntennas.forEach { ant ->
                         val tech = repository.getTechniqueByAnfr(ant.idAnfr).firstOrNull()
                         if (tech != null) techMap[ant.idAnfr] = tech
                     }
@@ -279,7 +294,7 @@ fun SupportDetailScreen(
                 try {
                     val allHs = repository.getSitesHs()
                     val tempOutageMap = mutableMapOf<String, fr.geotower.data.models.SiteHsEntity>()
-                    antennas.forEach { ant ->
+                    sortedAntennas.forEach { ant ->
                         val hsData = allHs.firstOrNull { hs ->
                             val hsId = hs.idAnfr.toLongOrNull()
                             val antId = ant.idAnfr.toLongOrNull()
@@ -432,6 +447,9 @@ fun SupportDetailScreen(
     val txtNoGpsApp = stringResource(R.string.appstrings_no_gps_app)
 
     val txtSupportDetailTitle = stringResource(R.string.appstrings_support_detail_title)
+    val txtHomeTitle = stringResource(R.string.help_topic_title_home)
+    val txtNearbyTitle = stringResource(R.string.nav_near_antennas)
+    val txtMapTitle = stringResource(R.string.nav_map)
     val txtAddressLabel = stringResource(R.string.appstrings_address_label)
     val txtNotSpecified = stringResource(R.string.appstrings_not_specified)
     val txtGpsLabel = stringResource(R.string.appstrings_gps_label)
@@ -604,7 +622,45 @@ fun SupportDetailScreen(
                         icon = Icons.Default.VerticalAlignTop,
                         key = "support_detail"
                     ),
-                    currentRouteKeys = setOf("support_detail"),
+                    currentRouteKeys = setOf("support_detail", "site_detail", "site_detail_from_map"),
+                    impliedParentItems = listOf(
+                        GeoTowerBreadcrumbItem(
+                            label = txtHomeTitle,
+                            icon = Icons.Default.Home,
+                            onClick = {
+                                if (isSplitScreen) onCloseSplitScreen()
+                                navController.navigate("home") {
+                                    launchSingleTop = true
+                                }
+                            },
+                            key = "home"
+                        ),
+                        if (applyMapFilters) {
+                            GeoTowerBreadcrumbItem(
+                                label = txtMapTitle,
+                                icon = Icons.Default.Map,
+                                onClick = {
+                                    if (isSplitScreen) onCloseSplitScreen()
+                                    navController.navigate("map") {
+                                        launchSingleTop = true
+                                    }
+                                },
+                                key = "map"
+                            )
+                        } else {
+                            GeoTowerBreadcrumbItem(
+                                label = txtNearbyTitle,
+                                icon = Icons.Default.MyLocation,
+                                onClick = {
+                                    if (isSplitScreen) onCloseSplitScreen()
+                                    navController.navigate("emitters") {
+                                        launchSingleTop = true
+                                    }
+                                },
+                                key = "emitters"
+                            )
+                        }
+                    ),
                     onBackStackItemClick = {
                         if (isSplitScreen) onCloseSplitScreen()
                     },
@@ -1107,6 +1163,47 @@ private fun supportSharedPhotoUploadOperators(
 
     return OperatorColors.orderedKeys.mapNotNull { operatorsByKey[it] } +
         operatorsByKey.values.filterNot { it.key in OperatorColors.orderedKeys }
+}
+
+private fun List<LocalisationEntity>.selectSupportAnchor(
+    savedLat: Double,
+    savedLon: Double,
+    userLocation: Location?
+): LocalisationEntity? {
+    if (isEmpty()) return null
+
+    return firstOrNull {
+        kotlin.math.abs(it.latitude - savedLat) < 0.005 &&
+            kotlin.math.abs(it.longitude - savedLon) < 0.005
+    } ?: userLocation?.let { location ->
+        minByOrNull {
+            val dLat = it.latitude - location.latitude
+            val dLon = it.longitude - location.longitude
+            (dLat * dLat) + (dLon * dLon)
+        }
+    } ?: first()
+}
+
+private suspend fun List<LocalisationEntity>.filterBySupportId(
+    repository: AnfrRepository,
+    supportId: String
+): List<LocalisationEntity> {
+    if (isEmpty()) return emptyList()
+    val filtered = filter { antenna ->
+        repository.getPhysiqueByAnfr(antenna.idAnfr)
+            .any { it.idSupport.matchesSupportRouteId(supportId) }
+    }
+    return filtered.ifEmpty { this }
+}
+
+private fun String.matchesSupportRouteId(other: String): Boolean {
+    val candidate = trim()
+    val requested = other.trim()
+    if (candidate == requested) return true
+
+    val candidateLong = candidate.takeIf { it.all(Char::isDigit) }?.toLongOrNull()
+    val requestedLong = requested.takeIf { it.all(Char::isDigit) }?.toLongOrNull()
+    return candidateLong != null && candidateLong == requestedLong
 }
 
 @Composable

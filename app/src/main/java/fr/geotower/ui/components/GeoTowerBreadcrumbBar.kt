@@ -167,19 +167,18 @@ fun GeoTowerNavigationBreadcrumbBar(
         stackItems.removeAt(stackItems.lastIndex)
     }
 
-    impliedParentItems.forEach { parent ->
-        if (stackItems.none { it.resolvedKey == parent.resolvedKey }) {
-            stackItems.add(parent)
-        }
-    }
-
     val current = currentItem.copy(onClick = null)
-    if (stackItems.lastOrNull()?.resolvedKey != current.resolvedKey) {
-        stackItems.add(current)
+    val breadcrumbItems = if (impliedParentItems.isNotEmpty()) {
+        impliedParentItems + current
+    } else {
+        if (stackItems.lastOrNull()?.resolvedKey != current.resolvedKey) {
+            stackItems.add(current)
+        }
+        stackItems
     }
 
     GeoTowerBreadcrumbBar(
-        items = stackItems,
+        items = breadcrumbItems,
         modifier = modifier,
         backgroundColor = backgroundColor
     )

@@ -805,6 +805,7 @@ fun SiteDetailScreen(
 
     val txtHomeTitle = stringResource(R.string.help_topic_title_home)
     val txtNearbyTitle = stringResource(R.string.nav_near_antennas)
+    val txtMapTitle = stringResource(R.string.nav_map)
     val txtSupportDetailTitle = stringResource(R.string.appstrings_support_detail_title)
     val txtSiteDetailsTitle = stringResource(R.string.appstrings_site_detail_title)
     val txtIdCopied = stringResource(R.string.appstrings_id_copied)
@@ -921,12 +922,21 @@ fun SiteDetailScreen(
                             onClick = { navigateToBreadcrumbParent("home") },
                             key = "home"
                         ),
-                        GeoTowerBreadcrumbItem(
-                            label = txtNearbyTitle,
-                            icon = Icons.Default.MyLocation,
-                            onClick = { navigateToBreadcrumbParent("emitters") },
-                            key = "emitters"
-                        ),
+                        if (applyMapFilters) {
+                            GeoTowerBreadcrumbItem(
+                                label = txtMapTitle,
+                                icon = Icons.Default.Map,
+                                onClick = { navigateToBreadcrumbParent("map") },
+                                key = "map"
+                            )
+                        } else {
+                            GeoTowerBreadcrumbItem(
+                                label = txtNearbyTitle,
+                                icon = Icons.Default.MyLocation,
+                                onClick = { navigateToBreadcrumbParent("emitters") },
+                                key = "emitters"
+                            )
+                        },
                         GeoTowerBreadcrumbItem(
                             label = txtSupportDetailTitle,
                             icon = Icons.Default.VerticalAlignTop,
