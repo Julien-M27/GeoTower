@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.geotower.ui.theme.AppColorPalette
 import fr.geotower.ui.theme.AppColorPaletteOptions
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.ui.theme.appPalettePreviewColors
 import fr.geotower.utils.AppConfig
 import androidx.compose.ui.res.stringResource
@@ -73,6 +74,7 @@ fun ColorPaletteActionCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val selectedPaletteKey by AppConfig.colorPalette
     val selectedPalette = AppColorPalette.fromKey(selectedPaletteKey)
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
@@ -87,40 +89,41 @@ fun ColorPaletteActionCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(sizing.spacing(16.dp)),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
                 Text(
                     text = stringResource(R.string.appstrings_color_palette_title),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = stringResource(R.string.common_current_value, colorPaletteName(selectedPalette)),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 ColorPaletteSwatches(
                     colors = previewColorsFor(selectedPalette),
-                    dotSize = 18.dp,
-                    spacing = 4.dp
+                    dotSize = sizing.component(18.dp),
+                    spacing = sizing.spacing(4.dp)
                 )
-                Spacer(Modifier.width(12.dp))
+                Spacer(Modifier.width(sizing.spacing(12.dp)))
                 Icon(
                     imageVector = Icons.Outlined.Palette,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(sizing.component(22.dp))
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
                 Icon(
                     imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(sizing.component(24.dp))
                 )
             }
         }
@@ -135,6 +138,7 @@ fun ColorPalettePickerContent(
     useOneUi: Boolean,
     bubbleColor: Color
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
     val selectedPaletteKey by AppConfig.colorPalette
     val selectedPalette = AppColorPalette.fromKey(selectedPaletteKey)
@@ -147,20 +151,20 @@ fun ColorPalettePickerContent(
         if (showHeader) {
             Text(
                 text = stringResource(R.string.appstrings_color_source_title),
-                style = MaterialTheme.typography.headlineSmall,
+                style = sizing.textStyle(MaterialTheme.typography.headlineSmall),
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(sizing.spacing(12.dp)))
             Text(
                 text = stringResource(R.string.appstrings_color_source_desc),
-                style = MaterialTheme.typography.bodyLarge,
+                style = sizing.textStyle(MaterialTheme.typography.bodyLarge),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(sizing.spacing(24.dp)))
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
             AppColorPaletteOptions.forEach { palette ->
                 ColorPaletteOptionCard(
                     palette = palette,
@@ -183,7 +187,8 @@ private fun ColorPaletteOptionCard(
     bubbleColor: Color,
     onClick: () -> Unit
 ) {
-    val shape = if (useOneUi) RoundedCornerShape(28.dp) else RoundedCornerShape(12.dp)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val shape = if (useOneUi) RoundedCornerShape(sizing.component(28.dp)) else RoundedCornerShape(sizing.component(12.dp))
     val selectedColor = MaterialTheme.colorScheme.primary
     val cardColor = when {
         selected -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = if (useOneUi) 0.24f else 0.34f)
@@ -191,9 +196,9 @@ private fun ColorPaletteOptionCard(
         else -> Color.Transparent
     }
     val cardBorder = when {
-        selected -> BorderStroke(2.dp, selectedColor)
+        selected -> BorderStroke(sizing.component(2.dp), selectedColor)
         useOneUi -> null
-        else -> BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        else -> BorderStroke(sizing.component(1.dp), MaterialTheme.colorScheme.outlineVariant)
     }
 
     Surface(
@@ -207,57 +212,57 @@ private fun ColorPaletteOptionCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(sizing.spacing(16.dp))
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Surface(
                     shape = CircleShape,
                     color = if (selected) selectedColor.copy(alpha = 0.16f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.7f),
-                    modifier = Modifier.size(50.dp)
+                    modifier = Modifier.size(sizing.component(50.dp))
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = if (palette == AppColorPalette.Dynamic) Icons.Filled.AutoAwesome else Icons.Outlined.Palette,
                             contentDescription = null,
                             tint = if (selected) selectedColor else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(25.dp)
+                            modifier = Modifier.size(sizing.component(25.dp))
                         )
                     }
                 }
 
-                Spacer(Modifier.width(16.dp))
+                Spacer(Modifier.width(sizing.spacing(16.dp)))
 
                 Column(Modifier.weight(1f)) {
                     Text(
                         text = colorPaletteName(palette),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = colorPaletteDescription(palette),
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
 
                 if (selected) {
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(sizing.spacing(12.dp)))
                     Icon(
                         imageVector = Icons.Filled.Check,
                         contentDescription = null,
                         tint = selectedColor,
-                        modifier = Modifier.size(28.dp)
+                        modifier = Modifier.size(sizing.component(28.dp))
                     )
                 }
             }
 
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(sizing.spacing(14.dp)))
 
             ColorPaletteSwatches(
                 colors = previewColorsFor(palette),
-                dotSize = 24.dp,
-                spacing = 10.dp
+                dotSize = sizing.component(24.dp),
+                spacing = sizing.spacing(10.dp)
             )
 
         }

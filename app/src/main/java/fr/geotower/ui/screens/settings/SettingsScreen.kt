@@ -464,6 +464,7 @@ fun SettingsScreen(
     var pageThroughputAssumptions by remember { mutableStateOf(prefs.getBoolean(ThroughputPrefs.BLOCK_ASSUMPTIONS_VISIBLE, true)) }
 
     var showPagesCustomizationSheet by remember { mutableStateOf(false) }
+    var showPreferenceProfilesSheet by remember { mutableStateOf(false) }
     var showFrequenciesSheet by remember { mutableStateOf(false) }
     var showCommunityDataSheet by remember { mutableStateOf(false) }
     var communityDataSettingsFeatureId by remember { mutableStateOf<String?>(null) }
@@ -784,12 +785,12 @@ fun SettingsScreen(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                             if (navMode == 0 || !isExpanded) {
-                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; offlineMapsBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) }, scrollViewportTop, scrollViewportBottom, scrollState.value, scrollState.maxValue, targetMapFilename = offlineMapsTargetFilename, onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) }, onOfflineMapsExpandedChange = { offlineMapsExpandedForNavigation = it })
+                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, { showPreferenceProfilesSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; offlineMapsBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) }, scrollViewportTop, scrollViewportBottom, scrollState.value, scrollState.maxValue, targetMapFilename = offlineMapsTargetFilename, onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) }, onOfflineMapsExpandedChange = { offlineMapsExpandedForNavigation = it })
                             } else {
                                 when (activeSectionIndex) {
                                     0 -> SectionApparence(themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true })
                                     1 -> SectionCartographie(mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick)
-                                    2 -> SectionPreferences(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick)
+                                    2 -> SectionPreferences(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, { showPreferenceProfilesSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick)
                                     3 -> SectionSysteme(context, cardShape, border = cardBorder, bubbleColor = bubbleBaseColor, useOneUi = useOneUi, safeClick = safeClick)
                                     4 -> SectionDatabase(
                                         isExpanded,
@@ -906,6 +907,14 @@ fun SettingsScreen(
         }
 
         // ✅ AJOUT : Fenêtre des Unités
+        if (showPreferenceProfilesSheet) {
+            PreferenceProfilesSheet(
+                onDismiss = { showPreferenceProfilesSheet = false },
+                sheetState = sheetState,
+                useOneUi = useOneUi
+            )
+        }
+
         if (showUnitSheet) {
             fr.geotower.ui.components.UnitSettingsSheet(
                 onDismiss = { showUnitSheet = false },
@@ -1694,6 +1703,7 @@ fun AllSettingsContent(
     onCommunityData: () -> Unit,
     onExternalLinks: () -> Unit,
     onSharePrefs: () -> Unit,
+    onPreferenceProfiles: () -> Unit,
     map: Int,
     onMap: (Int) -> Unit,
     ign: Int,
@@ -1730,7 +1740,7 @@ fun AllSettingsContent(
     }
     Spacer(Modifier.height(32.dp))
     Column(modifier = preferencesSectionModifier.fillMaxWidth()) {
-        SectionPreferences(isWide, nav, onNav, op, onOp, lang, onLang, onUnitSettings, onPages, onCommunityData, onExternalLinks, onSharePrefs, shape, border, bubbleColor, useOneUi, safeClick)
+        SectionPreferences(isWide, nav, onNav, op, onOp, lang, onLang, onUnitSettings, onPages, onCommunityData, onExternalLinks, onSharePrefs, onPreferenceProfiles, shape, border, bubbleColor, useOneUi, safeClick)
     }
     Spacer(Modifier.height(32.dp))
     Column(modifier = systemSectionModifier.fillMaxWidth()) {
@@ -1821,6 +1831,7 @@ fun SectionPreferences(
     onCommunityData: () -> Unit,
     onExternalLinks: () -> Unit,
     onSharePrefs: () -> Unit,
+    onPreferenceProfiles: () -> Unit,
     shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick
 ) {
     // NOUVEAU : On récupère le contexte et les préférences ici pour le curseur
@@ -1870,6 +1881,18 @@ fun SectionPreferences(
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val paleBgColor = if (isDark) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow // <-- AJOUT
+
+    PreferenceActionCard(
+        title = stringResource(R.string.preference_profiles_title),
+        desc = stringResource(R.string.preference_profiles_card_desc),
+        onClick = onPreferenceProfiles,
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi,
+        safeClick = safeClick
+    )
+    Spacer(Modifier.height(12.dp))
 
     if (isWide) {
         var showModeSheet by remember { mutableStateOf(false) }
@@ -2370,10 +2393,16 @@ private fun WidgetFormatPickerSheet(
 @Composable
 fun SectionSysteme(ctx: Context, shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick) {
     SectionTitle(stringResource(R.string.settings_section_system));
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
     Surface(onClick = { safeClick("system_app_details_settings") { ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply { data = Uri.fromParts("package", ctx.packageName, null) }) } }, shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Default.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface); Spacer(Modifier.width(16.dp)); Column { Text(stringResource(R.string.appstrings_manage_permissions), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold); Text(stringResource(R.string.appstrings_permissions_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(sizing.component(24.dp)))
+            Spacer(Modifier.width(sizing.spacing(16.dp)))
+            Column {
+                Text(stringResource(R.string.appstrings_manage_permissions), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.appstrings_permissions_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
 }
@@ -2475,6 +2504,7 @@ fun SectionDatabase(
 
 @Composable
 fun SettingsOptionCard(label: String, icon: ImageVector, isSelected: Boolean, onClick: () -> Unit, modifier: Modifier, shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val themeMode by AppConfig.themeMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val paleBgColor = if (isDark) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer
@@ -2483,22 +2513,28 @@ fun SettingsOptionCard(label: String, icon: ImageVector, isSelected: Boolean, on
     val finalColor = if (isSelected) paleBgColor else (if (useOneUi) bubbleColor else Color.Transparent)
     val contentColor = if (isSelected) paleTextColor else MaterialTheme.colorScheme.onSurface
 
-    Surface(onClick = onClick, modifier = modifier.height(80.dp), shape = shape, border = if (isSelected) null else border, color = finalColor) {
+    Surface(onClick = onClick, modifier = modifier.height(sizing.component(80.dp)), shape = shape, border = if (isSelected) null else border, color = finalColor) {
         Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-            Icon(icon, contentDescription = null, tint = contentColor); Spacer(Modifier.height(8.dp)); Text(label, style = MaterialTheme.typography.labelMedium, color = contentColor)
+            Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(sizing.component(24.dp)))
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
+            Text(label, style = sizing.textStyle(MaterialTheme.typography.labelMedium), color = contentColor)
         }
     }
 }
 
 @Composable
 fun PreferenceSwitchCard(title: String, desc: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     // Toujours primary !
     val accentColor = MaterialTheme.colorScheme.primary
 
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
     Surface(shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) { Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold); Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        Row(modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp)), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                Text(desc, style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             fr.geotower.ui.components.GeoTowerSwitch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
@@ -2521,61 +2557,63 @@ fun PreferenceActionCard(
     safeClick: SafeClick,
     icon: ImageVector? = null // ✅ Garde le paramètre d'icône (si pas déjà fait)
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
     Surface(onClick = { safeClick("preference_action_$title") { onClick() } }, shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(sizing.spacing(16.dp)), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
 
             // ✅ LE TEXTE RESTE À GAUCHE (Prend toute la place dispo grâce au weight)
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
                 if (desc.isNotEmpty()) {
-                    Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(desc, style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
 
             // ✅ AJOUT DE L'ICÔNE ICI (À droite du texte, avant la flèche)
             if (icon != null) {
-                Spacer(modifier = Modifier.width(12.dp)) // Espace avec le texte
+                Spacer(modifier = Modifier.width(sizing.spacing(12.dp))) // Espace avec le texte
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(22.dp) // Légèrement plus petite pour l'équilibre
+                    modifier = Modifier.size(sizing.component(22.dp)) // Légèrement plus petite pour l'équilibre
                 )
             }
 
             // ✅ LA FLÈCHE RESTE TOUT À DROITE
-            Spacer(modifier = Modifier.width(8.dp)) // Espace avec l'icône
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.width(sizing.spacing(8.dp))) // Espace avec l'icône
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(sizing.component(24.dp)))
         }
     }
 }
 
 @Composable
 fun PreferenceOperatorCard(title: String, operator: String, onClick: () -> Unit, shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val logoRes = OperatorLogos.drawableRes(operator)
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
     Surface(onClick = { safeClick("preference_operator_$title") { onClick() } }, shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(sizing.spacing(16.dp)), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(if (operator == "Aucun") stringResource(R.string.common_select) else stringResource(R.string.common_current_value, operator), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                Text(if (operator == "Aucun") stringResource(R.string.common_select) else stringResource(R.string.common_current_value, operator), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (logoRes != null) {
-                    Image(painterResource(logoRes), contentDescription = null, modifier = Modifier.size(32.dp).clip(RoundedCornerShape(6.dp)))
-                    Spacer(Modifier.width(12.dp))
+                    Image(painterResource(logoRes), contentDescription = null, modifier = Modifier.size(sizing.component(32.dp)).clip(RoundedCornerShape(sizing.component(6.dp))))
+                    Spacer(Modifier.width(sizing.spacing(12.dp)))
                 } else {
                     // ✅ AJOUT DE L'ICÔNE PAR DÉFAUT ICI (Si aucun opérateur n'est choisi)
                     Icon(
                         imageVector = Icons.Default.SimCard,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(sizing.component(24.dp))
                     )
-                    Spacer(Modifier.width(12.dp))
+                    Spacer(Modifier.width(sizing.spacing(12.dp)))
                 }
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(sizing.component(24.dp)))
             }
         }
     }
@@ -2583,27 +2621,28 @@ fun PreferenceOperatorCard(title: String, operator: String, onClick: () -> Unit,
 
 @Composable
 fun PreferenceLanguageCard(title: String, language: String, onClick: () -> Unit, shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
 
     val flag = AppLocale.languageFlag(language)
     val displayLanguage = stringResource(AppLocale.languageDisplayNameRes(language))
 
     Surface(onClick = { safeClick("preference_language_$title") { onClick() } }, shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
-        Row(modifier = Modifier.padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(sizing.spacing(16.dp)), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(stringResource(R.string.common_current_value, displayLanguage), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.common_current_value, displayLanguage), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 // L'EMOJI REMPLACE L'ICÔNE PLANÈTE
                 Box(
-                    modifier = Modifier.size(32.dp),
+                    modifier = Modifier.size(sizing.component(32.dp)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = flag, fontSize = 24.sp)
+                    Text(text = flag, fontSize = sizing.text(24.sp))
                 }
-                Spacer(Modifier.width(8.dp))
-                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(sizing.component(24.dp)))
             }
         }
     }

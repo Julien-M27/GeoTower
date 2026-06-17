@@ -2,6 +2,7 @@ package fr.geotower.ui.screens.stats
 
 import android.content.Context
 import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
@@ -39,6 +40,7 @@ import fr.geotower.ui.screens.settings.StatsSettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.OperatorRegion
 import fr.geotower.utils.StatsDisplayMode
 import fr.geotower.utils.StatsPreferences
 import fr.geotower.utils.radioFrequencyLabel
@@ -71,9 +73,18 @@ private data class FrequencyBandSpec(
 private data class FrequencyBandStats(
     val frequencyId: String,
     val title: String,
-    val description: String,
+    @param:StringRes val descriptionRes: Int,
     val data: List<OperatorStatValue>,
     val weeklyData: List<WeeklyStatValue>
+)
+
+private data class OperatorStatsTarget(
+    val id: String,
+    val name: String,
+    val colorKey: String,
+    val queryNames: List<String>,
+    @param:StringRes val regionSuffixRes: Int? = null,
+    val allowLegacyFallback: Boolean = true
 )
 
 private data class StatsCardSpec(
@@ -94,6 +105,8 @@ private data class StatCount(
 
 private data class OperatorStatValue(
     val name: String,
+    val colorKey: String,
+    @param:StringRes val regionSuffixRes: Int? = null,
     val totalCount: Int,
     val activeCount: Int
 )
@@ -133,19 +146,66 @@ private fun operatorDisplayOrder(defaultOp: String): List<String> {
     return displayOrder
 }
 
+private fun operatorQueryNames(operatorKey: String): List<String> {
+    val spec = OperatorColors.specForKey(operatorKey) ?: return listOf(operatorKey)
+    return (spec.aliases + spec.label + spec.key)
+        .map { it.trim().uppercase(Locale.ROOT) }
+        .filter { it.isNotBlank() }
+        .distinct()
+}
+
+private fun overseasStatsOperatorName(operatorKey: String): String = "${operatorKey}_OVERSEAS"
+
+private fun operatorStatsTargets(defaultOp: String): List<OperatorStatsTarget> {
+    return operatorDisplayOrder(defaultOp).flatMap { operatorKey ->
+        val spec = OperatorColors.specForKey(operatorKey) ?: return@flatMap emptyList()
+        val queryNames = operatorQueryNames(operatorKey)
+        if (spec.region == OperatorRegion.METRO) {
+            listOf(
+                OperatorStatsTarget(
+                    id = "${spec.key}_METRO",
+                    name = spec.label,
+                    colorKey = spec.key,
+                    queryNames = queryNames
+                ),
+                OperatorStatsTarget(
+                    id = "${spec.key}_OVERSEAS",
+                    name = spec.label,
+                    colorKey = spec.key,
+                    queryNames = listOf(overseasStatsOperatorName(spec.key)),
+                    regionSuffixRes = R.string.appstrings_operator_region_overseas,
+                    allowLegacyFallback = false
+                )
+            )
+        } else {
+            listOf(
+                OperatorStatsTarget(
+                    id = spec.key,
+                    name = spec.label,
+                    colorKey = spec.key,
+                    queryNames = queryNames
+                )
+            )
+        }
+    }
+}
+
 private fun statsKey(category: String, itemKey: String): String = "$category|$itemKey"
 
-private fun formatOperatorData(map: Map<String, StatCount>, displayOrder: List<String>): List<OperatorStatValue> {
-    val rows = displayOrder.map { op ->
-        val name = OperatorColors.specForKey(op)?.label ?: op
-        val count = (map[op] ?: StatCount(0, 0)).normalized()
+private fun formatOperatorData(map: Map<String, StatCount>, targets: List<OperatorStatsTarget>): List<OperatorStatValue> {
+    val rows = targets.map { target ->
+        val count = (map[target.id] ?: StatCount(0, 0)).normalized()
         OperatorStatValue(
-            name = name,
+            name = target.name,
+            colorKey = target.colorKey,
+            regionSuffixRes = target.regionSuffixRes,
             totalCount = count.totalCount,
             activeCount = count.activeCount
         )
     }
-    return rows.filter { it.totalCount > 0 || it.activeCount > 0 }.ifEmpty { rows }
+    return rows
+        .filter { it.totalCount > 0 || it.activeCount > 0 }
+        .ifEmpty { rows.filter { it.regionSuffixRes == null } }
 }
 
 private fun statCount(rows: List<RadioStatRow>, category: String, itemKey: String): StatCount {
@@ -239,12 +299,13 @@ private fun visibleFrequencyStats(
         .filter { band -> StatsPreferences.isStatsFrequencyVisible(prefs, tech, band.frequencyId) }
 }
 
+@Composable
 private fun frequencyDetailTitle(tech: String): String {
     val normalizedTech = normalizeTech(tech)
     return if (frequencyBandsForTech(normalizedTech).isEmpty()) {
-        "Détail des fréquences"
+        stringResource(R.string.appstrings_stats_frequency_detail_title)
     } else {
-        "Détail $normalizedTech"
+        stringResource(R.string.appstrings_stats_frequency_detail_title_for, normalizedTech)
     }
 }
 
@@ -258,50 +319,57 @@ private suspend fun loadStatisticsData(
     val counts4GMap = mutableMapOf<String, StatCount>()
     val counts5GMap = mutableMapOf<String, StatCount>()
     val weeklyAccumulator = mutableMapOf<String, MutableMap<String, WeeklyStatAccumulator>>()
+    val targets = operatorStatsTargets(defaultOp)
 
-    for (operator in OperatorColors.all) {
-        val queryNames = operator.aliases.ifEmpty { listOf(operator.key) }
-        val currentStats = repository.getCurrentRadioStatsByOperator(queryNames)
+    for (target in targets) {
+        val currentStats = repository.getCurrentRadioStatsByOperator(target.queryNames)
         if (currentStats.isNotEmpty()) {
-            totalMap[operator.key] = statCount(currentStats, CATEGORY_SUPPORT, ITEM_ALL)
-            counts2GMap[operator.key] = statCount(currentStats, CATEGORY_TECH, "2G")
-            counts3GMap[operator.key] = statCount(currentStats, CATEGORY_TECH, "3G")
-            counts4GMap[operator.key] = statCount(currentStats, CATEGORY_TECH, "4G")
-            counts5GMap[operator.key] = statCount(currentStats, CATEGORY_TECH, "5G")
-        } else {
-            val activeCounts = repository.getActiveSupportRadioCountsByOperator(queryNames)
-            totalMap[operator.key] = StatCount(
-                totalCount = repository.getUniqueSupportCountByOperator(queryNames),
-                activeCount = repository.getActiveUniqueSupportCountByOperator(queryNames)
+            totalMap[target.id] = statCount(currentStats, CATEGORY_SUPPORT, ITEM_ALL)
+            counts2GMap[target.id] = statCount(currentStats, CATEGORY_TECH, "2G")
+            counts3GMap[target.id] = statCount(currentStats, CATEGORY_TECH, "3G")
+            counts4GMap[target.id] = statCount(currentStats, CATEGORY_TECH, "4G")
+            counts5GMap[target.id] = statCount(currentStats, CATEGORY_TECH, "5G")
+        } else if (target.allowLegacyFallback) {
+            val activeCounts = repository.getActiveSupportRadioCountsByOperator(target.queryNames)
+            totalMap[target.id] = StatCount(
+                totalCount = repository.getUniqueSupportCountByOperator(target.queryNames),
+                activeCount = repository.getActiveUniqueSupportCountByOperator(target.queryNames)
             )
-            counts2GMap[operator.key] = StatCount(
-                totalCount = repository.get2GSupportCountByOperator(queryNames),
+            counts2GMap[target.id] = StatCount(
+                totalCount = repository.get2GSupportCountByOperator(target.queryNames),
                 activeCount = activeCounts.techCounts["2G"] ?: 0
             )
-            counts3GMap[operator.key] = StatCount(
-                totalCount = repository.get3GSupportCountByOperator(queryNames),
+            counts3GMap[target.id] = StatCount(
+                totalCount = repository.get3GSupportCountByOperator(target.queryNames),
                 activeCount = activeCounts.techCounts["3G"] ?: 0
             )
-            counts4GMap[operator.key] = StatCount(
-                totalCount = repository.get4GSupportCountByOperator(queryNames),
+            counts4GMap[target.id] = StatCount(
+                totalCount = repository.get4GSupportCountByOperator(target.queryNames),
                 activeCount = activeCounts.techCounts["4G"] ?: 0
             )
-            counts5GMap[operator.key] = StatCount(
-                totalCount = repository.get5GSupportCountByOperator(queryNames),
+            counts5GMap[target.id] = StatCount(
+                totalCount = repository.get5GSupportCountByOperator(target.queryNames),
                 activeCount = activeCounts.techCounts["5G"] ?: 0
             )
+        } else {
+            totalMap[target.id] = StatCount(0, 0)
+            counts2GMap[target.id] = StatCount(0, 0)
+            counts3GMap[target.id] = StatCount(0, 0)
+            counts4GMap[target.id] = StatCount(0, 0)
+            counts5GMap[target.id] = StatCount(0, 0)
         }
-        aggregateWeeklyStats(repository.getWeeklyRadioStatsByOperator(queryNames), weeklyAccumulator)
     }
 
-    val displayOrder = operatorDisplayOrder(defaultOp)
+    for (operator in OperatorColors.all) {
+        aggregateWeeklyStats(repository.getWeeklyRadioStatsByOperator(operatorQueryNames(operator.key)), weeklyAccumulator)
+    }
 
     return StatisticsData(
-        supports = formatOperatorData(totalMap, displayOrder),
-        supports2G = formatOperatorData(counts2GMap, displayOrder),
-        supports3G = formatOperatorData(counts3GMap, displayOrder),
-        supports4G = formatOperatorData(counts4GMap, displayOrder),
-        supports5G = formatOperatorData(counts5GMap, displayOrder),
+        supports = formatOperatorData(totalMap, targets),
+        supports2G = formatOperatorData(counts2GMap, targets),
+        supports3G = formatOperatorData(counts3GMap, targets),
+        supports4G = formatOperatorData(counts4GMap, targets),
+        supports5G = formatOperatorData(counts5GMap, targets),
         weeklyByItem = weeklyAccumulatorToMap(weeklyAccumulator)
     )
 }
@@ -312,19 +380,22 @@ private suspend fun loadFrequencyStatsData(
     tech: String
 ): List<FrequencyBandStats> {
     val normalizedTech = normalizeTech(tech)
-    val displayOrder = operatorDisplayOrder(defaultOp)
+    val targets = operatorStatsTargets(defaultOp)
     val bands = frequencyBandsForTech(normalizedTech)
-    val currentRowsByOperator = mutableMapOf<String, List<RadioStatRow>>()
-    val activeCountsByOperator = mutableMapOf<String, ActiveSupportRadioCounts>()
+    val currentRowsByTarget = mutableMapOf<String, List<RadioStatRow>>()
+    val activeCountsByTarget = mutableMapOf<String, ActiveSupportRadioCounts>()
     val weeklyAccumulator = mutableMapOf<String, MutableMap<String, WeeklyStatAccumulator>>()
 
-    for (operator in OperatorColors.all) {
-        val queryNames = operator.aliases.ifEmpty { listOf(operator.key) }
-        val currentStats = repository.getCurrentRadioStatsByOperator(queryNames)
-        currentRowsByOperator[operator.key] = currentStats
-        if (currentStats.isEmpty()) {
-            activeCountsByOperator[operator.key] = repository.getActiveSupportRadioCountsByOperator(queryNames)
+    for (target in targets) {
+        val currentStats = repository.getCurrentRadioStatsByOperator(target.queryNames)
+        currentRowsByTarget[target.id] = currentStats
+        if (currentStats.isEmpty() && target.allowLegacyFallback) {
+            activeCountsByTarget[target.id] = repository.getActiveSupportRadioCountsByOperator(target.queryNames)
         }
+    }
+
+    for (operator in OperatorColors.all) {
+        val queryNames = operatorQueryNames(operator.key)
         aggregateWeeklyStats(repository.getWeeklyRadioStatsByOperator(queryNames), weeklyAccumulator)
     }
     val weeklyByItem = weeklyAccumulatorToMap(weeklyAccumulator)
@@ -332,15 +403,16 @@ private suspend fun loadFrequencyStatsData(
     val stats = bands.map { band ->
         val countsMap = mutableMapOf<String, StatCount>()
 
-        for (operator in OperatorColors.all) {
-            val queryNames = operator.aliases.ifEmpty { listOf(operator.key) }
-            val currentStats = currentRowsByOperator[operator.key].orEmpty()
-            countsMap[operator.key] = if (currentStats.isNotEmpty()) {
+        for (target in targets) {
+            val currentStats = currentRowsByTarget[target.id].orEmpty()
+            countsMap[target.id] = if (currentStats.isNotEmpty()) {
                 statCount(currentStats, CATEGORY_BAND, band.itemKey)
+            } else if (!target.allowLegacyFallback) {
+                StatCount(0, 0)
             } else {
-                val activeCounts = activeCountsByOperator[operator.key] ?: ActiveSupportRadioCounts(emptyMap(), emptyMap())
+                val activeCounts = activeCountsByTarget[target.id] ?: ActiveSupportRadioCounts(emptyMap(), emptyMap())
                 StatCount(
-                    totalCount = repository.getSupportCountByOperatorAndBand(queryNames, band.mask),
+                    totalCount = repository.getSupportCountByOperatorAndBand(target.queryNames, band.mask),
                     activeCount = activeCounts.bandCounts[band.itemKey] ?: 0
                 )
             }
@@ -349,8 +421,8 @@ private suspend fun loadFrequencyStatsData(
         FrequencyBandStats(
             frequencyId = band.frequencyId,
             title = "$normalizedTech ${band.label}",
-            description = "Supports déclarés par opérateur",
-            data = formatOperatorData(countsMap, displayOrder),
+            descriptionRes = R.string.appstrings_stats_frequency_supports_desc,
+            data = formatOperatorData(countsMap, targets),
             weeklyData = weeklyByItem[statsKey(CATEGORY_BAND, band.itemKey)].orEmpty()
         )
     }
@@ -601,7 +673,7 @@ fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRep
                 isLoading && frequencyStats.isEmpty() -> {
                     StatCard(
                         title = frequencyDetailTitle(normalizedTech),
-                        desc = "Chargement du détail par fréquence",
+                        desc = stringResource(R.string.appstrings_stats_frequency_detail_loading_desc),
                         data = emptyList(),
                         isLoading = true,
                         bgColor = cardBgColor,
@@ -617,7 +689,7 @@ fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRep
                             .padding(horizontal = 16.dp)
                     ) {
                         Text(
-                            text = "Aucune fréquence disponible pour $normalizedTech",
+                            text = stringResource(R.string.appstrings_stats_no_frequency_available_for, normalizedTech),
                             style = MaterialTheme.typography.bodyMedium,
                             modifier = Modifier.padding(16.dp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -631,7 +703,7 @@ fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRep
                         }
                         StatCard(
                             title = band.title,
-                            desc = band.description,
+                            desc = stringResource(band.descriptionRes),
                             data = band.data,
                             isLoading = false,
                             bgColor = cardBgColor,
@@ -810,7 +882,7 @@ private fun SupportBarChart(data: List<OperatorStatValue>, displayMode: StatsDis
     }
 
     val maxCount = (data.maxOfOrNull(::displayCount) ?: 0).coerceAtLeast(1)
-    val rows = data.sortedWith(compareByDescending<OperatorStatValue> { displayCount(it) }.thenBy { it.name })
+    val rows = data.sortedWith(compareByDescending<OperatorStatValue> { displayCount(it) }.thenBy { it.name }.thenBy { it.regionSuffixRes ?: 0 })
     val chartScrollState = rememberScrollState()
 
     Row(
@@ -822,14 +894,19 @@ private fun SupportBarChart(data: List<OperatorStatValue>, displayMode: StatsDis
         verticalAlignment = Alignment.Bottom
     ) {
         rows.forEach { stat ->
-            val barColor = OperatorColors.keyFor(stat.name)
-                ?.let { Color(OperatorColors.colorArgbForKey(it)) }
-                ?: Color.Gray
+            val barColor = Color(OperatorColors.colorArgbForKey(stat.colorKey))
             val targetFraction = (displayCount(stat).toFloat() / maxCount.toFloat()).coerceIn(0f, 1f)
             val animatedFraction by animateFloatAsState(targetValue = targetFraction, label = "statsBar")
+            val operatorName = stat.regionSuffixRes?.let { suffixRes ->
+                stringResource(
+                    R.string.appstrings_operator_display_with_region,
+                    stat.name,
+                    stringResource(suffixRes)
+                )
+            } ?: stat.name
 
             OperatorStatBar(
-                operatorName = stat.name,
+                operatorName = operatorName,
                 totalCount = stat.totalCount,
                 activeCount = stat.activeCount,
                 fraction = animatedFraction,
@@ -867,7 +944,7 @@ private fun WeeklyTrendChart(data: List<WeeklyStatValue>, displayMode: StatsDisp
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "Evolution hebdomadaire",
+                text = stringResource(R.string.appstrings_stats_weekly_trend_title),
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,

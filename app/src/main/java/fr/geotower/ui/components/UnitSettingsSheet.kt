@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.geotower.R
 import fr.geotower.services.LiveTrackingController
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -34,6 +35,7 @@ fun UnitSettingsSheet(
     useOneUi: Boolean,
     bubbleColor: Color
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
@@ -70,42 +72,43 @@ fun UnitSettingsSheet(
                 .fillMaxWidth()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
-                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp)
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp))
         ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(24.dp)), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text(text = stringResource(R.string.settings_units_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                Spacer(Modifier.width(48.dp))
+                Text(text = stringResource(R.string.settings_units_title), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
             }
 
-            Text(text = stringResource(R.string.appstrings_distance_label), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp, start = 8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(text = stringResource(R.string.appstrings_distance_label), style = sizing.textStyle(MaterialTheme.typography.titleMedium), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = sizing.spacing(8.dp), start = sizing.spacing(8.dp)))
+            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
                 UnitOptionItem(stringResource(R.string.appstrings_unit_km), currentDistance == 0, useOneUi, bubbleColor) { currentDistance = 0; saveUnit("distance_unit", AppConfig.distanceUnit, 0) }
                 UnitOptionItem(stringResource(R.string.appstrings_unit_mi), currentDistance == 1, useOneUi, bubbleColor) { currentDistance = 1; saveUnit("distance_unit", AppConfig.distanceUnit, 1) }
             }
 
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(sizing.spacing(24.dp)))
 
-            Text(text = stringResource(R.string.appstrings_speed_label), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 8.dp, start = 8.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(text = stringResource(R.string.appstrings_speed_label), style = sizing.textStyle(MaterialTheme.typography.titleMedium), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = sizing.spacing(8.dp), start = sizing.spacing(8.dp)))
+            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
                 UnitOptionItem(stringResource(R.string.appstrings_unit_kmh), currentSpeed == 0, useOneUi, bubbleColor) { currentSpeed = 0; saveUnit("speed_unit", AppConfig.speedUnit, 0) }
                 UnitOptionItem(stringResource(R.string.appstrings_unit_mph), currentSpeed == 1, useOneUi, bubbleColor) { currentSpeed = 1; saveUnit("speed_unit", AppConfig.speedUnit, 1) }
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(sizing.spacing(16.dp)))
         }
     }
 }
 
 @Composable
 private fun UnitOptionItem(name: String, isSelected: Boolean, useOneUi: Boolean, bubbleColor: Color, onClick: () -> Unit) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val accentColor = MaterialTheme.colorScheme.primary
     val bgColor = if (isSelected) accentColor.copy(alpha = 0.1f) else if (useOneUi) bubbleColor else Color.Transparent
-    val border = if (useOneUi) { if (isSelected) BorderStroke(2.dp, accentColor) else null } else { BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) accentColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) }
-    val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
+    val border = if (useOneUi) { if (isSelected) BorderStroke(sizing.component(2.dp), accentColor) else null } else { BorderStroke(sizing.component(if (isSelected) 2.dp else 1.dp), if (isSelected) accentColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) }
+    val shape = if (useOneUi) RoundedCornerShape(sizing.component(22.dp)) else RoundedCornerShape(sizing.component(12.dp))
 
-    Surface(shape = shape, border = border, color = bgColor, modifier = Modifier.fillMaxWidth().height(56.dp).clickable { onClick() }) {
-        Row(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(text = name, style = MaterialTheme.typography.titleMedium, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1f))
+    Surface(shape = shape, border = border, color = bgColor, modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)).clickable { onClick() }) {
+        Row(modifier = Modifier.fillMaxSize().padding(horizontal = sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
+            Text(text = name, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1f))
             if (useOneUi) { OneUiRadioButton(isSelected, onClick) } else { RadioButton(selected = isSelected, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = accentColor)) }
         }
     }

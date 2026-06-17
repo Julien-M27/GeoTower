@@ -11,9 +11,33 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.DeviceProfile
+
+internal const val GEO_TOWER_SIZE_SMALL_SCALE = 0.85f
+internal const val GEO_TOWER_SIZE_NORMAL_SCALE = 0.925f
+internal const val GEO_TOWER_SIZE_LARGE_SCALE = 1f
+
+@Immutable
+data class GeoTowerUiSizing(
+    val menuSize: String,
+    val componentScale: Float,
+    val spacingScale: Float,
+    val textScale: Float
+) {
+    fun component(value: Dp): Dp = (value.value * componentScale).dp
+    fun spacing(value: Dp): Dp = (value.value * spacingScale).dp
+    fun text(value: TextUnit): TextUnit =
+        if (value == TextUnit.Unspecified) value else (value.value * textScale).sp
+
+    fun textStyle(value: TextStyle): TextStyle =
+        if (value.fontSize == TextUnit.Unspecified) value else value.copy(fontSize = text(value.fontSize))
+}
 
 @Immutable
 data class GeoTowerUiStyle(
@@ -29,6 +53,7 @@ data class GeoTowerUiStyle(
     val blockShape: Shape,
     val actionButtonShape: Shape,
     val smallItemShape: Shape,
+    val sizing: GeoTowerUiSizing,
     val cardBorder: BorderStroke?,
     val subtleBorder: BorderStroke?
 )
@@ -42,6 +67,7 @@ fun rememberGeoTowerUiStyle(): GeoTowerUiStyle {
     val themeMode by AppConfig.themeMode
     val isOled by AppConfig.isOledMode
     val uiMode by AppConfig.uiMode
+    val menuSize by AppConfig.menuSize
     val isDark = themeMode == 2 || (themeMode == 0 && isSystemInDarkTheme())
     val useOneUi = uiMode.usesOneUi()
     val backgroundColor = if (isDark && isOled) Color.Black else MaterialTheme.colorScheme.background
@@ -62,6 +88,7 @@ fun rememberGeoTowerUiStyle(): GeoTowerUiStyle {
     }
     val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     val subtleBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.16f))
+    val sizing = geoTowerUiSizing(menuSize)
 
     return GeoTowerUiStyle(
         useOneUi = useOneUi,
@@ -76,8 +103,23 @@ fun rememberGeoTowerUiStyle(): GeoTowerUiStyle {
         blockShape = if (useOneUi) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp),
         actionButtonShape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp),
         smallItemShape = if (useOneUi) RoundedCornerShape(16.dp) else RoundedCornerShape(12.dp),
+        sizing = sizing,
         cardBorder = cardBorder,
         subtleBorder = subtleBorder
+    )
+}
+
+private fun geoTowerUiSizing(menuSize: String): GeoTowerUiSizing {
+    val scale = when (menuSize) {
+        "petit" -> GEO_TOWER_SIZE_SMALL_SCALE
+        "large" -> GEO_TOWER_SIZE_LARGE_SCALE
+        else -> GEO_TOWER_SIZE_NORMAL_SCALE
+    }
+    return GeoTowerUiSizing(
+        menuSize = menuSize,
+        componentScale = scale,
+        spacingScale = scale,
+        textScale = scale
     )
 }
 

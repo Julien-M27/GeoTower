@@ -26,30 +26,22 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_image_sharing)) {
-        item(stringResource(R.string.appstrings_release_image_sharing_copy_action))
-        item(stringResource(R.string.appstrings_release_image_sharing_supported_pages))
-        item(stringResource(R.string.appstrings_release_elevation_profile_operator_banner))
+    section(stringResource(R.string.appstrings_release_section_preference_profiles)) {
+        item(stringResource(R.string.appstrings_release_profiles_save_restore))
+        item(stringResource(R.string.appstrings_release_profiles_create_customize))
+        item(stringResource(R.string.appstrings_release_profiles_preview_before_apply))
+        item(stringResource(R.string.appstrings_release_profiles_import_export_share))
+        item(stringResource(R.string.appstrings_release_profiles_active_sync))
     }
 
-    section(stringResource(R.string.appstrings_release_section_refresh)) {
-        item(stringResource(R.string.appstrings_release_refresh_pull_to_refresh))
-        item(stringResource(R.string.appstrings_release_refresh_keeps_visible_data))
+    section(stringResource(R.string.appstrings_release_section_settings)) {
+        item(stringResource(R.string.appstrings_release_settings_menu_sizing_consistency))
+        item(stringResource(R.string.appstrings_release_settings_controls_aligned))
     }
 
-    section(stringResource(R.string.appstrings_release_section_nearby)) {
-        item(stringResource(R.string.appstrings_release_nearby_radius_load_more))
-        item(stringResource(R.string.appstrings_release_nearby_large_filtered_results))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_live_tracking)) {
-        item(stringResource(R.string.appstrings_release_live_tracking_gps_frequency))
-        item(stringResource(R.string.appstrings_release_live_tracking_frequency_live_apply))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_throughput_calculator)) {
-        item(stringResource(R.string.appstrings_release_throughput_simplified_profile))
-        item(stringResource(R.string.appstrings_release_throughput_modes_removed))
+    section(stringResource(R.string.appstrings_release_section_statistics)) {
+        item(stringResource(R.string.appstrings_release_statistics_operator_regions))
+        item(stringResource(R.string.appstrings_release_statistics_frequency_weekly_texts))
     }
 }
 

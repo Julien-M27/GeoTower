@@ -62,6 +62,8 @@ import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -91,6 +93,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import fr.geotower.data.workers.AppUpdateNotifier
 import fr.geotower.data.workers.DatabaseDownloadWorker
 import fr.geotower.ui.components.rememberSafeClick
+import fr.geotower.ui.theme.GEO_TOWER_SIZE_LARGE_SCALE
+import fr.geotower.ui.theme.GEO_TOWER_SIZE_NORMAL_SCALE
+import fr.geotower.ui.theme.GEO_TOWER_SIZE_SMALL_SCALE
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppLogoDrawingResources
 import fr.geotower.utils.AppLogger
@@ -99,6 +104,17 @@ import kotlinx.coroutines.launch
 
 private const val TAG_HOME = "GeoTowerDb"
 private const val PREF_HOME_ANNOUNCEMENT_DISMISSED = "home_announcement_dismissed_key"
+
+private data class HomeMenuButtonMetrics(
+    val width: Dp,
+    val height: Dp,
+    val oneUiCornerRadius: Dp,
+    val classicCornerRadius: Dp,
+    val iconSize: Dp,
+    val textSize: TextUnit,
+    val horizontalPadding: Dp,
+    val iconSpacing: Dp
+)
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @SuppressLint("UnusedBoxWithConstraintsScope")
@@ -914,6 +930,35 @@ fun AboutSection(
     }
 }
 
+private fun homeMenuSizeScale(menuSize: String): Float = when (menuSize) {
+    "petit" -> GEO_TOWER_SIZE_SMALL_SCALE
+    "large" -> GEO_TOWER_SIZE_LARGE_SCALE
+    else -> GEO_TOWER_SIZE_NORMAL_SCALE
+}
+
+private fun homeMenuButtonMetrics(menuSize: String, compact: Boolean): HomeMenuButtonMetrics {
+    val scale = homeMenuSizeScale(menuSize)
+    val baseWidth = if (compact) 300f else 330f
+    val baseHeight = if (compact) 66f else 80f
+    val baseOneUiCornerRadius = if (compact) 24f else 28f
+    val baseClassicCornerRadius = 20f
+    val baseIconSize = if (compact) 26f else 28f
+    val baseTextSize = if (compact) 17f else 18f
+    val baseHorizontalPadding = 12f
+    val baseIconSpacing = if (compact) 14f else 20f
+
+    return HomeMenuButtonMetrics(
+        width = (baseWidth * scale).dp,
+        height = (baseHeight * scale).dp,
+        oneUiCornerRadius = (baseOneUiCornerRadius * scale).dp,
+        classicCornerRadius = (baseClassicCornerRadius * scale).dp,
+        iconSize = (baseIconSize * scale).dp,
+        textSize = (baseTextSize * scale).sp,
+        horizontalPadding = (baseHorizontalPadding * scale).dp,
+        iconSpacing = (baseIconSpacing * scale).dp
+    )
+}
+
 @Composable
 fun MenuButton(
     text: String,
@@ -927,21 +972,17 @@ fun MenuButton(
     enabled: Boolean = true,
     onClick: () -> Unit
 ) {
-    val buttonWidth = if (compact) 300.dp else when(menuSize) { "petit" -> 280.dp; "large" -> 330.dp; else -> 320.dp }
-    val buttonHeight = if (compact) 66.dp else when(menuSize) { "petit" -> 65.dp; "large" -> 80.dp; else -> 60.dp }
-    val iconSize = if (compact) 26.dp else when(menuSize) { "petit" -> 24.dp; "large" -> 28.dp; else -> 28.dp }
-    val textSize = if (compact) 17.sp else when(menuSize) { "petit" -> 16.sp; "large" -> 18.sp; else -> 18.sp }
-
-    val buttonShape = if (useOneUi) RoundedCornerShape(if (compact) 24.dp else 28.dp) else RoundedCornerShape(20.dp)
+    val metrics = homeMenuButtonMetrics(menuSize, compact)
+    val buttonShape = if (useOneUi) RoundedCornerShape(metrics.oneUiCornerRadius) else RoundedCornerShape(metrics.classicCornerRadius)
     val buttonElevation = if (useOneUi) 0.dp else 2.dp
 
     // ✅ NOUVEAU : Si fillWidth est true (Grille), le bouton s'adapte !
-    val widthModifier = if (fillWidth) Modifier.fillMaxWidth() else Modifier.width(buttonWidth)
+    val widthModifier = if (fillWidth) Modifier.fillMaxWidth() else Modifier.width(metrics.width)
 
     Button(
         onClick = onClick,
         enabled = enabled,
-        modifier = widthModifier.height(buttonHeight),
+        modifier = widthModifier.height(metrics.height),
         shape = buttonShape,
         colors = ButtonDefaults.buttonColors(
             containerColor = color,
@@ -956,11 +997,11 @@ fun MenuButton(
             // On centre le contenu du bouton quand il est très large dans la grille
             horizontalArrangement = if (fillWidth) Arrangement.Center else Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp)
+            modifier = Modifier.fillMaxWidth().padding(horizontal = metrics.horizontalPadding)
         ) {
-            Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(iconSize))
-            Spacer(modifier = Modifier.width(if (compact) 14.dp else 20.dp))
-            Text(text = text, fontSize = textSize, fontWeight = FontWeight.SemiBold)
+            Icon(imageVector = icon, contentDescription = null, modifier = Modifier.size(metrics.iconSize))
+            Spacer(modifier = Modifier.width(metrics.iconSpacing))
+            Text(text = text, fontSize = metrics.textSize, fontWeight = FontWeight.SemiBold)
         }
     }
 }

@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.R
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppLocale
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColors
@@ -56,10 +57,11 @@ fun OneUiRadioButton(
     selectedColor: Color,
     onClick: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val activeColor = selectedColor
     val color = if (selected) activeColor else MaterialTheme.colorScheme.outline
 
-    Box(modifier = Modifier.size(24.dp).clip(CircleShape).border(2.dp, color, CircleShape).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onClick() }.padding(5.dp), contentAlignment = Alignment.Center) {
+    Box(modifier = Modifier.size(sizing.component(24.dp)).clip(CircleShape).border(sizing.component(2.dp), color, CircleShape).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onClick() }.padding(sizing.spacing(5.dp)), contentAlignment = Alignment.Center) {
         if (selected) Box(modifier = Modifier.fillMaxSize().clip(CircleShape).background(color))
     }
 }
@@ -84,16 +86,17 @@ fun CustomSliderCard(
     enabled: Boolean = true
 ) {
     var currentIndex by remember { mutableFloatStateOf(steps.indexOf(currentValue).coerceAtLeast(0).toFloat()) }
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val accentColor = MaterialTheme.colorScheme.primary
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
 
     Surface(shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp).alpha(if (enabled) 1f else 0.5f)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)).alpha(if (enabled) 1f else 0.5f)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(labels[currentIndex.toInt()], style = MaterialTheme.typography.titleMedium, color = accentColor, fontWeight = FontWeight.Bold)
+                Text(title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                Text(labels[currentIndex.toInt()], style = sizing.textStyle(MaterialTheme.typography.titleMedium), color = accentColor, fontWeight = FontWeight.Bold)
             }
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
 
             if (useOneUi) {
                 Slider(
@@ -104,20 +107,20 @@ fun CustomSliderCard(
                     valueRange = 0f..(steps.size - 1).toFloat(),
                     steps = steps.size - 2,
                     thumb = {
-                        Box(modifier = Modifier.size(24.dp).background(MaterialTheme.colorScheme.surface, CircleShape).border(3.dp, MaterialTheme.colorScheme.primary, CircleShape))
+                        Box(modifier = Modifier.size(sizing.component(24.dp)).background(MaterialTheme.colorScheme.surface, CircleShape).border(sizing.component(3.dp), MaterialTheme.colorScheme.primary, CircleShape))
                     },
                     track = { _ ->
-                        Canvas(modifier = Modifier.fillMaxWidth().height(14.dp)) {
+                        Canvas(modifier = Modifier.fillMaxWidth().height(sizing.component(14.dp))) {
                             val trackColor = Color.Gray.copy(alpha = 0.3f)
                             val dotColor = Color.Gray.copy(alpha = 0.6f)
 
-                            drawLine(color = trackColor, start = Offset(0f, size.height / 2), end = Offset(size.width, size.height / 2), strokeWidth = 14.dp.toPx(), cap = StrokeCap.Round)
+                            drawLine(color = trackColor, start = Offset(0f, size.height / 2), end = Offset(size.width, size.height / 2), strokeWidth = sizing.component(14.dp).toPx(), cap = StrokeCap.Round)
 
                             // Logique mathématique de calcul des espacements
                             val dotCount = steps.size
                             val stepWidth = size.width / (dotCount - 1)
                             for (i in 0 until dotCount) {
-                                drawCircle(color = dotColor, radius = 4.dp.toPx(), center = Offset(i * stepWidth, size.height / 2))
+                                drawCircle(color = dotColor, radius = sizing.component(4.dp).toPx(), center = Offset(i * stepWidth, size.height / 2))
                             }
                         }
                     }
@@ -130,7 +133,7 @@ fun CustomSliderCard(
             }
 
             if (footerText != null) {
-                Text(footerText, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(footerText, style = sizing.textStyle(MaterialTheme.typography.labelSmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -149,6 +152,7 @@ fun OperatorSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
     val scrollState = rememberScrollState()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         Column(
@@ -156,17 +160,17 @@ fun OperatorSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
                 .fillMaxWidth()
                 .fillMaxHeight(0.92f)
                 .navigationBarsPadding()
-                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+                .padding(start = sizing.spacing(24.dp), end = sizing.spacing(24.dp), bottom = sizing.spacing(24.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(stringResource(R.string.settings_default_operator), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 24.dp))
+            Text(stringResource(R.string.settings_default_operator), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = sizing.spacing(24.dp)))
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .settingsPopupFadingEdge(scrollState)
                     .verticalScroll(scrollState),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
             ) {
                 OperatorItem(stringResource(R.string.common_none), null, Color.Gray, tempOp == "Aucun", useOneUi, bubbleColor, showSimFallback = true) { tempOp = "Aucun" }
                 OperatorGroupTitle(stringResource(R.string.operator_region_metro))
@@ -196,21 +200,22 @@ fun OperatorSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
 
             Button(
                 onClick = { onSelect(tempOp); onDismiss() },
-                modifier = Modifier.padding(top = 16.dp).fillMaxWidth().height(56.dp),
-                shape = RoundedCornerShape(28.dp)
-            ) { Text(stringResource(R.string.common_validate), fontWeight = FontWeight.Bold) }
+                modifier = Modifier.padding(top = sizing.spacing(16.dp)).fillMaxWidth().height(sizing.component(56.dp)),
+                shape = RoundedCornerShape(sizing.component(28.dp))
+            ) { Text(stringResource(R.string.common_validate), style = sizing.textStyle(MaterialTheme.typography.labelLarge), fontWeight = FontWeight.Bold) }
         }
     }
 }
 
 @Composable
 private fun OperatorGroupTitle(text: String) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Text(
         text = text,
-        style = MaterialTheme.typography.labelLarge,
+        style = sizing.textStyle(MaterialTheme.typography.labelLarge),
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+        modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(8.dp))
     )
 }
 
@@ -225,27 +230,28 @@ fun OperatorItem(
     showSimFallback: Boolean = false,
     onClick: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val activeBg = operatorColor.copy(alpha = 0.1f)
     val bgColor = if (isSelected) activeBg else (if (useOneUi) bubbleColor else Color.Transparent)
-    val border = if (useOneUi) { if (isSelected) BorderStroke(2.dp, operatorColor) else null } else { BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) operatorColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) }
+    val border = if (useOneUi) { if (isSelected) BorderStroke(sizing.component(2.dp), operatorColor) else null } else { BorderStroke(sizing.component(if (isSelected) 2.dp else 1.dp), if (isSelected) operatorColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) }
 
-    Surface(onClick = onClick, modifier = Modifier.fillMaxWidth().height(64.dp), color = bgColor, border = border, shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)) {
-        Row(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (logoRes != null) Image(painterResource(logoRes), null, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)))
-            else Box(modifier = Modifier.size(40.dp).background(operatorColor.copy(alpha = 0.14f), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+    Surface(onClick = onClick, modifier = Modifier.fillMaxWidth().height(sizing.component(64.dp)), color = bgColor, border = border, shape = if (useOneUi) RoundedCornerShape(sizing.component(22.dp)) else RoundedCornerShape(sizing.component(12.dp))) {
+        Row(modifier = Modifier.fillMaxSize().padding(horizontal = sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
+            if (logoRes != null) Image(painterResource(logoRes), null, modifier = Modifier.size(sizing.component(40.dp)).clip(RoundedCornerShape(sizing.component(8.dp))))
+            else Box(modifier = Modifier.size(sizing.component(40.dp)).background(operatorColor.copy(alpha = 0.14f), RoundedCornerShape(sizing.component(8.dp))), contentAlignment = Alignment.Center) {
                 if (showSimFallback) {
                     Icon(
                         imageVector = Icons.Default.SimCard,
                         contentDescription = null,
                         tint = operatorColor,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(sizing.component(24.dp))
                     )
                 } else {
                     Text(text = name.take(1).uppercase(), color = operatorColor, fontWeight = FontWeight.Bold)
                 }
             }
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(text = name, style = MaterialTheme.typography.titleMedium, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1f))
+            Spacer(modifier = Modifier.width(sizing.spacing(16.dp)))
+            Text(text = name, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1f))
             if (useOneUi) OneUiRadioButton(isSelected, selectedColor = operatorColor, onClick = onClick) else RadioButton(selected = isSelected, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = operatorColor))
         }
     }
@@ -264,6 +270,7 @@ fun LanguageSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
     val scrollState = rememberScrollState()
     val context = LocalContext.current
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         Column(
@@ -271,11 +278,11 @@ fun LanguageSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
                 .fillMaxWidth()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
-                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+                .padding(start = sizing.spacing(24.dp), end = sizing.spacing(24.dp), bottom = sizing.spacing(24.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(stringResource(R.string.settings_app_language), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 24.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(stringResource(R.string.settings_app_language), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = sizing.spacing(24.dp)))
+            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                 LanguageItem(stringResource(R.string.language_system), AppLocale.languageFlag(AppLocale.LANGUAGE_SYSTEM), tempLang == AppLocale.LANGUAGE_SYSTEM, useOneUi, bubbleColor, activeColor) { tempLang = AppLocale.LANGUAGE_SYSTEM }
                 LanguageItem(stringResource(R.string.language_french_name), AppLocale.languageFlag(AppLocale.LANGUAGE_FRENCH), tempLang == AppLocale.LANGUAGE_FRENCH, useOneUi, bubbleColor, activeColor) { tempLang = AppLocale.LANGUAGE_FRENCH }
                 LanguageItem(stringResource(R.string.language_english_name), AppLocale.languageFlag(AppLocale.LANGUAGE_ENGLISH), tempLang == AppLocale.LANGUAGE_ENGLISH, useOneUi, bubbleColor, activeColor) { tempLang = AppLocale.LANGUAGE_ENGLISH }
@@ -286,11 +293,11 @@ fun LanguageSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
 
                 Button(
                     onClick = { onSelect(tempLang); onDismiss() },
-                    modifier = Modifier.padding(top = 4.dp).fillMaxWidth().height(56.dp),
-                    shape = RoundedCornerShape(28.dp),
+                    modifier = Modifier.padding(top = sizing.spacing(4.dp)).fillMaxWidth().height(sizing.component(56.dp)),
+                    shape = RoundedCornerShape(sizing.component(28.dp)),
                     // ✅ MODIFICATION : On s'assure que le texte du bouton utilise "onPrimary" (généralement blanc) pour contraster avec la couleur vive
                     colors = ButtonDefaults.buttonColors(containerColor = activeColor, contentColor = MaterialTheme.colorScheme.onPrimary)
-                ) { Text(AppLocale.getString(context, tempLang, R.string.common_validate), fontWeight = FontWeight.Bold) }
+                ) { Text(AppLocale.getString(context, tempLang, R.string.common_validate), style = sizing.textStyle(MaterialTheme.typography.labelLarge), fontWeight = FontWeight.Bold) }
             }
         }
     }
@@ -298,15 +305,16 @@ fun LanguageSheet(current: String, onSelect: (String) -> Unit, onDismiss: () -> 
 
 @Composable
 fun LanguageItem(name: String, flag: String, isSelected: Boolean, useOneUi: Boolean, bubbleColor: Color, accentColor: Color, onClick: () -> Unit) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val activeBg = accentColor.copy(alpha = 0.1f)
     val bgColor = if (isSelected) activeBg else (if (useOneUi) bubbleColor else Color.Transparent)
-    val border = if (useOneUi) { if (isSelected) BorderStroke(2.dp, accentColor) else null } else { BorderStroke(if (isSelected) 2.dp else 1.dp, if (isSelected) accentColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) }
+    val border = if (useOneUi) { if (isSelected) BorderStroke(sizing.component(2.dp), accentColor) else null } else { BorderStroke(sizing.component(if (isSelected) 2.dp else 1.dp), if (isSelected) accentColor else MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) }
 
-    Surface(onClick = onClick, modifier = Modifier.fillMaxWidth().height(64.dp), color = bgColor, border = border, shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)) {
-        Row(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) { Text(flag, fontSize = 26.sp) }
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(name, style = MaterialTheme.typography.titleMedium, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1f))
+    Surface(onClick = onClick, modifier = Modifier.fillMaxWidth().height(sizing.component(64.dp)), color = bgColor, border = border, shape = if (useOneUi) RoundedCornerShape(sizing.component(22.dp)) else RoundedCornerShape(sizing.component(12.dp))) {
+        Row(modifier = Modifier.fillMaxSize().padding(horizontal = sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
+            Box(modifier = Modifier.size(sizing.component(32.dp)), contentAlignment = Alignment.Center) { Text(flag, fontSize = sizing.text(26.sp)) }
+            Spacer(modifier = Modifier.width(sizing.spacing(16.dp)))
+            Text(name, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal, modifier = Modifier.weight(1f))
             if (useOneUi) OneUiRadioButton(isSelected, onClick) else RadioButton(selected = isSelected, onClick = null, colors = RadioButtonDefaults.colors(selectedColor = accentColor))
         }
     }

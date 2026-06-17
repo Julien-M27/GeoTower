@@ -11,6 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 
 @Composable
 fun LiveNotificationCard(
@@ -24,6 +25,7 @@ fun LiveNotificationCard(
     bubbleColor: Color,
     useOneUi: Boolean
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
     val contentAlpha = if (enabled) 1f else 0.5f // Grisé si désactivé
 
@@ -40,13 +42,13 @@ fun LiveNotificationCard(
         modifier = Modifier.fillMaxWidth().alpha(contentAlpha)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp)),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                Text(desc, style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             GeoTowerSwitch(

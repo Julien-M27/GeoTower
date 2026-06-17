@@ -6,6 +6,7 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.api.RetrofitClient
 import fr.geotower.data.upload.SignalQuestUploadQueue
+import fr.geotower.utils.PreferenceProfileManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -30,6 +31,7 @@ class GeoTowerApp : Application() {
         )
         Configuration.getInstance().userAgentValue = packageName
         RemoteFeatureFlags.loadCached(applicationContext)
+        PreferenceProfileManager.install(applicationContext)
         appScope.launch {
             RemoteFeatureFlags.refreshIfNeeded(applicationContext, force = true)
         }
