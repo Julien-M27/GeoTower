@@ -208,7 +208,7 @@ class CarNearbySitesScreen(
                 val title = if (splitIndex > 0) fullAddress.substring(0, splitIndex).trim() else fullAddress
                 val subtitle = if (splitIndex > 0) fullAddress.substring(splitIndex + 1).trim() else siteTitle
                 val operators = antennas
-                    .flatMap { it.operatorSummary().split(", ") }
+                    .flatMap { it.operatorSummary(carContext).split(", ") }
                     .distinct()
                     .joinToString(", ")
 

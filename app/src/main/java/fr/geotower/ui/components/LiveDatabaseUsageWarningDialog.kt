@@ -20,6 +20,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import fr.geotower.R
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.GeoTowerDatabaseValidator
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -28,6 +29,7 @@ import kotlinx.coroutines.withContext
 fun LiveDatabaseUsageWarningDialog(liveFeatureId: String) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val localDbState by AppConfig.localDatabaseState
     val featureFlags by RemoteFeatureFlags.config
     var showDialog by remember(liveFeatureId) { mutableStateOf(true) }
@@ -61,8 +63,18 @@ fun LiveDatabaseUsageWarningDialog(liveFeatureId: String) {
     if (showDialog && isUsingLiveDatabase) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = { Text(stringResource(R.string.live_database_warning_title)) },
-            text = { Text(stringResource(R.string.live_database_warning_desc)) },
+            title = {
+                Text(
+                    stringResource(R.string.live_database_warning_title),
+                    style = sizing.textStyle(MaterialTheme.typography.headlineSmall)
+                )
+            },
+            text = {
+                Text(
+                    stringResource(R.string.live_database_warning_desc),
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium)
+                )
+            },
             confirmButton = {
                 Button(
                     onClick = { showDialog = false },
@@ -70,7 +82,10 @@ fun LiveDatabaseUsageWarningDialog(liveFeatureId: String) {
                         containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
-                    Text(stringResource(R.string.common_continue))
+                    Text(
+                        stringResource(R.string.common_continue),
+                        style = sizing.textStyle(MaterialTheme.typography.labelLarge)
+                    )
                 }
             }
         )

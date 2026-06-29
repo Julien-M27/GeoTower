@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -108,6 +109,8 @@ import androidx.work.WorkManager
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.RadioRepository
+import fr.geotower.data.api.CellMapperLinks
+import fr.geotower.data.api.CellMapperNetwork
 import fr.geotower.data.api.CellularFrApi
 import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.api.SignalQuestSpeedtestSortMetric
@@ -117,6 +120,7 @@ import fr.geotower.data.api.filterBySignalQuestPlmn
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.physicalSiteKey
 import fr.geotower.data.models.RadioBroadcastProgram
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.RadioMapMarker
@@ -125,7 +129,6 @@ import fr.geotower.data.models.RadioSystemMasks
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.upload.SignalQuestUploadDraftStore
 import fr.geotower.data.upload.SignalQuestUploadQueue
-import fr.geotower.data.upload.SignalQuestUploadRules
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.GeoTowerBreadcrumbItem
 import fr.geotower.ui.components.GeoTowerLoadingMessage
@@ -236,6 +239,7 @@ fun SiteDetailScreen(
     }
     val haptic = LocalHapticFeedback.current
     val uiStyle = LocalGeoTowerUiStyle.current
+    val sizing = uiStyle.sizing
     rememberCoroutineScope()
     val uriHandler = LocalUriHandler.current
     LocalView.current
@@ -271,6 +275,8 @@ fun SiteDetailScreen(
     val safeClick = rememberSafeClick()
 
     var antenna by remember { mutableStateOf<LocalisationEntity?>(null) }
+    // Zoom eNB-Analytics adapté à la densité locale (calculé au chargement du site). 15 = densité inconnue.
+    var enbAnalyticsZoom by remember { mutableStateOf(15) }
     var physique by remember { mutableStateOf<PhysiqueEntity?>(null) }
 
     // --- ÉTATS POUR LE SPEEDTEST ---
@@ -299,10 +305,8 @@ fun SiteDetailScreen(
         ) {
             return
         }
-        val maxPhotos = RemoteFeatureFlags
-            .limitOrDefault(RemoteFeatureFlags.Limits.PHOTO_UPLOAD_MAX_COUNT, SignalQuestUploadRules.MAX_PHOTOS)
-            .coerceIn(1, SignalQuestUploadRules.MAX_PHOTOS)
-        val selectedUris = uris.take(maxPhotos)
+        // Pas de limite de nombre : le serveur recoit et traite les photos une par une.
+        val selectedUris = uris
         if (selectedUris.isNotEmpty() && antenna != null) {
             val draftId = SignalQuestUploadDraftStore.put(selectedUris.map { it.toString() })
             val uploadSiteId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: antenna!!.idAnfr
@@ -335,12 +339,13 @@ fun SiteDetailScreen(
     var showEnbSheet by remember { mutableStateOf(false) }
     var showCellularFrSheet by remember { mutableStateOf(false) }
     var showSignalQuestSheet by remember { mutableStateOf(false) }
+    var showCellMapperSheet by remember { mutableStateOf(false) }
     var showNavigationSheet by remember { mutableStateOf(false) }
     var showRncSheet by remember { mutableStateOf(false) }
     var showAnfrSheet by remember { mutableStateOf(false) }
 
     val photoPickerLauncher = rememberLauncherForActivityResult<PickVisualMediaRequest, List<Uri>>(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = SignalQuestUploadRules.MAX_PHOTOS),
+        contract = ActivityResultContracts.PickMultipleVisualMedia(),
         onResult = { uris ->
             navigateToUploadWithUris(uris)
         }
@@ -415,6 +420,10 @@ fun SiteDetailScreen(
     val canUseElevationProfile =
         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ELEVATION_PROFILE) &&
             featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_ELEVATION_PROFILE) &&
+            featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ELEVATION_IGN)
+    val canUseTheoreticalCoverage =
+        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THEORETICAL_COVERAGE) &&
+            featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_THEORETICAL_COVERAGE) &&
             featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ELEVATION_IGN)
     val canUseThroughputCalculator =
         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THROUGHPUT_CALCULATOR) &&
@@ -548,6 +557,7 @@ fun SiteDetailScreen(
     var showIds by remember { mutableStateOf(SitePagePrefs.ids.read(prefs)) }
     var showOpenMap by remember { mutableStateOf(SitePagePrefs.openMap.read(prefs)) }
     var showElevationProfile by remember { mutableStateOf(SitePagePrefs.elevationProfile.read(prefs)) }
+    var showTheoreticalCoverage by remember { mutableStateOf(SitePagePrefs.theoreticalCoverage.read(prefs)) }
     var showThroughputCalculator by remember { mutableStateOf(SitePagePrefs.throughputCalculator.read(prefs)) }
     var showNav by remember { mutableStateOf(SitePagePrefs.nav.read(prefs)) }
     var showShare by remember { mutableStateOf(SitePagePrefs.share.read(prefs)) }
@@ -577,6 +587,7 @@ fun SiteDetailScreen(
         val lon = prefs.getFloat("clicked_lon", 0f).toDouble()
 
         var localData: LocalisationEntity? = null
+        var siteSiblings: List<LocalisationEntity> = emptyList() // antennes voisines (mêmes coords) pour la propagation ZB
         if (lat != 0.0 && lon != 0.0) {
             val box = repository.getAntennasInBox(
                 latNorth = lat + 0.0005,
@@ -584,6 +595,7 @@ fun SiteDetailScreen(
                 latSouth = lat - 0.0005,
                 lonWest = lon - 0.0005
             )
+            siteSiblings = box
             localData = box.firstOrNull { it.latitude.toFloat() == lat.toFloat() && it.longitude.toFloat() == lon.toFloat() && it.idAnfr.matchesRequestedAnfrId(antennaId) }
                 ?: box.firstOrNull { it.latitude.toFloat() == lat.toFloat() && it.longitude.toFloat() == lon.toFloat() }
         }
@@ -597,14 +609,44 @@ fun SiteDetailScreen(
 
             // 🚨 TÉLÉCHARGEMENT DES PANNES
             try {
+                val anchor = localData
                 val allHs = repository.getSitesHs()
-                val tempOutageMap = mutableMapOf<String, fr.geotower.data.models.SiteHsEntity>()
-                val hsData = allHs.firstOrNull { hs ->
-                    hs.idAnfr.toLongOrNull() == localData.idAnfr.toLongOrNull()
+
+                // Antennes du même site physique (autres opérateurs du support) pour la propagation ZB.
+                val siteKey = anchor.physicalSiteKey()
+                val siblings = (listOf(anchor) + siteSiblings)
+                    .distinctBy { it.idAnfr }
+                    .filter { it.physicalSiteKey() == siteKey }
+
+                // Pannes réellement déclarées sur ce site physique (tous opérateurs confondus).
+                val declaredOnSite = mutableMapOf<String, fr.geotower.data.models.SiteHsEntity>()
+                siblings.forEach { sib ->
+                    val sibId = sib.idAnfr.toLongOrNull()
+                    val match = allHs.firstOrNull { hs -> sibId != null && hs.idAnfr.toLongOrNull() == sibId }
+                    if (match != null) declaredOnSite[sib.idAnfr] = match
                 }
-                if (hsData != null) tempOutageMap[localData.idAnfr] = hsData
-                hsDataMap = tempOutageMap
+
+                val tempOutageMap = declaredOnSite.toMutableMap()
+                // Propagation « zone blanche » : marque les opérateurs ZB sans déclaration.
+                fr.geotower.utils.zbPotentialOutagesForSite(siblings, declaredOnSite.values.toList())
+                    .forEach { potential -> tempOutageMap.putIfAbsent(potential.idAnfr, potential) }
+
+                // Cet écran n'affiche qu'un opérateur → on ne garde que son entrée (déclarée ou déduite).
+                hsDataMap = tempOutageMap.filterKeys { it == anchor.idAnfr }
             } catch (e: Exception) { AppLogger.w(TAG_SITE_DETAIL, "Outage data request failed", e) }
+
+            // Densité locale → zoom eNB-Analytics : nb de sites physiques distincts dans ~1,5 km.
+            try {
+                val latDelta = 0.0135 // ~1,5 km en latitude
+                val lonDelta = (latDelta / Math.cos(Math.toRadians(localData.latitude))).coerceIn(latDelta, 0.05)
+                val nearbySiteCount = repository.getAntennasInBox(
+                    latNorth = localData.latitude + latDelta,
+                    lonEast = localData.longitude + lonDelta,
+                    latSouth = localData.latitude - latDelta,
+                    lonWest = localData.longitude - lonDelta
+                ).asSequence().map { it.physicalSiteKey() }.distinct().count()
+                enbAnalyticsZoom = enbAnalyticsZoomForSiteCount(nearbySiteCount)
+            } catch (e: Exception) { AppLogger.w(TAG_SITE_DETAIL, "eNB zoom density query failed", e) }
         }
 
         if (localData != null && localData.idAnfr.isNotBlank() && canUseSitePhotos) {
@@ -964,12 +1006,14 @@ fun SiteDetailScreen(
             val scrollState = rememberScrollState()
 
             val opColor = getOperatorColor(info.operateur)
-            val opNameUrl = when {
-                info.operateur?.contains("ORANGE", true) == true -> "orange"
-                info.operateur?.contains("FREE", true) == true -> "free"
-                info.operateur?.contains("BOUYGUES", true) == true -> "bytel"
-                info.operateur?.contains("SFR", true) == true -> "sfr"
-                else -> ""
+            // eNB-Analytics : table = code PLMN (MCC 208 + MNC) de l'opérateur métropolitain.
+            // Orange 208-01, SFR 208-10, Free 208-15, Bouygues 208-20. null = opérateur non couvert.
+            val enbAnalyticsTable: Int? = when {
+                info.operateur?.contains("ORANGE", true) == true -> 20801
+                info.operateur?.contains("FREE", true) == true -> 20815
+                info.operateur?.contains("BOUYGUES", true) == true -> 20820
+                info.operateur?.contains("SFR", true) == true -> 20810
+                else -> null
             }
             val operatorFilterKeys = if (applyMapFilters) {
                 AppConfig.selectedOperatorKeys.value
@@ -993,32 +1037,79 @@ fun SiteDetailScreen(
 
             if (showCartoradioSheet) {
                 ModalBottomSheet(onDismissRequest = { showCartoradioSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("Cartoradio", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.appstrings_open_on), style = MaterialTheme.typography.bodyMedium)
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    ExternalOpenOnSheetContent(
+                        title = "Cartoradio",
+                        subtitle = stringResource(R.string.appstrings_open_on),
+                        cardRow = {
                             CommunityCard(title = stringResource(R.string.appstrings_website), txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_cartoradio, modifier = Modifier.weight(1f)) {
-                                haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                                showCartoradioSheet = false
-                                openWebsiteUrl("https://cartoradio.fr/index.html#/cartographie/lonlat/${info.longitude}/${info.latitude}")
-                            }
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    showCartoradioSheet = false
+                                    openWebsiteUrl("https://cartoradio.fr/index.html#/cartographie/lonlat/${info.longitude}/${info.latitude}")
+                                }
                         }
+                    )
+                }
+            }
+
+            if (showCellMapperSheet) {
+                val cellMapperNetwork = CellMapperLinks.networkFor(info.operateur)
+                if (cellMapperNetwork != null) {
+                    val cellMapperTechnologies = listOfNotNull(
+                        technique?.detailsFrequences,
+                        technique?.technologies,
+                        info.filtres,
+                        info.frequences
+                    ).joinToString("\n")
+                    val hasCellMapper4G = cellMapperTechnologies.isBlank() ||
+                        cellMapperTechnologies.contains("4G", ignoreCase = true) ||
+                        cellMapperTechnologies.contains("LTE", ignoreCase = true)
+                    val hasCellMapper5G = cellMapperTechnologies.contains("5G", ignoreCase = true) ||
+                        cellMapperTechnologies.contains("NR", ignoreCase = true)
+                    ModalBottomSheet(onDismissRequest = { showCellMapperSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
+                        ExternalOpenOnSheetContent(
+                            title = "CellMapper",
+                            subtitle = txtWhichMap,
+                            cardRow = {
+                                CommunityCard(title = txtMap4G, txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_cellmapper, isEnabled = hasCellMapper4G, modifier = Modifier.weight(1f)) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    showCellMapperSheet = false
+                                    openWebsiteUrl(
+                                        cellMapperMapUrl(
+                                            network = cellMapperNetwork,
+                                            type = "LTE",
+                                            latitude = info.latitude,
+                                            longitude = info.longitude
+                                        )
+                                    )
+                                }
+                                CommunityCard(title = txtMap5G, txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_cellmapper, isEnabled = hasCellMapper5G, modifier = Modifier.weight(1f)) {
+                                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                                    showCellMapperSheet = false
+                                    openWebsiteUrl(
+                                        cellMapperMapUrl(
+                                            network = cellMapperNetwork,
+                                            type = "NR",
+                                            latitude = info.latitude,
+                                            longitude = info.longitude
+                                        )
+                                    )
+                                }
+                            }
+                        )
                     }
                 }
             }
 
-            if (showEnbSheet && opNameUrl.isNotEmpty()) {
+            if (showEnbSheet && enbAnalyticsTable != null) {
                 ModalBottomSheet(onDismissRequest = { showEnbSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("eNB-Analytics", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(txtWhichMap, style = MaterialTheme.typography.bodyMedium)
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    ExternalOpenOnSheetContent(
+                        title = "eNB-Analytics",
+                        subtitle = txtWhichMap,
+                        cardRow = {
                             CommunityCard(title = txtMap4G, txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_enbanalytics, modifier = Modifier.weight(1f)) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 showEnbSheet = false
-                                openWebsiteUrl("https://enb-analytics.fr/analytics_${opNameUrl}.html")
+                                openWebsiteUrl(enbAnalyticsMapUrl(table = enbAnalyticsTable, generation = 4, latitude = info.latitude, longitude = info.longitude, zoom = enbAnalyticsZoom))
                             }
                             val has5G = listOfNotNull(
                                 technique?.technologies,
@@ -1026,12 +1117,13 @@ fun SiteDetailScreen(
                                 info.frequences
                             ).any { it.contains("5G", ignoreCase = true) }
                             CommunityCard(title = txtMap5G, txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_enbanalytics, isEnabled = has5G, modifier = Modifier.weight(1f)) {
-                                if (has5G) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); showEnbSheet = false; openWebsiteUrl("https://enb-analytics.fr/analytics_nr_${opNameUrl}.html") }
+                                if (has5G) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); showEnbSheet = false; openWebsiteUrl(enbAnalyticsMapUrl(table = enbAnalyticsTable, generation = 5, latitude = info.latitude, longitude = info.longitude, zoom = enbAnalyticsZoom)) }
                             }
+                        },
+                        appLauncher = {
+                            AppLauncherButton(isInstalled = isEnbAppInstalled, appName = "eNB-Analytics", txtOpen = txtOpen, txtInstall = txtInstallApp, useOneUi = useOneUi) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); showEnbSheet = false; if (isEnbAppInstalled) launchApp(context, "fr.enb_analytics.enb4g") else uriHandler.openUri("https://play.google.com/store/apps/details?id=fr.enb_analytics.enb4g") }
                         }
-                        Spacer(modifier = Modifier.height(24.dp))
-                        AppLauncherButton(isInstalled = isEnbAppInstalled, appName = "eNB-Analytics", txtOpen = txtOpen, txtInstall = txtInstallApp, useOneUi = useOneUi) { haptic.performHapticFeedback(HapticFeedbackType.LongPress); showEnbSheet = false; if (isEnbAppInstalled) launchApp(context, "fr.enb_analytics.enb4g") else uriHandler.openUri("https://play.google.com/store/apps/details?id=fr.enb_analytics.enb4g") }
-                    }
+                    )
                 }
             }
 
@@ -1039,16 +1131,16 @@ fun SiteDetailScreen(
             if (showCellularFrSheet) {
                 val supportId = physique?.idSupport ?: info.idAnfr // ✅ VRAI ID
                 ModalBottomSheet(onDismissRequest = { showCellularFrSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("CellularFR", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.appstrings_open_on), style = MaterialTheme.typography.bodyMedium)
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp), top = sizing.spacing(8.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("CellularFR", style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.appstrings_open_on), style = sizing.textStyle(MaterialTheme.typography.bodyMedium))
+                        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
                             CommunityCard(title = stringResource(R.string.appstrings_website), txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_cellularfr, isEnabled = supportId.isNotEmpty(), modifier = Modifier.weight(1f)) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress); showCellularFrSheet = false; openWebsiteUrl("https://cellularfr.fr/site-details.html?siteId=$supportId")
                             }
                         }
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
                         AppLauncherButton(isInstalled = isCellularFrInstalled, appName = "CellularFR", txtOpen = txtOpen, txtInstall = txtInstallApp, useOneUi = useOneUi) {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress); showCellularFrSheet = false; if (isCellularFrInstalled) launchApp(context, "com.luisbaker.cellularfr") else uriHandler.openUri("https://play.google.com/store/apps/details?id=com.luisbaker.cellularfr")
                         }
@@ -1073,18 +1165,18 @@ fun SiteDetailScreen(
                     )
 
                     ModalBottomSheet(onDismissRequest = { showSignalQuestSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
-                        Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text("Signal Quest", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                            Text(stringResource(R.string.appstrings_open_on), style = MaterialTheme.typography.bodyMedium)
-                            Spacer(modifier = Modifier.height(24.dp))
-                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Column(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp), top = sizing.spacing(8.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
+                            Text("Signal Quest", style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold)
+                            Text(stringResource(R.string.appstrings_open_on), style = sizing.textStyle(MaterialTheme.typography.bodyMedium))
+                            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+                            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
                                 CommunityCard(title = stringResource(R.string.appstrings_website), txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_signalquest, isEnabled = info.idAnfr.isNotBlank(), modifier = Modifier.weight(1f)) {
                                     haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                     showSignalQuestSheet = false
                                     openWebsiteUrl(websiteUrl)
                                 }
                             }
-                            Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
                             AppLauncherButton(isInstalled = isSignalQuestInstalled, appName = "Signal Quest", txtOpen = txtOpen, txtInstall = txtInstallApp, useOneUi = useOneUi) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 showSignalQuestSheet = false
@@ -1103,16 +1195,16 @@ fun SiteDetailScreen(
 
             if (showRncSheet) {
                 ModalBottomSheet(onDismissRequest = { showRncSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("RNC Mobile", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.appstrings_open_on), style = MaterialTheme.typography.bodyMedium)
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp), top = sizing.spacing(8.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("RNC Mobile", style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.appstrings_open_on), style = sizing.textStyle(MaterialTheme.typography.bodyMedium))
+                        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
                             CommunityCard(title = stringResource(R.string.appstrings_website), txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_rncmobile, modifier = Modifier.weight(1f)) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress); showRncSheet = false; openWebsiteUrl("https://rncmobile.net/site/${info.latitude},${info.longitude}")
                             }
                         }
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
                         AppLauncherButton(isInstalled = isRncMobileInstalled, appName = "RNC Mobile", txtOpen = txtOpen, txtInstall = txtInstallApp, useOneUi = useOneUi) {
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress); showRncSheet = false; if (isRncMobileInstalled) launchApp(context, "org.rncteam.rncfreemobile") else uriHandler.openUri("https://play.google.com/store/apps/details?id=org.rncteam.rncfreemobile")
                         }
@@ -1122,11 +1214,11 @@ fun SiteDetailScreen(
 
             if (showAnfrSheet) {
                 ModalBottomSheet(onDismissRequest = { showAnfrSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 24.dp, end = 24.dp, top = 8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                        Text("data.gouv.fr", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.appstrings_open_on), style = MaterialTheme.typography.bodyMedium)
-                        Spacer(modifier = Modifier.height(24.dp))
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp), top = sizing.spacing(8.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("data.gouv.fr", style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.appstrings_open_on), style = sizing.textStyle(MaterialTheme.typography.bodyMedium))
+                        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
                             CommunityCard(title = stringResource(R.string.appstrings_website), txtUnavailable = txtUnavailable, opColor = opColor, iconRes = R.drawable.logo_anfr, modifier = Modifier.weight(1f)) {
                                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                                 showAnfrSheet = false
@@ -1453,6 +1545,30 @@ fun SiteDetailScreen(
                                 }
                             }
                         }
+                        "theoretical_coverage" -> {
+                            if (showTheoreticalCoverage && canUseTheoreticalCoverage) {
+                                Button(
+                                    onClick = {
+                                        safeClick {
+                                            if (isSplitScreen) onCloseSplitScreen()
+                                            navController.navigate("theoretical_coverage/${info.idAnfr}")
+                                        }
+                                    },
+                                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                                    shape = buttonShape,
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                ) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(24.dp))
+                                        Spacer(modifier = Modifier.width(12.dp))
+                                        Text(stringResource(R.string.appstrings_coverage_button), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                    }
+                                }
+                            }
+                        }
                         "throughput_calculator" -> {
                             if (showThroughputCalculator && canUseThroughputCalculator) {
                                 Button(
@@ -1495,7 +1611,7 @@ fun SiteDetailScreen(
                                     useOneUi = useOneUi,
                                     buttonShape = buttonShape,
                                     globalMapRef = globalMapRef,
-                                    communityPhotosSize = communityPhotos.size,
+                                    communityPhotos = communityPhotos,
                                     speedtestData = speedtestData // 🚨 NEW
                                 )
                             }
@@ -1523,7 +1639,7 @@ fun SiteDetailScreen(
                         }
                         "freqs" -> { if (showFreqs && canUseSiteFrequencies) fr.geotower.ui.components.SiteFrequenciesBlock(info = info, technique = technique, formattedAzimuths = formattedAzimuths, cardBgColor = cardBgColor, blockShape = blockShape, applyMapFilters = applyMapFilters) }
                         "links" -> {
-                            if (showLinks && canUseSiteExternalLinks && opNameUrl.isNotEmpty()) {
+                            if (showLinks && canUseSiteExternalLinks && enbAnalyticsTable != null) {
                                 fr.geotower.ui.components.SiteExternalLinksBlock(
                                     info = info,
                                     cardBgColor = cardBgColor,
@@ -1537,6 +1653,9 @@ fun SiteDetailScreen(
                                     },
                                     onShowSignalQuest = {
                                         if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_EXTERNAL_LINKS)) showSignalQuestSheet = true
+                                    },
+                                    onShowCellMapper = {
+                                        if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.EXTERNAL_LINKS_CELLMAPPER)) showCellMapperSheet = true
                                     },
                                     onShowRnc = {
                                         if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.EXTERNAL_LINKS_RNC_MOBILE)) showRncSheet = true
@@ -1958,7 +2077,7 @@ fun RadioSiteDetailScreen(
         containerColor = mainBgColor,
         topBar = {
             GeoTowerBackTopBar(
-                title = "Détail radio ANFR",
+                title = stringResource(R.string.appstrings_radio_detail_title),
                 onBack = { safeBackNavigation.navigateBack() },
                 backgroundColor = mainBgColor,
                 backEnabled = !safeBackNavigation.isLocked
@@ -2052,7 +2171,7 @@ fun RadioSiteDetailScreen(
                     )
 
                     RadioSiteInfoCard(
-                        title = "Radio",
+                        title = stringResource(R.string.appstrings_radio_share_radio_title),
                         icon = Icons.Default.Info,
                         cardBgColor = cardBgColor,
                         blockShape = blockShape,
@@ -2064,13 +2183,13 @@ fun RadioSiteDetailScreen(
                             )
                         }
                     ) {
-                        RadioSiteInfoLine("Categories", radioSiteUsageSummary(site))
-                        RadioSiteInfoLine("Famille", RadioServiceMasks.labelFor(site.serviceMask))
-                        RadioSiteInfoLine("Reseau", site.networkName)
-                        RadioSiteInfoLine("Systemes", site.systemSummary)
-                        RadioSiteInfoLine("Frequences", site.frequencySummary)
-                        RadioSiteInfoLine("Emetteurs", site.emitterCount.takeIf { it > 0 }?.toString())
-                        RadioSiteInfoLine("Antennes", site.antennaCount.takeIf { it > 0 }?.toString())
+                        RadioSiteInfoLine(stringResource(R.string.appstrings_radio_share_categories), radioSiteUsageSummary(site))
+                        RadioSiteInfoLine(stringResource(R.string.appstrings_radio_family), stringResource(RadioServiceMasks.labelRes(site.serviceMask)))
+                        RadioSiteInfoLine(stringResource(R.string.appstrings_radio_share_network), site.networkName(context))
+                        RadioSiteInfoLine(stringResource(R.string.appstrings_radio_share_systems), site.systemSummary)
+                        RadioSiteInfoLine(stringResource(R.string.appstrings_frequencies_title), site.frequencySummary)
+                        RadioSiteInfoLine(stringResource(R.string.appstrings_radio_share_emitters), site.emitterCount.takeIf { it > 0 }?.toString())
+                        RadioSiteInfoLine(stringResource(R.string.appstrings_radio_share_antennas), site.antennaCount.takeIf { it > 0 }?.toString())
                     }
 
                     val broadcastPrograms = remember(site) { site.broadcastPrograms }
@@ -2085,7 +2204,7 @@ fun RadioSiteDetailScreen(
 
                     if (site.antennaLines.isNotEmpty()) {
                         RadioSiteInfoCard(
-                            title = "Antennes et azimuts",
+                            title = stringResource(R.string.appstrings_radio_share_block_azimuths),
                             icon = Icons.Default.Navigation,
                             cardBgColor = cardBgColor,
                             blockShape = blockShape
@@ -2099,7 +2218,7 @@ fun RadioSiteDetailScreen(
                     val extraDetails = remember(site) { radioSiteExtraDetailLines(site) }
                     if (extraDetails.isNotEmpty()) {
                         RadioSiteInfoCard(
-                            title = "Details ANFR",
+                            title = stringResource(R.string.appstrings_radio_share_block_extra),
                             icon = Icons.Default.Info,
                             cardBgColor = cardBgColor,
                             blockShape = blockShape
@@ -2133,6 +2252,7 @@ private fun RadioSiteHeaderCard(
     cardBgColor: Color,
     blockShape: RoundedCornerShape
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     Card(
         shape = blockShape,
         colors = CardDefaults.cardColors(containerColor = cardBgColor),
@@ -2159,14 +2279,14 @@ private fun RadioSiteHeaderCard(
             Spacer(modifier = Modifier.width(16.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = marker.networkName,
+                    text = marker.networkName(context),
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(3.dp))
                 Text(
-                    text = marker.systemSummary ?: RadioServiceMasks.labelFor(marker.serviceMask),
+                    text = marker.systemSummary ?: stringResource(RadioServiceMasks.labelRes(marker.serviceMask)),
                     style = MaterialTheme.typography.bodyMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -2218,7 +2338,7 @@ private fun RadioSiteBroadcastProgramsCard(
     blockShape: RoundedCornerShape
 ) {
     RadioSiteInfoCard(
-        title = "Radios diffusées",
+        title = stringResource(R.string.appstrings_radio_share_block_programs),
         icon = Icons.Default.Info,
         cardBgColor = cardBgColor,
         blockShape = blockShape,
@@ -2233,7 +2353,7 @@ private fun RadioSiteBroadcastProgramsCard(
         programs.forEach { program ->
             RadioSiteInfoLine(
                 label = program.serviceName,
-                value = program.detailLabel ?: "Radio diffusée"
+                value = program.detailLabel ?: stringResource(R.string.appstrings_radio_share_program_fallback)
             )
         }
     }
@@ -2262,7 +2382,7 @@ private fun RadioSiteBearingHeightRow(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Cap mesure", style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
+                Text(stringResource(R.string.appstrings_radio_share_cap_measured_short), style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(8.dp))
                 Icon(
                     Icons.Default.Navigation,
@@ -2286,7 +2406,7 @@ private fun RadioSiteBearingHeightRow(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Hauteur support", style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
+                Text(stringResource(R.string.appstrings_radio_share_support_height_short), style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(8.dp))
                 Icon(
                     Icons.Default.VerticalAlignTop,
@@ -2310,15 +2430,15 @@ private fun RadioSiteSupportDetailsCard(
     blockShape: RoundedCornerShape
 ) {
     RadioSiteInfoCard(
-        title = "Details du support",
+        title = stringResource(R.string.appstrings_radio_support_details_title),
         icon = Icons.Default.Info,
         cardBgColor = cardBgColor,
         blockShape = blockShape
     ) {
-        RadioSiteInfoLine("Nature du support", marker.supportNatureSummary)
-        RadioSiteInfoLine("Proprietaire", marker.supportOwnerSummary)
-        RadioSiteInfoLine("Distance", "$distanceStr de vous")
-        RadioSiteInfoLine("Cap mesure", bearingStr)
+        RadioSiteInfoLine(stringResource(R.string.appstrings_support_nature), marker.supportNatureSummary)
+        RadioSiteInfoLine(stringResource(R.string.appstrings_owner), marker.supportOwnerSummary)
+        RadioSiteInfoLine(stringResource(R.string.appstrings_report_label_distance), "$distanceStr ${stringResource(R.string.appstrings_from_my_position)}")
+        RadioSiteInfoLine(stringResource(R.string.appstrings_radio_share_cap_measured_short), bearingStr)
     }
 }
 
@@ -2375,13 +2495,13 @@ private fun RadioSiteIdentifiersCard(
     val context = androidx.compose.ui.platform.LocalContext.current
 
     RadioSiteInfoCard(
-        title = "Identifiants",
+        title = stringResource(R.string.appstrings_site_ids_option),
         icon = Icons.Default.Tag,
         cardBgColor = cardBgColor,
         blockShape = blockShape
     ) {
         RadioSiteInfoLine(
-            label = "ID Support",
+            label = stringResource(R.string.appstrings_id_support_copy),
             value = marker.supportId,
             onCopy = {
                 copyRadioSiteValue(
@@ -2393,12 +2513,12 @@ private fun RadioSiteIdentifiersCard(
             }
         )
         RadioSiteInfoLine(
-            label = "Numero de station ANFR",
+            label = stringResource(R.string.appstrings_station_anfr_number),
             value = marker.stationId,
             onCopy = {
                 copyRadioSiteValue(
                     context = context,
-                    label = "Station ANFR",
+                    label = context.getString(R.string.appstrings_station_anfr),
                     value = marker.stationId,
                     toastMessage = context.getString(R.string.appstrings_id_copied)
                 )
@@ -2419,13 +2539,13 @@ private fun RadioSiteAddressCard(
     val cleanGpsCoords = String.format(Locale.US, "%.5f, %.5f", marker.latitude, marker.longitude)
 
     RadioSiteInfoCard(
-        title = "Adresse",
+        title = stringResource(R.string.appstrings_address_copy),
         icon = Icons.Default.Info,
         cardBgColor = cardBgColor,
         blockShape = blockShape
     ) {
         RadioSiteInfoLine(
-            label = "Adresse",
+            label = stringResource(R.string.appstrings_address_copy),
             value = marker.addressSummary,
             onCopy = {
                 copyRadioSiteValue(
@@ -2448,7 +2568,7 @@ private fun RadioSiteAddressCard(
                 )
             }
         )
-        RadioSiteInfoLine("Distance", "$distanceStr de vous")
+        RadioSiteInfoLine(stringResource(R.string.appstrings_report_label_distance), "$distanceStr ${stringResource(R.string.appstrings_from_my_position)}")
     }
 }
 
@@ -2460,9 +2580,10 @@ private fun RadioSiteInfoLine(label: String, value: String?, onCopy: (() -> Unit
 
 @Composable
 private fun RadioAntennaInfoLine(line: String) {
-    val label = line.substringBefore(":", missingDelimiterValue = "Antenne").trim()
+    val antennaFallback = stringResource(R.string.appstrings_antenna)
+    val label = line.substringBefore(":", missingDelimiterValue = antennaFallback).trim()
     val value = line.substringAfter(":", missingDelimiterValue = line).trim()
-    RadioSiteInfoLine(label.ifBlank { "Antenne" }, value)
+    RadioSiteInfoLine(label.ifBlank { antennaFallback }, value)
 }
 
 private fun formatRadioSiteGps(latitude: Double, longitude: Double): String {
@@ -2514,9 +2635,44 @@ private fun radioSiteExtraDetailLines(marker: RadioMapMarker): List<Pair<String,
 }
 
 @Composable
+private fun ExternalOpenOnSheetContent(
+    title: String,
+    subtitle: String,
+    cardRow: @Composable RowScope.() -> Unit,
+    appLauncher: (@Composable () -> Unit)? = null
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(
+                bottom = sizing.spacing(48.dp),
+                start = sizing.spacing(24.dp),
+                end = sizing.spacing(24.dp),
+                top = sizing.spacing(8.dp)
+            ),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Text(title, style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold)
+        Text(subtitle, style = sizing.textStyle(MaterialTheme.typography.bodyMedium))
+        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp)),
+            content = cardRow
+        )
+        if (appLauncher != null) {
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+            appLauncher()
+        }
+    }
+}
+
+@Composable
 private fun AppLauncherButton(isInstalled: Boolean, appName: String, txtOpen: String, txtInstall: String, useOneUi: Boolean, onClick: () -> Unit) {
-    Button(onClick = onClick, modifier = Modifier.fillMaxWidth().height(56.dp), shape = oneUiActionButtonShape(useOneUi), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
-        Row(verticalAlignment = Alignment.CenterVertically) { Icon(if (isInstalled) Icons.AutoMirrored.Filled.Launch else Icons.Default.Download, null, modifier = Modifier.size(20.dp)); Spacer(modifier = Modifier.width(8.dp)); Text(if (isInstalled) "$txtOpen $appName" else "$txtInstall $appName", fontWeight = FontWeight.Bold, fontSize = 16.sp) }
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Button(onClick = onClick, modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)), shape = oneUiActionButtonShape(useOneUi), colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primaryContainer, contentColor = MaterialTheme.colorScheme.onPrimaryContainer)) {
+        Row(verticalAlignment = Alignment.CenterVertically) { Icon(if (isInstalled) Icons.AutoMirrored.Filled.Launch else Icons.Default.Download, null, modifier = Modifier.size(sizing.component(20.dp))); Spacer(modifier = Modifier.width(sizing.spacing(8.dp))); Text(if (isInstalled) "$txtOpen $appName" else "$txtInstall $appName", style = sizing.textStyle(MaterialTheme.typography.labelLarge), fontWeight = FontWeight.Bold) }
     }
 }
 
@@ -2535,6 +2691,62 @@ private fun openUrlInBrowser(context: Context, url: String, fallback: () -> Unit
     } catch (e: Exception) {
         fallback()
     }
+}
+
+private fun cellMapperMapUrl(network: CellMapperNetwork, type: String, latitude: Double, longitude: Double): String {
+    return Uri.Builder()
+        .scheme("https")
+        .authority("www.cellmapper.net")
+        .path("map")
+        .appendQueryParameter("MCC", network.mcc.toString())
+        .appendQueryParameter("MNC", network.mnc.toString())
+        .appendQueryParameter("type", type)
+        .appendQueryParameter("latitude", latitude.toString())
+        .appendQueryParameter("longitude", longitude.toString())
+        .appendQueryParameter("zoom", "18")
+        .appendQueryParameter("showTowers", "true")
+        .appendQueryParameter("showIcons", "true")
+        .appendQueryParameter("showTowerLabels", "true")
+        .appendQueryParameter("clusterEnabled", "true")
+        .appendQueryParameter("showSectorColours", "true")
+        .build()
+        .toString()
+}
+
+// Zoom eNB-Analytics selon la densité locale (nb de sites physiques dans ~1,5 km). Plafonné à 17 (ville dense).
+private fun enbAnalyticsZoomForSiteCount(physicalSiteCount: Int): Int {
+    return when {
+        physicalSiteCount >= 15 -> 17 // ville dense
+        physicalSiteCount >= 7 -> 16  // urbain
+        physicalSiteCount >= 3 -> 15  // bourg / péri-urbain
+        physicalSiteCount >= 2 -> 14  // rural avec quelques sites
+        else -> 13                    // site isolé
+    }
+}
+
+// eNB-Analytics : page unique paramétrée centrée sur le site.
+// table = code PLMN opérateur (20801/20810/20815/20820), xg = génération (4 = 4G, 5 = 5G),
+// par1/par2 = latitude/longitude, zoom = niveau de zoom (max 17), par4 = fond coloré (« météo des données »).
+private fun enbAnalyticsMapUrl(
+    table: Int,
+    generation: Int,
+    latitude: Double,
+    longitude: Double,
+    zoom: Int,
+    coloredBackground: Boolean = true
+): String {
+    return Uri.Builder()
+        .scheme("https")
+        .authority("enb-analytics.fr")
+        .path("analytics_a.html")
+        .appendQueryParameter("table", table.toString())
+        .appendQueryParameter("xg", generation.toString())
+        .appendQueryParameter("par1", latitude.toString())
+        .appendQueryParameter("par2", longitude.toString())
+        .appendQueryParameter("zoom", zoom.coerceIn(1, 17).toString())
+        .appendQueryParameter("par4", coloredBackground.toString())
+        .build()
+        .toString()
 }
 
 private fun signalQuestWebsiteUrl(anfrCode: String, operator: String, latitude: Double, longitude: Double): String {
@@ -2588,14 +2800,28 @@ private fun formatSiteHeightMeters(heightMeters: Double?): String {
 
 @Composable
 private fun CommunityCard(title: String, txtUnavailable: String, opColor: Color, iconRes: Int? = null, modifier: Modifier = Modifier, isEnabled: Boolean = true, onClick: () -> Unit) {
-    OutlinedCard(modifier = modifier.height(120.dp).clickable(enabled = isEnabled, onClick = onClick), shape = RoundedCornerShape(16.dp), border = BorderStroke(1.dp, if (isEnabled) SolidColor(opColor) else SolidColor(Color.Gray.copy(0.3f)))) {
-        Column(modifier = Modifier.fillMaxSize().padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    OutlinedCard(modifier = modifier.height(sizing.component(120.dp)).clickable(enabled = isEnabled, onClick = onClick), shape = RoundedCornerShape(sizing.component(16.dp)), border = BorderStroke(sizing.component(1.dp), if (isEnabled) SolidColor(opColor) else SolidColor(Color.Gray.copy(0.3f)))) {
+        Column(modifier = Modifier.fillMaxSize().padding(sizing.spacing(12.dp)), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
             if (iconRes != null) {
-                Image(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)))
+                if (iconRes == R.drawable.logo_cellmapper) {
+                    Box(
+                        modifier = Modifier
+                            .size(sizing.component(40.dp))
+                            .clip(RoundedCornerShape(sizing.component(8.dp)))
+                            .background(Color.White)
+                            .padding(sizing.spacing(4.dp)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.fillMaxSize())
+                    }
+                } else {
+                    Image(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.size(sizing.component(40.dp)).clip(RoundedCornerShape(sizing.component(8.dp))))
+                }
             } else {
-                Box(modifier = Modifier.size(40.dp).clip(RoundedCornerShape(8.dp)).background(if (isEnabled) opColor else Color.Gray.copy(0.5f)), contentAlignment = Alignment.Center) { Text(title.takeLast(2), color = Color.White, fontWeight = FontWeight.Bold) }
+                Box(modifier = Modifier.size(sizing.component(40.dp)).clip(RoundedCornerShape(sizing.component(8.dp))).background(if (isEnabled) opColor else Color.Gray.copy(0.5f)), contentAlignment = Alignment.Center) { Text(title.takeLast(2), style = sizing.textStyle(MaterialTheme.typography.bodyMedium), color = Color.White, fontWeight = FontWeight.Bold) }
             }
-            Spacer(modifier = Modifier.height(12.dp)); Text(if (isEnabled) title else txtUnavailable, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp))); Text(if (isEnabled) title else txtUnavailable, textAlign = TextAlign.Center, fontWeight = FontWeight.Bold, fontSize = sizing.text(14.sp))
         }
     }
 }

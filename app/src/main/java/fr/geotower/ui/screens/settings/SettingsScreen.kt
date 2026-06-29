@@ -39,6 +39,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -46,8 +47,10 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDownload
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.VerticalAlignTop
@@ -94,6 +97,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -231,6 +235,8 @@ fun SettingsScreen(
     val uiStyle = LocalGeoTowerUiStyle.current
     var showUnitSheet by remember { mutableStateOf(false) }
     var showColorPalettePage by remember { mutableStateOf(false) }
+    var settingsSearchQuery by remember { mutableStateOf("") }
+    var pendingSearchScrollSection by remember { mutableStateOf<Int?>(null) }
 
     fun updateOneUi(enabled: Boolean) {
         val mode = AppUiMode.fromOneUiEnabled(enabled)
@@ -240,6 +246,7 @@ fun SettingsScreen(
 
     val useOneUi = uiStyle.useOneUi
     val isDark = uiStyle.isDark
+    val sizing = uiStyle.sizing
     val cardShape = uiStyle.cardShape
     val cardBorder = uiStyle.cardBorder
     val bubbleBaseColor = uiStyle.bubbleColor
@@ -260,12 +267,28 @@ fun SettingsScreen(
         safeBackNavigation.navigateBack()
     }
 
+    // Recherche active : le retour efface d'abord la recherche au lieu de quitter l'écran.
+    BackHandler(enabled = settingsSearchQuery.isNotBlank() && !showColorPalettePage) {
+        settingsSearchQuery = ""
+    }
+
     var isBlurEnabled by AppConfig.isBlurEnabled
     var mapProvider by AppConfig.mapProvider
     var ignStyle by AppConfig.ignStyle
     var defaultOperator by AppConfig.defaultOperator
     val navMode = AppConfig.navMode.intValue
     var activeSectionIndex by remember { mutableIntStateOf(0) }
+
+    // Recherche : actions de navigation déclenchées depuis un résultat.
+    fun searchScrollTo(section: Int) {
+        settingsSearchQuery = ""
+        activeSectionIndex = section
+        pendingSearchScrollSection = section
+    }
+    fun searchOpen(action: () -> Unit) {
+        settingsSearchQuery = ""
+        action()
+    }
 
     // ✅ NOUVEAU : Auto-scroll vers la section demandée (ex: database)
     suspend fun alignAnchorToViewportTop(anchorRootY: Float?) {
@@ -344,6 +367,23 @@ fun SettingsScreen(
         }
     }
 
+    // Recherche : une fois la recherche fermée, on défile vers la section du paramètre choisi
+    // (on attend que le contenu normal soit recomposé et mesuré).
+    LaunchedEffect(pendingSearchScrollSection, scrollState.maxValue) {
+        val target = pendingSearchScrollSection ?: return@LaunchedEffect
+        if (navMode == 0 || !isWideScreen) {
+            var tries = 0
+            while (tries < 25 && (scrollState.maxValue <= 0 || sectionRootPositions[target] == null)) {
+                kotlinx.coroutines.delay(40)
+                tries++
+            }
+            sectionBringIntoViewRequesters[target].bringIntoView()
+            kotlinx.coroutines.delay(80)
+            alignAnchorToViewportTop(sectionRootPositions[target])
+        }
+        pendingSearchScrollSection = null
+    }
+
     var appLanguage by remember { mutableStateOf(prefs.getString("app_language", AppLocale.LANGUAGE_FRENCH) ?: AppLocale.LANGUAGE_FRENCH) }
     var showLanguageSheet by remember { mutableStateOf(false) }
     var showOperatorSheet by remember { mutableStateOf(false) }
@@ -370,6 +410,7 @@ fun SettingsScreen(
     var shareMapEnabled by remember { mutableStateOf(SharePrefs.siteMapEnabled.read(prefs)) }
     var shareElevationProfileEnabled by remember { mutableStateOf(SharePrefs.siteElevationProfileEnabled.read(prefs)) }
     var shareSupportEnabled by remember { mutableStateOf(SharePrefs.siteSupportEnabled.read(prefs)) }
+    var sharePhotosEnabled by remember { mutableStateOf(SharePrefs.sitePhotosEnabled.read(prefs)) }
     var shareIdsEnabled by remember { mutableStateOf(SharePrefs.siteIdsEnabled.read(prefs)) }
     var shareDatesEnabled by remember { mutableStateOf(SharePrefs.siteDatesEnabled.read(prefs)) }
     var shareAddressEnabled by remember { mutableStateOf(SharePrefs.siteAddressEnabled.read(prefs)) }
@@ -387,6 +428,7 @@ fun SettingsScreen(
     // 2. Variables du Pylône (Support) - SEULEMENT 3 BLOCS !
     var shareSupMapEnabled by remember { mutableStateOf(SharePrefs.supportMapEnabled.read(prefs)) }
     var shareSupSupportEnabled by remember { mutableStateOf(SharePrefs.supportDetailsEnabled.read(prefs)) }
+    var shareSupPhotosEnabled by remember { mutableStateOf(SharePrefs.supportPhotosEnabled.read(prefs)) }
     var shareSupOperatorsEnabled by remember { mutableStateOf(SharePrefs.supportOperatorsEnabled.read(prefs)) }
     var shareSupConfidentialEnabled by remember { mutableStateOf(SharePrefs.supportConfidentialEnabled.read(prefs)) }
     var shareSupOrder by remember { mutableStateOf(SharePrefs.supportOrder(prefs)) }
@@ -464,6 +506,8 @@ fun SettingsScreen(
     var pageThroughputAssumptions by remember { mutableStateOf(prefs.getBoolean(ThroughputPrefs.BLOCK_ASSUMPTIONS_VISIBLE, true)) }
 
     var showPagesCustomizationSheet by remember { mutableStateOf(false) }
+    var showCoverageDefaultsSheet by remember { mutableStateOf(false) }
+    var showElevationDefaultsSheet by remember { mutableStateOf(false) }
     var showPreferenceProfilesSheet by remember { mutableStateOf(false) }
     var showFrequenciesSheet by remember { mutableStateOf(false) }
     var showCommunityDataSheet by remember { mutableStateOf(false) }
@@ -588,6 +632,69 @@ fun SettingsScreen(
                 sectionRootPositions[index] = top
                 sectionBounds[index] = SettingsSectionBounds(top = top, height = coordinates.size.height)
             }
+    }
+
+    // Recherche : index de tous les paramètres trouvables depuis la barre de recherche.
+    val settingsSearchEntries = remember(featureFlags, appLanguage, isWideScreen) {
+        buildList {
+            fun entry(title: String, keywords: String, section: Int, openAction: (() -> Unit)? = null) {
+                val meta = menuItems[section]
+                add(
+                    SettingsSearchEntry(
+                        title = title,
+                        keywords = keywords,
+                        sectionLabel = meta.first,
+                        icon = meta.second,
+                        onClick = { if (openAction != null) searchOpen(openAction) else searchScrollTo(section) }
+                    )
+                )
+            }
+
+            // --- Apparence (0) ---
+            entry(context.getString(R.string.appearance_theme_title), "theme thème clair sombre systeme dark light mode nuit jour couleur apparence", 0)
+            entry(context.getString(R.string.appstrings_color_palette_title), "palette couleur color accent teinte material", 0) { showColorPalettePage = true }
+            entry(context.getString(R.string.appearance_oled_title), "oled noir pur black amoled sombre economie", 0)
+            entry(context.getString(R.string.appearance_one_ui_title), "one ui oneui samsung style interface bulle", 0)
+            entry(context.getString(R.string.appearance_scroll_blur_title), "flou blur defilement transparence effet", 0)
+            entry(context.getString(R.string.appearance_app_icon_title), "icone icon launcher logo application accueil", 0) { showIconSheet = true }
+            entry(context.getString(R.string.appearance_in_app_logo_title), "logo dessin drawing application interne", 0) { showLogoDrawingSheet = true }
+            entry(context.getString(R.string.appearance_menu_size_title), "taille menu size police texte echelle zoom", 0)
+
+            // --- Cartographie (1) ---
+            entry(context.getString(R.string.settings_section_mapping), "carte map fond fournisseur ign osm maplibre topo provider tuiles", 1)
+            entry(context.getString(R.string.mapping_style_title), "style carte clair sombre satellite couleur", 1)
+
+            // --- Préférences (2) ---
+            entry(context.getString(R.string.preference_profiles_title), "profil profils profiles preferences sauvegarde configuration", 2) { showPreferenceProfilesSheet = true }
+            entry(context.getString(R.string.settings_default_operator), "operateur operator orange sfr free bouygues sim defaut", 2) { showOperatorSheet = true }
+            entry(context.getString(R.string.settings_app_language), "langue language francais anglais traduction locale", 2) { showLanguageSheet = true }
+            entry(context.getString(R.string.settings_units_title), "unites units distance vitesse metre km mesure imperial", 2) { showUnitSheet = true }
+            entry(context.getString(R.string.appstrings_update_notif_setting_title), "notification mise a jour update base donnees alerte", 2)
+            entry(context.getString(R.string.appstrings_live_notification_title), "notification live suivi temps reel antenne direct", 2)
+            entry(context.getString(R.string.appstrings_widget_refresh_title), "widget frequence rafraichissement synchronisation accueil", 2)
+            if (isWideScreen) {
+                entry(context.getString(R.string.settings_navigation_mode_title), "navigation mode defilement pages scroll", 2)
+                entry(context.getString(R.string.settings_display_style_title), "affichage display plein ecran split divise tablette", 2)
+            }
+            if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.PAGES_CUSTOMIZATION)) {
+                entry(context.getString(R.string.settings_pages_customization_title), "pages personnalisation accueil carte boussole site support proximite statistiques", 2) { showPagesCustomizationSheet = true }
+            }
+            if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.EXTERNAL_LINKS_SETTINGS)) {
+                entry(context.getString(R.string.settings_external_links_title), "liens externes links cartoradio sites web", 2) { showExternalLinksSheet = true }
+            }
+            if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.SHARE_SETTINGS)) {
+                entry(context.getString(R.string.settings_default_share_content_title), "partage share image contenu carte antenne support", 2) { showShareSelectorSheet = true }
+            }
+
+            // --- Système (3) ---
+            entry(context.getString(R.string.appstrings_manage_permissions), "permissions autorisations systeme application acces", 3)
+            entry(context.getString(R.string.appstrings_diagnostic_title), "diagnostic logs debogage info journal probleme", 3) { navController.navigate("diagnostic") }
+
+            // --- Base de données (4) ---
+            entry(context.getString(R.string.settings_section_database), "base de donnees database telechargement anfr support antenne", 4)
+            entry(context.getString(R.string.appstrings_radio_data_title), "radio donnees frequences base anfr", 4)
+            entry(context.getString(R.string.appstrings_offline_maps_title), "cartes hors ligne offline maps telechargement tuiles", 4)
+        }
     }
 
     if (isWideScreen && navMode == 0) {
@@ -784,14 +891,33 @@ fun SettingsScreen(
                             .navigationBarsPadding()
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+                            SettingsSearchBar(
+                                query = settingsSearchQuery,
+                                onQueryChange = { settingsSearchQuery = it },
+                                shape = cardShape,
+                                border = cardBorder,
+                                bubbleColor = bubbleBaseColor,
+                                useOneUi = useOneUi
+                            )
+                            Spacer(Modifier.height(20.dp))
+                            if (settingsSearchQuery.isNotBlank()) {
+                                SettingsSearchResults(
+                                    query = settingsSearchQuery,
+                                    entries = settingsSearchEntries,
+                                    shape = cardShape,
+                                    border = cardBorder,
+                                    bubbleColor = bubbleBaseColor,
+                                    useOneUi = useOneUi
+                                )
+                            } else {
                             if (navMode == 0 || !isExpanded) {
-                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, { showPreferenceProfilesSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; offlineMapsBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) }, scrollViewportTop, scrollViewportBottom, scrollState.value, scrollState.maxValue, targetMapFilename = offlineMapsTargetFilename, onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) }, onOfflineMapsExpandedChange = { offlineMapsExpandedForNavigation = it })
+                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, { showPreferenceProfilesSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; offlineMapsBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) }, scrollViewportTop, scrollViewportBottom, scrollState.value, scrollState.maxValue, targetMapFilename = offlineMapsTargetFilename, onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) }, onOfflineMapsExpandedChange = { offlineMapsExpandedForNavigation = it }, onOpenDiagnostic = { navController.navigate("diagnostic") })
                             } else {
                                 when (activeSectionIndex) {
                                     0 -> SectionApparence(themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true })
                                     1 -> SectionCartographie(mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick)
                                     2 -> SectionPreferences(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, { showPreferenceProfilesSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick)
-                                    3 -> SectionSysteme(context, cardShape, border = cardBorder, bubbleColor = bubbleBaseColor, useOneUi = useOneUi, safeClick = safeClick)
+                                    3 -> SectionSysteme(context, cardShape, border = cardBorder, bubbleColor = bubbleBaseColor, useOneUi = useOneUi, safeClick = safeClick, onOpenDiagnostic = { navController.navigate("diagnostic") })
                                     4 -> SectionDatabase(
                                         isExpanded,
                                         cardShape,
@@ -811,6 +937,7 @@ fun SettingsScreen(
                                         onOfflineMapsExpandedChange = { offlineMapsExpandedForNavigation = it }
                                     )
                                 }
+                            }
                             }
                             Spacer(Modifier.height(48.dp))
                         }
@@ -902,7 +1029,27 @@ fun SettingsScreen(
                     // ✅ L'échange se fait ici : on ferme l'un et on ouvre l'autre
                     showPagesCustomizationSheet = false
                     showFrequenciesSheet = true
-                }
+                },
+                onTheoreticalCoverageClick = { safeClick { showPagesCustomizationSheet = false; showCoverageDefaultsSheet = true } },
+                onElevationProfileClick = { safeClick { showPagesCustomizationSheet = false; showElevationDefaultsSheet = true } }
+            )
+        }
+
+        if (showCoverageDefaultsSheet) {
+            CoverageSettingsSheet(
+                onDismiss = { showCoverageDefaultsSheet = false },
+                sheetState = sheetState,
+                useOneUi = useOneUi,
+                onBack = { safeClick { showCoverageDefaultsSheet = false; showPagesCustomizationSheet = true } }
+            )
+        }
+
+        if (showElevationDefaultsSheet) {
+            ElevationProfileSettingsSheet(
+                onDismiss = { showElevationDefaultsSheet = false },
+                sheetState = sheetState,
+                useOneUi = useOneUi,
+                onBack = { safeClick { showElevationDefaultsSheet = false; showPagesCustomizationSheet = true } }
             )
         }
 
@@ -1415,14 +1562,14 @@ fun SettingsScreen(
                         .fillMaxWidth()
                         .settingsPopupFadingEdge(shareSelectorScrollState)
                         .verticalScroll(shareSelectorScrollState)
-                        .padding(bottom = 48.dp, start = 16.dp, end = 16.dp)
+                        .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(16.dp), end = sizing.spacing(16.dp))
                 ) {
                     Text(
                         stringResource(R.string.settings_default_share_content_title),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.align(Alignment.CenterHorizontally)
-                            .padding(bottom = 24.dp)
+                            .padding(bottom = sizing.spacing(24.dp))
                     )
 
                     // ✅ AJOUT DU BOUTON CARTE
@@ -1437,7 +1584,7 @@ fun SettingsScreen(
                             showMapSharePrefsSheet = true
                         }
                     }
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(sizing.spacing(12.dp)))
 
                     NavigationMenuItem(
                         title = stringResource(R.string.appstrings_share_support_details_title),
@@ -1450,7 +1597,7 @@ fun SettingsScreen(
                             showSupportSharePrefsSheet = true
                         }
                     }
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(sizing.spacing(12.dp)))
                     NavigationMenuItem(
                         title = stringResource(R.string.appstrings_share_site_details_title),
                         icon = Icons.Default.WifiTethering,
@@ -1483,6 +1630,11 @@ fun SettingsScreen(
                 onSupportChange = {
                     shareSupSupportEnabled = it; prefs.edit()
                     .putBoolean(SharePrefs.supportDetailsEnabled.key, it).apply()
+                },
+                photosEnabled = shareSupPhotosEnabled,
+                onPhotosChange = {
+                    shareSupPhotosEnabled = it; prefs.edit()
+                    .putBoolean(SharePrefs.supportPhotosEnabled.key, it).apply()
                 },
                 operatorsEnabled = shareSupOperatorsEnabled,
                 onOperatorsChange = {
@@ -1550,6 +1702,10 @@ fun SettingsScreen(
                 onSupportChange = {
                     shareSupportEnabled = it; prefs.edit().putBoolean(SharePrefs.siteSupportEnabled.key, it)
                     .apply()
+                },
+                photosEnabled = sharePhotosEnabled,
+                onPhotosChange = {
+                    sharePhotosEnabled = it; prefs.edit().putBoolean(SharePrefs.sitePhotosEnabled.key, it).apply()
                 },
                 idsEnabled = shareIdsEnabled,
                 onIdsChange = {
@@ -1729,7 +1885,8 @@ fun AllSettingsContent(
     scrollMaxValue: Int = 0,
     targetMapFilename: String? = null,
     onTargetMapPositioned: (Float, Int) -> Unit = { _, _ -> },
-    onOfflineMapsExpandedChange: (Boolean) -> Unit = {}
+    onOfflineMapsExpandedChange: (Boolean) -> Unit = {},
+    onOpenDiagnostic: () -> Unit = {}
 ) {
     Column(modifier = appearanceSectionModifier.fillMaxWidth()) {
         SectionApparence(theme, onTheme, oled, onOled, oneUi, onOneUi, blur, onBlur, logo, onIcon, onLogoDrawing, shape, border, bubbleColor, useOneUi, safeClick, onColorPaletteClick)
@@ -1744,7 +1901,7 @@ fun AllSettingsContent(
     }
     Spacer(Modifier.height(32.dp))
     Column(modifier = systemSectionModifier.fillMaxWidth()) {
-        SectionSysteme(ctx, shape, border, bubbleColor, useOneUi, safeClick)
+        SectionSysteme(ctx, shape, border, bubbleColor, useOneUi, safeClick, onOpenDiagnostic)
     }
     Spacer(Modifier.height(32.dp))
     SectionDatabase(
@@ -1840,6 +1997,7 @@ fun SectionPreferences(
 
     // ✅ NOUVEAU : Le lanceur magique qui déclenche le menu Android spécifique !
     val featureFlags by RemoteFeatureFlags.config
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     val bgLocationLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
         contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
@@ -1851,6 +2009,9 @@ fun SectionPreferences(
     }
     var liveLocationIntervalSeconds by remember {
         mutableIntStateOf(LiveTrackingPrefs.locationUpdateIntervalSeconds(prefs))
+    }
+    var liveLocationPriority by remember {
+        mutableIntStateOf(LiveTrackingPrefs.locationPriority(prefs))
     }
 
     // Présence d'au moins un widget GeoTower posé : conditionne l'activation du curseur de fréquence
@@ -1892,16 +2053,16 @@ fun SectionPreferences(
         useOneUi = useOneUi,
         safeClick = safeClick
     )
-    Spacer(Modifier.height(12.dp))
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
 
     if (isWide) {
         var showModeSheet by remember { mutableStateOf(false) }
         val cardBg = if (useOneUi) bubbleColor else Color.Transparent
-        Surface(onClick = { showModeSheet = true }, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), shape = shape, border = border, color = cardBg) {
-            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Surface(onClick = { showModeSheet = true }, modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp)), shape = shape, border = border, color = cardBg) {
+            Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.settings_navigation_mode_title), fontWeight = FontWeight.Bold)
-                    Text(if (nav == 0) stringResource(R.string.settings_navigation_mode_scroll) else stringResource(R.string.settings_navigation_mode_pages), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.settings_navigation_mode_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                    Text(if (nav == 0) stringResource(R.string.settings_navigation_mode_scroll) else stringResource(R.string.settings_navigation_mode_pages), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Icon(Icons.Default.UnfoldMore, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -1917,15 +2078,15 @@ fun SectionPreferences(
                         .fillMaxWidth()
                         .settingsPopupFadingEdge(modeScrollState)
                         .verticalScroll(modeScrollState)
-                        .padding(bottom = 48.dp, start = 24.dp, end = 24.dp)
+                        .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp))
                 ) {
-                    Text(stringResource(R.string.settings_navigation_style_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(16.dp))
+                    Text(stringResource(R.string.settings_navigation_style_title), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.height(sizing.spacing(16.dp)))
                     NavigationModeOption(stringResource(R.string.settings_navigation_scroll_title), stringResource(R.string.settings_navigation_scroll_desc), nav == 0, useOneUi) {
                         onNav(0)
                         showModeSheet = false
                     }
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(sizing.spacing(12.dp)))
                     NavigationModeOption(stringResource(R.string.settings_navigation_pages_title), stringResource(R.string.settings_navigation_pages_desc), nav == 1, useOneUi) {
                         onNav(1)
                         showModeSheet = false
@@ -1938,11 +2099,11 @@ fun SectionPreferences(
     // ✅ NOUVEAU : Option Style d'affichage (uniquement sur grand écran réel)
     if (minOf(configuration.screenWidthDp, configuration.screenHeightDp) >= 600) {
         val cardBg = if (useOneUi) bubbleColor else Color.Transparent
-        Surface(onClick = { safeClick("display_styles_sheet") { showDisplayStylesSheet = true } }, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp), shape = shape, border = border, color = cardBg) {
-            Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Surface(onClick = { safeClick("display_styles_sheet") { showDisplayStylesSheet = true } }, modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp)), shape = shape, border = border, color = cardBg) {
+            Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.settings_display_style_title), fontWeight = FontWeight.Bold)
-                    Text(if (displayStyle == 0) stringResource(R.string.settings_display_fullscreen_title) else stringResource(R.string.settings_display_split_title), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.settings_display_style_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                    Text(if (displayStyle == 0) stringResource(R.string.settings_display_fullscreen_title) else stringResource(R.string.settings_display_split_title), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Icon(Icons.Default.UnfoldMore, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -1959,13 +2120,13 @@ fun SectionPreferences(
                         .fillMaxWidth()
                         .settingsPopupFadingEdge(displayStylesScrollState)
                         .verticalScroll(displayStylesScrollState)
-                        .padding(bottom = 48.dp, start = 24.dp, end = 24.dp)
+                        .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp))
                 ) {
                     Text(
                         text = stringResource(R.string.settings_display_style_title),
-                        style = MaterialTheme.typography.titleLarge,
+                        style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 16.dp)
+                        modifier = Modifier.padding(bottom = sizing.spacing(16.dp))
                     )
 
                     NavigationModeOption(
@@ -1981,7 +2142,7 @@ fun SectionPreferences(
                         }
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
                     NavigationModeOption(
                         title = stringResource(R.string.settings_display_split_title),
@@ -2100,6 +2261,32 @@ fun SectionPreferences(
             bubbleColor = bubbleColor,
             useOneUi = useOneUi,
             footerText = stringResource(R.string.appstrings_live_location_refresh_footer)
+        )
+        Spacer(Modifier.height(12.dp))
+        val priorityLabels = listOf(
+            stringResource(R.string.appstrings_live_location_accuracy_low),
+            stringResource(R.string.appstrings_live_location_accuracy_balanced),
+            stringResource(R.string.appstrings_live_location_accuracy_high)
+        )
+        fr.geotower.ui.components.CustomSliderCard(
+            title = stringResource(R.string.appstrings_live_location_accuracy_title),
+            currentValue = liveLocationPriority,
+            steps = LiveTrackingPrefs.LOCATION_PRIORITY_OPTIONS,
+            labels = priorityLabels,
+            onValueChange = { newPriority ->
+                val normalizedPriority =
+                    LiveTrackingPrefs.normalizeLocationPriority(newPriority)
+                liveLocationPriority = normalizedPriority
+                prefs.edit()
+                    .putInt(LiveTrackingPrefs.LOCATION_PRIORITY, normalizedPriority)
+                    .apply()
+                LiveTrackingController.refreshLocationSettings(context)
+            },
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            footerText = stringResource(R.string.appstrings_live_location_accuracy_footer)
         )
     }
     Spacer(Modifier.height(12.dp))
@@ -2345,6 +2532,7 @@ private fun WidgetFormatPickerSheet(
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     val formats = listOf(
         WidgetFormatOption(R.string.antenna_widget_label, R.string.appstrings_widget_size_compact, fr.geotower.widget.AntennaWidgetReceiver::class.java),
@@ -2357,32 +2545,32 @@ private fun WidgetFormatPickerSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp)
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp))
         ) {
             Text(
                 text = stringResource(R.string.appstrings_widget_add_button_title),
-                style = MaterialTheme.typography.titleLarge,
+                style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = sizing.spacing(16.dp))
             )
             formats.forEachIndexed { index, format ->
-                if (index > 0) Spacer(modifier = Modifier.height(12.dp))
+                if (index > 0) Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                 val cardBg = if (useOneUi) MaterialTheme.colorScheme.surface else Color.Transparent
-                val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                val cardBorder = if (useOneUi) null else BorderStroke(sizing.component(1.dp), MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                 Surface(
                     onClick = { onPick(format.receiver) },
-                    shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp),
+                    shape = if (useOneUi) RoundedCornerShape(sizing.component(22.dp)) else RoundedCornerShape(sizing.component(12.dp)),
                     border = cardBorder,
                     color = cardBg,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) {
-                            Text(stringResource(format.labelRes), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                            Text(stringResource(format.sizeRes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(stringResource(format.labelRes), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                            Text(stringResource(format.sizeRes), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(22.dp))
+                        Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                        Icon(Icons.Default.Add, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(sizing.component(22.dp)))
                     }
                 }
             }
@@ -2391,7 +2579,15 @@ private fun WidgetFormatPickerSheet(
 }
 
 @Composable
-fun SectionSysteme(ctx: Context, shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick) {
+fun SectionSysteme(
+    ctx: Context,
+    shape: Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
+    useOneUi: Boolean,
+    safeClick: SafeClick,
+    onOpenDiagnostic: () -> Unit = {}
+) {
     SectionTitle(stringResource(R.string.settings_section_system));
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
@@ -2402,6 +2598,25 @@ fun SectionSysteme(ctx: Context, shape: Shape, border: BorderStroke?, bubbleColo
             Column {
                 Text(stringResource(R.string.appstrings_manage_permissions), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
                 Text(stringResource(R.string.appstrings_permissions_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
+
+    Surface(
+        onClick = { safeClick("system_diagnostic") { onOpenDiagnostic() } },
+        shape = shape,
+        border = border,
+        color = cardBg,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(sizing.component(24.dp)))
+            Spacer(Modifier.width(sizing.spacing(16.dp)))
+            Column {
+                Text(stringResource(R.string.appstrings_diagnostic_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.appstrings_diagnostic_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -2680,6 +2895,7 @@ fun LogoDrawingSheet(
     val options = remember { AppLogoDrawingResources.choices }
     val scrollState = rememberScrollState()
     val sheetBgColor = if (useOneUi) MaterialTheme.colorScheme.surfaceContainerLow else MaterialTheme.colorScheme.surface
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         Column(
@@ -2688,21 +2904,21 @@ fun LogoDrawingSheet(
                 .navigationBarsPadding()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
-                .padding(start = 24.dp, end = 24.dp, bottom = 40.dp),
+                .padding(start = sizing.spacing(24.dp), end = sizing.spacing(24.dp), bottom = sizing.spacing(40.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 stringResource(R.string.appstrings_app_logo_drawing_title),
-                style = MaterialTheme.typography.titleLarge,
+                style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(bottom = 8.dp)
+                modifier = Modifier.padding(bottom = sizing.spacing(8.dp))
             )
             Text(
                 stringResource(R.string.appstrings_app_logo_drawing_subtitle),
-                style = MaterialTheme.typography.bodySmall,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
-                modifier = Modifier.padding(bottom = 20.dp)
+                modifier = Modifier.padding(bottom = sizing.spacing(20.dp))
             )
 
             options.forEach { choice ->
@@ -2712,10 +2928,10 @@ fun LogoDrawingSheet(
                 if (family != null && family != previousFamily) {
                     Text(
                         text = appLogoDrawingFamilyName(family),
-                        style = MaterialTheme.typography.labelLarge,
+                        style = sizing.textStyle(MaterialTheme.typography.labelLarge),
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.Bold,
-                        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp)
+                        modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(12.dp), bottom = sizing.spacing(8.dp))
                     )
                 }
 
@@ -2732,7 +2948,7 @@ fun LogoDrawingSheet(
                         }
                     }
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(sizing.spacing(8.dp)))
             }
         }
     }
@@ -2748,23 +2964,24 @@ private fun LogoDrawingOptionRow(
     bubbleColor: Color,
     onClick: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val previewRes = AppLogoDrawingResources.resolve(choice, activeIconRes, isDark)
     val cardColor = if (useOneUi) bubbleColor else Color.Transparent
     val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant
 
     Surface(
         onClick = onClick,
-        shape = RoundedCornerShape(if (useOneUi) 22.dp else 12.dp),
+        shape = RoundedCornerShape(if (useOneUi) sizing.component(22.dp) else sizing.component(12.dp)),
         color = cardColor,
-        border = BorderStroke(if (isSelected) 2.dp else 1.dp, borderColor),
+        border = BorderStroke(sizing.component(if (isSelected) 2.dp else 1.dp), borderColor),
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(14.dp), vertical = sizing.spacing(10.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             AndroidView(
-                modifier = Modifier.size(52.dp),
+                modifier = Modifier.size(sizing.component(52.dp)),
                 factory = { ctx ->
                     ImageView(ctx).apply {
                         scaleType = ImageView.ScaleType.FIT_CENTER
@@ -2773,16 +2990,16 @@ private fun LogoDrawingOptionRow(
                 },
                 update = { it.setImageResource(previewRes) }
             )
-            Spacer(Modifier.width(14.dp))
+            Spacer(Modifier.width(sizing.spacing(14.dp)))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = appLogoDrawingChoiceName(choice),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                     fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
                 )
                 Text(
                     text = appLogoDrawingChoiceDescription(choice),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -2793,6 +3010,7 @@ private fun LogoDrawingOptionRow(
 
 @Composable
 fun NavigationMenuItem(title: String, icon: ImageVector, isSelected: Boolean, isDark: Boolean, onClick: () -> Unit) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     // 1. On utilise le beau bleu dynamique pour l'élément sélectionné
     val activeColor = MaterialTheme.colorScheme.primary
     // 2. On utilise le gris par défaut d'Android pour les éléments inactifs
@@ -2806,16 +3024,16 @@ fun NavigationMenuItem(title: String, icon: ImageVector, isSelected: Boolean, is
 
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(12.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(4.dp)),
+        shape = RoundedCornerShape(sizing.component(12.dp)),
         color = bgColor
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(24.dp))
-            Spacer(Modifier.width(16.dp))
+        Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, contentDescription = null, tint = contentColor, modifier = Modifier.size(sizing.component(24.dp)))
+            Spacer(Modifier.width(sizing.spacing(16.dp)))
             Text(
                 text = title,
-                style = MaterialTheme.typography.bodyLarge,
+                style = sizing.textStyle(MaterialTheme.typography.bodyLarge),
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                 color = contentColor
             )
@@ -2833,13 +3051,14 @@ private fun NavigationModeOption(
     trailingIcon: androidx.compose.ui.graphics.vector.ImageVector? = null,
     onClick: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val bgColor = when {
         isSelected -> MaterialTheme.colorScheme.primaryContainer
         useOneUi -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
         else -> Color.Transparent
     }
-    val border = if (!useOneUi && isSelected) BorderStroke(1.dp, MaterialTheme.colorScheme.primary) else null
-    val optionShape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
+    val border = if (!useOneUi && isSelected) BorderStroke(sizing.component(1.dp), MaterialTheme.colorScheme.primary) else null
+    val optionShape = if (useOneUi) RoundedCornerShape(sizing.component(22.dp)) else RoundedCornerShape(sizing.component(12.dp))
     val selectedTextColor = if (useOneUi) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer
     val selectedDescColor = if (useOneUi) MaterialTheme.colorScheme.primary.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
 
@@ -2851,13 +3070,13 @@ private fun NavigationModeOption(
         border = border
     ) {
         Row(
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(sizing.spacing(16.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
-                Text(title, fontWeight = FontWeight.Bold, color = if (isSelected) selectedTextColor else MaterialTheme.colorScheme.onSurface)
-                Spacer(Modifier.height(2.dp))
-                Text(desc, style = MaterialTheme.typography.bodySmall, color = if (isSelected) selectedDescColor else MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold, color = if (isSelected) selectedTextColor else MaterialTheme.colorScheme.onSurface)
+                Spacer(Modifier.height(sizing.spacing(2.dp)))
+                Text(desc, style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = if (isSelected) selectedDescColor else MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             // ✅ NOUVELLE LOGIQUE : Affichage de l'icône descriptive
@@ -2868,7 +3087,7 @@ private fun NavigationModeOption(
                     // Légèrement transparent si non sélectionné, coloré si sélectionné
                     tint = if (isSelected) selectedTextColor.copy(alpha = 0.7f) else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
                     // Espacement avant la coche si sélectionné, sinon aligné à droite
-                    modifier = Modifier.padding(end = 8.dp).size(20.dp)
+                    modifier = Modifier.padding(end = sizing.spacing(8.dp)).size(sizing.component(20.dp))
                 )
             }
 
@@ -2914,6 +3133,7 @@ fun IconSheet(
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
     val scrollState = rememberScrollState()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         Column(
@@ -2921,18 +3141,18 @@ fun IconSheet(
                 .fillMaxWidth()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
-                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Text(stringResource(R.string.appstrings_app_icon), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = 32.dp))
+            Text(stringResource(R.string.appstrings_app_icon), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.padding(bottom = sizing.spacing(32.dp)))
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
 
                 // --- LOGO 1 (Classique) : Index 0 ---
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     // Clic sur l'image : on change juste la variable temporaire (pas de onDismiss/onToggle)
-                    Surface(onClick = { safeClick("launcher_icon_0") { tempIconIndex = 0 } }, shape = RoundedCornerShape(22.dp), color = Color.Transparent, modifier = Modifier.size(70.dp)) { LauncherIconPreview(R.mipmap.ic_launcher_geotower, Modifier.fillMaxSize()) }
-                    Spacer(Modifier.height(12.dp))
+                    Surface(onClick = { safeClick("launcher_icon_0") { tempIconIndex = 0 } }, shape = RoundedCornerShape(sizing.component(22.dp)), color = Color.Transparent, modifier = Modifier.size(sizing.component(70.dp))) { LauncherIconPreview(R.mipmap.ic_launcher_geotower, Modifier.fillMaxSize()) }
+                    Spacer(Modifier.height(sizing.spacing(12.dp)))
                     val isSelected = tempIconIndex == 0
                     // Clic sur le cercle radio
                     if(useOneUi) fr.geotower.ui.components.OneUiRadioButton(isSelected) { tempIconIndex = 0 } else RadioButton(selected = isSelected, onClick = { tempIconIndex = 0 })
@@ -2940,22 +3160,22 @@ fun IconSheet(
 
                 // --- LOGO 2 (Radio) : Index 1 ---
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Surface(onClick = { safeClick("launcher_icon_1") { tempIconIndex = 1 } }, shape = RoundedCornerShape(22.dp), color = Color.Transparent, modifier = Modifier.size(70.dp)) { LauncherIconPreview(R.mipmap.ic_launcher_georadio, Modifier.fillMaxSize()) }
-                    Spacer(Modifier.height(12.dp))
+                    Surface(onClick = { safeClick("launcher_icon_1") { tempIconIndex = 1 } }, shape = RoundedCornerShape(sizing.component(22.dp)), color = Color.Transparent, modifier = Modifier.size(sizing.component(70.dp))) { LauncherIconPreview(R.mipmap.ic_launcher_georadio, Modifier.fillMaxSize()) }
+                    Spacer(Modifier.height(sizing.spacing(12.dp)))
                     val isSelected = tempIconIndex == 1
                     if(useOneUi) fr.geotower.ui.components.OneUiRadioButton(isSelected) { tempIconIndex = 1 } else RadioButton(selected = isSelected, onClick = { tempIconIndex = 1 })
                 }
 
                 // --- LOGO 3 (Funny) : Index 2 ---
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Surface(onClick = { safeClick("launcher_icon_2") { tempIconIndex = 2 } }, shape = RoundedCornerShape(22.dp), color = Color.Transparent, modifier = Modifier.size(70.dp)) { LauncherIconPreview(R.mipmap.ic_launcher_funny, Modifier.fillMaxSize()) }
-                    Spacer(Modifier.height(12.dp))
+                    Surface(onClick = { safeClick("launcher_icon_2") { tempIconIndex = 2 } }, shape = RoundedCornerShape(sizing.component(22.dp)), color = Color.Transparent, modifier = Modifier.size(sizing.component(70.dp))) { LauncherIconPreview(R.mipmap.ic_launcher_funny, Modifier.fillMaxSize()) }
+                    Spacer(Modifier.height(sizing.spacing(12.dp)))
                     val isSelected = tempIconIndex == 2
                     if(useOneUi) fr.geotower.ui.components.OneUiRadioButton(isSelected) { tempIconIndex = 2 } else RadioButton(selected = isSelected, onClick = { tempIconIndex = 2 })
                 }
             }
 
-            Text(stringResource(R.string.appstrings_restart_to_apply), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(top = 24.dp, bottom = 16.dp))
+            Text(stringResource(R.string.appstrings_restart_to_apply), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.outline, modifier = Modifier.padding(top = sizing.spacing(24.dp), bottom = sizing.spacing(16.dp)))
 
             // --- NOUVEAU : BOUTON VALIDER ---
             Button(
@@ -2965,10 +3185,10 @@ fun IconSheet(
                         onDismiss() // On ferme la fenêtre
                     }
                 },
-                modifier = Modifier.fillMaxWidth().height(50.dp),
-                shape = RoundedCornerShape(25.dp)
+                modifier = Modifier.fillMaxWidth().height(sizing.component(50.dp)),
+                shape = RoundedCornerShape(sizing.component(25.dp))
             ) {
-                Text(stringResource(R.string.appstrings_validate), fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.appstrings_validate), style = sizing.textStyle(MaterialTheme.typography.labelLarge), fontWeight = FontWeight.Bold)
             }
         }
     }
@@ -2986,3 +3206,173 @@ fun SettingsTopBar(onBack: () -> Unit) {
 
 @Composable
 fun DrawableImage(resId: Int, modifier: Modifier = Modifier) { AndroidView({ ctx -> ImageView(ctx).apply { scaleType = ImageView.ScaleType.FIT_CENTER } }, modifier, { view -> view.setImageResource(resId) }) }
+
+// ============================================================
+// 🔎 RECHERCHE DE PARAMÈTRES
+// ============================================================
+
+/** Une entrée indexée pour la barre de recherche des réglages. */
+private class SettingsSearchEntry(
+    val title: String,
+    val keywords: String,
+    val sectionLabel: String,
+    val icon: ImageVector,
+    val onClick: () -> Unit
+)
+
+/** Normalise une chaîne pour la recherche : minuscules + suppression des accents. */
+private fun normalizeForSearch(input: String): String {
+    val decomposed = java.text.Normalizer.normalize(input, java.text.Normalizer.Form.NFD)
+    return decomposed.replace(Regex("\\p{Mn}+"), "").lowercase()
+}
+
+@Composable
+fun SettingsSearchBar(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    shape: Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
+    useOneUi: Boolean
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val cardBg = if (useOneUi) bubbleColor else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+    Surface(shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp)),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(sizing.component(22.dp))
+            )
+            Spacer(Modifier.width(sizing.spacing(12.dp)))
+            Box(modifier = Modifier.weight(1f).padding(vertical = sizing.spacing(16.dp))) {
+                if (query.isEmpty()) {
+                    Text(
+                        text = stringResource(R.string.settings_search_placeholder),
+                        style = sizing.textStyle(MaterialTheme.typography.bodyLarge),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
+                BasicTextField(
+                    value = query,
+                    onValueChange = onQueryChange,
+                    singleLine = true,
+                    textStyle = sizing.textStyle(MaterialTheme.typography.bodyLarge)
+                        .copy(color = MaterialTheme.colorScheme.onSurface),
+                    cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+            AnimatedVisibility(visible = query.isNotEmpty()) {
+                IconButton(
+                    onClick = { onQueryChange("") },
+                    modifier = Modifier.size(sizing.component(36.dp))
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Close,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(sizing.component(20.dp))
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsSearchResults(
+    query: String,
+    entries: List<SettingsSearchEntry>,
+    shape: Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
+    useOneUi: Boolean
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val tokens = normalizeForSearch(query).split(' ').filter { it.isNotBlank() }
+    val results = if (tokens.isEmpty()) {
+        emptyList()
+    } else {
+        entries.filter { entry ->
+            val haystack = normalizeForSearch("${entry.title} ${entry.keywords} ${entry.sectionLabel}")
+            tokens.all { haystack.contains(it) }
+        }
+    }
+
+    if (results.isEmpty()) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(48.dp)),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f),
+                modifier = Modifier.size(sizing.component(40.dp))
+            )
+            Spacer(Modifier.height(sizing.spacing(12.dp)))
+            Text(
+                text = stringResource(R.string.settings_search_no_results),
+                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
+    } else {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
+        ) {
+            results.forEach { entry ->
+                SettingsSearchResultRow(entry, shape, border, bubbleColor, useOneUi)
+            }
+        }
+    }
+}
+
+@Composable
+private fun SettingsSearchResultRow(
+    entry: SettingsSearchEntry,
+    shape: Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
+    useOneUi: Boolean
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val cardBg = if (useOneUi) bubbleColor else Color.Transparent
+    Surface(onClick = entry.onClick, shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = entry.icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(sizing.component(24.dp))
+            )
+            Spacer(Modifier.width(sizing.spacing(16.dp)))
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = entry.title,
+                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = entry.sectionLabel,
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.width(sizing.spacing(8.dp)))
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(sizing.component(24.dp))
+            )
+        }
+    }
+}

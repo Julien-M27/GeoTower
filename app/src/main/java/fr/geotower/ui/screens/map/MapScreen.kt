@@ -29,6 +29,8 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -246,6 +248,30 @@ private fun hasSavedMapPosition(prefs: SharedPreferences): Boolean {
         zoom in 0.0..25.0
 }
 
+/**
+ * Parse une date ANFR en entier yyyymmdd comparable, ou null si absente/invalide.
+ * L'ANFR fournit "JJ/MM/AAAA" (ex: "01/06/2012") ; on accepte aussi l'ISO "AAAA-MM-JJ" par sécurité.
+ */
+private fun parseServiceDateInt(raw: String?): Int? {
+    val s = raw?.trim() ?: return null
+    if (s.length < 10) return null
+    return when {
+        (s[2] == '/' || s[2] == '-') && (s[5] == '/' || s[5] == '-') -> {
+            val d = s.substring(0, 2).toIntOrNull() ?: return null
+            val m = s.substring(3, 5).toIntOrNull() ?: return null
+            val y = s.substring(6, 10).toIntOrNull() ?: return null
+            if (m in 1..12 && d in 1..31) y * 10000 + m * 100 + d else null
+        }
+        s[4] == '-' && s[7] == '-' -> {
+            val y = s.substring(0, 4).toIntOrNull() ?: return null
+            val m = s.substring(5, 7).toIntOrNull() ?: return null
+            val d = s.substring(8, 10).toIntOrNull() ?: return null
+            if (m in 1..12 && d in 1..31) y * 10000 + m * 100 + d else null
+        }
+        else -> null
+    }
+}
+
 private fun MapView.enableMouseWheelZoom() {
     setOnGenericMotionListener { _, event ->
         if (event.action != MotionEvent.ACTION_SCROLL) return@setOnGenericMotionListener false
@@ -333,6 +359,22 @@ private fun MapViewportSnapshot.isCloseTo(other: MapViewportSnapshot): Boolean {
 private fun MapView.loadVisibleAntennas(viewModel: MapViewModel) {
     val snapshot = visibleViewportSnapshot()
     viewModel.loadAntennasInBox(
+        snapshot.zoom,
+        snapshot.latNorth,
+        snapshot.lonEast,
+        snapshot.latSouth,
+        snapshot.lonWest
+    )
+}
+
+private fun MapView.loadVisibleSignalQuestCoverage(viewModel: MapViewModel, enabled: Boolean) {
+    if (!enabled) {
+        viewModel.clearSignalQuestCoveragePoints()
+        return
+    }
+
+    val snapshot = visibleViewportSnapshot()
+    viewModel.loadSignalQuestCoveragePointsInBox(
         snapshot.zoom,
         snapshot.latNorth,
         snapshot.lonEast,
@@ -591,11 +633,14 @@ private fun buildActiveMapFilterSummary(
     showRadioPrivateMobile: Boolean,
     showRadioFh: Boolean,
     showRadioOther: Boolean,
+    showSignalQuestCoveragePoints: Boolean,
+    selectedSignalQuestCoverageOperatorKeys: Set<String>,
     operatorsLabel: String,
     technologiesLabel: String,
     frequenciesLabel: String,
     siteDisplayLabel: String,
     radioLabel: String,
+    signalQuestCoverageLabel: String,
     inServiceLabel: String,
     outOfServiceLabel: String,
     hideUndergroundLabel: String,
@@ -720,6 +765,24 @@ private fun buildActiveMapFilterSummary(
         activeFilters += "$radioLabel: ${compactActiveFilterValues(radioFilters, moreLabel)}"
     }
 
+    if (showSignalQuestCoveragePoints) {
+        val coverageOperators = OperatorColors.metro.filter { it.key in AppConfig.signalQuestCoverageOperatorKeys }
+        val selectedCoverageOperators = coverageOperators
+            .filter { it.key in selectedSignalQuestCoverageOperatorKeys }
+            .map { it.label }
+        val hiddenCoverageOperators = coverageOperators
+            .filter { it.key !in selectedSignalQuestCoverageOperatorKeys }
+            .map { it.label }
+
+        activeFilters += "$signalQuestCoverageLabel: " + summarizedActiveFilterSelection(
+            selectedValues = selectedCoverageOperators,
+            hiddenValues = hiddenCoverageOperators,
+            noneLabel = noneLabel,
+            exceptLabel = exceptLabel,
+            moreLabel = moreLabel
+        )
+    }
+
     val siteFilters = mutableListOf<String>()
     if (showSitesInService != showSitesOutOfService) {
         val selectedStatuses = listOfNotNull(
@@ -765,13 +828,19 @@ fun MapScreen(
     val uriHandler = LocalUriHandler.current
     val density = LocalDensity.current
     val antennas by viewModel.antennas.collectAsState()
+    val oldestServiceDate by viewModel.oldestServiceDate.collectAsState()
     val radioMarkers by viewModel.radioMarkers.collectAsState()
+    val signalQuestCoveragePoints by viewModel.signalQuestCoveragePoints.collectAsState()
+    val theoreticalCoverage by viewModel.theoreticalCoverage.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val sitesHs by viewModel.sitesHs.collectAsState()
     val cityStatsTechniques by viewModel.cityStatsTechniques.collectAsState()
     val isCityStatsTechniquesLoading by viewModel.isCityStatsTechniquesLoading.collectAsState()
     val lifecycleOwner = LocalLifecycleOwner.current
     val featureFlags by RemoteFeatureFlags.config
+    val canUseSignalQuestCoverage by androidx.compose.runtime.rememberUpdatedState(
+        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_COVERAGE)
+    )
 
     LiveDatabaseUsageWarningDialog(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)
 
@@ -815,6 +884,7 @@ fun MapScreen(
 
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val uiStyle = LocalGeoTowerUiStyle.current
+    val sizing = uiStyle.sizing
     val pendingSharedPhotoDraftId = photoDraftId?.takeIf { it.isNotBlank() }
     val pendingSharedPhotoCount = remember(pendingSharedPhotoDraftId) {
         pendingSharedPhotoDraftId?.let { SignalQuestUploadDraftStore.peek(it).size } ?: 0
@@ -930,6 +1000,16 @@ fun MapScreen(
     val searchBoundaryOverlay = remember { FolderOverlay() }
     // ✅ LE CALQUE MACRO POUR LA VUE DÉZOOMÉE
     val macroOverlay = remember { FolderOverlay() }
+    val signalQuestCoverageOverlay = remember { SignalQuestCoverageOverlay(context) }
+    val theoreticalCoverageOverlay = remember { TheoreticalCoverageOverlay(context) }
+    var selectedCoveragePoint by remember { mutableStateOf<SignalQuestCoveragePoint?>(null) }
+    signalQuestCoverageOverlay.onPointClick = { selectedCoveragePoint = it }
+    selectedCoveragePoint?.let { coveragePoint ->
+        CoveragePointDetailDialog(
+            point = coveragePoint,
+            onDismiss = { selectedCoveragePoint = null }
+        )
+    }
     val radioOverlay = remember { FolderOverlay() }
 
     fun refreshSearchBoundaryOverlay(map: MapView, polygons: List<List<GeoPoint>>?) {
@@ -1003,6 +1083,18 @@ fun MapScreen(
     var myCurrentLoc by remember { mutableStateOf<GeoPoint?>(null) }
     var currentSpeedKmH by remember { mutableIntStateOf(0) }
     var isToolboxExpanded by rememberSaveable { mutableStateOf(false) }
+    var isTimeSliderVisible by rememberSaveable { mutableStateOf(false) }
+    var timeSliderThreshold by rememberSaveable { mutableStateOf<Int?>(null) }
+    var timeSliderStats by remember { mutableStateOf(TimeSliderStats(emptyMap(), 0)) }
+    val timeSliderLift = if (isTimeSliderVisible) 104.dp else 0.dp
+    val todayDateInt = remember {
+        val c = java.util.Calendar.getInstance()
+        c.get(java.util.Calendar.YEAR) * 10000 + (c.get(java.util.Calendar.MONTH) + 1) * 100 + c.get(java.util.Calendar.DAY_OF_MONTH)
+    }
+    // Le slider temporel n'a de sens qu'avec la base ANFR locale (dates par site).
+    // L'API live (fallback sans base) ne fournit pas les dates -> on masque le bouton.
+    val timeSliderAvailable = AppConfig.localDatabaseState.value ==
+        fr.geotower.data.db.GeoTowerDatabaseValidator.LocalDatabaseState.VALID
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
     var operatorSearchPreviousOperatorKeys by rememberSaveable { mutableStateOf<List<String>?>(null) }
 
@@ -1174,6 +1266,7 @@ fun MapScreen(
     val txtRadioPrivateMobile = stringResource(R.string.appstrings_radio_category_private_mobile)
     val txtRadioFh = stringResource(R.string.appstrings_radio_category_fh)
     val txtRadioOther = stringResource(R.string.appstrings_radio_category_other)
+    val txtSignalQuestCoverage = stringResource(R.string.appstrings_signalquest_coverage_title)
     val txtNoActiveFilterValue = stringResource(R.string.appstrings_map_active_filters_none)
     val activeMapFilterSummary = buildActiveMapFilterSummary(
         selectedOperatorKeys = AppConfig.selectedOperatorKeys.value,
@@ -1187,11 +1280,14 @@ fun MapScreen(
         showRadioPrivateMobile = AppConfig.showRadioPrivateMobile.value,
         showRadioFh = AppConfig.showRadioFh.value,
         showRadioOther = AppConfig.showRadioOther.value,
+        showSignalQuestCoveragePoints = canUseSignalQuestCoverage && AppConfig.showSignalQuestCoveragePoints.value,
+        selectedSignalQuestCoverageOperatorKeys = AppConfig.selectedSignalQuestCoverageOperatorKeys.value,
         operatorsLabel = txtOperatorsTitle,
         technologiesLabel = txtTechnologiesTitle,
         frequenciesLabel = txtFrequenciesTitle,
         siteDisplayLabel = txtSiteDisplayTitle,
         radioLabel = txtRadioTitle,
+        signalQuestCoverageLabel = txtSignalQuestCoverage,
         inServiceLabel = txtInService,
         outOfServiceLabel = txtOutOfService,
         hideUndergroundLabel = txtHideUndergroundSites,
@@ -1290,6 +1386,7 @@ fun MapScreen(
 
         onDispose {
             restoreOperatorSearchSelection()
+            AppConfig.timeSliderActive.value = false
             viewModel.resetCityLock()
             lifecycleOwner.lifecycle.removeObserver(observer)
             searchJob?.cancel()
@@ -1314,9 +1411,10 @@ fun MapScreen(
         AppConfig.f2G_900.value, AppConfig.f2G_1800.value, AppConfig.f3G_900.value, AppConfig.f3G_2100.value,
         AppConfig.f4G_700.value, AppConfig.f4G_800.value, AppConfig.f4G_900.value, AppConfig.f4G_1800.value, AppConfig.f4G_2100.value, AppConfig.f4G_2600.value,
         AppConfig.f5G_700.value, AppConfig.f5G_1400.value, AppConfig.f5G_2100.value, AppConfig.f5G_3500.value, AppConfig.f5G_4200.value, AppConfig.f5G_26000.value,
-        AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value, AppConfig.showOnlyZbSites.value, sitesHs, currentCityPolygons
+        AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value, AppConfig.showOnlyZbSites.value, sitesHs, currentCityPolygons,
+        isTimeSliderVisible, timeSliderThreshold
     ) {
-        val result = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+        val computed = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
             val selectedOperators = AppConfig.selectedOperatorKeys.value
             val showSitesInService = AppConfig.showSitesInService.value
             val showSitesOutOfService = AppConfig.showSitesOutOfService.value
@@ -1325,7 +1423,7 @@ fun MapScreen(
             val frequencyFilter = FrequencyFilterSelection.fromMapConfig()
             val hsOperatorMap = buildHsOperatorMap(sitesHs)
 
-            antennas.filter { antenna ->
+            val base = antennas.filter { antenna ->
                 val visibleOperators = visibleOperatorKeysForAntenna(
                     antenna = antenna,
                     hsOperatorMap = hsOperatorMap,
@@ -1351,8 +1449,44 @@ fun MapScreen(
 
                 visibleOperators.isNotEmpty() && matchesUndergroundFilter && matchesZbFilter && isInCityBounds && matchTechno
             }
+
+            // Slider temporel : on ne garde que les sites mis en service avant le seuil choisi,
+            // et on compte les sites visibles par operateur (+ ceux sans date exploitable).
+            if (!isTimeSliderVisible) {
+                base to null
+            } else {
+                val threshold = timeSliderThreshold
+                val counts = HashMap<String, Int>()
+                var undated = 0
+                var datedTotal = 0
+                val visible = ArrayList<LocalisationEntity>(base.size)
+                base.forEach { antenna ->
+                    if (antenna.idAnfr.startsWith("CLUSTER_")) {
+                        visible.add(antenna)
+                        return@forEach
+                    }
+                    val serviceInt = parseServiceDateInt(antenna.dateService)
+                    if (serviceInt == null) {
+                        undated++
+                        if (threshold == null) visible.add(antenna)
+                        return@forEach
+                    }
+                    datedTotal++
+                    if (threshold == null || serviceInt <= threshold) {
+                        visible.add(antenna)
+                        OperatorColors.keyFor(antenna.operateur)?.let { key ->
+                            counts[key] = (counts[key] ?: 0) + 1
+                        }
+                    }
+                }
+                // Aucune date exploitable dans la zone (typiquement la base live qui ne renvoie pas
+                // les dates) : on n'efface pas la carte, le slider reste sans effet ici.
+                val finalVisible = if (datedTotal == 0) base else visible
+                finalVisible to TimeSliderStats(counts, undated)
+            }
         }
-        filteredAntennas = result
+        filteredAntennas = computed.first
+        computed.second?.let { timeSliderStats = it }
     }
 
     fun createDistanceLabel(text: String): BitmapDrawable {
@@ -1649,8 +1783,8 @@ fun MapScreen(
                 position = GeoPoint(item.latitude, item.longitude)
                 setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
                 icon = MapUtils.createRadioMarkerIcon(context, item.serviceMask, item.systemMask, item.clusterCount)
-                title = item.title
-                snippet = item.subtitle
+                title = item.title(context)
+                snippet = item.subtitle(context)
                 setOnMarkerClickListener { clickedMarker, mapView ->
                     if (isMeasuringMode) {
                         addManualMeasurePoint(
@@ -1719,8 +1853,16 @@ fun MapScreen(
                 return@withContext
             }
 
-            // Table de correspondance ANFR -> operateurs declares HS.
+            // Table de correspondance ANFR -> operateurs declares HS (sert au filtre de visibilité).
             val hsOperatorMap = buildHsOperatorMap(sitesHsList)
+            // Propagation « zone blanche » : uniquement pour la COULEUR du marqueur (pas le filtre).
+            // On ajoute les opérateurs ZB déduits HS parce qu'un voisin du même site est déclaré HS.
+            val zbPotentialHs = fr.geotower.utils.zbPotentialOutages(antennasList, sitesHsList)
+            val hsColorOperatorMap = if (zbPotentialHs.isEmpty()) {
+                hsOperatorMap
+            } else {
+                buildHsOperatorMap(sitesHsList + zbPotentialHs)
+            }
 
             fun visibleAntennaForMap(
                 antenna: LocalisationEntity,
@@ -1760,7 +1902,7 @@ fun MapScreen(
 
                     val mainAntenna = filteredSiteAntennas.first()
                     val isHs = filteredSiteAntennas.any { antenna ->
-                        hasVisibleHsOperator(antenna, hsOperatorMap)
+                        hasVisibleHsOperator(antenna, hsColorOperatorMap)
                     }
 
                     ensureMapNotDisposed()
@@ -1858,7 +2000,7 @@ fun MapScreen(
 
                     val mainAntenna = filteredSiteAntennas.first()
                     val isHs = filteredSiteAntennas.any { antenna ->
-                        hasVisibleHsOperator(antenna, hsOperatorMap)
+                        hasVisibleHsOperator(antenna, hsColorOperatorMap)
                     }
 
                     // Le marqueur UNIQUE (L'antenne)
@@ -1969,6 +2111,52 @@ fun MapScreen(
         mapViewRef?.let { map ->
             updateRadioMarkers(map, radioMarkers)
         }
+    }
+
+    LaunchedEffect(signalQuestCoveragePoints) {
+        signalQuestCoverageOverlay.setPoints(signalQuestCoveragePoints)
+        mapViewRef?.invalidate()
+    }
+
+    LaunchedEffect(theoreticalCoverage, AppConfig.showTheoreticalCoverage.value) {
+        if (AppConfig.showTheoreticalCoverage.value) {
+            theoreticalCoverageOverlay.setCoverage(theoreticalCoverage)
+        } else {
+            theoreticalCoverageOverlay.clear()
+        }
+        mapViewRef?.invalidate()
+    }
+
+    // Déclenchement depuis une fiche site : calcule la couverture (le centrage se fait via last_map_* au montage).
+    LaunchedEffect(AppConfig.pendingTheoreticalCoverage.value) {
+        val pending = AppConfig.pendingTheoreticalCoverage.value ?: return@LaunchedEffect
+        AppConfig.showTheoreticalCoverage.value = true
+        android.widget.Toast.makeText(context, context.getString(R.string.appstrings_coverage_computing), android.widget.Toast.LENGTH_SHORT).show()
+        viewModel.loadTheoreticalCoverageForSite(pending.idAnfr)
+        AppConfig.pendingTheoreticalCoverage.value = null
+    }
+
+    // Diagnostic temporaire à l'écran (en attendant l'écran-outil du Lot 3) : résumé du calcul.
+    LaunchedEffect(theoreticalCoverage) {
+        val cov = theoreticalCoverage ?: return@LaunchedEffect
+        val complete = cov.terrainValidFraction >= 0.9 && cov.terrainFailedChunks == 0
+        val message = if (complete) {
+            // Succès : rappel scientifique (ligne de visée, pas couverture RF) en attendant le disclaimer Lot 3.
+            context.getString(R.string.appstrings_coverage_disclaimer_short)
+        } else {
+            "Couverture partielle : terrain ${(cov.terrainValidFraction * 100).toInt()}% · " +
+                "${cov.terrainFailedChunks}/${cov.terrainTotalChunks} req KO" +
+                (cov.terrainSampleError?.let { " — $it" } ?: "")
+        }
+        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+    }
+
+    LaunchedEffect(
+        canUseSignalQuestCoverage,
+        AppConfig.showSignalQuestCoveragePoints.value,
+        AppConfig.selectedSignalQuestCoverageOperatorKeys.value
+    ) {
+        mapViewRef?.loadVisibleSignalQuestCoverage(viewModel, canUseSignalQuestCoverage)
     }
 
     LaunchedEffect(AppConfig.radioMapCategoryMask()) {
@@ -2224,6 +2412,8 @@ fun MapScreen(
                     overlays.add(measureOverlay)
                     overlays.add(searchBoundaryOverlay)
                     overlays.add(macroOverlay) // <-- Calque macro au fond
+                    overlays.add(theoreticalCoverageOverlay) // <-- Enveloppe couverture théorique (sous les points/marqueurs)
+                    overlays.add(signalQuestCoverageOverlay)
                     overlays.add(radioOverlay)
                     overlays.add(markersOverlay) // <-- Calque micro au milieu
                     overlays.add(locationOverlay) // <-- Curseur devant
@@ -2271,6 +2461,7 @@ fun MapScreen(
                                 }
                                 lastLoadedViewport = snapshot
                                 this@apply.loadVisibleAntennas(viewModel)
+                                this@apply.loadVisibleSignalQuestCoverage(viewModel, canUseSignalQuestCoverage)
                             }
                         }
                     })
@@ -2280,6 +2471,7 @@ fun MapScreen(
                         currentZoom = snapshot.zoom
                         currentLat = snapshot.centerLat
                         this@apply.loadVisibleAntennas(viewModel)
+                        this@apply.loadVisibleSignalQuestCoverage(viewModel, canUseSignalQuestCoverage)
                     }
                     mapViewRef = this
                 }
@@ -2543,6 +2735,7 @@ fun MapScreen(
         val visibleToolboxActionCount = listOf(
             canUseMapSearch,
             canUseMapMeasure,
+            timeSliderAvailable, // bouton historique / slider temporel
             canUseLayerSelector,
             true
         ).count { it }
@@ -2622,7 +2815,8 @@ fun MapScreen(
                 currentZoom = currentZoom,
                 currentLat = currentLat,
                 azimuth = azimuth,
-                measureOverlay = measureOverlay
+                measureOverlay = measureOverlay,
+                timeSliderDateLabel = if (isTimeSliderVisible) timeSliderThreshold?.let { timeSliderMonthLabel(it) } else null
             )
         }
 
@@ -2951,10 +3145,22 @@ fun MapScreen(
                             }
                         }
                     },
+                    isTimeSliderActive = isTimeSliderVisible,
+                    onToggleTimeSlider = {
+                        isTimeSliderVisible = !isTimeSliderVisible
+                        AppConfig.timeSliderActive.value = isTimeSliderVisible
+                        if (isTimeSliderVisible) {
+                            viewModel.ensureOldestServiceDateLoaded()
+                        } else {
+                            timeSliderThreshold = null
+                        }
+                        mapViewRef?.loadVisibleAntennas(viewModel)
+                    },
                     onOpenLayers = { safeClick { if (canUseLayerSelector) showLayerSheet = true } },
                     onOpenSettings = { safeClick { showMapPageSettingsSheet = true } },
                     showSearch = canUseMapSearch,
                     showMeasure = canUseMapMeasure,
+                    showTimeSlider = timeSliderAvailable,
                     showLayers = canUseLayerSelector,
                     expandLeft = toolboxExpandsLeft
                 )
@@ -3115,10 +3321,25 @@ fun MapScreen(
             }
         }
 
+        if (isTimeSliderVisible) {
+            MapTimeSliderBar(
+                oldestDateInt = oldestServiceDate?.toIntOrNull()?.coerceAtLeast(19910101) ?: 19910101,
+                newestDateInt = todayDateInt,
+                thresholdInt = timeSliderThreshold,
+                countsByOperator = timeSliderStats.countsByOperator,
+                undatedCount = timeSliderStats.undated,
+                onThresholdChange = { timeSliderThreshold = it },
+                modifier = Modifier
+                    .align(Alignment.BottomStart)
+                    .padding(start = 12.dp, end = MapControlButtonDiameter + 24.dp)
+                    .navigationBarsPadding()
+            )
+        }
+
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 16.dp, bottom = 32.dp)
+                .padding(start = 16.dp, bottom = 32.dp + timeSliderLift)
                 .navigationBarsPadding(),
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(4.dp)
@@ -3217,12 +3438,12 @@ fun MapScreen(
             ) {
                 // ✅ 1. ON CRÉE LA COLONNE GLOBALE QUI APPLIQUE LE PADDING À TOUT
                 Column(
-                    modifier = Modifier.padding(horizontal = 24.dp).padding(bottom = 24.dp)
+                    modifier = Modifier.padding(horizontal = sizing.spacing(24.dp)).padding(bottom = sizing.spacing(24.dp))
                 ) {
 
                     // ✅ 2. LA COLONNE DES PREMIERS BOUTONS
                     Column(
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))
                     ) {
                         // 🌐 ON N'AFFICHE LES CARTES EN LIGNE QUE SI ON A INTERNET
                         if (isOnline) {
@@ -3239,7 +3460,7 @@ fun MapScreen(
                                     }
                                 }
                             }
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
                                 if (isMapProviderEnabled(2)) {
                                     MapLayerButton(txtMapMapLibre, mapProvider == 2, Modifier.weight(1f)) {
                                         AppConfig.mapProvider.value = 2; prefs.edit().putInt("map_provider", 2).apply()
@@ -3257,7 +3478,8 @@ fun MapScreen(
                                 text = "⚠️ $txtOfflineMessage",
                                 color = MaterialTheme.colorScheme.error,
                                 fontWeight = FontWeight.Bold,
-                                modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 4.dp, top = 8.dp)
+                                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                                modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = sizing.spacing(4.dp), top = sizing.spacing(8.dp))
                             )
                         }
 
@@ -3272,8 +3494,8 @@ fun MapScreen(
                             Text(
                                 text = stringResource(R.string.appstrings_no_offline_maps_installed),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 12.sp,
-                                modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 8.dp)
+                                fontSize = sizing.text(12.sp),
+                                modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = sizing.spacing(8.dp))
                             )
                         }
                     }
@@ -3285,8 +3507,8 @@ fun MapScreen(
                         exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it }) + shrinkVertically(shrinkTowards = Alignment.Top)
                     ) {
                         Column {
-                            Spacer(Modifier.height(12.dp))
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Spacer(Modifier.height(sizing.spacing(12.dp)))
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
                                 MapLayerButton(txtMapLight, ignStyle == 0, Modifier.weight(1f)) {
                                     AppConfig.ignStyle.value = 0; prefs.edit().putInt("ign_style", 0).apply()
                                 }
@@ -3570,10 +3792,11 @@ private fun MapScaleBar(zoom: Double, latitude: Double) {
 
 @Composable
 private fun MapLayerButton(text: String, isSelected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val bgColor = if (isSelected) Color(0xFF3B5998) else MaterialTheme.colorScheme.surfaceVariant
     val textColor = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
-    Surface(onClick = onClick, modifier = modifier.height(56.dp), shape = RoundedCornerShape(14.dp), color = bgColor) {
-        Box(contentAlignment = Alignment.Center) { Text(text = text, color = textColor, fontWeight = FontWeight.SemiBold, fontSize = 14.sp) }
+    Surface(onClick = onClick, modifier = modifier.height(sizing.component(56.dp)), shape = RoundedCornerShape(sizing.component(14.dp)), color = bgColor) {
+        Box(contentAlignment = Alignment.Center) { Text(text = text, color = textColor, fontWeight = FontWeight.SemiBold, fontSize = sizing.text(14.sp)) }
     }
 }
 
@@ -4285,6 +4508,233 @@ class RadioMarker(
         }
         super.draw(canvas, projection)
     }
+}
+
+private class SignalQuestCoverageOverlay(context: Context) : org.osmdroid.views.overlay.Overlay() {
+    private val density = context.resources.displayMetrics.density
+    private val point = android.graphics.Point()
+    private val fillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
+        style = android.graphics.Paint.Style.FILL
+    }
+    private var points: List<SignalQuestCoveragePoint> = emptyList()
+
+    /** Callback déclenché au tap sur un point. Affecté depuis la composition. */
+    var onPointClick: ((SignalQuestCoveragePoint) -> Unit)? = null
+
+    fun setPoints(nextPoints: List<SignalQuestCoveragePoint>) {
+        points = nextPoints
+    }
+
+    override fun draw(canvas: android.graphics.Canvas, projection: org.osmdroid.views.Projection) {
+        if (points.isEmpty()) return
+
+        val radius = 3.6f * density
+        points.forEach { coveragePoint ->
+            projection.toPixels(GeoPoint(coveragePoint.latitude, coveragePoint.longitude), point)
+            fillPaint.color = rsrpColor(coveragePoint.signalStrength)
+            canvas.drawCircle(point.x.toFloat(), point.y.toFloat(), radius, fillPaint)
+        }
+    }
+
+    override fun onSingleTapConfirmed(e: android.view.MotionEvent, mapView: org.osmdroid.views.MapView): Boolean {
+        val handler = onPointClick ?: return false
+        if (points.isEmpty()) return false
+
+        val projection = mapView.projection
+        val touchRadiusPx = 18f * density
+        val touchRadiusSq = touchRadiusPx * touchRadiusPx
+        var best: SignalQuestCoveragePoint? = null
+        var bestDistanceSq = Float.MAX_VALUE
+
+        points.forEach { coveragePoint ->
+            projection.toPixels(GeoPoint(coveragePoint.latitude, coveragePoint.longitude), point)
+            val dx = e.x - point.x
+            val dy = e.y - point.y
+            val distanceSq = dx * dx + dy * dy
+            if (distanceSq <= touchRadiusSq && distanceSq < bestDistanceSq) {
+                bestDistanceSq = distanceSq
+                best = coveragePoint
+            }
+        }
+
+        val tapped = best ?: return false
+        handler(tapped)
+        return true
+    }
+}
+
+/** Couleur d'un point de couverture selon le RSRP (dBm), du vert (bon) au rouge (mauvais). */
+private fun rsrpColor(signalStrength: Float?): Int {
+    val rsrp = signalStrength ?: return android.graphics.Color.GRAY
+    return when {
+        rsrp >= -80f -> android.graphics.Color.parseColor("#1B7F2E")  // vert foncé
+        rsrp >= -95f -> android.graphics.Color.parseColor("#66BB6A")  // vert clair
+        rsrp >= -105f -> android.graphics.Color.parseColor("#FDD835") // jaune
+        rsrp >= -115f -> android.graphics.Color.parseColor("#FB8C00") // orange
+        else -> android.graphics.Color.parseColor("#E53935")          // rouge
+    }
+}
+
+private fun coverageQualityLabelRes(signalStrength: Float): Int = when {
+    signalStrength >= -80f -> R.string.appstrings_signalquest_coverage_quality_excellent
+    signalStrength >= -95f -> R.string.appstrings_signalquest_coverage_quality_good
+    signalStrength >= -105f -> R.string.appstrings_signalquest_coverage_quality_fair
+    signalStrength >= -115f -> R.string.appstrings_signalquest_coverage_quality_poor
+    else -> R.string.appstrings_signalquest_coverage_quality_bad
+}
+
+private fun formatCoverageTimestamp(raw: String?): String? {
+    val value = raw?.trim().orEmpty()
+    if (value.isBlank()) return null
+    val patterns = listOf(
+        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+        "yyyy-MM-dd'T'HH:mm:ssXXX",
+        "yyyy-MM-dd'T'HH:mm:ss"
+    )
+    for (pattern in patterns) {
+        try {
+            val parser = java.text.SimpleDateFormat(pattern, java.util.Locale.US)
+            if (!pattern.endsWith("XXX")) {
+                parser.timeZone = java.util.TimeZone.getTimeZone("UTC")
+            }
+            val date = parser.parse(value) ?: continue
+            return java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", java.util.Locale.getDefault()).format(date)
+        } catch (_: Exception) {
+            // essaie le motif suivant
+        }
+    }
+    return value
+}
+
+@Composable
+private fun CoverageDetailRow(label: String, value: String, valueColor: Color = Color.Unspecified) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.weight(1f)
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = FontWeight.SemiBold,
+            color = if (valueColor == Color.Unspecified) MaterialTheme.colorScheme.onSurface else valueColor,
+            textAlign = TextAlign.End,
+            modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+@Composable
+private fun CoveragePointDetailDialog(point: SignalQuestCoveragePoint, onDismiss: () -> Unit) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = {
+            Text(
+                text = stringResource(R.string.appstrings_signalquest_coverage_detail_title),
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                CoverageDetailRow(
+                    stringResource(R.string.appstrings_signalquest_coverage_detail_operator),
+                    point.operatorLabel
+                )
+                point.technology?.takeIf { it.isNotBlank() }?.let {
+                    CoverageDetailRow(
+                        stringResource(R.string.appstrings_signalquest_coverage_detail_technology),
+                        it
+                    )
+                }
+                point.networkType?.takeIf { it.isNotBlank() }?.let {
+                    CoverageDetailRow(
+                        stringResource(R.string.appstrings_signalquest_coverage_detail_network_type),
+                        it
+                    )
+                }
+                point.signalStrength?.let { signal ->
+                    CoverageDetailRow(
+                        label = stringResource(R.string.appstrings_signalquest_coverage_detail_signal),
+                        value = "${signal.roundToInt()} dBm · ${stringResource(coverageQualityLabelRes(signal))}",
+                        valueColor = Color(rsrpColor(signal))
+                    )
+                }
+                point.rsrq?.let {
+                    CoverageDetailRow(
+                        stringResource(R.string.appstrings_signalquest_coverage_detail_rsrq),
+                        "${it.roundToInt()} dB"
+                    )
+                }
+                point.snr?.let {
+                    CoverageDetailRow(
+                        stringResource(R.string.appstrings_signalquest_coverage_detail_snr),
+                        "${it.roundToInt()} dB"
+                    )
+                }
+                if (point.mcc != null || point.mnc != null) {
+                    val plmn = buildString {
+                        point.mcc?.let { append(it) }
+                        if (point.mcc != null && point.mnc != null) append(" / ")
+                        point.mnc?.let { append(it.toString().padStart(2, '0')) }
+                    }
+                    CoverageDetailRow(
+                        stringResource(R.string.appstrings_signalquest_coverage_detail_plmn),
+                        plmn
+                    )
+                }
+                point.cellId?.takeIf { it.isNotBlank() }?.let {
+                    CoverageDetailRow(
+                        stringResource(R.string.appstrings_signalquest_coverage_detail_cell_id),
+                        it
+                    )
+                }
+                point.pci?.let {
+                    CoverageDetailRow(
+                        stringResource(R.string.appstrings_signalquest_coverage_detail_pci),
+                        it.toString()
+                    )
+                }
+                point.enb?.takeIf { it.isNotBlank() }?.let {
+                    CoverageDetailRow(
+                        stringResource(R.string.appstrings_signalquest_coverage_detail_enb),
+                        it
+                    )
+                }
+                point.gnb?.takeIf { it.isNotBlank() }?.let {
+                    CoverageDetailRow(
+                        stringResource(R.string.appstrings_signalquest_coverage_detail_gnb),
+                        it
+                    )
+                }
+                CoverageDetailRow(
+                    stringResource(R.string.appstrings_signalquest_coverage_detail_coordinates),
+                    String.format(java.util.Locale.US, "%.5f, %.5f", point.latitude, point.longitude)
+                )
+                formatCoverageTimestamp(point.timestamp)?.let {
+                    CoverageDetailRow(
+                        stringResource(R.string.appstrings_signalquest_coverage_detail_measured_at),
+                        it
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.appstrings_signalquest_coverage_detail_close))
+            }
+        }
+    )
 }
 
 private fun mapLocationKey(latitude: Double, longitude: Double): String {

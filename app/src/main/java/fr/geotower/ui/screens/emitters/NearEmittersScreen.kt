@@ -1040,6 +1040,7 @@ private fun NearbyFrequencyFilterSheet(
     sheetState: SheetState,
     onDismiss: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     var show2G by AppConfig.showTechno2G
     var show3G by AppConfig.showTechno3G
     var show4G by AppConfig.showTechno4G
@@ -1060,11 +1061,11 @@ private fun NearbyFrequencyFilterSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 48.dp)
+                .padding(horizontal = sizing.spacing(24.dp))
+                .padding(bottom = sizing.spacing(48.dp))
         ) {
             SectionTitle(stringResource(R.string.appstrings_technologies_title))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)), modifier = Modifier.fillMaxWidth()) {
                 SelectableButton("5G", show5G, Modifier.weight(1f)) {
                     show5G = it
                     prefs.edit().putBoolean("show_techno_5g", it).apply()
@@ -1087,7 +1088,7 @@ private fun NearbyFrequencyFilterSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(28.dp)))
             SectionTitle(stringResource(R.string.appstrings_frequencies_title))
 
             androidx.compose.animation.AnimatedVisibility(visible = show5G) {
@@ -1134,9 +1135,9 @@ private fun NearbyFrequencyFilterSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(28.dp)))
             SectionTitle(stringResource(R.string.appstrings_site_display_title))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)), modifier = Modifier.fillMaxWidth()) {
                 SelectableButton(
                     label = stringResource(R.string.appstrings_sites_in_service_label),
                     isSelected = showSitesInService,
@@ -1157,7 +1158,7 @@ private fun NearbyFrequencyFilterSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
             SelectableButton(
                 label = stringResource(R.string.appstrings_show_only_zb_sites_label),
@@ -1169,7 +1170,7 @@ private fun NearbyFrequencyFilterSheet(
                 prefs.edit().putBoolean(AppConfig.PREF_SHOW_ONLY_ZB_SITES, it).apply()
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
             SelectableButton(
                 label = stringResource(R.string.appstrings_hide_underground_sites_label),
@@ -1209,6 +1210,7 @@ private fun NearbyQuickSearchSuggestions(
     useOneUi: Boolean,
     onSuggestionClick: (String) -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     var showSearchHelp by remember { mutableStateOf(false) }
     val suggestions = listOf(
         NearbySearchSuggestion(stringResource(R.string.appstrings_nearby_search_suggestion_city), "ville:"),
@@ -1235,14 +1237,14 @@ private fun NearbyQuickSearchSuggestions(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState())
-            .padding(start = 16.dp, top = 8.dp, end = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(start = sizing.spacing(16.dp), top = sizing.spacing(8.dp), end = sizing.spacing(16.dp)),
+        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
         verticalAlignment = Alignment.CenterVertically
     ) {
         OutlinedButton(
             onClick = { showSearchHelp = true },
-            shape = if (useOneUi) RoundedCornerShape(50) else RoundedCornerShape(16.dp),
-            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+            shape = if (useOneUi) RoundedCornerShape(50) else RoundedCornerShape(sizing.component(16.dp)),
+            contentPadding = PaddingValues(horizontal = sizing.spacing(10.dp), vertical = sizing.spacing(6.dp)),
             colors = ButtonDefaults.outlinedButtonColors(
                 contentColor = MaterialTheme.colorScheme.secondary
             )
@@ -1250,22 +1252,22 @@ private fun NearbyQuickSearchSuggestions(
             Icon(
                 imageVector = Icons.Default.Info,
                 contentDescription = stringResource(R.string.appstrings_nearby_search_help_content_description),
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(sizing.component(16.dp))
             )
         }
 
         suggestions.forEach { suggestion ->
             OutlinedButton(
                 onClick = { onSuggestionClick(suggestion.query) },
-                shape = if (useOneUi) RoundedCornerShape(50) else RoundedCornerShape(16.dp),
-                contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+                shape = if (useOneUi) RoundedCornerShape(50) else RoundedCornerShape(sizing.component(16.dp)),
+                contentPadding = PaddingValues(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(6.dp)),
                 colors = ButtonDefaults.outlinedButtonColors(
                     contentColor = MaterialTheme.colorScheme.primary
                 )
             ) {
                 Text(
                     text = suggestion.label,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.labelMedium),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -1276,22 +1278,25 @@ private fun NearbyQuickSearchSuggestions(
 
 @Composable
 private fun NearbySearchHelpDialog(onDismiss: () -> Unit) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     AlertDialog(
         onDismissRequest = onDismiss,
         icon = {
             Icon(
                 imageVector = Icons.Default.Info,
-                contentDescription = null
+                contentDescription = null,
+                modifier = Modifier.size(sizing.component(24.dp))
             )
         },
         title = {
             Text(
                 text = stringResource(R.string.appstrings_nearby_search_help_title),
+                style = sizing.textStyle(MaterialTheme.typography.headlineSmall),
                 fontWeight = FontWeight.Bold
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
                 NearbySearchHelpLine("ville:Lyon", stringResource(R.string.appstrings_nearby_search_help_city_desc))
                 NearbySearchHelpLine("adresse:rue de Paris", stringResource(R.string.appstrings_nearby_search_help_address_desc))
                 NearbySearchHelpLine("cp:75001", stringResource(R.string.appstrings_nearby_search_help_postal_desc))
@@ -1306,7 +1311,7 @@ private fun NearbySearchHelpDialog(onDismiss: () -> Unit) {
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.appstrings_nearby_search_help_ok))
+                Text(stringResource(R.string.appstrings_nearby_search_help_ok), style = sizing.textStyle(MaterialTheme.typography.labelLarge))
             }
         }
     )
@@ -1317,16 +1322,17 @@ private fun NearbySearchHelpLine(
     code: String,
     description: String
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(2.dp))) {
         Text(
             text = code,
-            style = MaterialTheme.typography.labelLarge,
+            style = sizing.textStyle(MaterialTheme.typography.labelLarge),
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.primary
         )
         Text(
             text = description,
-            style = MaterialTheme.typography.bodySmall,
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }

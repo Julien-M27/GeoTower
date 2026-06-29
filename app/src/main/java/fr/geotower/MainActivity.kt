@@ -58,6 +58,7 @@ import fr.geotower.ui.screens.onboarding.FirstStartScreen
 import fr.geotower.ui.screens.home.HomeScreen
 import fr.geotower.ui.screens.help.HelpScreen
 import fr.geotower.ui.screens.settings.SettingsScreen
+import fr.geotower.ui.screens.coverage.TheoreticalCoverageScreen
 import fr.geotower.ui.screens.emitters.ElevationProfileScreen
 import fr.geotower.ui.screens.emitters.NearEmittersSupportWrapperScreen
 import fr.geotower.ui.screens.emitters.SiteSpeedtestsScreen
@@ -69,6 +70,7 @@ import fr.geotower.ui.screens.stats.StatisticsScreen
 import fr.geotower.ui.screens.about.AboutScreen
 import fr.geotower.ui.screens.about.PhotoUploadHistoryScreen
 import fr.geotower.ui.screens.compass.CompassScreen
+import fr.geotower.ui.screens.diagnostic.DiagnosticScreen
 import fr.geotower.ui.screens.emitters.SignalQuestUploadScreen
 import android.net.Uri
 
@@ -726,6 +728,19 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
+                            composable(
+                                route = "diagnostic",
+                                deepLinks = listOf(navDeepLink { uriPattern = "geotower://diagnostic" })
+                            ) {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.DIAGNOSTIC)) {
+                                        DiagnosticScreen(navController)
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
+                                }
+                            }
+
                             composable("photo_upload_history") {
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.PHOTO_UPLOAD_HISTORY)) {
@@ -938,16 +953,42 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             composable(
-                                route = "throughput_calculator/{id}",
-                                arguments = listOf(navArgument("id") { type = NavType.StringType })
+                                route = "theoretical_coverage/{id}",
+                                arguments = listOf(navArgument("id") { type = NavType.StringType }),
+                                deepLinks = listOf(navDeepLink { uriPattern = "geotower://coverage/{id}" })
                             ) { backStackEntry ->
                                 val id = backStackEntry.arguments?.getString("id") ?: ""
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    if (
+                                        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THEORETICAL_COVERAGE) &&
+                                        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_THEORETICAL_COVERAGE) &&
+                                        featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ELEVATION_IGN)
+                                    ) {
+                                        TheoreticalCoverageScreen(navController, repository, id)
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
+                                }
+                            }
+                            composable(
+                                route = "throughput_calculator/{id}?cfg={cfg}",
+                                arguments = listOf(
+                                    navArgument("id") { type = NavType.StringType },
+                                    navArgument("cfg") { type = NavType.StringType; defaultValue = "" }
+                                ),
+                                deepLinks = listOf(
+                                    navDeepLink { uriPattern = "geotower://throughput/{id}?cfg={cfg}" },
+                                    navDeepLink { uriPattern = "geotower://throughput/{id}" }
+                                )
+                            ) { backStackEntry ->
+                                val id = backStackEntry.arguments?.getString("id") ?: ""
+                                val cfg = backStackEntry.arguments?.getString("cfg").orEmpty()
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     if (
                                         featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THROUGHPUT_CALCULATOR) &&
                                         featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_THROUGHPUT_CALCULATOR)
                                     ) {
-                                        ThroughputCalculatorScreen(navController, repository, id)
+                                        ThroughputCalculatorScreen(navController, repository, id, incomingConfig = cfg.ifBlank { null })
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }

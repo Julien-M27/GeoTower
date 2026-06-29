@@ -99,6 +99,7 @@ object PreferenceProfileManager {
 
     private var listener: SharedPreferences.OnSharedPreferenceChangeListener? = null
     private var suppressProfileSync = false
+    private val compactPersonalizedNameRegex = Regex("^Personnalisé(\\d+)$")
 
     private val explicitVisibleKeys = setOf(
         "theme_mode",
@@ -126,6 +127,7 @@ object PreferenceProfileManager {
         "link_cartoradio",
         "link_cellularfr",
         "link_signalquest",
+        "link_cellmapper",
         "link_rncmobile",
         "link_enbanalytics",
         "show_anfr",
@@ -143,6 +145,8 @@ object PreferenceProfileManager {
         AppConfig.PREF_SHOW_RADIO_PRIVATE_MOBILE,
         AppConfig.PREF_SHOW_RADIO_FH,
         AppConfig.PREF_SHOW_RADIO_OTHER,
+        AppConfig.PREF_SHOW_SIGNALQUEST_COVERAGE_POINTS,
+        AppConfig.PREF_SIGNALQUEST_COVERAGE_OPERATOR_KEYS,
         AppConfig.PREF_HIDE_UNDERGROUND_SITES,
         AppConfig.PREF_SHOW_ONLY_ZB_SITES,
         AppLogoDrawingResources.PREF_KEY
@@ -201,6 +205,8 @@ object PreferenceProfileManager {
         AppLogoDrawingResources.PREF_KEY to "Apparence",
         "map_provider" to "Cartographie",
         "ign_style" to "Cartographie",
+        AppConfig.PREF_SHOW_SIGNALQUEST_COVERAGE_POINTS to "Cartographie",
+        AppConfig.PREF_SIGNALQUEST_COVERAGE_OPERATOR_KEYS to "Cartographie",
         "default_operator" to "Préférences",
         "app_language" to "Préférences",
         "distance_unit" to "Préférences",
@@ -214,7 +220,14 @@ object PreferenceProfileManager {
         "startup_page" to "Pages",
         "pages_order" to "Pages",
         "external_links_order" to "Liens externes",
-        "page_site_external_links_order" to "Liens externes"
+        "page_site_external_links_order" to "Liens externes",
+        "link_cartoradio" to "Liens externes",
+        "link_cellularfr" to "Liens externes",
+        "link_signalquest" to "Liens externes",
+        "link_cellmapper" to "Liens externes",
+        "link_rncmobile" to "Liens externes",
+        "link_enbanalytics" to "Liens externes",
+        "show_anfr" to "Liens externes"
     )
 
     private val keyLabels = mapOf(
@@ -227,6 +240,8 @@ object PreferenceProfileManager {
         AppLogoDrawingResources.PREF_KEY to "Logo dans l'app",
         "map_provider" to "Fond de carte",
         "ign_style" to "Style IGN",
+        AppConfig.PREF_SHOW_SIGNALQUEST_COVERAGE_POINTS to "Points de couverture SignalQuest",
+        AppConfig.PREF_SIGNALQUEST_COVERAGE_OPERATOR_KEYS to "OpÃ©rateurs couverture SignalQuest",
         "default_operator" to "Opérateur par défaut",
         "app_language" to "Langue",
         "distance_unit" to "Unité de distance",
@@ -240,7 +255,14 @@ object PreferenceProfileManager {
         "startup_page" to "Page de démarrage",
         "pages_order" to "Ordre des pages",
         "external_links_order" to "Ordre des liens externes",
-        "page_site_external_links_order" to "Ordre des liens externes"
+        "page_site_external_links_order" to "Ordre des liens externes",
+        "link_cartoradio" to "Cartoradio",
+        "link_cellularfr" to "CellularFR",
+        "link_signalquest" to "Signal Quest",
+        "link_cellmapper" to "CellMapper",
+        "link_rncmobile" to "RNC Mobile",
+        "link_enbanalytics" to "eNB-Analytics",
+        "show_anfr" to "data.gouv.fr"
     )
 
     fun install(context: Context) {
@@ -258,9 +280,11 @@ object PreferenceProfileManager {
         val prefs = appPrefs(context)
         val store = readProfiles(prefs)
         if (store.any { it.id == DEFAULT_PROFILE_ID }) {
+            val now = System.currentTimeMillis()
             val normalizedStore = store.map { profile ->
-                if (profile.id == DEFAULT_PROFILE_ID && profile.name != DEFAULT_PROFILE_NAME) {
-                    profile.copy(name = DEFAULT_PROFILE_NAME, updatedAt = System.currentTimeMillis())
+                val normalizedName = normalizedProfileName(profile)
+                if (profile.name != normalizedName) {
+                    profile.copy(name = normalizedName, updatedAt = now)
                 } else {
                     profile
                 }
@@ -364,6 +388,7 @@ object PreferenceProfileManager {
     }
 
     fun updateProfileImage(context: Context, profileId: String, imageUri: Uri): Boolean {
+        if (profileId == DEFAULT_PROFILE_ID) return false
         val prefs = appPrefs(context)
         val profiles = ensureProfiles(context)
         if (profiles.none { it.id == profileId }) return false
@@ -556,9 +581,27 @@ object PreferenceProfileManager {
         val profiles = readProfiles(prefs)
         val activeId = prefs.getString(ACTIVE_PROFILE_ID_KEY, DEFAULT_PROFILE_ID) ?: DEFAULT_PROFILE_ID
         val now = System.currentTimeMillis()
+        val currentValues = currentVisibleValues(prefs)
+        val activeProfile = profiles.firstOrNull { it.id == activeId }
+
+        if (activeId == DEFAULT_PROFILE_ID && activeProfile != null && activeProfile.values != currentValues) {
+            val customProfile = PreferenceProfile(
+                id = uniqueId(profiles),
+                name = uniquePersonalizedName(profiles.map { it.name }),
+                colorArgb = activeProfile.colorArgb,
+                icon = activeProfile.icon,
+                createdAt = now,
+                updatedAt = now,
+                values = currentValues
+            )
+            writeProfiles(prefs, profiles + customProfile)
+            prefs.edit().putString(ACTIVE_PROFILE_ID_KEY, customProfile.id).apply()
+            return
+        }
+
         val updated = profiles.map { profile ->
             if (profile.id == activeId) {
-                profile.copy(values = currentVisibleValues(prefs), updatedAt = now)
+                profile.copy(values = currentValues, updatedAt = now)
             } else {
                 profile
             }
@@ -781,6 +824,24 @@ object PreferenceProfileManager {
             if (existingNames.none { it.equals(candidate, ignoreCase = true) }) return candidate
             index++
         }
+    }
+
+    private fun uniquePersonalizedName(existingNames: List<String>): String {
+        var index = 1
+        while (true) {
+            val candidate = "Personnalisé $index"
+            val compactCandidate = "Personnalisé$index"
+            if (existingNames.none { it.equals(candidate, ignoreCase = true) || it.equals(compactCandidate, ignoreCase = true) }) {
+                return candidate
+            }
+            index++
+        }
+    }
+
+    private fun normalizedProfileName(profile: PreferenceProfile): String {
+        if (profile.id == DEFAULT_PROFILE_ID) return DEFAULT_PROFILE_NAME
+        val compactPersonalizedName = compactPersonalizedNameRegex.matchEntire(profile.name) ?: return profile.name
+        return "Personnalisé ${compactPersonalizedName.groupValues[1]}"
     }
 
     private fun exportFileStem(profiles: List<PreferenceProfile>): String {

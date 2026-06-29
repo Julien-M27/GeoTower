@@ -205,7 +205,7 @@
     <string name="signalquest_unsupported_operator">SignalQuest-Betreiber wird nicht unterstützt.</string>
     <string name="signalquest_upload_disabled_for_operator">SignalQuest-Upload ist für diesen Betreiber deaktiviert.</string>
     <string name="signalquest_unsupported_photo_format">Fotoformat wird nicht unterstützt.</string>
-    <string name="signalquest_photo_too_large">Ein Foto überschreitet das Limit von 20 MB.</string>
+    <string name="signalquest_photo_too_large">Ein Foto überschreitet das Limit von 64 MB.</string>
     <string name="signalquest_prepare_photos_failed">Fotos konnten nicht vorbereitet werden.</string>
     <string name="signalquest_manifest_missing">Upload-Manifest nicht gefunden.</string>
     <string name="signalquest_manifest_invalid">Ungültiges Upload-Manifest.</string>
@@ -654,6 +654,8 @@
     <string name="appstrings_outage_reason_technical">Technischer Einsatz</string>
     <string name="appstrings_outage_status_degraded">Beeinträchtigt</string>
     <string name="appstrings_outage_status_hs">Außer Betrieb</string>
+    <string name="appstrings_outage_status_potential">Möglicherweise gestört</string>
+    <string name="appstrings_outage_potential_explanation">Für diesen Betreiber wurde keine Störung gemeldet, aber ein anderer Betreiber ist an diesem gemeinsam genutzten Standort (Funkloch-Zone) gestört.</string>
     <string name="appstrings_outage_voice">Sprache</string>
     <string name="appstrings_owner">Eigentümer</string>
     <string name="appstrings_page_compass">Kompass</string>
@@ -845,6 +847,11 @@
     <string name="appstrings_throughput_cone_assumption">Annahme: Panel-/Trägerhöhe, Mobilgerät auf 1,5 m, typischer vertikaler Tilt 4°-8° mit 6° nominalem Punkt.</string>
     <string name="appstrings_throughput_cone_height_unavailable">Panel-/Trägerhöhe nicht verfügbar: Hauptzone des Kegels kann nicht geschätzt werden.</string>
     <string name="appstrings_throughput_cone_map_explanation">Der Kreis markiert die optimale Entfernung; Punkte zeigen Panelachsen, auf denen das Signal am stärksten sein sollte.</string>
+    <string name="appstrings_throughput_receiver_height_title">Empfangshöhe</string>
+    <string name="appstrings_throughput_receiver_height_desc">Höhe des Empfängers über dem Boden, zur Schätzung des optimalen Abstandskegels.</string>
+    <string name="throughput_receiver_height_value">%1$s ≈ %2$s</string>
+    <string name="throughput_floor_ground">Erdgeschoss</string>
+    <string name="throughput_floor_nth">%1$d. Etage</string>
     <string name="appstrings_throughput_custom_aggregation_title">4G-Aggregation</string>
     <string name="appstrings_throughput_custom_backhaul_title">Backhaul</string>
     <string name="appstrings_throughput_custom_environment_title">Umgebung</string>

@@ -32,6 +32,7 @@ import java.util.Locale
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
 import fr.geotower.data.models.SiteHsEntity
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 
 // 1. Structure pour gérer l'état de chaque case de la grille
 data class ServiceStatus(
@@ -81,7 +82,9 @@ fun SiteStatusCard(
         (it.isVoixOk == false && !it.isProject && !it.isVoixProject) ||
             (it.isInternetOk == false && !it.isProject && !it.isInternetProject)
     }
-    val displayIsOutage = isOutage && (!hasKnownServiceState || hasNonProjectOutage)
+    // Panne déduite (propagation zone blanche) : même rouge que le HS confirmé, libellé différent.
+    val isPotentialOutage = outageDetails?.isPotential == true
+    val displayIsOutage = isOutage && (isPotentialOutage || !hasKnownServiceState || hasNonProjectOutage)
 
     if (showLegendDialog) {
         StatusLegendDialog(onDismiss = { showLegendDialog = false })
@@ -123,6 +126,7 @@ fun SiteStatusCard(
                     Text(
                         text = when {
                             isProjectSite -> stringResource(R.string.appstrings_status_project)
+                            displayIsOutage && isPotentialOutage -> stringResource(R.string.appstrings_outage_status_potential)
                             displayIsOutage -> stringResource(R.string.appstrings_status_outage)
                             else -> stringResource(R.string.appstrings_status_functional)
                         },
@@ -140,11 +144,17 @@ fun SiteStatusCard(
                 }
             }
 
-            // Affichage du détail de la panne s'il existe
-            if (displayIsOutage && !outageText.isNullOrBlank()) {
+            // Affichage du détail de la panne s'il existe.
+            // Pour une panne déduite (zone blanche), on remplace le libellé répété par une phrase explicative.
+            val outageBodyText = if (isPotentialOutage) {
+                stringResource(R.string.appstrings_outage_potential_explanation)
+            } else {
+                outageText
+            }
+            if (displayIsOutage && !outageBodyText.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = outageText,
+                    text = outageBodyText,
                     fontSize = 13.sp,
                     color = colorKo,
                     modifier = Modifier.fillMaxWidth(),
@@ -175,7 +185,8 @@ fun SiteStatusCard(
                 }
             }
 
-            if (isOutage && outageDetails != null) {
+            // Une panne déduite (zone blanche) n'a pas de données déclarées détaillées → pas de section dépliable.
+            if (isOutage && outageDetails != null && !isPotentialOutage) {
                 OutageDetailsSection(outageDetails, techStatus)
             }
 
@@ -281,6 +292,7 @@ private data class OutageDetailDisplayRow(
 
 @Composable
 private fun StatusLegendDialog(onDismiss: () -> Unit) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val colorOk = Color(0xFF4CAF50)
     val colorKo = Color(0xFFE53935)
     val colorProject = Color(0xFFFFA000)
@@ -291,32 +303,33 @@ private fun StatusLegendDialog(onDismiss: () -> Unit) {
         title = {
             Text(
                 text = stringResource(R.string.appstrings_status_legend_title),
+                style = sizing.textStyle(MaterialTheme.typography.headlineSmall),
                 fontWeight = FontWeight.Bold
             )
         },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                 StatusLegendRow(
                     symbol = {
-                        Icon(Icons.Default.Check, null, tint = colorOk, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Check, null, tint = colorOk, modifier = Modifier.size(sizing.component(20.dp)))
                     },
                     text = stringResource(R.string.appstrings_status_legend_ok)
                 )
                 StatusLegendRow(
                     symbol = {
-                        Icon(Icons.Default.Close, null, tint = colorKo, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Close, null, tint = colorKo, modifier = Modifier.size(sizing.component(20.dp)))
                     },
                     text = stringResource(R.string.appstrings_status_legend_outage)
                 )
                 StatusLegendRow(
                     symbol = {
-                        Icon(Icons.Default.Remove, null, tint = colorNeutral, modifier = Modifier.size(20.dp))
+                        Icon(Icons.Default.Remove, null, tint = colorNeutral, modifier = Modifier.size(sizing.component(20.dp)))
                     },
                     text = stringResource(R.string.appstrings_status_legend_unavailable)
                 )
                 StatusLegendRow(
                     symbol = {
-                        Text("~", color = colorProject, fontWeight = FontWeight.Bold, fontSize = 22.sp)
+                        Text("~", color = colorProject, fontWeight = FontWeight.Bold, fontSize = sizing.text(22.sp))
                     },
                     text = stringResource(R.string.appstrings_status_legend_project)
                 )
@@ -324,7 +337,7 @@ private fun StatusLegendDialog(onDismiss: () -> Unit) {
         },
         confirmButton = {
             TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.appstrings_close))
+                Text(stringResource(R.string.appstrings_close), style = sizing.textStyle(MaterialTheme.typography.labelLarge))
             }
         }
     )
@@ -335,19 +348,20 @@ private fun StatusLegendRow(
     symbol: @Composable BoxScope.() -> Unit,
     text: String
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
-            modifier = Modifier.size(28.dp),
+            modifier = Modifier.size(sizing.component(28.dp)),
             contentAlignment = Alignment.Center,
             content = symbol
         )
         Text(
             text = text,
-            fontSize = 13.sp,
+            fontSize = sizing.text(13.sp),
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )

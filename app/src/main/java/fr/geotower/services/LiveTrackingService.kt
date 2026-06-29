@@ -36,7 +36,6 @@ import com.google.android.gms.location.LocationCallback
 import com.google.android.gms.location.LocationRequest
 import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
 import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
@@ -191,7 +190,7 @@ class LiveTrackingService : Service() {
 
         stopLocationUpdates()
         val updateIntervalMs = liveLocationUpdateIntervalMillis()
-        val locationRequest = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, updateIntervalMs)
+        val locationRequest = LocationRequest.Builder(liveLocationPriority(), updateIntervalMs)
             .setMinUpdateIntervalMillis(updateIntervalMs)
             .build()
 
@@ -221,6 +220,11 @@ class LiveTrackingService : Service() {
         val prefs = getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
         val seconds = LiveTrackingPrefs.locationUpdateIntervalSeconds(prefs)
         return TimeUnit.SECONDS.toMillis(seconds.toLong())
+    }
+
+    private fun liveLocationPriority(): Int {
+        val prefs = getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+        return LiveTrackingPrefs.locationPriority(prefs)
     }
 
     private fun processLocationUpdate(location: Location) {

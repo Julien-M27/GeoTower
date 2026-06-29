@@ -44,6 +44,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.R
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import androidx.compose.ui.res.stringResource
 
@@ -58,6 +59,7 @@ fun NavigationBottomSheet(
 ) {
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
@@ -80,13 +82,13 @@ fun NavigationBottomSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 32.dp, start = 16.dp, end = 16.dp)
+                .padding(bottom = sizing.spacing(32.dp), start = sizing.spacing(16.dp), end = sizing.spacing(16.dp))
         ) {
             Text(
                 text = stringResource(R.string.appstrings_open_route_with),
-                style = MaterialTheme.typography.titleLarge,
+                style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 16.dp)
+                modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = sizing.spacing(16.dp))
             )
 
             NavOptionItem(
@@ -112,7 +114,7 @@ fun NavigationBottomSheet(
                 }
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
 
             NavOptionItem(
                 iconVector = Icons.Default.Language,
@@ -127,7 +129,7 @@ fun NavigationBottomSheet(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 24.dp, top = 8.dp)
+                        .padding(start = sizing.spacing(24.dp), top = sizing.spacing(8.dp))
                 ) {
                     // --- 1. GOOGLE MAPS CLASSIQUE (Lien corrigé et propre) ---
                     NavOptionItem(
@@ -216,25 +218,26 @@ private fun NavOptionItem(
     useOneUi: Boolean,
     onClick: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(if (useOneUi) RoundedCornerShape(16.dp) else RoundedCornerShape(12.dp))
+            .clip(if (useOneUi) RoundedCornerShape(sizing.component(16.dp)) else RoundedCornerShape(sizing.component(12.dp)))
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = if (isSubItem) 8.dp else 12.dp),
+            .padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(if (isSubItem) 8.dp else 12.dp)),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val iconSize = 24.dp
+        val iconSize = sizing.component(24.dp)
         if (iconRes != null) {
-            Image(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.size(iconSize).clip(RoundedCornerShape(4.dp)))
+            Image(painter = painterResource(id = iconRes), contentDescription = null, modifier = Modifier.size(iconSize).clip(RoundedCornerShape(sizing.component(4.dp))))
         } else if (iconVector != null) {
             Icon(imageVector = iconVector, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(iconSize))
         }
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(sizing.spacing(16.dp)))
         Column(modifier = Modifier.weight(1f)) {
-            Text(text = label, fontWeight = if (isSubItem) FontWeight.Medium else FontWeight.SemiBold, fontSize = if (isSubItem) 15.sp else 16.sp, color = MaterialTheme.colorScheme.onSurface)
-            if (subLabel != null) { Text(text = subLabel, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            Text(text = label, fontWeight = if (isSubItem) FontWeight.Medium else FontWeight.SemiBold, fontSize = sizing.text(if (isSubItem) 15.sp else 16.sp), color = MaterialTheme.colorScheme.onSurface)
+            if (subLabel != null) { Text(text = subLabel, fontSize = sizing.text(13.sp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
-        if (trailingIcon != null) { Icon(trailingIcon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (trailingIcon != null) { Icon(trailingIcon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(sizing.component(24.dp))) }
     }
 }

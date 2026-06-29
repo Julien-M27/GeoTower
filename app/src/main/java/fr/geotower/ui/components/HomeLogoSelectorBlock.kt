@@ -25,6 +25,7 @@ import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 
 data class HomeLogoOption(val id: String, val name: String, val resId: Int?)
 
@@ -34,6 +35,7 @@ fun HomeLogoSelectorBlock(
 ) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     // On lit le choix actuel (par défaut : "app")
     var currentSelection by remember { mutableStateOf(prefs.getString("home_logo_choice", "app") ?: "app") }
@@ -74,15 +76,15 @@ fun HomeLogoSelectorBlock(
     Column(modifier = Modifier.fillMaxWidth()) {
         Text(
             text = stringResource(R.string.appstrings_home_logo_setting_title),
-            style = MaterialTheme.typography.titleMedium,
+            style = sizing.textStyle(MaterialTheme.typography.titleMedium),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.padding(bottom = 12.dp)
+            modifier = Modifier.padding(bottom = sizing.spacing(12.dp))
         )
 
         LazyRow(
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            contentPadding = PaddingValues(bottom = 8.dp)
+            horizontalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp)),
+            contentPadding = PaddingValues(bottom = sizing.spacing(8.dp))
         ) {
             items(options) { option ->
                 val isSelected = currentSelection == option.id
@@ -91,7 +93,7 @@ fun HomeLogoSelectorBlock(
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier
-                        .width(80.dp)
+                        .width(sizing.component(80.dp))
                         .clickable {
                             safeClick("home_logo_${option.id}") {
                                 currentSelection = option.id
@@ -102,10 +104,10 @@ fun HomeLogoSelectorBlock(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(72.dp)
-                            .clip(RoundedCornerShape(16.dp))
-                            .border(BorderStroke(3.dp, borderColor), RoundedCornerShape(16.dp))
-                            .padding(4.dp),
+                            .size(sizing.component(72.dp))
+                            .clip(RoundedCornerShape(sizing.component(16.dp)))
+                            .border(BorderStroke(sizing.component(3.dp), borderColor), RoundedCornerShape(sizing.component(16.dp)))
+                            .padding(sizing.spacing(4.dp)),
                         contentAlignment = Alignment.Center
                     ) {
                         if (option.resId != null && option.resId != 0) {
@@ -113,7 +115,7 @@ fun HomeLogoSelectorBlock(
                             // ---> CORRECTION DU CRASH ICI <---
                             // On remplace Image() par AndroidView pour supporter les icônes Mipmap
                             androidx.compose.ui.viewinterop.AndroidView(
-                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(12.dp)),
+                                modifier = Modifier.fillMaxSize().clip(RoundedCornerShape(sizing.component(12.dp))),
                                 factory = { ctx ->
                                     android.widget.ImageView(ctx).apply {
                                         scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
@@ -124,10 +126,10 @@ fun HomeLogoSelectorBlock(
                             )
                         }
                     }
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                     Text(
                         text = option.name,
-                        fontSize = 12.sp,
+                        fontSize = sizing.text(12.sp),
                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                         color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,

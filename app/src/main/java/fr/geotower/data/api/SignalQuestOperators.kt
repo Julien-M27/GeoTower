@@ -32,6 +32,11 @@ object SignalQuestOperators {
             .firstNotNullOfOrNull { key -> operatorParamByKey[key] }
     }
 
+    fun operatorParamForKey(operatorKey: String?): String? {
+        val normalizedKey = OperatorColors.specForKey(operatorKey)?.key ?: return null
+        return operatorParamByKey[normalizedKey]
+    }
+
     fun speedtestPlmnFor(rawOperator: String?): SignalQuestPlmnFilter? {
         return OperatorColors.keysFor(rawOperator)
             .firstNotNullOfOrNull { key -> speedtestPlmnByKey[key] }

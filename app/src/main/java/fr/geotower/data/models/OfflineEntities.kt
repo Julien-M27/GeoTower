@@ -205,6 +205,15 @@ data class RefTypeAntenneDbEntity(
     @ColumnInfo(name = "libelle") val libelle: String
 )
 
+/** Projection légère pour la couverture théorique : position + opérateur + hauteur de support d'un site. */
+data class CoverageSiteLocationEntity(
+    @ColumnInfo(name = "id_anfr") val idAnfr: String,
+    @ColumnInfo(name = "latitude") val latitude: Double,
+    @ColumnInfo(name = "longitude") val longitude: Double,
+    @ColumnInfo(name = "operateur") val operateur: String?,
+    @ColumnInfo(name = "support_height") val supportHeight: Double?
+)
+
 @Entity(tableName = "ref_systeme")
 data class RefSystemeDbEntity(
     @PrimaryKey
@@ -275,7 +284,8 @@ data class LocalisationEntity(
     @ColumnInfo(name = "is_zb") val isZb: Int = 0,
     @ColumnInfo(name = "statut") val statut: String? = null,
     @ColumnInfo(name = "has_active") val hasActive: Int = 0,
-    @ColumnInfo(name = "has_underground_support") val hasUndergroundSupport: Int = 0
+    @ColumnInfo(name = "has_underground_support") val hasUndergroundSupport: Int = 0,
+    @ColumnInfo(name = "date_service") val dateService: String? = null
 ) {
     @androidx.room.Ignore
     var frequences: String? = null

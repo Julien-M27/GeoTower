@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.R
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColorSpec
@@ -52,6 +53,7 @@ import fr.geotower.utils.OperatorColors
 import android.content.SharedPreferences
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.MutableState
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -65,9 +67,11 @@ fun MapSettingsSheet(
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     // ✅ AJOUT : Pour pouvoir sauvegarder le paramètre
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", android.content.Context.MODE_PRIVATE)
+    val featureFlags by RemoteFeatureFlags.config
     var hasRadioDatabase by remember(context) { mutableStateOf(false) }
 
     LaunchedEffect(context) {
@@ -88,6 +92,8 @@ fun MapSettingsSheet(
     var showRadioPrivateMobile by AppConfig.showRadioPrivateMobile
     var showRadioFh by AppConfig.showRadioFh
     var showRadioOther by AppConfig.showRadioOther
+    var showSignalQuestCoveragePoints by AppConfig.showSignalQuestCoveragePoints
+    var selectedSignalQuestCoverageOperatorKeys by AppConfig.selectedSignalQuestCoverageOperatorKeys
 
     // Variables Affichage des sites
     var showSitesInService by AppConfig.showSitesInService
@@ -142,9 +148,9 @@ fun MapSettingsSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = sizing.spacing(24.dp))
                 .verticalScroll(rememberScrollState())
-                .padding(bottom = 64.dp)
+                .padding(bottom = sizing.spacing(64.dp))
         ) {
 
             // 1. OPÉRATEURS
@@ -168,7 +174,7 @@ fun MapSettingsSheet(
             var isOverseasExpanded by remember(defaultOperatorKey) {
                 mutableStateOf(prefs.getBoolean(PREF_OPERATOR_FILTER_OVERSEAS_EXPANDED, defaultOperatorIsOverseas))
             }
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                 OperatorFilterGroup(
                     title = stringResource(R.string.operator_region_metro),
                     operators = metroOperators,
@@ -194,7 +200,7 @@ fun MapSettingsSheet(
                 )
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
 
             // ==========================================
             // 2. AZIMUTS
@@ -204,7 +210,7 @@ fun MapSettingsSheet(
             // On récupère la nouvelle variable
             var showAzimuthsCone by AppConfig.showAzimuthsCone
 
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                 SelectableButton(
                     label = stringResource(R.string.appstrings_show_azimuths_label).replace(" (", "\n("),
                     isSelected = showAzimuths,
@@ -228,11 +234,11 @@ fun MapSettingsSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
 
             // 2. TECHNOLOGIES
             SectionTitle(stringResource(R.string.appstrings_technologies_title))
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
                 SelectableButton("5G", show5G, Modifier.weight(1f)) {
                     show5G = it; prefs.edit().putBoolean("show_techno_5g", it).apply()
                 }
@@ -250,7 +256,7 @@ fun MapSettingsSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
 
             // 3. FRÉQUENCES
             SectionTitle(stringResource(R.string.appstrings_frequencies_title))
@@ -302,7 +308,7 @@ fun MapSettingsSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
 
             SectionTitle(stringResource(R.string.appstrings_map_location_section_title))
             SelectableButton(
@@ -314,13 +320,77 @@ fun MapSettingsSheet(
                 prefs.edit().putBoolean(AppConfig.PREF_SHOW_MAP_LOCATION_MARKER, it).apply()
             }
 
-            if (hasRadioDatabase) {
-                Spacer(modifier = Modifier.height(12.dp))
+            if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_COVERAGE)) {
+                Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
 
-                SectionTitle("Filtres radio ANFR")
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                SectionTitle(stringResource(R.string.appstrings_signalquest_coverage_title))
+                SelectableButton(
+                    label = stringResource(R.string.appstrings_signalquest_coverage_points_label),
+                    isSelected = showSignalQuestCoveragePoints,
+                    modifier = Modifier.fillMaxWidth(),
+                    selectedColor = MaterialTheme.colorScheme.tertiary
+                ) { enabled ->
+                    showSignalQuestCoveragePoints = enabled
+                    prefs.edit()
+                        .putBoolean(AppConfig.PREF_SHOW_SIGNALQUEST_COVERAGE_POINTS, enabled)
+                        .apply()
+                }
+
+                AnimatedVisibility(visible = showSignalQuestCoveragePoints) {
+                    val coverageOperators = listOfNotNull(
+                        OperatorColors.specForKey(OperatorColors.ORANGE_KEY),
+                        OperatorColors.specForKey(OperatorColors.SFR_KEY),
+                        OperatorColors.specForKey(OperatorColors.BOUYGUES_KEY)?.copy(label = "Bouygues"),
+                        OperatorColors.specForKey(OperatorColors.FREE_KEY)?.copy(label = "Free")
+                    )
+                    var isCoverageOperatorsExpanded by remember { mutableStateOf(true) }
+
+                    Column(modifier = Modifier.padding(top = sizing.spacing(12.dp))) {
+                        OperatorFilterGroup(
+                            title = stringResource(R.string.appstrings_operators_title),
+                            operators = coverageOperators,
+                            selectedKeys = selectedSignalQuestCoverageOperatorKeys,
+                            isExpanded = isCoverageOperatorsExpanded,
+                            onExpandedChange = { isCoverageOperatorsExpanded = it },
+                            onSelectionChange = { next ->
+                                AppConfig.saveSelectedSignalQuestCoverageOperatorKeys(prefs, next)
+                                selectedSignalQuestCoverageOperatorKeys =
+                                    AppConfig.selectedSignalQuestCoverageOperatorKeys.value
+                            },
+                            singleSelection = true
+                        )
+                    }
+                }
+            }
+
+            if (
+                featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THEORETICAL_COVERAGE) &&
+                featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_THEORETICAL_COVERAGE) &&
+                featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ELEVATION_IGN)
+            ) {
+                Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
+
+                SectionTitle(stringResource(R.string.appstrings_coverage_layer_title))
+                SelectableButton(
+                    label = stringResource(R.string.appstrings_coverage_layer_label),
+                    isSelected = AppConfig.showTheoreticalCoverage.value,
+                    modifier = Modifier.fillMaxWidth(),
+                    selectedColor = MaterialTheme.colorScheme.tertiary
+                ) { enabled ->
+                    AppConfig.showTheoreticalCoverage.value = enabled
+                    prefs.edit()
+                        .putBoolean(AppConfig.PREF_SHOW_THEORETICAL_COVERAGE, enabled)
+                        .apply()
+                }
+            }
+
+            if (hasRadioDatabase) {
+                Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+                SectionTitle(stringResource(R.string.appstrings_radio_filters_title))
+                Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                     SelectableButton(
-                        label = "TV",
+                        label = stringResource(R.string.appstrings_radio_category_tv),
                         isSelected = showRadioTv,
                         modifier = Modifier.weight(1f),
                         selectedColor = Color(0xFF8BC34A)
@@ -329,7 +399,7 @@ fun MapSettingsSheet(
                         saveRadioCategory(AppConfig.PREF_SHOW_RADIO_TV, it)
                     }
                     SelectableButton(
-                        label = "Radio",
+                        label = stringResource(R.string.appstrings_radio_category_radio),
                         isSelected = showRadioBroadcast,
                         modifier = Modifier.weight(1f),
                         selectedColor = Color(0xFFFDD835)
@@ -339,11 +409,11 @@ fun MapSettingsSheet(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                     SelectableButton(
-                        label = "Réseaux mobiles privés",
+                        label = stringResource(R.string.appstrings_radio_category_private_mobile),
                         isSelected = showRadioPrivateMobile,
                         modifier = Modifier.weight(1f),
                         selectedColor = Color(0xFF006D77),
@@ -354,7 +424,7 @@ fun MapSettingsSheet(
                         saveRadioCategory(AppConfig.PREF_SHOW_RADIO_PRIVATE_MOBILE, it)
                     }
                     SelectableButton(
-                        label = "Faisceaux hertziens",
+                        label = stringResource(R.string.appstrings_radio_category_fh),
                         isSelected = showRadioFh,
                         modifier = Modifier.weight(1f),
                         selectedColor = Color(0xFF0D47A1),
@@ -366,10 +436,10 @@ fun MapSettingsSheet(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
                 SelectableButton(
-                    label = "Autres stations",
+                    label = stringResource(R.string.appstrings_radio_category_other),
                     isSelected = showRadioOther,
                     modifier = Modifier.fillMaxWidth(),
                     selectedColor = Color.Black
@@ -379,10 +449,10 @@ fun MapSettingsSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
 
             SectionTitle(stringResource(R.string.appstrings_site_display_title))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                 SelectableButton(
                     label = stringResource(R.string.appstrings_sites_in_service_label),
                     isSelected = showSitesInService,
@@ -403,7 +473,7 @@ fun MapSettingsSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
             SelectableButton(
                 label = stringResource(R.string.appstrings_show_only_zb_sites_label),
@@ -415,7 +485,7 @@ fun MapSettingsSheet(
                 prefs.edit().putBoolean(AppConfig.PREF_SHOW_ONLY_ZB_SITES, it).apply()
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
             SelectableButton(
                 label = stringResource(R.string.appstrings_hide_underground_sites_label),
@@ -433,12 +503,13 @@ fun MapSettingsSheet(
 
 @Composable
 fun SectionTitle(text: String) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Text(
         text = text,
-        style = MaterialTheme.typography.titleMedium,
+        style = sizing.textStyle(MaterialTheme.typography.titleMedium),
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.padding(bottom = 16.dp)
+        modifier = Modifier.padding(bottom = sizing.spacing(16.dp))
     )
 }
 
@@ -450,34 +521,36 @@ fun OperatorFilterGroup(
     selectedKeys: Set<String>,
     isExpanded: Boolean,
     onExpandedChange: (Boolean) -> Unit,
-    onSelectionChange: (Set<String>) -> Unit
+    onSelectionChange: (Set<String>) -> Unit,
+    singleSelection: Boolean = false
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val selectedCount = operators.count { it.key in selectedKeys }
 
     Column(modifier = Modifier.fillMaxWidth()) {
         Surface(
             onClick = { onExpandedChange(!isExpanded) },
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(12.dp),
+            shape = RoundedCornerShape(sizing.component(12.dp)),
             color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
-            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+            border = BorderStroke(sizing.component(1.dp), MaterialTheme.colorScheme.outlineVariant)
         ) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                    .padding(horizontal = sizing.spacing(14.dp), vertical = sizing.spacing(12.dp)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.labelLarge,
+                        style = sizing.textStyle(MaterialTheme.typography.labelLarge),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = "$selectedCount/${operators.size}",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = sizing.textStyle(MaterialTheme.typography.labelMedium),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -491,14 +564,14 @@ fun OperatorFilterGroup(
 
         AnimatedVisibility(visible = isExpanded) {
             Column(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 12.dp)
+                    .padding(top = sizing.spacing(12.dp))
             ) {
                 operators.chunked(2).forEach { rowOperators ->
                     Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         rowOperators.forEach { operator ->
@@ -507,10 +580,14 @@ fun OperatorFilterGroup(
                                 isSelected = operator.key in selectedKeys,
                                 modifier = Modifier
                                     .weight(1f)
-                                    .height(OperatorFilterButtonHeight),
+                                    .height(sizing.component(OperatorFilterButtonHeight)),
                                 selectedColor = Color(operator.colorArgb)
                             ) { selected ->
-                                val next = if (selected) selectedKeys + operator.key else selectedKeys - operator.key
+                                val next = if (singleSelection) {
+                                    if (selected) setOf(operator.key) else emptySet()
+                                } else {
+                                    if (selected) selectedKeys + operator.key else selectedKeys - operator.key
+                                }
                                 onSelectionChange(next)
                             }
                         }
@@ -534,18 +611,19 @@ fun SelectableButton(
     maxLines: Int = 3,
     onClick: (Boolean) -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val activeColor = selectedColor ?: MaterialTheme.colorScheme.primary
 
     // Le fond reste légèrement teinté, mais le texte ne change plus de couleur
     val containerColor = if (isSelected) activeColor.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceContainerHighest
     val contentColor = MaterialTheme.colorScheme.onSurface // Couleur fixe pour l'écriture
-    val border = if (isSelected) BorderStroke(1.dp, activeColor) else null // Bordure plus fine
+    val border = if (isSelected) BorderStroke(sizing.component(1.dp), activeColor) else null // Bordure plus fine
 
     Surface(
         onClick = { onClick(!isSelected) },
         // ✅ CORRECTION : heightIn(min = 56.dp) permet au bouton de s'agrandir s'il y a 2 lignes
-        modifier = modifier.heightIn(min = minHeight),
-        shape = RoundedCornerShape(12.dp),
+        modifier = modifier.heightIn(min = sizing.component(minHeight)),
+        shape = RoundedCornerShape(sizing.component(12.dp)),
         color = containerColor,
         contentColor = contentColor,
         border = border
@@ -554,17 +632,17 @@ fun SelectableButton(
             contentAlignment = Alignment.Center,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 8.dp, vertical = 8.dp)
+                .padding(horizontal = sizing.spacing(8.dp), vertical = sizing.spacing(8.dp))
         ) {
             val compactText = label.length >= 18
             Text(
                 text = label,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = if (compactText) 15.sp else 16.sp,
+                fontSize = sizing.text(if (compactText) 15.sp else 16.sp),
                 maxLines = maxLines,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.Center, // ✅ CORRECTION : Centre le texte
-                lineHeight = 20.sp // Rapproche joliment les deux lignes
+                lineHeight = sizing.text(20.sp) // Rapproche joliment les deux lignes
             )
         }
     }
@@ -574,20 +652,21 @@ fun SelectableButton(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun FreqRow(label: String, content: @Composable () -> Unit) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Row(
-        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+        modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(12.dp)),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
             text = label,
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
-            fontSize = 18.sp,
-            modifier = Modifier.width(50.dp)
+            fontSize = sizing.text(18.sp),
+            modifier = Modifier.width(sizing.component(50.dp))
         )
         FlowRow(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
             modifier = Modifier.weight(1f)
         ) { content() }
     }
@@ -599,26 +678,27 @@ fun FreqButton(
     isSelected: Boolean,
     onClick: (Boolean) -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val containerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
     val contentColor = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
 
     Surface(
         onClick = { onClick(!isSelected) },
-        shape = RoundedCornerShape(8.dp),
+        shape = RoundedCornerShape(sizing.component(8.dp)),
         color = containerColor,
         contentColor = contentColor,
-        modifier = Modifier.size(width = if (label.length >= 12) 112.dp else 86.dp, height = 44.dp)
+        modifier = Modifier.size(width = sizing.component(if (label.length >= 12) 112.dp else 86.dp), height = sizing.component(44.dp))
     ) {
         Box(
             contentAlignment = Alignment.Center,
-            modifier = Modifier.padding(horizontal = 4.dp)
+            modifier = Modifier.padding(horizontal = sizing.spacing(4.dp))
         ) {
             Text(
                 text = label,
                 fontWeight = FontWeight.Medium,
-                fontSize = if (label.length >= 12) 12.sp else 13.sp,
+                fontSize = sizing.text(if (label.length >= 12) 12.sp else 13.sp),
                 textAlign = TextAlign.Center,
-                lineHeight = 14.sp,
+                lineHeight = sizing.text(14.sp),
                 maxLines = 2
             )
         }

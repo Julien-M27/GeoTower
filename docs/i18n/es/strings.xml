@@ -205,7 +205,7 @@
     <string name="signalquest_unsupported_operator">Operador SignalQuest no compatible.</string>
     <string name="signalquest_upload_disabled_for_operator">Envío SignalQuest desactivado para este operador.</string>
     <string name="signalquest_unsupported_photo_format">Formato de foto no compatible.</string>
-    <string name="signalquest_photo_too_large">Una foto supera el límite de 20 MB.</string>
+    <string name="signalquest_photo_too_large">Una foto supera el límite de 64 MB.</string>
     <string name="signalquest_prepare_photos_failed">No se han podido preparar las fotos.</string>
     <string name="signalquest_manifest_missing">Manifiesto de envío no encontrado.</string>
     <string name="signalquest_manifest_invalid">Manifiesto de envío no válido.</string>
@@ -654,6 +654,8 @@
     <string name="appstrings_outage_reason_technical">Intervención técnica</string>
     <string name="appstrings_outage_status_degraded">Degradado</string>
     <string name="appstrings_outage_status_hs">Fuera de servicio</string>
+    <string name="appstrings_outage_status_potential">Posiblemente fuera de servicio</string>
+    <string name="appstrings_outage_potential_explanation">No hay avería declarada para este operador, pero otro operador está fuera de servicio en este emplazamiento compartido de zona blanca.</string>
     <string name="appstrings_outage_voice">Voz</string>
     <string name="appstrings_owner">Propietario</string>
     <string name="appstrings_page_compass">Brújula</string>
@@ -845,6 +847,11 @@
     <string name="appstrings_throughput_cone_assumption">Supuesto: altura panel/soporte, teléfono a 1,5 m, inclinación vertical típica 4°-8° con punto nominal a 6°.</string>
     <string name="appstrings_throughput_cone_height_unavailable">Altura del panel/soporte no disponible: no se puede estimar la zona principal del cono.</string>
     <string name="appstrings_throughput_cone_map_explanation">El círculo marca la distancia óptima; los puntos muestran ejes de panel donde la señal debería ser más fuerte.</string>
+    <string name="appstrings_throughput_receiver_height_title">Altura de recepción</string>
+    <string name="appstrings_throughput_receiver_height_desc">Altura del receptor sobre el suelo, usada para estimar el cono de distancia óptima.</string>
+    <string name="throughput_receiver_height_value">%1$s ≈ %2$s</string>
+    <string name="throughput_floor_ground">planta baja</string>
+    <string name="throughput_floor_nth">planta %1$d</string>
     <string name="appstrings_throughput_custom_aggregation_title">Agregación 4G</string>
     <string name="appstrings_throughput_custom_backhaul_title">Backhaul</string>
     <string name="appstrings_throughput_custom_environment_title">Entorno</string>

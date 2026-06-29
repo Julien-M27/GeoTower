@@ -39,6 +39,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.FileProvider
@@ -57,6 +58,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import java.util.Locale
 
 private const val TAG_MAP_SHARE = "GeoTowerMap"
@@ -101,44 +103,71 @@ private fun MapShareActionButtons(
     onCopyClick: () -> Unit,
     onShareClick: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Surface(
         modifier = modifier,
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surfaceContainerHigh,
-        tonalElevation = 6.dp,
-        shadowElevation = 6.dp
+        tonalElevation = sizing.component(6.dp),
+        shadowElevation = sizing.component(6.dp)
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                .padding(sizing.spacing(8.dp)),
+            horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             FilledTonalButton(
                 onClick = onCopyClick,
                 modifier = Modifier
                     .weight(1f)
-                    .height(56.dp),
+                    .height(sizing.component(56.dp)),
                 shape = CircleShape,
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
                 )
             ) {
-                Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(txtCopyImage, fontWeight = FontWeight.Bold, maxLines = 1)
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.ContentCopy,
+                        contentDescription = null,
+                        modifier = Modifier.align(Alignment.CenterStart).size(sizing.component(18.dp))
+                    )
+                    Text(
+                        txtCopyImage,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(28.dp)),
+                        style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
             Button(
                 onClick = onShareClick,
                 modifier = Modifier
                     .weight(1f)
-                    .height(56.dp),
+                    .height(sizing.component(56.dp)),
                 shape = CircleShape
             ) {
-                Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(txtGenerateImage, fontWeight = FontWeight.Bold, maxLines = 1)
+                Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        Icons.Default.Share,
+                        contentDescription = null,
+                        modifier = Modifier.align(Alignment.CenterStart).size(sizing.component(18.dp))
+                    )
+                    Text(
+                        txtGenerateImage,
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(28.dp)),
+                        style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
         }
     }
@@ -187,7 +216,8 @@ private fun shareFullMapCapture(
     qrUri: String?,
     txtInitError: String,
     destination: MapShareDestination = MapShareDestination.Share,
-    txtCopiedToClipboard: String = ""
+    txtCopiedToClipboard: String = "",
+    txtTimeSliderDate: String? = null
 ) {
     try {
         val composeView = ComposeView(context).apply {
@@ -230,6 +260,17 @@ private fun shareFullMapCapture(
                                         color = Color.White.copy(alpha = 0.8f)
                                     ) {
                                         Text(text = currentSpeed, color = Color.Black, modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp), fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                    }
+                                }
+
+                                // Superposition de la date du slider temporel (mois + année)
+                                if (txtTimeSliderDate != null) {
+                                    Surface(
+                                        modifier = Modifier.align(Alignment.TopEnd).padding(12.dp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = Color.White.copy(alpha = 0.85f)
+                                    ) {
+                                        Text(text = txtTimeSliderDate, color = Color.Black, modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp), fontWeight = FontWeight.Bold, fontSize = 15.sp)
                                     }
                                 }
 
@@ -345,10 +386,12 @@ fun MapShareMenu(
     currentZoom: Double,
     currentLat: Double,
     azimuth: Float,
-    measureOverlay: org.osmdroid.views.overlay.FolderOverlay? = null // ✅ AJOUT : Le calque des mesures
+    measureOverlay: org.osmdroid.views.overlay.FolderOverlay? = null, // ✅ AJOUT : Le calque des mesures
+    timeSliderDateLabel: String? = null
 ) {
     val context = LocalContext.current
     val currentView = LocalView.current
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
@@ -392,8 +435,8 @@ fun MapShareMenu(
     val txtImageContent = stringResource(R.string.appstrings_image_content)
     val txtShareConfidentialOption = stringResource(R.string.appstrings_share_confidential_option)
     val txtShareConfidentialDesc = stringResource(R.string.appstrings_share_confidential_desc)
-    val txtGenerateImage = stringResource(R.string.appstrings_generate_image)
-    val txtCopyImage = stringResource(R.string.appstrings_photo_copy)
+    val txtGenerateImage = stringResource(R.string.appstrings_share_action_share)
+    val txtCopyImage = stringResource(R.string.appstrings_copy)
     val txtPhotoCopiedToClipboard = stringResource(R.string.appstrings_photo_copied_to_clipboard)
     val txtInitError = stringResource(R.string.appstrings_init_error)
 
@@ -415,21 +458,21 @@ fun MapShareMenu(
         onClick = { safeClick { showShareSheet = true } },
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = 4.dp,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.size(54.dp)
+        shadowElevation = sizing.component(4.dp),
+        border = BorderStroke(sizing.component(1.dp), MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.size(sizing.component(54.dp))
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(sizing.component(24.dp)))
         }
     }
 
     if (showShareSheet) {
         ModalBottomSheet(onDismissRequest = { showShareSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
-            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 48.dp, start = 16.dp, end = 16.dp)) {
-                Text(txtShareAs, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 24.dp))
+            Column(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(16.dp), end = sizing.spacing(16.dp))) {
+                Text(txtShareAs, style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = sizing.spacing(24.dp)))
                 fr.geotower.ui.components.ThemeOptionItem(iconVector = Icons.Outlined.LightMode, label = txtThemeLight, subLabel = txtLightModeDesc, useOneUi = useOneUi) { safeClick { selectedShareTheme = false; showShareSheet = false; showSelectionSheet = true } }
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                 fr.geotower.ui.components.ThemeOptionItem(iconVector = Icons.Outlined.DarkMode, label = txtThemeDark, subLabel = txtDarkModeDesc, useOneUi = useOneUi) { safeClick { selectedShareTheme = true; showShareSheet = false; showSelectionSheet = true } }
             }
         }
@@ -443,50 +486,50 @@ fun MapShareMenu(
                         .fillMaxSize()
                         .verticalScroll(rememberScrollState())
                         .padding(
-                            start = 24.dp,
-                            end = 24.dp,
-                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 112.dp
+                            start = sizing.spacing(24.dp),
+                            end = sizing.spacing(24.dp),
+                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + sizing.spacing(112.dp)
                         )
                 ) {
-                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = { safeClick { showSelectionSheet = false; showShareSheet = true } }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }
-                    Text(text = txtImageContent, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                    Spacer(modifier = Modifier.width(48.dp))
+                Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = { safeClick { showSelectionSheet = false; showShareSheet = true } }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp))) }
+                    Text(text = txtImageContent, style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                    Spacer(modifier = Modifier.width(sizing.spacing(48.dp)))
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
                     // Azimuts
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Text(txtAzimuths, modifier = Modifier.weight(1f))
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(4.dp))) {
+                        Text(txtAzimuths, modifier = Modifier.weight(1f), style = sizing.textStyle(MaterialTheme.typography.bodyLarge))
                         GeoTowerSwitch(checked = incAzimuths, onCheckedChange = { incAzimuths = it }, useOneUi = useOneUi)
                     }
                     // Compteur de vitesse
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Text(txtSpeedometer, modifier = Modifier.weight(1f))
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(4.dp))) {
+                        Text(txtSpeedometer, modifier = Modifier.weight(1f), style = sizing.textStyle(MaterialTheme.typography.bodyLarge))
                         GeoTowerSwitch(checked = incSpeedometer, onCheckedChange = { incSpeedometer = it }, useOneUi = useOneUi)
                     }
                     // Échelle
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Text(txtScale, modifier = Modifier.weight(1f))
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(4.dp))) {
+                        Text(txtScale, modifier = Modifier.weight(1f), style = sizing.textStyle(MaterialTheme.typography.bodyLarge))
                         GeoTowerSwitch(checked = incScale, onCheckedChange = { incScale = it }, useOneUi = useOneUi)
                     }
                     // Crédits (Attribution)
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Text(txtAttributionOption, modifier = Modifier.weight(1f))
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(4.dp))) {
+                        Text(txtAttributionOption, modifier = Modifier.weight(1f), style = sizing.textStyle(MaterialTheme.typography.bodyLarge))
                         GeoTowerSwitch(checked = incAttribution, onCheckedChange = { incAttribution = it }, useOneUi = useOneUi)
                     }
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
-                        Text(txtQrCode, modifier = Modifier.weight(1f))
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(4.dp))) {
+                        Text(txtQrCode, modifier = Modifier.weight(1f), style = sizing.textStyle(MaterialTheme.typography.bodyLarge))
                         GeoTowerSwitch(checked = incQrCode, onCheckedChange = { incQrCode = it }, useOneUi = useOneUi)
                     }
 
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(8.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
                     // Bouton Confidentiel
-                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(4.dp))) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text(txtShareConfidentialOption, fontWeight = FontWeight.Bold, color = if(incConfidential) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
-                            Text(txtShareConfidentialDesc, fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(txtShareConfidentialOption, style = sizing.textStyle(MaterialTheme.typography.bodyLarge), fontWeight = FontWeight.Bold, color = if(incConfidential) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                            Text(txtShareConfidentialDesc, style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         GeoTowerSwitch(checked = incConfidential, onCheckedChange = { incConfidential = it }, useOneUi = useOneUi)
                     }
@@ -558,7 +601,8 @@ fun MapShareMenu(
                         qrUri = mapDeepLink,
                         txtInitError = txtInitError,
                         destination = destination,
-                        txtCopiedToClipboard = txtPhotoCopiedToClipboard
+                        txtCopiedToClipboard = txtPhotoCopiedToClipboard,
+                        txtTimeSliderDate = timeSliderDateLabel
                     )
                 }, 300)
             }
@@ -567,12 +611,12 @@ fun MapShareMenu(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
                     .padding(
-                        start = 24.dp,
-                        end = 24.dp,
-                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
+                        start = sizing.spacing(24.dp),
+                        end = sizing.spacing(24.dp),
+                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + sizing.spacing(16.dp)
                     )
                     .fillMaxWidth()
-                    .widthIn(max = 420.dp),
+                    .widthIn(max = sizing.component(420.dp)),
                 txtCopyImage = txtCopyImage,
                 txtGenerateImage = txtGenerateImage,
                 onCopyClick = { safeClick { startMapImageExport(MapShareDestination.Clipboard) } },

@@ -31,6 +31,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.res.stringResource
+import fr.geotower.R
 import fr.geotower.data.models.RadioMapMarker
 
 @Composable
@@ -62,7 +64,7 @@ fun SupportRadioPresenceCard(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Autres usages radio ANFR",
+                    text = stringResource(R.string.appstrings_radio_other_usages),
                     modifier = Modifier.weight(1f),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
@@ -91,6 +93,7 @@ private fun SupportRadioItem(
     marker: RadioMapMarker,
     onClick: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -115,7 +118,7 @@ private fun SupportRadioItem(
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = marker.networkName,
+                text = marker.networkName(context),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 fontWeight = FontWeight.Bold,
@@ -123,7 +126,7 @@ private fun SupportRadioItem(
                 fontSize = 16.sp
             )
             Text(
-                text = marker.broadcastProgramSummary ?: marker.systemSummary ?: marker.subtitle,
+                text = marker.broadcastProgramSummary ?: marker.systemSummary ?: marker.subtitle(context),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

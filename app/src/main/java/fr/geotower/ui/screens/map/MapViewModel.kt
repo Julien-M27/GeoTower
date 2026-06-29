@@ -5,6 +5,14 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.RadioRepository
+import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.coverage.CoverageComputer
+import fr.geotower.data.coverage.CoverageRequest
+import fr.geotower.data.coverage.SiteCoverage
+import fr.geotower.data.coverage.ViewshedParams
+import fr.geotower.data.api.SignalQuestClient
+import fr.geotower.data.api.SignalQuestOperators
+import fr.geotower.data.api.SqCoveragePointData
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.RadioMapMarker
 import fr.geotower.data.models.TechniqueEntity
@@ -21,6 +29,36 @@ import fr.geotower.utils.AppLogger
 import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.OperatorColors
 
+data class SignalQuestCoveragePoint(
+    val id: String?,
+    val latitude: Double,
+    val longitude: Double,
+    val operatorKey: String,
+    val operatorLabel: String,
+    val technology: String?,
+    val networkType: String?,
+    val signalStrength: Float?,
+    val rsrq: Float?,
+    val snr: Float?,
+    val mcc: Int?,
+    val mnc: Int?,
+    val enb: String?,
+    val gnb: String?,
+    val cellId: String?,
+    val pci: Int?,
+    val timestamp: String?
+)
+
+private data class SignalQuestCoverageBounds(
+    val north: Double,
+    val east: Double,
+    val south: Double,
+    val west: Double
+)
+
+/** Progression du calcul de couverture théorique (lots de requêtes terrain). */
+data class TheoreticalCoverageProgress(val done: Int, val total: Int)
+
 class MapViewModel(
     private val repository: AnfrRepository,
     private val radioRepository: RadioRepository
@@ -32,8 +70,27 @@ class MapViewModel(
     private val _radioMarkers = MutableStateFlow<List<RadioMapMarker>>(emptyList())
     val radioMarkers = _radioMarkers.asStateFlow()
 
+    private val _signalQuestCoveragePoints = MutableStateFlow<List<SignalQuestCoveragePoint>>(emptyList())
+    val signalQuestCoveragePoints = _signalQuestCoveragePoints.asStateFlow()
+
+    private val _theoreticalCoverage = MutableStateFlow<SiteCoverage?>(null)
+    val theoreticalCoverage = _theoreticalCoverage.asStateFlow()
+
+    private val _theoreticalCoverageProgress = MutableStateFlow<TheoreticalCoverageProgress?>(null)
+    val theoreticalCoverageProgress = _theoreticalCoverageProgress.asStateFlow()
+
+    private val _theoreticalCoverageLoading = MutableStateFlow(false)
+    val theoreticalCoverageLoading = _theoreticalCoverageLoading.asStateFlow()
+
+    private var theoreticalCoverageJob: Job? = null
+    private val theoreticalCoverageCache = mutableMapOf<String, SiteCoverage>()
+
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
+
+    // Date de mise en service la plus ancienne, pour borner le slider temporel de la carte.
+    private val _oldestServiceDate = MutableStateFlow<String?>(null)
+    val oldestServiceDate = _oldestServiceDate.asStateFlow()
 
     private val _cityStatsTechniques = MutableStateFlow<Map<String, TechniqueEntity>>(emptyMap())
     val cityStatsTechniques = _cityStatsTechniques.asStateFlow()
@@ -42,6 +99,8 @@ class MapViewModel(
     val isCityStatsTechniquesLoading = _isCityStatsTechniquesLoading.asStateFlow()
 
     private var searchJob: Job? = null
+    private var signalQuestCoverageJob: Job? = null
+    private var lastSignalQuestCoverageRequestKey: String? = null
     private var cityStatsTechniquesJob: Job? = null
     private var loadedCityStatsTechniqueIds: Set<String> = emptySet()
     private val mapAzimuthTechniqueCache = mutableMapOf<String, TechniqueEntity>()
@@ -114,7 +173,7 @@ class MapViewModel(
                 val hasSiteDisplayFilter = !showSitesInService || !showSitesOutOfService
                 val hasFrequencyFilter = !frequencyFilter.isFullyEnabled
 
-                if (zoom < 13.0 && cityPolygons == null && !hasSiteDisplayFilter && !hasFrequencyFilter) {
+                if (zoom < 13.0 && cityPolygons == null && !hasSiteDisplayFilter && !hasFrequencyFilter && !AppConfig.timeSliderActive.value) {
                     val clusters = repository.getClusteredAntennas(zoom, latNorth, lonEast, latSouth, lonWest)
                     val clusterIsZb = if (AppConfig.showOnlyZbSites.value) 1 else 0
 
@@ -185,6 +244,15 @@ class MapViewModel(
         }
     }
 
+    /** Charge (une seule fois) la date de mise en service la plus ancienne pour borner le slider temporel. */
+    fun ensureOldestServiceDateLoaded() {
+        if (_oldestServiceDate.value != null) return
+        viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            val date = runCatching { repository.getOldestServiceDate() }.getOrNull()
+            if (date != null) _oldestServiceDate.value = date
+        }
+    }
+
     private suspend fun loadRadioMarkers(
         zoom: Double,
         latNorth: Double,
@@ -205,6 +273,194 @@ class MapViewModel(
         } else {
             emptyList()
         }
+    }
+
+    fun loadSignalQuestCoveragePointsInBox(
+        zoom: Double,
+        latNorth: Double,
+        lonEast: Double,
+        latSouth: Double,
+        lonWest: Double
+    ) {
+        val selectedOperatorKeys = AppConfig.selectedSignalQuestCoverageOperatorKeys.value
+            .filter { it in AppConfig.signalQuestCoverageOperatorKeys }
+            .toSet()
+        val bounds = clippedMetropolitanCoverageBounds(latNorth, lonEast, latSouth, lonWest)
+
+        if (
+            !AppConfig.showSignalQuestCoveragePoints.value ||
+            zoom < SIGNALQUEST_COVERAGE_MIN_ZOOM ||
+            selectedOperatorKeys.isEmpty() ||
+            bounds == null
+        ) {
+            clearSignalQuestCoveragePoints()
+            return
+        }
+
+        val requestKey = listOf(
+            selectedOperatorKeys.sorted().joinToString(","),
+            bounds.north,
+            bounds.east,
+            bounds.south,
+            bounds.west
+        ).joinToString("|")
+        if (requestKey == lastSignalQuestCoverageRequestKey) return
+        lastSignalQuestCoverageRequestKey = requestKey
+
+        signalQuestCoverageJob?.cancel()
+        signalQuestCoverageJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val perOperatorLimit = ((SIGNALQUEST_COVERAGE_MAX_POINTS + selectedOperatorKeys.size - 1) /
+                    selectedOperatorKeys.size).coerceAtLeast(1)
+                val loadedPoints = mutableListOf<SignalQuestCoveragePoint>()
+
+                selectedOperatorKeys.sorted().forEach { operatorKey ->
+                    val operatorParam = SignalQuestOperators.operatorParamForKey(operatorKey) ?: return@forEach
+                    val response = SignalQuestClient.api.getCoveragePoints(
+                        market = "FR",
+                        operator = operatorParam,
+                        north = bounds.north,
+                        south = bounds.south,
+                        east = bounds.east,
+                        west = bounds.west,
+                        days = SIGNALQUEST_COVERAGE_DAYS,
+                        limit = perOperatorLimit
+                    )
+
+                    if (response.isSuccessful) {
+                        loadedPoints += response.body()
+                            ?.data
+                            .orEmpty()
+                            .mapNotNull { point ->
+                                point.toCoveragePoint(
+                                    fallbackOperatorKey = operatorKey,
+                                    selectedOperatorKeys = selectedOperatorKeys,
+                                    bounds = bounds
+                                )
+                            }
+                    } else {
+                        AppLogger.w(TAG, "SignalQuest coverage request failed code=${response.code()}")
+                    }
+                }
+
+                _signalQuestCoveragePoints.value = loadedPoints
+                    .distinctBy { point ->
+                        point.id ?: "${point.operatorKey}:${point.latitude}:${point.longitude}:${point.timestamp.orEmpty()}"
+                    }
+                    .take(SIGNALQUEST_COVERAGE_MAX_POINTS)
+                AppLogger.d(TAG, "SignalQuest coverage points loaded count=${_signalQuestCoveragePoints.value.size}")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.w(TAG, "SignalQuest coverage request failed", e)
+                _signalQuestCoveragePoints.value = emptyList()
+            }
+        }
+    }
+
+    fun clearSignalQuestCoveragePoints() {
+        signalQuestCoverageJob?.cancel()
+        signalQuestCoverageJob = null
+        lastSignalQuestCoverageRequestKey = null
+        _signalQuestCoveragePoints.value = emptyList()
+    }
+
+    /**
+     * Calcule (ou ressort du cache) la couverture théorique d'un site et la publie pour l'overlay carte.
+     * Le terrain est mutualisé ; respecte les flags (provider IGN + feature) et les bornes (Limits).
+     * Le calcul est annulable et reporte sa progression.
+     */
+    fun loadTheoreticalCoverageForSite(idAnfr: String) {
+        if (idAnfr.isBlank()) return
+        if (!RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ELEVATION_IGN) ||
+            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_THEORETICAL_COVERAGE)
+        ) {
+            return
+        }
+
+        val request = defaultCoverageRequest()
+        val cacheKey = listOf(
+            idAnfr, request.maxRadiusM, request.angularStepDeg, request.sampleStepM,
+            request.includeObstacles, request.viewshed.tiltDeg, request.viewshed.frequencyMHz
+        ).joinToString("|")
+        theoreticalCoverageCache[cacheKey]?.let { cached ->
+            theoreticalCoverageJob?.cancel()
+            _theoreticalCoverageLoading.value = false
+            _theoreticalCoverageProgress.value = null
+            _theoreticalCoverage.value = cached
+            return
+        }
+
+        theoreticalCoverageJob?.cancel()
+        _theoreticalCoverageLoading.value = true
+        _theoreticalCoverageProgress.value = null
+        theoreticalCoverageJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+            try {
+                val coverage = CoverageComputer.compute(
+                    repository = repository,
+                    idAnfr = idAnfr,
+                    request = request,
+                    maxPointsPerRequest = RemoteFeatureFlags.limitOrDefault(RemoteFeatureFlags.Limits.COVERAGE_MAX_POINTS_PER_REQUEST, 300),
+                    maxConcurrentRequests = RemoteFeatureFlags.limitOrDefault(RemoteFeatureFlags.Limits.COVERAGE_MAX_CONCURRENT_REQUESTS, 1)
+                ) { done, total ->
+                    _theoreticalCoverageProgress.value = TheoreticalCoverageProgress(done, total)
+                }
+                if (coverage == null) {
+                    _theoreticalCoverage.value = null
+                    return@launch
+                }
+                theoreticalCoverageCache[cacheKey] = coverage
+                _theoreticalCoverage.value = coverage
+                AppLogger.d(
+                    TAG,
+                    "Coverage[$idAnfr] terrain=${(coverage.terrainValidFraction * 100).toInt()}% " +
+                        "KO=${coverage.terrainFailedChunks}/${coverage.terrainTotalChunks} sectors=${coverage.sectors.size}"
+                )
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                AppLogger.w(TAG, "Theoretical coverage failed", e)
+                _theoreticalCoverage.value = null
+            } finally {
+                _theoreticalCoverageLoading.value = false
+                _theoreticalCoverageProgress.value = null
+            }
+        }
+    }
+
+    fun clearTheoreticalCoverage() {
+        theoreticalCoverageJob?.cancel()
+        theoreticalCoverageJob = null
+        _theoreticalCoverage.value = null
+        _theoreticalCoverageProgress.value = null
+        _theoreticalCoverageLoading.value = false
+    }
+
+    /** Profil « équilibré » par défaut (≈ 6 km / 3° / 30 m), borné par les flags. Lot 3 exposera le curseur. */
+    private fun defaultCoverageRequest(): CoverageRequest {
+        val maxRadiusM = RemoteFeatureFlags.limitOrDefault(RemoteFeatureFlags.Limits.COVERAGE_MAX_RADIUS_KM, 8) * 1000.0
+        // Défaut volontairement léger : le réseau MOBILE s'effondre au-delà de ~30 requêtes IGN en rafale
+        // (l'IGN lui-même encaisse, c'est l'appareil qui timeout). ~24 requêtes ici. Lot 3 = curseur qualité.
+        val radius = minOf(4000.0, maxRadiusM)
+        val minAngular = RemoteFeatureFlags.limitOrDefault(RemoteFeatureFlags.Limits.COVERAGE_MIN_ANGULAR_STEP_DEG, 2).toDouble()
+        val minSample = RemoteFeatureFlags.limitOrDefault(RemoteFeatureFlags.Limits.COVERAGE_SAMPLE_STEP_M, 20).toDouble()
+        val tilt = RemoteFeatureFlags.limitOrDefault(RemoteFeatureFlags.Limits.COVERAGE_DEFAULT_TILT_DEG, 5).toDouble()
+        val vbeam = RemoteFeatureFlags.limitOrDefault(RemoteFeatureFlags.Limits.COVERAGE_DEFAULT_VBEAM_DEG, 10).toDouble()
+        // Concurrence 1 (l'IGN rate-limite la concurrence) ⇒ on garde peu de requêtes pour rester ~15-20 s.
+        return CoverageRequest(
+            maxRadiusM = radius,
+            angularStepDeg = maxOf(6.0, minAngular),
+            sampleStepM = maxOf(70.0, minSample),
+            includeObstacles = true,
+            viewshed = ViewshedParams(
+                maxRadiusM = radius,
+                curvature = true,
+                fresnel = false,
+                frequencyMHz = 3500,
+                tiltDeg = tilt,
+                verticalBeamwidthDeg = vbeam
+            )
+        )
     }
 
     private fun sitesHsAnfrIds(sitesHs: List<SiteHsEntity>): List<String> {
@@ -308,10 +564,12 @@ class MapViewModel(
         _antennas.value = emptyList()
         _radioMarkers.value = emptyList()
         loadAntennasInBox(zoom, latNorth, lonEast, latSouth, lonWest)
+        loadSignalQuestCoveragePointsInBox(zoom, latNorth, lonEast, latSouth, lonWest)
     }
 
     fun resetCityLock() {
         searchJob?.cancel()
+        clearSignalQuestCoveragePoints()
         isCityLocked = false // ✅ ON DÉVERROUILLE
         cityPolygons = null
         _antennas.value = emptyList()
@@ -349,6 +607,59 @@ class MapViewModel(
     }
 }
 
+private fun clippedMetropolitanCoverageBounds(
+    latNorth: Double,
+    lonEast: Double,
+    latSouth: Double,
+    lonWest: Double
+): SignalQuestCoverageBounds? {
+    val north = minOf(latNorth, SIGNALQUEST_COVERAGE_METRO_NORTH)
+    val south = maxOf(latSouth, SIGNALQUEST_COVERAGE_METRO_SOUTH)
+    val east = minOf(lonEast, SIGNALQUEST_COVERAGE_METRO_EAST)
+    val west = maxOf(lonWest, SIGNALQUEST_COVERAGE_METRO_WEST)
+
+    return if (north > south && east > west) {
+        SignalQuestCoverageBounds(north = north, east = east, south = south, west = west)
+    } else {
+        null
+    }
+}
+
+private fun SqCoveragePointData.toCoveragePoint(
+    fallbackOperatorKey: String,
+    selectedOperatorKeys: Set<String>,
+    bounds: SignalQuestCoverageBounds
+): SignalQuestCoveragePoint? {
+    val pointCoordinates = coordinates ?: return null
+    val latitude = pointCoordinates.lat ?: return null
+    val longitude = pointCoordinates.lng ?: return null
+    if (latitude !in bounds.south..bounds.north || longitude !in bounds.west..bounds.east) return null
+
+    val operatorKey = OperatorColors.keyFor(mobileOperator) ?: fallbackOperatorKey
+    if (operatorKey !in selectedOperatorKeys) return null
+    val operatorLabel = OperatorColors.specForKey(operatorKey)?.label ?: mobileOperator ?: operatorKey
+
+    return SignalQuestCoveragePoint(
+        id = id,
+        latitude = latitude,
+        longitude = longitude,
+        operatorKey = operatorKey,
+        operatorLabel = operatorLabel,
+        technology = technology,
+        networkType = networkType,
+        signalStrength = signalStrength,
+        rsrq = rsrq,
+        snr = snr,
+        mcc = mcc,
+        mnc = mnc,
+        enb = radio?.enb,
+        gnb = radio?.gnb,
+        cellId = radio?.cellId,
+        pci = radio?.pci,
+        timestamp = timestamp
+    )
+}
+
 class MapViewModelFactory(
     private val repository: AnfrRepository,
     private val radioRepository: RadioRepository
@@ -365,3 +676,10 @@ class MapViewModelFactory(
 private const val TAG = "GeoTowerMap"
 private const val CITY_STATS_TECHNIQUE_BATCH_SIZE = 400
 private const val MAP_AZIMUTH_TECHNIQUE_BATCH_SIZE = 400
+private const val SIGNALQUEST_COVERAGE_MIN_ZOOM = 13.0
+private const val SIGNALQUEST_COVERAGE_MAX_POINTS = 5000
+private const val SIGNALQUEST_COVERAGE_DAYS = 365
+private const val SIGNALQUEST_COVERAGE_METRO_SOUTH = 41.0
+private const val SIGNALQUEST_COVERAGE_METRO_NORTH = 51.6
+private const val SIGNALQUEST_COVERAGE_METRO_WEST = -5.8
+private const val SIGNALQUEST_COVERAGE_METRO_EAST = 10.1

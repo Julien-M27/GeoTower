@@ -99,7 +99,6 @@ import fr.geotower.ui.components.GeoTowerSwitch
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.data.upload.SignalQuestUploadQueue
-import fr.geotower.data.upload.SignalQuestUploadRules
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.MapUtils
 import fr.geotower.utils.isNetworkAvailable
@@ -168,10 +167,7 @@ fun SignalQuestUploadScreen(
     fun addSelectedUris(uris: List<Uri>) {
         if (uris.isNotEmpty()) {
             val newUris = uris.map { it.toString() }.filter { !currentUris.contains(it) }
-            val availableSlots = SignalQuestUploadRules.MAX_PHOTOS - currentUris.size
-            if (availableSlots > 0) {
-                currentUris.addAll(newUris.take(availableSlots))
-            }
+            currentUris.addAll(newUris)
         }
     }
 
@@ -275,7 +271,7 @@ fun SignalQuestUploadScreen(
 
     // --- 1.5 LANCEURS GALERIE ET CAMERA ---
     val photoPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.PickMultipleVisualMedia(maxItems = SignalQuestUploadRules.MAX_PHOTOS)
+        contract = ActivityResultContracts.PickMultipleVisualMedia()
     ) { uris ->
         addSelectedUris(uris)
     }
@@ -293,7 +289,7 @@ fun SignalQuestUploadScreen(
         val capturedUri = currentCameraUriString?.let(Uri::parse)
         if (capturedUri != null) {
             SignalQuestUploadQueue.completeCameraCapture(context, capturedUri, success)
-            if (success && currentUris.size < SignalQuestUploadRules.MAX_PHOTOS) {
+            if (success) {
                 currentUris.add(capturedUri.toString())
             }
         }
@@ -401,11 +397,7 @@ fun SignalQuestUploadScreen(
                 val carouselContentWidth = with(density) {
                     val photoSlotsWidth = (photoCardWidthPx * currentUris.size) +
                         (photoSpacingPx * (currentUris.size - 1).coerceAtLeast(0))
-                    val addSlotWidth = if (currentUris.size < SignalQuestUploadRules.MAX_PHOTOS) {
-                        photoSpacingPx + addPhotoCardWidthPx
-                    } else {
-                        0f
-                    }
+                    val addSlotWidth = photoSpacingPx + addPhotoCardWidthPx
                     (photoSlotsWidth + addSlotWidth).toDp()
                 }
                 val addPhotoPullConnection = remember(carouselScrollState, currentUris.size) {
@@ -425,7 +417,7 @@ fun SignalQuestUploadScreen(
                                 addPhotoPullPx = addPhotoPullThresholdPx
                                 return Offset.Zero
                             }
-                            if (source != NestedScrollSource.UserInput || currentUris.size >= SignalQuestUploadRules.MAX_PHOTOS) {
+                            if (source != NestedScrollSource.UserInput) {
                                 resetAddPhotoPull()
                                 return Offset.Zero
                             }
@@ -624,42 +616,40 @@ fun SignalQuestUploadScreen(
                                 }
                             }
 
-                            if (currentUris.size < SignalQuestUploadRules.MAX_PHOTOS) {
-                                val addPhotoExtraWidth = addPhotoExpandedWidth * addPhotoPullProgress
-                                val addPhotoIconScale = 1f + (addPhotoPullProgress * 0.25f)
-                                val addPhotoBorderWidth = 2.dp + (2.dp * addPhotoPullProgress)
-                                Card(
-                                    modifier = Modifier
-                                        .offset {
-                                            IntOffset(
-                                                x = ((currentUris.size * photoReorderStepPx) - addPhotoPushPx).roundToInt(),
-                                                y = 0
-                                            )
-                                        }
-                                        .size(width = addPhotoCardWidth + addPhotoExtraWidth, height = photoCardHeight)
-                                        .clip(photoShape)
-                                        .clickable { safeClick { showImageSourceDialog = true } },
-                                    shape = photoShape,
-                                    colors = CardDefaults.cardColors(containerColor = surfaceColor.copy(alpha = 0.3f)),
-                                    border = BorderStroke(addPhotoBorderWidth, activeColor.copy(alpha = 0.5f + (0.35f * addPhotoPullProgress)))
-                                ) {
-                                    Column(
-                                        modifier = Modifier.fillMaxSize(),
-                                        horizontalAlignment = Alignment.CenterHorizontally,
-                                        verticalArrangement = Arrangement.Center
-                                    ) {
-                                        Icon(
-                                            Icons.Default.Add,
-                                            null,
-                                            modifier = Modifier
-                                                .size(36.dp)
-                                                .graphicsLayer {
-                                                    scaleX = addPhotoIconScale
-                                                    scaleY = addPhotoIconScale
-                                                },
-                                            tint = activeColor
+                            val addPhotoExtraWidth = addPhotoExpandedWidth * addPhotoPullProgress
+                            val addPhotoIconScale = 1f + (addPhotoPullProgress * 0.25f)
+                            val addPhotoBorderWidth = 2.dp + (2.dp * addPhotoPullProgress)
+                            Card(
+                                modifier = Modifier
+                                    .offset {
+                                        IntOffset(
+                                            x = ((currentUris.size * photoReorderStepPx) - addPhotoPushPx).roundToInt(),
+                                            y = 0
                                         )
                                     }
+                                    .size(width = addPhotoCardWidth + addPhotoExtraWidth, height = photoCardHeight)
+                                    .clip(photoShape)
+                                    .clickable { safeClick { showImageSourceDialog = true } },
+                                shape = photoShape,
+                                colors = CardDefaults.cardColors(containerColor = surfaceColor.copy(alpha = 0.3f)),
+                                border = BorderStroke(addPhotoBorderWidth, activeColor.copy(alpha = 0.5f + (0.35f * addPhotoPullProgress)))
+                            ) {
+                                Column(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
+                                ) {
+                                    Icon(
+                                        Icons.Default.Add,
+                                        null,
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .graphicsLayer {
+                                                scaleX = addPhotoIconScale
+                                                scaleY = addPhotoIconScale
+                                            },
+                                        tint = activeColor
+                                    )
                                 }
                             }
                         }

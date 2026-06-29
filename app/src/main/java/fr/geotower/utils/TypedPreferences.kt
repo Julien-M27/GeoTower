@@ -90,7 +90,7 @@ object SitePagePrefs {
     const val ORDER = "page_site_order"
     const val MINI_MAP_MODE = "page_site_mini_map_mode"
     const val DEFAULT_ORDER =
-        "operator,bearing_height,map,support_details,elevation_profile,throughput_calculator,open_map,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links"
+        "operator,bearing_height,map,support_details,elevation_profile,theoretical_coverage,throughput_calculator,open_map,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links"
 
     val defaultOrder = DEFAULT_ORDER.split(",")
     val operator = BooleanPreference("page_site_operator", true)
@@ -102,6 +102,7 @@ object SitePagePrefs {
     val ids = BooleanPreference("page_site_ids", true)
     val openMap = BooleanPreference("page_site_open_map", true)
     val elevationProfile = BooleanPreference("page_site_elevation_profile", true)
+    val theoreticalCoverage = BooleanPreference("page_site_theoretical_coverage", true)
     val throughputCalculator = BooleanPreference("page_site_throughput_calculator", true)
     val nav = BooleanPreference("page_site_nav", true)
     val share = BooleanPreference("page_site_share", true)
@@ -144,6 +145,14 @@ object SitePagePrefs {
                 elevationProfileIndex >= 0 -> mutableOrder.add(elevationProfileIndex + 1, "throughput_calculator")
                 openMapIndex >= 0 -> mutableOrder.add(openMapIndex, "throughput_calculator")
                 else -> mutableOrder.add("throughput_calculator")
+            }
+        }
+        if (!mutableOrder.contains("theoretical_coverage")) {
+            val elevationProfileIndex = mutableOrder.indexOf("elevation_profile")
+            if (elevationProfileIndex >= 0) {
+                mutableOrder.add(elevationProfileIndex + 1, "theoretical_coverage")
+            } else {
+                mutableOrder.add("theoretical_coverage")
             }
         }
         val openMapIndex = mutableOrder.indexOf("open_map")
@@ -192,8 +201,8 @@ object SupportPagePrefs {
 object SharePrefs {
     const val SITE_ORDER = "share_order"
     const val SUPPORT_ORDER = "share_sup_order"
-    const val DEFAULT_SITE_ORDER = "map,elevation_profile,support,ids,dates,address,speedtest,throughput,status,freq"
-    const val DEFAULT_SUPPORT_ORDER = "map,support,operators"
+    const val DEFAULT_SITE_ORDER = "map,elevation_profile,support,photos,ids,dates,address,speedtest,throughput,status,freq"
+    const val DEFAULT_SUPPORT_ORDER = "map,support,photos,operators"
 
     val siteMapEnabled = BooleanPreference("share_map_enabled", true)
     val siteElevationProfileEnabled = BooleanPreference("share_elevation_profile_enabled", true)
@@ -207,8 +216,10 @@ object SharePrefs {
     val siteConfidentialEnabled = BooleanPreference("share_confidential_enabled", false)
     val siteQrEnabled = BooleanPreference("share_site_qr_enabled", true)
     val siteSplitImageEnabled = BooleanPreference("share_split_image_enabled", true)
+    val sitePhotosEnabled = BooleanPreference("share_photos_enabled", true)
     val supportMapEnabled = BooleanPreference("share_sup_map_enabled", true)
     val supportDetailsEnabled = BooleanPreference("share_sup_support_enabled", true)
+    val supportPhotosEnabled = BooleanPreference("share_sup_photos_enabled", true)
     val supportOperatorsEnabled = BooleanPreference("share_sup_operators_enabled", true)
     val supportConfidentialEnabled = BooleanPreference("share_sup_confidential_enabled", false)
     val supportQrEnabled = BooleanPreference("share_sup_qr_enabled", true)
@@ -228,9 +239,21 @@ object SharePrefs {
     }
 
     fun supportOrder(prefs: SharedPreferences): List<String> {
-        return (prefs.getString(SUPPORT_ORDER, DEFAULT_SUPPORT_ORDER) ?: DEFAULT_SUPPORT_ORDER)
+        return normalizeSupportOrder(prefs.getString(SUPPORT_ORDER, DEFAULT_SUPPORT_ORDER))
+    }
+
+    fun normalizeSupportOrder(rawOrder: String?): List<String> {
+        return (rawOrder ?: DEFAULT_SUPPORT_ORDER)
             .split(",")
             .filter { it.isNotBlank() }
+            .toMutableList()
+            .apply {
+                if (!contains("photos")) {
+                    val supportIndex = indexOf("support")
+                    if (supportIndex >= 0) add(supportIndex + 1, "photos") else add("photos")
+                }
+            }
+            .distinct()
     }
 
     fun normalizeSiteOrder(rawOrder: String?): List<String> {
@@ -246,6 +269,10 @@ object SharePrefs {
                 if (!contains("speedtest")) {
                     val addressIndex = indexOf("address")
                     if (addressIndex >= 0) add(addressIndex + 1, "speedtest") else add("speedtest")
+                }
+                if (!contains("photos")) {
+                    val supportIndex = indexOf("support")
+                    if (supportIndex >= 0) add(supportIndex + 1, "photos") else add("photos")
                 }
                 if (!contains("throughput")) {
                     val speedtestIndex = indexOf("speedtest")
@@ -276,6 +303,7 @@ object ThroughputPrefs {
     const val CUSTOM_DEVICE = "throughput_custom_device"
     const val CUSTOM_SELECTED_LAT = "throughput_custom_selected_lat"
     const val CUSTOM_SELECTED_LON = "throughput_custom_selected_lon"
+    const val CUSTOM_RECEIVER_HEIGHT = "throughput_custom_receiver_height"
     val include4G = BooleanPreference("throughput_include_4g", true)
     val include5G = BooleanPreference("throughput_include_5g", true)
     val includePlanned = BooleanPreference("throughput_include_planned", false)
@@ -410,6 +438,37 @@ object LiveTrackingPrefs {
             value
         } else {
             DEFAULT_LOCATION_UPDATE_INTERVAL_SECONDS
+        }
+    }
+
+    // Précision GPS : valeurs alignées sur com.google.android.gms.location.Priority
+    // pour pouvoir être passées directement au LocationRequest.Builder.
+    const val LOCATION_PRIORITY = "live_tracking_location_priority"
+    const val PRIORITY_HIGH_ACCURACY = 100 // Priority.PRIORITY_HIGH_ACCURACY
+    const val PRIORITY_BALANCED_POWER_ACCURACY = 102 // Priority.PRIORITY_BALANCED_POWER_ACCURACY
+    const val PRIORITY_LOW_POWER = 104 // Priority.PRIORITY_LOW_POWER
+    const val DEFAULT_LOCATION_PRIORITY = PRIORITY_HIGH_ACCURACY
+    // Ordre du curseur : de la plus économe (gauche) à la meilleure précision (droite).
+    val LOCATION_PRIORITY_OPTIONS = listOf(
+        PRIORITY_LOW_POWER,
+        PRIORITY_BALANCED_POWER_ACCURACY,
+        PRIORITY_HIGH_ACCURACY
+    )
+
+    fun locationPriority(prefs: SharedPreferences): Int {
+        val rawValue = try {
+            prefs.getInt(LOCATION_PRIORITY, DEFAULT_LOCATION_PRIORITY)
+        } catch (_: ClassCastException) {
+            DEFAULT_LOCATION_PRIORITY
+        }
+        return normalizeLocationPriority(rawValue)
+    }
+
+    fun normalizeLocationPriority(value: Int): Int {
+        return if (value in LOCATION_PRIORITY_OPTIONS) {
+            value
+        } else {
+            DEFAULT_LOCATION_PRIORITY
         }
     }
 }

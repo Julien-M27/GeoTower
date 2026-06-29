@@ -12,6 +12,8 @@ import fr.geotower.data.db.InvalidGeoTowerDatabaseException
 import fr.geotower.data.db.RadioStatRow
 import fr.geotower.data.db.SupportRadioStatsRow
 import fr.geotower.data.db.WeeklyRadioStatRow
+import fr.geotower.data.models.AntenneDbEntity
+import fr.geotower.data.models.CoverageSiteLocationEntity
 import fr.geotower.data.models.DbCluster
 import fr.geotower.data.models.FaisceauxEntity
 import fr.geotower.data.models.FrequencyDetailsCodec
@@ -19,6 +21,7 @@ import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.LiveSiteResponseDto
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.RadioFilterMasks
+import fr.geotower.data.models.RefTypeAntenneDbEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.config.RemoteFeatureFlags
@@ -759,6 +762,12 @@ class AnfrRepository(
     // =================================================================
     // 1. POUR LA CARTE (Affichage ultra-rapide des points)
     // =================================================================
+
+    /** Date de mise en service la plus ancienne (repli implantation), pour borner le slider temporel de la carte. */
+    suspend fun getOldestServiceDate(): String? {
+        return queryLocalDatabase<String?>(null) { getOldestServiceDate() }
+    }
+
     suspend fun getAntennasInBox(
         latNorth: Double,
         lonEast: Double,
@@ -978,6 +987,27 @@ class AnfrRepository(
 
         return queryLocalDatabase(emptyList()) {
             getPhysiqueDetails(idAnfr)
+        }
+    }
+
+    /** Antennes brutes d'un site (couverture théorique). FH inclus : le moteur filtre `is_fh`. */
+    suspend fun getAntennesForCoverage(idAnfr: String): List<AntenneDbEntity> {
+        return queryLocalDatabase(emptyList()) {
+            getAntennesByIdAnfr(idAnfr)
+        }
+    }
+
+    /** Libellés de type d'antenne (tae_id → libelle), pour classer omni / sectorielle. */
+    suspend fun getAntennaTypes(): List<RefTypeAntenneDbEntity> {
+        return queryLocalDatabase(emptyList()) {
+            getAntennaTypes()
+        }
+    }
+
+    /** Position + opérateur d'un site (couverture théorique). */
+    suspend fun getCoverageSiteLocation(idAnfr: String): CoverageSiteLocationEntity? {
+        return queryLocalDatabase(null) {
+            getCoverageSiteLocation(idAnfr)
         }
     }
 

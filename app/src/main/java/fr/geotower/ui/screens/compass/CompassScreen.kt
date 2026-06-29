@@ -589,7 +589,7 @@ fun CompassScreen(
                         "location" -> {
                             if (showLocation) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Outlined.LocationOn, contentDescription = "Position", tint = oncompassBg, modifier = Modifier.size(32.dp))
+                                    Icon(Icons.Outlined.LocationOn, contentDescription = stringResource(R.string.appstrings_position), tint = oncompassBg, modifier = Modifier.size(32.dp))
                                     Spacer(modifier = Modifier.height(4.dp))
                                     Text(text = city, fontSize = 32.sp, fontWeight = FontWeight.Bold, color = oncompassBg)
                                     Text(text = country, fontSize = 24.sp, fontWeight = FontWeight.Medium, color = oncompassBgVariant)
@@ -767,7 +767,7 @@ private fun CompassInfoPanel(
                         Column(horizontalAlignment = horizontalAlignment) {
                             Icon(
                                 Icons.Outlined.LocationOn,
-                                contentDescription = "Position",
+                                contentDescription = stringResource(R.string.appstrings_position),
                                 tint = oncompassBg,
                                 modifier = Modifier.size(iconSize)
                             )

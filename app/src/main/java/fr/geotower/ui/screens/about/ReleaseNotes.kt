@@ -26,22 +26,45 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_preference_profiles)) {
-        item(stringResource(R.string.appstrings_release_profiles_save_restore))
-        item(stringResource(R.string.appstrings_release_profiles_create_customize))
-        item(stringResource(R.string.appstrings_release_profiles_preview_before_apply))
-        item(stringResource(R.string.appstrings_release_profiles_import_export_share))
-        item(stringResource(R.string.appstrings_release_profiles_active_sync))
+    section(stringResource(R.string.appstrings_release_section_map)) {
+        item(stringResource(R.string.appstrings_release_v1599_map_coverage_points))
+        item(stringResource(R.string.appstrings_release_v1599_map_theoretical_coverage))
+        item(stringResource(R.string.appstrings_release_v1599_map_history_slider))
     }
 
     section(stringResource(R.string.appstrings_release_section_settings)) {
-        item(stringResource(R.string.appstrings_release_settings_menu_sizing_consistency))
-        item(stringResource(R.string.appstrings_release_settings_controls_aligned))
+        item(stringResource(R.string.appstrings_release_v1599_settings_search))
+        item(stringResource(R.string.appstrings_release_v1599_settings_theme_button))
+        item(stringResource(R.string.appstrings_release_v1599_settings_diagnostic))
+        item(stringResource(R.string.appstrings_release_v1599_settings_battery_opt))
     }
 
-    section(stringResource(R.string.appstrings_release_section_statistics)) {
-        item(stringResource(R.string.appstrings_release_statistics_operator_regions))
-        item(stringResource(R.string.appstrings_release_statistics_frequency_weekly_texts))
+    section(stringResource(R.string.appstrings_release_section_live_tracking)) {
+        item(stringResource(R.string.appstrings_release_v1599_live_gps_accuracy))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_preference_profiles)) {
+        item(stringResource(R.string.appstrings_release_v1599_profiles_rename))
+        item(stringResource(R.string.appstrings_release_v1599_profiles_import_preview))
+        item(stringResource(R.string.appstrings_release_v1599_profiles_export_selective))
+        item(stringResource(R.string.appstrings_release_v1599_profiles_changes_count))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_elevation_profile)) {
+        item(stringResource(R.string.appstrings_release_v1599_elevation_obstacles))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_share_export)) {
+        item(stringResource(R.string.appstrings_release_v1599_share_radio_report))
+        item(stringResource(R.string.appstrings_release_v1599_share_site_pdf))
+        item(stringResource(R.string.appstrings_release_v1599_share_community_photos))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_site_detail)) {
+        item(stringResource(R.string.appstrings_release_v1599_site_potential_outage))
+        item(stringResource(R.string.appstrings_release_v1599_site_cellmapper))
+        item(stringResource(R.string.appstrings_release_v1599_site_aer_id))
+        item(stringResource(R.string.appstrings_release_v1599_site_throughput_height))
     }
 }
 

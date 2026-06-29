@@ -44,17 +44,31 @@ fun getElevationProfileLastKnownLocation(context: Context): Location? {
     }
 }
 
+fun loadElevationProfileIncludeObstacles(context: Context): Boolean {
+    return context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+        .getBoolean(ELEVATION_PROFILE_INCLUDE_OBSTACLES_PREF_KEY, false)
+}
+
+fun saveElevationProfileIncludeObstacles(context: Context, value: Boolean) {
+    context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+        .edit()
+        .putBoolean(ELEVATION_PROFILE_INCLUDE_OBSTACLES_PREF_KEY, value)
+        .apply()
+}
+
 fun fetchIgnElevationProfileData(
     fromLatitude: Double,
     fromLongitude: Double,
     toLatitude: Double,
-    toLongitude: Double
+    toLongitude: Double,
+    includeObstacles: Boolean = false
 ): ElevationProfileDataResult {
     val profile = ElevationProfileApi.getProfile(
         fromLatitude = fromLatitude,
         fromLongitude = fromLongitude,
         toLatitude = toLatitude,
-        toLongitude = toLongitude
+        toLongitude = toLongitude,
+        includeObstacles = includeObstacles
     )
     return ElevationProfileDataResult(
         points = profile.points.map { point ->
@@ -219,4 +233,5 @@ private fun normalizeElevationProfileFrequency(value: Int): Int? {
 
 const val ELEVATION_USER_EYE_HEIGHT_METERS = 1.5
 const val DEFAULT_ELEVATION_PROFILE_FREQUENCY_MHZ = 3500
+private const val ELEVATION_PROFILE_INCLUDE_OBSTACLES_PREF_KEY = "elevation_profile_include_obstacles"
 private val ELEVATION_PROFILE_FREQUENCY_ORDER = listOf(26000, 4200, 3500, 2600, 2100, 1800, 1400, 900, 800, 700)

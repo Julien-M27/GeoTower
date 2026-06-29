@@ -254,6 +254,12 @@ private fun getLocalLogoRes(opName: String): Int? {
 
 @Composable
 fun formatOutageDetails(hsData: fr.geotower.data.models.SiteHsEntity): String {
+    // 0. Panne déduite (propagation zone blanche) : pas de déclaration propre à cet opérateur,
+    //    on affiche simplement « Potentiellement en panne » sans détail de service/raison.
+    if (hsData.isPotential) {
+        return stringResource(R.string.appstrings_outage_status_potential)
+    }
+
     // 1. Traduction du texte détaillé de l'API (ex: "Incident en cours")
     val detailTranslated = when (hsData.detail?.lowercase()) {
         "incident en cours" -> stringResource(R.string.appstrings_api_detail_incident)

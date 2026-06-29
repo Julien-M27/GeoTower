@@ -17,6 +17,7 @@ import com.google.gson.Gson
 import fr.geotower.R
 import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.community.CommunityDataPreferences
+import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -30,12 +31,19 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 object SignalQuestUploadRules {
-    const val MAX_PHOTOS = 10
-    const val MAX_DIMENSION_PX = 2560
-    const val JPEG_QUALITY = 86
-    const val MIN_JPEG_QUALITY = 70
-    const val MAX_SOURCE_BYTES: Long = 20L * 1024L * 1024L
-    const val MAX_OUTPUT_BYTES: Long = MAX_SOURCE_BYTES
+    // Plafonds imposes par SignalQuest (serveur). On ne touche a la photo que si elle les
+    // depasse, jamais pour « optimiser » une image qui passe deja : aucune perte par defaut.
+    const val MAX_OUTPUT_BYTES: Long = 20L * 1024L * 1024L
+    const val MAX_DIMENSION_PX = 10_000
+    const val MAX_OUTPUT_PIXELS = 50_000_000
+
+    // Le fichier source peut depasser le plafond serveur : on l'accepte puis on le recompresse
+    // juste ce qu'il faut pour repasser sous MAX_OUTPUT_BYTES (« pile 20 Mo »).
+    const val MAX_SOURCE_BYTES: Long = 64L * 1024L * 1024L
+
+    // Reencodage uniquement quand c'est inevitable (strip EXIF, format non-JPEG, source > 20 Mo).
+    const val MAX_JPEG_QUALITY = 100
+    const val MIN_JPEG_QUALITY = 60
 
     private val acceptedMimeTypes = setOf(
         "image/jpeg",
@@ -53,12 +61,23 @@ object SignalQuestUploadRules {
         return sizeBytes != null && sizeBytes in 1..MAX_SOURCE_BYTES
     }
 
-    fun calculateInSampleSize(width: Int, height: Int, maxDimension: Int = MAX_DIMENSION_PX): Int {
-        if (width <= 0 || height <= 0 || maxDimension <= 0) return 1
+    // Plus petit facteur (puissance de 2) qui ramene l'image sous les limites serveur en
+    // dimension ET en nombre de pixels. Retourne 1 quand la photo tient deja : pas de downscale.
+    fun calculateInSampleSize(
+        width: Int,
+        height: Int,
+        maxDimension: Int = MAX_DIMENSION_PX,
+        maxPixels: Int = MAX_OUTPUT_PIXELS
+    ): Int {
+        if (width <= 0 || height <= 0 || maxDimension <= 0 || maxPixels <= 0) return 1
 
         var sampleSize = 1
-        val largestSide = max(width, height)
-        while (largestSide / (sampleSize * 2) >= maxDimension) {
+        while (sampleSize < (1 shl 16)) {
+            val sampledWidth = width / sampleSize
+            val sampledHeight = height / sampleSize
+            val withinDimension = max(sampledWidth, sampledHeight) <= maxDimension
+            val withinPixels = sampledWidth.toLong() * sampledHeight.toLong() <= maxPixels
+            if (withinDimension && withinPixels) break
             sampleSize *= 2
         }
         return sampleSize
@@ -214,11 +233,7 @@ object SignalQuestUploadQueue {
         if (uriStrings.isEmpty()) {
             throw SignalQuestUploadQueueException(context.getString(R.string.signalquest_photo_required))
         }
-        if (uriStrings.size > SignalQuestUploadRules.MAX_PHOTOS) {
-            throw SignalQuestUploadQueueException(
-                context.getString(R.string.signalquest_max_photos, SignalQuestUploadRules.MAX_PHOTOS)
-            )
-        }
+        // Pas de limite de nombre cote app : le serveur recoit et traite les photos une par une.
         val signalQuestOperator = SignalQuestOperators.operatorParamFor(operator)
             ?: throw SignalQuestUploadQueueException(context.getString(R.string.signalquest_unsupported_operator))
         val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
@@ -385,59 +400,53 @@ object SignalQuestUploadQueue {
             throw SignalQuestInvalidPhotoException(context.getString(R.string.signalquest_invalid_source_file))
         }
 
-        val uploadDir = uploadDir(context, manifest.uploadId)
-        val preparedFile = File(uploadDir, "prepared_${source.nameWithoutExtension}.jpg")
-        if (preparedFile.isFile) preparedFile.delete()
-
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(source.absolutePath, bounds)
         if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
             throw SignalQuestInvalidPhotoException(context.getString(R.string.signalquest_unreadable_image))
         }
 
+        // Chemin sans aucune perte : JPEG d'origine qui tient deja sous la limite serveur et dont
+        // on conserve les metadonnees (l'orientation EXIF reste donc correcte cote serveur).
         if (!manifest.stripExifBeforeUpload && canUploadOriginalJpeg(uploadFile, source, bounds)) {
             return source
         }
 
-        var decoded: Bitmap? = null
-        var oriented: Bitmap? = null
-        var scaled: Bitmap? = null
+        val uploadDir = uploadDir(context, manifest.uploadId)
+        val preparedFile = File(uploadDir, "prepared_${source.nameWithoutExtension}.jpg")
+        if (preparedFile.isFile) preparedFile.delete()
 
+        var bitmap: Bitmap? = null
         try {
+            // Pleine resolution + ARGB_8888 : on ne sous-echantillonne que pour respecter les
+            // limites serveur (10000 px / 50 Mpx), sinon l'envoi serait refuse (HTTP 413).
             val decodeOptions = BitmapFactory.Options().apply {
                 inSampleSize = SignalQuestUploadRules.calculateInSampleSize(bounds.outWidth, bounds.outHeight)
-                inPreferredConfig = Bitmap.Config.RGB_565
+                inPreferredConfig = Bitmap.Config.ARGB_8888
             }
-            decoded = BitmapFactory.decodeFile(source.absolutePath, decodeOptions)
+            var working = BitmapFactory.decodeFile(source.absolutePath, decodeOptions)
                 ?: throw SignalQuestInvalidPhotoException(context.getString(R.string.signalquest_unreadable_image))
+            bitmap = working
 
-            val bitmapForScale = if (manifest.stripExifBeforeUpload) {
-                val orientedBitmap = applyExifOrientation(source, decoded)
-                if (orientedBitmap !== decoded) {
-                    decoded.recycle()
-                    decoded = null
-                    oriented = orientedBitmap
-                }
-                orientedBitmap
-            } else {
-                decoded
-            }
-
-            scaled = scaleToMaxDimension(bitmapForScale, SignalQuestUploadRules.MAX_DIMENSION_PX)
-            if (scaled !== bitmapForScale) {
-                when (bitmapForScale) {
-                    decoded -> {
-                        decoded.recycle()
-                        decoded = null
-                    }
-                    oriented -> {
-                        oriented.recycle()
-                        oriented = null
-                    }
+            // En mode strip EXIF on grave l'orientation dans les pixels (l'EXIF est supprime).
+            // Sinon l'orientation reste portee par l'EXIF recopie plus bas.
+            if (manifest.stripExifBeforeUpload) {
+                val oriented = applyExifOrientation(source, working)
+                if (oriented !== working) {
+                    working.recycle()
+                    working = oriented
+                    bitmap = oriented
                 }
             }
 
-            writeCompressedJpeg(context, scaled, preparedFile) {
+            val clamped = scaleToMaxDimension(working, SignalQuestUploadRules.MAX_DIMENSION_PX)
+            if (clamped !== working) {
+                working.recycle()
+                working = clamped
+                bitmap = clamped
+            }
+
+            encodeWithinBudget(context, working, preparedFile) {
                 if (!manifest.stripExifBeforeUpload) {
                     copyExifAttributes(source, preparedFile)
                 }
@@ -453,11 +462,7 @@ object SignalQuestUploadQueue {
             preparedFile.delete()
             throw SignalQuestInvalidPhotoException(context.getString(R.string.signalquest_image_prepare_failed), e)
         } finally {
-            if (scaled !== decoded && scaled !== oriented) {
-                scaled?.recycle()
-            }
-            decoded?.recycle()
-            oriented?.recycle()
+            bitmap?.recycle()
         }
     }
 
@@ -661,14 +666,19 @@ object SignalQuestUploadQueue {
         return copiedBytes
     }
 
+    // Un JPEG d'origine est envoyable tel quel (octets bruts, zero perte) tant qu'il respecte TOUS
+    // les plafonds serveur : taille <= 20 Mo, plus grand cote <= 10000 px et <= 50 Mpx. Au-dela, le
+    // serveur le refuserait (HTTP 413) : on bascule alors sur un reencodage qui le ramene dans les
+    // clous. La resolution n'est donc bornee que par la limite serveur, jamais en dessous.
     private fun canUploadOriginalJpeg(
         uploadFile: SignalQuestUploadFile,
         source: File,
         bounds: BitmapFactory.Options
     ): Boolean {
         return uploadFile.sourceMimeType.equals("image/jpeg", ignoreCase = true) &&
+            source.length() in 1..SignalQuestUploadRules.MAX_OUTPUT_BYTES &&
             max(bounds.outWidth, bounds.outHeight) <= SignalQuestUploadRules.MAX_DIMENSION_PX &&
-            source.length() in 1..SignalQuestUploadRules.MAX_OUTPUT_BYTES
+            bounds.outWidth.toLong() * bounds.outHeight.toLong() <= SignalQuestUploadRules.MAX_OUTPUT_PIXELS
     }
 
     private fun applyExifOrientation(source: File, bitmap: Bitmap): Bitmap {
@@ -710,9 +720,11 @@ object SignalQuestUploadQueue {
         return Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
     }
 
+    // Recompresse au plus pres de la limite serveur : on garde la meilleure qualite qui tient sous
+    // MAX_OUTPUT_BYTES. Si la qualite 100 passe deja, on l'utilise (reencodage visuellement neutre).
     @Throws(SignalQuestInvalidPhotoException::class)
-    private fun writeCompressedJpeg(context: Context, bitmap: Bitmap, targetFile: File, afterWrite: () -> Unit) {
-        var quality = SignalQuestUploadRules.JPEG_QUALITY
+    private fun encodeWithinBudget(context: Context, bitmap: Bitmap, targetFile: File, afterWrite: () -> Unit) {
+        var quality = highestQualityWithinBudget(bitmap, SignalQuestUploadRules.MAX_OUTPUT_BYTES)
         while (quality >= SignalQuestUploadRules.MIN_JPEG_QUALITY) {
             FileOutputStream(targetFile).use { output ->
                 if (!bitmap.compress(Bitmap.CompressFormat.JPEG, quality, output)) {
@@ -720,14 +732,42 @@ object SignalQuestUploadQueue {
                 }
             }
 
+            // afterWrite() peut reinjecter l'EXIF : on revalide la taille finale du fichier ecrit.
             afterWrite()
             if (targetFile.length() in 1..SignalQuestUploadRules.MAX_OUTPUT_BYTES) {
                 return
             }
-            quality -= 6
+            quality -= 4
         }
         targetFile.delete()
         throw SignalQuestInvalidPhotoException(context.getString(R.string.signalquest_compressed_photo_too_large))
+    }
+
+    // Recherche dichotomique de la qualite JPEG la plus haute dont la taille reste <= maxBytes.
+    private fun highestQualityWithinBudget(bitmap: Bitmap, maxBytes: Long): Int {
+        if (compressedSize(bitmap, SignalQuestUploadRules.MAX_JPEG_QUALITY) <= maxBytes) {
+            return SignalQuestUploadRules.MAX_JPEG_QUALITY
+        }
+        var low = SignalQuestUploadRules.MIN_JPEG_QUALITY
+        var high = SignalQuestUploadRules.MAX_JPEG_QUALITY - 1
+        var best = SignalQuestUploadRules.MIN_JPEG_QUALITY
+        while (low <= high) {
+            val mid = (low + high) / 2
+            if (compressedSize(bitmap, mid) <= maxBytes) {
+                best = mid
+                low = mid + 1
+            } else {
+                high = mid - 1
+            }
+        }
+        return best
+    }
+
+    private fun compressedSize(bitmap: Bitmap, quality: Int): Long {
+        ByteArrayOutputStream().use { buffer ->
+            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, buffer)
+            return buffer.size().toLong()
+        }
     }
 
     @Throws(IOException::class)

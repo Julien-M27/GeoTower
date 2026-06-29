@@ -79,6 +79,7 @@ import fr.geotower.data.workers.DatabaseDownloadWorker
 import fr.geotower.ui.components.SafeClick
 import fr.geotower.ui.components.colorPaletteFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
+import fr.geotower.ui.screens.settings.PreferenceProfilesSheet
 import fr.geotower.services.LiveTrackingController
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLocale
@@ -180,6 +181,7 @@ fun FirstStartScreen(
     var showOperatorSheet by remember { mutableStateOf(false) }
     var showWarningDialog by remember { mutableStateOf(false) } // État du pop-up d'avertissement
     var showUnitSheet by remember { mutableStateOf(false) }
+    var showPreferenceProfilesSheet by remember { mutableStateOf(false) }
 
     // ✅ NOUVEAU : Variables pour gérer le pop-up de succès de fin de téléchargement
     var showSuccessDialog by remember { mutableStateOf(false) }
@@ -289,6 +291,7 @@ fun FirstStartScreen(
                                 bubbleColor = bubbleColor,
                                 onOpenOperatorSheet = { showOperatorSheet = true },
                                 onOpenUnitSheet = { showUnitSheet = true },
+                                onOpenPreferenceProfilesSheet = { showPreferenceProfilesSheet = true },
                                 onSafeClick = safeClick
                             )
                         }
@@ -542,6 +545,13 @@ fun FirstStartScreen(
             bubbleColor = bubbleColor
         )
     }
+    if (showPreferenceProfilesSheet) {
+        PreferenceProfilesSheet(
+            onDismiss = { showPreferenceProfilesSheet = false },
+            sheetState = sheetState,
+            useOneUi = useOneUi
+        )
+    }
 }
 
 // ==========================================
@@ -555,6 +565,7 @@ fun StepPreferencesDesign(
     bubbleColor: Color,
     onOpenOperatorSheet: () -> Unit,
     onOpenUnitSheet: () -> Unit,
+    onOpenPreferenceProfilesSheet: () -> Unit,
     onSafeClick: SafeClick
 ) {
     val context = LocalContext.current
@@ -573,7 +584,19 @@ fun StepPreferencesDesign(
 
         Spacer(modifier = Modifier.height(32.dp))
 
-        // --- CARTE OPÉRATEUR ---
+        // --- CARTE PROFILS DE PRÉFÉRENCES ---
+        Surface(onClick = { onSafeClick("onboarding_preference_profiles") { onOpenPreferenceProfilesSheet() } }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
+            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(stringResource(R.string.preference_profiles_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.preference_profiles_card_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
         Surface(onClick = { onSafeClick("onboarding_operator") { onOpenOperatorSheet() } }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
             Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(modifier = Modifier.weight(1f)) {

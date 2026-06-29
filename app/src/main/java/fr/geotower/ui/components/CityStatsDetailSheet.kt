@@ -38,6 +38,7 @@ import kotlinx.coroutines.withContext
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 
 // ✅ CLASSE DE DONNÉES COMPLÈTE
 data class OperatorStat(
@@ -67,6 +68,7 @@ fun CityStatsDetailSheet(
     onDismiss: () -> Unit
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     val stats by produceState<List<OperatorStat>?>(initialValue = null, antennas, techniques) {
         value = withContext(Dispatchers.Default) {
@@ -87,38 +89,38 @@ fun CityStatsDetailSheet(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 24.dp)
-                .padding(bottom = 32.dp),
+                .padding(horizontal = sizing.spacing(24.dp))
+                .padding(bottom = sizing.spacing(32.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 text = stringResource(R.string.appstrings_operator_details_title),
-                style = MaterialTheme.typography.titleLarge,
+                style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
             LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 val currentStats = stats
                 if (currentStats == null) {
                     item {
                         Column(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 32.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(32.dp)),
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
                         ) {
                             LoadingIndicator(
-                                modifier = Modifier.size(48.dp),
+                                modifier = Modifier.size(sizing.component(48.dp)),
                                 color = MaterialTheme.colorScheme.primary
                             )
                             Text(
                                 text = stringResource(R.string.appstrings_loading_operator_stats),
-                                style = MaterialTheme.typography.labelLarge,
+                                style = sizing.textStyle(MaterialTheme.typography.labelLarge),
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -138,7 +140,7 @@ fun CityStatsDetailSheet(
                                 onRequestFrequencyStatus(stat.idAnfrs)
                             }
                         },
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(sizing.component(16.dp)),
                         // ✅ BANDEAU OPÉRATEUR : alpha = 0.5f
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
@@ -147,20 +149,20 @@ fun CityStatsDetailSheet(
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
                             Row(
-                                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                                modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp)),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 if (stat.logoRes != null) {
                                     Image(
                                         painter = painterResource(id = stat.logoRes),
                                         contentDescription = stat.name,
-                                        modifier = Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)).background(Color.White)
+                                        modifier = Modifier.size(sizing.component(60.dp)).clip(RoundedCornerShape(sizing.component(8.dp))).background(Color.White)
                                     )
                                 } else {
                                     Box(
                                         modifier = Modifier
-                                            .size(60.dp)
-                                            .clip(RoundedCornerShape(8.dp))
+                                            .size(sizing.component(60.dp))
+                                            .clip(RoundedCornerShape(sizing.component(8.dp)))
                                             .background(stat.color.copy(alpha = 0.14f)),
                                         contentAlignment = Alignment.Center
                                     ) {
@@ -168,26 +170,26 @@ fun CityStatsDetailSheet(
                                             text = stat.name.take(1).uppercase(),
                                             color = stat.color,
                                             fontWeight = FontWeight.Black,
-                                            fontSize = 24.sp
+                                            fontSize = sizing.text(24.sp)
                                         )
                                     }
                                 }
-                                Spacer(modifier = Modifier.width(16.dp))
+                                Spacer(modifier = Modifier.width(sizing.spacing(16.dp)))
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(text = stat.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                                    Text(text = pluralStringResource(R.plurals.sites_count, stat.totalCount, stat.totalCount), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                    Text(text = stat.name, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                                    Text(text = pluralStringResource(R.plurals.sites_count, stat.totalCount, stat.totalCount), style = sizing.textStyle(MaterialTheme.typography.bodyMedium), color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
-                                Box(modifier = Modifier.background(stat.color, CircleShape).padding(horizontal = 16.dp, vertical = 8.dp), contentAlignment = Alignment.Center) {
-                                    Text(text = "${stat.activeCount}/${stat.totalCount}", fontSize = 24.sp, fontWeight = FontWeight.Black, color = Color.White)
+                                Box(modifier = Modifier.background(stat.color, CircleShape).padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp)), contentAlignment = Alignment.Center) {
+                                    Text(text = "${stat.activeCount}/${stat.totalCount}", fontSize = sizing.text(24.sp), fontWeight = FontWeight.Black, color = Color.White)
                                 }
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Icon(Icons.Default.KeyboardArrowDown, null, modifier = Modifier.rotate(arrowRotation))
+                                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                                Icon(Icons.Default.KeyboardArrowDown, null, modifier = Modifier.size(sizing.component(24.dp)).rotate(arrowRotation))
                             }
 
                             AnimatedVisibility(visible = isExpanded, enter = expandVertically(), exit = shrinkVertically()) {
                                 Column(modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
 
-                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f), thickness = 0.5.dp)
+                                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f), thickness = sizing.component(0.5.dp))
 
                                     CartoradioGroupedTable(
                                         groupedData = stat.groupedFreqs,
@@ -439,17 +441,18 @@ fun CartoradioGroupedTable(
     brandColor: Color,
     isLoadingActiveStatus: Boolean = false
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val tableBgColor = MaterialTheme.colorScheme.surface
 
     if (groupedData.isEmpty()) {
-        Box(modifier = Modifier.fillMaxWidth().background(tableBgColor).padding(16.dp), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxWidth().background(tableBgColor).padding(sizing.spacing(16.dp)), contentAlignment = Alignment.Center) {
             if (isLoadingActiveStatus) {
                 LoadingIndicator(
-                    modifier = Modifier.size(28.dp),
+                    modifier = Modifier.size(sizing.component(28.dp)),
                     color = brandColor
                 )
             } else {
-                Text(stringResource(R.string.appstrings_technical_data_unavailable), fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.appstrings_technical_data_unavailable), fontSize = sizing.text(12.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
         return
@@ -460,11 +463,11 @@ fun CartoradioGroupedTable(
     ) {
         // ✅ CHANGEMENT ICI : En-tête du tableau mis à 0.5f pour matcher avec le reste
         Row(
-            modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)).padding(12.dp),
+            modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)).padding(sizing.spacing(12.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(stringResource(R.string.appstrings_frequencies_and_techs), fontWeight = FontWeight.Bold, fontSize = 13.sp, modifier = Modifier.weight(1f))
-            Text(stringResource(R.string.appstrings_sites_label), fontWeight = FontWeight.Bold, fontSize = 13.sp)
+            Text(stringResource(R.string.appstrings_frequencies_and_techs), fontWeight = FontWeight.Bold, fontSize = sizing.text(13.sp), modifier = Modifier.weight(1f))
+            Text(stringResource(R.string.appstrings_sites_label), fontWeight = FontWeight.Bold, fontSize = sizing.text(13.sp))
         }
 
         groupedData.forEach { (tech, items) ->
@@ -473,11 +476,11 @@ fun CartoradioGroupedTable(
                     .fillMaxWidth()
                     // ✅ COLONNE TECHNOLOGIE : Déjà à 0.5f, donc elle matche avec l'en-tête et le bandeau
                     .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
-                    .border(width = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
+                    .border(width = sizing.component(0.5.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.2f))
             ) {
                 // COLONNE GAUCHE
-                Box(modifier = Modifier.weight(0.25f).padding(vertical = 16.dp), contentAlignment = Alignment.Center) {
-                    Text(text = tech, fontWeight = FontWeight.Black, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Box(modifier = Modifier.weight(0.25f).padding(vertical = sizing.spacing(16.dp)), contentAlignment = Alignment.Center) {
+                    Text(text = tech, fontWeight = FontWeight.Black, fontSize = sizing.text(16.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
 
                 // COLONNE DROITE
@@ -506,7 +509,7 @@ fun CartoradioGroupedTable(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .background(if (isAlternate) Color.Transparent else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.2f))
-                                .padding(vertical = 12.dp, horizontal = 16.dp),
+                                .padding(vertical = sizing.spacing(12.dp), horizontal = sizing.spacing(16.dp)),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
@@ -518,7 +521,7 @@ fun CartoradioGroupedTable(
                                 } else {
                                     "$frequencyLabel MHz"
                                 },
-                                fontSize = 14.sp,
+                                fontSize = sizing.text(14.sp),
                                 fontWeight = FontWeight.SemiBold,
                                 color = MaterialTheme.colorScheme.onSurface,
                                 modifier = Modifier.weight(1f)
@@ -545,26 +548,27 @@ private fun FrequencySitesCount(
     brandColor: Color,
     isLoadingActiveStatus: Boolean
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Row(
-        modifier = Modifier.widthIn(min = 56.dp),
+        modifier = Modifier.widthIn(min = sizing.component(56.dp)),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.End
     ) {
         if (isLoadingActiveStatus) {
             LoadingIndicator(
-                modifier = Modifier.size(16.dp),
+                modifier = Modifier.size(sizing.component(16.dp)),
                 color = brandColor
             )
             Text(
                 text = "/$totalCount",
-                fontSize = 16.sp,
+                fontSize = sizing.text(16.sp),
                 fontWeight = FontWeight.Bold,
                 color = brandColor
             )
         } else {
             Text(
                 text = "$activeCount/$totalCount",
-                fontSize = 16.sp,
+                fontSize = sizing.text(16.sp),
                 fontWeight = FontWeight.Bold,
                 color = brandColor
             )

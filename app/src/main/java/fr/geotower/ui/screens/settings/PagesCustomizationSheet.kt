@@ -102,6 +102,9 @@ import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.ui.components.MiniMapViewMode
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import kotlin.math.roundToInt
+import androidx.compose.runtime.mutableIntStateOf
+import fr.geotower.ui.screens.emitters.loadElevationProfileIncludeObstacles
+import fr.geotower.ui.screens.emitters.saveElevationProfileIncludeObstacles
 import fr.geotower.utils.PreferenceStores
 import fr.geotower.utils.StatsDisplayMode
 import fr.geotower.utils.StatsPreferences
@@ -180,7 +183,9 @@ fun PagesCustomizationSheet(
     onSiteClick: () -> Unit,
     onSpeedtestsClick: () -> Unit,
     onThroughputCalculatorClick: () -> Unit,
-    onOpenFrequencies: () -> Unit
+    onOpenFrequencies: () -> Unit,
+    onTheoreticalCoverageClick: () -> Unit = {},
+    onElevationProfileClick: () -> Unit = {}
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val themeMode by AppConfig.themeMode
@@ -245,6 +250,12 @@ fun PagesCustomizationSheet(
                 NavigationMenuItem(title = stringResource(R.string.appstrings_page_site_settings), icon = Icons.Default.WifiTethering, isSelected = false, isDark = isDark) { onSiteClick() }
                 NavigationMenuItem(title = stringResource(R.string.appstrings_page_speedtests_settings), icon = Icons.Default.Speed, isSelected = false, isDark = isDark) { onSpeedtestsClick() }
             }
+            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THEORETICAL_COVERAGE)) {
+                NavigationMenuItem(title = stringResource(R.string.appstrings_coverage_button), icon = Icons.Default.Map, isSelected = false, isDark = isDark) { onTheoreticalCoverageClick() }
+            }
+            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ELEVATION_PROFILE)) {
+                NavigationMenuItem(title = stringResource(R.string.appstrings_elevation_profile_title), icon = Icons.Default.VerticalAlignTop, isSelected = false, isDark = isDark) { onElevationProfileClick() }
+            }
             if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THROUGHPUT_CALCULATOR)) {
                 NavigationMenuItem(title = stringResource(R.string.appstrings_throughput_calculator_title), icon = Icons.Default.Speed, isSelected = false, isDark = isDark) { onThroughputCalculatorClick() }
             }
@@ -281,6 +292,7 @@ fun StartupPageSelectionSheet(
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
     val scrollState = rememberScrollState()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         BackHandler(onBack = onBack)
@@ -289,17 +301,17 @@ fun StartupPageSelectionSheet(
                 .fillMaxWidth()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
-                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(24.dp)), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text(stringResource(R.string.appstrings_startup_page_settings), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                Spacer(Modifier.width(48.dp))
+                Text(stringResource(R.string.appstrings_startup_page_settings), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
             }
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(sizing.spacing(24.dp)))
 
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                 SettingsRadioItem(stringResource(R.string.appstrings_page_home_settings), tempPage == "home", useOneUi, bubbleColor) { tempPage = "home" }
                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)) {
                     SettingsRadioItem(stringResource(R.string.appstrings_page_nearby_settings), tempPage == "nearby", useOneUi, bubbleColor) { tempPage = "nearby" }
@@ -316,7 +328,7 @@ fun StartupPageSelectionSheet(
                 }
 
                 // --- NOUVEAU BOUTON RÉINITIALISER ---
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                 TextButton(
                     onClick = {
                         // On valide directement le choix par défaut et on ferme la fenêtre
@@ -326,18 +338,18 @@ fun StartupPageSelectionSheet(
                     modifier = Modifier.align(Alignment.CenterHorizontally)
                 ) {
                     Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(sizing.spacing(8.dp)))
                     Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
-                Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
+                Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
 
                 // Bouton Valider classique
                 Button(
                     onClick = { onPageSelected(tempPage); onDismiss() },
-                    modifier = Modifier.fillMaxWidth().height(50.dp).padding(top = 8.dp),
-                    shape = oneUiActionButtonShape(useOneUi, RoundedCornerShape(25.dp))
+                    modifier = Modifier.fillMaxWidth().height(sizing.component(50.dp)).padding(top = sizing.spacing(8.dp)),
+                    shape = oneUiActionButtonShape(useOneUi, RoundedCornerShape(sizing.component(25.dp)))
                 ) {
-                    Text(stringResource(R.string.appstrings_validate), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.appstrings_validate), style = sizing.textStyle(MaterialTheme.typography.labelLarge), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -727,6 +739,7 @@ fun NearbySettingsSheet(
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
     val scrollState = rememberScrollState()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         BackHandler(onBack = onBack)
@@ -735,15 +748,15 @@ fun NearbySettingsSheet(
                 .fillMaxWidth()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
-                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text(stringResource(R.string.appstrings_page_nearby_settings), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                Spacer(Modifier.width(48.dp))
+                Text(stringResource(R.string.appstrings_page_nearby_settings), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
             }
-            Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
+            Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = sizing.spacing(24.dp)), textAlign = TextAlign.Center)
 
             val shape = oneUiActionButtonShape(useOneUi)
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
@@ -762,9 +775,9 @@ fun NearbySettingsSheet(
                 useOneUi = useOneUi
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
-            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+            HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(8.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
             SimpleSwitchCard(
                 title = stringResource(R.string.appstrings_nearby_search_suggestions_option),
                 showMapLocation = showSuggestions,
@@ -774,7 +787,7 @@ fun NearbySettingsSheet(
                 bubbleColor = bubbleColor,
                 useOneUi = useOneUi
             )
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
             // --- NOUVEAU : BOUTON RÉINITIALISER L'ORDRE ---
             TextButton(
                 onClick = {
@@ -790,14 +803,14 @@ fun NearbySettingsSheet(
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
                 Text(
                     text = stringResource(R.string.appstrings_reset_to_default),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
 
             // --- 2. LE CURSEUR DU RAYON ---
             SearchRadiusCard(
@@ -897,6 +910,7 @@ fun CompassSettingsSheet(
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
     val scrollState = rememberScrollState()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         BackHandler(onBack = onBack)
@@ -905,15 +919,15 @@ fun CompassSettingsSheet(
                 .fillMaxWidth()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
-                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text(stringResource(R.string.appstrings_page_compass_settings), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                Spacer(Modifier.width(48.dp))
+                Text(stringResource(R.string.appstrings_page_compass_settings), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
             }
-            Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 24.dp), textAlign = TextAlign.Center)
+            Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = sizing.spacing(24.dp)), textAlign = TextAlign.Center)
 
             val shape = oneUiActionButtonShape(useOneUi)
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
@@ -932,7 +946,7 @@ fun CompassSettingsSheet(
                 useOneUi = useOneUi
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
             TextButton(onClick = {
                 onOrderChange(listOf("location", "gps", "accuracy"))
                 onLocationChange(true)
@@ -940,10 +954,10 @@ fun CompassSettingsSheet(
                 onAccuracyChange(true)
             }) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
                 Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
-            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
         }
     }
 }
@@ -980,6 +994,7 @@ fun MapSettingsSheet(
         }
     }
     val scrollState = rememberScrollState()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         BackHandler {
@@ -990,33 +1005,33 @@ fun MapSettingsSheet(
                 .navigationBarsPadding()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
-                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(24.dp)), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { if (showAzimuthSettings) showAzimuthSettings = false else onBack() }) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, null)
                 }
                 Text(
                     if (showAzimuthSettings) stringResource(R.string.appstrings_map_azimuths_option) else stringResource(R.string.appstrings_page_map_settings),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.width(48.dp))
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
             }
 
             val shape = oneUiActionButtonShape(useOneUi)
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
             if (showAzimuthSettings) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_azimuth_lines_option), showMapLocation = showAzimuths, onLocationChange = onAzimuthsChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_azimuth_cones_option), showMapLocation = showAzimuthsCone, onLocationChange = onAzimuthsConeChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                 }
             } else {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_location_option), showMapLocation = showLocation, onLocationChange = onLocationChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_location_marker_option), showMapLocation = showLocationMarker, onLocationChange = onLocationMarkerChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     ConfigurableSwitchCard(stringResource(R.string.appstrings_map_azimuths_option), showAnyAzimuths, ::setAzimuthsVisible, { showAzimuthSettings = true }, shape, border, bubbleColor, useOneUi)
@@ -1031,7 +1046,7 @@ fun MapSettingsSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
             TextButton(onClick = {
                 if (showAzimuthSettings) {
                     onAzimuthsChange(AppConfig.DEFAULT_SHOW_AZIMUTH_LINES)
@@ -1050,10 +1065,10 @@ fun MapSettingsSheet(
                 }
             }) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
                 Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
-            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
         }
     }
 }
@@ -1117,6 +1132,7 @@ fun SiteSpeedtestsSettingsSheet(
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
     val scrollState = rememberScrollState()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
         BackHandler(onBack = onBack)
@@ -1125,28 +1141,28 @@ fun SiteSpeedtestsSettingsSheet(
                 .fillMaxWidth()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
-                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(24.dp)), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(
                     text = stringResource(R.string.appstrings_speedtests_settings_title),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.width(48.dp))
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
             }
 
             val shape = oneUiActionButtonShape(useOneUi)
             val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                 Text(
                     text = stringResource(R.string.appstrings_speedtests_best_metric_title),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1168,10 +1184,10 @@ fun SiteSpeedtestsSettingsSheet(
                     useOneUi,
                     bubbleColor
                 ) { onBestMetricChange(SiteSpeedtestsPagePreferences.SORT_DOWNLOAD) }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                 Text(
                     text = stringResource(R.string.appstrings_speedtests_sort_title),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1194,10 +1210,10 @@ fun SiteSpeedtestsSettingsSheet(
                     bubbleColor
                 ) { onSortMetricChange(SiteSpeedtestsPagePreferences.SORT_DOWNLOAD) }
                 SimpleSwitchCard(stringResource(R.string.appstrings_speedtests_sort_descending), sortDescending, onSortDescendingChange, shape, border, bubbleColor, useOneUi)
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                 Text(
                     text = stringResource(R.string.appstrings_speedtests_display_title),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -1209,13 +1225,13 @@ fun SiteSpeedtestsSettingsSheet(
                 SimpleSwitchCard(stringResource(R.string.appstrings_speedtests_show_coordinates), showCoordinates, onShowCoordinatesChange, shape, border, bubbleColor, useOneUi)
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
             TextButton(onClick = onReset) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
                 Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
-            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
         }
     }
 }
@@ -1282,6 +1298,7 @@ fun ThroughputCalculatorSettingsSheet(
         useOneUi = useOneUi,
         bubbleColor = bubbleColor,
         contentBeforeList = { shape, border ->
+            val sizing = LocalGeoTowerUiStyle.current.sizing
             SimpleSwitchCard(
                 title = stringResource(R.string.appstrings_site_throughput_calculator_option),
                 showMapLocation = showThroughputCalculator,
@@ -1292,9 +1309,9 @@ fun ThroughputCalculatorSettingsSheet(
                 useOneUi = useOneUi
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(20.dp)))
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
         }
     )
 }
@@ -1317,6 +1334,7 @@ fun ThroughputCalculationDefaultsSheet(
     val shape = oneUiActionButtonShape(useOneUi)
     val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
     val scrollState = rememberScrollState()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     var include4G by remember { mutableStateOf(ThroughputPrefs.include4G.read(prefs)) }
     var include5G by remember { mutableStateOf(ThroughputPrefs.include5G.read(prefs)) }
@@ -1346,41 +1364,41 @@ fun ThroughputCalculationDefaultsSheet(
                 .navigationBarsPadding()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
-                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(20.dp)), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(
                     stringResource(R.string.appstrings_throughput_calculation_settings_title),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.width(48.dp))
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
             }
 
             SimpleSwitchCard(stringResource(R.string.appstrings_throughput_include4g), include4G, { saveBool(ThroughputPrefs.include4G.key, it) { value -> include4G = value } }, shape, border, bubbleColor, useOneUi)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
             SimpleSwitchCard(stringResource(R.string.appstrings_throughput_include5g), include5G, { saveBool(ThroughputPrefs.include5G.key, it) { value -> include5G = value } }, shape, border, bubbleColor, useOneUi)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
             SimpleSwitchCard(stringResource(R.string.appstrings_throughput_include_planned), includePlanned, { saveBool(ThroughputPrefs.includePlanned.key, it) { value -> includePlanned = value } }, shape, border, bubbleColor, useOneUi)
 
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(sizing.spacing(20.dp)))
             Text(
                 stringResource(R.string.appstrings_throughput_default_frequency_bands_title),
-                style = MaterialTheme.typography.labelLarge,
+                style = sizing.textStyle(MaterialTheme.typography.labelLarge),
                 fontWeight = FontWeight.Bold,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(8.dp))
             )
 
             throughputBandDefaults.forEach { group ->
                 Text(
                     text = group.title,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 6.dp)
+                    modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(8.dp), bottom = sizing.spacing(6.dp))
                 )
                 group.bands.forEach { band ->
                     SimpleSwitchCard(
@@ -1392,11 +1410,11 @@ fun ThroughputCalculationDefaultsSheet(
                         bubbleColor = bubbleColor,
                         useOneUi = useOneUi
                     )
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(sizing.spacing(8.dp)))
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
             TextButton(onClick = {
                 include4G = true
                 include5G = true
@@ -1417,10 +1435,10 @@ fun ThroughputCalculationDefaultsSheet(
                 editor.apply()
             }) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
                 Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
-            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
         }
     }
 }
@@ -1736,6 +1754,190 @@ fun SiteSettingsSheet(
     )
 }
 
+// ===== Réglages par défaut « Couverture théorique » (centralisés ici) =====
+const val COVERAGE_DEFAULTS_PREFS = "GeoTowerPrefs"
+const val COVERAGE_PREF_QUALITY = "coverage_default_quality"
+const val COVERAGE_PREF_OBSTACLES = "coverage_default_obstacles"
+const val COVERAGE_PREF_TILT = "coverage_default_tilt"
+
+/** Feuille de réglages par DÉFAUT de la couverture théorique (qualité, obstacles, down-tilt), persistés. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun CoverageSettingsSheet(
+    onDismiss: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    onBack: (() -> Unit)? = null
+) {
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences(COVERAGE_DEFAULTS_PREFS, Context.MODE_PRIVATE)
+    var quality by remember { mutableIntStateOf(prefs.getInt(COVERAGE_PREF_QUALITY, 1)) }
+    var obstacles by remember { mutableStateOf(prefs.getBoolean(COVERAGE_PREF_OBSTACLES, true)) }
+    var tilt by remember { mutableIntStateOf(prefs.getInt(COVERAGE_PREF_TILT, 5)) }
+
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val bg = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = bg) {
+        if (onBack != null) BackHandler(onBack = onBack)
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 48.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (onBack != null) {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                } else {
+                    Spacer(Modifier.width(48.dp))
+                }
+                Text(
+                    stringResource(R.string.appstrings_coverage_settings_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.width(48.dp))
+            }
+            Text("${stringResource(R.string.appstrings_coverage_quality)} (${quality + 1}/4)", fontWeight = FontWeight.Bold)
+            OneUiDefaultSlider(
+                value = quality.toFloat(),
+                valueRange = 0f..3f,
+                steps = 2,
+                useOneUi = useOneUi,
+                onValueChange = { quality = it.roundToInt() },
+                onValueChangeFinished = { prefs.edit().putInt(COVERAGE_PREF_QUALITY, quality).apply() }
+            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                fr.geotower.ui.components.GeoTowerSwitch(
+                    checked = obstacles,
+                    onCheckedChange = { obstacles = it; prefs.edit().putBoolean(COVERAGE_PREF_OBSTACLES, it).apply() },
+                    useOneUi = useOneUi
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.appstrings_coverage_obstacles))
+            }
+            Text("${stringResource(R.string.appstrings_coverage_tilt)} : $tilt°", fontWeight = FontWeight.Bold)
+            OneUiDefaultSlider(
+                value = tilt.toFloat(),
+                valueRange = 0f..15f,
+                steps = 14,
+                useOneUi = useOneUi,
+                onValueChange = { tilt = it.roundToInt() },
+                onValueChangeFinished = { prefs.edit().putInt(COVERAGE_PREF_TILT, tilt).apply() }
+            )
+        }
+    }
+}
+
+/** Feuille de réglages par DÉFAUT du profil altimétrique : prise en compte des obstacles (bâtiments). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun ElevationProfileSettingsSheet(
+    onDismiss: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    onBack: (() -> Unit)? = null
+) {
+    val context = LocalContext.current
+    var obstacles by remember { mutableStateOf(loadElevationProfileIncludeObstacles(context)) }
+
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val bg = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = bg) {
+        if (onBack != null) BackHandler(onBack = onBack)
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 48.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (onBack != null) {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                } else {
+                    Spacer(Modifier.width(48.dp))
+                }
+                Text(
+                    stringResource(R.string.appstrings_coverage_settings_title),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.width(48.dp))
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                fr.geotower.ui.components.GeoTowerSwitch(
+                    checked = obstacles,
+                    onCheckedChange = { obstacles = it; saveElevationProfileIncludeObstacles(context, it) },
+                    useOneUi = useOneUi
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.appstrings_coverage_obstacles))
+            }
+        }
+    }
+}
+
+/** Slider stylé OneUI (rail épais + pastilles + pouce cerclé) quand OneUI est actif, sinon Slider standard. */
+@Composable
+private fun OneUiDefaultSlider(
+    value: Float,
+    valueRange: ClosedFloatingPointRange<Float>,
+    steps: Int,
+    useOneUi: Boolean,
+    onValueChange: (Float) -> Unit,
+    onValueChangeFinished: () -> Unit
+) {
+    if (!useOneUi) {
+        Slider(
+            value = value,
+            onValueChange = onValueChange,
+            onValueChangeFinished = onValueChangeFinished,
+            valueRange = valueRange,
+            steps = steps
+        )
+        return
+    }
+    val span = (valueRange.endInclusive - valueRange.start).coerceAtLeast(1f)
+    val fraction = ((value - valueRange.start) / span).coerceIn(0f, 1f)
+    val tickCount = steps.coerceAtLeast(0) + 2
+    val inactiveTrack = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
+    val activeTrack = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f)
+    val dotColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f)
+    Slider(
+        value = value,
+        onValueChange = onValueChange,
+        onValueChangeFinished = onValueChangeFinished,
+        valueRange = valueRange,
+        steps = steps,
+        thumb = {
+            Box(
+                modifier = Modifier
+                    .size(22.dp)
+                    .background(MaterialTheme.colorScheme.surface, CircleShape)
+                    .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
+            )
+        },
+        track = {
+            Canvas(modifier = Modifier.fillMaxWidth().height(12.dp)) {
+                val centerY = size.height / 2
+                drawLine(inactiveTrack, Offset(0f, centerY), Offset(size.width, centerY), 10.dp.toPx(), StrokeCap.Round)
+                drawLine(activeTrack, Offset(0f, centerY), Offset(size.width * fraction, centerY), 10.dp.toPx(), StrokeCap.Round)
+                val radius = if (tickCount > 52) 0.85.dp.toPx() else 1.15.dp.toPx()
+                val lastIndex = (tickCount - 1).coerceAtLeast(1)
+                for (i in 0 until tickCount) {
+                    drawCircle(dotColor, radius, Offset(size.width * (i.toFloat() / lastIndex.toFloat()), centerY))
+                }
+            }
+        }
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MiniMapSettingsSheet(
@@ -1754,6 +1956,7 @@ fun MiniMapSettingsSheet(
     val shape = oneUiActionButtonShape(useOneUi)
     val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1764,7 +1967,7 @@ fun MiniMapSettingsSheet(
                 modifier = Modifier.fillMaxWidth().statusBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                BottomSheetDefaults.DragHandle(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+                BottomSheetDefaults.DragHandle(modifier = Modifier.padding(top = sizing.spacing(8.dp), bottom = sizing.spacing(4.dp)))
             }
         }
     ) {
@@ -1773,22 +1976,22 @@ fun MiniMapSettingsSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
-                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(20.dp)), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(
                     stringResource(R.string.appstrings_mini_map_settings_title),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.width(48.dp))
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
             }
 
-            Column(verticalArrangement = Arrangement.spacedBy(LocalGeoTowerUiStyle.current.sizing.spacing(12.dp)), modifier = Modifier.fillMaxWidth()) {
+            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)), modifier = Modifier.fillMaxWidth()) {
                 MiniMapModeOption(
                     title = stringResource(R.string.appstrings_mini_map_antenna_centered),
                     selected = selectedMode == MiniMapViewMode.AntennaCentered,
@@ -1887,6 +2090,7 @@ fun StatsSettingsSheet(
     val shape = oneUiActionButtonShape(useOneUi)
     val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
     val scrollState = rememberScrollState()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     var selectedFrequencyTech by remember { mutableStateOf<String?>(null) }
     var displayMode by remember { mutableStateOf(StatsPreferences.displayMode(prefs)) }
@@ -2011,10 +2215,10 @@ fun StatsSettingsSheet(
                 .navigationBarsPadding()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
-                .padding(bottom = 48.dp, start = 24.dp, end = 24.dp),
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(24.dp)), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(
                     onClick = {
                         if (selectedFrequencyTech != null) {
@@ -2027,23 +2231,23 @@ fun StatsSettingsSheet(
                 Text(
                     text = selectedFrequencyTech?.let { "${stringResource(R.string.appstrings_frequencies_title)} $it" }
                         ?: stringResource(R.string.appstrings_stats_title),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.width(48.dp))
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
             }
 
             val frequencyTech = selectedFrequencyTech
             if (frequencyTech == null) {
                 Text(
                     text = stringResource(R.string.appstrings_stats_display_mode_title),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                     fontWeight = FontWeight.Bold,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
+                    modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(10.dp))
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
                     StatsDisplayMode.values().forEach { mode ->
                         SettingsRadioItem(statsDisplayModeTitle(mode), displayMode == mode, useOneUi, bubbleColor) {
                             saveDisplayMode(mode)
@@ -2051,10 +2255,10 @@ fun StatsSettingsSheet(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                Spacer(modifier = Modifier.height(16.dp))
-                Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = 16.dp), textAlign = TextAlign.Center)
+                Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                Text(stringResource(R.string.appstrings_drag_to_reorder_hint), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(bottom = sizing.spacing(16.dp)), textAlign = TextAlign.Center)
 
                 ReorderableBlockList(
                     order = statsOrder,
@@ -2078,10 +2282,10 @@ fun StatsSettingsSheet(
                     useOneUi = useOneUi
                 )
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
                 TextButton(onClick = ::resetStatsSettings) {
                     Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(sizing.spacing(8.dp)))
                     Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                 }
             } else {
@@ -2095,7 +2299,7 @@ fun StatsSettingsSheet(
                     onReset = { resetFrequencySettings(frequencyTech) }
                 )
             }
-            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
         }
     }
 }
@@ -2110,17 +2314,18 @@ private fun StatsFrequencySettingsContent(
     onVisibilityChange: (String, Boolean) -> Unit,
     onReset: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Text(
         text = stringResource(R.string.appstrings_drag_to_reorder_hint),
-        style = MaterialTheme.typography.bodySmall,
+        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(bottom = 16.dp),
+        modifier = Modifier.padding(bottom = sizing.spacing(16.dp)),
         textAlign = TextAlign.Center
     )
 
     val freqDragState = rememberReorderableDragState(
         items = frequencyOrder,
-        itemHeight = 48.dp,
+        itemHeight = sizing.component(48.dp),
         onOrderChange = onOrderChange
     )
 
@@ -2128,7 +2333,7 @@ private fun StatsFrequencySettingsContent(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
             frequencyOrder.forEach { frequencyId ->
                 key("$tech-$frequencyId") {
                     val isDragged = freqDragState.isDragged(frequencyId)
@@ -2144,21 +2349,21 @@ private fun StatsFrequencySettingsContent(
                             }
                             .background(
                                 if (isDragged) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
-                                RoundedCornerShape(8.dp)
+                                RoundedCornerShape(sizing.component(8.dp))
                             )
                             .then(freqDragState.dragModifier(frequencyId))
-                            .padding(vertical = 4.dp, horizontal = 4.dp)
+                            .padding(vertical = sizing.spacing(4.dp), horizontal = sizing.spacing(4.dp))
                     ) {
                         Icon(
                             Icons.Default.DragHandle,
                             contentDescription = null,
-                            modifier = Modifier.size(20.dp),
+                            modifier = Modifier.size(sizing.component(20.dp)),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                         )
                         Text(
                             text = StatsPreferences.frequencyLabel(frequencyId),
-                            modifier = Modifier.weight(1f).padding(start = 12.dp),
-                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.weight(1f).padding(start = sizing.spacing(12.dp)),
+                            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                             fontWeight = if (isDragged) FontWeight.Bold else FontWeight.Normal
                         )
                         fr.geotower.ui.components.GeoTowerSwitch(
@@ -2174,10 +2379,10 @@ private fun StatsFrequencySettingsContent(
         }
     }
 
-    Spacer(modifier = Modifier.height(16.dp))
+    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
     TextButton(onClick = onReset) {
         Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-        Spacer(Modifier.width(8.dp))
+        Spacer(Modifier.width(sizing.spacing(8.dp)))
         Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
     }
 }
@@ -2192,9 +2397,10 @@ fun SiteFreqFiltersSheet(
     val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
     val switchColor = MaterialTheme.colorScheme.primary
     val useOneUi = AppConfig.useOneUiDesign
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val technoDragState = rememberReorderableDragState(
         items = AppConfig.siteTechnoOrder.value,
-        itemHeight = 80.dp,
+        itemHeight = sizing.component(80.dp),
         onOrderChange = { newOrder ->
             AppConfig.siteTechnoOrder.value = newOrder
             prefs.edit().putString("site_techno_order", newOrder.joinToString(",")).apply()
@@ -2237,10 +2443,10 @@ fun SiteFreqFiltersSheet(
                 .navigationBarsPadding()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = sizing.spacing(24.dp))
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp, top = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(16.dp), top = sizing.spacing(8.dp)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
@@ -2248,30 +2454,30 @@ fun SiteFreqFiltersSheet(
                 }
                 Text(
                     text = stringResource(R.string.appstrings_site_freq_filters_title),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.width(48.dp))
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
             }
 
             // ✅ NOUVEAU : BOUTON AFFICHAGE EN GRILLE
             Card(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(16.dp)),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp)),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.GridView, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(12.dp))
+                    Icon(Icons.Default.GridView, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(sizing.component(20.dp)))
+                    Spacer(Modifier.width(sizing.spacing(12.dp)))
                     Text(
                         text = stringResource(R.string.appstrings_freq_grid_display_option),
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.weight(1f),
-                        fontSize = 16.sp
+                        fontSize = sizing.text(16.sp)
                     )
 
                     val onGridChange = { newValue: Boolean ->
@@ -2311,17 +2517,17 @@ fun SiteFreqFiltersSheet(
                     val freqOrder = technoData.second.second
 
                     Card(
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                        modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp))
                             .zIndex(if (isTechnoDragged) 1f else 0f)
                             .graphicsLayer { translationY = if (isTechnoDragged) technoDragOffset else 0f }
                             .then(technoDragState.dragModifier(technoId)),
                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
+                        Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.DragHandle, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                                Spacer(Modifier.width(8.dp))
-                                Text(title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), fontSize = 16.sp)
+                                Spacer(Modifier.width(sizing.spacing(8.dp)))
+                                Text(title, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), fontSize = sizing.text(16.sp))
                                 val onTechnoChange = { newValue: Boolean ->
                                     if (!newValue) {
                                         val remainingFreqs = getTotalActiveFrequenciesCount() - freqList.count { it.second.value }
@@ -2346,11 +2552,11 @@ fun SiteFreqFiltersSheet(
                                 )
                             }
                             AnimatedVisibility(visible = technoState.value && freqList.isNotEmpty()) {
-                                Column(modifier = Modifier.padding(top = 8.dp)) {
-                                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                                Column(modifier = Modifier.padding(top = sizing.spacing(8.dp))) {
+                                    HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(8.dp)), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                                     val freqDragState = rememberReorderableDragState(
                                         items = freqOrder.value,
-                                        itemHeight = 48.dp,
+                                        itemHeight = sizing.component(48.dp),
                                         onOrderChange = { newOrder ->
                                             freqOrder.value = newOrder
                                             prefs.edit().putString("site_freq_${technoId.lowercase()}_order", newOrder.joinToString(",")).apply()
@@ -2368,13 +2574,13 @@ fun SiteFreqFiltersSheet(
                                                     verticalAlignment = Alignment.CenterVertically,
                                                     modifier = Modifier.fillMaxWidth().zIndex(if (isFreqDragged) 1f else 0f)
                                                         .graphicsLayer { translationY = if (isFreqDragged) freqDragOffset else 0f; scaleX = if (isFreqDragged) 1.02f else 1f; scaleY = if (isFreqDragged) 1.02f else 1f }
-                                                        .background(if (isFreqDragged) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent, RoundedCornerShape(8.dp))
+                                                        .background(if (isFreqDragged) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent, RoundedCornerShape(sizing.component(8.dp)))
                                                         .then(freqDragState.dragModifier(freqLabel))
-                                                        .padding(vertical = 4.dp, horizontal = 4.dp)
+                                                        .padding(vertical = sizing.spacing(4.dp), horizontal = sizing.spacing(4.dp))
                                                 ) {
-                                                    Icon(Icons.Default.DragHandle, null, modifier = Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f))
+                                                    Icon(Icons.Default.DragHandle, null, modifier = Modifier.size(sizing.component(20.dp)), tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(0.7f))
                                                     val displayFreqLabel = freqLabel.toIntOrNull()?.let(::radioFrequencyLabel) ?: "$freqLabel MHz"
-                                                    Text(displayFreqLabel, modifier = Modifier.weight(1f).padding(start = 12.dp), style = MaterialTheme.typography.bodyMedium, fontWeight = if(isFreqDragged) FontWeight.Bold else FontWeight.Normal)
+                                                    Text(displayFreqLabel, modifier = Modifier.weight(1f).padding(start = sizing.spacing(12.dp)), style = sizing.textStyle(MaterialTheme.typography.bodyMedium), fontWeight = if(isFreqDragged) FontWeight.Bold else FontWeight.Normal)
                                                     val onFreqChange = { newValue: Boolean ->
                                                         if (!newValue && getTotalActiveFrequenciesCount() <= 1) {
                                                             android.widget.Toast.makeText(context, txtMinOneFreq, android.widget.Toast.LENGTH_SHORT).show()
@@ -2403,12 +2609,12 @@ fun SiteFreqFiltersSheet(
             }
 
             Card(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp)),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(R.string.appstrings_spectrum_title), fontWeight = FontWeight.Bold, fontSize = 16.sp, modifier = Modifier.weight(1f))
+                        Text(stringResource(R.string.appstrings_spectrum_title), fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp), modifier = Modifier.weight(1f))
                         val onSpectrumChange = { newValue: Boolean ->
                             saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, newValue)
                             saveBool("site_show_spectrum_band", AppConfig.siteShowSpectrumBand, newValue)
@@ -2423,9 +2629,9 @@ fun SiteFreqFiltersSheet(
                     }
                     AnimatedVisibility(visible = AppConfig.siteShowSpectrum.value) {
                         Column {
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(stringResource(R.string.appstrings_spectrum_by_band), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(8.dp)), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(4.dp)), verticalAlignment = Alignment.CenterVertically) {
+                                Text(stringResource(R.string.appstrings_spectrum_by_band), modifier = Modifier.weight(1f), style = sizing.textStyle(MaterialTheme.typography.bodyMedium))
                                 val onBandChange = { newValue: Boolean ->
                                     saveBool("site_show_spectrum_band", AppConfig.siteShowSpectrumBand, newValue)
                                     if (!newValue && !AppConfig.siteShowSpectrumTotal.value) saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, false)
@@ -2439,8 +2645,8 @@ fun SiteFreqFiltersSheet(
                                     checkedColor = switchColor
                                 )
                             }
-                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(stringResource(R.string.appstrings_totalspectrum), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(4.dp)), verticalAlignment = Alignment.CenterVertically) {
+                                Text(stringResource(R.string.appstrings_totalspectrum), modifier = Modifier.weight(1f), style = sizing.textStyle(MaterialTheme.typography.bodyMedium))
                                 val onTotalChange = { newValue: Boolean ->
                                     saveBool("site_show_spectrum_total", AppConfig.siteShowSpectrumTotal, newValue)
                                     if (!newValue && !AppConfig.siteShowSpectrumBand.value) saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, false)
@@ -2459,7 +2665,7 @@ fun SiteFreqFiltersSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
             TextButton(
                 onClick = {
                     AppConfig.siteTechnoOrder.value = listOf("5G", "4G", "3G", "2G", "FH")
@@ -2502,10 +2708,10 @@ fun SiteFreqFiltersSheet(
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
                 Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
-            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
         }
     }
 }
@@ -2525,6 +2731,7 @@ fun SitePhotosSettingsSheet(
     val useOneUi = AppConfig.useOneUiDesign
     val scrollState = rememberScrollState()
     val featureFlags by RemoteFeatureFlags.config
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     fun saveBool(key: String, state: androidx.compose.runtime.MutableState<Boolean>, value: Boolean) {
         state.value = value
@@ -2539,10 +2746,10 @@ fun SitePhotosSettingsSheet(
                 .navigationBarsPadding()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
-                .padding(horizontal = 24.dp)
+                .padding(horizontal = sizing.spacing(24.dp))
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp, top = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(16.dp), top = sizing.spacing(8.dp)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onBack) {
@@ -2550,21 +2757,21 @@ fun SitePhotosSettingsSheet(
                 }
                 Text(
                     text = stringResource(R.string.appstrings_site_photos_settings_title),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.width(48.dp))
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
             }
 
             Card(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp)),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             ) {
-                Column(modifier = Modifier.padding(16.dp)) {
+                Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(R.string.appstrings_site_photos_and_schemes_option), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), fontSize = 16.sp)
+                        Text(stringResource(R.string.appstrings_site_photos_and_schemes_option), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), fontSize = sizing.text(16.sp))
                         val onMasterChange = { newValue: Boolean ->
                             onPhotosVisibilityChange(newValue)
                         }
@@ -2578,11 +2785,11 @@ fun SitePhotosSettingsSheet(
                     
                     androidx.compose.animation.AnimatedVisibility(visible = photosVisible) {
                         Column {
-                            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+                            HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                             
                             // Schematics
-                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(stringResource(R.string.appstrings_show_schemes_label), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(4.dp)), verticalAlignment = Alignment.CenterVertically) {
+                                Text(stringResource(R.string.appstrings_show_schemes_label), modifier = Modifier.weight(1f), style = sizing.textStyle(MaterialTheme.typography.bodyMedium))
                                 fr.geotower.ui.components.GeoTowerSwitch(
                                     checked = AppConfig.siteShowSchemes.value,
                                     onCheckedChange = { saveBool("site_show_schemes", AppConfig.siteShowSchemes, it) },
@@ -2592,8 +2799,8 @@ fun SitePhotosSettingsSheet(
                                 )
                             }
 
-                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Text(stringResource(R.string.appstrings_show_exif_label), modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(4.dp)), verticalAlignment = Alignment.CenterVertically) {
+                                Text(stringResource(R.string.appstrings_show_exif_label), modifier = Modifier.weight(1f), style = sizing.textStyle(MaterialTheme.typography.bodyMedium))
                                 fr.geotower.ui.components.GeoTowerSwitch(
                                     checked = AppConfig.siteShowPhotoExif.value,
                                     onCheckedChange = { saveBool("site_show_photo_exif", AppConfig.siteShowPhotoExif, it) },
@@ -2610,37 +2817,37 @@ fun SitePhotosSettingsSheet(
             if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.COMMUNITY_DATA_SETTINGS)) {
                 Card(
                     onClick = onOpenCommunityDataSettings,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp)),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 text = stringResource(R.string.appstrings_photo_sources_settings_title),
                                 fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
+                                fontSize = sizing.text(16.sp)
                             )
                             Text(
                                 text = stringResource(R.string.appstrings_photo_sources_settings_desc),
-                                style = MaterialTheme.typography.bodySmall,
+                                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(top = 4.dp)
+                                modifier = Modifier.padding(top = sizing.spacing(4.dp))
                             )
                         }
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(start = 12.dp).size(28.dp)
+                            modifier = Modifier.padding(start = sizing.spacing(12.dp)).size(sizing.component(28.dp))
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
             TextButton(
                 onClick = {
                     onPhotosVisibilityChange(true)
@@ -2650,10 +2857,10 @@ fun SitePhotosSettingsSheet(
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
                 Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
-            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
         }
     }
 }

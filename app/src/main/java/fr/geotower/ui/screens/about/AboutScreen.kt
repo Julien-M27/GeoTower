@@ -439,6 +439,9 @@ fun AboutScreen(navController: NavController) {
                                     sectionAnchorModifiers[5],
                                     onOpenPhotoUploadHistory = {
                                         navController.navigate("photo_upload_history")
+                                    },
+                                    onOpenDiagnostic = {
+                                        navController.navigate("diagnostic")
                                     }
                                 )
                                 Spacer(modifier = Modifier.height(60.dp))
@@ -456,7 +459,11 @@ fun AboutScreen(navController: NavController) {
                                         }
                                     )
                                     3 -> SectionSources(cardShape, bubbleBaseColor)
-                                    4 -> SectionVersions(cardShape, bubbleBaseColor)
+                                    4 -> SectionVersions(
+                                        cardShape,
+                                        bubbleBaseColor,
+                                        onOpenDiagnostic = { navController.navigate("diagnostic") }
+                                    )
                                     5 -> SectionDeveloppement()
                                 }
                             }
@@ -525,7 +532,8 @@ fun AllAboutContent(
     sourcesModifier: Modifier = Modifier,
     versionsModifier: Modifier = Modifier,
     developmentModifier: Modifier = Modifier,
-    onOpenPhotoUploadHistory: () -> Unit = {}
+    onOpenPhotoUploadHistory: () -> Unit = {},
+    onOpenDiagnostic: () -> Unit = {}
 ) {
     Column(
         modifier = presentationModifier.fillMaxWidth(),
@@ -563,7 +571,7 @@ fun AllAboutContent(
         modifier = versionsModifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        SectionVersions(cardShape, bubbleColor)
+        SectionVersions(cardShape, bubbleColor, onOpenDiagnostic)
     }
     Spacer(modifier = Modifier.height(16.dp))
     Column(
@@ -775,7 +783,11 @@ private fun AboutDrawableImage(resId: Int, modifier: Modifier = Modifier, conten
 }
 
 @Composable
-fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
+fun SectionVersions(
+    cardShape: Shape,
+    bubbleColor: Color,
+    onOpenDiagnostic: () -> Unit = {}
+) {
     val context = LocalContext.current
     var appVersion by remember { mutableStateOf("-") }
     var dbVersion by remember { mutableStateOf("-") }
@@ -919,6 +931,24 @@ fun SectionVersions(cardShape: Shape, bubbleColor: Color) {
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
                     )
                 }
+            }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    Surface(
+        onClick = onOpenDiagnostic,
+        shape = cardShape,
+        color = cardColor,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(stringResource(R.string.appstrings_diagnostic_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.appstrings_diagnostic_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

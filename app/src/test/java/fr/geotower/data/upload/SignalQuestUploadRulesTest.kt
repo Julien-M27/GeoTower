@@ -25,10 +25,19 @@ class SignalQuestUploadRulesTest {
     }
 
     @Test
-    fun calculatesPowerOfTwoSampleSizeForLargeImages() {
+    fun keepsFullResolutionUntilServerLimitsAreExceeded() {
+        // Photos classiques (< 10000 px et < 50 Mpx) : aucun sous-echantillonnage.
         assertEquals(1, SignalQuestUploadRules.calculateInSampleSize(2048, 1536))
-        assertEquals(2, SignalQuestUploadRules.calculateInSampleSize(6000, 4000))
-        assertEquals(4, SignalQuestUploadRules.calculateInSampleSize(12000, 9000))
+        assertEquals(1, SignalQuestUploadRules.calculateInSampleSize(6000, 4000))
+        assertEquals(1, SignalQuestUploadRules.calculateInSampleSize(8000, 6000))
+    }
+
+    @Test
+    fun downsamplesOnlyBeyondServerLimits() {
+        // 12000 px > 10000 px (limite dimension serveur) -> facteur 2.
+        assertEquals(2, SignalQuestUploadRules.calculateInSampleSize(12000, 9000))
+        // 10000 x 8000 = 80 Mpx > 50 Mpx (limite pixels serveur) -> facteur 2.
+        assertEquals(2, SignalQuestUploadRules.calculateInSampleSize(10000, 8000))
     }
 
     @Test

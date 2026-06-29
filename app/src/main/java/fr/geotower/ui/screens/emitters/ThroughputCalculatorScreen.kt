@@ -71,6 +71,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -133,9 +135,12 @@ import kotlin.math.asin
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
+import kotlin.math.exp
+import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
+import kotlin.math.tan
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
@@ -148,6 +153,20 @@ private const val PANEL_AZIMUTH_HALF_BEAM_DEGREES = 45.0
 private const val MAX_FR_UPLINK_AGGREGATED_CARRIERS = 2
 private val LTE_LOW_BAND_MHZ = setOf(700, 800, 900)
 
+private const val DEFAULT_RECEIVER_HEIGHT_METERS = 2f
+private const val RECEIVER_HEIGHT_MIN_METERS = 2f
+private const val RECEIVER_HEIGHT_MAX_METERS = 50f
+private const val GROUND_FLOOR_HEIGHT_METERS = 1.5
+private const val METERS_PER_FLOOR = 3.0
+
+private fun snapReceiverHeight(value: Float): Float {
+    return value.roundToInt().toFloat().coerceIn(RECEIVER_HEIGHT_MIN_METERS, RECEIVER_HEIGHT_MAX_METERS)
+}
+
+private fun floorEquivalentForHeight(heightMeters: Double): Int {
+    return ((heightMeters - GROUND_FLOOR_HEIGHT_METERS) / METERS_PER_FLOOR).roundToInt().coerceAtLeast(0)
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun ThroughputCalculatorScreen(
@@ -155,10 +174,17 @@ fun ThroughputCalculatorScreen(
     repository: AnfrRepository,
     antennaId: String,
     isSplitScreen: Boolean = false,
-    onCloseSplitScreen: () -> Unit = {}
+    onCloseSplitScreen: () -> Unit = {},
+    incomingConfig: String? = null
 ) {
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE) }
+    // A throughput deep link (QR share) carries the settings as a compact config string. Apply it to
+    // the prefs before the state below reads them, so the calculator opens with the shared settings.
+    remember(incomingConfig) {
+        if (!incomingConfig.isNullOrBlank()) applyThroughputShareConfig(prefs, incomingConfig)
+        incomingConfig
+    }
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
     val useOneUiDesign = AppConfig.useOneUiDesign
@@ -186,26 +212,9 @@ fun ThroughputCalculatorScreen(
     var physique by remember { mutableStateOf<PhysiqueEntity?>(null) }
     var technique by remember { mutableStateOf<TechniqueEntity?>(null) }
     var isLoading by remember { mutableStateOf(true) }
+    var coneMapView by remember { mutableStateOf<org.osmdroid.views.MapView?>(null) }
     var customSettings by remember {
-        mutableStateOf(
-            CustomModulationSettings(
-                lteDownIndex = prefs.getInt(ThroughputPrefs.CUSTOM_LTE_DOWN, 3).coerceIn(0, lteDownModulationOptions.lastIndex),
-                lteUpIndex = prefs.getInt(ThroughputPrefs.CUSTOM_LTE_UP, 2).coerceIn(0, lteUpModulationOptions.lastIndex),
-                nrDownIndex = prefs.getInt(ThroughputPrefs.CUSTOM_NR_DOWN, 3).coerceIn(0, nrDownModulationOptions.lastIndex),
-                nrUpIndex = prefs.getInt(ThroughputPrefs.CUSTOM_NR_UP, 2).coerceIn(0, nrUpModulationOptions.lastIndex),
-                lteRsrpDbm = prefs.getFloat(ThroughputPrefs.CUSTOM_LTE_RSRP, -95f),
-                lteSinrDb = prefs.getFloat(ThroughputPrefs.CUSTOM_LTE_SINR, 15f),
-                nrRsrpDbm = prefs.getFloat(ThroughputPrefs.CUSTOM_NR_RSRP, -92f),
-                nrSinrDb = prefs.getFloat(ThroughputPrefs.CUSTOM_NR_SINR, 18f),
-                environment = radioEnvironmentFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_ENVIRONMENT, null)),
-                positionScenario = positionScenarioFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_POSITION, null)),
-                networkLoad = networkLoadFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_NETWORK_LOAD, null)),
-                backhaul = backhaulQualityFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_BACKHAUL, null)),
-                lteAggregation = lteAggregationModeFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_LTE_AGGREGATION, null)),
-                selectedLatitude = prefs.getString(ThroughputPrefs.CUSTOM_SELECTED_LAT, null)?.toDoubleOrNull(),
-                selectedLongitude = prefs.getString(ThroughputPrefs.CUSTOM_SELECTED_LON, null)?.toDoubleOrNull()
-            )
-        )
+        mutableStateOf(readThroughputCustomSettings(prefs))
     }
     fun updateCustomSettings(newSettings: CustomModulationSettings) {
         customSettings = newSettings
@@ -223,6 +232,7 @@ fun ThroughputCalculatorScreen(
             .putString(ThroughputPrefs.CUSTOM_NETWORK_LOAD, newSettings.networkLoad.id)
             .putString(ThroughputPrefs.CUSTOM_BACKHAUL, newSettings.backhaul.id)
             .putString(ThroughputPrefs.CUSTOM_LTE_AGGREGATION, newSettings.lteAggregation.id)
+            .putFloat(ThroughputPrefs.CUSTOM_RECEIVER_HEIGHT, newSettings.receiverHeightMeters)
             .remove(ThroughputPrefs.CUSTOM_DEVICE)
         if (newSettings.selectedLatitude != null && newSettings.selectedLongitude != null) {
             editor
@@ -316,7 +326,11 @@ fun ThroughputCalculatorScreen(
             include5G = include5G,
             includePlanned = includePlanned,
             enabledBandKeys = effectiveEnabledBandKeys,
-            supportHeightMeters = supportHeightMeters
+            supportHeightMeters = supportHeightMeters,
+            receiverHeightMeters = customSettings.receiverHeightMeters.toDouble(),
+            siteLatitude = site?.latitude ?: 0.0,
+            siteLongitude = site?.longitude ?: 0.0,
+            siteAzimuths = site?.azimuts
         )
     }
     val txtSiteDetailsTitle = stringResource(R.string.appstrings_site_detail_title)
@@ -332,6 +346,15 @@ fun ThroughputCalculatorScreen(
                     backgroundColor = mainBgColor,
                     backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
                     actions = {
+                        site?.let { loadedSite ->
+                            fr.geotower.ui.components.ThroughputShareMenu(
+                                info = loadedSite,
+                                physique = physique,
+                                technique = technique,
+                                useOneUi = uiStyle.useOneUi,
+                                coneMapView = coneMapView
+                            )
+                        }
                         IconButton(onClick = { showThroughputSettingsSheet = true }) {
                             Icon(
                                 Icons.Default.Settings,
@@ -399,29 +422,14 @@ fun ThroughputCalculatorScreen(
                 },
                 result = result,
                 blockOrder = throughputBlockOrder,
-                visibleBlocks = visibleThroughputBlocks
+                visibleBlocks = visibleThroughputBlocks,
+                onConeMapReady = { coneMapView = it }
             )
         }
     }
 
     fun refreshThroughputDefaultsFromPrefs() {
-        customSettings = CustomModulationSettings(
-            lteDownIndex = prefs.getInt(ThroughputPrefs.CUSTOM_LTE_DOWN, 3).coerceIn(0, lteDownModulationOptions.lastIndex),
-            lteUpIndex = prefs.getInt(ThroughputPrefs.CUSTOM_LTE_UP, 2).coerceIn(0, lteUpModulationOptions.lastIndex),
-            nrDownIndex = prefs.getInt(ThroughputPrefs.CUSTOM_NR_DOWN, 3).coerceIn(0, nrDownModulationOptions.lastIndex),
-            nrUpIndex = prefs.getInt(ThroughputPrefs.CUSTOM_NR_UP, 2).coerceIn(0, nrUpModulationOptions.lastIndex),
-            lteRsrpDbm = prefs.getFloat(ThroughputPrefs.CUSTOM_LTE_RSRP, -95f),
-            lteSinrDb = prefs.getFloat(ThroughputPrefs.CUSTOM_LTE_SINR, 15f),
-            nrRsrpDbm = prefs.getFloat(ThroughputPrefs.CUSTOM_NR_RSRP, -92f),
-            nrSinrDb = prefs.getFloat(ThroughputPrefs.CUSTOM_NR_SINR, 18f),
-            environment = radioEnvironmentFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_ENVIRONMENT, null)),
-            positionScenario = positionScenarioFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_POSITION, null)),
-            networkLoad = networkLoadFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_NETWORK_LOAD, null)),
-            backhaul = backhaulQualityFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_BACKHAUL, null)),
-            lteAggregation = lteAggregationModeFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_LTE_AGGREGATION, null)),
-            selectedLatitude = prefs.getString(ThroughputPrefs.CUSTOM_SELECTED_LAT, null)?.toDoubleOrNull(),
-            selectedLongitude = prefs.getString(ThroughputPrefs.CUSTOM_SELECTED_LON, null)?.toDoubleOrNull()
-        )
+        customSettings = readThroughputCustomSettings(prefs)
         include4G = ThroughputPrefs.include4G.read(prefs)
         include5G = ThroughputPrefs.include5G.read(prefs)
         includePlanned = ThroughputPrefs.includePlanned.read(prefs)
@@ -558,7 +566,8 @@ private fun ThroughputContent(
     onBandEnabledChange: (String, Boolean) -> Unit,
     result: ThroughputResult,
     blockOrder: List<ThroughputBlock>,
-    visibleBlocks: Map<ThroughputBlock, Boolean>
+    visibleBlocks: Map<ThroughputBlock, Boolean>,
+    onConeMapReady: (org.osmdroid.views.MapView) -> Unit
 ) {
     val scrollState = rememberScrollState()
 
@@ -584,7 +593,8 @@ private fun ThroughputContent(
                     cardBgColor = cardBgColor,
                     blockShape = blockShape,
                     customSettings = customSettings,
-                    onCustomSettingsChange = onCustomSettingsChange
+                    onCustomSettingsChange = onCustomSettingsChange,
+                    onConeMapReady = onConeMapReady
                 )
                 ThroughputBlock.Controls -> ThroughputControlsCard(
                     cardBgColor = cardBgColor,
@@ -616,6 +626,156 @@ private fun ThroughputContent(
             }
         }
         Spacer(Modifier.height(8.dp))
+    }
+}
+
+/**
+ * Static rendering of the calculator page used for the share image / QR export: same header and
+ * cards, in the user's block order, minus the interactive controls and live map.
+ */
+@Composable
+fun ThroughputShareContent(
+    site: LocalisationEntity,
+    physique: PhysiqueEntity?,
+    technique: TechniqueEntity?,
+    prefs: SharedPreferences,
+    cardBgColor: Color,
+    blockShape: Shape,
+    coneMapBitmap: android.graphics.Bitmap? = null
+) {
+    val txtUnknown = stringResource(R.string.appstrings_unknown)
+    val txtAzimuthNotSpecified = stringResource(R.string.appstrings_azimuth_not_specified)
+    val rawFrequencies = technique?.detailsFrequences?.takeIf { it.isNotBlank() } ?: site.frequences
+    val parsedBands = remember(rawFrequencies, txtUnknown, txtAzimuthNotSpecified) {
+        parseAndSortFrequencies(rawFrequencies, txtUnknown, txtAzimuthNotSpecified)
+    }
+    val customSettings = remember(prefs) { readThroughputCustomSettings(prefs) }
+    val include4G = remember(prefs) { ThroughputPrefs.include4G.read(prefs) }
+    val include5G = remember(prefs) { ThroughputPrefs.include5G.read(prefs) }
+    val includePlanned = remember(prefs) { ThroughputPrefs.includePlanned.read(prefs) }
+    val enabledBandKeys = remember(parsedBands, prefs) {
+        throughputCalculationBands(parsedBands)
+            .filter { isThroughputBandEnabledByDefault(it, prefs) }
+            .map { throughputBandKey(it) }
+            .toSet()
+    }
+    val result = remember(parsedBands, customSettings, include4G, include5G, includePlanned, enabledBandKeys, physique?.hauteur) {
+        calculateThroughput(
+            bands = parsedBands,
+            operatorName = site.operateur,
+            preset = ThroughputPreset.Conservative,
+            customSettings = customSettings,
+            include4G = include4G,
+            include5G = include5G,
+            includePlanned = includePlanned,
+            enabledBandKeys = enabledBandKeys,
+            supportHeightMeters = physique?.hauteur,
+            receiverHeightMeters = customSettings.receiverHeightMeters.toDouble(),
+            siteLatitude = site.latitude,
+            siteLongitude = site.longitude,
+            siteAzimuths = site.azimuts
+        )
+    }
+    val blockOrder = remember(prefs) {
+        normalizeThroughputBlockOrder(
+            prefs.getString(ThroughputPrefs.BLOCK_ORDER, ThroughputPrefs.defaultBlockOrder.joinToString(","))
+                ?.split(",")
+                .orEmpty()
+        )
+    }
+    val visibleBlocks = remember(prefs) {
+        ThroughputBlock.entries.associateWith { prefs.getBoolean(it.prefKey, true) }
+    }
+
+    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        blockOrder.forEach { block ->
+            if (visibleBlocks[block] != true) return@forEach
+            when (block) {
+                ThroughputBlock.Header -> ThroughputHeaderCard(site, physique, cardBgColor, blockShape)
+                ThroughputBlock.Summary -> ThroughputSummaryCard(result, cardBgColor, blockShape)
+                ThroughputBlock.Cone -> ThroughputShareConeCard(result, cardBgColor, blockShape, coneMapBitmap)
+                ThroughputBlock.Controls -> Unit // interactive: omitted from the static share image
+                ThroughputBlock.Bands -> {
+                    if (result.bands.isEmpty()) {
+                        Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
+                            Text(
+                                text = stringResource(R.string.appstrings_throughput_no_bands),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(16.dp)
+                            )
+                        }
+                    } else {
+                        ThroughputBandsCard(result, cardBgColor, blockShape)
+                    }
+                }
+                ThroughputBlock.Assumptions -> ThroughputAssumptionsCard(result, cardBgColor, blockShape)
+            }
+        }
+    }
+}
+
+@Composable
+private fun ThroughputShareConeCard(
+    result: ThroughputResult,
+    cardBgColor: Color,
+    blockShape: Shape,
+    coneMapBitmap: android.graphics.Bitmap? = null
+) {
+    val coneDistance = result.coneDistance
+    Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = stringResource(R.string.appstrings_throughput_estimated_optimal_distance_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            if (coneDistance == null) {
+                Text(
+                    text = stringResource(R.string.appstrings_throughput_cone_height_unavailable),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Text(
+                    text = formatThroughputDistanceMeters(coneDistance.centerMeters),
+                    style = MaterialTheme.typography.headlineSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Text(
+                    text = ThroughputDisplayText.mainZoneEstimated(
+                        formatThroughputDistanceMeters(coneDistance.nearMeters),
+                        formatThroughputDistanceMeters(coneDistance.farMeters)
+                    ),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = stringResource(R.string.appstrings_throughput_cone_assumption),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                if (coneMapBitmap != null) {
+                    Spacer(Modifier.height(4.dp))
+                    Image(
+                        bitmap = coneMapBitmap.asImageBitmap(),
+                        contentDescription = null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(180.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), RoundedCornerShape(12.dp)),
+                        contentScale = ContentScale.Crop
+                    )
+                    Text(
+                        text = stringResource(R.string.appstrings_throughput_cone_map_explanation),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }
 
@@ -770,7 +930,8 @@ private fun ThroughputConeCard(
     cardBgColor: Color,
     blockShape: Shape,
     customSettings: CustomModulationSettings? = null,
-    onCustomSettingsChange: ((CustomModulationSettings) -> Unit)? = null
+    onCustomSettingsChange: ((CustomModulationSettings) -> Unit)? = null,
+    onConeMapReady: (org.osmdroid.views.MapView) -> Unit = {}
 ) {
     val coneDistance = result.coneDistance
     val selectedMapPoint = customSettings?.let { settings ->
@@ -912,6 +1073,38 @@ private fun ThroughputConeCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                if (customSettings != null && onCustomSettingsChange != null) {
+                    Spacer(Modifier.height(4.dp))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                    Text(
+                        text = stringResource(R.string.appstrings_throughput_receiver_height_title),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = stringResource(R.string.appstrings_throughput_receiver_height_desc),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    SignalSlider(
+                        label = "",
+                        value = customSettings.receiverHeightMeters,
+                        valueRange = RECEIVER_HEIGHT_MIN_METERS..RECEIVER_HEIGHT_MAX_METERS,
+                        steps = (RECEIVER_HEIGHT_MAX_METERS - RECEIVER_HEIGHT_MIN_METERS).roundToInt() - 1,
+                        unit = "m",
+                        useOneUi = LocalGeoTowerUiStyle.current.useOneUi,
+                        onValueChange = { newHeight ->
+                            onCustomSettingsChange(customSettings.copy(receiverHeightMeters = snapReceiverHeight(newHeight)))
+                        },
+                        valueLabel = { meters ->
+                            ThroughputDisplayText.receiverHeightValue(
+                                formatHeightMeters(meters.toDouble()),
+                                ThroughputDisplayText.floorEquivalent(floorEquivalentForHeight(meters.toDouble()))
+                            )
+                        }
+                    )
+                }
                 if (coneMapOverlay != null) {
                     Spacer(Modifier.height(4.dp))
                     if (customSettings != null && onCustomSettingsChange != null) {
@@ -1001,7 +1194,7 @@ private fun ThroughputConeCard(
                         mappedAntennas = listOf(site),
                         blockShape = blockShape,
                         cardBorder = null,
-                        onMapReady = {},
+                        onMapReady = onConeMapReady,
                         focusOperator = site.operateur,
                         coneOverlay = coneMapOverlay,
                         initialZoom = mapZoomForCone(coneDistance.centerMeters),
@@ -1377,7 +1570,8 @@ private fun SignalSlider(
     steps: Int,
     unit: String,
     useOneUi: Boolean,
-    onValueChange: (Float) -> Unit
+    onValueChange: (Float) -> Unit,
+    valueLabel: (@Composable (Int) -> String)? = null
 ) {
     val roundedValue = value.roundToInt().coerceIn(valueRange.start.roundToInt(), valueRange.endInclusive.roundToInt())
     val valueSpan = (valueRange.endInclusive - valueRange.start).coerceAtLeast(1f)
@@ -1386,9 +1580,10 @@ private fun SignalSlider(
     val inactiveTrackColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.18f)
     val activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f)
     val dotColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f)
+    val valueText = valueLabel?.invoke(roundedValue) ?: "$roundedValue $unit"
     Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Text(
-            text = "$label : $roundedValue $unit",
+            text = if (label.isBlank()) valueText else "$label : $valueText",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -1744,6 +1939,66 @@ private suspend fun loadThroughputSite(
     return ThroughputSiteData(selected, physique, technique)
 }
 
+private fun readThroughputCustomSettings(prefs: SharedPreferences): CustomModulationSettings {
+    return CustomModulationSettings(
+        lteDownIndex = prefs.getInt(ThroughputPrefs.CUSTOM_LTE_DOWN, 3).coerceIn(0, lteDownModulationOptions.lastIndex),
+        lteUpIndex = prefs.getInt(ThroughputPrefs.CUSTOM_LTE_UP, 2).coerceIn(0, lteUpModulationOptions.lastIndex),
+        nrDownIndex = prefs.getInt(ThroughputPrefs.CUSTOM_NR_DOWN, 3).coerceIn(0, nrDownModulationOptions.lastIndex),
+        nrUpIndex = prefs.getInt(ThroughputPrefs.CUSTOM_NR_UP, 2).coerceIn(0, nrUpModulationOptions.lastIndex),
+        lteRsrpDbm = prefs.getFloat(ThroughputPrefs.CUSTOM_LTE_RSRP, -95f),
+        lteSinrDb = prefs.getFloat(ThroughputPrefs.CUSTOM_LTE_SINR, 15f),
+        nrRsrpDbm = prefs.getFloat(ThroughputPrefs.CUSTOM_NR_RSRP, -92f),
+        nrSinrDb = prefs.getFloat(ThroughputPrefs.CUSTOM_NR_SINR, 18f),
+        environment = radioEnvironmentFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_ENVIRONMENT, null)),
+        positionScenario = positionScenarioFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_POSITION, null)),
+        networkLoad = networkLoadFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_NETWORK_LOAD, null)),
+        backhaul = backhaulQualityFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_BACKHAUL, null)),
+        lteAggregation = lteAggregationModeFromPreference(prefs.getString(ThroughputPrefs.CUSTOM_LTE_AGGREGATION, null)),
+        receiverHeightMeters = snapReceiverHeight(prefs.getFloat(ThroughputPrefs.CUSTOM_RECEIVER_HEIGHT, DEFAULT_RECEIVER_HEIGHT_METERS)),
+        selectedLatitude = prefs.getString(ThroughputPrefs.CUSTOM_SELECTED_LAT, null)?.toDoubleOrNull(),
+        selectedLongitude = prefs.getString(ThroughputPrefs.CUSTOM_SELECTED_LON, null)?.toDoubleOrNull()
+    )
+}
+
+private const val THROUGHPUT_SHARE_CONFIG_VERSION = "v1"
+
+/**
+ * Encodes the settings that actually influence the calculator result (generation toggles, planned
+ * bands, arrival height, selected position) into a compact string carried by the QR deep link.
+ */
+fun encodeThroughputShareConfig(prefs: SharedPreferences): String {
+    val include4G = if (ThroughputPrefs.include4G.read(prefs)) "1" else "0"
+    val include5G = if (ThroughputPrefs.include5G.read(prefs)) "1" else "0"
+    val includePlanned = if (ThroughputPrefs.includePlanned.read(prefs)) "1" else "0"
+    val receiverHeight = prefs.getFloat(ThroughputPrefs.CUSTOM_RECEIVER_HEIGHT, DEFAULT_RECEIVER_HEIGHT_METERS).roundToInt().toString()
+    val latitude = prefs.getString(ThroughputPrefs.CUSTOM_SELECTED_LAT, null).orEmpty()
+    val longitude = prefs.getString(ThroughputPrefs.CUSTOM_SELECTED_LON, null).orEmpty()
+    return listOf(THROUGHPUT_SHARE_CONFIG_VERSION, include4G, include5G, includePlanned, receiverHeight, latitude, longitude)
+        .joinToString(";")
+}
+
+/** Writes a config string produced by [encodeThroughputShareConfig] back into the throughput prefs. */
+fun applyThroughputShareConfig(prefs: SharedPreferences, config: String) {
+    val parts = config.split(";")
+    if (parts.size < 5 || parts[0] != THROUGHPUT_SHARE_CONFIG_VERSION) return
+    val editor = prefs.edit()
+    ThroughputPrefs.include4G.write(editor, parts[1] == "1")
+    ThroughputPrefs.include5G.write(editor, parts[2] == "1")
+    ThroughputPrefs.includePlanned.write(editor, parts[3] == "1")
+    parts[4].toFloatOrNull()?.let {
+        editor.putFloat(ThroughputPrefs.CUSTOM_RECEIVER_HEIGHT, it.coerceIn(RECEIVER_HEIGHT_MIN_METERS, RECEIVER_HEIGHT_MAX_METERS))
+    }
+    val latitude = parts.getOrNull(5)?.takeIf { it.isNotBlank() && it.toDoubleOrNull() != null }
+    val longitude = parts.getOrNull(6)?.takeIf { it.isNotBlank() && it.toDoubleOrNull() != null }
+    if (latitude != null && longitude != null) {
+        editor.putString(ThroughputPrefs.CUSTOM_SELECTED_LAT, latitude)
+        editor.putString(ThroughputPrefs.CUSTOM_SELECTED_LON, longitude)
+    } else {
+        editor.remove(ThroughputPrefs.CUSTOM_SELECTED_LAT).remove(ThroughputPrefs.CUSTOM_SELECTED_LON)
+    }
+    editor.apply()
+}
+
 private fun calculateThroughput(
     bands: List<FreqBand>,
     operatorName: String?,
@@ -1753,7 +2008,11 @@ private fun calculateThroughput(
     include5G: Boolean,
     includePlanned: Boolean,
     enabledBandKeys: Set<String>,
-    supportHeightMeters: Double?
+    supportHeightMeters: Double?,
+    receiverHeightMeters: Double,
+    siteLatitude: Double,
+    siteLongitude: Double,
+    siteAzimuths: String?
 ): ThroughputResult {
     val operator = MobileOperator.fromLabel(operatorName)
     val engineProfile = engineProfileFor(preset, customSettings)
@@ -1780,7 +2039,13 @@ private fun calculateThroughput(
             val isIncluded = generationAllowed && bandAllowed && engineIncluded && (includePlanned || !isPlanned)
             val panelHeightMeters = extractThroughputPanelHeightMeters(band, supportHeightMeters)
             val azimuths = extractThroughputAzimuths(band)
-            val customMultipliers = throughputMultipliersFor(preset, band.gen, customSettings)
+            // Position is applied as a second pass below (continuous geometric factor); here we only
+            // apply the non-position multipliers so the per-band cone/azimuths are available first.
+            val baseMultipliers = if (preset == ThroughputPreset.Custom) {
+                throughputMultipliersFor(preset, band.gen, customSettings)
+            } else {
+                CustomThroughputMultipliers()
+            }
             val excludedReason = when {
                 !generationAllowed -> if (band.gen == 5) ThroughputTextKey.THROUGHPUT_REASON_5G_DISABLED else ThroughputTextKey.THROUGHPUT_REASON_4G_DISABLED
                 !bandAllowed -> ThroughputTextKey.THROUGHPUT_REASON_BAND_EXCLUDED
@@ -1801,17 +2066,44 @@ private fun calculateThroughput(
                     ?: throughputModulationLabel(band.gen, engineProfile),
                 bandwidthMHz = bandwidth.valueMHz,
                 bandwidthIsEstimated = bandwidth.isEstimated,
-                coneDistance = estimateThroughputConeDistance(panelHeightMeters),
+                coneDistance = estimateThroughputConeDistance(panelHeightMeters, userDeviceHeightMeters = receiverHeightMeters),
                 azimuths = azimuths,
                 status = band.status,
-                downMbps = (carrierResult?.dlMbps ?: 0.0) * customMultipliers.down,
-                upMbps = (carrierResult?.ulMbps ?: 0.0) * customMultipliers.up,
+                downMbps = (carrierResult?.dlMbps ?: 0.0) * baseMultipliers.down,
+                upMbps = (carrierResult?.ulMbps ?: 0.0) * baseMultipliers.up,
                 isIncluded = isIncluded,
                 excludedReason = excludedReason
             )
         }
 
-    val aggregationAwareBands = applyCarrierAggregationPolicy(calculatedBands, engineProfile)
+    // Second pass: when a position is selected (non-custom presets), scale the débit by a continuous
+    // factor derived from the real geometry. The arrival height reshapes the cone, so this factor —
+    // and therefore the throughput — varies smoothly with height instead of jumping between zones.
+    val selectedLat = customSettings.selectedLatitude
+    val selectedLon = customSettings.selectedLongitude
+    val positionMultipliers = if (preset != ThroughputPreset.Custom && selectedLat != null && selectedLon != null) {
+        val cone = aggregateThroughputCone(calculatedBands)
+        val azimuths = strongThroughputAzimuths(calculatedBands, siteAzimuths)
+        val distance = distanceMetersBetween(siteLatitude, siteLongitude, selectedLat, selectedLon)
+        val bearing = bearingDegreesBetween(siteLatitude, siteLongitude, selectedLat, selectedLon)
+        val nearestAzimuth = azimuths.minByOrNull { angularDistanceDegrees(it, bearing) }
+        val azimuthDelta = nearestAzimuth?.let { angularDistanceDegrees(it, bearing) }
+        continuousPositionMultipliers(cone, distance, azimuthDelta)
+    } else {
+        CustomThroughputMultipliers()
+    }
+    val positionedBands = if (positionMultipliers.down == 1.0 && positionMultipliers.up == 1.0) {
+        calculatedBands
+    } else {
+        calculatedBands.map { band ->
+            band.copy(
+                downMbps = band.downMbps * positionMultipliers.down,
+                upMbps = band.upMbps * positionMultipliers.up
+            )
+        }
+    }
+
+    val aggregationAwareBands = applyCarrierAggregationPolicy(positionedBands, engineProfile)
     val aggregationWarnings = aggregationAwareBands
         .mapNotNull { it.downAggregationExcludedReason }
         .distinct()
@@ -1945,6 +2237,65 @@ private fun positionThroughputMultipliers(
         down = scenario.multiplier.coerceIn(0.10, 1.20),
         up = upPositionMultiplier.coerceIn(0.10, 1.15)
     )
+}
+
+private const val NOMINAL_DOWNTILT_DEGREES = 6.0
+private const val ELEVATION_BEAM_SIGMA_DEGREES = 2.5
+private const val AZIMUTH_BEAM_SIGMA_DEGREES = 35.0
+private const val POSITION_FACTOR_FLOOR = 0.45
+private const val POSITION_FACTOR_PEAK = 1.06
+
+private fun aggregateThroughputCone(bands: List<ThroughputBandResult>): ConeDistance? {
+    val distances = bands.filter { it.isIncluded }.mapNotNull { it.coneDistance }
+    if (distances.isEmpty()) return null
+    return ConeDistance(
+        centerMeters = distances.map { it.centerMeters }.average(),
+        nearMeters = distances.minOf { it.nearMeters },
+        farMeters = distances.maxOf { it.farMeters }
+    )
+}
+
+private fun strongThroughputAzimuths(
+    bands: List<ThroughputBandResult>,
+    siteAzimuths: String?
+): List<Double> {
+    val fromBands = bands.filter { it.isIncluded }
+        .flatMap { it.azimuths }
+        .distinctBy { it.roundToInt() }
+    if (fromBands.isNotEmpty()) return fromBands
+    return siteAzimuths
+        ?.split(",")
+        ?.mapNotNull { it.trim().replace(',', '.').toDoubleOrNull() }
+        ?.filter { it in 0.0..360.0 }
+        ?.distinctBy { it.roundToInt() }
+        .orEmpty()
+}
+
+/**
+ * Continuous geometric factor: instead of a 4-step zone classification, the elevation angle from the
+ * panel to the receiver is compared with the nominal downtilt. The gain peaks when the angle matches
+ * the beam centre and rolls off with a Gaussian on both the elevation and azimuth offsets. Because the
+ * cone centre encodes (antenna height - arrival height), the factor varies smoothly with the chosen
+ * arrival height and the horizontal distance.
+ */
+private fun continuousPositionMultipliers(
+    cone: ConeDistance?,
+    distanceMeters: Double,
+    azimuthDeltaDegrees: Double?
+): CustomThroughputMultipliers {
+    if (cone == null) return CustomThroughputMultipliers()
+    val center = cone.centerMeters.coerceAtLeast(1.0)
+    val verticalDelta = center * tan(Math.toRadians(NOMINAL_DOWNTILT_DEGREES))
+    val safeDistance = distanceMeters.coerceAtLeast(1.0)
+    val elevationDeg = Math.toDegrees(atan2(verticalDelta, safeDistance))
+    val elevationGain = exp(-(elevationDeg - NOMINAL_DOWNTILT_DEGREES).pow(2) / (2 * ELEVATION_BEAM_SIGMA_DEGREES.pow(2)))
+    val azimuthGain = azimuthDeltaDegrees?.let {
+        exp(-it.pow(2) / (2 * AZIMUTH_BEAM_SIGMA_DEGREES.pow(2)))
+    } ?: 1.0
+    val gain = (elevationGain * azimuthGain).coerceIn(0.0, 1.0)
+    val down = (POSITION_FACTOR_FLOOR + (POSITION_FACTOR_PEAK - POSITION_FACTOR_FLOOR) * gain).coerceIn(0.10, 1.20)
+    val up = (down * 0.9 + 0.1).coerceIn(0.10, 1.15)
+    return CustomThroughputMultipliers(down = down, up = up)
 }
 
 private fun applyLteLowBandAggregationPolicy(
@@ -2294,6 +2645,7 @@ private data class CustomModulationSettings(
     val networkLoad: NetworkLoad = NetworkLoad.Unknown,
     val backhaul: BackhaulQuality = BackhaulQuality.Unknown,
     val lteAggregation: LteAggregationMode = LteAggregationMode.Realistic,
+    val receiverHeightMeters: Float = DEFAULT_RECEIVER_HEIGHT_METERS,
     val selectedLatitude: Double? = null,
     val selectedLongitude: Double? = null
 )

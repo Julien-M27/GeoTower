@@ -1,5 +1,8 @@
 package fr.geotower.data.models
 
+import android.content.Context
+import androidx.annotation.StringRes
+import fr.geotower.R
 import java.util.Locale
 
 object RadioServiceMasks {
@@ -14,18 +17,21 @@ object RadioServiceMasks {
 
     const val ALL = BROADCAST or PRIVATE or RAIL or TRANSPORT or FH or SATELLITE or RADAR or OTHER
 
-    fun labelFor(mask: Int): String {
+    @StringRes
+    fun labelRes(mask: Int): Int {
         return when {
-            (mask and BROADCAST) != 0 -> "Radio/TV"
-            (mask and RAIL) != 0 -> "Ferroviaire"
-            (mask and TRANSPORT) != 0 -> "Transport"
-            (mask and FH) != 0 -> "FH"
-            (mask and SATELLITE) != 0 -> "Satellite"
-            (mask and RADAR) != 0 -> "Radar"
-            (mask and PRIVATE) != 0 -> "Reseaux prives"
-            else -> "Autres"
+            (mask and BROADCAST) != 0 -> R.string.appstrings_radio_service_broadcast
+            (mask and RAIL) != 0 -> R.string.appstrings_radio_service_rail
+            (mask and TRANSPORT) != 0 -> R.string.appstrings_radio_service_transport
+            (mask and FH) != 0 -> R.string.appstrings_radio_service_fh
+            (mask and SATELLITE) != 0 -> R.string.appstrings_radio_service_satellite
+            (mask and RADAR) != 0 -> R.string.appstrings_radio_service_radar
+            (mask and PRIVATE) != 0 -> R.string.appstrings_radio_service_private
+            else -> R.string.appstrings_radio_service_other
         }
     }
+
+    fun labelFor(context: Context, mask: Int): String = context.getString(labelRes(mask))
 }
 
 object RadioSystemMasks {
@@ -83,8 +89,8 @@ data class RadioMapMarker(
     val isCluster: Boolean
         get() = clusterCount > 1 || id.startsWith(RADIO_CLUSTER_ID_PREFIX)
 
-    val networkName: String
-        get() = actorLabel?.takeIf { it.isNotBlank() } ?: RadioServiceMasks.labelFor(serviceMask)
+    fun networkName(context: Context): String =
+        actorLabel?.takeIf { it.isNotBlank() } ?: RadioServiceMasks.labelFor(context, serviceMask)
 
     val systemSummary: String?
         get() = detailValue("Systemes")
@@ -169,27 +175,28 @@ data class RadioMapMarker(
     val addressSummary: String?
         get() = detailValue("Adresse")
 
-    val title: String
-        get() {
-            val service = RadioServiceMasks.labelFor(serviceMask)
-            return if (isCluster) {
-                "$clusterCount sites $service"
-            } else {
-                networkName
-            }
+    fun title(context: Context): String {
+        return if (isCluster) {
+            context.getString(
+                R.string.appstrings_radio_cluster_sites,
+                clusterCount,
+                RadioServiceMasks.labelFor(context, serviceMask)
+            )
+        } else {
+            networkName(context)
         }
+    }
 
-    val subtitle: String
-        get() {
-            broadcastProgramSummary?.let { return it }
-            val service = RadioServiceMasks.labelFor(serviceMask)
-            val counts = buildList {
-                if (emitterCount > 0) add("$emitterCount emetteurs")
-                if (antennaCount > 0) add("$antennaCount antennes")
-                frequencyLabel()?.let { add(it) }
-            }
-            return (listOf(service) + counts).joinToString(" - ")
+    fun subtitle(context: Context): String {
+        broadcastProgramSummary?.let { return it }
+        val service = RadioServiceMasks.labelFor(context, serviceMask)
+        val counts = buildList {
+            if (emitterCount > 0) add(context.getString(R.string.appstrings_radio_emitters_count, emitterCount))
+            if (antennaCount > 0) add(context.getString(R.string.appstrings_radio_antennas_count, antennaCount))
+            frequencyLabel()?.let { add(it) }
         }
+        return (listOf(service) + counts).joinToString(" - ")
+    }
 
     private fun frequencyLabel(): String? {
         val min = minFreqKhz ?: return null
@@ -231,6 +238,38 @@ data class RadioMapMarker(
             RegexOption.IGNORE_CASE
         )
     }
+}
+
+/** Identifiants des champs du résumé partageable (rapport GeoTower). */
+object RadioReportSummaryFields {
+    const val NETWORK = "network"
+    const val SYSTEMS = "systems"
+    const val FREQUENCIES = "frequencies"
+    const val SUPPORT_HEIGHT = "support_height"
+}
+
+data class RadioReportSummaryField(
+    val id: String,
+    val value: String
+)
+
+/**
+ * Construit, à partir des données déjà chargées d'un marqueur, la liste ordonnée
+ * des champs factuels du résumé du rapport. Le libellé réseau localisé est fourni
+ * par l'appelant (via [networkName]) afin que cette fonction reste pure (sans
+ * Compose ni ressources) et testable unitairement. Les champs vides sont omis.
+ */
+fun RadioMapMarker.reportSummaryFields(networkLabel: String): List<RadioReportSummaryField> {
+    return listOfNotNull(
+        networkLabel.takeIf { it.isNotBlank() }
+            ?.let { RadioReportSummaryField(RadioReportSummaryFields.NETWORK, it) },
+        systemSummary?.takeIf { it.isNotBlank() }
+            ?.let { RadioReportSummaryField(RadioReportSummaryFields.SYSTEMS, it) },
+        frequencySummary?.takeIf { it.isNotBlank() }
+            ?.let { RadioReportSummaryField(RadioReportSummaryFields.FREQUENCIES, it) },
+        supportHeightSummary?.takeIf { it.isNotBlank() }
+            ?.let { RadioReportSummaryField(RadioReportSummaryFields.SUPPORT_HEIGHT, it) }
+    )
 }
 
 data class RadioBroadcastProgram(

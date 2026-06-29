@@ -32,6 +32,7 @@ class TypedPreferencesTest {
                 "map",
                 "support_details",
                 "elevation_profile",
+                "theoretical_coverage",
                 "throughput_calculator",
                 "open_map",
                 "photos",

@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import fr.geotower.R
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 
 // On réutilise la carte d'option définie dans SettingsScreen
 import fr.geotower.ui.screens.settings.SettingsOptionCard
@@ -24,14 +25,15 @@ fun MappingOptionsBlock(
     ignStyle: Int, onIgnStyleChange: (Int) -> Unit,
     shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     // 1. Les 4 fournisseurs répartis sur 2 lignes pour ne pas écraser l'interface
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)), verticalAlignment = Alignment.CenterVertically) {
             // Si on passe sur OSM et qu'on était en Satellite (2), on repasse en Clair (0) automatiquement
             SettingsOptionCard(stringResource(R.string.mapping_provider_osm), Icons.Default.Public, mapProvider == 1, { safeClick("mapping_provider_osm") { onMapProviderChange(1); if (ignStyle == 2) onIgnStyleChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
             SettingsOptionCard(stringResource(R.string.mapping_provider_ign), Icons.Default.Layers, mapProvider == 0, { safeClick("mapping_provider_ign") { onMapProviderChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
         }
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)), verticalAlignment = Alignment.CenterVertically) {
             SettingsOptionCard(stringResource(R.string.mapping_provider_maplibre), Icons.Default.Explore, mapProvider == 2, { safeClick("mapping_provider_maplibre") { onMapProviderChange(2) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
             SettingsOptionCard(stringResource(R.string.mapping_provider_topo), Icons.Default.Terrain, mapProvider == 3, { safeClick("mapping_provider_topo") { onMapProviderChange(3) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
         }
@@ -45,11 +47,11 @@ fun MappingOptionsBlock(
         exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it }) + shrinkVertically(shrinkTowards = Alignment.Top)
     ) {
         Column {
-            Spacer(Modifier.height(16.dp))
-            Text(stringResource(R.string.mapping_style_title), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(sizing.spacing(16.dp)))
+            Text(stringResource(R.string.mapping_style_title), style = sizing.textStyle(MaterialTheme.typography.labelLarge), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
 
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)), verticalAlignment = Alignment.CenterVertically) {
                 SettingsOptionCard(stringResource(R.string.appearance_theme_light), Icons.Default.WbSunny, ignStyle == 0, { safeClick("mapping_style_light") { onIgnStyleChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
                 SettingsOptionCard(stringResource(R.string.appearance_theme_dark), Icons.Default.NightsStay, ignStyle == 1, { safeClick("mapping_style_dark") { onIgnStyleChange(1) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
 

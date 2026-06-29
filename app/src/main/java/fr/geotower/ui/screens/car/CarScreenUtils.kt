@@ -1,6 +1,8 @@
 package fr.geotower.ui.screens.car
 
+import android.content.Context
 import android.location.Location
+import fr.geotower.R
 import fr.geotower.data.models.LocalisationEntity
 import java.util.Locale
 
@@ -23,7 +25,7 @@ internal fun calculateCarDistance(
     return result[0]
 }
 
-internal fun LocalisationEntity.operatorSummary(): String {
+internal fun LocalisationEntity.operatorSummary(context: Context): String {
     return operateur
         ?.split(Regex("[/,\\-]"))
         ?.map { it.trim().uppercase(Locale.FRANCE) }
@@ -31,5 +33,5 @@ internal fun LocalisationEntity.operatorSummary(): String {
         ?.distinct()
         ?.joinToString(", ")
         ?.takeIf { it.isNotBlank() }
-        ?: "Operateur inconnu"
+        ?: context.getString(R.string.appstrings_operator_unknown)
 }

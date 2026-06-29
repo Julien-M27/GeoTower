@@ -54,6 +54,7 @@ import fr.geotower.data.community.CommunityDataFeature
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.ui.components.GeoTowerSwitch
 import fr.geotower.ui.components.settingsPopupFadingEdge
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColors
 
@@ -74,8 +75,9 @@ fun CommunityDataSettingsSheet(
     val isOledMode = AppConfig.isOledMode.value
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
-    val cardShape = if (useOneUi) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
-    val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val cardShape = if (useOneUi) RoundedCornerShape(sizing.component(24.dp)) else RoundedCornerShape(sizing.component(12.dp))
+    val cardBorder = if (useOneUi) null else BorderStroke(sizing.component(1.dp), MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     val cardColor = if (useOneUi) {
         if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
     } else {
@@ -83,7 +85,7 @@ fun CommunityDataSettingsSheet(
     }
     val scrollState = rememberScrollState()
     val communityOperators = CommunityDataPreferences.orderedOperators(AppConfig.defaultOperator.value)
-    val sheetMaxHeight = (configuration.screenHeightDp.dp * 0.7f).coerceAtMost(560.dp)
+    val sheetMaxHeight = (configuration.screenHeightDp.dp * 0.7f).coerceAtMost(sizing.component(560.dp))
     val sheetTitle = when (featureId) {
         CommunityDataPreferences.FEATURE_PHOTOS -> stringResource(R.string.appstrings_photo_sources_settings_title)
         CommunityDataPreferences.FEATURE_SPEEDTEST -> stringResource(R.string.appstrings_speedtest_sources_settings_title)
@@ -234,10 +236,10 @@ fun CommunityDataSettingsSheet(
                 .navigationBarsPadding()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
-                .padding(start = 24.dp, end = 24.dp, bottom = 32.dp)
+                .padding(start = sizing.spacing(24.dp), end = sizing.spacing(24.dp), bottom = sizing.spacing(32.dp))
         ) {
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(20.dp)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onDismiss) {
@@ -245,44 +247,44 @@ fun CommunityDataSettingsSheet(
                 }
                 Text(
                     text = sheetTitle,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.width(48.dp))
+                Spacer(modifier = Modifier.width(sizing.spacing(48.dp)))
             }
 
             Text(
                 text = sheetDescription,
-                style = MaterialTheme.typography.bodyMedium,
+                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = sizing.spacing(16.dp))
             )
 
             communityOperators.forEach { operator ->
                 val visibleFeatures = operator.features.filter { feature -> featureId == null || feature.id == featureId }
                 if (visibleFeatures.isEmpty()) return@forEach
                 Surface(
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+                    modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp)),
                     shape = cardShape,
                     border = cardBorder,
                     color = cardColor
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Spacer(
                                 modifier = Modifier
-                                    .size(12.dp)
+                                    .size(sizing.component(12.dp))
                                     .background(Color(OperatorColors.colorIntForKey(operator.key)), CircleShape)
                             )
-                            Spacer(modifier = Modifier.width(10.dp))
-                            Text(operator.label, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                            Spacer(modifier = Modifier.width(sizing.spacing(10.dp)))
+                            Text(operator.label, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
                         }
 
                         visibleFeatures.forEach { feature ->
                             HorizontalDivider(
-                                modifier = Modifier.padding(top = 14.dp, bottom = 12.dp),
+                                modifier = Modifier.padding(top = sizing.spacing(14.dp), bottom = sizing.spacing(12.dp)),
                                 color = MaterialTheme.colorScheme.outline.copy(alpha = 0.18f)
                             )
                             Text(
@@ -291,10 +293,10 @@ fun CommunityDataSettingsSheet(
                                     CommunityDataPreferences.FEATURE_SPEEDTEST -> stringResource(R.string.appstrings_community_data_speedtest)
                                     else -> feature.label
                                 },
-                                style = MaterialTheme.typography.labelLarge,
+                                style = sizing.textStyle(MaterialTheme.typography.labelLarge),
                                 color = MaterialTheme.colorScheme.primary,
                                 fontWeight = FontWeight.SemiBold,
-                                modifier = Modifier.padding(bottom = 4.dp)
+                                modifier = Modifier.padding(bottom = sizing.spacing(4.dp))
                             )
                             val availableSources = feature.sources.filter { source ->
                                 featureFlags.isCommunitySourceEnabled(feature.id, source.id)
@@ -302,13 +304,13 @@ fun CommunityDataSettingsSheet(
                             if (feature.id == CommunityDataPreferences.FEATURE_PHOTOS) {
                                 val photosChecked = photosEnabledStates[operator.key] ?: true
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(4.dp)),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
                                         text = stringResource(R.string.appstrings_community_data_show_operator_photos),
                                         modifier = Modifier.weight(1f),
-                                        style = MaterialTheme.typography.bodyMedium
+                                        style = sizing.textStyle(MaterialTheme.typography.bodyMedium)
                                     )
                                     GeoTowerSwitch(
                                         checked = photosChecked,
@@ -320,9 +322,9 @@ fun CommunityDataSettingsSheet(
                                 if (photosChecked && availableSources.size > 1) {
                                     Text(
                                         text = stringResource(R.string.appstrings_community_data_photo_source_order),
-                                        style = MaterialTheme.typography.labelMedium,
+                                        style = sizing.textStyle(MaterialTheme.typography.labelMedium),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
+                                        modifier = Modifier.padding(top = sizing.spacing(8.dp), bottom = sizing.spacing(2.dp))
                                     )
                                 }
                             }
@@ -339,30 +341,30 @@ fun CommunityDataSettingsSheet(
                                 val checked = enabledStates[key] ?: true
                                 val canReorder = feature.id == CommunityDataPreferences.FEATURE_PHOTOS && orderedSources.size > 1
                                 Row(
-                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(4.dp)),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
                                         text = source.label,
                                         modifier = Modifier.weight(1f),
-                                        style = MaterialTheme.typography.bodyMedium
+                                        style = sizing.textStyle(MaterialTheme.typography.bodyMedium)
                                     )
                                     if (canReorder) {
                                         IconButton(
                                             onClick = { moveSource(operator.key, feature, source.id, -1) },
                                             enabled = index > 0,
-                                            modifier = Modifier.size(32.dp)
+                                            modifier = Modifier.size(sizing.component(32.dp))
                                         ) {
                                             Icon(Icons.Default.KeyboardArrowUp, contentDescription = null)
                                         }
                                         IconButton(
                                             onClick = { moveSource(operator.key, feature, source.id, 1) },
                                             enabled = index < orderedSources.lastIndex,
-                                            modifier = Modifier.size(32.dp)
+                                            modifier = Modifier.size(sizing.component(32.dp))
                                         ) {
                                             Icon(Icons.Default.KeyboardArrowDown, contentDescription = null)
                                         }
-                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
                                     }
                                     GeoTowerSwitch(
                                         checked = checked,
@@ -377,13 +379,13 @@ fun CommunityDataSettingsSheet(
                                     val fallbackKey = CommunityDataPreferences.sourceFallbackPrefKey(operator.key, feature.id, source.id)
                                     val fallbackChecked = fallbackOnlyStates[fallbackKey] ?: false
                                     Row(
-                                        modifier = Modifier.fillMaxWidth().padding(start = 16.dp, top = 2.dp, bottom = 4.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(start = sizing.spacing(16.dp), top = sizing.spacing(2.dp), bottom = sizing.spacing(4.dp)),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
                                             text = stringResource(R.string.appstrings_community_data_photo_source_fallback_only),
                                             modifier = Modifier.weight(1f),
-                                            style = MaterialTheme.typography.bodySmall,
+                                            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
                                         GeoTowerSwitch(
@@ -402,14 +404,14 @@ fun CommunityDataSettingsSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
             TextButton(
                 onClick = { resetVisiblePreferences() },
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
                 Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
         }

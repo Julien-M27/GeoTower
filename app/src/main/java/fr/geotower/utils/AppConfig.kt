@@ -20,6 +20,9 @@ object AppConfig {
     const val PREF_SHOW_RADIO_PRIVATE_MOBILE = "show_radio_private_mobile"
     const val PREF_SHOW_RADIO_FH = "show_radio_fh"
     const val PREF_SHOW_RADIO_OTHER = "show_radio_other"
+    const val PREF_SHOW_SIGNALQUEST_COVERAGE_POINTS = "show_signalquest_coverage_points"
+    const val PREF_SIGNALQUEST_COVERAGE_OPERATOR_KEYS = "signalquest_coverage_operator_keys"
+    const val PREF_SHOW_THEORETICAL_COVERAGE = "show_theoretical_coverage"
     const val PREF_HIDE_UNDERGROUND_SITES = "hide_underground_sites"
     const val PREF_SHOW_ONLY_ZB_SITES = "show_only_zb_sites"
     const val DEFAULT_SHOW_AZIMUTH_LINES = true
@@ -64,6 +67,15 @@ object AppConfig {
     var mapProvider = mutableIntStateOf(0)
     var ignStyle = mutableIntStateOf(0)
 
+    val signalQuestCoverageOperatorKeys = setOf(
+        OperatorColors.ORANGE_KEY,
+        OperatorColors.SFR_KEY,
+        OperatorColors.BOUYGUES_KEY,
+        OperatorColors.FREE_KEY
+    )
+    // Un seul opérateur peut être affiché à la fois pour la couverture SignalQuest.
+    val defaultSignalQuestCoverageOperatorKeys = setOf(OperatorColors.ORANGE_KEY)
+
     var showSpeedometer = mutableStateOf(true)
     var showMapLocationMarker = mutableStateOf(true)
     var showRadioSites = mutableStateOf(false)
@@ -72,6 +84,15 @@ object AppConfig {
     var showRadioPrivateMobile = mutableStateOf(false)
     var showRadioFh = mutableStateOf(false)
     var showRadioOther = mutableStateOf(false)
+    var showSignalQuestCoveragePoints = mutableStateOf(false)
+    var selectedSignalQuestCoverageOperatorKeys = mutableStateOf(defaultSignalQuestCoverageOperatorKeys)
+
+    // Couverture théorique (viewshed) : couche désactivée par défaut (calcul à la demande, par site).
+    var showTheoreticalCoverage = mutableStateOf(false)
+
+    // Demande de couverture théorique déclenchée depuis une fiche site (idAnfr + position pour centrer la carte).
+    data class PendingCoverageRequest(val idAnfr: String, val latitude: Double, val longitude: Double)
+    var pendingTheoreticalCoverage = mutableStateOf<PendingCoverageRequest?>(null)
 
     // --- FILTRES : OPÉRATEURS ---
     var showOrange = mutableStateOf(true)
@@ -90,6 +111,11 @@ object AppConfig {
     var showSitesOutOfService = mutableStateOf(true)
     var hideUndergroundSites = mutableStateOf(false)
     var showOnlyZbSites = mutableStateOf(false)
+
+    // --- SLIDER TEMPOREL (apparition des sites par date de mise en service) ---
+    // Ephemere : non persiste (l'app ne doit pas rouvrir bloquee dans le passe).
+    // Lu par le MapViewModel pour forcer le chargement detaille (pas de clustering) quand actif.
+    var timeSliderActive = mutableStateOf(false)
 
     // --- FILTRES : TECHNOLOGIES ---
     var showTechno2G = mutableStateOf(true)
@@ -220,6 +246,9 @@ object AppConfig {
         showRadioFh.value = prefs.getBoolean(PREF_SHOW_RADIO_FH, legacyShowRadioSites)
         showRadioOther.value = prefs.getBoolean(PREF_SHOW_RADIO_OTHER, legacyShowRadioSites)
         updateShowRadioSitesFromCategoryFilters()
+        showSignalQuestCoveragePoints.value = prefs.getBoolean(PREF_SHOW_SIGNALQUEST_COVERAGE_POINTS, false)
+        selectedSignalQuestCoverageOperatorKeys.value = loadSignalQuestCoverageOperatorKeys(prefs)
+        showTheoreticalCoverage.value = prefs.getBoolean(PREF_SHOW_THEORETICAL_COVERAGE, false)
         showSpeedometer.value = MapDisplayPrefs.showSpeedometer.read(prefs)
 
         showSitesInService.value = MapDisplayPrefs.showSitesInService.read(prefs)
@@ -387,6 +416,14 @@ object AppConfig {
             .apply()
     }
 
+    fun saveSelectedSignalQuestCoverageOperatorKeys(prefs: SharedPreferences, keys: Set<String>) {
+        val normalizedKeys = normalizeSignalQuestCoverageOperatorKeys(keys)
+        selectedSignalQuestCoverageOperatorKeys.value = normalizedKeys
+        prefs.edit()
+            .putStringSet(PREF_SIGNALQUEST_COVERAGE_OPERATOR_KEYS, normalizedKeys)
+            .apply()
+    }
+
     fun radioMapCategoryMask(): Int {
         var mask = 0
         if (showRadioTv.value) mask = mask or RadioMapCategoryMasks.TV
@@ -418,6 +455,25 @@ object AppConfig {
         }
     }
 
+    private fun loadSignalQuestCoverageOperatorKeys(prefs: android.content.SharedPreferences): Set<String> {
+        if (!prefs.contains(PREF_SIGNALQUEST_COVERAGE_OPERATOR_KEYS)) {
+            return defaultSignalQuestCoverageOperatorKeys
+        }
+        return normalizeSignalQuestCoverageOperatorKeys(
+            prefs.getStringSet(PREF_SIGNALQUEST_COVERAGE_OPERATOR_KEYS, defaultSignalQuestCoverageOperatorKeys)
+                .orEmpty()
+        )
+    }
+
+    private fun normalizeSignalQuestCoverageOperatorKeys(keys: Set<String>): Set<String> {
+        val valid = keys
+            .mapNotNull { OperatorColors.specForKey(it)?.key }
+            .filter { it in signalQuestCoverageOperatorKeys }
+        // Un seul opérateur à la fois : on garde une clé unique (ordre déterministe si legacy multi).
+        val chosen = OperatorColors.orderedKeys.firstOrNull { it in valid } ?: valid.firstOrNull()
+        return chosen?.let { setOf(it) } ?: emptySet()
+    }
+
     private fun normalizeSavedOrder(savedOrder: List<String>, defaultOrder: List<String>): List<String> {
         val known = defaultOrder.toSet()
         val normalized = savedOrder
@@ -443,4 +499,5 @@ object AppConfig {
         listOf("3500", "2100", "1400", "700", "26000"),
         listOf("3500", "2100", "700")
     )
+
 }

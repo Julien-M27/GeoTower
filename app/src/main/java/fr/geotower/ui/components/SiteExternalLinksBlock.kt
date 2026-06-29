@@ -2,10 +2,13 @@ package fr.geotower.ui.components
 
 import android.content.Context
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -36,6 +39,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.geotower.R
+import fr.geotower.data.api.CellMapperLinks
 import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.models.LocalisationEntity
@@ -49,6 +53,7 @@ fun SiteExternalLinksBlock(
     onShowCartoradio: () -> Unit,
     onShowCellularFr: () -> Unit,
     onShowSignalQuest: () -> Unit,
+    onShowCellMapper: () -> Unit,
     onShowRnc: () -> Unit,
     onShowEnb: () -> Unit,
     onShowAnfr: () -> Unit
@@ -68,6 +73,7 @@ fun SiteExternalLinksBlock(
     val showCellularFr by remember { mutableStateOf(prefs.getBoolean("link_cellularfr", true)) }
     val showRncMobile by remember { mutableStateOf(prefs.getBoolean("link_rncmobile", true)) }
     val showSignalQuest by remember { mutableStateOf(prefs.getBoolean("link_signalquest", true)) }
+    val showCellMapper by remember { mutableStateOf(prefs.getBoolean("link_cellmapper", true)) }
     val showEnbAnalytics by remember { mutableStateOf(prefs.getBoolean("link_enbanalytics", true)) }
 
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor), modifier = Modifier.fillMaxWidth()) {
@@ -128,6 +134,17 @@ fun SiteExternalLinksBlock(
                                 CommunityLinkRow(siteExternalLinkById(block)?.label ?: "Signal Quest", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_signalquest, buttonShape) { safeClick { onShowSignalQuest() } }
                             }
                         }
+                        "cellmapper" -> {
+                            if (
+                                showCellMapper &&
+                                featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.EXTERNAL_LINKS_CELLMAPPER) &&
+                                featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.CELLMAPPER) &&
+                                featureFlags.isActionEnabled(RemoteFeatureFlags.Actions.OPEN_EXTERNAL_LINK) &&
+                                CellMapperLinks.supports(info.operateur)
+                            ) {
+                                CommunityLinkRow(siteExternalLinkById(block)?.label ?: "CellMapper", txtOpenApp, siteExternalLinkById(block)?.logoRes ?: R.drawable.logo_cellmapper, buttonShape) { safeClick { onShowCellMapper() } }
+                            }
+                        }
                         "enbanalytics" -> {
                             if (
                                 showEnbAnalytics &&
@@ -160,7 +177,20 @@ fun SiteExternalLinksBlock(
 @Composable
 private fun CommunityLinkRow(btnText: String, txtOpen: String, logoRes: Int, buttonShape: Shape, onClick: () -> Unit) {
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-        Image(painter = painterResource(id = logoRes), contentDescription = null, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)))
+        if (logoRes == R.drawable.logo_cellmapper) {
+            Box(
+                modifier = Modifier
+                    .size(48.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color.White)
+                    .padding(5.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Image(painter = painterResource(id = logoRes), contentDescription = null, modifier = Modifier.fillMaxSize())
+            }
+        } else {
+            Image(painter = painterResource(id = logoRes), contentDescription = null, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)))
+        }
         Spacer(modifier = Modifier.width(16.dp))
         Button(onClick = onClick, modifier = Modifier.weight(1f), shape = buttonShape) {
             Text(text = "$txtOpen $btnText", fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)

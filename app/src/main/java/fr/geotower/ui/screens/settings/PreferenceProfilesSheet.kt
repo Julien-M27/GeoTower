@@ -35,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.FileDownload
 import androidx.compose.material.icons.filled.FileUpload
 import androidx.compose.material.icons.filled.Image
@@ -69,6 +70,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -104,6 +106,7 @@ fun PreferenceProfilesSheet(
     var activeProfileId by remember { mutableStateOf(PreferenceProfileManager.activeProfileId(context)) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var profileToDelete by remember { mutableStateOf<PreferenceProfile?>(null) }
+    var profileToRename by remember { mutableStateOf<PreferenceProfile?>(null) }
     var profileToApply by remember { mutableStateOf<PreferenceProfile?>(null) }
     var importPreview by remember { mutableStateOf<PreferenceProfileImportPreview?>(null) }
     var importError by remember { mutableStateOf<String?>(null) }
@@ -216,9 +219,14 @@ fun PreferenceProfilesSheet(
                     onClick = {
                         if (profile.id != activeProfileId) profileToApply = profile
                     },
+                    onRename = {
+                        if (!profile.isDefault) profileToRename = profile
+                    },
                     onImageClick = {
-                        pendingImageProfileId = profile.id
-                        imageLauncher.launch(arrayOf("image/*"))
+                        if (!profile.isDefault) {
+                            pendingImageProfileId = profile.id
+                            imageLauncher.launch(arrayOf("image/*"))
+                        }
                     },
                     onDelete = {
                         if (!profile.isDefault) profileToDelete = profile
@@ -245,27 +253,11 @@ fun PreferenceProfilesSheet(
             )
             Spacer(Modifier.height(sizing.spacing(10.dp)))
             ProfileActionButton(
-                title = stringResource(R.string.preference_profiles_export_active),
-                desc = stringResource(R.string.preference_profiles_export_active_desc),
-                icon = Icons.Default.Share,
-                useOneUi = useOneUi,
-                onClick = { exportIds = setOf(activeProfileId) }
-            )
-            Spacer(Modifier.height(sizing.spacing(10.dp)))
-            ProfileActionButton(
                 title = stringResource(R.string.preference_profiles_export_selected),
                 desc = stringResource(R.string.preference_profiles_export_selected_desc),
                 icon = Icons.Default.FileDownload,
                 useOneUi = useOneUi,
                 onClick = { showExportSelection = true }
-            )
-            Spacer(Modifier.height(sizing.spacing(10.dp)))
-            ProfileActionButton(
-                title = stringResource(R.string.preference_profiles_export_all),
-                desc = stringResource(R.string.preference_profiles_export_all_desc),
-                icon = Icons.Default.FileDownload,
-                useOneUi = useOneUi,
-                onClick = { exportIds = profiles.map { it.id }.toSet() }
             )
         }
     }
@@ -281,6 +273,19 @@ fun PreferenceProfilesSheet(
                 showCreateDialog = false
                 refreshProfiles()
                 Toast.makeText(context, R.string.preference_profiles_created, Toast.LENGTH_SHORT).show()
+            }
+        )
+    }
+
+    profileToRename?.let { profile ->
+        RenamePreferenceProfileDialog(
+            profile = profile,
+            onDismiss = { profileToRename = null },
+            onRename = { name ->
+                PreferenceProfileManager.renameProfile(context, profile.id, name)
+                profileToRename = null
+                refreshProfiles()
+                Toast.makeText(context, R.string.preference_profiles_renamed, Toast.LENGTH_SHORT).show()
             }
         )
     }
@@ -370,8 +375,9 @@ fun PreferenceProfilesSheet(
             title = { Text(stringResource(R.string.preference_profiles_export_choice_title)) },
             text = {
                 Text(
-                    stringResource(
-                        R.string.preference_profiles_export_choice_desc,
+                    pluralStringResource(
+                        R.plurals.preference_profiles_export_choice_count,
+                        exportProfiles.size,
                         exportProfiles.size
                     )
                 )
@@ -416,6 +422,7 @@ private fun PreferenceProfileRow(
     active: Boolean,
     useOneUi: Boolean,
     onClick: () -> Unit,
+    onRename: () -> Unit,
     onImageClick: () -> Unit,
     onDelete: () -> Unit
 ) {
@@ -455,14 +462,7 @@ private fun PreferenceProfileRow(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
-            if (active) {
-                Icon(
-                    Icons.Default.CheckCircle,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(sizing.component(24.dp))
-                )
-            } else {
+            if (!active) {
                 Icon(
                     Icons.AutoMirrored.Filled.KeyboardArrowRight,
                     contentDescription = null,
@@ -470,15 +470,23 @@ private fun PreferenceProfileRow(
                     modifier = Modifier.size(sizing.component(24.dp))
                 )
             }
-            Spacer(Modifier.width(sizing.spacing(4.dp)))
-            IconButton(onClick = onImageClick) {
-                Icon(
-                    Icons.Default.Image,
-                    contentDescription = null,
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
             if (!profile.isDefault) {
+                Spacer(Modifier.width(sizing.spacing(4.dp)))
+                IconButton(onClick = onRename) {
+                    Icon(
+                        Icons.Default.Edit,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(Modifier.width(sizing.spacing(4.dp)))
+                IconButton(onClick = onImageClick) {
+                    Icon(
+                        Icons.Default.Image,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Spacer(Modifier.width(sizing.spacing(4.dp)))
                 IconButton(onClick = onDelete) {
                     Icon(
@@ -559,6 +567,7 @@ private fun CreatePreferenceProfileDialog(
     var selectedIcon by remember { mutableStateOf(profileIcons.first()) }
     var selectedImageUri by remember { mutableStateOf<Uri?>(null) }
     val scrollState = rememberScrollState()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val imageLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
@@ -571,7 +580,7 @@ private fun CreatePreferenceProfileDialog(
         text = {
             Column(
                 modifier = Modifier
-                    .heightIn(max = 420.dp)
+                    .heightIn(max = sizing.component(420.dp))
                     .verticalScroll(scrollState)
             ) {
                 OutlinedTextField(
@@ -581,19 +590,19 @@ private fun CreatePreferenceProfileDialog(
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth()
                 )
-                Spacer(Modifier.height(16.dp))
-                Text(stringResource(R.string.preference_profiles_color_label), fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(sizing.spacing(16.dp)))
+                Text(stringResource(R.string.preference_profiles_color_label), style = sizing.textStyle(MaterialTheme.typography.titleSmall), fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(sizing.spacing(8.dp)))
                 Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
                     profileColors.forEach { colorInt ->
                         val color = Color(colorInt)
                         Surface(
                             onClick = { selectedColor = colorInt },
-                            modifier = Modifier.padding(end = 10.dp).size(44.dp),
+                            modifier = Modifier.padding(end = sizing.spacing(10.dp)).size(sizing.component(44.dp)),
                             shape = CircleShape,
                             color = color.copy(alpha = 0.18f),
                             border = BorderStroke(
-                                if (selectedColor == colorInt) 3.dp else 1.dp,
+                                sizing.component(if (selectedColor == colorInt) 3.dp else 1.dp),
                                 if (selectedColor == colorInt) color else MaterialTheme.colorScheme.outlineVariant
                             )
                         ) {
@@ -605,17 +614,17 @@ private fun CreatePreferenceProfileDialog(
                         }
                     }
                 }
-                Spacer(Modifier.height(16.dp))
-                Text(stringResource(R.string.preference_profiles_icon_label), fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(sizing.spacing(16.dp)))
+                Text(stringResource(R.string.preference_profiles_icon_label), style = sizing.textStyle(MaterialTheme.typography.titleSmall), fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(sizing.spacing(8.dp)))
                 Row(modifier = Modifier.horizontalScroll(rememberScrollState())) {
                     profileIcons.forEach { icon ->
                         Surface(
                             onClick = { selectedIcon = icon },
-                            modifier = Modifier.padding(end = 10.dp).size(48.dp),
-                            shape = RoundedCornerShape(14.dp),
+                            modifier = Modifier.padding(end = sizing.spacing(10.dp)).size(sizing.component(48.dp)),
+                            shape = RoundedCornerShape(sizing.component(14.dp)),
                             color = if (selectedIcon == icon) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
-                            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                            border = BorderStroke(sizing.component(1.dp), MaterialTheme.colorScheme.outlineVariant)
                         ) {
                             Box(contentAlignment = Alignment.Center) {
                                 Icon(profileIcon(icon), contentDescription = null)
@@ -623,23 +632,23 @@ private fun CreatePreferenceProfileDialog(
                         }
                     }
                 }
-                Spacer(Modifier.height(16.dp))
-                Text(stringResource(R.string.preference_profiles_image_label), fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(sizing.spacing(16.dp)))
+                Text(stringResource(R.string.preference_profiles_image_label), style = sizing.textStyle(MaterialTheme.typography.titleSmall), fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(sizing.spacing(8.dp)))
                 Surface(
                     onClick = { imageLauncher.launch(arrayOf("image/*")) },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = RoundedCornerShape(sizing.component(14.dp)),
                     color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f),
-                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    border = BorderStroke(sizing.component(1.dp), MaterialTheme.colorScheme.outlineVariant)
                 ) {
                     Row(
-                        modifier = Modifier.fillMaxWidth().padding(12.dp),
+                        modifier = Modifier.fillMaxWidth().padding(sizing.spacing(12.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Box(
                             modifier = Modifier
-                                .size(56.dp)
+                                .size(sizing.component(56.dp))
                                 .clip(CircleShape)
                                 .background(Color(selectedColor).copy(alpha = 0.16f)),
                             contentAlignment = Alignment.Center
@@ -659,7 +668,7 @@ private fun CreatePreferenceProfileDialog(
                                 )
                             }
                         }
-                        Spacer(Modifier.width(12.dp))
+                        Spacer(Modifier.width(sizing.spacing(12.dp)))
                         Text(
                             text = stringResource(
                                 if (selectedImageUri == null) {
@@ -668,6 +677,7 @@ private fun CreatePreferenceProfileDialog(
                                     R.string.preference_profiles_image_change
                                 }
                             ),
+                            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -677,6 +687,42 @@ private fun CreatePreferenceProfileDialog(
         confirmButton = {
             TextButton(onClick = { onCreate(name, selectedColor, selectedIcon, selectedImageUri) }) {
                 Text(stringResource(R.string.preference_profiles_create_short))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(stringResource(R.string.common_cancel))
+            }
+        }
+    )
+}
+
+@Composable
+private fun RenamePreferenceProfileDialog(
+    profile: PreferenceProfile,
+    onDismiss: () -> Unit,
+    onRename: (String) -> Unit
+) {
+    var name by remember(profile.id) { mutableStateOf(profile.name) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.preference_profiles_rename_title)) },
+        text = {
+            OutlinedTextField(
+                value = name,
+                onValueChange = { name = it },
+                label = { Text(stringResource(R.string.preference_profiles_name_label)) },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+        },
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank(),
+                onClick = { onRename(name) }
+            ) {
+                Text(stringResource(R.string.preference_profiles_rename))
             }
         },
         dismissButton = {
@@ -720,32 +766,37 @@ private fun ApplyPreferenceProfileDialog(
 @Composable
 private fun ChangePreviewList(changes: List<PreferenceProfileChange>) {
     val scrollState = rememberScrollState()
-    Column(modifier = Modifier.heightIn(max = 420.dp).verticalScroll(scrollState)) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Column(modifier = Modifier.heightIn(max = sizing.component(420.dp)).verticalScroll(scrollState)) {
         Text(
-            text = stringResource(R.string.preference_profiles_changes_count, changes.size),
-            style = MaterialTheme.typography.bodyMedium,
+            text = pluralStringResource(
+                R.plurals.preference_profiles_changes_count,
+                changes.size,
+                changes.size
+            ),
+            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
         changes.groupBy { it.section }.forEach { (section, sectionChanges) ->
-            Text(section, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.height(6.dp))
+            Text(section, style = sizing.textStyle(MaterialTheme.typography.titleSmall), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(sizing.spacing(6.dp)))
             sectionChanges.forEach { change ->
-                Column(modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
-                    Text(change.label, fontWeight = FontWeight.SemiBold)
+                Column(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(10.dp))) {
+                    Text(change.label, style = sizing.textStyle(MaterialTheme.typography.bodyMedium), fontWeight = FontWeight.SemiBold)
                     Text(
                         text = stringResource(R.string.preference_profiles_change_from, change.oldValue),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
                         text = stringResource(R.string.preference_profiles_change_to, change.newValue),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
         }
     }
 }
@@ -757,23 +808,30 @@ private fun ImportPreferenceProfilesDialog(
     onImport: (PreferenceProfileImportResolution) -> Unit
 ) {
     val hasConflicts = preview.conflicts.isNotEmpty()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.preference_profiles_import_preview_title)) },
         text = {
-            Column(modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+            Column(modifier = Modifier.heightIn(max = sizing.component(420.dp)).verticalScroll(rememberScrollState())) {
                 Text(
-                    stringResource(R.string.preference_profiles_import_preview_desc, preview.profiles.size),
+                    pluralStringResource(
+                        R.plurals.preference_profiles_import_preview_desc,
+                        preview.profiles.size,
+                        preview.profiles.size
+                    ),
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(sizing.spacing(12.dp)))
                 preview.profiles.forEach { profile ->
                     Text("• ${profile.name}", fontWeight = FontWeight.SemiBold)
                 }
                 if (hasConflicts) {
-                    Spacer(Modifier.height(16.dp))
+                    Spacer(Modifier.height(sizing.spacing(16.dp)))
                     Text(
                         stringResource(R.string.preference_profiles_import_conflicts_title),
+                        style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.error
                     )
@@ -783,7 +841,7 @@ private fun ImportPreferenceProfilesDialog(
                                 R.string.preference_profiles_import_conflict_item,
                                 conflict.importedProfile.name
                             ),
-                            style = MaterialTheme.typography.bodySmall
+                            style = sizing.textStyle(MaterialTheme.typography.bodySmall)
                         )
                     }
                 }
@@ -791,7 +849,7 @@ private fun ImportPreferenceProfilesDialog(
         },
         confirmButton = {
             if (hasConflicts) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
                     TextButton(onClick = { onImport(PreferenceProfileImportResolution.ReplaceExisting) }) {
                         Text(stringResource(R.string.preference_profiles_replace))
                     }
@@ -821,11 +879,12 @@ private fun ExportSelectionDialog(
     onContinue: (Set<String>) -> Unit
 ) {
     var selection by remember { mutableStateOf(initiallySelected) }
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.preference_profiles_export_selected)) },
         text = {
-            Column(modifier = Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+            Column(modifier = Modifier.heightIn(max = sizing.component(420.dp)).verticalScroll(rememberScrollState())) {
                 profiles.forEach { profile ->
                     Surface(
                         onClick = {
@@ -835,7 +894,7 @@ private fun ExportSelectionDialog(
                         color = Color.Transparent
                     ) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(8.dp)),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Checkbox(
@@ -844,10 +903,10 @@ private fun ExportSelectionDialog(
                                     selection = if (checked) selection + profile.id else selection - profile.id
                                 }
                             )
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(sizing.spacing(8.dp)))
                             ProfileIconBadge(profile)
-                            Spacer(Modifier.width(12.dp))
-                            Text(profile.name, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                            Spacer(Modifier.width(sizing.spacing(12.dp)))
+                            Text(profile.name, modifier = Modifier.weight(1f), style = sizing.textStyle(MaterialTheme.typography.bodyMedium), fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }

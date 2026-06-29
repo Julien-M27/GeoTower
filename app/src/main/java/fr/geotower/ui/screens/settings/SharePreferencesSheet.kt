@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import fr.geotower.R
 import fr.geotower.ui.components.settingsPopupFadingEdge
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.SharePrefs
 
@@ -55,6 +56,8 @@ fun SharePreferencesSheet(
     onElevationProfileChange: (Boolean) -> Unit,
     supportEnabled: Boolean,
     onSupportChange: (Boolean) -> Unit,
+    photosEnabled: Boolean,
+    onPhotosChange: (Boolean) -> Unit,
     idsEnabled: Boolean,
     onIdsChange: (Boolean) -> Unit,
     datesEnabled: Boolean,
@@ -88,6 +91,7 @@ fun SharePreferencesSheet(
             ConfigurableBlock("map", { stringResource(R.string.appstrings_share_map_option) }, mapEnabled, onMapChange),
             ConfigurableBlock("elevation_profile", { stringResource(R.string.appstrings_share_elevation_profile_option) }, elevationProfileEnabled, onElevationProfileChange),
             ConfigurableBlock("support", { stringResource(R.string.appstrings_share_support_option) }, supportEnabled, onSupportChange),
+            ConfigurableBlock("photos", { stringResource(R.string.appstrings_share_photos_option) }, photosEnabled, onPhotosChange),
             ConfigurableBlock("ids", { stringResource(R.string.appstrings_share_ids_option) }, idsEnabled, onIdsChange),
             ConfigurableBlock("dates", { stringResource(R.string.appstrings_share_dates_option) }, datesEnabled, onDatesChange),
             ConfigurableBlock("address", { stringResource(R.string.appstrings_share_address_option) }, addressEnabled, onAddressChange),
@@ -103,6 +107,7 @@ fun SharePreferencesSheet(
             onElevationProfileChange(true)
             onSplitImageChange(true)
             onSupportChange(true)
+            onPhotosChange(true)
             onIdsChange(true)
             onDatesChange(true)
             onAddressChange(true)
@@ -117,9 +122,10 @@ fun SharePreferencesSheet(
         useOneUi = useOneUi,
         bubbleColor = bubbleColor,
         contentAfterReset = { shape, border ->
-            Spacer(modifier = Modifier.height(24.dp).navigationBarsPadding())
+            val sizing = LocalGeoTowerUiStyle.current.sizing
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)).navigationBarsPadding())
             HorizontalDivider(
-                modifier = Modifier.padding(vertical = 12.dp),
+                modifier = Modifier.padding(vertical = sizing.spacing(12.dp)),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
             )
             if (freqEnabled) {
@@ -133,10 +139,10 @@ fun SharePreferencesSheet(
                     bubbleColor = bubbleColor,
                     useOneUi = useOneUi
                 )
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
             }
             SimpleSwitchCard("QR Code", qrEnabled, onQrChange, shape, border, bubbleColor, useOneUi)
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
             SimpleSwitchCardWithDesc(
                 stringResource(R.string.appstrings_share_confidential_option),
                 stringResource(R.string.appstrings_share_confidential_desc),
@@ -160,6 +166,8 @@ fun SupportSharePreferencesSheet(
     onMapChange: (Boolean) -> Unit,
     supportEnabled: Boolean,
     onSupportChange: (Boolean) -> Unit,
+    photosEnabled: Boolean,
+    onPhotosChange: (Boolean) -> Unit,
     operatorsEnabled: Boolean,
     onOperatorsChange: (Boolean) -> Unit,
     qrEnabled: Boolean,
@@ -178,6 +186,7 @@ fun SupportSharePreferencesSheet(
         blocks = listOf(
             ConfigurableBlock("map", { stringResource(R.string.appstrings_share_map_option) }, mapEnabled, onMapChange),
             ConfigurableBlock("support", { stringResource(R.string.appstrings_share_support_option) }, supportEnabled, onSupportChange),
+            ConfigurableBlock("photos", { stringResource(R.string.appstrings_share_photos_option) }, photosEnabled, onPhotosChange),
             ConfigurableBlock("operators", { stringResource(R.string.appstrings_operators_title) }, operatorsEnabled, onOperatorsChange)
         ),
         onOrderChange = onOrderChange,
@@ -185,6 +194,7 @@ fun SupportSharePreferencesSheet(
             onOrderChange(SharePrefs.DEFAULT_SUPPORT_ORDER.split(","))
             onMapChange(true)
             onSupportChange(true)
+            onPhotosChange(true)
             onOperatorsChange(true)
         },
         onDismiss = onDismiss,
@@ -193,13 +203,14 @@ fun SupportSharePreferencesSheet(
         useOneUi = useOneUi,
         bubbleColor = bubbleColor,
         contentAfterReset = { shape, border ->
-            Spacer(modifier = Modifier.height(24.dp).navigationBarsPadding())
+            val sizing = LocalGeoTowerUiStyle.current.sizing
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)).navigationBarsPadding())
             HorizontalDivider(
-                modifier = Modifier.padding(vertical = 12.dp),
+                modifier = Modifier.padding(vertical = sizing.spacing(12.dp)),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
             )
             SimpleSwitchCard("QR Code", qrEnabled, onQrChange, shape, border, bubbleColor, useOneUi)
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
             SimpleSwitchCardWithDesc(
                 stringResource(R.string.appstrings_share_confidential_option),
                 stringResource(R.string.appstrings_share_confidential_desc),
@@ -225,16 +236,17 @@ fun SimpleSwitchCardWithDesc(
     bubbleColor: Color,
     useOneUi: Boolean
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
 
     Surface(shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(12.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(modifier = Modifier.weight(1f).padding(end = 16.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(modifier = Modifier.weight(1f).padding(end = sizing.spacing(16.dp))) {
+                Text(title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                Text(desc, style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             fr.geotower.ui.components.GeoTowerSwitch(
                 checked = checked,
@@ -272,6 +284,7 @@ fun MapSharePreferencesSheet(
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -282,7 +295,7 @@ fun MapSharePreferencesSheet(
                 modifier = Modifier.fillMaxWidth().statusBarsPadding(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                BottomSheetDefaults.DragHandle(modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+                BottomSheetDefaults.DragHandle(modifier = Modifier.padding(top = sizing.spacing(8.dp), bottom = sizing.spacing(4.dp)))
             }
         }
     ) {
@@ -293,24 +306,24 @@ fun MapSharePreferencesSheet(
                 .navigationBarsPadding()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
-                .padding(bottom = 24.dp, start = 24.dp, end = 24.dp),
+                .padding(bottom = sizing.spacing(24.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(24.dp)), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(
                     text = stringResource(R.string.appstrings_share_map_details_title),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.width(48.dp))
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
             }
 
-            val spacing = 12.dp
-            val shape = if (useOneUi) RoundedCornerShape(22.dp) else RoundedCornerShape(12.dp)
-            val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+            val spacing = sizing.spacing(12.dp)
+            val shape = if (useOneUi) RoundedCornerShape(sizing.component(22.dp)) else RoundedCornerShape(sizing.component(12.dp))
+            val border = if (!useOneUi) BorderStroke(sizing.component(1.dp), MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
 
             Column(verticalArrangement = Arrangement.spacedBy(spacing)) {
                 SimpleSwitchCard(stringResource(R.string.appstrings_share_map_azimuths_option), azimuthsEnabled, onAzimuthsChange, shape, border, bubbleColor, useOneUi)
@@ -321,7 +334,7 @@ fun MapSharePreferencesSheet(
                 SimpleSwitchCard(stringResource(R.string.brand_qr_code), qrEnabled, onQrChange, shape, border, bubbleColor, useOneUi)
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
             TextButton(
                 onClick = {
                     onAzimuthsChange(true)
@@ -332,13 +345,13 @@ fun MapSharePreferencesSheet(
                 }
             ) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
                 Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
             }
-            Spacer(modifier = Modifier.height(24.dp).navigationBarsPadding())
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)).navigationBarsPadding())
 
             HorizontalDivider(
-                modifier = Modifier.padding(vertical = 12.dp),
+                modifier = Modifier.padding(vertical = sizing.spacing(12.dp)),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
             )
             SimpleSwitchCardWithDesc(

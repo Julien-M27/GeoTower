@@ -22,7 +22,7 @@ android {
         minSdk = 24
         targetSdk = 37
         versionCode = 1
-        versionName = "1.9.9.5.8"
+        versionName = "1.9.9.5.9"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val manifestPublicKeys = providers
@@ -83,34 +83,29 @@ dependencies {
 
     // Carte OSM
     implementation(libs.osmdroid.android)
-
-    // --- AJOUT POUR LES CLUSTERS (REGROUPEMENT D'ANTENNES) ---
+    // CLUSTERS D'ANTENNES
     implementation(libs.osmbonuspack)
-    // ---------------------------------------------------------
-
-    // --- AJOUT POUR LE VECTORIEL (Mapsforge) ---
-    // Le pont entre Osmdroid et Mapsforge
+    // Pont Osmdroid Mapsforge
     implementation(libs.osmdroid.mapsforge)
-    // Le moteur Mapsforge
+    // Moteur Mapsforge
     implementation(libs.mapsforge.map.android)
     implementation(libs.mapsforge.map.reader)
     implementation(libs.mapsforge.themes)
-    // --- ROOM (BASE DE DONNÉES) ---
+    // ROOM
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
 
-    // Pour parler à l'API (Retrofit)
+    // API (Retrofit)
     implementation(libs.retrofit)
     implementation(libs.retrofit.converter.gson)
-    // --- AJOUT COIL POUR LES IMAGES ---
+    // COIL POUR LES IMAGES
     implementation(libs.coil.compose)
-    // ✅ NOUVEAU : Librairie ZXing pour générer le QR Code
+    // Librairie ZXing pour générer le QR Code
     implementation(libs.zxing.core)
     // INDISPENSABLE pour le GPS
     implementation(libs.play.services.location)
 
-    // INDISPENSABLE pour .await()
     implementation(libs.kotlinx.coroutines.play.services)
     // Net
     implementation(libs.okhttp)
@@ -128,7 +123,7 @@ dependencies {
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
 
-    // WorkManager (Le seul outil autorisé par Google pour l'arrière-plan, min 15 min)
+    // WorkManager
     implementation(libs.androidx.work.runtime.ktx)
 
     // WorkManager conversion photo

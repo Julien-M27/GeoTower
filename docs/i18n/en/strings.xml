@@ -205,7 +205,7 @@
     <string name="signalquest_unsupported_operator">SignalQuest operator not supported.</string>
     <string name="signalquest_upload_disabled_for_operator">SignalQuest upload is disabled for this operator.</string>
     <string name="signalquest_unsupported_photo_format">Photo format not supported.</string>
-    <string name="signalquest_photo_too_large">A photo exceeds the 20 MB limit.</string>
+    <string name="signalquest_photo_too_large">A photo exceeds the 64 MB limit.</string>
     <string name="signalquest_prepare_photos_failed">Unable to prepare photos.</string>
     <string name="signalquest_manifest_missing">Upload manifest not found.</string>
     <string name="signalquest_manifest_invalid">Invalid upload manifest.</string>
@@ -654,6 +654,8 @@
     <string name="appstrings_outage_reason_technical">Technical intervention</string>
     <string name="appstrings_outage_status_degraded">Degraded</string>
     <string name="appstrings_outage_status_hs">Out of Service</string>
+    <string name="appstrings_outage_status_potential">Potentially down</string>
+    <string name="appstrings_outage_potential_explanation">No outage reported for this operator, but another operator is down on this shared white-zone site.</string>
     <string name="appstrings_outage_voice">Voice</string>
     <string name="appstrings_owner">Owner</string>
     <string name="appstrings_page_compass">Compass</string>
@@ -845,6 +847,11 @@
     <string name="appstrings_throughput_cone_assumption">Assumption: panel/support height, handset at 1.5 m, typical vertical tilt 4°-8° with a 6° nominal point.</string>
     <string name="appstrings_throughput_cone_height_unavailable">Panel/support height unavailable: unable to estimate the main cone zone.</string>
     <string name="appstrings_throughput_cone_map_explanation">The circle marks the optimal distance; dots show panel axes where signal should be strongest.</string>
+    <string name="appstrings_throughput_receiver_height_title">Arrival height</string>
+    <string name="appstrings_throughput_receiver_height_desc">Receiver height above the ground, used to estimate the optimal-distance cone.</string>
+    <string name="throughput_receiver_height_value">%1$s ≈ %2$s</string>
+    <string name="throughput_floor_ground">ground floor</string>
+    <string name="throughput_floor_nth">floor %1$d</string>
     <string name="appstrings_throughput_custom_aggregation_title">4G aggregation</string>
     <string name="appstrings_throughput_custom_backhaul_title">Backhaul</string>
     <string name="appstrings_throughput_custom_environment_title">Environment</string>

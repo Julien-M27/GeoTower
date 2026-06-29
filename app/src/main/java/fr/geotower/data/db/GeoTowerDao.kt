@@ -3,10 +3,13 @@ package fr.geotower.data.db
 import androidx.room.Dao
 import androidx.room.ColumnInfo
 import androidx.room.Query
+import fr.geotower.data.models.AntenneDbEntity
+import fr.geotower.data.models.CoverageSiteLocationEntity
 import fr.geotower.data.models.DbCluster
 import fr.geotower.data.models.FaisceauxEntity
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
+import fr.geotower.data.models.RefTypeAntenneDbEntity
 import fr.geotower.data.models.TechniqueEntity
 
 data class SupportRadioStatsRow(
@@ -55,6 +58,7 @@ interface GeoTowerDao {
             l.is_zb,
             COALESCE(st.libelle, '') AS statut,
             COALESCE(t.has_active, 0) AS has_active,
+            COALESCE(NULLIF(t.date_service, ''), NULLIF(t.date_implantation, '')) AS date_service,
             CASE WHEN EXISTS (
                 SELECT 1
                 FROM support underground_support
@@ -71,6 +75,17 @@ interface GeoTowerDao {
     """)
     suspend fun getLocalisationsInBox(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<LocalisationEntity>
 
+    // Dates ANFR au format "JJ/MM/AAAA" -> on reconstruit "AAAAMMJJ" pour un MIN chronologique correct.
+    @Query("""
+        SELECT MIN(substr(v, 7, 4) || substr(v, 4, 2) || substr(v, 1, 2))
+        FROM (
+            SELECT COALESCE(NULLIF(date_service, ''), NULLIF(date_implantation, '')) AS v
+            FROM technique
+        )
+        WHERE v IS NOT NULL AND length(v) >= 10
+    """)
+    suspend fun getOldestServiceDate(): String?
+
     @Query("""
         SELECT
             l.id_anfr,
@@ -86,6 +101,7 @@ interface GeoTowerDao {
             l.is_zb,
             COALESCE(st.libelle, '') AS statut,
             COALESCE(t.has_active, 0) AS has_active,
+            COALESCE(NULLIF(t.date_service, ''), NULLIF(t.date_implantation, '')) AS date_service,
             CASE WHEN EXISTS (
                 SELECT 1
                 FROM support underground_support
@@ -130,6 +146,7 @@ interface GeoTowerDao {
             l.is_zb,
             COALESCE(st.libelle, '') AS statut,
             COALESCE(t.has_active, 0) AS has_active,
+            COALESCE(NULLIF(t.date_service, ''), NULLIF(t.date_implantation, '')) AS date_service,
             CASE WHEN EXISTS (
                 SELECT 1
                 FROM support underground_support
@@ -168,6 +185,7 @@ interface GeoTowerDao {
             l.is_zb,
             COALESCE(st.libelle, '') AS statut,
             COALESCE(t.has_active, 0) AS has_active,
+            COALESCE(NULLIF(t.date_service, ''), NULLIF(t.date_implantation, '')) AS date_service,
             CASE WHEN EXISTS (
                 SELECT 1
                 FROM support underground_support
@@ -210,6 +228,7 @@ interface GeoTowerDao {
             l.is_zb,
             COALESCE(st.libelle, '') AS statut,
             COALESCE(t.has_active, 0) AS has_active,
+            COALESCE(NULLIF(t.date_service, ''), NULLIF(t.date_implantation, '')) AS date_service,
             CASE WHEN EXISTS (
                 SELECT 1
                 FROM support underground_support
@@ -261,6 +280,7 @@ interface GeoTowerDao {
             l.is_zb,
             COALESCE(st.libelle, '') AS statut,
             COALESCE(t.has_active, 0) AS has_active,
+            COALESCE(NULLIF(t.date_service, ''), NULLIF(t.date_implantation, '')) AS date_service,
             CASE WHEN EXISTS (
                 SELECT 1
                 FROM support underground_support
@@ -301,6 +321,7 @@ interface GeoTowerDao {
             l.is_zb,
             COALESCE(st.libelle, '') AS statut,
             COALESCE(t.has_active, 0) AS has_active,
+            COALESCE(NULLIF(t.date_service, ''), NULLIF(t.date_implantation, '')) AS date_service,
             CASE WHEN EXISTS (
                 SELECT 1
                 FROM support underground_support
@@ -690,6 +711,29 @@ interface GeoTowerDao {
     """)
     suspend fun getFaisceauxDetails(idAnfr: String): List<FaisceauxEntity>
 
+    /** Antennes brutes d'un site (toutes, FH compris — le filtrage is_fh se fait côté moteur de couverture). */
+    @Query("SELECT * FROM antenne WHERE id_anfr = :idAnfr")
+    suspend fun getAntennesByIdAnfr(idAnfr: String): List<AntenneDbEntity>
+
+    /** Libellés de type d'antenne (tae_id → libelle), pour classer omni / sectorielle. */
+    @Query("SELECT * FROM ref_type_antenne")
+    suspend fun getAntennaTypes(): List<RefTypeAntenneDbEntity>
+
+    /** Position + opérateur d'un site, pour la couverture théorique. */
+    @Query("""
+        SELECT
+            l.id_anfr AS id_anfr,
+            l.latitude AS latitude,
+            l.longitude AS longitude,
+            o.libelle AS operateur,
+            (SELECT MAX(sup.hauteur) FROM support sup WHERE sup.id_anfr = l.id_anfr) AS support_height
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.id_anfr = :idAnfr
+        LIMIT 1
+    """)
+    suspend fun getCoverageSiteLocation(idAnfr: String): CoverageSiteLocationEntity?
+
     @Query("""
         SELECT
             AVG(l.latitude) AS centerLat,
@@ -873,6 +917,7 @@ interface GeoTowerDao {
             l.is_zb,
             COALESCE(st.libelle, '') AS statut,
             COALESCE(t.has_active, 0) AS has_active,
+            COALESCE(NULLIF(t.date_service, ''), NULLIF(t.date_implantation, '')) AS date_service,
             CASE WHEN EXISTS (
                 SELECT 1
                 FROM support underground_support
@@ -906,6 +951,7 @@ interface GeoTowerDao {
             l.is_zb,
             COALESCE(st.libelle, '') AS statut,
             COALESCE(t.has_active, 0) AS has_active,
+            COALESCE(NULLIF(t.date_service, ''), NULLIF(t.date_implantation, '')) AS date_service,
             CASE WHEN EXISTS (
                 SELECT 1
                 FROM support underground_support
@@ -973,6 +1019,7 @@ interface GeoTowerDao {
             l.is_zb,
             COALESCE(st.libelle, '') AS statut,
             COALESCE(t.has_active, 0) AS has_active,
+            COALESCE(NULLIF(t.date_service, ''), NULLIF(t.date_implantation, '')) AS date_service,
             CASE WHEN EXISTS (
                 SELECT 1
                 FROM support underground_support
@@ -1004,6 +1051,7 @@ interface GeoTowerDao {
             l.is_zb,
             COALESCE(st.libelle, '') AS statut,
             COALESCE(t.has_active, 0) AS has_active,
+            COALESCE(NULLIF(t.date_service, ''), NULLIF(t.date_implantation, '')) AS date_service,
             CASE WHEN EXISTS (
                 SELECT 1
                 FROM support underground_support
@@ -1117,6 +1165,7 @@ interface GeoTowerDao {
             l.band_mask,
             COALESCE(st.libelle, '') AS statut,
             COALESCE(t.has_active, 0) AS has_active,
+            COALESCE(NULLIF(t.date_service, ''), NULLIF(t.date_implantation, '')) AS date_service,
             t.details_frequences AS details_frequences
         FROM support s
         INNER JOIN localisation l ON s.id_anfr = l.id_anfr

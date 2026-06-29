@@ -172,7 +172,7 @@ fun RadioDatabaseDownloadCard(
                 }
                 Spacer(modifier = Modifier.width(textStartPadding))
                 Text(
-                    text = "Données radio ANFR",
+                    text = stringResource(R.string.appstrings_radio_data_title),
                     fontWeight = FontWeight.Bold,
                     style = MaterialTheme.typography.titleMedium,
                     textAlign = TextAlign.Start

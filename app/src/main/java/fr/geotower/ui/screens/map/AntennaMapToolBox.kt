@@ -32,10 +32,13 @@ fun AntennaMapToolBox(
     onToggleSearch: () -> Unit,
     isMeasuringMode: Boolean,
     onToggleMeasure: () -> Unit,
+    isTimeSliderActive: Boolean,
+    onToggleTimeSlider: () -> Unit,
     onOpenLayers: () -> Unit,
     onOpenSettings: () -> Unit,
     showSearch: Boolean = true,
     showMeasure: Boolean = true,
+    showTimeSlider: Boolean = true,
     showLayers: Boolean = true,
     showSettings: Boolean = true,
     expandLeft: Boolean = false
@@ -94,6 +97,21 @@ fun AntennaMapToolBox(
                                     Icons.Default.Straighten,
                                     contentDescription = stringResource(R.string.appstrings_ruler),
                                     tint = if (isMeasuringMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(ToolboxIconDiameter)
+                                )
+                            }
+                        }
+                        if (showTimeSlider) {
+                            IconButton(
+                                onClick = onToggleTimeSlider,
+                                modifier = Modifier
+                                    .size(ToolboxButtonDiameter)
+                                    .background(if (isTimeSliderActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, CircleShape)
+                            ) {
+                                Icon(
+                                    Icons.Default.History,
+                                    contentDescription = stringResource(R.string.appstrings_time_slider),
+                                    tint = if (isTimeSliderActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(ToolboxIconDiameter)
                                 )
                             }
@@ -173,6 +191,21 @@ fun AntennaMapToolBox(
                                 Icons.Default.Straighten,
                                 contentDescription = stringResource(R.string.appstrings_ruler),
                                 tint = if (isMeasuringMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(ToolboxIconDiameter)
+                            )
+                        }
+                    }
+                    if (showTimeSlider) {
+                        IconButton(
+                            onClick = onToggleTimeSlider,
+                            modifier = Modifier
+                                .size(ToolboxButtonDiameter)
+                                .background(if (isTimeSliderActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, CircleShape)
+                        ) {
+                            Icon(
+                                Icons.Default.History,
+                                contentDescription = stringResource(R.string.appstrings_time_slider),
+                                tint = if (isTimeSliderActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.size(ToolboxIconDiameter)
                             )
                         }

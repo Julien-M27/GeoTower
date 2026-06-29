@@ -55,6 +55,9 @@ object ThroughputDisplayText {
     @Composable fun customImpact(ltePercent: Int, nrPercent: Int) = stringResource(R.string.throughput_custom_impact, ltePercent, nrPercent)
     @Composable fun customExplanationSignalDesc(ltePercent: Int, nrPercent: Int) = stringResource(R.string.throughput_custom_explanation_signal_desc_dynamic, ltePercent, nrPercent)
     @Composable fun customExplanationAggregationDesc(maxLteCarriers: Int) = stringResource(R.string.throughput_custom_explanation_aggregation_desc_dynamic, maxLteCarriers)
+    @Composable fun receiverHeightValue(height: String, floor: String) = stringResource(R.string.throughput_receiver_height_value, height, floor)
+    @Composable fun floorEquivalent(floor: Int): String =
+        if (floor <= 0) stringResource(R.string.throughput_floor_ground) else stringResource(R.string.throughput_floor_nth, floor)
     @Composable fun shareOptimalDistance(distance: String) = stringResource(R.string.share_throughput_optimal_distance, distance)
     @Composable fun shareZone(near: String, far: String) = stringResource(R.string.share_throughput_zone, near, far)
     @Composable fun shareBandsSummary(presetLabel: String, included: Int, total: Int) = stringResource(R.string.share_throughput_bands_summary, presetLabel, included, total)

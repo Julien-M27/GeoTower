@@ -16,6 +16,7 @@ import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Settings
@@ -222,6 +223,7 @@ private fun rememberGeoTowerBreadcrumbLabels(): GeoTowerBreadcrumbLabels {
         stats = stringResource(R.string.nav_statistics),
         settings = stringResource(R.string.nav_settings),
         about = stringResource(R.string.nav_about),
+        diagnostic = stringResource(R.string.appstrings_diagnostic_title),
         support = stringResource(R.string.appstrings_support_detail_title),
         site = stringResource(R.string.appstrings_site_detail_title),
         elevationProfile = stringResource(R.string.appstrings_elevation_profile_title),
@@ -240,6 +242,7 @@ private data class GeoTowerBreadcrumbLabels(
     val stats: String,
     val settings: String,
     val about: String,
+    val diagnostic: String,
     val support: String,
     val site: String,
     val elevationProfile: String,
@@ -264,6 +267,7 @@ private fun NavBackStackEntry.toGeoTowerBreadcrumbItem(
         "stats" -> GeoTowerBreadcrumbItem(labels.stats, Icons.Default.BarChart, onClick, "stats")
         "settings?section={section}&target_map={targetMapFilename}" -> GeoTowerBreadcrumbItem(labels.settings, Icons.Default.Settings, onClick, "settings")
         "about" -> GeoTowerBreadcrumbItem(labels.about, Icons.Default.Home, onClick, "about")
+        "diagnostic" -> GeoTowerBreadcrumbItem(labels.diagnostic, Icons.Default.Info, onClick, "diagnostic")
         "photo_upload_history" -> GeoTowerBreadcrumbItem(labels.uploadHistory, Icons.Default.History, onClick, "photo_upload_history")
         "support_detail/{id}?operator={operator}&fromMap={fromMap}&photoDraftId={photoDraftId}" -> GeoTowerBreadcrumbItem(labels.support, Icons.Default.VerticalAlignTop, onClick, "support_detail")
         "site_detail/{id}" -> GeoTowerBreadcrumbItem(labels.site, Icons.Default.Tag, onClick, "site_detail")

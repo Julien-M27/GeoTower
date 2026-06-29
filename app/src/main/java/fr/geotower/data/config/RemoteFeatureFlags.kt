@@ -183,6 +183,7 @@ data class RemoteFeatureFlagConfig(
         return when (linkId) {
             "signalquest" -> isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_EXTERNAL_LINKS)
             "cellularfr" -> isFeatureEnabled(RemoteFeatureFlags.Features.CELLULARFR_EXTERNAL_LINKS)
+            "cellmapper" -> isFeatureEnabled(RemoteFeatureFlags.Features.EXTERNAL_LINKS_CELLMAPPER)
             else -> true
         }
     }
@@ -205,11 +206,13 @@ object RemoteFeatureFlags {
         const val SETTINGS = "settings"
         const val HELP = "help"
         const val ABOUT = "about"
+        const val DIAGNOSTIC = "diagnostic"
         const val PHOTO_UPLOAD_HISTORY = "photoUploadHistory"
         const val SUPPORT_DETAIL = "supportDetail"
         const val SITE_DETAIL = "siteDetail"
         const val SITE_SPEEDTESTS = "siteSpeedtests"
         const val ELEVATION_PROFILE = "elevationProfile"
+        const val THEORETICAL_COVERAGE = "theoreticalCoverage"
         const val THROUGHPUT_CALCULATOR = "throughputCalculator"
         const val SIGNALQUEST_UPLOAD = "signalQuestUpload"
         const val FIRST_START = "firstStart"
@@ -261,6 +264,7 @@ object RemoteFeatureFlags {
         const val SITE_FREQUENCIES = "site.frequencies"
         const val SITE_SPECTRUM = "site.spectrum"
         const val SITE_ELEVATION_PROFILE = "site.elevationProfile"
+        const val SITE_THEORETICAL_COVERAGE = "site.theoreticalCoverage"
         const val SITE_THROUGHPUT_CALCULATOR = "site.throughputCalculator"
         const val SUPPORT_PHOTOS = "support.photos"
         const val SUPPORT_EXTERNAL_NAVIGATION = "support.externalNavigation"
@@ -272,6 +276,7 @@ object RemoteFeatureFlags {
         const val SIGNALQUEST_PHOTOS = "signalQuest.photos"
         const val SIGNALQUEST_UPLOAD = "signalQuest.upload"
         const val SIGNALQUEST_SPEEDTESTS = "signalQuest.speedtests"
+        const val SIGNALQUEST_COVERAGE = "signalQuest.coverage"
         const val SIGNALQUEST_EXTERNAL_LINKS = "signalQuest.externalLinks"
         const val CELLULARFR_PHOTOS = "cellularFr.photos"
         const val CELLULARFR_EXTERNAL_LINKS = "cellularFr.externalLinks"
@@ -280,6 +285,7 @@ object RemoteFeatureFlags {
         const val EXTERNAL_LINKS_ENB_ANALYTICS = "externalLinks.enbAnalytics"
         const val EXTERNAL_LINKS_SIGNALQUEST = "externalLinks.signalQuest"
         const val EXTERNAL_LINKS_CELLULARFR = "externalLinks.cellularFr"
+        const val EXTERNAL_LINKS_CELLMAPPER = "externalLinks.cellMapper"
         const val EXTERNAL_LINKS_ANFR = "externalLinks.anfr"
     }
 
@@ -305,6 +311,7 @@ object RemoteFeatureFlags {
         const val OUTAGES_GEOTOWER = "outages.geotower"
         const val SIGNALQUEST = "signalQuest"
         const val CELLULARFR = "cellularFr"
+        const val CELLMAPPER = "cellMapper"
         const val CARTORADIO = "cartoradio"
         const val RNC_MOBILE = "rncMobile"
         const val ENB_ANALYTICS = "enbAnalytics"
@@ -340,6 +347,13 @@ object RemoteFeatureFlags {
         const val LIVE_API_BBOX_MAX_LIMIT = "liveApiBboxMaxLimit"
         const val LIVE_API_BBOX_MAX_DEGREES = "liveApiBboxMaxDegrees"
         const val LIVE_API_SEARCH_MAX_LIMIT = "liveApiSearchMaxLimit"
+        const val COVERAGE_MAX_RADIUS_KM = "coverageMaxRadiusKm"
+        const val COVERAGE_MIN_ANGULAR_STEP_DEG = "coverageMinAngularStepDeg"
+        const val COVERAGE_SAMPLE_STEP_M = "coverageSampleStepM"
+        const val COVERAGE_MAX_POINTS_PER_REQUEST = "coverageMaxPointsPerRequest"
+        const val COVERAGE_MAX_CONCURRENT_REQUESTS = "coverageMaxConcurrentRequests"
+        const val COVERAGE_DEFAULT_TILT_DEG = "coverageDefaultTiltDeg"
+        const val COVERAGE_DEFAULT_VBEAM_DEG = "coverageDefaultVBeamDeg"
     }
 
     val defaultConfig = RemoteFeatureFlagConfig(
@@ -353,11 +367,13 @@ object RemoteFeatureFlags {
             Screens.SETTINGS to true,
             Screens.HELP to true,
             Screens.ABOUT to true,
+            Screens.DIAGNOSTIC to true,
             Screens.PHOTO_UPLOAD_HISTORY to true,
             Screens.SUPPORT_DETAIL to true,
             Screens.SITE_DETAIL to true,
             Screens.SITE_SPEEDTESTS to true,
             Screens.ELEVATION_PROFILE to true,
+            Screens.THEORETICAL_COVERAGE to true,
             Screens.THROUGHPUT_CALCULATOR to true,
             Screens.SIGNALQUEST_UPLOAD to true,
             Screens.FIRST_START to true
@@ -407,6 +423,7 @@ object RemoteFeatureFlags {
             Features.SITE_FREQUENCIES to true,
             Features.SITE_SPECTRUM to true,
             Features.SITE_ELEVATION_PROFILE to true,
+            Features.SITE_THEORETICAL_COVERAGE to true,
             Features.SITE_THROUGHPUT_CALCULATOR to true,
             Features.SUPPORT_PHOTOS to true,
             Features.SUPPORT_EXTERNAL_NAVIGATION to true,
@@ -418,6 +435,7 @@ object RemoteFeatureFlags {
             Features.SIGNALQUEST_PHOTOS to true,
             Features.SIGNALQUEST_UPLOAD to true,
             Features.SIGNALQUEST_SPEEDTESTS to true,
+            Features.SIGNALQUEST_COVERAGE to true,
             Features.SIGNALQUEST_EXTERNAL_LINKS to true,
             Features.CELLULARFR_PHOTOS to false,
             Features.CELLULARFR_EXTERNAL_LINKS to false,
@@ -426,6 +444,7 @@ object RemoteFeatureFlags {
             Features.EXTERNAL_LINKS_ENB_ANALYTICS to true,
             Features.EXTERNAL_LINKS_SIGNALQUEST to true,
             Features.EXTERNAL_LINKS_CELLULARFR to false,
+            Features.EXTERNAL_LINKS_CELLMAPPER to true,
             Features.EXTERNAL_LINKS_ANFR to true
         ),
         actions = mapOf(
@@ -449,6 +468,7 @@ object RemoteFeatureFlags {
             Providers.OUTAGES_GEOTOWER to true,
             Providers.SIGNALQUEST to true,
             Providers.CELLULARFR to false,
+            Providers.CELLMAPPER to true,
             Providers.CARTORADIO to true,
             Providers.RNC_MOBILE to true,
             Providers.ENB_ANALYTICS to true,
@@ -480,7 +500,14 @@ object RemoteFeatureFlags {
             Limits.LIVE_API_NEARBY_MAX_RADIUS_KM to 50,
             Limits.LIVE_API_BBOX_MAX_LIMIT to 1000,
             Limits.LIVE_API_BBOX_MAX_DEGREES to 3,
-            Limits.LIVE_API_SEARCH_MAX_LIMIT to 100
+            Limits.LIVE_API_SEARCH_MAX_LIMIT to 100,
+            Limits.COVERAGE_MAX_RADIUS_KM to 8,
+            Limits.COVERAGE_MIN_ANGULAR_STEP_DEG to 2,
+            Limits.COVERAGE_SAMPLE_STEP_M to 20,
+            Limits.COVERAGE_MAX_POINTS_PER_REQUEST to 300,
+            Limits.COVERAGE_MAX_CONCURRENT_REQUESTS to 1,
+            Limits.COVERAGE_DEFAULT_TILT_DEG to 5,
+            Limits.COVERAGE_DEFAULT_VBEAM_DEG to 10
         ),
         homeAnnouncement = RemoteHomeAnnouncement()
     )

@@ -43,6 +43,9 @@ import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material.icons.filled.Settings
+import fr.geotower.ui.screens.settings.ElevationProfileSettingsSheet
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -84,6 +87,7 @@ import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.GeoTowerBreadcrumbItem
 import fr.geotower.ui.components.GeoTowerNavigationBreadcrumbBar
+import fr.geotower.ui.components.GeoTowerSwitch
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
@@ -111,6 +115,7 @@ import fr.geotower.R
 
 private const val TAG_ELEVATION_PROFILE = "GeoTowerLocation"
 
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun ElevationProfileScreen(
     navController: NavController,
@@ -149,7 +154,10 @@ fun ElevationProfileScreen(
     var savedProfilePrompt by remember { mutableStateOf<SavedElevationProfile?>(null) }
     var hasAnsweredSavedProfilePrompt by remember(antennaId) { mutableStateOf(false) }
     var isUsingSavedProfile by remember(antennaId) { mutableStateOf(false) }
+    var includeObstacles by remember { mutableStateOf(loadElevationProfileIncludeObstacles(context)) }
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "site_detail/$antennaId")
+    var showElevationSettings by remember { mutableStateOf(false) }
+    val elevationSettingsSheetState = rememberModalBottomSheetState()
 
     fun handleBackNavigation() {
         if (isSplitScreen) {
@@ -224,7 +232,7 @@ fun ElevationProfileScreen(
         }
     }
 
-    LaunchedEffect(site, userLocation, isOnline) {
+    LaunchedEffect(site, userLocation, isOnline, includeObstacles) {
         val currentSite = site ?: return@LaunchedEffect
 
         if (!isOnline) {
@@ -259,7 +267,7 @@ fun ElevationProfileScreen(
         val toLatitude = pendingPoint?.toLatitude ?: currentSite.latitude
         val toLongitude = pendingPoint?.toLongitude ?: currentSite.longitude
 
-        val key = "${currentSite.idAnfr}:${(fromLatitude * 100000).roundToInt()}:${(fromLongitude * 100000).roundToInt()}"
+        val key = "${currentSite.idAnfr}:${(fromLatitude * 100000).roundToInt()}:${(fromLongitude * 100000).roundToInt()}:obs=$includeObstacles"
         if (loadedProfileKey == key) return@LaunchedEffect
         val now = System.currentTimeMillis()
         if (
@@ -283,7 +291,8 @@ fun ElevationProfileScreen(
                     fromLatitude = fromLatitude,
                     fromLongitude = fromLongitude,
                     toLatitude = toLatitude,
-                    toLongitude = toLongitude
+                    toLongitude = toLongitude,
+                    includeObstacles = includeObstacles
                 )
             }
         }
@@ -318,7 +327,15 @@ fun ElevationProfileScreen(
                     title = txtElevationProfileTitle,
                     onBack = { handleBackNavigation() },
                     backgroundColor = mainBgColor,
-                    backEnabled = isSplitScreen || !safeBackNavigation.isLocked
+                    backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
+                    actions = {
+                        IconButton(onClick = { showElevationSettings = true }) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.appstrings_coverage_settings_title)
+                            )
+                        }
+                    }
                 )
                 GeoTowerNavigationBreadcrumbBar(
                     navController = navController,
@@ -345,6 +362,13 @@ fun ElevationProfileScreen(
                     },
                     backgroundColor = if (useOneUi) cardBgColor else MaterialTheme.colorScheme.surfaceContainer
                 )
+                if (showElevationSettings) {
+                    ElevationProfileSettingsSheet(
+                        onDismiss = { showElevationSettings = false },
+                        sheetState = elevationSettingsSheetState,
+                        useOneUi = useOneUi
+                    )
+                }
             }
         }
     ) { padding ->
@@ -472,6 +496,29 @@ fun ElevationProfileScreen(
                                 selectedFrequencyMHz = frequency,
                                 onFrequencySelected = { selectedFrequencyMHz = it }
                             )
+                            ObstaclesToggle(
+                                checked = includeObstacles,
+                                onCheckedChange = { newValue ->
+                                    includeObstacles = newValue
+                                    saveElevationProfileIncludeObstacles(context, newValue)
+                                    // Force un recalcul immédiat malgré l'anti-rebond GPS.
+                                    loadedProfileKey = null
+                                    lastProfileRecalculationAtMillis = 0L
+                                }
+                            )
+                            if (includeObstacles && !profile!!.obstaclesIncluded) {
+                                Text(
+                                    text = stringResource(R.string.appstrings_elevation_profile_obstacles_unavailable),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.error
+                                )
+                            } else if (profile!!.obstaclesIncluded) {
+                                Text(
+                                    text = stringResource(R.string.appstrings_elevation_profile_obstacles_active),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                             ElevationProfileChart(
                                 profile = profile!!,
                                 supportHeightMeters = supportHeight,
@@ -883,6 +930,33 @@ private fun FrequencySelector(
 }
 
 @Composable
+private fun ObstaclesToggle(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(
+                text = stringResource(R.string.appstrings_elevation_profile_obstacles_label),
+                style = MaterialTheme.typography.bodyMedium,
+                fontWeight = FontWeight.SemiBold,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = stringResource(R.string.appstrings_elevation_profile_obstacles_detail),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        GeoTowerSwitch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+@Composable
 private fun ElevationProfileChart(
     profile: ElevationProfileResult,
     supportHeightMeters: Double,
@@ -1059,13 +1133,15 @@ private fun fetchIgnElevationProfile(
     fromLatitude: Double,
     fromLongitude: Double,
     toLatitude: Double,
-    toLongitude: Double
+    toLongitude: Double,
+    includeObstacles: Boolean
 ): ElevationProfileResult {
     val profile = ElevationProfileApi.getProfile(
         fromLatitude = fromLatitude,
         fromLongitude = fromLongitude,
         toLatitude = toLatitude,
-        toLongitude = toLongitude
+        toLongitude = toLongitude,
+        includeObstacles = includeObstacles
     )
     return ElevationProfileResult(
         points = profile.points.map { point ->
@@ -1076,7 +1152,8 @@ private fun fetchIgnElevationProfile(
                 distanceMeters = point.distanceMeters
             )
         },
-        distanceMeters = profile.distanceMeters
+        distanceMeters = profile.distanceMeters,
+        obstaclesIncluded = profile.obstaclesIncluded
     )
 }
 
@@ -1241,6 +1318,7 @@ private fun saveElevationProfile(
         .put("fromLatitude", calculationInfo.fromLatitude)
         .put("fromLongitude", calculationInfo.fromLongitude)
         .put("distanceMeters", profile.distanceMeters.toDouble())
+        .put("obstaclesIncluded", profile.obstaclesIncluded)
         .put("points", points)
 
     context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
@@ -1276,7 +1354,8 @@ private fun loadSavedElevationProfile(context: Context, antennaId: String): Save
         SavedElevationProfile(
             profile = ElevationProfileResult(
                 points = points,
-                distanceMeters = json.optDouble("distanceMeters", points.last().distanceMeters.toDouble()).toFloat()
+                distanceMeters = json.optDouble("distanceMeters", points.last().distanceMeters.toDouble()).toFloat(),
+                obstaclesIncluded = json.optBoolean("obstaclesIncluded", false)
             ),
             calculationInfo = ProfileCalculationInfo(
                 calculatedAtMillis = json.getLong("calculatedAtMillis"),
@@ -1306,7 +1385,9 @@ private data class ElevationProfilePoint(
 
 private data class ElevationProfileResult(
     val points: List<ElevationProfilePoint>,
-    val distanceMeters: Float
+    val distanceMeters: Float,
+    /** true si le profil inclut les obstacles (MNS LiDAR HD), false pour le sol nu (MNT). */
+    val obstaclesIncluded: Boolean = false
 )
 
 private data class ProfileSiteData(

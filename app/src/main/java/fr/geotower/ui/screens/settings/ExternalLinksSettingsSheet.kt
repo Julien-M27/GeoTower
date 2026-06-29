@@ -60,6 +60,7 @@ import fr.geotower.ui.components.resetSiteExternalLinks
 import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.ui.components.siteExternalLinkById
 import fr.geotower.ui.components.writeSiteExternalLinkOrder
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -76,10 +77,11 @@ fun ExternalLinksSettingsSheet(
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     // Design des petits blocs individuels
-    val cardShape = if (useOneUi) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
-    val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+    val cardShape = if (useOneUi) RoundedCornerShape(sizing.component(24.dp)) else RoundedCornerShape(sizing.component(12.dp))
+    val cardBorder = if (useOneUi) null else BorderStroke(sizing.component(1.dp), MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     val bubbleColor = if (useOneUi) {
         if (isDark) Color(0xFF212121) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.9f)
     } else {
@@ -105,12 +107,12 @@ fun ExternalLinksSettingsSheet(
                 .fillMaxWidth()
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
-                .padding(bottom = 32.dp, start = 24.dp, end = 24.dp)
+                .padding(bottom = sizing.spacing(32.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp))
         ) {
 
             // --- EN-TÊTE AVEC BOUTON RETOUR ---
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 24.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(24.dp)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = onDismiss) {
@@ -118,16 +120,16 @@ fun ExternalLinksSettingsSheet(
                 }
                 Text(
                     text = stringResource(R.string.settings_external_links_title),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
-                Spacer(modifier = Modifier.width(48.dp))
+                Spacer(modifier = Modifier.width(sizing.spacing(48.dp)))
             }
 
-            val itemHeight = 64.dp
-            val spacing = 10.dp
+            val itemHeight = sizing.component(64.dp)
+            val spacing = sizing.spacing(10.dp)
             val reorderState = rememberReorderableDragState(
                 items = linksOrder,
                 itemHeight = itemHeight,
@@ -164,7 +166,7 @@ fun ExternalLinksSettingsSheet(
                                         translationY = if (isDragged) dragOffset else 0f
                                         scaleX = if (isDragged) 1.02f else 1f
                                         scaleY = if (isDragged) 1.02f else 1f
-                                        shadowElevation = if (isDragged) 8.dp.toPx() else 0f
+                                        shadowElevation = if (isDragged) sizing.component(8.dp).toPx() else 0f
                                     }
                                     .then(dragModifier),
                                 shape = cardShape,
@@ -173,15 +175,15 @@ fun ExternalLinksSettingsSheet(
                             ) {
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
-                                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp)
+                                    modifier = Modifier.fillMaxSize().padding(horizontal = sizing.spacing(16.dp))
                                 ) {
-                                    Icon(Icons.Default.DragHandle, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
-                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Icon(Icons.Default.DragHandle, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(sizing.component(24.dp)))
+                                    Spacer(modifier = Modifier.width(sizing.spacing(16.dp)))
 
-                                    Image(painter = painterResource(id = link.logoRes), contentDescription = null, modifier = Modifier.size(32.dp).clip(RoundedCornerShape(6.dp)))
-                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Image(painter = painterResource(id = link.logoRes), contentDescription = null, modifier = Modifier.size(sizing.component(32.dp)).clip(RoundedCornerShape(sizing.component(6.dp))))
+                                    Spacer(modifier = Modifier.width(sizing.spacing(16.dp)))
 
-                                    Text(link.label, modifier = Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                                    Text(link.label, modifier = Modifier.weight(1f), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.SemiBold)
 
                                     fr.geotower.ui.components.GeoTowerSwitch(
                                         checked = checked,
@@ -196,7 +198,7 @@ fun ExternalLinksSettingsSheet(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
             TextButton(
                 onClick = {
@@ -211,14 +213,14 @@ fun ExternalLinksSettingsSheet(
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
                 Text(
                     text = stringResource(R.string.appstrings_reset_to_default),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
             }
-            Spacer(modifier = Modifier.height(32.dp).navigationBarsPadding())
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
         }
     }
 }

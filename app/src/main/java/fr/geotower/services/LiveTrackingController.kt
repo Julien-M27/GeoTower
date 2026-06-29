@@ -5,7 +5,9 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import fr.geotower.data.config.RemoteFeatureFlags
@@ -122,6 +124,38 @@ object LiveTrackingController {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             runCatching { appContext.startActivity(fallbackIntent) }
+        }
+    }
+
+    /**
+     * Vrai si l'app est exemptée des optimisations d'énergie (Doze / App Standby). Sans cette
+     * exemption, les OEM agressifs (Samsung/One UI) gèlent le service de premier plan dès que
+     * l'app quitte le premier plan → les positions GPS du suivi live s'arrêtent.
+     */
+    fun isIgnoringBatteryOptimizations(context: Context): Boolean {
+        val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+            ?: return true
+        return powerManager.isIgnoringBatteryOptimizations(context.packageName)
+    }
+
+    /**
+     * Ouvre la boîte de dialogue système demandant à ignorer les optimisations de batterie.
+     * Action explicite déclenchée depuis une carte des réglages (pas un popup automatique).
+     */
+    fun requestIgnoreBatteryOptimizations(context: Context) {
+        val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+            data = Uri.parse("package:${context.packageName}")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        try {
+            context.startActivity(intent)
+        } catch (e: Exception) {
+            // Certains appareils n'exposent pas l'écran direct : on retombe sur la liste générale.
+            AppLogger.w(TAG, "Battery optimization request dialog unavailable, opening settings", e)
+            val fallback = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            runCatching { context.startActivity(fallback) }
         }
     }
 

@@ -205,7 +205,7 @@
     <string name="signalquest_unsupported_operator">Opérateur SignalQuest non pris en charge.</string>
     <string name="signalquest_upload_disabled_for_operator">Envoi SignalQuest désactivé pour cet opérateur.</string>
     <string name="signalquest_unsupported_photo_format">Format de photo non pris en charge.</string>
-    <string name="signalquest_photo_too_large">Une photo dépasse la limite de 20 Mo.</string>
+    <string name="signalquest_photo_too_large">Une photo dépasse la limite de 64 Mo.</string>
     <string name="signalquest_prepare_photos_failed">Impossible de préparer les photos.</string>
     <string name="signalquest_manifest_missing">Manifeste d\'envoi introuvable.</string>
     <string name="signalquest_manifest_invalid">Manifeste d\'envoi invalide.</string>
@@ -654,6 +654,8 @@
     <string name="appstrings_outage_reason_technical">Intervention technique</string>
     <string name="appstrings_outage_status_degraded">Dégradé</string>
     <string name="appstrings_outage_status_hs">Hors Service</string>
+    <string name="appstrings_outage_status_potential">Potentiellement en panne</string>
+    <string name="appstrings_outage_potential_explanation">Aucune panne déclarée pour cet opérateur, mais un autre opérateur est en panne sur ce site partagé en zone blanche.</string>
     <string name="appstrings_outage_voice">Voix</string>
     <string name="appstrings_owner">Propriétaire</string>
     <string name="appstrings_page_compass">Boussole</string>
@@ -845,6 +847,11 @@
     <string name="appstrings_throughput_cone_assumption">Hypothèse : hauteur panneau/support, mobile à 1,5 m, tilt vertical typique 4°-8° avec un point nominal à 6°.</string>
     <string name="appstrings_throughput_cone_height_unavailable">Hauteur de panneau/support indisponible : impossible d\'estimer la zone principale du cône.</string>
     <string name="appstrings_throughput_cone_map_explanation">Le cercle marque la distance optimale, les points indiquent les axes de panneau où le signal devrait être le plus fort.</string>
+    <string name="appstrings_throughput_receiver_height_title">Hauteur d\'arrivée</string>
+    <string name="appstrings_throughput_receiver_height_desc">Hauteur du récepteur au-dessus du sol, utilisée pour estimer le cône de distance optimale.</string>
+    <string name="throughput_receiver_height_value">%1$s ≈ %2$s</string>
+    <string name="throughput_floor_ground">rez-de-chaussée</string>
+    <string name="throughput_floor_nth">étage %1$d</string>
     <string name="appstrings_throughput_custom_aggregation_title">Agrégation 4G</string>
     <string name="appstrings_throughput_custom_backhaul_title">Backhaul</string>
     <string name="appstrings_throughput_custom_environment_title">Environnement</string>

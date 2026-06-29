@@ -53,6 +53,12 @@ data class SqSpeedtestsResponse(
     val requestId: String? = null
 )
 
+data class SqCoveragePointsResponse(
+    val data: List<SqCoveragePointData> = emptyList(),
+    val meta: SqCoveragePointsMeta? = null,
+    val requestId: String? = null
+)
+
 data class SqSpeedtestData(
     val id: String? = null,
     val coordinates: SqCoordinates? = null,
@@ -71,6 +77,21 @@ data class SqSpeedtestData(
     val radio: SqSpeedtestRadio? = null
 )
 
+data class SqCoveragePointData(
+    val id: String? = null,
+    val timestamp: String? = null,
+    val coordinates: SqCoordinates? = null,
+    val signalStrength: Float? = null,
+    val rsrq: Float? = null,
+    val snr: Float? = null,
+    val technology: String? = null,
+    val networkType: String? = null,
+    val mobileOperator: String? = null,
+    val mcc: Int? = null,
+    val mnc: Int? = null,
+    val radio: SqCoverageRadio? = null
+)
+
 data class SqCoordinates(
     val lat: Double? = null,
     val lng: Double? = null
@@ -86,6 +107,13 @@ data class SqSpeedtestRadio(
     val snr: Float? = null
 )
 
+data class SqCoverageRadio(
+    val enb: String? = null,
+    val gnb: String? = null,
+    val cellId: String? = null,
+    val pci: Int? = null
+)
+
 data class SqSpeedtestsMeta(
     val total: Int? = null,
     val limit: Int? = null,
@@ -93,6 +121,14 @@ data class SqSpeedtestsMeta(
     val bestOnly: Boolean? = null,
     val market: String? = null,
     val operator: String? = null
+)
+
+data class SqCoveragePointsMeta(
+    val limit: Int? = null,
+    val returned: Int? = null,
+    val market: String? = null,
+    val operator: String? = null,
+    val technology: String? = null
 )
 
 interface SignalQuestApiService {
@@ -139,6 +175,19 @@ interface SignalQuestApiService {
         @Query("limit") limit: Int? = null,
         @Query("offset") offset: Int? = null
     ): retrofit2.Response<SqSpeedtestsResponse>
+
+    @GET("api/v2/signalquest/coverage/points")
+    suspend fun getCoveragePoints(
+        @Query("market") market: String = "FR",
+        @Query("operator") operator: String? = null,
+        @Query("technology") technology: String? = null,
+        @Query("north") north: Double? = null,
+        @Query("south") south: Double? = null,
+        @Query("east") east: Double? = null,
+        @Query("west") west: Double? = null,
+        @Query("days") days: Int? = null,
+        @Query("limit") limit: Int? = null
+    ): retrofit2.Response<SqCoveragePointsResponse>
 }
 
 object SignalQuestClient {

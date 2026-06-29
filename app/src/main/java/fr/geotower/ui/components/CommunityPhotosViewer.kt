@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.ContentValues
 import android.content.Context
+import android.content.SharedPreferences
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
@@ -126,6 +127,7 @@ import java.util.Locale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import kotlin.math.roundToInt
 
 // Modèle de données unifié
@@ -162,6 +164,139 @@ private fun CommunityPhoto.favoriteBucketId(): String? {
     } else {
         resolvedSourceId
     }
+}
+
+fun visibleCommunityPhotosForShare(
+    photos: List<CommunityPhoto>,
+    prefs: SharedPreferences,
+    operatorNames: List<String?>,
+    favoriteScopeId: String?
+): List<CommunityPhoto> {
+    val dataOperators = operatorNames.ifEmpty { listOf(null) }
+    val dataOperatorKeys = dataOperators
+        .mapNotNull { CommunityDataPreferences.operatorKeyFor(it) }
+        .distinct()
+    val preferredKeys = CommunityDataPreferences
+        .orderedOperators(AppConfig.defaultOperator.value)
+        .map { it.key }
+    val orderedOperatorKeys = preferredKeys.filter { it in dataOperatorKeys } +
+        dataOperatorKeys.filterNot { it in preferredKeys }
+
+    val showCellularFr = CommunityDataPreferences.isPhotoSourceEnabledForAny(
+        prefs,
+        dataOperators,
+        CommunityDataPreferences.SOURCE_CELLULARFR
+    )
+    val showSignalQuest = CommunityDataPreferences.isPhotoSourceEnabledForAny(
+        prefs,
+        dataOperators,
+        CommunityDataPreferences.SOURCE_SIGNALQUEST
+    )
+    val photoSourceOrder = CommunityDataPreferences.orderedPhotoSourceIdsForOperatorKeys(prefs, orderedOperatorKeys)
+    val photoSourceRank = photoSourceOrder.withIndex().associate { (index, sourceId) -> sourceId to index }
+    val signalQuestOperatorOrder = signalQuestOperatorOrder(AppConfig.defaultOperator.value)
+    val canSelectFavoritePhoto = !favoriteScopeId.isNullOrBlank()
+
+    val favoritesByBucket = if (canSelectFavoritePhoto) {
+        photos
+            .mapNotNull { photo -> photo.favoriteBucketId() }
+            .distinct()
+            .mapNotNull { bucketId ->
+                CommunityDataPreferences.favoritePhotoIdForSource(prefs, favoriteScopeId, bucketId)
+                    ?.let { favoritePhotoId -> bucketId to favoritePhotoId }
+            }
+            .toMap()
+    } else {
+        emptyMap()
+    }
+    val legacySignalQuestFavorite = if (canSelectFavoritePhoto) {
+        CommunityDataPreferences.favoritePhotoIdForSource(
+            prefs,
+            favoriteScopeId,
+            CommunityDataPreferences.SOURCE_SIGNALQUEST
+        )
+    } else {
+        null
+    }
+    val legacySignalQuestBucket = legacySignalQuestFavorite?.let { favoritePhotoId ->
+        photos.firstOrNull { photo ->
+            photo.resolvedSourceId() == CommunityDataPreferences.SOURCE_SIGNALQUEST &&
+                photo.stableId == favoritePhotoId
+        }?.favoriteBucketId()
+    }
+    val favoritePhotoIdsByBucket = if (
+        legacySignalQuestFavorite != null &&
+        legacySignalQuestBucket != null &&
+        legacySignalQuestBucket !in favoritesByBucket
+    ) {
+        favoritesByBucket + (legacySignalQuestBucket to legacySignalQuestFavorite)
+    } else {
+        favoritesByBucket
+    }
+
+    fun isFavoritePhoto(photo: CommunityPhoto): Boolean {
+        val bucketId = photo.favoriteBucketId() ?: return false
+        return favoritePhotoIdsByBucket[bucketId] == photo.stableId
+    }
+
+    val sourceEnabledById = mapOf(
+        CommunityDataPreferences.SOURCE_CELLULARFR to showCellularFr,
+        CommunityDataPreferences.SOURCE_SIGNALQUEST to showSignalQuest
+    )
+    val availablePhotoSourceIds = photos.mapNotNull { photo -> photo.resolvedSourceId() }.toSet()
+    val fallbackOnlyBySource = photoSourceOrder.associateWith { sourceId ->
+        CommunityDataPreferences.isPhotoSourceFallbackOnlyForOperatorKeys(prefs, orderedOperatorKeys, sourceId)
+    }
+    val visiblePhotoSourceIds = photoSourceOrder.filterIndexed { index, sourceId ->
+        val isEnabled = sourceEnabledById[sourceId] ?: true
+        if (!isEnabled) {
+            false
+        } else if (fallbackOnlyBySource[sourceId] == true) {
+            val previousSourceHasPhotos = photoSourceOrder
+                .take(index)
+                .any { previousSourceId ->
+                    sourceEnabledById[previousSourceId] == true &&
+                        previousSourceId in availablePhotoSourceIds
+                }
+            !previousSourceHasPhotos
+        } else {
+            true
+        }
+    }.toSet()
+
+    fun isPhotoEnabledForItsOperator(photo: CommunityPhoto): Boolean {
+        val sourceId = photo.resolvedSourceId() ?: return true
+        if (sourceId !in visiblePhotoSourceIds) return false
+
+        val photoOperatorKey = photo.operatorKey?.takeIf { it.isNotBlank() } ?: return true
+        if (photoOperatorKey !in orderedOperatorKeys) return false
+
+        return CommunityDataPreferences.isEnabled(
+            prefs = prefs,
+            operatorKey = photoOperatorKey,
+            featureId = CommunityDataPreferences.FEATURE_PHOTOS,
+            sourceId = sourceId
+        )
+    }
+
+    return photos.filter { photo ->
+        isPhotoEnabledForItsOperator(photo)
+    }.sortedWith(
+        compareBy<CommunityPhoto>(
+            { photo ->
+                val sourceId = photo.resolvedSourceId()
+                if (sourceId != null && canSelectFavoritePhoto && isFavoritePhoto(photo)) 0 else 1
+            },
+            { photo -> photoSourceRank[photo.resolvedSourceId()] ?: 99 },
+            { photo ->
+                if (photo.resolvedSourceId() == CommunityDataPreferences.SOURCE_SIGNALQUEST) {
+                    signalQuestOperatorRank(photo.operatorKey, signalQuestOperatorOrder)
+                } else {
+                    0
+                }
+            }
+        )
+    )
 }
 
 private fun signalQuestOperatorOrder(defaultOperator: String?): List<String> {
@@ -1767,10 +1902,11 @@ private fun PhotoFavoriteButton(
     contentColor: Color,
     onClick: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     IconButton(
         onClick = onClick,
         modifier = modifier
-            .size(32.dp)
+            .size(sizing.component(32.dp))
             .background(backgroundColor, CircleShape)
     ) {
         Icon(
@@ -1795,17 +1931,18 @@ private fun PhotoInfoButton(
     contentColor: Color,
     onClick: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     IconButton(
         onClick = onClick,
         modifier = modifier
-            .size(32.dp)
+            .size(sizing.component(32.dp))
             .background(backgroundColor, CircleShape)
     ) {
         Icon(
             imageVector = Icons.Default.Info,
             contentDescription = stringResource(R.string.appstrings_photo_exif_info_desc),
             tint = contentColor,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(sizing.component(18.dp))
         )
     }
 }
@@ -1815,22 +1952,23 @@ private fun PhotoExifDialog(
     photo: CommunityPhoto,
     onDismiss: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val items = exifDisplayItems(photo.exifMetadata)
     val coordinate = remember(photo.exifMetadata) { exifCoordinate(photo.exifMetadata) }
-    val dialogShape = RoundedCornerShape(18.dp)
-    val mapShape = RoundedCornerShape(12.dp)
+    val dialogShape = RoundedCornerShape(sizing.component(18.dp))
+    val mapShape = RoundedCornerShape(sizing.component(12.dp))
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
             shape = dialogShape,
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 8.dp
+            tonalElevation = sizing.component(8.dp)
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 640.dp)
-                    .padding(20.dp)
+                    .heightIn(max = sizing.component(640.dp))
+                    .padding(sizing.spacing(20.dp))
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -1839,12 +1977,12 @@ private fun PhotoExifDialog(
                 ) {
                     Text(
                         text = stringResource(R.string.appstrings_photo_exif_metadata_title),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_close))
+                        Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_close), modifier = Modifier.size(sizing.component(24.dp)))
                     }
                 }
 
@@ -1854,21 +1992,21 @@ private fun PhotoExifDialog(
                         .verticalScroll(rememberScrollState())
                 ) {
                     coordinate?.let { point ->
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                         Text(
                             text = stringResource(R.string.appstrings_photo_exif_gps_position),
-                            style = MaterialTheme.typography.labelLarge,
+                            style = sizing.textStyle(MaterialTheme.typography.labelLarge),
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                         SharedMiniMapCard(
                             modifier = Modifier.fillMaxWidth(),
                             centerLat = point.latitude,
                             centerLon = point.longitude,
                             mappedAntennas = emptyList(),
                             blockShape = mapShape,
-                            cardBorder = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
+                            cardBorder = BorderStroke(sizing.component(1.dp), MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)),
                             onMapReady = {},
                             initialZoom = 17.0,
                             allowGestures = true
@@ -1876,8 +2014,8 @@ private fun PhotoExifDialog(
                     }
 
                     if (items.isNotEmpty()) {
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+                        Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
                             items.forEach { item ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth(),
@@ -1886,14 +2024,14 @@ private fun PhotoExifDialog(
                                 ) {
                                     Text(
                                         text = photoExifLabel(item.key),
-                                        style = MaterialTheme.typography.bodySmall,
+                                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.weight(1f)
                                     )
-                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Spacer(modifier = Modifier.width(sizing.spacing(16.dp)))
                                     Text(
                                         text = item.value,
-                                        style = MaterialTheme.typography.bodyMedium,
+                                        style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                                         color = MaterialTheme.colorScheme.onSurface,
                                         textAlign = TextAlign.End,
                                         modifier = Modifier.weight(1f)

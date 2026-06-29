@@ -304,6 +304,10 @@ fun SupportDetailScreen(
                             tempOutageMap[ant.idAnfr] = hsData
                         }
                     }
+                    // Propagation « zone blanche » : si un opérateur du support ZB est déclaré HS,
+                    // les autres opérateurs ZB sans déclaration passent en « potentiellement en panne ».
+                    fr.geotower.utils.zbPotentialOutagesForSite(sortedAntennas, tempOutageMap.values.toList())
+                        .forEach { potential -> tempOutageMap.putIfAbsent(potential.idAnfr, potential) }
                     hsDataMap = tempOutageMap
                 } catch (e: Exception) {
                     AppLogger.w(TAG_SUPPORT_DETAIL, "Outage data request failed", e)
@@ -694,7 +698,7 @@ fun SupportDetailScreen(
                 val radioMiniMapAntenna = remember(mainRadio) {
                     LocalisationEntity(
                         idAnfr = mainRadio.supportId.ifBlank { mainRadio.stationId.ifBlank { mainRadio.id } },
-                        operateur = mainRadio.networkName,
+                        operateur = mainRadio.networkName(context),
                         latitude = mainRadio.latitude,
                         longitude = mainRadio.longitude,
                         azimuts = null,
@@ -967,6 +971,7 @@ fun SupportDetailScreen(
                                             useOneUi = useOneUi,
                                             buttonShape = buttonShape,
                                             globalMapRef = globalMapRef,
+                                            communityPhotos = communityPhotos,
                                             radioMarkers = radioSupportMarkers
                                         )
                                     }

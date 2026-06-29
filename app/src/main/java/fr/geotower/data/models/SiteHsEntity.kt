@@ -48,5 +48,13 @@ data class SiteHsEntity(
     // --- Dates globales ---
     val dateDebut: String? = null, // Correspond à "debut"
     val dateFin: String? = null,   // Correspond à "fin"
-    val sourceLastUpdate: String? = null
+    val sourceLastUpdate: String? = null,
+
+    // --- Statut déduit (propagation zone blanche) ---
+    /**
+     * `true` lorsque la panne n'est PAS déclarée pour cet opérateur, mais déduite :
+     * un autre opérateur du même site partagé en zone blanche (ZB) est, lui, déclaré HS.
+     * Affiché comme « potentiellement en panne ».
+     */
+    val isPotential: Boolean = false
 )

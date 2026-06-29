@@ -53,7 +53,8 @@ fun SiteFrequenciesBlock(
     formattedAzimuths: String,
     cardBgColor: Color,
     blockShape: Shape,
-    applyMapFilters: Boolean = false
+    applyMapFilters: Boolean = false,
+    forceGridDisplay: Boolean = false
 ) {
     val context = LocalContext.current
     val txtFrequenciesTitle = stringResource(R.string.appstrings_frequencies_title)
@@ -128,7 +129,7 @@ fun SiteFrequenciesBlock(
                 Text(text = txtBandsNotSpecified, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 // ✅ NOUVEAU : On vérifie l'option d'affichage
-                if (AppConfig.siteFreqGridDisplay.value) {
+                if (forceGridDisplay || AppConfig.siteFreqGridDisplay.value) {
                     FrequenciesGridView(
                         parsedBands = parsedBands,
                         txtUnknown = txtUnknown,
