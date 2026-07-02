@@ -50,6 +50,11 @@ fun AntennaMapToolBox(
         label = "toolboxRotation"
     )
 
+    // Une fonction active alors que la toolbox est repliée : on met en avant le
+    // bouton de la toolbox (comme les boutons internes) pour le signaler.
+    val hasActiveFunction = isSearchActive || isMeasuringMode || isTimeSliderActive
+    val highlightCollapsed = hasActiveFunction && !isToolboxExpanded
+
     if (expandLeft) {
         Surface(
             modifier = Modifier.height(ToolboxButtonDiameter),
@@ -137,12 +142,17 @@ fun AntennaMapToolBox(
                 Box(
                     modifier = Modifier
                         .size(ToolboxButtonDiameter)
+                        .background(
+                            if (highlightCollapsed) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                            CircleShape
+                        )
                         .clickable { onToggleToolbox() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         if (isToolboxExpanded) Icons.Default.Close else Icons.Default.Build,
                         contentDescription = stringResource(R.string.appstrings_tools),
+                        tint = if (highlightCollapsed) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                         modifier = Modifier.size(ToolboxIconDiameter).rotate(toolboxRotation)
                     )
                 }
@@ -226,12 +236,17 @@ fun AntennaMapToolBox(
             Box(
                 modifier = Modifier
                     .size(ToolboxButtonDiameter)
+                    .background(
+                        if (highlightCollapsed) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                        CircleShape
+                    )
                     .clickable { onToggleToolbox() },
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
                     if (isToolboxExpanded) Icons.Default.Close else Icons.Default.Build,
                     contentDescription = stringResource(R.string.appstrings_tools),
+                    tint = if (highlightCollapsed) MaterialTheme.colorScheme.primary else LocalContentColor.current,
                     modifier = Modifier.size(ToolboxIconDiameter).rotate(toolboxRotation)
                 )
             }

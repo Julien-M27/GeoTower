@@ -190,6 +190,7 @@
     <string name="notification_signalquest_upload_retry">Error de red, se reintentará más tarde.</string>
     <string name="notification_signalquest_upload_success">%1$d/%2$d fotos enviadas correctamente a Signal Quest.</string>
     <string name="notification_signalquest_upload_partial">%1$d/%2$d fotos enviadas a Signal Quest. Algunas fallaron.</string>
+    <string name="notification_signalquest_upload_cancelled">Envío cancelado (%1$d/%2$d fotos enviadas).</string>
     <string name="operator_count">↓ Número de operadores: %1$d</string>
     <string name="upload_history_no_photo_recorded">Ninguna foto registrada</string>
     <string name="upload_history_status_success">Aprobada</string>
@@ -197,9 +198,12 @@
     <string name="upload_history_status_failed">Fallida</string>
     <string name="upload_history_status_retry">En espera</string>
     <string name="upload_history_status_in_progress">En curso</string>
+    <string name="upload_history_status_cancelled">Cancelado</string>
     <string name="upload_history_exif_removed">EXIF eliminado</string>
     <string name="upload_history_exif_kept">EXIF conservado</string>
     <string name="upload_progress_text">%1$d / %2$d fotos enviadas...</string>
+    <string name="appstrings_upload_cancel">Cancelar el envío</string>
+    <string name="appstrings_download_cancel">Cancelar la descarga</string>
     <string name="upload_result_text">%1$d de %2$d fotos enviadas correctamente a Signal Quest.</string>
     <string name="photo_by_author">Por %1$s</string>
     <string name="photo_on_date">el %1$s</string>
@@ -2122,4 +2126,14 @@
     <string name="appstrings_release_v1599_site_cellmapper">Nuevo enlace externo a CellMapper en los operadores compatibles</string>
     <string name="appstrings_release_v1599_site_aer_id">Se añade el identificador del panel (AER ID) a la información de la antena</string>
     <string name="appstrings_release_v1599_site_throughput_height">La calculadora de velocidad incorpora un ajuste de altura del receptor (planta) para afinar la estimación</string>
+    <!-- Condiciones de uso -->
+    <string name="appstrings_terms_title">Condiciones de uso</string>
+    <string name="appstrings_terms_button_desc">Condiciones de uso y privacidad</string>
+    <string name="appstrings_release_section_downloads_uploads">Descargas y envíos</string>
+    <string name="appstrings_release_section_performance">Rendimiento</string>
+    <string name="appstrings_release_v196_terms_screen">Nueva pantalla de «Condiciones de uso» (condiciones y privacidad), accesible desde Acerca de</string>
+    <string name="appstrings_release_v196_cancel_downloads">Ahora puedes cancelar una descarga en curso (base de datos, mapa sin conexión, base de radio)</string>
+    <string name="appstrings_release_v196_cancel_uploads">Ahora puedes cancelar un envío de fotos en curso, con estado «Cancelado» en el historial</string>
+    <string name="appstrings_release_v196_db_indexes">Base de datos indexada para acelerar el mapa y los filtros</string>
+    <string name="appstrings_release_v196_baseline_profile">Inicio de la aplicación más rápido (perfil de inicio)</string>
 </resources>

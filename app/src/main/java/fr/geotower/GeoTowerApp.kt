@@ -5,6 +5,7 @@ import androidx.preference.PreferenceManager
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.api.RetrofitClient
+import fr.geotower.data.db.AppDatabase
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.utils.PreferenceProfileManager
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +26,7 @@ class GeoTowerApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        RetrofitClient.init(applicationContext)
         Configuration.getInstance().load(
             applicationContext,
             PreferenceManager.getDefaultSharedPreferences(applicationContext)
@@ -34,6 +36,11 @@ class GeoTowerApp : Application() {
         PreferenceProfileManager.install(applicationContext)
         appScope.launch {
             RemoteFeatureFlags.refreshIfNeeded(applicationContext, force = true)
+        }
+        appScope.launch(Dispatchers.IO) {
+            // Pré-ouvre la base hors thread UI : crée au besoin les index de perf
+            // (cf. GeoTowerDatabaseIndexes) et accélère la première requête carte.
+            runCatching { AppDatabase.getDatabase(applicationContext) }
         }
         SignalQuestUploadQueue.cleanupStaleFiles(applicationContext)
     }

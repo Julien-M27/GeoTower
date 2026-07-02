@@ -1,32 +1,40 @@
 package fr.geotower.ui.screens.about
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudUpload
 import androidx.compose.material.icons.filled.Check
@@ -48,21 +56,28 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import fr.geotower.data.upload.ExternalPhotoUploadHistoryEntry
@@ -73,6 +88,8 @@ import fr.geotower.ui.components.geoTowerLazyListFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.utils.AppConfig
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -347,6 +364,18 @@ fun PhotoUploadHistoryScreen(
                 }
             }
 
+            UploadHistoryDateScrollbar(
+                listState = listState,
+                items = historyItems,
+                modifier = Modifier
+                    .align(Alignment.CenterEnd)
+                    .fillMaxHeight()
+                    .padding(
+                        top = 12.dp,
+                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 12.dp
+                    )
+            )
+
             if (isSelectionMode) {
                 Box(
                     modifier = Modifier
@@ -430,12 +459,14 @@ private fun PhotoUploadHistoryRow(
         ExternalPhotoUploadHistoryStore.STATUS_SUCCESS -> Color(0xFF4CAF50)
         ExternalPhotoUploadHistoryStore.STATUS_FAILED -> MaterialTheme.colorScheme.error
         ExternalPhotoUploadHistoryStore.STATUS_RETRY -> MaterialTheme.colorScheme.tertiary
+        ExternalPhotoUploadHistoryStore.STATUS_CANCELLED -> MaterialTheme.colorScheme.outline
         ExternalPhotoUploadHistoryStore.STATUS_AWAITING_VALIDATION -> MaterialTheme.colorScheme.primary
         else -> MaterialTheme.colorScheme.primary
     }
     val statusIcon = when (item.status) {
         ExternalPhotoUploadHistoryStore.STATUS_SUCCESS -> Icons.Default.CheckCircle
         ExternalPhotoUploadHistoryStore.STATUS_FAILED -> Icons.Default.Error
+        ExternalPhotoUploadHistoryStore.STATUS_CANCELLED -> Icons.Default.Cancel
         else -> Icons.Default.CloudUpload
     }
 
@@ -518,6 +549,7 @@ private fun uploadHistoryStatusLabel(status: String): String = when (status) {
     ExternalPhotoUploadHistoryStore.STATUS_AWAITING_VALIDATION -> stringResource(R.string.upload_history_status_awaiting_validation)
     ExternalPhotoUploadHistoryStore.STATUS_FAILED -> stringResource(R.string.upload_history_status_failed)
     ExternalPhotoUploadHistoryStore.STATUS_RETRY -> stringResource(R.string.upload_history_status_retry)
+    ExternalPhotoUploadHistoryStore.STATUS_CANCELLED -> stringResource(R.string.upload_history_status_cancelled)
     else -> stringResource(R.string.upload_history_status_in_progress)
 }
 
@@ -567,6 +599,141 @@ private fun HistoryThumbnail(thumbnailPath: String?) {
             )
         }
     }
+}
+
+// Barre de défilement latérale : pouce ancré au bord droit, bulle affichant le jour d'envoi des
+// photos visibles, et saut direct dans la liste en tirant le pouce. Elle apparaît pendant le
+// défilement et s'efface toute seule après une courte inactivité.
+@Composable
+private fun UploadHistoryDateScrollbar(
+    listState: LazyListState,
+    items: List<ExternalPhotoUploadHistoryEntry>,
+    modifier: Modifier = Modifier
+) {
+    if (items.isEmpty()) return
+
+    val scope = rememberCoroutineScope()
+    var isDragging by remember { mutableStateOf(false) }
+    var dragFraction by remember { mutableFloatStateOf(0f) }
+
+    // Position du pouce alignée sur le défilement réel (progression inter-élément comprise).
+    val listFraction by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val visibleItems = layoutInfo.visibleItemsInfo
+            if (visibleItems.isEmpty()) {
+                0f
+            } else {
+                val denominator = (layoutInfo.totalItemsCount - visibleItems.size).coerceAtLeast(1)
+                val firstItem = visibleItems.first()
+                val firstItemProgress = -firstItem.offset.toFloat() / firstItem.size.coerceAtLeast(1)
+                ((firstItem.index + firstItemProgress) / denominator).coerceIn(0f, 1f)
+            }
+        }
+    }
+
+    val isScrollable = listState.canScrollForward || listState.canScrollBackward
+    val isActive = isDragging || listState.isScrollInProgress
+    var isBarVisible by remember { mutableStateOf(false) }
+    LaunchedEffect(isActive, isScrollable) {
+        if (isActive && isScrollable) {
+            isBarVisible = true
+        } else {
+            delay(1400)
+            isBarVisible = false
+        }
+    }
+    val barAlpha by animateFloatAsState(
+        targetValue = if (isBarVisible) 1f else 0f,
+        label = "uploadHistoryScrollbarAlpha"
+    )
+    if (barAlpha < 0.01f) return
+
+    val fraction = if (isDragging) dragFraction else listFraction
+    val labelIndex = if (isDragging) {
+        (dragFraction * (items.size - 1)).roundToInt()
+    } else {
+        listState.firstVisibleItemIndex
+    }.coerceIn(0, items.lastIndex)
+    val dayLabel = formatUploadHistoryDay(items[labelIndex].createdAtMillis)
+
+    BoxWithConstraints(modifier = modifier.alpha(barAlpha)) {
+        val thumbHeightPx = with(LocalDensity.current) { UPLOAD_HISTORY_SCROLLBAR_THUMB_HEIGHT.toPx() }
+        val maxOffsetPx = (constraints.maxHeight - thumbHeightPx).coerceAtLeast(0f)
+
+        fun fractionForPointer(y: Float): Float {
+            if (maxOffsetPx <= 0f) return 0f
+            return ((y - thumbHeightPx / 2f) / maxOffsetPx).coerceIn(0f, 1f)
+        }
+
+        fun scrollToFraction(value: Float) {
+            dragFraction = value
+            val targetIndex = (value * (items.size - 1)).roundToInt().coerceIn(0, items.lastIndex)
+            scope.launch { listState.scrollToItem(targetIndex) }
+        }
+
+        // Zone de prise en main : toute la hauteur du bord droit.
+        Box(
+            modifier = Modifier
+                .align(Alignment.CenterEnd)
+                .fillMaxHeight()
+                .width(24.dp)
+                .pointerInput(items.size, maxOffsetPx) {
+                    detectVerticalDragGestures(
+                        onDragStart = { startOffset ->
+                            isDragging = true
+                            scrollToFraction(fractionForPointer(startOffset.y))
+                        },
+                        onDragEnd = { isDragging = false },
+                        onDragCancel = { isDragging = false },
+                        onVerticalDrag = { change, _ ->
+                            change.consume()
+                            scrollToFraction(fractionForPointer(change.position.y))
+                        }
+                    )
+                }
+        )
+
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .offset { IntOffset(0, (fraction * maxOffsetPx).roundToInt()) }
+                .height(UPLOAD_HISTORY_SCROLLBAR_THUMB_HEIGHT)
+        ) {
+            Surface(
+                color = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                shape = CircleShape,
+                shadowElevation = 4.dp
+            ) {
+                Text(
+                    text = dayLabel,
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
+            Box(
+                modifier = Modifier
+                    .padding(end = 3.dp)
+                    .width(6.dp)
+                    .fillMaxHeight()
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary)
+            )
+        }
+    }
+}
+
+private val UPLOAD_HISTORY_SCROLLBAR_THUMB_HEIGHT = 48.dp
+
+private fun formatUploadHistoryDay(timestamp: Long): String {
+    return runCatching {
+        SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(timestamp))
+    }.getOrDefault("-")
 }
 
 private fun formatUploadHistoryDate(timestamp: Long): String {

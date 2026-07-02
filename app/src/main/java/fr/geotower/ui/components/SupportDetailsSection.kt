@@ -263,6 +263,7 @@ fun SiteSupportDetailsBlock(
 }
 
 private fun resolveLikelyOrangeVendor(info: LocalisationEntity): String? {
+    if (info.isZb == 1) return null // ZB : on n'affiche pas l'équipementier
     if (info.operateur?.contains("ORANGE", ignoreCase = true) != true) return null
     val departmentCode = extractMetroOrCorsicaDepartmentCode(info.codeInsee) ?: return null
 

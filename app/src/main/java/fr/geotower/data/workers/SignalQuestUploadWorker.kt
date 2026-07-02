@@ -7,11 +7,14 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import fr.geotower.AppGlobalState
@@ -20,6 +23,7 @@ import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.upload.CancelledUploadSummary
 import fr.geotower.data.upload.ExternalPhotoUploadHistoryStore
 import fr.geotower.data.upload.SignalQuestInvalidPhotoException
 import fr.geotower.data.upload.SignalQuestUploadFile
@@ -30,6 +34,9 @@ import fr.geotower.data.upload.SignalQuestUploadQueueException
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.NotificationIconResources
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.MultipartBody
 import okhttp3.RequestBody
@@ -123,24 +130,90 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
                 }
                 summary.uploadedCount == total -> {
                     SignalQuestUploadQueue.cleanupUpload(applicationContext, uploadId)
-                    showFinishedNotification(summary.uploadedCount, total, partial = false, progressNotificationId, resultNotificationId)
+                    showFinishedNotification(uploadId, summary.uploadedCount, total, partial = false, progressNotificationId, resultNotificationId)
                     Result.success(uploadResultData(summary.uploadedCount, total))
                 }
                 summary.uploadedCount > 0 -> {
                     SignalQuestUploadQueue.cleanupUpload(applicationContext, uploadId)
-                    showFinishedNotification(summary.uploadedCount, total, partial = true, progressNotificationId, resultNotificationId)
+                    showFinishedNotification(uploadId, summary.uploadedCount, total, partial = true, progressNotificationId, resultNotificationId)
                     Result.success(uploadResultData(summary.uploadedCount, total))
                 }
                 else -> {
                     SignalQuestUploadQueue.cleanupUpload(applicationContext, uploadId)
-                    showFinishedNotification(summary.uploadedCount, total, partial = true, progressNotificationId, resultNotificationId)
+                    showFinishedNotification(uploadId, summary.uploadedCount, total, partial = true, progressNotificationId, resultNotificationId)
                     Result.failure(uploadResultData(summary.uploadedCount, total))
                 }
             }
         } catch (e: CancellationException) {
-            cancelSafely(progressNotificationId)
+            withContext(NonCancellable) {
+                onUploadInterrupted(uploadId, progressNotificationId, resultNotificationId)
+            }
             throw e
         }
+    }
+
+    // La coroutine du worker est annulee aussi bien quand l'utilisateur annule l'envoi que quand
+    // WorkManager le stoppe pour reessayer plus tard (perte reseau, quotas systeme...). Seule la
+    // vraie annulation (etat CANCELLED, persiste en base avant l'interruption du worker) finalise
+    // l'upload ; sinon on laisse manifeste et fichiers en place pour la reprise.
+    private suspend fun onUploadInterrupted(
+        uploadId: String,
+        progressNotificationId: Int,
+        resultNotificationId: Int
+    ) {
+        cancelSafely(progressNotificationId)
+        if (!isWorkCancelled()) return
+
+        SignalQuestUploadQueue.finalizeCancelledUpload(applicationContext, uploadId)?.let { summary ->
+            showCancelledNotification(uploadId, summary, resultNotificationId)
+        }
+        cleanupCancelledQueuedUploads()
+    }
+
+    private suspend fun isWorkCancelled(): Boolean {
+        return runCatching {
+            WorkManager.getInstance(applicationContext)
+                .getWorkInfoByIdFlow(id)
+                .first()
+                ?.state == WorkInfo.State.CANCELLED
+        }.getOrDefault(false)
+    }
+
+    // Annuler le work en cours annule aussi les envois ajoutes a sa suite dans la file unique
+    // (APPEND_OR_REPLACE) : leurs workers ne demarreront jamais, on finalise donc leurs
+    // manifestes ici pour ne pas laisser de photos en cache ni d'historique bloque « en cours ».
+    private suspend fun cleanupCancelledQueuedUploads() {
+        val cancelledInfos = runCatching {
+            WorkManager.getInstance(applicationContext)
+                .getWorkInfosByTagFlow(SignalQuestUploadScheduler.GLOBAL_TAG)
+                .first()
+        }.getOrDefault(emptyList())
+            .filter { it.state == WorkInfo.State.CANCELLED && it.id != id }
+
+        cancelledInfos.forEach { info ->
+            val queuedUploadId = SignalQuestUploadScheduler.uploadIdFromTags(info.tags) ?: return@forEach
+            if (SignalQuestUploadQueue.finalizeCancelledUpload(applicationContext, queuedUploadId) != null) {
+                cancelUploadNotifications(applicationContext, queuedUploadId)
+            }
+        }
+    }
+
+    private fun showCancelledNotification(uploadId: String, summary: CancelledUploadSummary, resultNotificationId: Int) {
+        notifySafely(
+            resultNotificationId,
+            createResultNotification(
+                message = applicationContext.getString(
+                    R.string.notification_signalquest_upload_cancelled,
+                    summary.uploadedCount,
+                    summary.totalCount
+                ),
+                successCount = summary.uploadedCount,
+                total = summary.totalCount,
+                hasErrors = summary.uploadedCount < summary.totalCount,
+                requestCode = resultNotificationId,
+                uploadId = uploadId
+            )
+        )
     }
 
     private suspend fun uploadOneFile(
@@ -285,6 +358,7 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
     }
 
     private fun showFinishedNotification(
+        uploadId: String,
         successCount: Int,
         total: Int,
         partial: Boolean,
@@ -304,7 +378,8 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
                 successCount = successCount,
                 total = total,
                 hasErrors = partial,
-                requestCode = resultNotificationId
+                requestCode = resultNotificationId,
+                uploadId = uploadId
             )
         )
     }
@@ -351,6 +426,9 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         val progressPercent = progressPercent(current, total)
         val shortCriticalText = "$current/$total"
         val pendingIntent = createUploadPendingIntent(manifest, notificationId)
+        val cancelLabel = applicationContext.getString(R.string.appstrings_upload_cancel)
+        val cancelIntent = WorkManager.getInstance(applicationContext).createCancelPendingIntent(id)
+        val actionIconRes = NotificationIconResources.smallIconRes(applicationContext)
 
         val builder = NotificationCompat.Builder(applicationContext, channelId)
             .setContentTitle(title)
@@ -362,6 +440,7 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setProgress(100, progressPercent, false)
+            .addAction(actionIconRes, cancelLabel, cancelIntent)
         NotificationIconResources.applyTo(builder, applicationContext)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -382,6 +461,13 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
                 .setCategory(Notification.CATEGORY_PROGRESS)
                 .setVisibility(Notification.VISIBILITY_PUBLIC)
                 .setStyle(progressStyle)
+                .addAction(
+                    Notification.Action.Builder(
+                        Icon.createWithResource(applicationContext, actionIconRes),
+                        cancelLabel,
+                        cancelIntent
+                    ).build()
+                )
             NotificationIconResources.applyTo(nativeBuilder, applicationContext)
 
             runCatching {
@@ -414,13 +500,14 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         successCount: Int,
         total: Int,
         hasErrors: Boolean,
-        requestCode: Int
+        requestCode: Int,
+        uploadId: String? = null
     ): Notification {
         ensureNotificationChannel()
         return NotificationCompat.Builder(applicationContext, channelId)
             .setContentTitle(APP_NOTIFICATION_TITLE)
             .setContentText(message)
-            .setContentIntent(createUploadResultPendingIntent(message, successCount, total, hasErrors, requestCode))
+            .setContentIntent(createUploadResultPendingIntent(message, successCount, total, hasErrors, requestCode, uploadId))
             .setPriority(NotificationCompat.PRIORITY_LOW)
             .setAutoCancel(true)
             .setCategory(NotificationCompat.CATEGORY_STATUS)
@@ -460,7 +547,8 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         successCount: Int,
         total: Int,
         hasErrors: Boolean,
-        requestCode: Int
+        requestCode: Int,
+        uploadId: String? = null
     ): PendingIntent {
         val intent = Intent(applicationContext, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
@@ -469,6 +557,7 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
             putExtra(AppGlobalState.EXTRA_UPLOAD_RESULT_SUCCESS_COUNT, successCount)
             putExtra(AppGlobalState.EXTRA_UPLOAD_RESULT_TOTAL, total)
             putExtra(AppGlobalState.EXTRA_UPLOAD_RESULT_HAS_ERRORS, hasErrors)
+            putExtra(AppGlobalState.EXTRA_UPLOAD_RESULT_UPLOAD_ID, uploadId)
         }
         return PendingIntent.getActivity(
             applicationContext,
@@ -495,14 +584,6 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
     private fun progressPercent(current: Int, total: Int): Int {
         if (total <= 0) return 0
         return ((current.coerceIn(0, total) * 100f) / total).toInt().coerceIn(0, 100)
-    }
-
-    private fun progressNotificationId(uploadId: String): Int {
-        return UPLOAD_NOTIFICATION_ID_BASE xor uploadId.hashCode()
-    }
-
-    private fun resultNotificationId(uploadId: String): Int {
-        return progressNotificationId(uploadId) xor UPLOAD_RESULT_NOTIFICATION_ID_MASK
     }
 
     private fun uploadResultData(successCount: Int, total: Int): androidx.work.Data {
@@ -596,10 +677,27 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         val pendingCount: Int
     )
 
-    private companion object {
+    companion object {
         private const val TAG = "GeoTowerUpload"
         private const val APP_NOTIFICATION_TITLE = "GeoTower"
         private const val UPLOAD_NOTIFICATION_ID_BASE = 99
         private const val UPLOAD_RESULT_NOTIFICATION_ID_MASK = 0x3F3F
+
+        private fun progressNotificationId(uploadId: String): Int {
+            return UPLOAD_NOTIFICATION_ID_BASE xor uploadId.hashCode()
+        }
+
+        private fun resultNotificationId(uploadId: String): Int {
+            return progressNotificationId(uploadId) xor UPLOAD_RESULT_NOTIFICATION_ID_MASK
+        }
+
+        // Purge les notifications residuelles (progression ou « nouvel essai plus tard ») d'un
+        // upload finalise apres annulation sans que son worker n'ait tourne.
+        fun cancelUploadNotifications(context: Context, uploadId: String) {
+            val notificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            runCatching { notificationManager.cancel(progressNotificationId(uploadId)) }
+            runCatching { notificationManager.cancel(resultNotificationId(uploadId)) }
+        }
     }
 }

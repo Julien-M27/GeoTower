@@ -86,7 +86,7 @@ fun HomeLogoSelectorBlock(
             horizontalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp)),
             contentPadding = PaddingValues(bottom = sizing.spacing(8.dp))
         ) {
-            items(options) { option ->
+            items(options, key = { it.id }) { option ->
                 val isSelected = currentSelection == option.id
                 val borderColor = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent
 

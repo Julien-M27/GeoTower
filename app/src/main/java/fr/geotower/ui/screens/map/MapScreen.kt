@@ -481,6 +481,22 @@ private fun normalizeOperatorSearchToken(value: String): String {
         .replace(operatorSearchRepeatedSpacesRegex, " ")
 }
 
+/**
+ * Alias d'opérateurs normalisés une seule fois (indépendants de la requête de recherche) :
+ * évite de tout re-normaliser à chaque frappe dans la recherche « op: … ».
+ */
+private val operatorSearchAliasCandidates: List<Pair<String, String>> by lazy {
+    OperatorColors.all
+        .flatMap { spec ->
+            (listOf(spec.key, spec.label) + spec.aliases).map { rawAlias ->
+                spec.key to normalizeOperatorSearchToken(rawAlias)
+            }
+        }
+        .filter { (_, alias) -> alias.isNotBlank() }
+        .distinct()
+        .sortedByDescending { (_, alias) -> alias.length }
+}
+
 private fun parseOperatorSearchKeys(query: String): List<String> {
     val trimmed = query.trim()
     val splitIndex = trimmed.indexOf(':')
@@ -504,15 +520,7 @@ private fun parseOperatorSearchKeys(query: String): List<String> {
     val normalizedQuery = normalizeOperatorSearchToken(cleanQuery)
     if (normalizedQuery.isBlank()) return emptyList()
 
-    val candidates = OperatorColors.all
-        .flatMap { spec ->
-            (listOf(spec.key, spec.label) + spec.aliases).map { rawAlias ->
-                spec.key to normalizeOperatorSearchToken(rawAlias)
-            }
-        }
-        .filter { (_, alias) -> alias.isNotBlank() }
-        .distinct()
-        .sortedByDescending { (_, alias) -> alias.length }
+    val candidates = operatorSearchAliasCandidates
 
     var reducedQuery = " $normalizedQuery "
     val matches = mutableListOf<Pair<Int, String>>()
@@ -2688,10 +2696,17 @@ fun MapScreen(
         val isLandscapeLayout = maxWidth > maxHeight ||
             configuration.screenWidthDp > configuration.screenHeightDp
 
+        // En paysage, la toolbox ne se déplie à l'horizontale (avec la barre de
+        // recherche à côté en bas) que sur les écrans courts type téléphone, où
+        // une toolbox verticale dépliée ne tiendrait pas en hauteur. Dès qu'on a
+        // la hauteur d'une tablette (≥ 600dp, breakpoint "large" Android), on
+        // garde la disposition portrait : toolbox verticale et recherche en haut.
+        val toolboxExpandsLeft = isLandscapeLayout && maxHeight < 600.dp
+
         if (!isUltraCompact) {
 
             AnimatedVisibility(
-                visible = isSearchActive && !isLandscapeLayout,
+                visible = isSearchActive && !toolboxExpandsLeft,
                 enter = fadeIn() + expandHorizontally(expandFrom = Alignment.End),
                 exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.End),
                 modifier = Modifier
@@ -2731,7 +2746,6 @@ fun MapScreen(
         val showCompactCompass = showCompass && AppConfig.hasCompass.value &&
             useCompactCompassPlacement && !showCompassInMapHeader
         val compactCompassHeight = if (showCompactCompass) MapControlButtonDiameter else 0.dp
-        val toolboxExpandsLeft = isLandscapeLayout
         val visibleToolboxActionCount = listOf(
             canUseMapSearch,
             canUseMapMeasure,
@@ -2780,7 +2794,15 @@ fun MapScreen(
             targetValue = 40.dp + rightControlsHeight,
             label = "measureDrawerBottomAnim"
         )
-        val measureDrawerModifier = if (!useCompactCompassPlacement) {
+        // Sur tablette en paysage, le tiroir de suivi (« site le plus proche »)
+        // est déporté en haut à gauche, dans la zone dégagée sous les boutons
+        // retour/partage, pour ne pas chevaucher la toolbox et le menu à droite.
+        val trackingDrawerTopLeft = isLandscapeLayout && maxHeight >= 600.dp
+        val measureDrawerModifier = if (trackingDrawerTopLeft) {
+            Modifier
+                .align(Alignment.TopStart)
+                .padding(start = 16.dp, top = compassTopPadding + 70.dp)
+        } else if (!useCompactCompassPlacement) {
             Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 16.dp, bottom = measureDrawerBottomPadding)
@@ -2844,52 +2866,65 @@ fun MapScreen(
         // --- LES BOUTONS DE SUIVI "A TIROIR" (MODE MESURE) ---
         AnimatedVisibility(
             visible = isMeasuringMode,
-            enter = fadeIn() + slideInHorizontally(initialOffsetX = { it }),
-            exit = fadeOut() + slideOutHorizontally(targetOffsetX = { it }),
+            enter = fadeIn() + slideInHorizontally(initialOffsetX = { if (trackingDrawerTopLeft) -it else it }),
+            exit = fadeOut() + slideOutHorizontally(targetOffsetX = { if (trackingDrawerTopLeft) -it else it }),
             modifier = measureDrawerModifier
         ) {
             Column(
-                horizontalAlignment = Alignment.End,
+                horizontalAlignment = if (trackingDrawerTopLeft) Alignment.Start else Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(trackingButtonSpacing)
             ) {
                 // ========================================================
                 // 1. TIROIR SUIVI GLOBAL
                 // ========================================================
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // La petite barre verticale cliquable (le toggle)
-                    Box(
-                        modifier = Modifier
-                            .height(trackingButtonHeight).width(12.dp)
-                            // ✅ NOUVEAU : Bords arrondis de tous les côtés pour la poignée
-                            .background(darkMaterialColor, RoundedCornerShape(6.dp))
-                            .clickable { safeClick { isClosestSiteExpanded = !isClosestSiteExpanded } }
-                    )
-
-                    // ✅ NOUVEAU : Le petit espace qui détache élégamment le bouton
-                    Spacer(modifier = Modifier.width(6.dp))
+                    // La petite barre verticale cliquable (le toggle / poignée)
+                    val handle: @Composable () -> Unit = {
+                        Box(
+                            modifier = Modifier
+                                .height(trackingButtonHeight).width(12.dp)
+                                // ✅ Bords arrondis de tous les côtés pour la poignée
+                                .background(darkMaterialColor, RoundedCornerShape(6.dp))
+                                .clickable { safeClick { isClosestSiteExpanded = !isClosestSiteExpanded } }
+                        )
+                    }
 
                     // Le contenu du tiroir (le bouton)
-                    AnimatedVisibility(
-                        visible = isClosestSiteExpanded,
-                        enter = expandHorizontally(expandFrom = Alignment.End) + fadeIn(),
-                        exit = shrinkHorizontally(shrinkTowards = Alignment.End) + fadeOut()
-                    ) {
-                        Button(
-                            onClick = { safeClick { trackNearestAll = !trackNearestAll } },
-                            modifier = Modifier.height(trackingButtonHeight).width(210.dp),
-                            contentPadding = PaddingValues(horizontal = 14.dp),
-                            // ✅ NOUVEAU : Forme de pilule parfaite
-                            shape = RoundedCornerShape(trackingButtonHeight / 2f),
-                            colors = ButtonDefaults.buttonColors(containerColor = darkMaterialColor, contentColor = Color.White)
+                    val pill: @Composable () -> Unit = {
+                        AnimatedVisibility(
+                            visible = isClosestSiteExpanded,
+                            enter = expandHorizontally(expandFrom = if (trackingDrawerTopLeft) Alignment.Start else Alignment.End) + fadeIn(),
+                            exit = shrinkHorizontally(shrinkTowards = if (trackingDrawerTopLeft) Alignment.Start else Alignment.End) + fadeOut()
                         ) {
-                            Icon(Icons.Default.NearMe, null, modifier = Modifier.size(18.dp))
-                            Spacer(Modifier.width(8.dp))
-                            Text(
-                                text = if (trackNearestAll) stringResource(R.string.appstrings_track_global_active) else txtClosestSite,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
+                            Button(
+                                onClick = { safeClick { trackNearestAll = !trackNearestAll } },
+                                modifier = Modifier.height(trackingButtonHeight).width(210.dp),
+                                contentPadding = PaddingValues(horizontal = 14.dp),
+                                // ✅ NOUVEAU : Forme de pilule parfaite
+                                shape = RoundedCornerShape(trackingButtonHeight / 2f),
+                                colors = ButtonDefaults.buttonColors(containerColor = darkMaterialColor, contentColor = Color.White)
+                            ) {
+                                Icon(Icons.Default.NearMe, null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = if (trackNearestAll) stringResource(R.string.appstrings_track_global_active) else txtClosestSite,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
                         }
+                    }
+
+                    // Tiroir à gauche (tablette) : bouton collé au bord, poignée à
+                    // l'intérieur. Ailleurs : poignée d'abord, bouton vers le bord droit.
+                    if (trackingDrawerTopLeft) {
+                        pill()
+                        Spacer(modifier = Modifier.width(6.dp))
+                        handle()
+                    } else {
+                        handle()
+                        Spacer(modifier = Modifier.width(6.dp))
+                        pill()
                     }
                 }
 
@@ -2898,39 +2933,52 @@ fun MapScreen(
                 // ========================================================
                 if (defaultOp != "Aucun") {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        // La petite barre verticale cliquable (le toggle)
-                        Box(
-                            modifier = Modifier
-                                .height(trackingButtonHeight).width(12.dp)
-                                // ✅ NOUVEAU : Bords arrondis de tous les côtés
-                                .background(opColor, RoundedCornerShape(6.dp))
-                                .clickable { safeClick { isClosestFavSiteExpanded = !isClosestFavSiteExpanded } }
-                        )
-
-                        // ✅ NOUVEAU : Le petit espace
-                        Spacer(modifier = Modifier.width(6.dp))
+                        // La petite barre verticale cliquable (le toggle / poignée)
+                        val handle: @Composable () -> Unit = {
+                            Box(
+                                modifier = Modifier
+                                    .height(trackingButtonHeight).width(12.dp)
+                                    // ✅ Bords arrondis de tous les côtés
+                                    .background(opColor, RoundedCornerShape(6.dp))
+                                    .clickable { safeClick { isClosestFavSiteExpanded = !isClosestFavSiteExpanded } }
+                            )
+                        }
 
                         // Le contenu du tiroir (le bouton)
-                        AnimatedVisibility(
-                            visible = isClosestFavSiteExpanded,
-                            enter = expandHorizontally(expandFrom = Alignment.End) + fadeIn(),
-                            exit = shrinkHorizontally(shrinkTowards = Alignment.End) + fadeOut()
-                        ) {
-                            Button(
-                                onClick = { safeClick { trackNearestFav = !trackNearestFav } },
-                                modifier = Modifier.height(trackingButtonHeight).width(210.dp),
-                                contentPadding = PaddingValues(horizontal = 14.dp),
-                                // ✅ NOUVEAU : Forme de pilule parfaite
-                                shape = RoundedCornerShape(trackingButtonHeight / 2f),
-                                colors = ButtonDefaults.buttonColors(containerColor = opColor, contentColor = Color.White)
+                        val pill: @Composable () -> Unit = {
+                            AnimatedVisibility(
+                                visible = isClosestFavSiteExpanded,
+                                enter = expandHorizontally(expandFrom = if (trackingDrawerTopLeft) Alignment.Start else Alignment.End) + fadeIn(),
+                                exit = shrinkHorizontally(shrinkTowards = if (trackingDrawerTopLeft) Alignment.Start else Alignment.End) + fadeOut()
                             ) {
-                                Icon(Icons.Default.WifiTethering, null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
-                                Text(
-                                    text = if (trackNearestFav) stringResource(R.string.track_operator_active, defaultOp) else "$txtClosestSite $defaultOp",
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Bold
-                                )                            }
+                                Button(
+                                    onClick = { safeClick { trackNearestFav = !trackNearestFav } },
+                                    modifier = Modifier.height(trackingButtonHeight).width(210.dp),
+                                    contentPadding = PaddingValues(horizontal = 14.dp),
+                                    // ✅ NOUVEAU : Forme de pilule parfaite
+                                    shape = RoundedCornerShape(trackingButtonHeight / 2f),
+                                    colors = ButtonDefaults.buttonColors(containerColor = opColor, contentColor = Color.White)
+                                ) {
+                                    Icon(Icons.Default.WifiTethering, null, modifier = Modifier.size(18.dp))
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = if (trackNearestFav) stringResource(R.string.track_operator_active, defaultOp) else "$txtClosestSite $defaultOp",
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Bold
+                                    )                            }
+                            }
+                        }
+
+                        // Tiroir à gauche (tablette) : bouton collé au bord, poignée à
+                        // l'intérieur. Ailleurs : poignée d'abord, bouton vers le bord droit.
+                        if (trackingDrawerTopLeft) {
+                            pill()
+                            Spacer(modifier = Modifier.width(6.dp))
+                            handle()
+                        } else {
+                            handle()
+                            Spacer(modifier = Modifier.width(6.dp))
+                            pill()
                         }
                     }
                 }
@@ -3092,27 +3140,11 @@ fun MapScreen(
                 AntennaMapToolBox(
                     isToolboxExpanded = isToolboxExpanded,
                     onToggleToolbox = {
+                        // On se contente de replier/déplier la toolbox : les éléments
+                        // actifs (recherche, filtre ville, mesure, suivi, time slider…)
+                        // restent ouverts. Leur fermeture propre passe désormais
+                        // uniquement par leurs boutons respectifs.
                         isToolboxExpanded = !isToolboxExpanded
-                        if (!isToolboxExpanded) {
-                            isMeasuringMode = false
-
-                            isSearchActive = false
-                            restoreOperatorSearchSelection()
-                            searchQuery = ""
-                            setCurrentCitySearch(null, null)
-                            searchBoundaryOverlay.items.clear()
-
-                            // ✅ CORRECTION DU NOM ET APPEL AVEC LE ZOOM
-                            mapViewRef?.let { map ->
-                                map.clearCityFilterAndReloadVisible(viewModel)
-                            }
-
-                            trackNearestAll = false
-                            trackNearestFav = false
-                            clearMeasureSelections()
-                            mapViewRef?.let { refreshMeasureLayers(it) }
-                            mapViewRef?.invalidate()
-                        }
                     },
                     isSearchActive = isSearchActive,
                     onToggleSearch = {
@@ -3166,7 +3198,7 @@ fun MapScreen(
                 )
                 }
 
-                if (isLandscapeLayout && isSearchActive) {
+                if (toolboxExpandsLeft && isSearchActive) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()

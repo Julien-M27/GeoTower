@@ -190,6 +190,7 @@
     <string name="notification_signalquest_upload_retry">Errore di rete, nuovo tentativo più tardi.</string>
     <string name="notification_signalquest_upload_success">%1$d/%2$d foto inviate correttamente a Signal Quest!</string>
     <string name="notification_signalquest_upload_partial">%1$d/%2$d foto inviate a Signal Quest. Alcune non sono riuscite.</string>
+    <string name="notification_signalquest_upload_cancelled">Invio annullato (%1$d/%2$d foto inviate).</string>
     <string name="operator_count">↓ Numero di operatori: %1$d</string>
     <string name="upload_history_no_photo_recorded">Nessuna foto registrata</string>
     <string name="upload_history_status_success">Approvata</string>
@@ -197,9 +198,12 @@
     <string name="upload_history_status_failed">Non riuscita</string>
     <string name="upload_history_status_retry">In attesa</string>
     <string name="upload_history_status_in_progress">In corso</string>
+    <string name="upload_history_status_cancelled">Annullato</string>
     <string name="upload_history_exif_removed">EXIF rimossi</string>
     <string name="upload_history_exif_kept">EXIF conservati</string>
     <string name="upload_progress_text">%1$d / %2$d foto inviate...</string>
+    <string name="appstrings_upload_cancel">Annulla l\'invio</string>
+    <string name="appstrings_download_cancel">Annulla il download</string>
     <string name="upload_result_text">%1$d su %2$d foto inviate correttamente a Signal Quest.</string>
     <string name="photo_by_author">Di %1$s</string>
     <string name="photo_on_date">il %1$s</string>
@@ -2122,4 +2126,14 @@
     <string name="appstrings_release_v1599_site_cellmapper">Nuovo collegamento esterno a CellMapper sugli operatori compatibili</string>
     <string name="appstrings_release_v1599_site_aer_id">Aggiunto l\'identificativo del pannello (AER ID) nelle informazioni dell\'antenna</string>
     <string name="appstrings_release_v1599_site_throughput_height">Il calcolatore di velocità guadagna un\'impostazione di altezza del ricevitore (piano) per affinare la stima</string>
+    <!-- Condizioni d'uso -->
+    <string name="appstrings_terms_title">Condizioni d\'uso</string>
+    <string name="appstrings_terms_button_desc">Condizioni d\'uso e privacy</string>
+    <string name="appstrings_release_section_downloads_uploads">Download e invii</string>
+    <string name="appstrings_release_section_performance">Prestazioni</string>
+    <string name="appstrings_release_v196_terms_screen">Nuova schermata «Condizioni d\'uso» (condizioni e privacy), accessibile da Informazioni</string>
+    <string name="appstrings_release_v196_cancel_downloads">Ora puoi annullare un download in corso (database, mappa offline, database radio)</string>
+    <string name="appstrings_release_v196_cancel_uploads">Ora puoi annullare un invio di foto in corso, con stato «Annullato» nella cronologia</string>
+    <string name="appstrings_release_v196_db_indexes">Database indicizzato per velocizzare la mappa e i filtri</string>
+    <string name="appstrings_release_v196_baseline_profile">Avvio dell\'app più rapido (profilo di avvio)</string>
 </resources>

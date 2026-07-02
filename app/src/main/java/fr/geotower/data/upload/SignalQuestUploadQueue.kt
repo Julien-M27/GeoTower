@@ -173,6 +173,11 @@ object SignalQuestUploadDraftStore {
 class SignalQuestUploadQueueException(message: String, cause: Throwable? = null) : Exception(message, cause)
 class SignalQuestInvalidPhotoException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
+data class CancelledUploadSummary(
+    val uploadedCount: Int,
+    val totalCount: Int
+)
+
 object SignalQuestUploadQueue {
     const val INPUT_UPLOAD_ID = "uploadId"
 
@@ -365,6 +370,32 @@ object SignalQuestUploadQueue {
 
     fun cleanupUpload(context: Context, uploadId: String) {
         deleteInsideRoot(uploadRoot(context), uploadDir(context, uploadId))
+    }
+
+    // Finalise un upload annule par l'utilisateur : les photos pas encore envoyees passent en
+    // « annulee » dans l'historique et le dossier de travail est supprime. Le manifeste sert de
+    // verrou d'idempotence : une fois le dossier supprime, les appels suivants retournent null
+    // (l'annulation peut etre traitee en parallele par le worker et par l'overlay UI).
+    @Synchronized
+    fun finalizeCancelledUpload(context: Context, uploadId: String): CancelledUploadSummary? {
+        if (uploadId.isBlank()) return null
+        val manifest = runCatching { loadManifest(context, uploadId) }.getOrNull() ?: return null
+
+        manifest.files.forEach { uploadFile ->
+            if (SignalQuestUploadFileStatus.shouldUpload(uploadFile.status)) {
+                ExternalPhotoUploadHistoryStore.updateUploadResult(
+                    context = context,
+                    entryId = uploadFile.historyEntryId,
+                    status = ExternalPhotoUploadHistoryStore.STATUS_CANCELLED
+                )
+            }
+        }
+        cleanupUpload(context, uploadId)
+
+        return CancelledUploadSummary(
+            uploadedCount = manifest.files.count { SignalQuestUploadFileStatus.countsAsUploaded(it.status) },
+            totalCount = manifest.files.size
+        )
     }
 
     fun cleanupStaleFiles(context: Context, maxAgeMillis: Long = STALE_CACHE_MAX_AGE_MS) {

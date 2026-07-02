@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.sqlite.db.SupportSQLiteDatabase
 import fr.geotower.data.models.AntenneDbEntity
 import fr.geotower.data.models.LocalisationDbEntity
 import fr.geotower.data.models.MetadataDbEntity
@@ -63,6 +64,14 @@ abstract class AppDatabase : RoomDatabase() {
                     AppDatabase::class.java,
                     GeoTowerDatabaseValidator.DB_NAME
                 )
+                    .addCallback(object : RoomDatabase.Callback() {
+                        override fun onOpen(db: SupportSQLiteDatabase) {
+                            // Index de performance (re)créés à chaque ouverture, en idempotent.
+                            // Impossible via @Index : la base est un fichier préconstruit téléchargé
+                            // dont le hash de schéma Room doit rester figé. Voir GeoTowerDatabaseIndexes.
+                            GeoTowerDatabaseIndexes.apply(db)
+                        }
+                    })
                     .build()
                 try {
                     instance.openHelper.readableDatabase

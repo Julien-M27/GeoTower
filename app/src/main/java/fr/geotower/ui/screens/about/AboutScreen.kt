@@ -33,6 +33,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
@@ -442,6 +443,9 @@ fun AboutScreen(navController: NavController) {
                                     },
                                     onOpenDiagnostic = {
                                         navController.navigate("diagnostic")
+                                    },
+                                    onOpenTerms = {
+                                        navController.navigate("terms")
                                     }
                                 )
                                 Spacer(modifier = Modifier.height(60.dp))
@@ -456,6 +460,9 @@ fun AboutScreen(navController: NavController) {
                                         bubbleBaseColor,
                                         onOpenPhotoUploadHistory = {
                                             navController.navigate("photo_upload_history")
+                                        },
+                                        onOpenTerms = {
+                                            navController.navigate("terms")
                                         }
                                     )
                                     3 -> SectionSources(cardShape, bubbleBaseColor)
@@ -533,7 +540,8 @@ fun AllAboutContent(
     versionsModifier: Modifier = Modifier,
     developmentModifier: Modifier = Modifier,
     onOpenPhotoUploadHistory: () -> Unit = {},
-    onOpenDiagnostic: () -> Unit = {}
+    onOpenDiagnostic: () -> Unit = {},
+    onOpenTerms: () -> Unit = {}
 ) {
     Column(
         modifier = presentationModifier.fillMaxWidth(),
@@ -555,7 +563,7 @@ fun AllAboutContent(
         modifier = privacyModifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        SectionConfidentialite(cardShape, bubbleColor, onOpenPhotoUploadHistory)
+        SectionConfidentialite(cardShape, bubbleColor, onOpenPhotoUploadHistory, onOpenTerms)
     }
     Spacer(modifier = Modifier.height(48.dp))
     // ---------------
@@ -1042,7 +1050,8 @@ private fun VersionLine(label: String, value: String) {
 fun SectionConfidentialite(
     cardShape: Shape,
     bubbleColor: Color,
-    onOpenPhotoUploadHistory: () -> Unit = {}
+    onOpenPhotoUploadHistory: () -> Unit = {},
+    onOpenTerms: () -> Unit = {}
 ) {
     SectionTitle(stringResource(R.string.appstrings_privacy_category))
     val cardColor = if (bubbleColor == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else bubbleColor
@@ -1069,4 +1078,21 @@ fun SectionConfidentialite(
         cardColor = cardColor,
         onOpenHistory = onOpenPhotoUploadHistory
     )
+
+    Spacer(modifier = Modifier.height(12.dp))
+    Surface(
+        onClick = onOpenTerms,
+        shape = cardShape,
+        color = cardColor,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(stringResource(R.string.appstrings_terms_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.appstrings_terms_button_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
 }

@@ -36,6 +36,7 @@ object ExternalPhotoUploadHistoryStore {
     const val STATUS_SUCCESS = "success"
     const val STATUS_FAILED = "failed"
     const val STATUS_RETRY = "retry"
+    const val STATUS_CANCELLED = "cancelled"
 
     private const val HISTORY_FILE_NAME = "external_photo_upload_history.json"
     private const val THUMB_DIR_NAME = "external_photo_upload_history_thumbs"

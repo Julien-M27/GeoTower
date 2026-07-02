@@ -1213,7 +1213,7 @@ fun CommunityPhotosSectionShared(
                     if (operatorName != null && operatorName.contains("FREE", ignoreCase = true)) {
 
                         if (filteredPhotos.isNotEmpty()) {
-                            itemsIndexed(filteredPhotos) { index, photo ->
+                            itemsIndexed(filteredPhotos, key = { _, photo -> photo.url }) { index, photo ->
                                 Box(
                                     modifier = Modifier
                                         .size(120.dp)
@@ -1307,7 +1307,7 @@ fun CommunityPhotosSectionShared(
 
                         // 2. POUR LES AUTRES OPÉRATEURS : ON AFFICHE D'ABORD LES VRAIES PHOTOS
                         if (filteredPhotos.isNotEmpty()) {
-                            itemsIndexed(filteredPhotos) { index, photo ->
+                            itemsIndexed(filteredPhotos, key = { _, photo -> photo.url }) { index, photo ->
                                 Box(
                                     modifier = Modifier
                                         .size(120.dp)

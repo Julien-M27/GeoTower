@@ -60,11 +60,52 @@ object MapUtils {
         defaultOp: String,
         inactiveOperatorKeys: Set<String> = emptySet()
     ): BitmapDrawable {
-        val inactiveSignature = inactiveOperatorKeys.sorted().joinToString(",")
-        val markerSignature = siteAntennas.joinToString("|") { antenna ->
-            "${antenna.idAnfr}:${antenna.operateur}:${antenna.azimuts}:${antenna.azimutsFh}"
+        // --- Ordre de priorité des opérateurs (selon l'opérateur par défaut) ---
+        val def = defaultOp.uppercase()
+        val baseOrder = OperatorColors.orderedKeys
+        val priorityList = mutableListOf<String>()
+        OperatorColors.keyFor(def)?.let { priorityList.add(it) }
+        baseOrder.forEach { if (!priorityList.contains(it)) priorityList.add(it) }
+
+        val operatorsOnSite = siteAntennas.mapNotNull { it.operateur }
+            .flatMap { OperatorColors.keysFor(it) }
+            .distinct()
+            .sortedBy { op -> priorityList.indexOf(op) }
+
+        // Carte angle -> opérateurs (uniquement si les azimuts sont affichés).
+        val azimutMap: Map<Int, List<String>> = if (showAzimuths) {
+            val map = mutableMapOf<Int, MutableList<String>>()
+            siteAntennas.forEach { antenna ->
+                val operatorKeys = OperatorColors.keysFor(antenna.operateur)
+                if (operatorKeys.isEmpty()) return@forEach
+                val azStr = antenna.azimuts
+                if (!azStr.isNullOrBlank() && azStr != "null") {
+                    parseMarkerAzimuths(azStr).forEach { angle ->
+                        val list = map.getOrPut(angle) { mutableListOf() }
+                        operatorKeys.forEach { opClean ->
+                            if (!list.contains(opClean)) list.add(opClean)
+                        }
+                    }
+                }
+            }
+            map
+        } else {
+            emptyMap()
         }
-        val cacheKey = "${markerSignature}_${showAzimuths}_${defaultOp}_${inactiveSignature}"
+
+        // --- Clé de cache basée UNIQUEMENT sur le rendu visuel (plus d'idAnfr) ---
+        // Deux sites avec les mêmes opérateurs (et mêmes azimuts si affichés) partagent
+        // la même icône : le taux de réussite du cache grimpe fortement.
+        val inactiveSignature = inactiveOperatorKeys.sorted().joinToString(",")
+        val azimuthSignature = if (showAzimuths) {
+            azimutMap.entries.sortedBy { it.key }.joinToString("|") { (angle, ops) ->
+                "$angle>" + ops.sortedBy { priorityList.indexOf(it) }.joinToString("+")
+            }
+        } else {
+            ""
+        }
+        val cacheKey =
+            "m2|$showAzimuths|$def|${operatorsOnSite.joinToString(",")}|$inactiveSignature|$azimuthSignature"
 
         markerIconCache.get(cacheKey)?.let { return it }
 
@@ -89,13 +130,6 @@ object MapUtils {
             isAntiAlias = true
         }
 
-        val def = defaultOp.uppercase()
-        val baseOrder = OperatorColors.orderedKeys
-        val priorityList = mutableListOf<String>()
-
-        OperatorColors.keyFor(def)?.let { priorityList.add(it) }
-        baseOrder.forEach { if (!priorityList.contains(it)) priorityList.add(it) }
-
         val colorMap = OperatorColors.androidColorMap()
         fun colorForOperator(op: String): Int {
             return if (op in inactiveOperatorKeys) {
@@ -105,30 +139,7 @@ object MapUtils {
             }
         }
 
-        val operatorsOnSite = siteAntennas.mapNotNull { it.operateur }
-            .flatMap { OperatorColors.keysFor(it) }
-            .distinct()
-            .sortedBy { op -> priorityList.indexOf(op) }
-
-        if (showAzimuths) {
-            val azimutMap = mutableMapOf<Int, MutableList<String>>()
-
-            siteAntennas.forEach { antenna ->
-                val operatorKeys = OperatorColors.keysFor(antenna.operateur)
-                if (operatorKeys.isEmpty()) return@forEach
-
-                val azStr = antenna.azimuts
-                if (!azStr.isNullOrBlank() && azStr != "null") {
-                    parseMarkerAzimuths(azStr).forEach { angle ->
-                        operatorKeys.forEach { opClean ->
-                            if (!azimutMap.getOrPut(angle) { mutableListOf() }.contains(opClean)) {
-                                azimutMap[angle]!!.add(opClean)
-                            }
-                        }
-                    }
-                }
-            }
-
+        if (showAzimuths && azimutMap.isNotEmpty()) {
             val innerRadius = pieRadius + 4f
             val outerRadius = pieRadius + 60f
             val strokeWidth = 6f

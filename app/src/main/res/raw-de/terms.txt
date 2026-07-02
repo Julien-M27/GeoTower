@@ -1,0 +1,128 @@
+~ Zuletzt aktualisiert: 30. Juni 2026
+
+Mit der Installation und Nutzung der App **GeoTower** akzeptieren Sie diese Bedingungen. Wenn Sie nicht einverstanden sind, nutzen Sie die App bitte nicht.
+
+# 1. Anbieter
+
+GeoTower ist eine App, die privat und nicht gewerblich von **Julien** entwickelt und herausgegeben wird.
+
+Kontakt: **support@geotower.fr**.
+
+GeoTower ist eine **kostenlose** App, ohne Werbung und ohne In-App-Käufe.
+
+# 2. Zweck der App
+
+Mit GeoTower können Sie **Standorte und Antennen des Mobilfunks** in Frankreich auf einer Karte anzeigen, auf Grundlage **offener öffentlicher Daten** (insbesondere ANFR, ARCEP, data.gouv.fr) sowie von Kartenhintergründen und Höhendaten (IGN, OpenStreetMap).
+
+Die angezeigten Informationen dienen **nur zur Orientierung**. Sie stammen aus Drittquellen und können Fehler, Aktualisierungsverzögerungen oder Ungenauigkeiten enthalten. GeoTower übernimmt keine Gewähr für ihre Richtigkeit oder Vollständigkeit.
+
+# 3. Personenbezogene Daten und Datenschutz
+
+GeoTower ist nach dem Grundsatz der **Datenminimierung** gestaltet.
+
+**GeoTower legt kein Konto an, verlangt keine Registrierung und erhebt keine Identitätsdaten** (weder Name noch E-Mail, Telefonnummer oder Werbe-ID).
+
+## 3.1 Keine Erhebung durch den Anbieter
+
+Der Anbieter von GeoTower empfängt, speichert und erfasst **keinerlei Daten** über Sie:
+- keine Nutzungsprotokolle (Logs);
+- keine Statistiken oder Analysewerkzeuge (Analytics);
+- keine Werbe-Tracker;
+- keine Telemetrie.
+
+Es verlassen keine Nutzungsdaten Ihr Gerät in Richtung des Anbieters.
+
+## 3.2 Standort
+
+Mit Ihrer Erlaubnis verwendet GeoTower den Standort Ihres Geräts, um die Karte zu zentrieren und nahe gelegene Standorte anzuzeigen, sowie für die Funktion **Echtzeit-Verfolgung** („live"), die einen Standortzugriff **im Hintergrund** erfordern kann, um fortlaufend den Mobilfunkstandort zu ermitteln, mit dem Sie möglicherweise verbunden sind.
+
+Ihr Standort wird **lokal auf Ihrem Gerät verarbeitet**. Er wird **niemals an den Anbieter** oder an Dritte zu Tracking-Zwecken übermittelt. Sie können die Standortberechtigung jederzeit in den Android-Einstellungen widerrufen; die betroffenen Funktionen werden dann deaktiviert.
+
+## 3.3 Auf Ihrem Gerät gespeicherte Daten
+
+GeoTower speichert ausschließlich in seinem privaten Bereich auf Ihrem Gerät: Ihre **Einstellungen**, die heruntergeladene **Datenbank** der Standorte und den **Verlauf Ihrer Foto-Uploads** (siehe Abschnitt 4). Diese Daten verbleiben auf dem Gerät, werden nicht in der Cloud gesichert und werden bei der Deinstallation der App gelöscht.
+
+# 4. Community-Fotos (Upload zu SignalQuest)
+
+GeoTower ermöglicht es Ihnen, **wenn Sie möchten**, ein oder mehrere **Fotos eines Standorts** hochzuladen (die Sie aus Ihrer Galerie auswählen oder mit der Kamera aufnehmen), um die Community-Datenbank **SignalQuest**, einen unabhängigen Drittanbieterdienst, zu erweitern.
+
+## 4.1 Was übermittelt wird
+
+Wenn Sie einen Upload bestätigen, wird Folgendes an SignalQuest übermittelt:
+- das **Foto** (verkleinert und neu komprimiert);
+- die **Beschreibung**, die Sie frei eingeben (optional);
+- der **Betreiber** und die **Kennungen** des betreffenden Standorts (z. B. ANFR-Code);
+- gegebenenfalls die **EXIF-Metadaten** des Fotos.
+
+> EXIF-Metadaten: Ein Foto kann technische Informationen (Datum, Gerätemodell) und gegebenenfalls den **GPS-Standort** des Aufnahmeorts enthalten. Vor jedem Upload bietet GeoTower an, diese Metadaten zu entfernen. **Diese Option ist standardmäßig deaktiviert**: Wenn Sie sie nicht aktivieren, werden die EXIF-Metadaten mit dem Foto übermittelt. Aktivieren Sie sie, wenn Sie diese Informationen nicht teilen möchten.
+
+Der Upload ist **anonym**: Dem Foto werden keine Sie identifizierenden Daten beigefügt (kein Name, kein Konto, keine Kennung).
+
+## 4.2 Nachdem das Foto gesendet wurde
+
+Sobald ein Foto hochgeladen ist, wird es **ausschließlich von SignalQuest gehostet und verwaltet**. **GeoTower hat keinen Zugriff mehr darauf, bewahrt keine Remote-Kopie davon auf und hat keine Kontrolle darüber.**
+
+Alle von GeoTower hochgeladenen Fotos werden bei SignalQuest **unter dem Sammelnamen „GeoTower"** veröffentlicht und nicht unter einem individuellen Konto – anders als bei Nutzern, die ein eigenes SignalQuest-Konto haben. Es gibt daher **keinen schnelleren Weg**, gezielt Ihre Uploads aufzufinden.
+
+Um ein Foto entfernen zu lassen, müssen Sie:
+1. SignalQuest aufrufen (App oder Website), im Tab **Karte**;
+2. das betreffende Foto suchen;
+3. es **melden** und um seine Entfernung bitten.
+
+Sie können SignalQuest auch unter **support@signalquest.fr** kontaktieren. GeoTower kann ein von SignalQuest gehostetes Foto nicht in Ihrem Namen löschen oder ändern.
+
+## 4.3 Lokaler Verlauf
+
+GeoTower bewahrt **nur auf Ihrem Gerät** einen Verlauf Ihrer Uploads auf (Miniaturansichten und Status), den Sie jederzeit über den Bildschirm „Upload-Verlauf" löschen können. Das Löschen dieses lokalen Verlaufs entfernt nicht die bereits bei SignalQuest veröffentlichten Fotos.
+
+# 5. Drittanbieterdienste
+
+Um zu funktionieren, kommuniziert GeoTower mit Drittanbieterdiensten, die über eigene Bedingungen verfügen:
+- **SignalQuest** – ein unabhängiger Drittanbieterdienst, herausgegeben von **Alexandre Germain** (support@signalquest.fr): Hosting der Community-Fotos (siehe Abschnitt 4);
+- **IGN (Géoservices)** – Kartenhintergründe, Höhen- und Abdeckungsdaten; geografische Koordinaten können an sie übermittelt werden, um ein Profil zu berechnen oder eine Karte anzuzeigen;
+- **OpenStreetMap / MapsForge** – Kartenhintergründe;
+- **ANFR, ARCEP, data.gouv.fr** – Herunterladen der öffentlichen Datenbanken.
+
+GeoTower gibt Ihre Daten an keinen Werbetreibenden oder Datenhändler weiter.
+
+# 6. Rechtsgrundlage (DSGVO)
+
+Die Verarbeitung beruht auf Ihrer **Einwilligung** (Standortberechtigung, freiwillige Foto-Uploads), die Sie jederzeit widerrufen können, sowie auf dem **berechtigten Interesse** am ordnungsgemäßen lokalen Betrieb der App.
+
+# 7. Speicherdauer
+
+- Auf Ihrem Gerät: solange die App installiert ist oder bis Sie sie selbst löschen (Einstellungen, Löschen des Verlaufs, Deinstallation).
+- Bei SignalQuest: gemäß der eigenen Speicherrichtlinie von SignalQuest.
+
+# 8. Ihre Rechte
+
+Nach der DSGVO haben Sie das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung, Widerspruch und Datenübertragbarkeit.
+- Auf Ihrem Gerät vorhandene Daten: Sie kontrollieren sie direkt (Android-Berechtigungen, Löschen des Verlaufs, Deinstallation).
+- Von SignalQuest gehostete Fotos: Richten Sie Ihre Anfrage direkt an SignalQuest (siehe Abschnitt 4.2).
+- Jede andere Frage zu diesen Bedingungen: **support@geotower.fr**.
+
+Sie können auch Beschwerde bei der CNIL (www.cnil.fr), der französischen Datenschutzbehörde, einlegen.
+
+# 9. Sicherheit
+
+Die Netzwerkkommunikation von GeoTower ist **verschlüsselt (HTTPS/TLS)**. Die App sichert Ihre Daten nicht in der Cloud.
+
+# 10. Minderjährige
+
+GeoTower richtet sich nicht speziell an Minderjährige und erhebt wissentlich keine Daten über sie.
+
+# 11. Geistiges Eigentum und Lizenzen
+
+Die Daten und Kartenhintergründe unterliegen weiterhin den Lizenzen ihrer jeweiligen Anbieter (ANFR, ARCEP, IGN, © OpenStreetMap-Mitwirkende usw.). GeoTower erhebt darauf keinen Eigentumsanspruch.
+
+# 12. Haftung
+
+GeoTower wird „wie besehen" ohne Gewährleistung bereitgestellt. Der Anbieter haftet nicht für Entscheidungen, die auf Grundlage der angezeigten Informationen getroffen werden, noch für Inhalte, die von Drittanbieterdiensten gehostet werden.
+
+# 13. Änderung der Bedingungen
+
+Diese Bedingungen können aktualisiert werden. Das Datum der letzten Aktualisierung steht oben auf dieser Seite.
+
+# 14. Anwendbares Recht
+
+Diese Bedingungen unterliegen **französischem Recht**.

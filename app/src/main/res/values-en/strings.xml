@@ -190,6 +190,7 @@
     <string name="notification_signalquest_upload_retry">Network error, retrying later.</string>
     <string name="notification_signalquest_upload_success">%1$d/%2$d photos sent successfully to Signal Quest!</string>
     <string name="notification_signalquest_upload_partial">%1$d/%2$d photos sent to Signal Quest. Some failed.</string>
+    <string name="notification_signalquest_upload_cancelled">Upload cancelled (%1$d/%2$d photos sent).</string>
     <string name="operator_count">↓ Number of operators: %1$d</string>
     <string name="upload_history_no_photo_recorded">No photo recorded</string>
     <string name="upload_history_status_success">Approved</string>
@@ -197,9 +198,12 @@
     <string name="upload_history_status_failed">Failed</string>
     <string name="upload_history_status_retry">Waiting</string>
     <string name="upload_history_status_in_progress">In progress</string>
+    <string name="upload_history_status_cancelled">Cancelled</string>
     <string name="upload_history_exif_removed">EXIF removed</string>
     <string name="upload_history_exif_kept">EXIF kept</string>
     <string name="upload_progress_text">%1$d / %2$d photo(s) sent...</string>
+    <string name="appstrings_upload_cancel">Cancel upload</string>
+    <string name="appstrings_download_cancel">Cancel download</string>
     <string name="upload_result_text">%1$d out of %2$d photo(s) successfully sent to Signal Quest.</string>
     <string name="photo_by_author">By %1$s</string>
     <string name="photo_on_date">on %1$s</string>
@@ -2122,4 +2126,14 @@
     <string name="appstrings_release_v1599_site_cellmapper">New external CellMapper link on supported operators</string>
     <string name="appstrings_release_v1599_site_aer_id">Added the antenna panel identifier (AER ID) to antenna information</string>
     <string name="appstrings_release_v1599_site_throughput_height">The throughput calculator gains a receiver height setting (floor) to refine the estimate</string>
+    <!-- Terms of use -->
+    <string name="appstrings_terms_title">Terms of Use</string>
+    <string name="appstrings_terms_button_desc">Terms of use and privacy</string>
+    <string name="appstrings_release_section_downloads_uploads">Downloads and uploads</string>
+    <string name="appstrings_release_section_performance">Performance</string>
+    <string name="appstrings_release_v196_terms_screen">New Terms of Use screen (terms and privacy), available from the About page</string>
+    <string name="appstrings_release_v196_cancel_downloads">You can now cancel an ongoing download (database, offline map, radio database)</string>
+    <string name="appstrings_release_v196_cancel_uploads">You can now cancel an ongoing photo upload, with a Cancelled status in the history</string>
+    <string name="appstrings_release_v196_db_indexes">Database indexed to speed up the map and filters</string>
+    <string name="appstrings_release_v196_baseline_profile">Faster app startup (startup profile)</string>
 </resources>

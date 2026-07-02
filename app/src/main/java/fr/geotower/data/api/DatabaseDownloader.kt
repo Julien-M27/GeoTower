@@ -5,6 +5,7 @@ import android.os.Handler
 import android.os.Looper
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.AppDatabase
+import fr.geotower.data.db.GeoTowerDatabaseIndexes
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
@@ -156,6 +157,10 @@ object DatabaseDownloader {
                     tempFile.delete()
                     return@withContext false
                 }
+
+                // Recrée les index de perf sur le fichier fraîchement installé (toujours sur
+                // Dispatchers.IO ici) afin que la prochaine ouverture Room n'ait rien à reconstruire.
+                GeoTowerDatabaseIndexes.applyToFile(dbFile)
 
                 GeoTowerDatabaseValidator.clearInstalledDatabaseInvalid(context)
                 updateCachedDatabaseState(GeoTowerDatabaseValidator.LocalDatabaseState.VALID)

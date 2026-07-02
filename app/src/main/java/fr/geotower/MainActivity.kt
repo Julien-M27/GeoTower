@@ -94,12 +94,14 @@ object AppGlobalState {
     val uploadResultPopupSuccessCount = androidx.compose.runtime.mutableIntStateOf(0)
     val uploadResultPopupTotal = androidx.compose.runtime.mutableIntStateOf(0)
     val uploadResultPopupHasErrors = androidx.compose.runtime.mutableStateOf(false)
+    val uploadResultPopupUploadId = androidx.compose.runtime.mutableStateOf<String?>(null)
 
     const val EXTRA_SHOW_UPLOAD_RESULT_POPUP = "SHOW_SQ_UPLOAD_RESULT_POPUP"
     const val EXTRA_UPLOAD_RESULT_MESSAGE = "SQ_UPLOAD_RESULT_MESSAGE"
     const val EXTRA_UPLOAD_RESULT_SUCCESS_COUNT = "SQ_UPLOAD_RESULT_SUCCESS_COUNT"
     const val EXTRA_UPLOAD_RESULT_TOTAL = "SQ_UPLOAD_RESULT_TOTAL"
     const val EXTRA_UPLOAD_RESULT_HAS_ERRORS = "SQ_UPLOAD_RESULT_HAS_ERRORS"
+    const val EXTRA_UPLOAD_RESULT_UPLOAD_ID = "SQ_UPLOAD_RESULT_UPLOAD_ID"
 }
 
 @Composable
@@ -294,6 +296,8 @@ class MainActivity : ComponentActivity() {
                 intent.getIntExtra(AppGlobalState.EXTRA_UPLOAD_RESULT_TOTAL, 0)
             AppGlobalState.uploadResultPopupHasErrors.value =
                 intent.getBooleanExtra(AppGlobalState.EXTRA_UPLOAD_RESULT_HAS_ERRORS, false)
+            AppGlobalState.uploadResultPopupUploadId.value =
+                intent.getStringExtra(AppGlobalState.EXTRA_UPLOAD_RESULT_UPLOAD_ID)
             AppGlobalState.showUploadResultPopup.value = true
         }
     }
@@ -725,6 +729,13 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }
+                                }
+                            }
+
+                            // Conditions d'utilisation & confidentialité (toujours accessible, page légale)
+                            composable("terms") {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    fr.geotower.ui.screens.terms.TermsScreen(navController)
                                 }
                             }
 

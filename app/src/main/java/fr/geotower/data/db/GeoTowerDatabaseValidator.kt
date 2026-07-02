@@ -337,6 +337,18 @@ object GeoTowerDatabaseValidator {
             return ValidationResult(false, "PRAGMA integrity_check a echoue")
         }
 
+        // Room lit PRAGMA user_version a l'ouverture : s'il ne vaut pas EXPECTED_SCHEMA_VERSION,
+        // il tente une migration introuvable et l'ouverture echoue. Ce controle rejette une base
+        // mal estampee AVANT installation (le validateur ne verifie sinon que le schema_version
+        // stocke dans metadata, qui peut etre correct alors que user_version est reste a 0).
+        val userVersion = readUserVersion(db)
+        if (userVersion != EXPECTED_SCHEMA_VERSION) {
+            return ValidationResult(
+                false,
+                "user_version SQLite incompatible: $userVersion (attendu $EXPECTED_SCHEMA_VERSION)"
+            )
+        }
+
         requiredColumns.forEach { (tableName, columns) ->
             if (!tableExists(db, tableName)) {
                 return ValidationResult(false, "Table manquante: $tableName")
@@ -425,6 +437,13 @@ object GeoTowerDatabaseValidator {
         val cursor = db.rawQuery("PRAGMA integrity_check", null)
         return cursor.use {
             it.moveToFirst() && it.getString(0).equals("ok", ignoreCase = true)
+        }
+    }
+
+    private fun readUserVersion(db: SQLiteDatabase): Int {
+        val cursor = db.rawQuery("PRAGMA user_version", null)
+        return cursor.use {
+            if (it.moveToFirst()) it.getInt(0) else -1
         }
     }
 

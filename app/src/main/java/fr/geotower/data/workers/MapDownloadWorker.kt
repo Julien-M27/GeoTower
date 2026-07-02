@@ -6,11 +6,13 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.StatFs
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ForegroundInfo
+import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import fr.geotower.MainActivity
@@ -114,6 +116,7 @@ class MapDownloadWorker(
                         while (bytes >= 0) {
                             if (isStopped) {
                                 tempMapFile.delete()
+                                notificationManager.cancel(progressNotifId)
                                 return@withContext Result.failure()
                             }
 
@@ -162,6 +165,7 @@ class MapDownloadWorker(
             }
         } catch (e: CancellationException) {
             if (tempMapFile.exists()) tempMapFile.delete()
+            notificationManager.cancel(progressNotifId)
             throw e
         } catch (e: Exception) {
             AppLogger.w(TAG, "Map download failed", e)
@@ -228,6 +232,9 @@ class MapDownloadWorker(
         val pendingIntent = createOfflineMapsPendingIntent(notifId)
         val title = applicationContext.getString(R.string.notification_map_download_title, mapName)
         val content = applicationContext.getString(R.string.notification_map_download_progress, progress)
+        val cancelLabel = applicationContext.getString(R.string.appstrings_download_cancel)
+        val cancelIntent = WorkManager.getInstance(applicationContext).createCancelPendingIntent(id)
+        val actionIconRes = NotificationIconResources.smallIconRes(applicationContext)
 
         val builder = NotificationCompat.Builder(applicationContext, channelId)
             .setContentTitle(title)
@@ -237,6 +244,7 @@ class MapDownloadWorker(
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .addAction(actionIconRes, cancelLabel, cancelIntent)
         NotificationIconResources.applyTo(builder, applicationContext)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
@@ -252,6 +260,13 @@ class MapDownloadWorker(
                 .setOnlyAlertOnce(true)
                 .setCategory(Notification.CATEGORY_PROGRESS)
                 .setStyle(progressStyle)
+                .addAction(
+                    Notification.Action.Builder(
+                        Icon.createWithResource(applicationContext, actionIconRes),
+                        cancelLabel,
+                        cancelIntent
+                    ).build()
+                )
             NotificationIconResources.applyTo(nativeBuilder, applicationContext)
 
             runCatching {

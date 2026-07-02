@@ -190,6 +190,7 @@
     <string name="notification_signalquest_upload_retry">Netzwerkfehler, später wird erneut versucht.</string>
     <string name="notification_signalquest_upload_success">%1$d/%2$d Fotos erfolgreich an Signal Quest gesendet!</string>
     <string name="notification_signalquest_upload_partial">%1$d/%2$d Fotos an Signal Quest gesendet. Einige sind fehlgeschlagen.</string>
+    <string name="notification_signalquest_upload_cancelled">Upload abgebrochen (%1$d/%2$d Fotos gesendet).</string>
     <string name="operator_count">↓ Anzahl Betreiber: %1$d</string>
     <string name="upload_history_no_photo_recorded">Kein Foto gespeichert</string>
     <string name="upload_history_status_success">Genehmigt</string>
@@ -197,9 +198,12 @@
     <string name="upload_history_status_failed">Fehlgeschlagen</string>
     <string name="upload_history_status_retry">Wartet</string>
     <string name="upload_history_status_in_progress">In Bearbeitung</string>
+    <string name="upload_history_status_cancelled">Abgebrochen</string>
     <string name="upload_history_exif_removed">EXIF entfernt</string>
     <string name="upload_history_exif_kept">EXIF behalten</string>
     <string name="upload_progress_text">%1$d / %2$d Fotos gesendet...</string>
+    <string name="appstrings_upload_cancel">Upload abbrechen</string>
+    <string name="appstrings_download_cancel">Download abbrechen</string>
     <string name="upload_result_text">%1$d von %2$d Fotos erfolgreich an Signal Quest gesendet.</string>
     <string name="photo_by_author">Von %1$s</string>
     <string name="photo_on_date">am %1$s</string>
@@ -2122,4 +2126,14 @@
     <string name="appstrings_release_v1599_site_cellmapper">Neuer externer CellMapper-Link bei unterstützten Betreibern</string>
     <string name="appstrings_release_v1599_site_aer_id">Antennenkennung (AER-ID) zu den Antenneninformationen hinzugefügt</string>
     <string name="appstrings_release_v1599_site_throughput_height">Der Durchsatzrechner erhält eine Einstellung für die Empfängerhöhe (Stockwerk), um die Schätzung zu verfeinern</string>
+    <!-- Nutzungsbedingungen -->
+    <string name="appstrings_terms_title">Nutzungsbedingungen</string>
+    <string name="appstrings_terms_button_desc">Nutzungsbedingungen und Datenschutz</string>
+    <string name="appstrings_release_section_downloads_uploads">Downloads und Uploads</string>
+    <string name="appstrings_release_section_performance">Leistung</string>
+    <string name="appstrings_release_v196_terms_screen">Neuer Bildschirm „Nutzungsbedingungen“ (Bedingungen und Datenschutz), erreichbar über die Info-Seite</string>
+    <string name="appstrings_release_v196_cancel_downloads">Ein laufender Download (Datenbank, Offline-Karte, Funkdatenbank) kann jetzt abgebrochen werden</string>
+    <string name="appstrings_release_v196_cancel_uploads">Ein laufender Foto-Upload kann jetzt abgebrochen werden, mit dem Status „Abgebrochen“ im Verlauf</string>
+    <string name="appstrings_release_v196_db_indexes">Datenbank indiziert, um Karte und Filter zu beschleunigen</string>
+    <string name="appstrings_release_v196_baseline_profile">Schnellerer App-Start (Startprofil)</string>
 </resources>

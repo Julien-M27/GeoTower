@@ -18,6 +18,16 @@ object SignalQuestUploadScheduler {
     const val UNIQUE_WORK_NAME = "signalquest_upload_queue"
     const val GLOBAL_TAG = "sq_upload_global"
 
+    // WorkInfo n'expose pas l'inputData : l'uploadId voyage donc aussi en tag pour pouvoir
+    // retrouver le dossier d'upload d'un work annule (nettoyage historique + cache).
+    private const val UPLOAD_ID_TAG_PREFIX = "sq_upload_id:"
+
+    fun uploadIdFromTags(tags: Set<String>): String? {
+        return tags.firstOrNull { it.startsWith(UPLOAD_ID_TAG_PREFIX) }
+            ?.removePrefix(UPLOAD_ID_TAG_PREFIX)
+            ?.takeIf { it.isNotBlank() }
+    }
+
     fun enqueue(context: Context, manifest: SignalQuestUploadManifest): UUID {
         val appContext = context.applicationContext
         val request = buildRequest(manifest)
@@ -38,6 +48,7 @@ object SignalQuestUploadScheduler {
             .setInputData(uploadData)
             .addTag("sq_upload_${manifest.siteId}")
             .addTag(GLOBAL_TAG)
+            .addTag(UPLOAD_ID_TAG_PREFIX + manifest.uploadId)
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)

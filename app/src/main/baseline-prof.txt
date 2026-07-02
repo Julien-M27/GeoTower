@@ -1,0 +1,46 @@
+# Baseline Profile — règles de démarrage (Human-Readable Format, consommé par AGP).
+#
+# ⚠️ PROFIL DE DÉPART écrit à la main : il pré-compile (AOT) le code applicatif des
+# chemins chauds (démarrage à froid + premier rendu carte/accueil). Les règles
+# pointant vers une classe absente sont simplement IGNORÉES (aucun risque).
+#
+# 👉 Pour l'optimum, régénérer sur un appareil/émulateur avec le plugin
+#    androidx.baselineprofile (cf. note remise par l'assistant), puis remplacer ce fichier.
+#
+# Flags : H = Hot, S = Startup, P = Post-startup.  ** = wildcard.
+
+# --- Application & Activity (chemin de démarrage) ---
+HSPLfr/geotower/GeoTowerApp;->**(**)**
+Lfr/geotower/GeoTowerApp;
+HSPLfr/geotower/MainActivity;->**(**)**
+Lfr/geotower/MainActivity;
+HSPLfr/geotower/MainActivity$**;->**(**)**
+Lfr/geotower/MainActivity$**;
+
+# --- Couche données (base Room, API, modèles, repository) ---
+HSPLfr/geotower/data/db/**->**(**)**
+Lfr/geotower/data/db/**;
+HSPLfr/geotower/data/api/**->**(**)**
+Lfr/geotower/data/api/**;
+HSPLfr/geotower/data/models/**->**(**)**
+Lfr/geotower/data/models/**;
+HSPLfr/geotower/data/config/**->**(**)**
+Lfr/geotower/data/config/**;
+HSPLfr/geotower/data/AnfrRepository;->**(**)**
+Lfr/geotower/data/AnfrRepository;
+HSPLfr/geotower/data/RadioRepository;->**(**)**
+Lfr/geotower/data/RadioRepository;
+
+# --- Utilitaires chauds (config runtime, locale, thème, icônes carte) ---
+HSPLfr/geotower/utils/**->**(**)**
+Lfr/geotower/utils/**;
+
+# --- Thème & accueil (page de démarrage par défaut) ---
+HSPLfr/geotower/ui/theme/**->**(**)**
+Lfr/geotower/ui/theme/**;
+HSPLfr/geotower/ui/screens/home/**->**(**)**
+Lfr/geotower/ui/screens/home/**;
+
+# --- Carte (écran le plus coûteux, fréquemment ouvert tôt) ---
+HSPLfr/geotower/ui/screens/map/**->**(**)**
+Lfr/geotower/ui/screens/map/**;

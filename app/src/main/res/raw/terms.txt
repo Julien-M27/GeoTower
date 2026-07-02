@@ -1,0 +1,128 @@
+~ Last updated: 30 June 2026
+
+By installing and using the **GeoTower** application, you accept these terms. If you do not agree, please do not use the application.
+
+# 1. Publisher
+
+GeoTower is an application developed and published, on a personal and non-commercial basis, by **Julien**.
+
+Contact: **support@geotower.fr**.
+
+GeoTower is a **free** application, with no advertising and no in-app purchases.
+
+# 2. Purpose of the application
+
+GeoTower lets you view **mobile telephony sites and antennas** in France on a map, based on **open public data** (in particular ANFR, ARCEP, data.gouv.fr), together with map backgrounds and elevation data (IGN, OpenStreetMap).
+
+The information shown is provided **for guidance only**. It comes from third-party sources and may contain errors, update delays or inaccuracies. GeoTower does not guarantee that it is accurate or complete.
+
+# 3. Personal data and privacy
+
+GeoTower is designed around the principle of **data minimisation**.
+
+**GeoTower creates no account, requires no registration and collects no identity data** (no name, no e-mail, no phone number, no advertising identifier).
+
+## 3.1 No collection by the publisher
+
+The publisher of GeoTower receives, stores and records **no data** about you:
+- no usage logs;
+- no statistics or analytics tools;
+- no advertising trackers;
+- no telemetry.
+
+No usage data leaves your device to reach the publisher.
+
+## 3.2 Location
+
+With your permission, GeoTower uses your device's location to centre the map and show nearby sites, as well as for the **real-time tracking** ("live") feature, which may require **background** location access in order to continuously identify the mobile site you are potentially connected to.
+
+Your location is **processed locally, on your device**. It is **never sent to the publisher** or to any third party for tracking purposes. You can withdraw the location permission at any time in the Android settings; the relevant features will then be disabled.
+
+## 3.3 Data stored on your device
+
+GeoTower only stores, in its private space on your device: your **preferences**, the downloaded **database** of sites, and the **history of your photo uploads** (see section 4). This data stays on the device, is not backed up to the cloud, and is removed when you uninstall the application.
+
+# 4. Community photos (upload to SignalQuest)
+
+GeoTower lets you, **if you wish**, upload one or more **photos of a site** (which you choose from your gallery or take with the camera) in order to enrich the **SignalQuest** community database, an independent third-party service.
+
+## 4.1 What is sent
+
+When you confirm an upload, the following is sent to SignalQuest:
+- the **photo** (resized and recompressed);
+- the **description** you enter freely (optional);
+- the **operator** and the **identification codes** of the site concerned (e.g. ANFR code);
+- where applicable, the photo's **EXIF metadata**.
+
+> EXIF metadata: a photo may contain technical information (date, device model) and, where applicable, the **GPS location** where it was taken. Before each upload, GeoTower offers to remove this metadata. **This option is disabled by default**: if you do not enable it, the EXIF metadata is sent with the photo. Remember to enable it if you do not wish to share this information.
+
+The upload is **anonymous**: no data identifying you is attached to the photo (no name, no account, no identifier).
+
+## 4.2 Once the photo has been sent
+
+As soon as a photo is uploaded, it is **hosted and managed exclusively by SignalQuest**. **GeoTower no longer has access to it, keeps no remote copy of it and has no control over it.**
+
+All photos uploaded from GeoTower are published on SignalQuest **under the collective name "GeoTower"**, and not under an individual account — unlike users who have their own SignalQuest account. There is therefore **no faster way** to specifically locate your uploads.
+
+To have a photo removed, you must:
+1. go to SignalQuest (app or website), in the **Map** tab;
+2. find the photo concerned;
+3. **report** it, asking for its removal.
+
+You may also contact SignalQuest at **support@signalquest.fr**. GeoTower cannot delete or modify on your behalf a photo hosted by SignalQuest.
+
+## 4.3 Local history
+
+GeoTower keeps, **on your device only**, a history of your uploads (thumbnails and status), which you can clear at any time from the "Upload history" screen. Clearing this local history does not remove photos already published on SignalQuest.
+
+# 5. Third-party services
+
+To function, GeoTower communicates with third-party services that have their own terms:
+- **SignalQuest** — an independent third-party service published by **Alexandre Germain** (support@signalquest.fr): hosting of community photos (see section 4);
+- **IGN (Géoservices)** — map backgrounds, elevation and coverage; geographic coordinates may be sent to them in order to compute a profile or display a map;
+- **OpenStreetMap / MapsForge** — map backgrounds;
+- **ANFR, ARCEP, data.gouv.fr** — downloading of the public databases.
+
+GeoTower does not share your data with any advertiser or data broker.
+
+# 6. Legal basis (GDPR)
+
+Processing is based on your **consent** (location permission, voluntary photo uploads), which you can withdraw at any time, and on the **legitimate interest** in the proper local operation of the application.
+
+# 7. Retention period
+
+- On your device: for as long as the application is installed, or until you delete it yourself (settings, clearing the history, uninstalling).
+- On SignalQuest: according to SignalQuest's own retention policy.
+
+# 8. Your rights
+
+Under the GDPR, you have the rights of access, rectification, erasure, restriction, objection and portability.
+- Data present on your device: you control it directly (Android permissions, clearing the history, uninstalling).
+- Photos hosted by SignalQuest: send your request directly to SignalQuest (see section 4.2).
+- Any other question regarding these terms: **support@geotower.fr**.
+
+You may also lodge a complaint with the CNIL (www.cnil.fr), the French data protection authority.
+
+# 9. Security
+
+GeoTower's network communications are **encrypted (HTTPS/TLS)**. The application does not back up your data to the cloud.
+
+# 10. Minors
+
+GeoTower is not specifically aimed at minors and does not knowingly collect data concerning them.
+
+# 11. Intellectual property and licences
+
+The data and map backgrounds remain subject to the licences of their respective providers (ANFR, ARCEP, IGN, © OpenStreetMap contributors, etc.). GeoTower claims no ownership of them.
+
+# 12. Liability
+
+GeoTower is provided "as is", without warranty. The publisher cannot be held liable for decisions made on the basis of the information shown, nor for content hosted by third-party services.
+
+# 13. Changes to the terms
+
+These terms may be updated. The date of the last update appears at the top of this page.
+
+# 14. Governing law
+
+These terms are governed by **French law**.

@@ -22,7 +22,7 @@ android {
         minSdk = 24
         targetSdk = 37
         versionCode = 1
-        versionName = "1.9.9.5.9"
+        versionName = "1.9.9.6"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val manifestPublicKeys = providers
@@ -41,6 +41,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

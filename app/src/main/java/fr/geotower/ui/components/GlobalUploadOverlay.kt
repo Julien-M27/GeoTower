@@ -11,7 +11,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -20,9 +22,16 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import coil.compose.AsyncImage
 import fr.geotower.AppGlobalState
+import fr.geotower.data.upload.ExternalPhotoUploadHistoryStore
+import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.workers.SignalQuestUploadScheduler
+import fr.geotower.data.workers.SignalQuestUploadWorker
 import fr.geotower.utils.AppConfig
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.File
 import java.util.UUID
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -53,6 +62,7 @@ fun GlobalUploadOverlay(
     var showFinishedDialog by remember { mutableStateOf(false) }
     var finishedDialogMessageOverride by remember { mutableStateOf<String?>(null) }
     var finishedDialogHasErrorsOverride by remember { mutableStateOf<Boolean?>(null) }
+    var finishedDialogUploadId by remember { mutableStateOf<String?>(null) }
 
     // Statistiques du job en cours/terminé
     var currentProgress by remember { mutableIntStateOf(0) }
@@ -61,6 +71,7 @@ fun GlobalUploadOverlay(
     val lifetimeScore = prefs.getInt("total_lifetime_uploads", 0)
 
     val completedWorkIds = remember { mutableSetOf<UUID>() }
+    val finalizedCancelledIds = remember { mutableSetOf<UUID>() }
 
     // NOUVEAU : Mémoire des états pour détecter les vraies transitions
     val previousStates = remember { mutableMapOf<UUID, WorkInfo.State>() }
@@ -108,6 +119,7 @@ fun GlobalUploadOverlay(
             totalPhotos = justFinishedWork.outputData.getInt("total", totalPhotos)
             finishedDialogMessageOverride = null
             finishedDialogHasErrorsOverride = null
+            finishedDialogUploadId = SignalQuestUploadScheduler.uploadIdFromTags(justFinishedWork.tags)
 
             // On sauvegarde le nouveau score global
             val newScore = lifetimeScore + finalSuccessCount
@@ -115,6 +127,26 @@ fun GlobalUploadOverlay(
 
             // On affiche le pop-up de victoire !
             showFinishedDialog = true
+        }
+
+        // Envois annulés sans worker actif (annulation pendant l'attente d'un nouvel essai, envois
+        // suivants de la file, ou restes d'une session précédente) : on marque l'historique,
+        // on purge le cache et les notifications résiduelles. Idempotent avec le nettoyage
+        // qu'effectue le worker quand il est annulé en pleine exécution.
+        val cancelledWork = workInfos.filter {
+            it.state == WorkInfo.State.CANCELLED && finalizedCancelledIds.add(it.id)
+        }
+        if (cancelledWork.isNotEmpty()) {
+            val appContext = context.applicationContext
+            withContext(Dispatchers.IO) {
+                cancelledWork.forEach { work ->
+                    SignalQuestUploadScheduler.uploadIdFromTags(work.tags)?.let { uploadId ->
+                        if (SignalQuestUploadQueue.finalizeCancelledUpload(appContext, uploadId) != null) {
+                            SignalQuestUploadWorker.cancelUploadNotifications(appContext, uploadId)
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -125,6 +157,7 @@ fun GlobalUploadOverlay(
             totalPhotos = AppGlobalState.uploadResultPopupTotal.intValue
             finishedDialogMessageOverride = AppGlobalState.uploadResultPopupMessage.value
             finishedDialogHasErrorsOverride = AppGlobalState.uploadResultPopupHasErrors.value
+            finishedDialogUploadId = AppGlobalState.uploadResultPopupUploadId.value
             showFinishedDialog = true
             AppGlobalState.showUploadResultPopup.value = false
         }
@@ -152,8 +185,31 @@ fun GlobalUploadOverlay(
                     }
                     Text(textProgress, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-                    Button(onClick = { isUploadPopupHidden = true }, shape = CircleShape, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)) {
-                        Text(stringResource(R.string.appstrings_hide), fontWeight = FontWeight.Bold)
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                activeWork?.id?.let { workId ->
+                                    WorkManager.getInstance(context).cancelWorkById(workId)
+                                }
+                                isUploadPopupHidden = true
+                            },
+                            shape = CircleShape,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
+                        ) {
+                            Text(stringResource(R.string.appstrings_upload_cancel), fontWeight = FontWeight.Bold)
+                        }
+                        Button(
+                            onClick = { isUploadPopupHidden = true },
+                            shape = CircleShape,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
+                        ) {
+                            Text(stringResource(R.string.appstrings_hide), fontWeight = FontWeight.Bold)
+                        }
                     }
                 }
             }
@@ -166,13 +222,62 @@ fun GlobalUploadOverlay(
         val finalIcon = if (hasErrors) Icons.Default.Warning else Icons.Default.CheckCircle
         val iconColor = if (hasErrors) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
 
+        // Miniature d'une des photos envoyées (persistée dans l'historique d'upload), affichée à
+        // la place de la coche verte avec un badge « +N » pour les autres photos du lot. En cas
+        // d'erreur ou de miniature introuvable (historique effacé...), on garde les icônes.
+        var successThumbnailPath by remember(finishedDialogUploadId) { mutableStateOf<String?>(null) }
+        LaunchedEffect(finishedDialogUploadId, hasErrors) {
+            val uploadId = finishedDialogUploadId
+            if (hasErrors || uploadId == null) return@LaunchedEffect
+            val appContext = context.applicationContext
+            successThumbnailPath = withContext(Dispatchers.IO) {
+                ExternalPhotoUploadHistoryStore.read(appContext)
+                    .asSequence()
+                    .filter { it.uploadId == uploadId }
+                    .filter {
+                        it.status == ExternalPhotoUploadHistoryStore.STATUS_SUCCESS ||
+                            it.status == ExternalPhotoUploadHistoryStore.STATUS_AWAITING_VALIDATION
+                    }
+                    .mapNotNull { it.thumbnailPath }
+                    .firstOrNull { File(it).isFile }
+            }
+        }
+
         Dialog(
             onDismissRequest = { /* L'utilisateur doit cliquer sur le bouton */ },
             properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
         ) {
             Surface(shape = blockShape, color = sheetBgColor, shadowElevation = 8.dp, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                 Column(modifier = Modifier.padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Icon(finalIcon, contentDescription = null, tint = iconColor, modifier = Modifier.size(64.dp))
+                    val thumbnailPath = successThumbnailPath
+                    if (!hasErrors && thumbnailPath != null) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            AsyncImage(
+                                model = File(thumbnailPath),
+                                contentDescription = null,
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier
+                                    .size(72.dp)
+                                    .clip(RoundedCornerShape(18.dp))
+                            )
+                            if (finalSuccessCount > 1) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                    shape = RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp)
+                                ) {
+                                    Text(
+                                        text = "+${finalSuccessCount - 1}",
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Icon(finalIcon, contentDescription = null, tint = iconColor, modifier = Modifier.size(64.dp))
+                    }
 
                     Text(stringResource(R.string.appstrings_upload_finished_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
 

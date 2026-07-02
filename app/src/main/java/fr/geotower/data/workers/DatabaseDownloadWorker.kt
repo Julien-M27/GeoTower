@@ -5,6 +5,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.work.BackoffPolicy
@@ -138,6 +139,9 @@ class DatabaseDownloadWorker(
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
+        val cancelLabel = context.getString(R.string.appstrings_download_cancel)
+        val cancelIntent = WorkManager.getInstance(context).createCancelPendingIntent(id)
+        val actionIconRes = NotificationIconResources.smallIconRes(context)
 
         val builder = NotificationCompat.Builder(context, channelId)
             .setContentTitle(title)
@@ -147,6 +151,7 @@ class DatabaseDownloadWorker(
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setCategory(NotificationCompat.CATEGORY_PROGRESS)
+            .addAction(actionIconRes, cancelLabel, cancelIntent)
         NotificationIconResources.applyTo(builder, context)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
@@ -162,6 +167,13 @@ class DatabaseDownloadWorker(
                 .setOnlyAlertOnce(true)
                 .setCategory(android.app.Notification.CATEGORY_PROGRESS)
                 .setStyle(progressStyle)
+                .addAction(
+                    android.app.Notification.Action.Builder(
+                        Icon.createWithResource(context, actionIconRes),
+                        cancelLabel,
+                        cancelIntent
+                    ).build()
+                )
             NotificationIconResources.applyTo(nativeBuilder, context)
 
             // ✅ Utilisation de la réflexion pour compatibilité A16

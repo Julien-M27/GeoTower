@@ -26,45 +26,18 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_map)) {
-        item(stringResource(R.string.appstrings_release_v1599_map_coverage_points))
-        item(stringResource(R.string.appstrings_release_v1599_map_theoretical_coverage))
-        item(stringResource(R.string.appstrings_release_v1599_map_history_slider))
+    section(stringResource(R.string.appstrings_release_section_about)) {
+        item(stringResource(R.string.appstrings_release_v196_terms_screen))
     }
 
-    section(stringResource(R.string.appstrings_release_section_settings)) {
-        item(stringResource(R.string.appstrings_release_v1599_settings_search))
-        item(stringResource(R.string.appstrings_release_v1599_settings_theme_button))
-        item(stringResource(R.string.appstrings_release_v1599_settings_diagnostic))
-        item(stringResource(R.string.appstrings_release_v1599_settings_battery_opt))
+    section(stringResource(R.string.appstrings_release_section_downloads_uploads)) {
+        item(stringResource(R.string.appstrings_release_v196_cancel_downloads))
+        item(stringResource(R.string.appstrings_release_v196_cancel_uploads))
     }
 
-    section(stringResource(R.string.appstrings_release_section_live_tracking)) {
-        item(stringResource(R.string.appstrings_release_v1599_live_gps_accuracy))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_preference_profiles)) {
-        item(stringResource(R.string.appstrings_release_v1599_profiles_rename))
-        item(stringResource(R.string.appstrings_release_v1599_profiles_import_preview))
-        item(stringResource(R.string.appstrings_release_v1599_profiles_export_selective))
-        item(stringResource(R.string.appstrings_release_v1599_profiles_changes_count))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_elevation_profile)) {
-        item(stringResource(R.string.appstrings_release_v1599_elevation_obstacles))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_share_export)) {
-        item(stringResource(R.string.appstrings_release_v1599_share_radio_report))
-        item(stringResource(R.string.appstrings_release_v1599_share_site_pdf))
-        item(stringResource(R.string.appstrings_release_v1599_share_community_photos))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_site_detail)) {
-        item(stringResource(R.string.appstrings_release_v1599_site_potential_outage))
-        item(stringResource(R.string.appstrings_release_v1599_site_cellmapper))
-        item(stringResource(R.string.appstrings_release_v1599_site_aer_id))
-        item(stringResource(R.string.appstrings_release_v1599_site_throughput_height))
+    section(stringResource(R.string.appstrings_release_section_performance)) {
+        item(stringResource(R.string.appstrings_release_v196_db_indexes))
+        item(stringResource(R.string.appstrings_release_v196_baseline_profile))
     }
 }
 
