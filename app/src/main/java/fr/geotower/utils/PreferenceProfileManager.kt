@@ -92,7 +92,9 @@ object PreferenceProfileManager {
     const val ACTIVE_PROFILE_ID_KEY = "__active_preference_profile_id"
 
     private const val STORE_SCHEMA_VERSION = 1
-    private const val EXPORT_SCHEMA_VERSION = 1
+    // v2 : "menuSize" (petit/normal/large) remplace par "ui_scale_percent" (Int). Les exports v1
+    // restent lisibles (conversion transparente dans profileFromJson).
+    private const val EXPORT_SCHEMA_VERSION = 2
     private const val EXPORT_MIME_TYPE = "application/json"
     private const val PROFILE_EXPORT_FILE_PREFIX = "geotower_profil_"
     private const val PROFILES_EXPORT_FILE_PREFIX = "geotower_profils_"
@@ -105,7 +107,7 @@ object PreferenceProfileManager {
         "theme_mode",
         "is_oled_mode",
         "is_blur_enabled",
-        "menuSize",
+        AppConfig.PREF_UI_SCALE_PERCENT,
         "app_language",
         "map_provider",
         "ign_style",
@@ -199,7 +201,7 @@ object PreferenceProfileManager {
         "theme_mode" to "Apparence",
         "is_oled_mode" to "Apparence",
         "is_blur_enabled" to "Apparence",
-        "menuSize" to "Apparence",
+        AppConfig.PREF_UI_SCALE_PERCENT to "Apparence",
         AppConfig.PREF_COLOR_PALETTE to "Apparence",
         AppConfig.PREF_UI_MODE to "Apparence",
         AppLogoDrawingResources.PREF_KEY to "Apparence",
@@ -234,7 +236,7 @@ object PreferenceProfileManager {
         "theme_mode" to "Thème",
         "is_oled_mode" to "Mode OLED",
         "is_blur_enabled" to "Flou",
-        "menuSize" to "Taille du menu",
+        AppConfig.PREF_UI_SCALE_PERCENT to "Taille de l'interface",
         AppConfig.PREF_COLOR_PALETTE to "Palette de couleurs",
         AppConfig.PREF_UI_MODE to "Style d'interface",
         AppLogoDrawingResources.PREF_KEY to "Logo dans l'app",
@@ -552,7 +554,7 @@ object PreferenceProfileManager {
         AppConfig.ignStyle.intValue = prefs.getInt("ign_style", 0)
         AppConfig.navMode.intValue = prefs.getInt("nav_mode", 0)
         AppConfig.defaultOperator.value = prefs.getString("default_operator", "Aucun") ?: "Aucun"
-        AppConfig.menuSize.value = prefs.getString("menuSize", "normal") ?: "normal"
+        AppConfig.uiScalePercent.intValue = AppConfig.readUiScalePercent(prefs)
         AppConfig.loadSavedFilters(prefs)
 
         UpdateCheckScheduler.onNotificationsPreferenceChanged(context, AppConfig.enableUpdateNotifications.value)
@@ -746,11 +748,27 @@ object PreferenceProfileManager {
     private fun profileFromJson(json: JSONObject): PreferenceProfile {
         val valuesJson = json.optJSONObject("values") ?: JSONObject()
         val values = buildMap {
+            var legacyMenuSize: String? = null
             valuesJson.keys().forEach { key ->
                 val valueJson = valuesJson.optJSONObject(key) ?: return@forEach
+                if (key == AppConfig.PREF_LEGACY_MENU_SIZE) {
+                    // Ancien reglage (petit/normal/large) : converti plus bas en ui_scale_percent.
+                    legacyMenuSize = valueFromJson(valueJson)?.value as? String
+                    return@forEach
+                }
                 if (isVisiblePreferenceKey(key)) {
                     valueFromJson(valueJson)?.let { put(key, it) }
                 }
+            }
+            // Migration des profils anterieurs : menuSize -> ui_scale_percent (base 100 = ancien normal).
+            if (!containsKey(AppConfig.PREF_UI_SCALE_PERCENT) && legacyMenuSize != null) {
+                put(
+                    AppConfig.PREF_UI_SCALE_PERCENT,
+                    PreferenceProfileValue(
+                        PreferenceProfileValue.TYPE_INT,
+                        AppConfig.menuSizeLegacyToPercent(legacyMenuSize)
+                    )
+                )
             }
         }
         val now = System.currentTimeMillis()

@@ -202,8 +202,9 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         notifySafely(
             resultNotificationId,
             createResultNotification(
-                message = applicationContext.getString(
-                    R.string.notification_signalquest_upload_cancelled,
+                message = applicationContext.resources.getQuantityString(
+                    R.plurals.notification_upload_cancelled,
+                    summary.totalCount,
                     summary.uploadedCount,
                     summary.totalCount
                 ),
@@ -367,9 +368,9 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
     ) {
         cancelSafely(progressNotificationId)
         val message = if (!partial) {
-            applicationContext.getString(R.string.notification_signalquest_upload_success, successCount, total)
+            applicationContext.resources.getQuantityString(R.plurals.notification_upload_success, total, successCount, total)
         } else {
-            applicationContext.getString(R.string.notification_signalquest_upload_partial, successCount, total)
+            applicationContext.resources.getQuantityString(R.plurals.notification_upload_partial, total, successCount, total)
         }
         notifySafely(
             resultNotificationId,

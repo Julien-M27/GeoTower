@@ -42,6 +42,7 @@ import fr.geotower.data.api.RetrofitClient
 import fr.geotower.data.models.OfflineMapDto
 import fr.geotower.data.workers.DownloadNotificationCenter
 import fr.geotower.data.workers.OfflineMapDownloadValidator
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.OfflineMapDisplayNames
 import java.io.File
 import kotlin.math.abs
@@ -102,6 +103,7 @@ fun MapDownloadCard(
     onSafeClick: SafeClick? = null
 ) {
     val context = LocalContext.current
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val workManager = remember { androidx.work.WorkManager.getInstance(context) }
     val safeClick = onSafeClick ?: rememberSafeClick()
     val featureFlags by RemoteFeatureFlags.config
@@ -171,7 +173,7 @@ fun MapDownloadCard(
         color = if (useOneUi) bubbleColor else Color.Transparent,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
             // EN-TÊTE AVEC BOUTON "TOUT TÉLÉCHARGER"
             Row(
                 verticalAlignment = Alignment.CenterVertically,
@@ -187,11 +189,11 @@ fun MapDownloadCard(
                             }
                         }
                 ) {
-                    Icon(Icons.Default.Map, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(Modifier.width(12.dp))
+                    Icon(Icons.Default.Map, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(sizing.component(24.dp)))
+                    Spacer(Modifier.width(sizing.spacing(12.dp)))
                     Column(modifier = Modifier.weight(1f)) {
-                        Text(text = stringResource(R.string.appstrings_offline_maps_title), fontWeight = FontWeight.Bold, style = MaterialTheme.typography.titleMedium)
-                        Text(text = stringResource(R.string.appstrings_offline_maps_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(text = stringResource(R.string.appstrings_offline_maps_title), fontWeight = FontWeight.Bold, style = sizing.textStyle(MaterialTheme.typography.titleMedium))
+                        Text(text = stringResource(R.string.appstrings_offline_maps_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
 
@@ -257,7 +259,7 @@ fun MapDownloadCard(
                 exit = fadeOut() + shrinkVertically()
             ) {
                 Column {
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
                     if (isLoading) {
                         LoadingIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
@@ -284,7 +286,7 @@ fun MapDownloadCard(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 8.dp)
+                            .padding(vertical = sizing.spacing(8.dp))
                             .onGloballyPositioned { coordinates ->
                                 rowBounds = MapRowViewportBounds(
                                     top = coordinates.positionInRoot().y,
@@ -301,9 +303,9 @@ fun MapDownloadCard(
                                 Text(
                                     text = displayName,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 15.sp
+                                    fontSize = sizing.text(15.sp)
                                 )
-                                Text(text = stringResource(R.string.map_file_size_mb, map.estimatedSizeMb), fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Text(text = stringResource(R.string.map_file_size_mb, map.estimatedSizeMb), fontSize = sizing.text(13.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
                             }
 
                             if (isSyncing) {
@@ -345,16 +347,16 @@ fun MapDownloadCard(
                         }
 
                         if (isSyncing) {
-                            Spacer(Modifier.height(8.dp))
+                            Spacer(Modifier.height(sizing.spacing(8.dp)))
                             LinearWavyProgressIndicator(
                                 progress = { progressValue / 100f },
-                                modifier = Modifier.fillMaxWidth().height(8.dp),
+                                modifier = Modifier.fillMaxWidth().height(sizing.component(8.dp)),
                                 color = MaterialTheme.colorScheme.primary,
                                 trackColor = MaterialTheme.colorScheme.surfaceVariant
                             )
                             // 🚨 L'extraction n'existe plus, on affiche juste la progression !
                             val statusText = stringResource(R.string.map_download_progress_inline, progressValue)
-                            Text(text = statusText, fontSize = 12.sp, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                            Text(text = statusText, fontSize = sizing.text(12.sp), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
                         }
                     }
                     if (index < catalog.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
@@ -362,37 +364,37 @@ fun MapDownloadCard(
 
                 // 🚀 NOUVEAU : Bouton pour annuler TOUS les téléchargements de cartes
                 if (isAnySyncing) {
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                     OutlinedButton(
                         onClick = {
                             safeClick("map_cancel_all") {
                                 workManager.cancelAllWorkByTag("map_download")
                             }
                         },
-                        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 50.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(50.dp)),
+                        shape = RoundedCornerShape(sizing.component(12.dp)),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(text = stringResource(R.string.appstrings_cancel_download), fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
+                        Spacer(Modifier.width(sizing.spacing(8.dp)))
+                        Text(text = stringResource(R.string.appstrings_cancel_download), fontWeight = FontWeight.Bold, style = sizing.textStyle(MaterialTheme.typography.labelLarge))
                     }
                 }
 
                 // 🚀 BOUTON : TOUT SUPPRIMER (Style calqué sur DatabaseDownloadCard)
                 if (hasDownloadedMaps) {
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                     OutlinedButton(
                         onClick = { showDeleteAllDialog = true },
-                        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 50.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(50.dp)),
+                        shape = RoundedCornerShape(sizing.component(12.dp)),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
                     ) {
-                        Icon(Icons.Default.Delete, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(text = stringResource(R.string.appstrings_delete_all_maps), fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
+                        Spacer(Modifier.width(sizing.spacing(8.dp)))
+                        Text(text = stringResource(R.string.appstrings_delete_all_maps), fontWeight = FontWeight.Bold, style = sizing.textStyle(MaterialTheme.typography.labelLarge))
                     }
                 }
                     }

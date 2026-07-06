@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -23,9 +24,38 @@ internal const val GEO_TOWER_SIZE_SMALL_SCALE = 0.85f
 internal const val GEO_TOWER_SIZE_NORMAL_SCALE = 0.925f
 internal const val GEO_TOWER_SIZE_LARGE_SCALE = 1f
 
+// --- Dimensionnement adaptatif de l'UI ---
+// L'ancien palier "normal" (x0.925) devient la reference : 100% du reglage utilisateur, sur un
+// ecran de reference. La taille finale = base(dp) x facteurEcran x (reglageUtilisateur / 100).
+
+// L'echelle de reference : le rendu "normal" historique correspond desormais a 100%.
+internal const val GEO_TOWER_UI_BASELINE_SCALE = GEO_TOWER_SIZE_NORMAL_SCALE
+
+// Largeur d'ecran (dp) a laquelle le facteur d'ecran vaut exactement 1.0.
+internal const val GEO_TOWER_UI_REFERENCE_WIDTH_DP = 400f
+// Bornes du facteur d'ecran : evite une UI minuscule sur tres petit ecran et geante sur tablette.
+internal const val GEO_TOWER_UI_SCREEN_FACTOR_MIN = 0.9f
+internal const val GEO_TOWER_UI_SCREEN_FACTOR_MAX = 1.15f
+
+// Reglage utilisateur, en pourcentage (100 = rendu de reference).
+internal const val GEO_TOWER_UI_SCALE_PERCENT_MIN = 80
+internal const val GEO_TOWER_UI_SCALE_PERCENT_MAX = 120
+internal const val GEO_TOWER_UI_SCALE_PERCENT_DEFAULT = 100
+
+/** Facteur d'echelle derive de la largeur d'ecran (borne). Vaut 1.0 a la largeur de reference. */
+fun geoTowerScreenFactor(screenWidthDp: Int): Float =
+    (screenWidthDp / GEO_TOWER_UI_REFERENCE_WIDTH_DP)
+        .coerceIn(GEO_TOWER_UI_SCREEN_FACTOR_MIN, GEO_TOWER_UI_SCREEN_FACTOR_MAX)
+
+/** Echelle effective appliquee a toute l'UI = reference x facteur ecran x reglage utilisateur. */
+fun geoTowerEffectiveScale(scalePercent: Int, screenWidthDp: Int): Float =
+    GEO_TOWER_UI_BASELINE_SCALE *
+        geoTowerScreenFactor(screenWidthDp) *
+        (scalePercent.coerceIn(GEO_TOWER_UI_SCALE_PERCENT_MIN, GEO_TOWER_UI_SCALE_PERCENT_MAX) / 100f)
+
 @Immutable
 data class GeoTowerUiSizing(
-    val menuSize: String,
+    val scalePercent: Int,
     val componentScale: Float,
     val spacingScale: Float,
     val textScale: Float
@@ -67,7 +97,8 @@ fun rememberGeoTowerUiStyle(): GeoTowerUiStyle {
     val themeMode by AppConfig.themeMode
     val isOled by AppConfig.isOledMode
     val uiMode by AppConfig.uiMode
-    val menuSize by AppConfig.menuSize
+    val scalePercent by AppConfig.uiScalePercent
+    val screenWidthDp = LocalConfiguration.current.screenWidthDp
     val isDark = themeMode == 2 || (themeMode == 0 && isSystemInDarkTheme())
     val useOneUi = uiMode.usesOneUi()
     val backgroundColor = if (isDark && isOled) Color.Black else MaterialTheme.colorScheme.background
@@ -88,7 +119,7 @@ fun rememberGeoTowerUiStyle(): GeoTowerUiStyle {
     }
     val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     val subtleBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.16f))
-    val sizing = geoTowerUiSizing(menuSize)
+    val sizing = geoTowerUiSizing(scalePercent, screenWidthDp)
 
     return GeoTowerUiStyle(
         useOneUi = useOneUi,
@@ -109,14 +140,10 @@ fun rememberGeoTowerUiStyle(): GeoTowerUiStyle {
     )
 }
 
-private fun geoTowerUiSizing(menuSize: String): GeoTowerUiSizing {
-    val scale = when (menuSize) {
-        "petit" -> GEO_TOWER_SIZE_SMALL_SCALE
-        "large" -> GEO_TOWER_SIZE_LARGE_SCALE
-        else -> GEO_TOWER_SIZE_NORMAL_SCALE
-    }
+private fun geoTowerUiSizing(scalePercent: Int, screenWidthDp: Int): GeoTowerUiSizing {
+    val scale = geoTowerEffectiveScale(scalePercent, screenWidthDp)
     return GeoTowerUiSizing(
-        menuSize = menuSize,
+        scalePercent = scalePercent,
         componentScale = scale,
         spacingScale = scale,
         textScale = scale

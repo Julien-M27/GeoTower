@@ -39,4 +39,32 @@
         <item quantity="one">🏆 Total: %1$d photo shared since you started!</item>
         <item quantity="other">🏆 Total: %1$d photos shared since you started!</item>
     </plurals>
+    <plurals name="upload_progress">
+        <item quantity="one">%1$d / %2$d photo sent...</item>
+        <item quantity="other">%1$d / %2$d photos sent...</item>
+    </plurals>
+    <plurals name="upload_result">
+        <item quantity="one">%1$d out of %2$d photo successfully sent to Signal Quest.</item>
+        <item quantity="other">%1$d out of %2$d photos successfully sent to Signal Quest.</item>
+    </plurals>
+    <plurals name="shared_photo_map_ready">
+        <item quantity="one">%1$d photo ready. Select the target support on the map.</item>
+        <item quantity="other">%1$d photos ready. Select the target support on the map.</item>
+    </plurals>
+    <plurals name="shared_photo_support_ready">
+        <item quantity="one">%1$d photo ready for this support.</item>
+        <item quantity="other">%1$d photos ready for this support.</item>
+    </plurals>
+    <plurals name="notification_upload_success">
+        <item quantity="one">%1$d/%2$d photo sent successfully to Signal Quest!</item>
+        <item quantity="other">%1$d/%2$d photos sent successfully to Signal Quest!</item>
+    </plurals>
+    <plurals name="notification_upload_partial">
+        <item quantity="one">%1$d/%2$d photo sent to Signal Quest. Some failed.</item>
+        <item quantity="other">%1$d/%2$d photos sent to Signal Quest. Some failed.</item>
+    </plurals>
+    <plurals name="notification_upload_cancelled">
+        <item quantity="one">Upload cancelled (%1$d/%2$d photo sent).</item>
+        <item quantity="other">Upload cancelled (%1$d/%2$d photos sent).</item>
+    </plurals>
 </resources>

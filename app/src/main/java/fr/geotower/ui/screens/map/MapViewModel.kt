@@ -14,6 +14,7 @@ import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.api.SqCoveragePointData
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.RadioMapMarker
 import fr.geotower.data.models.TechniqueEntity
 import kotlinx.coroutines.CancellationException
@@ -58,6 +59,18 @@ private data class SignalQuestCoverageBounds(
 
 /** Progression du calcul de couverture théorique (lots de requêtes terrain). */
 data class TheoreticalCoverageProgress(val done: Int, val total: Int)
+
+/**
+ * Un support physique distinct présent à un point de la carte.
+ * Sert à désambiguïser quand plusieurs supports (id_support différents) se retrouvent
+ * exactement aux mêmes coordonnées GPS (souvent des erreurs de saisie ANFR).
+ */
+data class SupportChoice(
+    val supportId: String,
+    val representative: LocalisationEntity,
+    val operatorKeys: List<String>,
+    val nature: String?
+)
 
 class MapViewModel(
     private val repository: AnfrRepository,
@@ -553,6 +566,40 @@ class MapViewModel(
             requestedIds.mapNotNull { id ->
                 mapAzimuthTechniqueCache[id]?.let { technique -> id to technique }
             }.toMap()
+        }
+    }
+
+    /**
+     * Regroupe les antennes situées à un même point par support physique
+     * (id_support, avec repli sur id_anfr si absent), dans l'ordre rencontré.
+     *
+     * - Une seule entrée => point normal : un support unique, éventuellement
+     *   plusieurs opérateurs (donc plusieurs id_anfr) — pas d'ambiguïté.
+     * - Plusieurs entrées => plusieurs supports superposés à désambiguïser.
+     */
+    suspend fun resolveSupportChoices(antennas: List<LocalisationEntity>): List<SupportChoice> {
+        return kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            val distinct = antennas.distinctBy { it.idAnfr }
+            val grouped = LinkedHashMap<String, MutableList<LocalisationEntity>>()
+            val natureByKey = HashMap<String, String?>()
+            for (antenna in distinct) {
+                val physique = repository.getPhysiqueByAnfr(antenna.idAnfr).firstOrNull()
+                val key = physique?.idSupport?.trim()?.takeIf { it.isNotBlank() } ?: antenna.idAnfr
+                grouped.getOrPut(key) { mutableListOf() }.add(antenna)
+                if (!natureByKey.containsKey(key)) natureByKey[key] = physique?.natureSupport
+            }
+            grouped.map { (key, group) ->
+                val operatorKeys = group
+                    .mapNotNull { it.operateur }
+                    .flatMap { OperatorColors.keysFor(it) }
+                    .distinct()
+                SupportChoice(
+                    supportId = key,
+                    representative = group.first(),
+                    operatorKeys = operatorKeys,
+                    nature = natureByKey[key]
+                )
+            }
         }
     }
 

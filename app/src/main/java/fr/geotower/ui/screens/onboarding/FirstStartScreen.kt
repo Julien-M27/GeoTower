@@ -929,7 +929,7 @@ fun StepThemeDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStrok
     var themeMode by AppConfig.themeMode
     var isOled by AppConfig.isOledMode
     var isBlurEnabled by AppConfig.isBlurEnabled
-    val menuSize by AppConfig.menuSize
+    val uiScalePercent by AppConfig.uiScalePercent
 
     fun updateOneUi(enabled: Boolean) {
         val mode = AppUiMode.fromOneUiEnabled(enabled)
@@ -954,10 +954,10 @@ fun StepThemeDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStrok
             isOled = isOled, onOledChange = { isOled = it; prefs.edit().putBoolean("is_oled_mode", it).apply() },
             useOneUi = useOneUi, onOneUiChange = ::updateOneUi,
             isBlur = isBlurEnabled, onBlurChange = { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() },
-            menuSize = menuSize,
-            onMenuSizeChange = { newSize ->
-                AppConfig.menuSize.value = newSize
-                prefs.edit().putString("menuSize", newSize).apply()
+            uiScalePercent = uiScalePercent,
+            onUiScalePercentChange = { newPercent ->
+                AppConfig.uiScalePercent.intValue = newPercent
+                prefs.edit().putInt(AppConfig.PREF_UI_SCALE_PERCENT, newPercent).apply()
             },
             appIconRes = null, // Pas de sélecteur d'icône au 1er lancement
             onAppIconClick = null,

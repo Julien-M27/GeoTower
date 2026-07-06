@@ -188,9 +188,6 @@
     <string name="notification_app_update_available_desc">GeoTower %1$s est disponible. Touchez pour ouvrir le téléchargement.</string>
     <string name="notification_signalquest_upload_progress">Envoi en cours (%1$d/%2$d)...</string>
     <string name="notification_signalquest_upload_retry">Échec réseau, nouvel essai plus tard.</string>
-    <string name="notification_signalquest_upload_success">%1$d/%2$d photos envoyées avec succès vers Signal Quest !</string>
-    <string name="notification_signalquest_upload_partial">%1$d/%2$d photos envoyées vers Signal Quest. Certaines ont échoué.</string>
-    <string name="notification_signalquest_upload_cancelled">Envoi annulé (%1$d/%2$d photos envoyées).</string>
     <string name="operator_count">↓ Nombre d\'opérateurs : %1$d</string>
     <string name="upload_history_no_photo_recorded">Aucune photo enregistrée</string>
     <string name="upload_history_status_success">Validée</string>
@@ -201,10 +198,9 @@
     <string name="upload_history_status_cancelled">Annulé</string>
     <string name="upload_history_exif_removed">EXIF supprimés</string>
     <string name="upload_history_exif_kept">EXIF conservés</string>
-    <string name="upload_progress_text">%1$d / %2$d photo(s) envoyée(s)...</string>
+    <string name="upload_target_operator">Vers %1$s</string>
     <string name="appstrings_upload_cancel">Annuler l\'envoi</string>
     <string name="appstrings_download_cancel">Annuler le téléchargement</string>
-    <string name="upload_result_text">%1$d sur %2$d photo(s) envoyée(s) avec succès vers Signal Quest.</string>
     <string name="photo_by_author">Par %1$s</string>
     <string name="photo_on_date">le %1$s</string>
     <string name="about_new_for_version">Nouveautés (%1$s)</string>
@@ -682,6 +678,12 @@
     <string name="appstrings_offline_maps_desc">Téléchargez des cartes de la France pour naviguer sans réseau.</string>
     <string name="appstrings_offline_maps_title">Cartes Hors-Ligne</string>
     <string name="appstrings_offline_message">Vous êtes hors ligne</string>
+    <string name="appstrings_location_disabled_title">Localisation désactivée</string>
+    <string name="appstrings_location_disabled_banner_desc">Activez l\'accès à la localisation pour que GeoTower trouve les antennes autour de vous.</string>
+    <string name="appstrings_location_disabled_nearby_desc">GeoTower ne peut pas rechercher les antennes à proximité sans accès à votre position.</string>
+    <string name="appstrings_location_services_off_banner_desc">Activez la localisation (GPS) dans les réglages de l\'appareil pour que GeoTower trouve les antennes autour de vous.</string>
+    <string name="appstrings_location_services_off_nearby_desc">La localisation (GPS) est désactivée. GeoTower ne peut pas rechercher les antennes à proximité tant qu\'elle n\'est pas activée.</string>
+    <string name="appstrings_location_services_enable">Activer</string>
     <string name="appstrings_old_undated_database">Ancienne version (Non datée)</string>
     <string name="appstrings_oled_subtitle">Économise de la batterie</string>
     <string name="appstrings_oled_title">Mode OLED (Noir Pur)</string>
@@ -1195,6 +1197,8 @@
     <string name="appstrings_support_open_map_option">Bouton Ouvrir la carte</string>
     <string name="appstrings_support_operators_option">Liste des opérateurs</string>
     <string name="appstrings_support_photos_option">Photos communautaires</string>
+    <string name="appstrings_support_picker_title">%1$d supports disponibles</string>
+    <string name="appstrings_support_picker_message">Ces supports partagent les mêmes coordonnées. Lequel voulez-vous ouvrir ?</string>
     <string name="appstrings_support_prefix">Support</string>
     <string name="appstrings_support_share_option">Bouton Partager</string>
     <string name="appstrings_support_share_title">Partage du pylône</string>
@@ -1313,9 +1317,7 @@
     <string name="appstrings_upload_sq_target_site">Support N°</string>
     <string name="appstrings_upload_sq_title">Envoi vers Signal Quest</string>
     <string name="shared_photo_map_title">Photos partagées</string>
-    <string name="shared_photo_map_desc">%1$d photo(s) prêtes. Sélectionnez le support cible sur la carte.</string>
     <string name="shared_photo_support_title">Photos partagées en attente</string>
-    <string name="shared_photo_support_desc">%1$d photo(s) prêtes pour ce support.</string>
     <string name="shared_photo_support_no_operator">Aucun opérateur compatible sur ce support.</string>
     <string name="shared_photo_support_select_one">Sélectionnez au moins un opérateur.</string>
     <string name="appstrings_uploading_title">Envoi en cours</string>
@@ -2136,4 +2138,9 @@
     <string name="appstrings_release_v196_cancel_uploads">Possibilité d\'annuler un envoi de photos en cours, avec statut « Annulé » dans l\'historique</string>
     <string name="appstrings_release_v196_db_indexes">Base de données indexée pour accélérer l\'affichage de la carte et les filtres</string>
     <string name="appstrings_release_v196_baseline_profile">Démarrage de l\'application optimisé pour un lancement plus rapide</string>
+    <string name="appstrings_release_section_location">Localisation</string>
+    <string name="appstrings_release_v1961_location_banner">Nouvelle bannière quand la localisation est désactivée (permission refusée ou GPS coupé), avec un bouton pour l\'activer, sur l\'accueil, la carte, la boussole et les sites à proximité</string>
+    <string name="appstrings_release_v1961_support_picker">Quand plusieurs supports partagent les mêmes coordonnées, un sélecteur permet de choisir lequel ouvrir</string>
+    <string name="appstrings_release_v1961_upload_plurals">Envoi de photos : progression, résultats et notifications corrigés au singulier/pluriel, avec l\'opérateur ciblé et le statut « Annulé »</string>
+    <string name="appstrings_release_v1961_upload_support_select">Après le partage, sélection du support cible directement sur la carte</string>
 </resources>

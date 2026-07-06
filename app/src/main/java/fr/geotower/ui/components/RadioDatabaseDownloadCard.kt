@@ -57,6 +57,7 @@ import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DatabaseVersionPolicy
 import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.data.workers.RadioDatabaseDownloadWorker
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -71,6 +72,7 @@ fun RadioDatabaseDownloadCard(
     onSafeClick: SafeClick? = null
 ) {
     val context = LocalContext.current
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val workManager = remember { androidx.work.WorkManager.getInstance(context) }
     val safeClick = onSafeClick ?: rememberSafeClick()
     val featureFlags by RemoteFeatureFlags.config
@@ -154,12 +156,12 @@ fun RadioDatabaseDownloadCard(
         color = if (useOneUi) bubbleColor else Color.Transparent,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            val iconColumnWidth = 24.dp
-            val textStartPadding = 12.dp
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
+            val iconColumnWidth = sizing.component(24.dp)
+            val textStartPadding = sizing.spacing(12.dp)
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(8.dp)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(modifier = Modifier.width(iconColumnWidth), contentAlignment = Alignment.Center) {
@@ -167,27 +169,27 @@ fun RadioDatabaseDownloadCard(
                         imageVector = Icons.Default.WifiTethering,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(sizing.component(24.dp))
                     )
                 }
                 Spacer(modifier = Modifier.width(textStartPadding))
                 Text(
                     text = stringResource(R.string.appstrings_radio_data_title),
                     fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                     textAlign = TextAlign.Start
                 )
             }
 
             RadioInfoRow(
-                icon = { Icon(Icons.Default.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
+                icon = { Icon(Icons.Default.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(sizing.component(18.dp))) },
                 label = txtLatestDb,
                 value = remoteVersion,
                 iconColumnWidth = iconColumnWidth,
                 textStartPadding = textStartPadding
             )
             RadioInfoRow(
-                icon = { Icon(Icons.Default.CloudDone, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp)) },
+                icon = { Icon(Icons.Default.CloudDone, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(sizing.component(18.dp))) },
                 label = txtDownloadedDb,
                 value = localVersion,
                 iconColumnWidth = iconColumnWidth,
@@ -203,54 +205,54 @@ fun RadioDatabaseDownloadCard(
             Text(
                 text = sizeText,
                 modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.bodySmall,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
             )
 
             localRowCount?.takeIf { it > 0 }?.let { count ->
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                 Text(
                     text = "Sites radio : ${"%,d".format(count)}",
                     modifier = Modifier.fillMaxWidth(),
-                    fontSize = 12.sp,
+                    fontSize = sizing.text(12.sp),
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
             if (isSyncing) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                     LinearWavyProgressIndicator(
                         progress = { downloadProgress },
-                        modifier = Modifier.fillMaxWidth().height(8.dp),
+                        modifier = Modifier.fillMaxWidth().height(sizing.component(8.dp)),
                         color = MaterialTheme.colorScheme.primary,
                         trackColor = MaterialTheme.colorScheme.surfaceVariant
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                     Text(
                         text = stringResource(R.string.database_download_progress, (downloadProgress * 100).toInt()),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                     OutlinedButton(
                         onClick = {
                             safeClick("radio_database_cancel_download") {
                                 workManager.cancelUniqueWork(RadioDatabaseDownloadWorker.UNIQUE_WORK_NAME)
                             }
                         },
-                        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 50.dp),
-                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(50.dp)),
+                        shape = RoundedCornerShape(sizing.component(12.dp)),
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                         border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
                     ) {
-                        Icon(Icons.Default.Close, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(text = stringResource(R.string.database_cancel_download), fontWeight = FontWeight.Bold)
+                        Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
+                        Spacer(Modifier.width(sizing.spacing(8.dp)))
+                        Text(text = stringResource(R.string.database_cancel_download), fontWeight = FontWeight.Bold, style = sizing.textStyle(MaterialTheme.typography.labelLarge))
                     }
                 }
             } else {
@@ -270,32 +272,33 @@ fun RadioDatabaseDownloadCard(
                         }
                     },
                     enabled = canDownload && !isUpToDate && !isSearching,
-                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 56.dp),
-                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(56.dp)),
+                    shape = RoundedCornerShape(sizing.component(12.dp)),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (isUpToDate) MaterialTheme.colorScheme.surfaceVariant else MaterialTheme.colorScheme.primary,
                         contentColor = if (isUpToDate) MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f) else MaterialTheme.colorScheme.onPrimary
                     )
                 ) {
                     if (isUpToDate) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = null)
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
                     } else {
-                        Icon(Icons.Default.CloudDownload, contentDescription = null)
+                        Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
                     }
-                    Spacer(Modifier.width(8.dp))
+                    Spacer(Modifier.width(sizing.spacing(8.dp)))
                     Text(
                         text = if (isUpToDate) stringResource(R.string.database_up_to_date) else "Télécharger les radios",
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
+                        style = sizing.textStyle(MaterialTheme.typography.labelLarge)
                     )
                 }
             }
 
             if (localAnfrDate.isNotEmpty() && localAnfrDate != txtUnknown) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                 Text(
                     text = stringResource(R.string.database_weekly_downloaded_from, localAnfrDate),
                     modifier = Modifier.fillMaxWidth(),
-                    fontSize = 12.sp,
+                    fontSize = sizing.text(12.sp),
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
@@ -303,17 +306,17 @@ fun RadioDatabaseDownloadCard(
             }
 
             if (localVersion != txtNoDb && localVersion != txtUnknown && localVersion != txtInvalidDb && !isSyncing) {
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                 OutlinedButton(
                     onClick = { showDeleteDialog = true },
-                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 50.dp),
-                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(50.dp)),
+                    shape = RoundedCornerShape(sizing.component(12.dp)),
                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error),
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.error.copy(alpha = 0.5f))
                 ) {
-                    Icon(Icons.Default.Delete, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(text = stringResource(R.string.database_delete_data), fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.Delete, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
+                    Spacer(Modifier.width(sizing.spacing(8.dp)))
+                    Text(text = stringResource(R.string.database_delete_data), fontWeight = FontWeight.Bold, style = sizing.textStyle(MaterialTheme.typography.labelLarge))
                 }
             }
         }
@@ -348,20 +351,21 @@ private fun RadioInfoRow(
     iconColumnWidth: androidx.compose.ui.unit.Dp,
     textStartPadding: androidx.compose.ui.unit.Dp
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Row(
         verticalAlignment = Alignment.Top,
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+        modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(8.dp))
     ) {
         Box(
-            modifier = Modifier.width(iconColumnWidth).padding(top = 2.dp),
+            modifier = Modifier.width(iconColumnWidth).padding(top = sizing.spacing(2.dp)),
             contentAlignment = Alignment.TopCenter
         ) {
             icon()
         }
         Spacer(modifier = Modifier.width(textStartPadding))
         Column {
-            Text(text = label, fontWeight = FontWeight.SemiBold, fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
-            Text(text = value, fontWeight = FontWeight.Bold, fontSize = 13.sp, color = MaterialTheme.colorScheme.primary)
+            Text(text = label, fontWeight = FontWeight.SemiBold, fontSize = sizing.text(14.sp), color = MaterialTheme.colorScheme.onSurface)
+            Text(text = value, fontWeight = FontWeight.Bold, fontSize = sizing.text(13.sp), color = MaterialTheme.colorScheme.primary)
         }
     }
 }

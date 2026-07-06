@@ -22,9 +22,19 @@ object SignalQuestUploadScheduler {
     // retrouver le dossier d'upload d'un work annule (nettoyage historique + cache).
     private const val UPLOAD_ID_TAG_PREFIX = "sq_upload_id:"
 
+    // L'operateur cible voyage aussi en tag pour l'afficher dans le pop-up « Envoi en cours »
+    // des l'etat ENQUEUED (avant tout setProgress), sans relire le manifeste sur le disque.
+    private const val OPERATOR_TAG_PREFIX = "sq_operator:"
+
     fun uploadIdFromTags(tags: Set<String>): String? {
         return tags.firstOrNull { it.startsWith(UPLOAD_ID_TAG_PREFIX) }
             ?.removePrefix(UPLOAD_ID_TAG_PREFIX)
+            ?.takeIf { it.isNotBlank() }
+    }
+
+    fun operatorParamFromTags(tags: Set<String>): String? {
+        return tags.firstOrNull { it.startsWith(OPERATOR_TAG_PREFIX) }
+            ?.removePrefix(OPERATOR_TAG_PREFIX)
             ?.takeIf { it.isNotBlank() }
     }
 
@@ -49,6 +59,7 @@ object SignalQuestUploadScheduler {
             .addTag("sq_upload_${manifest.siteId}")
             .addTag(GLOBAL_TAG)
             .addTag(UPLOAD_ID_TAG_PREFIX + manifest.uploadId)
+            .addTag(OPERATOR_TAG_PREFIX + manifest.operator)
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)

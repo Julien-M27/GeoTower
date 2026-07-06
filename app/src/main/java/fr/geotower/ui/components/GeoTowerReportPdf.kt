@@ -43,7 +43,8 @@ fun shareGeoTowerReportPdf(
             clipData = ClipData.newUri(context.contentResolver, fileName, uri)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-        context.startActivity(Intent.createChooser(intent, chooserTitle))
+        // FLAG_ACTIVITY_NEW_TASK requis : contexte localisé (LocaleProvider), pas une Activity → sinon crash OnePlus.
+        context.startActivity(Intent.createChooser(intent, chooserTitle).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     } catch (e: Exception) {
         AppLogger.w("GeoTowerReportPdf", "Report PDF generation failed", e)
     }

@@ -29,6 +29,7 @@ import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.workers.SignalQuestUploadScheduler
 import fr.geotower.data.workers.SignalQuestUploadWorker
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.OperatorColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -169,9 +170,25 @@ fun GlobalUploadOverlay(
             onDismissRequest = { isUploadPopupHidden = true },
             properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
         ) {
+            val operatorSpec = activeWork?.tags
+                ?.let { SignalQuestUploadScheduler.operatorParamFromTags(it) }
+                ?.let { OperatorColors.specForKey(it) }
+
             Surface(shape = blockShape, color = sheetBgColor, shadowElevation = 8.dp, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                 Column(modifier = Modifier.padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    Text(stringResource(R.string.appstrings_uploading_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(stringResource(R.string.appstrings_uploading_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+
+                        operatorSpec?.let { spec ->
+                            Text(
+                                text = stringResource(R.string.upload_target_operator, spec.label),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                                color = Color(spec.colorArgb),
+                                textAlign = TextAlign.Center
+                            )
+                        }
+                    }
 
                     CircularWavyProgressIndicator(
                         modifier = Modifier.size(56.dp),
@@ -179,7 +196,7 @@ fun GlobalUploadOverlay(
                     )
 
                     val textProgress = if (totalPhotos > 0) {
-                        stringResource(R.string.upload_progress_text, currentProgress, totalPhotos)
+                        pluralStringResource(R.plurals.upload_progress, totalPhotos, currentProgress, totalPhotos)
                     } else {
                         stringResource(R.string.appstrings_upload_preparing)
                     }
@@ -282,7 +299,7 @@ fun GlobalUploadOverlay(
                     Text(stringResource(R.string.appstrings_upload_finished_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
 
                     Text(
-                        text = finishedDialogMessageOverride ?: stringResource(R.string.upload_result_text, finalSuccessCount, totalPhotos),
+                        text = finishedDialogMessageOverride ?: pluralStringResource(R.plurals.upload_result, totalPhotos, finalSuccessCount, totalPhotos),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center

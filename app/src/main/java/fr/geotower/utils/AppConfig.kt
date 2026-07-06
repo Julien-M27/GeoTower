@@ -11,6 +11,8 @@ object AppConfig {
     const val DEFAULT_COLOR_PALETTE = "dynamic"
     const val PREF_SELECTED_OPERATORS = "selected_operator_keys"
     const val PREF_UI_MODE = "ui_mode"
+    const val PREF_UI_SCALE_PERCENT = "ui_scale_percent"
+    const val PREF_LEGACY_MENU_SIZE = "menuSize"
     const val PREF_SHOW_MAP_LOCATION_MARKER = "show_map_location_marker"
     const val PREF_SHOW_AZIMUTH_LINES = "show_azimuths"
     const val PREF_SHOW_AZIMUTH_CONES = "show_azimuths_cone"
@@ -37,7 +39,9 @@ object AppConfig {
     // 0 = Plein écran, 1 = Fractionné
     var displayStyle = mutableIntStateOf(0)
 
-    var menuSize = mutableStateOf("normal")
+    // Taille de l'interface, en pourcentage (100 = rendu de reference "normal" historique).
+    // Le facteur d'ecran est applique par-dessus dans GeoTowerUiStyle (dimensionnement adaptatif).
+    var uiScalePercent = mutableIntStateOf(100)
 
     // État validé une fois au démarrage/onboarding, réutilisé par l'accueil pour éviter les faux bandeaux.
     var localDatabaseState = mutableStateOf<GeoTowerDatabaseValidator.LocalDatabaseState?>(null)
@@ -385,6 +389,25 @@ object AppConfig {
         shareMapScale.value = prefs.getBoolean("share_map_scale", true)
         shareMapAttribution.value = prefs.getBoolean("share_map_attribution", true)
         shareMapConfidential.value = prefs.getBoolean("share_map_confidential", false)
+    }
+
+    // --- TAILLE DE L'INTERFACE ---
+    /**
+     * Convertit l'ancien reglage menuSize (petit/normal/large) en pourcentage de taille d'UI.
+     * L'ancien "normal" (x0.925) devient la reference 100% : petit = 0.85/0.925 ~= 92, large = 1.0/0.925 ~= 108.
+     */
+    fun menuSizeLegacyToPercent(menuSize: String?): Int = when (menuSize) {
+        "petit" -> 92
+        "large" -> 108
+        else -> 100
+    }
+
+    /** Lit le pourcentage de taille d'UI, avec migration transparente depuis l'ancien menuSize. */
+    fun readUiScalePercent(prefs: SharedPreferences): Int {
+        if (prefs.contains(PREF_UI_SCALE_PERCENT)) {
+            return prefs.getInt(PREF_UI_SCALE_PERCENT, 100)
+        }
+        return menuSizeLegacyToPercent(prefs.getString(PREF_LEGACY_MENU_SIZE, null))
     }
 
     // --- MISE À JOUR BASE DE DONNÉES ---

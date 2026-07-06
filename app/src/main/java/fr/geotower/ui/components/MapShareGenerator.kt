@@ -85,7 +85,8 @@ private fun shareOrCopyMapImageUri(
                 this.clipData = clipData
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            context.startActivity(Intent.createChooser(shareIntent, chooserTitle))
+            // FLAG_ACTIVITY_NEW_TASK requis : contexte localisé (LocaleProvider), pas une Activity → sinon crash OnePlus.
+            context.startActivity(Intent.createChooser(shareIntent, chooserTitle).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
         MapShareDestination.Clipboard -> {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager

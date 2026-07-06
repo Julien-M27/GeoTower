@@ -9,6 +9,7 @@ import android.location.Location
 import android.location.LocationManager
 import android.net.Uri
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -92,6 +93,7 @@ import fr.geotower.R
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.GeoTowerPullToRefreshBox
 import fr.geotower.ui.components.LiveDatabaseUsageWarningDialog
+import fr.geotower.ui.components.LocationUnavailableMessage
 import fr.geotower.ui.components.geoTowerLazyListFadingEdge
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.NominatimApi
@@ -109,7 +111,12 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.LocationHelper
+import fr.geotower.utils.LocationReadiness
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.locationReadiness
+import fr.geotower.utils.openAppLocationSettings
+import fr.geotower.utils.openLocationSourceSettings
+import fr.geotower.utils.rememberLocationReadinessState
 import fr.geotower.utils.OperatorLogos
 import fr.geotower.utils.formatNearbyDistanceLabel
 import kotlinx.coroutines.CancellationException
@@ -192,6 +199,45 @@ fun NearEmittersScreen(
     onSupportClick: ((UiSite, String?) -> Unit)? = null
 ) {
     val context = LocalContext.current
+    val activity = LocalActivity.current
+
+    // --- DÉTECTION RÉACTIVE DE LA DISPONIBILITÉ DE LA LOCALISATION ---
+    // Réévaluée à chaque retour sur l'écran (et en temps réel pour le GPS) : si l'accès à la position
+    // est coupé (permission OU services système), on ne peut pas chercher les antennes à proximité
+    // → on affiche une alerte centrale plutôt qu'un spinner infini.
+    val locationReadinessState = rememberLocationReadinessState()
+    val readiness by locationReadinessState
+    val isLocationReady = readiness == LocationReadiness.Ready
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        // Recalcule tout de suite le verdict complet (permission + services).
+        locationReadinessState.value = locationReadiness(context)
+        if (!granted) {
+            // Refus définitif (« Ne plus demander ») : la boîte système ne réapparaît plus,
+            // on renvoie donc vers les réglages de l'app.
+            val canAskAgain = activity?.let {
+                ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.ACCESS_FINE_LOCATION) ||
+                    ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.ACCESS_COARSE_LOCATION)
+            } ?: false
+            if (!canAskAgain) openAppLocationSettings(context)
+        }
+    }
+    // Selon la cause : on demande la permission OU on ouvre les réglages de localisation (GPS).
+    val onFixLocation: () -> Unit = {
+        when (readiness) {
+            LocationReadiness.PermissionMissing -> locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+            LocationReadiness.ServicesOff -> openLocationSourceSettings(context)
+            LocationReadiness.Ready -> {}
+        }
+    }
 
     // --- LECTURE RÉACTIVE DU THÈME D'ABORD ---
     val useOneUi = AppConfig.useOneUiDesign
@@ -291,12 +337,14 @@ fun NearEmittersScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        if (!hasNearbyLocationPermission(context)) {
+    LaunchedEffect(isLocationReady) {
+        if (!isLocationReady) {
             isResolvingInitialLocation = false
             return@LaunchedEffect
         }
 
+        // La localisation vient (re)devenir disponible (permission accordée / GPS rallumé) : on relance la résolution.
+        isResolvingInitialLocation = true
         try {
             val locationHelper = LocationHelper(context)
             val cachedLocation = locationHelper.getLastLocation()
@@ -317,7 +365,7 @@ fun NearEmittersScreen(
     }
 
     // --- GESTION DU GPS ---
-    DisposableEffect(Unit) {
+    DisposableEffect(isLocationReady) {
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val locationListener = object : android.location.LocationListener {
             override fun onLocationChanged(location: Location) {
@@ -823,14 +871,24 @@ fun NearEmittersScreen(
                                 modifier = Modifier.weight(1f).fillMaxWidth()
                             ) {
                                 when {
-                                    searchCenter == null -> {
+                                    // Localisation indisponible (permission coupée OU GPS éteint) : impossible de
+                                    // chercher les antennes à proximité. Une recherche par ville/adresse reste
+                                    // possible → on laisse passer ses résultats.
+                                    !isLocationReady && filteredSites.isEmpty() && !isSearchingRemote -> {
+                                        LocationUnavailableMessage(
+                                            readiness = readiness,
+                                            onFixClick = onFixLocation,
+                                            modifier = Modifier.align(Alignment.Center)
+                                        )
+                                    }
+                                    searchCenter == null && filteredSites.isEmpty() && !isSearchingRemote -> {
                                         Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                                             LoadingIndicator()
                                             Spacer(modifier = Modifier.height(8.dp))
                                             Text(stringResource(R.string.appstrings_search_gps), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
                                         }
                                     }
-                                    isLoading || (isResolvingInitialLocation && filteredSites.isEmpty()) -> {
+                                    filteredSites.isEmpty() && (isLoading || isSearchingRemote || isResolvingInitialLocation) -> {
                                         Column(
                                             modifier = Modifier
                                                 .align(Alignment.Center)

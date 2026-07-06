@@ -39,4 +39,32 @@
         <item quantity="one">🏆 Total: %1$d foto compartida desde el inicio!</item>
         <item quantity="other">🏆 Total: %1$d fotos compartidas desde el inicio!</item>
     </plurals>
+    <plurals name="upload_progress">
+        <item quantity="one">%1$d / %2$d foto enviada...</item>
+        <item quantity="other">%1$d / %2$d fotos enviadas...</item>
+    </plurals>
+    <plurals name="upload_result">
+        <item quantity="one">%1$d de %2$d foto enviada correctamente a Signal Quest.</item>
+        <item quantity="other">%1$d de %2$d fotos enviadas correctamente a Signal Quest.</item>
+    </plurals>
+    <plurals name="shared_photo_map_ready">
+        <item quantity="one">%1$d foto lista. Selecciona el soporte objetivo en el mapa.</item>
+        <item quantity="other">%1$d fotos listas. Selecciona el soporte objetivo en el mapa.</item>
+    </plurals>
+    <plurals name="shared_photo_support_ready">
+        <item quantity="one">%1$d foto lista para este soporte.</item>
+        <item quantity="other">%1$d fotos listas para este soporte.</item>
+    </plurals>
+    <plurals name="notification_upload_success">
+        <item quantity="one">%1$d/%2$d foto enviada correctamente a Signal Quest.</item>
+        <item quantity="other">%1$d/%2$d fotos enviadas correctamente a Signal Quest.</item>
+    </plurals>
+    <plurals name="notification_upload_partial">
+        <item quantity="one">%1$d/%2$d foto enviada a Signal Quest. Algunas fallaron.</item>
+        <item quantity="other">%1$d/%2$d fotos enviadas a Signal Quest. Algunas fallaron.</item>
+    </plurals>
+    <plurals name="notification_upload_cancelled">
+        <item quantity="one">Envío cancelado (%1$d/%2$d foto enviada).</item>
+        <item quantity="other">Envío cancelado (%1$d/%2$d fotos enviadas).</item>
+    </plurals>
 </resources>

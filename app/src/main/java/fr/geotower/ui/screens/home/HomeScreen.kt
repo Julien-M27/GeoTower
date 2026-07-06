@@ -1,5 +1,6 @@
 package fr.geotower.ui.screens.home
 
+import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
 import android.widget.ImageView
@@ -48,6 +49,9 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.ActivityCompat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -70,6 +74,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppIconManager
+import fr.geotower.utils.LocationReadiness
+import fr.geotower.utils.locationReadiness
+import fr.geotower.utils.openAppLocationSettings
+import fr.geotower.utils.openLocationSourceSettings
+import fr.geotower.utils.rememberLocationReadinessState
 import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.ui.zIndex
 import fr.geotower.BuildConfig
@@ -92,10 +101,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import fr.geotower.data.workers.AppUpdateNotifier
 import fr.geotower.data.workers.DatabaseDownloadWorker
+import fr.geotower.ui.components.LocationUnavailableBanner
 import fr.geotower.ui.components.rememberSafeClick
-import fr.geotower.ui.theme.GEO_TOWER_SIZE_LARGE_SCALE
-import fr.geotower.ui.theme.GEO_TOWER_SIZE_NORMAL_SCALE
-import fr.geotower.ui.theme.GEO_TOWER_SIZE_SMALL_SCALE
+import fr.geotower.ui.theme.GeoTowerUiSizing
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppLogoDrawingResources
 import fr.geotower.utils.AppLogger
@@ -134,6 +142,44 @@ fun HomeScreen(navController: NavController) {
         safeClick {
             LiveTrackingController.stop(context)
             activity?.finishAndRemoveTask()
+        }
+    }
+
+    // ---> DÉTECTION DE LA DISPONIBILITÉ DE LA LOCALISATION <---
+    // Réévaluée en continu : permission coupée OU localisation (GPS) désactivée au niveau système.
+    // Si l'un des deux manque, on affiche un bandeau d'alerte en haut de l'accueil.
+    val locationReadinessState = rememberLocationReadinessState()
+    val readiness by locationReadinessState
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        // Recalcule tout de suite le verdict complet (permission + services).
+        locationReadinessState.value = locationReadiness(context)
+        if (!granted) {
+            // Refus définitif (« Ne plus demander ») : la boîte système ne s'affiche plus,
+            // on renvoie donc vers les réglages de l'app.
+            val canAskAgain = activity?.let {
+                ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.ACCESS_FINE_LOCATION) ||
+                    ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.ACCESS_COARSE_LOCATION)
+            } ?: false
+            if (!canAskAgain) openAppLocationSettings(context)
+        }
+    }
+    // Action du bouton : selon la cause, on demande la permission OU on ouvre les réglages de localisation.
+    val onFixLocation: () -> Unit = {
+        safeClick {
+            when (readiness) {
+                LocationReadiness.PermissionMissing -> locationPermissionLauncher.launch(
+                    arrayOf(
+                        Manifest.permission.ACCESS_FINE_LOCATION,
+                        Manifest.permission.ACCESS_COARSE_LOCATION
+                    )
+                )
+                LocationReadiness.ServicesOff -> openLocationSourceSettings(context)
+                LocationReadiness.Ready -> {}
+            }
         }
     }
 
@@ -329,6 +375,12 @@ fun HomeScreen(navController: NavController) {
                     }
                 }
             }
+
+            // ---> LE BANDEAU DE LOCALISATION DÉSACTIVÉE (permission coupée OU GPS éteint) <---
+            LocationUnavailableBanner(
+                readiness = readiness,
+                onFixClick = onFixLocation
+            )
 
             // ---> 2. LE BANDEAU DE BASE DE DONNÉES (S'affiche juste en dessous si besoin) <---
             val isDbUnavailable = isDbChecked && localDbState != GeoTowerDatabaseValidator.LocalDatabaseState.VALID
@@ -770,7 +822,6 @@ fun MenuButtonsList(
 ) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-    val menuSize = prefs.getString("menuSize", "normal") ?: "normal"
     val showLogo = prefs.getBoolean("show_home_logo", true)
     val featureFlags by RemoteFeatureFlags.config
 
@@ -807,17 +858,17 @@ fun MenuButtonsList(
             }
             "nearby" -> {
                 if (showNearby) {
-                    buttons.add { MenuButton(nearAntennasLabel, Icons.Default.MyLocation, paleColor, onPaleColor, useOneUi, menuSize, isGrid, compact = compact) { navController.navigate("emitters") } }
+                    buttons.add { MenuButton(nearAntennasLabel, Icons.Default.MyLocation, paleColor, onPaleColor, useOneUi, isGrid, compact = compact) { navController.navigate("emitters") } }
                 }
             }
             "map" -> {
                 if (showMap) {
-                    buttons.add { MenuButton(mapLabel, Icons.Default.Map, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, compact = compact) { navController.navigate("map") } }
+                    buttons.add { MenuButton(mapLabel, Icons.Default.Map, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, isGrid, compact = compact) { navController.navigate("map") } }
                 }
             }
             "compass" -> {
                 if (showCompass && AppConfig.hasCompass.value) {
-                    buttons.add { MenuButton(compassLabel, Icons.Default.Explore, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, compact = compact) { navController.navigate("compass") } }
+                    buttons.add { MenuButton(compassLabel, Icons.Default.Explore, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, isGrid, compact = compact) { navController.navigate("compass") } }
                 }
             }
             "stats" -> {
@@ -829,7 +880,6 @@ fun MenuButtonsList(
                             color = buttonBgColor,
                             contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
                             useOneUi = useOneUi,
-                            menuSize = menuSize,
                             fillWidth = isGrid,
                             compact = compact,
                             onClick = { navController.navigate("stats") }
@@ -839,7 +889,7 @@ fun MenuButtonsList(
             }
             "settings" -> {
                 // ✅ PARAMÈTRES RESTE TOUJOURS CLIQUABLE (enabled = true)
-                buttons.add { MenuButton(settingsLabel, Icons.Default.Settings, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, menuSize, isGrid, compact = compact, enabled = true) { navController.navigate("settings") } }
+                buttons.add { MenuButton(settingsLabel, Icons.Default.Settings, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, isGrid, compact = compact, enabled = true) { navController.navigate("settings") } }
             }
         }
     }
@@ -930,14 +980,7 @@ fun AboutSection(
     }
 }
 
-private fun homeMenuSizeScale(menuSize: String): Float = when (menuSize) {
-    "petit" -> GEO_TOWER_SIZE_SMALL_SCALE
-    "large" -> GEO_TOWER_SIZE_LARGE_SCALE
-    else -> GEO_TOWER_SIZE_NORMAL_SCALE
-}
-
-private fun homeMenuButtonMetrics(menuSize: String, compact: Boolean): HomeMenuButtonMetrics {
-    val scale = homeMenuSizeScale(menuSize)
+private fun homeMenuButtonMetrics(sizing: GeoTowerUiSizing, compact: Boolean): HomeMenuButtonMetrics {
     val baseWidth = if (compact) 300f else 330f
     val baseHeight = if (compact) 66f else 80f
     val baseOneUiCornerRadius = if (compact) 24f else 28f
@@ -948,14 +991,14 @@ private fun homeMenuButtonMetrics(menuSize: String, compact: Boolean): HomeMenuB
     val baseIconSpacing = if (compact) 14f else 20f
 
     return HomeMenuButtonMetrics(
-        width = (baseWidth * scale).dp,
-        height = (baseHeight * scale).dp,
-        oneUiCornerRadius = (baseOneUiCornerRadius * scale).dp,
-        classicCornerRadius = (baseClassicCornerRadius * scale).dp,
-        iconSize = (baseIconSize * scale).dp,
-        textSize = (baseTextSize * scale).sp,
-        horizontalPadding = (baseHorizontalPadding * scale).dp,
-        iconSpacing = (baseIconSpacing * scale).dp
+        width = sizing.component(baseWidth.dp),
+        height = sizing.component(baseHeight.dp),
+        oneUiCornerRadius = sizing.component(baseOneUiCornerRadius.dp),
+        classicCornerRadius = sizing.component(baseClassicCornerRadius.dp),
+        iconSize = sizing.component(baseIconSize.dp),
+        textSize = sizing.text(baseTextSize.sp),
+        horizontalPadding = sizing.spacing(baseHorizontalPadding.dp),
+        iconSpacing = sizing.spacing(baseIconSpacing.dp)
     )
 }
 
@@ -966,13 +1009,13 @@ fun MenuButton(
     color: Color,
     contentColor: Color,
     useOneUi: Boolean,
-    menuSize: String = "normal",
     fillWidth: Boolean = false, // ✅ NOUVEAU
     compact: Boolean = false,
     enabled: Boolean = true,
     onClick: () -> Unit
 ) {
-    val metrics = homeMenuButtonMetrics(menuSize, compact)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val metrics = homeMenuButtonMetrics(sizing, compact)
     val buttonShape = if (useOneUi) RoundedCornerShape(metrics.oneUiCornerRadius) else RoundedCornerShape(metrics.classicCornerRadius)
     val buttonElevation = if (useOneUi) 0.dp else 2.dp
 

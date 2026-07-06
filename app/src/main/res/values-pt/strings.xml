@@ -188,9 +188,6 @@
     <string name="notification_app_update_available_desc">GeoTower %1$s está disponível. Toque para abrir a transferência.</string>
     <string name="notification_signalquest_upload_progress">A enviar (%1$d/%2$d)...</string>
     <string name="notification_signalquest_upload_retry">Erro de rede, nova tentativa mais tarde.</string>
-    <string name="notification_signalquest_upload_success">%1$d/%2$d fotos enviadas com sucesso para Signal Quest!</string>
-    <string name="notification_signalquest_upload_partial">%1$d/%2$d fotos enviadas para Signal Quest. Algumas falharam.</string>
-    <string name="notification_signalquest_upload_cancelled">Envio cancelado (%1$d/%2$d fotos enviadas).</string>
     <string name="operator_count">↓ Número de operadoras: %1$d</string>
     <string name="upload_history_no_photo_recorded">Nenhuma foto registada</string>
     <string name="upload_history_status_success">Validada</string>
@@ -201,10 +198,9 @@
     <string name="upload_history_status_cancelled">Cancelado</string>
     <string name="upload_history_exif_removed">EXIF removidos</string>
     <string name="upload_history_exif_kept">EXIF preservados</string>
-    <string name="upload_progress_text">%1$d / %2$d foto(s) enviada(s)...</string>
+    <string name="upload_target_operator">Para %1$s</string>
     <string name="appstrings_upload_cancel">Cancelar o envio</string>
     <string name="appstrings_download_cancel">Cancelar a transferência</string>
-    <string name="upload_result_text">%1$d de %2$d foto(s) enviadas com sucesso para Signal Quest.</string>
     <string name="photo_by_author">Por %1$s</string>
     <string name="photo_on_date">em %1$s</string>
     <string name="about_new_for_version">Novidades (%1$s)</string>
@@ -682,6 +678,12 @@
     <string name="appstrings_offline_maps_desc">Descarregue mapas de França para navegar sem rede.</string>
     <string name="appstrings_offline_maps_title">Mapas Offline</string>
     <string name="appstrings_offline_message">Você está offline</string>
+    <string name="appstrings_location_disabled_title">Localização desativada</string>
+    <string name="appstrings_location_disabled_banner_desc">Ative o acesso à localização para que o GeoTower encontre antenas ao seu redor.</string>
+    <string name="appstrings_location_disabled_nearby_desc">O GeoTower não pode procurar antenas próximas sem acesso à sua localização.</string>
+    <string name="appstrings_location_services_off_banner_desc">Ative a localização (GPS) nas definições do dispositivo para que o GeoTower encontre antenas ao seu redor.</string>
+    <string name="appstrings_location_services_off_nearby_desc">A localização (GPS) está desativada. O GeoTower não pode procurar antenas próximas até que a ative.</string>
+    <string name="appstrings_location_services_enable">Ativar</string>
     <string name="appstrings_old_undated_database">Versão antiga (Sem data)</string>
     <string name="appstrings_oled_subtitle">Poupa batterie</string>
     <string name="appstrings_oled_title">Modo OLED (Preto Puro)</string>
@@ -1195,6 +1197,8 @@
     <string name="appstrings_support_open_map_option">Botao Abrir o mapa</string>
     <string name="appstrings_support_operators_option">Lista de operadoras</string>
     <string name="appstrings_support_photos_option">Fotos da comunidade</string>
+    <string name="appstrings_support_picker_title">%1$d suportes disponíveis</string>
+    <string name="appstrings_support_picker_message">Estes suportes têm as mesmas coordenadas. Qual deseja abrir?</string>
     <string name="appstrings_support_prefix">Suporte</string>
     <string name="appstrings_support_share_option">Botão Compartilhar</string>
     <string name="appstrings_support_share_title">Partilha do pilão</string>
@@ -1313,9 +1317,7 @@
     <string name="appstrings_upload_sq_target_site">ID do Suporte</string>
     <string name="appstrings_upload_sq_title">Enviar para Signal Quest</string>
     <string name="shared_photo_map_title">Fotos compartilhadas</string>
-    <string name="shared_photo_map_desc">%1$d foto(s) prontas. Selecione o suporte de destino no mapa.</string>
     <string name="shared_photo_support_title">Fotos compartilhadas pendentes</string>
-    <string name="shared_photo_support_desc">%1$d foto(s) prontas para este suporte.</string>
     <string name="shared_photo_support_no_operator">Nenhuma operadora compatível neste suporte.</string>
     <string name="shared_photo_support_select_one">Selecione pelo menos uma operadora.</string>
     <string name="appstrings_uploading_title">Enviando</string>
@@ -2136,4 +2138,9 @@
     <string name="appstrings_release_v196_cancel_uploads">Agora pode cancelar um envio de fotos em curso, com estado «Cancelado» no histórico</string>
     <string name="appstrings_release_v196_db_indexes">Base de dados indexada para acelerar o mapa e os filtros</string>
     <string name="appstrings_release_v196_baseline_profile">Arranque da aplicação mais rápido (perfil de arranque)</string>
+    <string name="appstrings_release_section_location">Localização</string>
+    <string name="appstrings_release_v1961_location_banner">Novo aviso quando a localização está desativada (permissão recusada ou GPS desligado), com um botão para a ativar, no início, no mapa, na bússola e nos sites próximos</string>
+    <string name="appstrings_release_v1961_support_picker">Quando vários suportes partilham as mesmas coordenadas, um seletor permite escolher qual abrir</string>
+    <string name="appstrings_release_v1961_upload_plurals">Envio de fotos: progresso, resultados e notificações agora corretos no singular/plural, com a operadora de destino e o estado «Cancelado»</string>
+    <string name="appstrings_release_v1961_upload_support_select">Após a partilha, selecione o suporte de destino diretamente no mapa</string>
 </resources>

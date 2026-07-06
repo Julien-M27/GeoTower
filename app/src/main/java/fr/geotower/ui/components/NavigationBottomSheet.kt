@@ -103,7 +103,8 @@ fun NavigationBottomSheet(
                         val mapIntent = Intent(Intent.ACTION_VIEW, geoUri)
 
                         // MODIFIÉ ICI : Utilisation de la variable txtOpenRouteWith
-                        val chooser = Intent.createChooser(mapIntent, txtOpenRouteWith)
+                        // FLAG_ACTIVITY_NEW_TASK requis : contexte localisé (LocaleProvider), pas une Activity → sinon crash OnePlus.
+                        val chooser = Intent.createChooser(mapIntent, txtOpenRouteWith).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                         try {
                             context.startActivity(chooser)
                         } catch (e: Exception) {

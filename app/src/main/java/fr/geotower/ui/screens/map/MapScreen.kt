@@ -1,5 +1,6 @@
 package fr.geotower.ui.screens.map
 
+import android.Manifest
 import android.content.Context
 import android.content.SharedPreferences
 import android.graphics.Bitmap
@@ -17,6 +18,9 @@ import android.view.Surface as AndroidSurface
 import android.view.View
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.expandHorizontally
@@ -52,10 +56,12 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.LocationDisabled
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.NearMe
 import androidx.compose.material.icons.filled.PhotoLibrary
@@ -101,7 +107,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -122,6 +131,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.core.app.ActivityCompat
 import androidx.core.graphics.ColorUtils
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -143,8 +153,14 @@ import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.FrequencyFilterSelection
+import fr.geotower.utils.LocationReadiness
+import fr.geotower.utils.locationReadiness
+import fr.geotower.utils.openAppLocationSettings
+import fr.geotower.utils.openLocationSourceSettings
+import fr.geotower.utils.rememberLocationReadinessState
 import fr.geotower.utils.MapDisplayPrefs
 import fr.geotower.utils.MapUtils
+import fr.geotower.ui.screens.emitters.OperatorGrid
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.filteredAzimuthsForFrequencySelection
 import fr.geotower.utils.isNetworkAvailable
@@ -180,6 +196,7 @@ import android.os.Environment
 import kotlin.math.abs
 import kotlin.math.log2
 import kotlin.math.roundToInt
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
 
@@ -827,8 +844,41 @@ fun MapScreen(
     photoDraftId: String? = null
 ) {
     val context = LocalContext.current
+    val activity = LocalActivity.current
     val resources = LocalResources.current
     val screenRotation = currentDisplayRotation(context)
+
+    // --- DISPONIBILITÉ DE LA LOCALISATION (permission + GPS) pour le bouton de recentrage ---
+    val locationReadinessState = rememberLocationReadinessState()
+    val readiness by locationReadinessState
+    val isLocationReady = readiness == LocationReadiness.Ready
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        locationReadinessState.value = locationReadiness(context)
+        if (!granted) {
+            val canAskAgain = activity?.let {
+                ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.ACCESS_FINE_LOCATION) ||
+                    ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.ACCESS_COARSE_LOCATION)
+            } ?: false
+            if (!canAskAgain) openAppLocationSettings(context)
+        }
+    }
+    // Selon la cause : demander la permission OU ouvrir les réglages de localisation (GPS).
+    val onFixLocation: () -> Unit = {
+        when (readiness) {
+            LocationReadiness.PermissionMissing -> locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+            LocationReadiness.ServicesOff -> openLocationSourceSettings(context)
+            LocationReadiness.Ready -> {}
+        }
+    }
     val currentScreenRotation by androidx.compose.runtime.rememberUpdatedState(screenRotation)
     val configuration = androidx.compose.ui.platform.LocalConfiguration.current // ✅ AJOUT
     val isUltraCompact = configuration.screenWidthDp < 300 || configuration.screenHeightDp < 350 // ✅ AJOUT
@@ -934,6 +984,9 @@ fun MapScreen(
     var mapViewRef by remember { mutableStateOf<MapView?>(null) }
     var locationOverlayRef by remember { mutableStateOf<MyLocationNewOverlay?>(null) }
     val mapViewUsable = remember { java.util.concurrent.atomic.AtomicBoolean(false) }
+
+    // Supports superposés (mêmes coordonnées GPS) en attente de choix par l'utilisateur.
+    var supportChoices by remember { mutableStateOf<List<SupportChoice>>(emptyList()) }
 
     var currentZoom by remember { mutableDoubleStateOf(15.0) }
     var currentLat by remember { mutableDoubleStateOf(48.8584) }
@@ -1684,6 +1737,33 @@ fun MapScreen(
         }
     }
 
+    // Décide, au clic sur un marqueur, s'il faut ouvrir directement le support ou
+    // demander lequel regarder quand plusieurs supports physiques distincts partagent
+    // exactement les mêmes coordonnées (erreurs de saisie ANFR).
+    fun handleSupportTapFromMap(map: MapView, siteAntennas: List<LocalisationEntity>) {
+        val distinct = siteAntennas.distinctBy { it.idAnfr }
+        val firstAntenna = distinct.firstOrNull() ?: return
+        // Un seul id_anfr => aucune ambiguïté possible, on évite toute requête.
+        if (distinct.size == 1) {
+            openSupportDetailFromMap(map, firstAntenna)
+            return
+        }
+        scope.launch {
+            val choices = try {
+                viewModel.resolveSupportChoices(distinct)
+            } catch (e: Exception) {
+                AppLogger.w("GeoTowerMap", "Support choice resolution failed", e)
+                emptyList()
+            }
+            // <=1 support physique => plusieurs opérateurs sur le même support : ouverture directe.
+            if (choices.size <= 1) {
+                openSupportDetailFromMap(map, firstAntenna)
+            } else {
+                supportChoices = choices
+            }
+        }
+    }
+
     fun openRadioSupportDetailFromMap(map: MapView, marker: RadioMapMarker) {
         if (marker.supportId.isBlank()) {
             AppLogger.w("GeoTowerMap", "Cannot open radio support detail for marker=${marker.id}")
@@ -1941,7 +2021,7 @@ fun MapScreen(
                                 )
                                 refreshMeasureLayers(map)
                             } else {
-                                openSupportDetailFromMap(map, mainAntenna)
+                                handleSupportTapFromMap(map, filteredSiteAntennas)
                             }
                             true
                         }
@@ -2052,7 +2132,7 @@ fun MapScreen(
                                 )
                                 refreshMeasureLayers(map)
                             } else {
-                                openSupportDetailFromMap(map, mainAntenna)
+                                handleSupportTapFromMap(map, filteredSiteAntennas)
                             }
                             true
                         }
@@ -2745,26 +2825,7 @@ fun MapScreen(
         )
         val showCompactCompass = showCompass && AppConfig.hasCompass.value &&
             useCompactCompassPlacement && !showCompassInMapHeader
-        val compactCompassHeight = if (showCompactCompass) MapControlButtonDiameter else 0.dp
-        val visibleToolboxActionCount = listOf(
-            canUseMapSearch,
-            canUseMapMeasure,
-            timeSliderAvailable, // bouton historique / slider temporel
-            canUseLayerSelector,
-            true
-        ).count { it }
-        val toolboxHeight = when {
-            !showToolbox -> 0.dp
-            toolboxExpandsLeft -> MapControlButtonDiameter
-            isToolboxExpanded -> MapControlButtonDiameter +
-                7.dp +
-                (MapControlButtonDiameter * visibleToolboxActionCount.toFloat()) +
-                1.dp +
-                (visibleToolboxActionCount * 12).dp
-            else -> MapControlButtonDiameter
-        }
         val zoomControlsHeight = if (showZoomBtns) 117.dp else 0.dp
-        val locationButtonHeight = if (showLocationBtn && canUseMapLocation) MapControlButtonDiameter else 0.dp
         val defaultOp by AppConfig.defaultOperator
         val trackingButtonHeight = if (isLandscapeLayout) MapControlButtonDiameter else 40.dp
         val trackingButtonSpacing = if (isLandscapeLayout) 1.dp else 8.dp
@@ -2779,34 +2840,36 @@ fun MapScreen(
             }
         val trackingDrawerLandscapeBottomPadding = zoomBottomPadding +
             ((zoomControlsHeight - trackingDrawerHeight) / 2f).coerceAtLeast(0.dp)
-        val visibleRightControlGroups = listOf(
-            showCompactCompass,
-            showToolbox,
-            showZoomBtns,
-            showLocationBtn && canUseMapLocation
-        ).count { it }
-        val rightControlsHeight = compactCompassHeight +
-            toolboxHeight +
-            zoomControlsHeight +
-            locationButtonHeight +
-            ((visibleRightControlGroups - 1).coerceAtLeast(0) * 16).dp
-        val measureDrawerBottomPadding by animateDpAsState(
-            targetValue = 40.dp + rightControlsHeight,
-            label = "measureDrawerBottomAnim"
-        )
         // Sur tablette en paysage, le tiroir de suivi (« site le plus proche »)
         // est déporté en haut à gauche, dans la zone dégagée sous les boutons
         // retour/partage, pour ne pas chevaucher la toolbox et le menu à droite.
         val trackingDrawerTopLeft = isLandscapeLayout && maxHeight >= 600.dp
-        val measureDrawerModifier = if (trackingDrawerTopLeft) {
+        // En portrait, quand la toolbox est dépliée elle occupe tout le côté droit :
+        // on renvoie alors le tiroir de mesure en haut à GAUCHE (sous le partage)
+        // au lieu de le laisser chevaucher la boussole faute de place.
+        val measureDrawerPortraitLeft = !useCompactCompassPlacement &&
+            !trackingDrawerTopLeft && showToolbox && isToolboxExpanded
+        val measureDrawerOnLeft = trackingDrawerTopLeft || measureDrawerPortraitLeft
+        val measureDrawerModifier = if (measureDrawerOnLeft) {
+            // Tablette paysage OU portrait toolbox dépliée : en haut à gauche,
+            // dans la zone dégagée sous le bouton de partage.
             Modifier
                 .align(Alignment.TopStart)
                 .padding(start = 16.dp, top = compassTopPadding + 70.dp)
         } else if (!useCompactCompassPlacement) {
+            // Portrait, toolbox repliée : place libre en haut à droite, sous la boussole.
+            val compassShownTopRight = showCompass && AppConfig.hasCompass.value &&
+                !showCompassInMapHeader
             Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 16.dp, bottom = measureDrawerBottomPadding)
-                .navigationBarsPadding()
+                .align(Alignment.TopEnd)
+                .padding(
+                    end = 16.dp,
+                    top = if (compassShownTopRight) {
+                        compassTopPadding + MapControlButtonDiameter + 16.dp
+                    } else {
+                        compassTopPadding
+                    }
+                )
         } else if (isLandscapeLayout && showZoomBtns) {
             Modifier
                 .align(Alignment.BottomEnd)
@@ -2821,11 +2884,19 @@ fun MapScreen(
                 .padding(end = 16.dp, top = toolsTopPadding)
         }
 
+        // Positions mesurées (px, repère racine) du bas du bouton partage et du haut
+        // de la colonne d'infos, pour détecter en paysage un vrai chevauchement.
+        var shareButtonBottomPx by remember { mutableFloatStateOf(0f) }
+        var infoColumnTopPx by remember { mutableFloatStateOf(0f) }
+
         // ✅ NOUVEAU : Bouton de Partage positionné sous le bouton Retour avec animation
         Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
                 .padding(start = 16.dp, top = compassTopPadding)
+                .onGloballyPositioned {
+                    shareButtonBottomPx = it.positionInRoot().y + it.size.height
+                }
         ) {
             val isMi = fr.geotower.utils.AppConfig.distanceUnit.intValue == 1
             val speedText = if (isMi) "${(currentSpeedKmH / 1.60934).toInt()} mph" else "$currentSpeedKmH km/h"
@@ -2866,12 +2937,12 @@ fun MapScreen(
         // --- LES BOUTONS DE SUIVI "A TIROIR" (MODE MESURE) ---
         AnimatedVisibility(
             visible = isMeasuringMode,
-            enter = fadeIn() + slideInHorizontally(initialOffsetX = { if (trackingDrawerTopLeft) -it else it }),
-            exit = fadeOut() + slideOutHorizontally(targetOffsetX = { if (trackingDrawerTopLeft) -it else it }),
+            enter = fadeIn() + slideInHorizontally(initialOffsetX = { if (measureDrawerOnLeft) -it else it }),
+            exit = fadeOut() + slideOutHorizontally(targetOffsetX = { if (measureDrawerOnLeft) -it else it }),
             modifier = measureDrawerModifier
         ) {
             Column(
-                horizontalAlignment = if (trackingDrawerTopLeft) Alignment.Start else Alignment.End,
+                horizontalAlignment = if (measureDrawerOnLeft) Alignment.Start else Alignment.End,
                 verticalArrangement = Arrangement.spacedBy(trackingButtonSpacing)
             ) {
                 // ========================================================
@@ -2893,8 +2964,8 @@ fun MapScreen(
                     val pill: @Composable () -> Unit = {
                         AnimatedVisibility(
                             visible = isClosestSiteExpanded,
-                            enter = expandHorizontally(expandFrom = if (trackingDrawerTopLeft) Alignment.Start else Alignment.End) + fadeIn(),
-                            exit = shrinkHorizontally(shrinkTowards = if (trackingDrawerTopLeft) Alignment.Start else Alignment.End) + fadeOut()
+                            enter = expandHorizontally(expandFrom = if (measureDrawerOnLeft) Alignment.Start else Alignment.End) + fadeIn(),
+                            exit = shrinkHorizontally(shrinkTowards = if (measureDrawerOnLeft) Alignment.Start else Alignment.End) + fadeOut()
                         ) {
                             Button(
                                 onClick = { safeClick { trackNearestAll = !trackNearestAll } },
@@ -2915,9 +2986,9 @@ fun MapScreen(
                         }
                     }
 
-                    // Tiroir à gauche (tablette) : bouton collé au bord, poignée à
+                    // Tiroir à gauche (tablette ou toolbox dépliée) : bouton collé au bord, poignée à
                     // l'intérieur. Ailleurs : poignée d'abord, bouton vers le bord droit.
-                    if (trackingDrawerTopLeft) {
+                    if (measureDrawerOnLeft) {
                         pill()
                         Spacer(modifier = Modifier.width(6.dp))
                         handle()
@@ -2948,8 +3019,8 @@ fun MapScreen(
                         val pill: @Composable () -> Unit = {
                             AnimatedVisibility(
                                 visible = isClosestFavSiteExpanded,
-                                enter = expandHorizontally(expandFrom = if (trackingDrawerTopLeft) Alignment.Start else Alignment.End) + fadeIn(),
-                                exit = shrinkHorizontally(shrinkTowards = if (trackingDrawerTopLeft) Alignment.Start else Alignment.End) + fadeOut()
+                                enter = expandHorizontally(expandFrom = if (measureDrawerOnLeft) Alignment.Start else Alignment.End) + fadeIn(),
+                                exit = shrinkHorizontally(shrinkTowards = if (measureDrawerOnLeft) Alignment.Start else Alignment.End) + fadeOut()
                             ) {
                                 Button(
                                     onClick = { safeClick { trackNearestFav = !trackNearestFav } },
@@ -2969,9 +3040,9 @@ fun MapScreen(
                             }
                         }
 
-                        // Tiroir à gauche (tablette) : bouton collé au bord, poignée à
+                        // Tiroir à gauche (tablette ou toolbox dépliée) : bouton collé au bord, poignée à
                         // l'intérieur. Ailleurs : poignée d'abord, bouton vers le bord droit.
-                        if (trackingDrawerTopLeft) {
+                        if (measureDrawerOnLeft) {
                             pill()
                             Spacer(modifier = Modifier.width(6.dp))
                             handle()
@@ -3099,7 +3170,7 @@ fun MapScreen(
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                         Text(
-                            text = stringResource(R.string.shared_photo_map_desc, pendingSharedPhotoCount),
+                            text = pluralStringResource(R.plurals.shared_photo_map_ready, pendingSharedPhotoCount, pendingSharedPhotoCount),
                             fontSize = 13.sp,
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
                         )
@@ -3275,6 +3346,13 @@ fun MapScreen(
                 FloatingActionButton(
                     onClick = {
                         safeClick {
+                            // Localisation indisponible (permission coupée OU GPS éteint) : au lieu de tenter
+                            // un recentrage qui échouerait en silence, on invite à la réactiver.
+                            if (!isLocationReady) {
+                                onFixLocation()
+                                return@safeClick
+                            }
+
                             val map = mapViewRef
                             val locationOverlay = locationOverlayRef
 
@@ -3344,7 +3422,11 @@ fun MapScreen(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = if (isTrackingActive) Icons.Default.MyLocation else Icons.Outlined.MyLocation, // Change l'icône (plein/vide) pour plus de clarté si tu veux, ou garde Icons.Default.MyLocation
+                            imageVector = when {
+                                !isLocationReady -> Icons.Default.LocationDisabled // Localisation coupée : icône barrée
+                                isTrackingActive -> Icons.Default.MyLocation
+                                else -> Icons.Outlined.MyLocation
+                            },
                             contentDescription = stringResource(R.string.appstrings_locate),
                             tint = if (isTrackingActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer
                         )
@@ -3368,11 +3450,23 @@ fun MapScreen(
             )
         }
 
+        // En paysage, la colonne d'infos (vitesse / échelle / attribution) est
+        // ancrée en bas à gauche mais remonte quand le slider temporel est ouvert
+        // (ou sur un écran court). On compare les positions réellement mesurées :
+        // si le haut de la colonne recouvre le bas du bouton de partage (haut
+        // gauche), on la rend invisible pour ne pas le masquer.
+        val infoColumnMasksShare = isLandscapeLayout &&
+            shareButtonBottomPx > 0f &&
+            infoColumnTopPx > 0f &&
+            infoColumnTopPx < shareButtonBottomPx
+
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
                 .padding(start = 16.dp, bottom = 32.dp + timeSliderLift)
-                .navigationBarsPadding(),
+                .navigationBarsPadding()
+                .onGloballyPositioned { infoColumnTopPx = it.positionInRoot().y }
+                .alpha(if (infoColumnMasksShare) 0f else 1f),
             horizontalAlignment = Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -3404,7 +3498,10 @@ fun MapScreen(
                 ) {
                     Row(
                         modifier = Modifier
-                            .clickable { uriHandler.openUri(attributionUrl) }
+                            .then(
+                                if (infoColumnMasksShare) Modifier
+                                else Modifier.clickable { uriHandler.openUri(attributionUrl) }
+                            )
                             .padding(horizontal = 6.dp, vertical = 4.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -3666,6 +3763,16 @@ fun MapScreen(
                     Text(text = txtUnderstood, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onPrimary)
                 }
             }
+        )
+    }
+    if (supportChoices.isNotEmpty()) {
+        SupportChoiceDialog(
+            choices = supportChoices,
+            onSelect = { choice ->
+                supportChoices = emptyList()
+                mapViewRef?.let { openSupportDetailFromMap(it, choice.representative) }
+            },
+            onDismiss = { supportChoices = emptyList() }
         )
     }
     if (showCityStatsPopup) {
@@ -4659,6 +4766,100 @@ private fun CoverageDetailRow(label: String, value: String, valueColor: Color = 
             textAlign = TextAlign.End,
             modifier = Modifier.weight(1f)
         )
+    }
+}
+
+@Composable
+private fun SupportChoiceDialog(
+    choices: List<SupportChoice>,
+    onSelect: (SupportChoice) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = MaterialTheme.colorScheme.surface,
+        title = {
+            Text(
+                text = stringResource(R.string.appstrings_support_picker_title, choices.size),
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.titleLarge
+            )
+        },
+        text = {
+            Column(
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                modifier = Modifier.verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = stringResource(R.string.appstrings_support_picker_message),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                choices.forEach { choice ->
+                    SupportChoiceRow(choice = choice, onClick = { onSelect(choice) })
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(text = stringResource(R.string.appstrings_cancel))
+            }
+        }
+    )
+}
+
+@Composable
+private fun SupportChoiceRow(choice: SupportChoice, onClick: () -> Unit) {
+    val subtitle = buildString {
+        append(stringResource(R.string.appstrings_support_prefix))
+        append(' ')
+        append(choice.supportId)
+        choice.nature?.trim()?.takeIf { it.isNotEmpty() }?.let {
+            append(" · ")
+            append(it)
+        }
+    }
+    val operatorLabel = choice.operatorKeys
+        .mapNotNull { key -> OperatorColors.specForKey(key)?.label ?: key.takeIf { it.isNotBlank() } }
+        .distinct()
+        .joinToString(" · ")
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+        ) {
+            OperatorGrid(operators = choice.operatorKeys)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                if (operatorLabel.isNotBlank()) {
+                    Text(
+                        text = operatorLabel,
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Spacer(modifier = Modifier.height(3.dp))
+                }
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 

@@ -147,7 +147,9 @@ private fun shareOrCopyImageUris(
                 this.clipData = clipData
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            context.startActivity(Intent.createChooser(intent, chooserTitle))
+            // FLAG_ACTIVITY_NEW_TASK requis : LocalContext.current est le contexte localisé (LocaleProvider),
+            // pas une Activity → sans ce flag, startActivity() plante sur OnePlus/OxygenOS.
+            context.startActivity(Intent.createChooser(intent, chooserTitle).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         }
         ShareImageDestination.Clipboard -> {
             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -209,7 +211,9 @@ private fun ShareImageActionButtons(
     onPdfClick: (() -> Unit)? = null,
     pdfContentDescription: String? = null,
     onPdfDownloadClick: (() -> Unit)? = null,
-    pdfDownloadContentDescription: String? = null
+    pdfDownloadContentDescription: String? = null,
+    showCopyIcon: Boolean = true,
+    showShareIcon: Boolean = true
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val hasPdfAction = onPdfClick != null || onPdfDownloadClick != null
@@ -237,19 +241,22 @@ private fun ShareImageActionButtons(
                 modifier = Modifier.weight(textButtonWeight).height(sizing.component(56.dp)),
                 shape = CircleShape,
                 enabled = enabled,
+                contentPadding = if (showCopyIcon) ButtonDefaults.ContentPadding else PaddingValues(horizontal = sizing.spacing(12.dp)),
                 colors = ButtonDefaults.filledTonalButtonColors(
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
                 )
             ) {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Default.ContentCopy,
-                        contentDescription = null,
-                        modifier = Modifier.align(Alignment.CenterStart).size(sizing.component(16.dp))
-                    )
+                    if (showCopyIcon) {
+                        Icon(
+                            Icons.Default.ContentCopy,
+                            contentDescription = null,
+                            modifier = Modifier.align(Alignment.CenterStart).size(sizing.component(16.dp))
+                        )
+                    }
                     Text(
                         txtCopyImage,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = buttonTextPadding),
+                        modifier = if (showCopyIcon) Modifier.fillMaxWidth().padding(horizontal = buttonTextPadding) else Modifier,
                         style = buttonTextStyle,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
@@ -302,17 +309,20 @@ private fun ShareImageActionButtons(
                 onClick = onShareClick,
                 modifier = Modifier.weight(textButtonWeight).height(sizing.component(56.dp)),
                 shape = CircleShape,
-                enabled = enabled
+                enabled = enabled,
+                contentPadding = if (showShareIcon) ButtonDefaults.ContentPadding else PaddingValues(horizontal = sizing.spacing(12.dp))
             ) {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                    Icon(
-                        Icons.Default.Share,
-                        contentDescription = null,
-                        modifier = Modifier.align(Alignment.CenterStart).size(sizing.component(16.dp))
-                    )
+                    if (showShareIcon) {
+                        Icon(
+                            Icons.Default.Share,
+                            contentDescription = null,
+                            modifier = Modifier.align(Alignment.CenterStart).size(sizing.component(16.dp))
+                        )
+                    }
                     Text(
                         txtGenerateImage,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = buttonTextPadding),
+                        modifier = if (showShareIcon) Modifier.fillMaxWidth().padding(horizontal = buttonTextPadding) else Modifier,
                         style = buttonTextStyle,
                         fontWeight = FontWeight.Bold,
                         textAlign = TextAlign.Center,
@@ -4874,7 +4884,7 @@ fun shareFullAntennaCapture(
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 }
 
-                    context.startActivity(Intent.createChooser(intent, txtShareSiteVia))
+                    context.startActivity(Intent.createChooser(intent, txtShareSiteVia).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }
                 onComplete?.invoke()
             } else {
@@ -5664,7 +5674,9 @@ fun AntennaShareMenu(
                 onPdfClick = { startAntennaImageExport(ShareImageDestination.Pdf) },
                 pdfContentDescription = stringResource(R.string.appstrings_radio_share_export_pdf),
                 onPdfDownloadClick = { startAntennaImageExport(ShareImageDestination.PdfDownload) },
-                pdfDownloadContentDescription = stringResource(R.string.appstrings_pdf_download)
+                pdfDownloadContentDescription = stringResource(R.string.appstrings_pdf_download),
+                showCopyIcon = false,
+                showShareIcon = false
             )
             }
         }

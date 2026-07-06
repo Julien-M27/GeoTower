@@ -108,6 +108,7 @@ import java.util.Locale
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
 
@@ -1244,7 +1245,7 @@ private fun SupportSharedPhotoUploadCard(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = stringResource(R.string.shared_photo_support_desc, photoCount),
+                        text = pluralStringResource(R.plurals.shared_photo_support_ready, photoCount, photoCount),
                         fontSize = 13.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )

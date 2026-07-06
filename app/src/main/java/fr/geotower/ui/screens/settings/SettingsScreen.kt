@@ -560,7 +560,7 @@ fun SettingsScreen(
     var nearbySearchRadius by remember { mutableIntStateOf(prefs.getInt("nearby_search_radius", 5)) } // Par défaut 5 km
 
     LaunchedEffect(Unit) {
-        AppConfig.menuSize.value = prefs.getString("menuSize", "normal") ?: "normal"
+        AppConfig.uiScalePercent.intValue = AppConfig.readUiScalePercent(prefs)
         showNearbyPage = HomePrefs.showNearbyPage.read(prefs)
         showMapPage = HomePrefs.showMapPage.read(prefs)
         showCompassPage = HomePrefs.showCompassPage.read(prefs)
@@ -775,11 +775,11 @@ fun SettingsScreen(
                         .fillMaxSize()
                         .colorPaletteFadingEdge(colorPaletteScrollState)
                         .verticalScroll(colorPaletteScrollState)
-                        .padding(horizontal = if (isWideScreen) 48.dp else 24.dp)
+                        .padding(horizontal = if (isWideScreen) sizing.spacing(48.dp) else sizing.spacing(24.dp))
                         .navigationBarsPadding()
                 ) {
                     fr.geotower.ui.components.ColorPalettePickerContent(
-                        modifier = Modifier.padding(top = 16.dp, bottom = 48.dp),
+                        modifier = Modifier.padding(top = sizing.spacing(16.dp), bottom = sizing.spacing(48.dp)),
                         useOneUi = useOneUi,
                         bubbleColor = bubbleBaseColor
                     )
@@ -798,7 +798,7 @@ fun SettingsScreen(
                             .fillMaxHeight()
                             // 🚨 CORRECTION 2 : Marge pour les boutons de navigation
                             .navigationBarsPadding()
-                            .padding(top = 16.dp, bottom = 16.dp)
+                            .padding(top = sizing.spacing(16.dp), bottom = sizing.spacing(16.dp))
                     ) {
                         // ✅ RETOUR DU ROW AVEC LES DEUX BOUTONS
                         Row(
@@ -809,18 +809,18 @@ fun SettingsScreen(
                             IconButton(
                                 onClick = { safeBackNavigation.navigateBack() },
                                 enabled = !safeBackNavigation.isLocked,
-                                modifier = Modifier.padding(start = 8.dp)
+                                modifier = Modifier.padding(start = sizing.spacing(8.dp))
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
                             }
                             IconButton(
                                 onClick = onCloseSidebar,
-                                modifier = Modifier.padding(end = 8.dp)
+                                modifier = Modifier.padding(end = sizing.spacing(8.dp))
                             ) {
                                 Icon(Icons.Default.Menu, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
                             }
                         }
-                        Spacer(Modifier.height(16.dp))
+                        Spacer(Modifier.height(sizing.spacing(16.dp)))
                         menuItems.forEach { (title, icon, index) ->
                             NavigationMenuItem(title, icon, activeSectionIndex == index, isDark) {
                                 activeSectionIndex = index
@@ -833,8 +833,8 @@ fun SettingsScreen(
                                 }
                             }
                         }
-                        Spacer(Modifier.height(8.dp))
-                        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        Spacer(Modifier.height(sizing.spacing(8.dp)))
+                        HorizontalDivider(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                         NavigationMenuItem(stringResource(R.string.nav_about), Icons.Outlined.Info, false, isDark) {
                             safeClick {
                                 val currentDestinationId = navController.currentDestination?.id
@@ -848,12 +848,12 @@ fun SettingsScreen(
                                 }
                             }
                         }
-                        Spacer(Modifier.height(8.dp))
+                        Spacer(Modifier.height(sizing.spacing(8.dp)))
                         NavigationMenuItem(title = stringResource(R.string.settings_reset), icon = Icons.Default.Refresh, isSelected = false, isDark = isDark) {
                             safeClick { showGlobalResetDialog = true }
                         }
                         Spacer(Modifier.weight(1f))
-                        Text("${stringResource(R.string.common_version)} $versionName", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp), textAlign = TextAlign.Center)
+                        Text("${stringResource(R.string.common_version)} $versionName", style = sizing.textStyle(MaterialTheme.typography.labelSmall), color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f), modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp)), textAlign = TextAlign.Center)
                     }
                     VerticalDivider(thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                 }
@@ -864,16 +864,16 @@ fun SettingsScreen(
                     // --- EN-TÊTE TABLETTE (Apparaît quand le menu latéral est replié) ---
                     if (isExpanded) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(16.dp), bottom = sizing.spacing(16.dp)),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             AnimatedVisibility(visible = !isSidebarVisible, enter = fadeIn() + expandHorizontally(), exit = fadeOut() + shrinkHorizontally()) {
-                                IconButton(onClick = onToggleSidebar, modifier = Modifier.padding(start = 8.dp)) {
+                                IconButton(onClick = onToggleSidebar, modifier = Modifier.padding(start = sizing.spacing(8.dp))) {
                                     Icon(Icons.Default.Menu, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
                                 }
                             }
-                            Text(stringResource(R.string.nav_settings), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
-                            AnimatedVisibility(visible = !isSidebarVisible) { Spacer(Modifier.width(56.dp)) }
+                            Text(stringResource(R.string.nav_settings), style = sizing.textStyle(MaterialTheme.typography.headlineMedium), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                            AnimatedVisibility(visible = !isSidebarVisible) { Spacer(Modifier.width(sizing.component(56.dp))) }
                         }
                     }
 
@@ -886,7 +886,7 @@ fun SettingsScreen(
                             }
                             .then(if (navMode == 0 || !isExpanded) Modifier.geoTowerFadingEdge(scrollState) else Modifier)
                             .then(if (navMode == 0 || !isExpanded) Modifier.verticalScroll(scrollState) else Modifier)
-                            .padding(horizontal = if (isExpanded) 48.dp else 24.dp)
+                            .padding(horizontal = if (isExpanded) sizing.spacing(48.dp) else sizing.spacing(24.dp))
                             // 🚨 CORRECTION 3 : Marge pour pouvoir scroller jusqu'au bout
                             .navigationBarsPadding()
                     ) {
@@ -899,7 +899,7 @@ fun SettingsScreen(
                                 bubbleColor = bubbleBaseColor,
                                 useOneUi = useOneUi
                             )
-                            Spacer(Modifier.height(20.dp))
+                            Spacer(Modifier.height(sizing.spacing(20.dp)))
                             if (settingsSearchQuery.isNotBlank()) {
                                 SettingsSearchResults(
                                     query = settingsSearchQuery,
@@ -1841,13 +1841,14 @@ fun SettingsScreen(
 
 @Composable
 fun SectionTitle(title: String) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Text(
         text = title,
-        style = MaterialTheme.typography.titleMedium,
+        style = sizing.textStyle(MaterialTheme.typography.titleMedium),
         fontWeight = FontWeight.Bold,
         // On utilise primary tout court, Android gérera le mode clair/sombre tout seul !
         color = MaterialTheme.colorScheme.primary,
-        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+        modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp))
     )
 }
 
@@ -1888,22 +1889,23 @@ fun AllSettingsContent(
     onOfflineMapsExpandedChange: (Boolean) -> Unit = {},
     onOpenDiagnostic: () -> Unit = {}
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(modifier = appearanceSectionModifier.fillMaxWidth()) {
         SectionApparence(theme, onTheme, oled, onOled, oneUi, onOneUi, blur, onBlur, logo, onIcon, onLogoDrawing, shape, border, bubbleColor, useOneUi, safeClick, onColorPaletteClick)
     }
-    Spacer(Modifier.height(32.dp))
+    Spacer(Modifier.height(sizing.spacing(32.dp)))
     Column(modifier = mappingSectionModifier.fillMaxWidth()) {
         SectionCartographie(map, onMap, ign, onIgn, shape, border, bubbleColor, useOneUi, safeClick)
     }
-    Spacer(Modifier.height(32.dp))
+    Spacer(Modifier.height(sizing.spacing(32.dp)))
     Column(modifier = preferencesSectionModifier.fillMaxWidth()) {
         SectionPreferences(isWide, nav, onNav, op, onOp, lang, onLang, onUnitSettings, onPages, onCommunityData, onExternalLinks, onSharePrefs, onPreferenceProfiles, shape, border, bubbleColor, useOneUi, safeClick)
     }
-    Spacer(Modifier.height(32.dp))
+    Spacer(Modifier.height(sizing.spacing(32.dp)))
     Column(modifier = systemSectionModifier.fillMaxWidth()) {
         SectionSysteme(ctx, shape, border, bubbleColor, useOneUi, safeClick, onOpenDiagnostic)
     }
-    Spacer(Modifier.height(32.dp))
+    Spacer(Modifier.height(sizing.spacing(32.dp)))
     SectionDatabase(
         isWide,
         shape,
@@ -1934,7 +1936,7 @@ fun SectionApparence(
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = context.getSharedPreferences(PreferenceStores.APP, android.content.Context.MODE_PRIVATE)
-    val menuSize by AppConfig.menuSize
+    val uiScalePercent by AppConfig.uiScalePercent
     val logoDrawingChoice by AppConfig.appLogoDrawingChoice
     val isDark = LocalGeoTowerUiStyle.current.isDark
     val logoDrawingRes = AppLogoDrawingResources.resolve(logoDrawingChoice, logo, isDark)
@@ -1946,10 +1948,10 @@ fun SectionApparence(
         isOled = oled, onOledChange = onOled,
         useOneUi = oneUi, onOneUiChange = onOneUi,
         isBlur = blur, onBlurChange = onBlur,
-        menuSize = menuSize,
-        onMenuSizeChange = { newSize ->
-            AppConfig.menuSize.value = newSize
-            prefs.edit().putString("menuSize", newSize).apply()
+        uiScalePercent = uiScalePercent,
+        onUiScalePercentChange = { newPercent ->
+            AppConfig.uiScalePercent.intValue = newPercent
+            prefs.edit().putInt(AppConfig.PREF_UI_SCALE_PERCENT, newPercent).apply()
         },
         appIconRes = logo,
         onAppIconClick = onIcon,
@@ -2426,6 +2428,9 @@ fun SectionPreferences(
                         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
                             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                                 data = Uri.fromParts("package", context.packageName, null)
+                                // FLAG_ACTIVITY_NEW_TASK : LocalContext est le contexte localisé (LocaleProvider),
+                                // pas une Activity → sans ce flag, l'ouverture des réglages échoue silencieusement sur OnePlus.
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                             }
                             runCatching { context.startActivity(intent) }
                             return@PreferenceActionCard
@@ -2440,6 +2445,7 @@ fun SectionPreferences(
                             // Plan B : Le blocage est total (bouton "Ne plus demander" coché), on ouvre les paramètres globaux
                             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
                                 data = Uri.fromParts("package", context.packageName, null)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) // idem : contexte localisé sans Activity
                             }
                             context.startActivity(intent)
                         } else {
@@ -2643,6 +2649,7 @@ fun SectionDatabase(
 ) {
     var showResetDialog by remember { mutableStateOf(false) }
     val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     // On génère la bordure si on n'est pas en OneUI
     val border = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
@@ -2659,7 +2666,7 @@ fun SectionDatabase(
             title = stringResource(R.string.settings_section_database)
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
         fr.geotower.ui.components.RadioDatabaseDownloadCard(
             useOneUi = useOneUi,
@@ -2669,7 +2676,7 @@ fun SectionDatabase(
         )
     }
 
-    Spacer(modifier = Modifier.height(16.dp)) // Espace entre les deux cartes
+    Spacer(modifier = Modifier.height(sizing.spacing(16.dp))) // Espace entre les deux cartes
 
     // 🚀 NOUVEAU : LA CARTE DES CARTES HORS-LIGNE
     Box(modifier = offlineMapsModifier.fillMaxWidth()) {
@@ -2689,7 +2696,7 @@ fun SectionDatabase(
     }
 
     if (!isWideScreen) {
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
         TextButton(onClick = { showResetDialog = true }, modifier = Modifier.fillMaxWidth()) {
             Icon(imageVector = Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.error)
             Spacer(Modifier.width(8.dp))

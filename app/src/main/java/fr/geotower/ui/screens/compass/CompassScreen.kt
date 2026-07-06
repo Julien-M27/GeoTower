@@ -18,6 +18,9 @@ import android.os.Build
 import android.view.Surface
 import android.view.WindowManager
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
@@ -87,17 +90,24 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.LiveDatabaseUsageWarningDialog
+import fr.geotower.ui.components.LocationUnavailableBanner
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.settings.CompassSettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.ui.screens.map.MapViewModel
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.LocationReadiness
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.locationReadiness
+import fr.geotower.utils.openAppLocationSettings
+import fr.geotower.utils.openLocationSourceSettings
+import fr.geotower.utils.rememberLocationReadinessState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.util.Locale
@@ -111,10 +121,44 @@ fun CompassScreen(
     viewModel: MapViewModel
 ) {
     val context = LocalContext.current
+    val activity = LocalActivity.current
     val configuration = LocalConfiguration.current
     val screenRotation = currentDisplayRotation(context)
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val uiStyle = LocalGeoTowerUiStyle.current
+
+    // --- DÉTECTION RÉACTIVE DE LA DISPONIBILITÉ DE LA LOCALISATION (permission + GPS) ---
+    // La boussole magnétique fonctionne sans position, mais le radar des antennes et les infos GPS
+    // en dépendent : si la localisation est coupée, on affiche un bandeau d'alerte en haut.
+    val locationReadinessState = rememberLocationReadinessState()
+    val readiness by locationReadinessState
+    val isLocationReady = readiness == LocationReadiness.Ready
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { result ->
+        val granted = result[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
+            result[Manifest.permission.ACCESS_COARSE_LOCATION] == true
+        locationReadinessState.value = locationReadiness(context)
+        if (!granted) {
+            val canAskAgain = activity?.let {
+                ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.ACCESS_FINE_LOCATION) ||
+                    ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.ACCESS_COARSE_LOCATION)
+            } ?: false
+            if (!canAskAgain) openAppLocationSettings(context)
+        }
+    }
+    val onFixLocation: () -> Unit = {
+        when (readiness) {
+            LocationReadiness.PermissionMissing -> locationPermissionLauncher.launch(
+                arrayOf(
+                    Manifest.permission.ACCESS_FINE_LOCATION,
+                    Manifest.permission.ACCESS_COARSE_LOCATION
+                )
+            )
+            LocationReadiness.ServicesOff -> openLocationSourceSettings(context)
+            LocationReadiness.Ready -> {}
+        }
+    }
     var showLocation by remember { mutableStateOf(prefs.getBoolean("show_compass_location", true)) }
     var showGps by remember { mutableStateOf(prefs.getBoolean("show_compass_gps", true)) }
     var showAccuracy by remember { mutableStateOf(prefs.getBoolean("show_compass_accuracy", true)) }
@@ -228,7 +272,8 @@ fun CompassScreen(
     }
 
     // --- GESTION DU GPS (Localisation) ---
-    DisposableEffect(Unit) {
+    // Clé sur isLocationReady : dès que la permission est accordée / le GPS rallumé, on se réabonne.
+    DisposableEffect(isLocationReady) {
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val hasFinePermission = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         val hasCoarsePermission = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -406,11 +451,15 @@ fun CompassScreen(
         }
         val contentScrollState = rememberScrollState()
 
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(compassBg)
+                .padding(padding)
+        ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .background(compassBg)
                 // --- 1. AJOUT DU DÉFILEMENT ICI ---
                 .then(if (!isLandscape) Modifier.verticalScroll(contentScrollState) else Modifier),
             horizontalAlignment = Alignment.CenterHorizontally,
@@ -424,25 +473,29 @@ fun CompassScreen(
                     horizontalArrangement = Arrangement.spacedBy(24.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    CompassInfoPanel(
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 8.dp),
-                        compassOrder = compassOrder,
-                        showLocation = showLocation,
-                        showGps = showGps,
-                        showAccuracy = showAccuracy,
-                        city = city,
-                        country = country,
-                        latitude = latitude,
-                        longitude = longitude,
-                        accuracy = accuracy,
-                        oncompassBg = oncompassBg,
-                        oncompassBgVariant = oncompassBgVariant,
-                        compassTextGray = compassTextGray,
-                        alignStart = true,
-                        compact = compactLandscape
-                    )
+                    // Sans localisation : on retire le panneau d'infos, le cadran (seul enfant pondéré)
+                    // occupe alors toute la largeur et reste centré, à l'écart du bandeau.
+                    if (isLocationReady) {
+                        CompassInfoPanel(
+                            modifier = Modifier
+                                .weight(1f)
+                                .padding(horizontal = 8.dp),
+                            compassOrder = compassOrder,
+                            showLocation = showLocation,
+                            showGps = showGps,
+                            showAccuracy = showAccuracy,
+                            city = city,
+                            country = country,
+                            latitude = latitude,
+                            longitude = longitude,
+                            accuracy = accuracy,
+                            oncompassBg = oncompassBg,
+                            oncompassBgVariant = oncompassBgVariant,
+                            compassTextGray = compassTextGray,
+                            alignStart = true,
+                            compact = compactLandscape
+                        )
+                    }
 
                     Box(
                         modifier = Modifier
@@ -573,7 +626,7 @@ fun CompassScreen(
                 }
             }
 
-            if (!isLandscape) {
+            if (!isLandscape && isLocationReady) {
                 Spacer(modifier = Modifier.height(24.dp))
 
             // --- 4. AFFICHAGE DYNAMIQUE (LIEU, GPS, PRÉCISION) ---
@@ -626,6 +679,14 @@ fun CompassScreen(
             }
                 Spacer(modifier = Modifier.height(32.dp))
             }
+        }
+
+            // Bandeau superposé en haut si la localisation est indisponible (permission ou GPS).
+            LocationUnavailableBanner(
+                readiness = readiness,
+                onFixClick = onFixLocation,
+                modifier = Modifier.align(Alignment.TopCenter)
+            )
         }
     }
 

@@ -237,7 +237,8 @@ fun TheoreticalCoverageScreen(
                 putExtra(android.content.Intent.EXTRA_STREAM, uri)
                 addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
             }
-            context.startActivity(android.content.Intent.createChooser(intent, context.getString(R.string.appstrings_coverage_share)))
+            // FLAG_ACTIVITY_NEW_TASK requis : contexte localisé (LocaleProvider), pas une Activity → sinon crash OnePlus.
+            context.startActivity(android.content.Intent.createChooser(intent, context.getString(R.string.appstrings_coverage_share)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
         }.onFailure {
             AppLogger.w("TheoreticalCoverage", "share failed", it)
             android.widget.Toast.makeText(context, context.getString(R.string.appstrings_error), android.widget.Toast.LENGTH_SHORT).show()
