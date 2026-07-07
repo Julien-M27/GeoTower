@@ -363,27 +363,6 @@ fun MapSettingsSheet(
                 }
             }
 
-            if (
-                featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THEORETICAL_COVERAGE) &&
-                featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_THEORETICAL_COVERAGE) &&
-                featureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ELEVATION_IGN)
-            ) {
-                Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
-
-                SectionTitle(stringResource(R.string.appstrings_coverage_layer_title))
-                SelectableButton(
-                    label = stringResource(R.string.appstrings_coverage_layer_label),
-                    isSelected = AppConfig.showTheoreticalCoverage.value,
-                    modifier = Modifier.fillMaxWidth(),
-                    selectedColor = MaterialTheme.colorScheme.tertiary
-                ) { enabled ->
-                    AppConfig.showTheoreticalCoverage.value = enabled
-                    prefs.edit()
-                        .putBoolean(AppConfig.PREF_SHOW_THEORETICAL_COVERAGE, enabled)
-                        .apply()
-                }
-            }
-
             if (hasRadioDatabase) {
                 Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 

@@ -2094,8 +2094,6 @@
     <string name="appstrings_operator_unknown">Unbekannter Betreiber</string>
     <string name="appstrings_radio_filters_title">ANFR-Funkfilter</string>
     <string name="appstrings_coverage_button">Theoretische Abdeckung</string>
-    <string name="appstrings_coverage_layer_title">Theoretische Abdeckung</string>
-    <string name="appstrings_coverage_layer_label">Sichtlinien-Abdeckung</string>
     <string name="appstrings_coverage_computing">Theoretische Abdeckung wird berechnet…</string>
     <string name="appstrings_coverage_empty">Keine theoretische Abdeckung verfügbar</string>
     <string name="appstrings_coverage_disclaimer_short">Geometrische Sichtlinienschätzung, keine gemessene HF-Abdeckung. ANFR liefert weder Tilt, Gewinn noch Leistung.</string>

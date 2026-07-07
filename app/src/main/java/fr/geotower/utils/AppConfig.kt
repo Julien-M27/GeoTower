@@ -24,7 +24,6 @@ object AppConfig {
     const val PREF_SHOW_RADIO_OTHER = "show_radio_other"
     const val PREF_SHOW_SIGNALQUEST_COVERAGE_POINTS = "show_signalquest_coverage_points"
     const val PREF_SIGNALQUEST_COVERAGE_OPERATOR_KEYS = "signalquest_coverage_operator_keys"
-    const val PREF_SHOW_THEORETICAL_COVERAGE = "show_theoretical_coverage"
     const val PREF_HIDE_UNDERGROUND_SITES = "hide_underground_sites"
     const val PREF_SHOW_ONLY_ZB_SITES = "show_only_zb_sites"
     const val DEFAULT_SHOW_AZIMUTH_LINES = true
@@ -93,13 +92,6 @@ object AppConfig {
     var showRadioOther = mutableStateOf(false)
     var showSignalQuestCoveragePoints = mutableStateOf(false)
     var selectedSignalQuestCoverageOperatorKeys = mutableStateOf(defaultSignalQuestCoverageOperatorKeys)
-
-    // Couverture théorique (viewshed) : couche désactivée par défaut (calcul à la demande, par site).
-    var showTheoreticalCoverage = mutableStateOf(false)
-
-    // Demande de couverture théorique déclenchée depuis une fiche site (idAnfr + position pour centrer la carte).
-    data class PendingCoverageRequest(val idAnfr: String, val latitude: Double, val longitude: Double)
-    var pendingTheoreticalCoverage = mutableStateOf<PendingCoverageRequest?>(null)
 
     // --- FILTRES : OPÉRATEURS ---
     var showOrange = mutableStateOf(true)
@@ -255,7 +247,6 @@ object AppConfig {
         updateShowRadioSitesFromCategoryFilters()
         showSignalQuestCoveragePoints.value = prefs.getBoolean(PREF_SHOW_SIGNALQUEST_COVERAGE_POINTS, false)
         selectedSignalQuestCoverageOperatorKeys.value = loadSignalQuestCoverageOperatorKeys(prefs)
-        showTheoreticalCoverage.value = prefs.getBoolean(PREF_SHOW_THEORETICAL_COVERAGE, false)
         showSpeedometer.value = MapDisplayPrefs.showSpeedometer.read(prefs)
         measureReconnectOnDelete.value = MapDisplayPrefs.measureReconnectOnDelete.read(prefs)
 

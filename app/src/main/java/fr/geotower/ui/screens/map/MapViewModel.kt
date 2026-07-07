@@ -6,10 +6,6 @@ import androidx.lifecycle.viewModelScope
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.RadioRepository
 import fr.geotower.data.config.RemoteFeatureFlags
-import fr.geotower.data.coverage.CoverageComputer
-import fr.geotower.data.coverage.CoverageRequest
-import fr.geotower.data.coverage.SiteCoverage
-import fr.geotower.data.coverage.ViewshedParams
 import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.api.SqCoveragePointData
@@ -57,9 +53,6 @@ private data class SignalQuestCoverageBounds(
     val west: Double
 )
 
-/** Progression du calcul de couverture théorique (lots de requêtes terrain). */
-data class TheoreticalCoverageProgress(val done: Int, val total: Int)
-
 /**
  * Un support physique distinct présent à un point de la carte.
  * Sert à désambiguïser quand plusieurs supports (id_support différents) se retrouvent
@@ -85,18 +78,6 @@ class MapViewModel(
 
     private val _signalQuestCoveragePoints = MutableStateFlow<List<SignalQuestCoveragePoint>>(emptyList())
     val signalQuestCoveragePoints = _signalQuestCoveragePoints.asStateFlow()
-
-    private val _theoreticalCoverage = MutableStateFlow<SiteCoverage?>(null)
-    val theoreticalCoverage = _theoreticalCoverage.asStateFlow()
-
-    private val _theoreticalCoverageProgress = MutableStateFlow<TheoreticalCoverageProgress?>(null)
-    val theoreticalCoverageProgress = _theoreticalCoverageProgress.asStateFlow()
-
-    private val _theoreticalCoverageLoading = MutableStateFlow(false)
-    val theoreticalCoverageLoading = _theoreticalCoverageLoading.asStateFlow()
-
-    private var theoreticalCoverageJob: Job? = null
-    private val theoreticalCoverageCache = mutableMapOf<String, SiteCoverage>()
 
     private val _isLoading = MutableStateFlow(false)
     val isLoading = _isLoading.asStateFlow()
@@ -376,104 +357,6 @@ class MapViewModel(
         signalQuestCoverageJob = null
         lastSignalQuestCoverageRequestKey = null
         _signalQuestCoveragePoints.value = emptyList()
-    }
-
-    /**
-     * Calcule (ou ressort du cache) la couverture théorique d'un site et la publie pour l'overlay carte.
-     * Le terrain est mutualisé ; respecte les flags (provider IGN + feature) et les bornes (Limits).
-     * Le calcul est annulable et reporte sa progression.
-     */
-    fun loadTheoreticalCoverageForSite(idAnfr: String) {
-        if (idAnfr.isBlank()) return
-        if (!RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.ELEVATION_IGN) ||
-            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_THEORETICAL_COVERAGE)
-        ) {
-            return
-        }
-
-        val request = defaultCoverageRequest()
-        val cacheKey = listOf(
-            idAnfr, request.maxRadiusM, request.angularStepDeg, request.sampleStepM,
-            request.includeObstacles, request.viewshed.tiltDeg, request.viewshed.frequencyMHz
-        ).joinToString("|")
-        theoreticalCoverageCache[cacheKey]?.let { cached ->
-            theoreticalCoverageJob?.cancel()
-            _theoreticalCoverageLoading.value = false
-            _theoreticalCoverageProgress.value = null
-            _theoreticalCoverage.value = cached
-            return
-        }
-
-        theoreticalCoverageJob?.cancel()
-        _theoreticalCoverageLoading.value = true
-        _theoreticalCoverageProgress.value = null
-        theoreticalCoverageJob = viewModelScope.launch(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                val coverage = CoverageComputer.compute(
-                    repository = repository,
-                    idAnfr = idAnfr,
-                    request = request,
-                    maxPointsPerRequest = RemoteFeatureFlags.limitOrDefault(RemoteFeatureFlags.Limits.COVERAGE_MAX_POINTS_PER_REQUEST, 300),
-                    maxConcurrentRequests = RemoteFeatureFlags.limitOrDefault(RemoteFeatureFlags.Limits.COVERAGE_MAX_CONCURRENT_REQUESTS, 1)
-                ) { done, total ->
-                    _theoreticalCoverageProgress.value = TheoreticalCoverageProgress(done, total)
-                }
-                if (coverage == null) {
-                    _theoreticalCoverage.value = null
-                    return@launch
-                }
-                theoreticalCoverageCache[cacheKey] = coverage
-                _theoreticalCoverage.value = coverage
-                AppLogger.d(
-                    TAG,
-                    "Coverage[$idAnfr] terrain=${(coverage.terrainValidFraction * 100).toInt()}% " +
-                        "KO=${coverage.terrainFailedChunks}/${coverage.terrainTotalChunks} sectors=${coverage.sectors.size}"
-                )
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                AppLogger.w(TAG, "Theoretical coverage failed", e)
-                _theoreticalCoverage.value = null
-            } finally {
-                _theoreticalCoverageLoading.value = false
-                _theoreticalCoverageProgress.value = null
-            }
-        }
-    }
-
-    fun clearTheoreticalCoverage() {
-        theoreticalCoverageJob?.cancel()
-        theoreticalCoverageJob = null
-        _theoreticalCoverage.value = null
-        _theoreticalCoverageProgress.value = null
-        _theoreticalCoverageLoading.value = false
-    }
-
-    /** Profil « équilibré » par défaut (≈ 6 km / 3° / 30 m), borné par les flags. Lot 3 exposera le curseur. */
-    private fun defaultCoverageRequest(): CoverageRequest {
-        val maxRadiusM = RemoteFeatureFlags.limitOrDefault(RemoteFeatureFlags.Limits.COVERAGE_MAX_RADIUS_KM, 8) * 1000.0
-        // Défaut volontairement léger : le réseau MOBILE s'effondre au-delà de ~30 requêtes IGN en rafale
-        // (l'IGN lui-même encaisse, c'est l'appareil qui timeout). ~24 requêtes ici. Lot 3 = curseur qualité.
-        val radius = minOf(4000.0, maxRadiusM)
-        val minAngular = RemoteFeatureFlags.limitOrDefault(RemoteFeatureFlags.Limits.COVERAGE_MIN_ANGULAR_STEP_DEG, 2).toDouble()
-        val minSample = RemoteFeatureFlags.limitOrDefault(RemoteFeatureFlags.Limits.COVERAGE_SAMPLE_STEP_M, 20).toDouble()
-        val tilt = RemoteFeatureFlags.limitOrDefault(RemoteFeatureFlags.Limits.COVERAGE_DEFAULT_TILT_DEG, 5).toDouble()
-        val vbeam = RemoteFeatureFlags.limitOrDefault(RemoteFeatureFlags.Limits.COVERAGE_DEFAULT_VBEAM_DEG, 10).toDouble()
-        // Concurrence 1 (l'IGN rate-limite la concurrence) ⇒ on garde peu de requêtes pour rester ~15-20 s.
-        return CoverageRequest(
-            maxRadiusM = radius,
-            angularStepDeg = maxOf(6.0, minAngular),
-            sampleStepM = maxOf(70.0, minSample),
-            includeObstacles = true,
-            viewshed = ViewshedParams(
-                maxRadiusM = radius,
-                curvature = true,
-                fresnel = false,
-                frequencyMHz = 3500,
-                tiltDeg = tilt,
-                verticalBeamwidthDeg = vbeam
-            )
-        )
     }
 
     private fun sitesHsAnfrIds(sitesHs: List<SiteHsEntity>): List<String> {

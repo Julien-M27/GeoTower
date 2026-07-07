@@ -2094,8 +2094,6 @@
     <string name="appstrings_operator_unknown">Operadora desconhecida</string>
     <string name="appstrings_radio_filters_title">Filtros de rádio ANFR</string>
     <string name="appstrings_coverage_button">Cobertura teórica</string>
-    <string name="appstrings_coverage_layer_title">Cobertura teórica</string>
-    <string name="appstrings_coverage_layer_label">Cobertura em linha de visada</string>
     <string name="appstrings_coverage_computing">A calcular a cobertura teórica…</string>
     <string name="appstrings_coverage_empty">Nenhuma cobertura teórica para mostrar</string>
     <string name="appstrings_coverage_disclaimer_short">Estimativa geométrica em linha de visada, não é cobertura RF medida. A ANFR não fornece inclinação, ganho nem potência.</string>

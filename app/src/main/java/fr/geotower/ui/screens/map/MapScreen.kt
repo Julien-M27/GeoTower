@@ -910,7 +910,6 @@ fun MapScreen(
     val oldestServiceDate by viewModel.oldestServiceDate.collectAsState()
     val radioMarkers by viewModel.radioMarkers.collectAsState()
     val signalQuestCoveragePoints by viewModel.signalQuestCoveragePoints.collectAsState()
-    val theoreticalCoverage by viewModel.theoreticalCoverage.collectAsState()
     val isLoading by viewModel.isLoading.collectAsState()
     val sitesHs by viewModel.sitesHs.collectAsState()
     val cityStatsTechniques by viewModel.cityStatsTechniques.collectAsState()
@@ -1152,7 +1151,6 @@ fun MapScreen(
     // ✅ LE CALQUE MACRO POUR LA VUE DÉZOOMÉE
     val macroOverlay = remember { FolderOverlay() }
     val signalQuestCoverageOverlay = remember { SignalQuestCoverageOverlay(context) }
-    val theoreticalCoverageOverlay = remember { TheoreticalCoverageOverlay(context) }
     var selectedCoveragePoint by remember { mutableStateOf<SignalQuestCoveragePoint?>(null) }
     signalQuestCoverageOverlay.onPointClick = { selectedCoveragePoint = it }
     selectedCoveragePoint?.let { coveragePoint ->
@@ -2373,39 +2371,6 @@ fun MapScreen(
         mapViewRef?.invalidate()
     }
 
-    LaunchedEffect(theoreticalCoverage, AppConfig.showTheoreticalCoverage.value) {
-        if (AppConfig.showTheoreticalCoverage.value) {
-            theoreticalCoverageOverlay.setCoverage(theoreticalCoverage)
-        } else {
-            theoreticalCoverageOverlay.clear()
-        }
-        mapViewRef?.invalidate()
-    }
-
-    // Déclenchement depuis une fiche site : calcule la couverture (le centrage se fait via last_map_* au montage).
-    LaunchedEffect(AppConfig.pendingTheoreticalCoverage.value) {
-        val pending = AppConfig.pendingTheoreticalCoverage.value ?: return@LaunchedEffect
-        AppConfig.showTheoreticalCoverage.value = true
-        android.widget.Toast.makeText(context, context.getString(R.string.appstrings_coverage_computing), android.widget.Toast.LENGTH_SHORT).show()
-        viewModel.loadTheoreticalCoverageForSite(pending.idAnfr)
-        AppConfig.pendingTheoreticalCoverage.value = null
-    }
-
-    // Diagnostic temporaire à l'écran (en attendant l'écran-outil du Lot 3) : résumé du calcul.
-    LaunchedEffect(theoreticalCoverage) {
-        val cov = theoreticalCoverage ?: return@LaunchedEffect
-        val complete = cov.terrainValidFraction >= 0.9 && cov.terrainFailedChunks == 0
-        val message = if (complete) {
-            // Succès : rappel scientifique (ligne de visée, pas couverture RF) en attendant le disclaimer Lot 3.
-            context.getString(R.string.appstrings_coverage_disclaimer_short)
-        } else {
-            "Couverture partielle : terrain ${(cov.terrainValidFraction * 100).toInt()}% · " +
-                "${cov.terrainFailedChunks}/${cov.terrainTotalChunks} req KO" +
-                (cov.terrainSampleError?.let { " — $it" } ?: "")
-        }
-        android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
-    }
-
     LaunchedEffect(
         canUseSignalQuestCoverage,
         AppConfig.showSignalQuestCoveragePoints.value,
@@ -2667,7 +2632,6 @@ fun MapScreen(
                     overlays.add(measureOverlay)
                     overlays.add(searchBoundaryOverlay)
                     overlays.add(macroOverlay) // <-- Calque macro au fond
-                    overlays.add(theoreticalCoverageOverlay) // <-- Enveloppe couverture théorique (sous les points/marqueurs)
                     overlays.add(signalQuestCoverageOverlay)
                     overlays.add(radioOverlay)
                     overlays.add(markersOverlay) // <-- Calque micro au milieu

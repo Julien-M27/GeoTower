@@ -2094,8 +2094,6 @@
     <string name="appstrings_operator_unknown">Unknown operator</string>
     <string name="appstrings_radio_filters_title">ANFR radio filters</string>
     <string name="appstrings_coverage_button">Theoretical coverage</string>
-    <string name="appstrings_coverage_layer_title">Theoretical coverage</string>
-    <string name="appstrings_coverage_layer_label">Line-of-sight coverage</string>
     <string name="appstrings_coverage_computing">Computing theoretical coverage…</string>
     <string name="appstrings_coverage_empty">No theoretical coverage to display</string>
     <string name="appstrings_coverage_disclaimer_short">Geometric line-of-sight estimate, not measured RF coverage. ANFR provides no tilt, gain or power.</string>
