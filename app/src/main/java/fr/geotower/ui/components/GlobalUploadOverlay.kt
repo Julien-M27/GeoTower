@@ -1,6 +1,7 @@
 package fr.geotower.ui.components
 
 import android.content.Context
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -38,6 +39,17 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
 
+// Resultat d'un operateur au sein d'un lot d'envoi (mêmes photos vers plusieurs operateurs).
+private data class BatchOperatorResult(
+    val label: String,
+    val colorArgb: Long?,
+    val successCount: Int,
+    val total: Int,
+    val failed: Boolean
+) {
+    val isFullSuccess: Boolean get() = !failed && total > 0 && successCount >= total
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun GlobalUploadOverlay(
@@ -64,6 +76,8 @@ fun GlobalUploadOverlay(
     var finishedDialogMessageOverride by remember { mutableStateOf<String?>(null) }
     var finishedDialogHasErrorsOverride by remember { mutableStateOf<Boolean?>(null) }
     var finishedDialogUploadId by remember { mutableStateOf<String?>(null) }
+    // Résultats par opérateur pour le récapitulatif de lot (vide = affichage mono-opérateur).
+    var batchResults by remember { mutableStateOf<List<BatchOperatorResult>>(emptyList()) }
 
     // Statistiques du job en cours/terminé
     var currentProgress by remember { mutableIntStateOf(0) }
@@ -71,10 +85,11 @@ fun GlobalUploadOverlay(
     var finalSuccessCount by remember { mutableIntStateOf(0) }
     val lifetimeScore = prefs.getInt("total_lifetime_uploads", 0)
 
-    val completedWorkIds = remember { mutableSetOf<UUID>() }
     val finalizedCancelledIds = remember { mutableSetOf<UUID>() }
+    // Lots déjà résumés : on n'affiche le récap qu'une fois par lot.
+    val finishedBatchIds = remember { mutableSetOf<String>() }
 
-    // NOUVEAU : Mémoire des états pour détecter les vraies transitions
+    // Mémoire des états pour détecter les vraies transitions (RUNNING/ENQUEUED → terminé).
     val previousStates = remember { mutableMapOf<UUID, WorkInfo.State>() }
 
     val activeWork = workInfos.firstOrNull { it.state == WorkInfo.State.RUNNING }
@@ -87,46 +102,62 @@ fun GlobalUploadOverlay(
             totalPhotos = activeWork.progress.getInt("total", 0)
         }
 
-        var justFinishedWork: WorkInfo? = null
+        // 1. Détecter les lots qui viennent de se terminer (AVANT de mettre à jour previousStates) :
+        //    un lot est terminé quand tous ses works sont finis, qu'au moins un vient de transitionner
+        //    depuis un état actif, et qu'il reste au moins un envoi non annulé à résumer.
+        val justFinishedBatch = workInfos
+            .groupBy { SignalQuestUploadScheduler.batchIdFromTags(it.tags) }
+            .entries
+            .firstOrNull { (batchId, works) ->
+                batchId != null &&
+                    batchId !in finishedBatchIds &&
+                    works.all { it.state.isFinished } &&
+                    works.any { it.state != WorkInfo.State.CANCELLED } &&
+                    works.any { w ->
+                        val prev = previousStates[w.id]
+                        (prev == WorkInfo.State.RUNNING || prev == WorkInfo.State.ENQUEUED) && w.state.isFinished
+                    }
+            }
 
-        // On analyse chaque job du WorkManager
+        // 2. Réafficher le pop-up en cours si un tout nouveau job apparaît, puis MAJ previousStates.
         for (work in workInfos) {
             val prevState = previousStates[work.id]
-            val currentState = work.state
-
-            // 1. Si on détecte un TOUT NOUVEAU job, on réaffiche le pop-up s'il était caché
-            if (prevState == null && (currentState == WorkInfo.State.RUNNING || currentState == WorkInfo.State.ENQUEUED)) {
+            if (prevState == null && (work.state == WorkInfo.State.RUNNING || work.state == WorkInfo.State.ENQUEUED)) {
                 isUploadPopupHidden = false
             }
-
-            // 2. Si un job était EN COURS et vient JUSTE de se terminer (Succès ou Échec)
-            if (prevState != null &&
-                (prevState == WorkInfo.State.RUNNING || prevState == WorkInfo.State.ENQUEUED) &&
-                (currentState == WorkInfo.State.SUCCEEDED || currentState == WorkInfo.State.FAILED)
-            ) {
-                if (!completedWorkIds.contains(work.id)) {
-                    justFinishedWork = work
-                    completedWorkIds.add(work.id)
-                }
-            }
-
-            // On met à jour notre mémoire des états
-            previousStates[work.id] = currentState
+            previousStates[work.id] = work.state
         }
 
-        // Si on a capturé une fin d'envoi en direct :
-        if (justFinishedWork != null) {
-            finalSuccessCount = justFinishedWork.outputData.getInt("success_count", currentProgress)
-            totalPhotos = justFinishedWork.outputData.getInt("total", totalPhotos)
+        // 3. Construire et afficher le récapitulatif du lot terminé.
+        if (justFinishedBatch != null) {
+            val (batchId, works) = justFinishedBatch
+            finishedBatchIds.add(batchId!!)
+
+            val results = works
+                .filter { it.state != WorkInfo.State.CANCELLED }
+                .map { work ->
+                    val operatorParam = SignalQuestUploadScheduler.operatorParamFromTags(work.tags)
+                    val spec = operatorParam?.let { OperatorColors.specForKey(it) }
+                    BatchOperatorResult(
+                        label = spec?.label ?: operatorParam.orEmpty(),
+                        colorArgb = spec?.colorArgb,
+                        successCount = work.outputData.getInt("success_count", 0),
+                        total = work.outputData.getInt("total", 0),
+                        failed = work.state == WorkInfo.State.FAILED
+                    )
+                }
+
+            batchResults = results
+            totalPhotos = results.maxOfOrNull { it.total } ?: totalPhotos
+            finalSuccessCount = results.sumOf { it.successCount }
             finishedDialogMessageOverride = null
             finishedDialogHasErrorsOverride = null
-            finishedDialogUploadId = SignalQuestUploadScheduler.uploadIdFromTags(justFinishedWork.tags)
+            // Miniature : première photo réussie/en validation du lot (mêmes photos pour tous).
+            finishedDialogUploadId = works
+                .firstOrNull { it.state != WorkInfo.State.CANCELLED }
+                ?.let { SignalQuestUploadScheduler.uploadIdFromTags(it.tags) }
 
-            // On sauvegarde le nouveau score global
-            val newScore = lifetimeScore + finalSuccessCount
-            prefs.edit().putInt("total_lifetime_uploads", newScore).apply()
-
-            // On affiche le pop-up de victoire !
+            prefs.edit().putInt("total_lifetime_uploads", lifetimeScore + finalSuccessCount).apply()
             showFinishedDialog = true
         }
 
@@ -159,6 +190,8 @@ fun GlobalUploadOverlay(
             finishedDialogMessageOverride = AppGlobalState.uploadResultPopupMessage.value
             finishedDialogHasErrorsOverride = AppGlobalState.uploadResultPopupHasErrors.value
             finishedDialogUploadId = AppGlobalState.uploadResultPopupUploadId.value
+            // Ouverture depuis une notification = un seul opérateur : pas de liste récap.
+            batchResults = emptyList()
             showFinishedDialog = true
             AppGlobalState.showUploadResultPopup.value = false
         }
@@ -233,19 +266,22 @@ fun GlobalUploadOverlay(
         }
     }
 
-    // 2. POP-UP DE FIN (SUCCÈS OU ERREUR PARTIELLE)
+    // 2. POP-UP DE FIN (RÉCAPITULATIF DU LOT)
     if (showFinishedDialog) {
-        val hasErrors = finishedDialogHasErrorsOverride ?: (totalPhotos > 0 && finalSuccessCount < totalPhotos)
+        val isMultiOperator = batchResults.size > 1
+        val hasErrors = finishedDialogHasErrorsOverride
+            ?: if (batchResults.isNotEmpty()) batchResults.any { !it.isFullSuccess }
+               else (totalPhotos > 0 && finalSuccessCount < totalPhotos)
         val finalIcon = if (hasErrors) Icons.Default.Warning else Icons.Default.CheckCircle
         val iconColor = if (hasErrors) MaterialTheme.colorScheme.error else Color(0xFF4CAF50)
 
         // Miniature d'une des photos envoyées (persistée dans l'historique d'upload), affichée à
-        // la place de la coche verte avec un badge « +N » pour les autres photos du lot. En cas
-        // d'erreur ou de miniature introuvable (historique effacé...), on garde les icônes.
+        // la place de la coche verte avec un badge « +N » pour les autres photos du lot. Si aucune
+        // miniature n'est trouvable (aucun succès, historique effacé...), on garde les icônes.
         var successThumbnailPath by remember(finishedDialogUploadId) { mutableStateOf<String?>(null) }
-        LaunchedEffect(finishedDialogUploadId, hasErrors) {
+        LaunchedEffect(finishedDialogUploadId) {
             val uploadId = finishedDialogUploadId
-            if (hasErrors || uploadId == null) return@LaunchedEffect
+            if (uploadId == null) return@LaunchedEffect
             val appContext = context.applicationContext
             successThumbnailPath = withContext(Dispatchers.IO) {
                 ExternalPhotoUploadHistoryStore.read(appContext)
@@ -267,7 +303,7 @@ fun GlobalUploadOverlay(
             Surface(shape = blockShape, color = sheetBgColor, shadowElevation = 8.dp, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                 Column(modifier = Modifier.padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     val thumbnailPath = successThumbnailPath
-                    if (!hasErrors && thumbnailPath != null) {
+                    if (thumbnailPath != null) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             AsyncImage(
                                 model = File(thumbnailPath),
@@ -277,14 +313,14 @@ fun GlobalUploadOverlay(
                                     .size(72.dp)
                                     .clip(RoundedCornerShape(18.dp))
                             )
-                            if (finalSuccessCount > 1) {
+                            if (totalPhotos > 1) {
                                 Surface(
                                     color = MaterialTheme.colorScheme.primaryContainer,
                                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                                     shape = RoundedCornerShape(topEnd = 12.dp, bottomEnd = 12.dp)
                                 ) {
                                     Text(
-                                        text = "+${finalSuccessCount - 1}",
+                                        text = "+${totalPhotos - 1}",
                                         style = MaterialTheme.typography.titleSmall,
                                         fontWeight = FontWeight.ExtraBold,
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
@@ -298,12 +334,56 @@ fun GlobalUploadOverlay(
 
                     Text(stringResource(R.string.appstrings_upload_finished_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
 
-                    Text(
-                        text = finishedDialogMessageOverride ?: pluralStringResource(R.plurals.upload_result, totalPhotos, finalSuccessCount, totalPhotos),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        textAlign = TextAlign.Center
-                    )
+                    if (isMultiOperator) {
+                        // Un envoi vers plusieurs opérateurs : détail par opérateur.
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            batchResults.forEach { result ->
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    result.colorArgb?.let { argb ->
+                                        Box(
+                                            modifier = Modifier
+                                                .size(10.dp)
+                                                .clip(CircleShape)
+                                                .background(Color(argb))
+                                        )
+                                        Spacer(modifier = Modifier.width(10.dp))
+                                    }
+                                    Text(
+                                        text = result.label,
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.SemiBold,
+                                        color = MaterialTheme.colorScheme.onSurface,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    Text(
+                                        text = "${result.successCount}/${result.total}",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Icon(
+                                        imageVector = if (result.isFullSuccess) Icons.Default.CheckCircle else Icons.Default.Warning,
+                                        contentDescription = null,
+                                        tint = if (result.isFullSuccess) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        Text(
+                            text = finishedDialogMessageOverride ?: pluralStringResource(R.plurals.upload_result, totalPhotos, finalSuccessCount, totalPhotos),
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            textAlign = TextAlign.Center
+                        )
+                    }
 
                     if (hasErrors) {
                         Text(

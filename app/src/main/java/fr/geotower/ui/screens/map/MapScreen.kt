@@ -448,21 +448,6 @@ private fun decodeSearchAreaBounds(encoded: String?): SearchAreaBounds? {
     }
 }
 
-private fun encodeGeoPoints(points: List<GeoPoint>): String? {
-    return points.takeIf { it.isNotEmpty() }
-        ?.joinToString(";") { point -> "${point.latitude},${point.longitude}" }
-}
-
-private fun decodeGeoPoints(encoded: String?): List<GeoPoint> {
-    if (encoded.isNullOrBlank()) return emptyList()
-    return encoded.split(";").mapNotNull { pointText ->
-        val parts = pointText.split(",", limit = 2)
-        val latitude = parts.getOrNull(0)?.toDoubleOrNull()
-        val longitude = parts.getOrNull(1)?.toDoubleOrNull()
-        if (latitude != null && longitude != null) GeoPoint(latitude, longitude) else null
-    }
-}
-
 private fun encodeBooleanList(values: List<Boolean>): String? {
     return values.takeIf { it.isNotEmpty() }
         ?.joinToString(",") { value -> if (value) "1" else "0" }
@@ -471,6 +456,42 @@ private fun encodeBooleanList(values: List<Boolean>): String? {
 private fun decodeBooleanList(encoded: String?): List<Boolean> {
     if (encoded.isNullOrBlank()) return emptyList()
     return encoded.split(",").map { value -> value == "1" }
+}
+
+/**
+ * Un sommet de la chaîne de mesure : soit un point fixe posé sur la carte (ou une antenne),
+ * soit la position courante de l'utilisateur (« ma position »), qui se recalcule en direct.
+ */
+sealed class MeasureVertex {
+    data class Fixed(val point: GeoPoint) : MeasureVertex()
+    object CurrentLocation : MeasureVertex()
+}
+
+private fun encodeMeasureVertices(vertices: List<MeasureVertex>): String? {
+    return vertices.takeIf { it.isNotEmpty() }?.joinToString(";") { vertex ->
+        when (vertex) {
+            is MeasureVertex.CurrentLocation -> "L"
+            is MeasureVertex.Fixed -> "${vertex.point.latitude},${vertex.point.longitude}"
+        }
+    }
+}
+
+private fun decodeMeasureVertices(encoded: String?): List<MeasureVertex> {
+    if (encoded.isNullOrBlank()) return emptyList()
+    return encoded.split(";").mapNotNull { token ->
+        if (token == "L") {
+            MeasureVertex.CurrentLocation
+        } else {
+            val parts = token.split(",", limit = 2)
+            val latitude = parts.getOrNull(0)?.toDoubleOrNull()
+            val longitude = parts.getOrNull(1)?.toDoubleOrNull()
+            if (latitude != null && longitude != null) {
+                MeasureVertex.Fixed(GeoPoint(latitude, longitude))
+            } else {
+                null
+            }
+        }
+    }
 }
 
 private fun normalizedAnfrId(value: String): String {
@@ -993,56 +1014,125 @@ fun MapScreen(
     var isMeasuringMode by rememberSaveable { mutableStateOf(false) }
     var trackNearestAll by rememberSaveable { mutableStateOf(false) }
     var trackNearestFav by rememberSaveable { mutableStateOf(false) }
-    var measuredMapPointsStartFromLocation by rememberSaveable { mutableStateOf(true) }
-    var measuredMapPointsEncoded by rememberSaveable { mutableStateOf<String?>(null) }
-    var measuredMapPointLocationLinksEncoded by rememberSaveable { mutableStateOf<String?>(null) }
+    // Chaîne de mesure : suite ordonnée de sommets (point carte, antenne ou « ma position »),
+    // reliés deux à deux. measuredLinkedToPrev[i] = true si un trait relie le sommet i au i-1.
+    // Le premier sommet n'est jamais relié (measuredLinkedToPrev[0] toujours false).
+    var measuredVerticesEncoded by rememberSaveable { mutableStateOf<String?>(null) }
+    var measuredLinkedToPrevEncoded by rememberSaveable { mutableStateOf<String?>(null) }
     val measuredSites = remember { mutableStateMapOf<String, LocalisationEntity>() }
-    val measuredMapPoints = remember {
-        mutableStateListOf<GeoPoint>().apply {
-            addAll(decodeGeoPoints(measuredMapPointsEncoded))
+    val measuredVertices = remember {
+        mutableStateListOf<MeasureVertex>().apply {
+            addAll(decodeMeasureVertices(measuredVerticesEncoded))
         }
     }
-    val measuredMapPointLocationLinks = remember {
+    val measuredLinkedToPrev = remember {
         mutableStateListOf<Boolean>().apply {
-            addAll(decodeBooleanList(measuredMapPointLocationLinksEncoded))
+            val decoded = decodeBooleanList(measuredLinkedToPrevEncoded).toMutableList()
+            // On garde les deux listes synchronisées et le premier sommet toujours détaché.
+            while (decoded.size < measuredVertices.size) decoded.add(true)
+            if (decoded.isNotEmpty()) decoded[0] = false
+            addAll(decoded.take(measuredVertices.size))
         }
     }
+    // Boucle fermée : un trait supplémentaire relie le dernier sommet au premier (chaîne unique
+    // d'au moins 3 sommets, sans trou). Persisté séparément (booléen rememberSaveable).
+    var measuredLoopClosed by rememberSaveable { mutableStateOf(false) }
 
     var isClosestSiteExpanded by rememberSaveable { mutableStateOf(true) }
     var isClosestFavSiteExpanded by rememberSaveable { mutableStateOf(true) }
 
     fun saveMeasureSelections() {
-        measuredMapPointsEncoded = encodeGeoPoints(measuredMapPoints)
-        measuredMapPointLocationLinksEncoded = encodeBooleanList(measuredMapPointLocationLinks)
+        measuredVerticesEncoded = encodeMeasureVertices(measuredVertices)
+        measuredLinkedToPrevEncoded = encodeBooleanList(measuredLinkedToPrev)
     }
 
     fun clearMeasureSelections() {
         measuredSites.clear()
-        measuredMapPoints.clear()
-        measuredMapPointLocationLinks.clear()
-        measuredMapPointsStartFromLocation = true
+        measuredVertices.clear()
+        measuredLinkedToPrev.clear()
+        measuredLoopClosed = false
         saveMeasureSelections()
     }
 
-    fun addManualMeasurePoint(point: GeoPoint, startFromLocationIfFirst: Boolean) {
-        if (measuredMapPoints.isEmpty()) {
-            measuredMapPointsStartFromLocation = startFromLocationIfFirst
-        }
-        measuredMapPoints.add(point)
-        measuredMapPointLocationLinks.add(measuredMapPointsStartFromLocation)
+    // Ajoute un sommet à la fin de la chaîne. Le tout premier sommet n'est relié à rien : le trait
+    // n'apparaît donc qu'à partir du 2e point (qui rejoint automatiquement le précédent). Ajouter un
+    // point rouvre la boucle : on prolonge le chemin, l'utilisateur pourra la refermer ensuite.
+    fun addMeasureVertex(vertex: MeasureVertex) {
+        val isFirst = measuredVertices.isEmpty()
+        measuredVertices.add(vertex)
+        measuredLinkedToPrev.add(!isFirst)
+        measuredLoopClosed = false
         saveMeasureSelections()
     }
 
-    fun removeManualMeasurePoint(index: Int) {
-        if (index !in measuredMapPoints.indices) return
-        measuredMapPoints.removeAt(index)
-        if (index in measuredMapPointLocationLinks.indices) {
-            measuredMapPointLocationLinks.removeAt(index)
+    // Retire le sommet `index`. reconnect = true : les voisins se rejoignent (recalcule avec le
+    // point d'avant). reconnect = false : on conserve le trou, les autres traits ne bougent pas.
+    fun removeMeasureVertex(index: Int, reconnect: Boolean) {
+        if (index !in measuredVertices.indices) return
+        measuredVertices.removeAt(index)
+        if (index in measuredLinkedToPrev.indices) measuredLinkedToPrev.removeAt(index)
+        // Sans reconnexion, le sommet qui a glissé à `index` ne doit pas se raccrocher au précédent.
+        if (!reconnect && index in measuredLinkedToPrev.indices) {
+            measuredLinkedToPrev[index] = false
         }
-        if (measuredMapPoints.isEmpty()) {
-            measuredMapPointsStartFromLocation = true
-        }
+        if (measuredLinkedToPrev.isNotEmpty()) measuredLinkedToPrev[0] = false
         saveMeasureSelections()
+    }
+
+    // La chaîne peut être refermée en boucle si c'est un chemin ouvert unique d'au moins 3 sommets
+    // (tous reliés de proche en proche, sans trou).
+    fun isMeasureLoopClosable(): Boolean =
+        measuredVertices.size >= 3 &&
+            (1 until measuredVertices.size).all { measuredLinkedToPrev.getOrNull(it) == true }
+
+    fun toggleMeasureLoop() {
+        measuredLoopClosed = if (measuredLoopClosed) false else isMeasureLoopClosable()
+    }
+
+    // Retire les sommets devenus orphelins (plus aucun trait ne les touche) après une suppression,
+    // afin de ne pas laisser un point isolé au bout d'un trait supprimé. Appelée uniquement après
+    // une suppression : le tout premier point posé (isolé volontairement, avant le 2e tap) n'est
+    // donc jamais concerné.
+    fun pruneOrphanMeasureVertices() {
+        var i = measuredVertices.size - 1
+        while (i >= 0) {
+            val hasIncoming = measuredLinkedToPrev.getOrNull(i) == true
+            val hasOutgoing = measuredLinkedToPrev.getOrNull(i + 1) == true
+            if (!hasIncoming && !hasOutgoing) {
+                measuredVertices.removeAt(i)
+                if (i in measuredLinkedToPrev.indices) measuredLinkedToPrev.removeAt(i)
+            }
+            i--
+        }
+        if (measuredLinkedToPrev.isNotEmpty()) measuredLinkedToPrev[0] = false
+        // Une boucle n'a plus de sens si le chemin n'est plus une chaîne unique fermable.
+        if (measuredLoopClosed && !isMeasureLoopClosable()) measuredLoopClosed = false
+        saveMeasureSelections()
+    }
+
+    // Supprime le trait qui arrive sur le sommet `toIndex` (segment entre toIndex-1 et toIndex),
+    // en respectant le réglage (indépendant vs reconnexion), puis retire les extrémités orphelines.
+    fun deleteMeasureSegment(toIndex: Int) {
+        // Cas boucle fermée : couper une arête « déplie » la boucle en un chemin ouvert qui conserve
+        // toutes les autres arêtes (y compris l'ancienne arête de fermeture).
+        if (measuredLoopClosed && isMeasureLoopClosable() && toIndex in 1 until measuredVertices.size) {
+            val n = measuredVertices.size
+            val rotatedVertices = (0 until n).map { measuredVertices[(toIndex + it) % n] }
+            measuredVertices.clear()
+            measuredVertices.addAll(rotatedVertices)
+            measuredLinkedToPrev.clear()
+            measuredLinkedToPrev.addAll(List(n) { it != 0 })
+            measuredLoopClosed = false
+            saveMeasureSelections()
+            return
+        }
+        if (AppConfig.measureReconnectOnDelete.value) {
+            removeMeasureVertex(toIndex, reconnect = true)
+        } else if (toIndex in measuredLinkedToPrev.indices) {
+            measuredLinkedToPrev[toIndex] = false
+            saveMeasureSelections()
+        }
+        pruneOrphanMeasureVertices()
     }
 
     // Rétablit l'auto-ouverture à l'activation du mode mesure
@@ -1566,9 +1656,48 @@ fun MapScreen(
         return BitmapDrawable(context.resources, bitmap)
     }
 
+    // Pastille bleue cerclée de blanc pour matérialiser un sommet posé par l'utilisateur.
+    // highlight = true : sommet de départ d'une chaîne fermable, dessiné en « cible » creuse et
+    // agrandie pour inviter à cliquer dessus afin de fermer la boucle.
+    // Le bitmap est plus grand que le disque visible (marge transparente) : la zone tactile — donc
+    // le clic sur le sommet — reste généreuse alors que le point affiché reste petit.
+    fun createMeasurePointIcon(highlight: Boolean = false): BitmapDrawable {
+        val density = context.resources.displayMetrics.density
+        val visibleDiameter = (if (highlight) 24f else 15f) * density
+        val touchDiameter = (if (highlight) 44f else 34f) * density
+        val sizePx = touchDiameter.toInt().coerceAtLeast(24)
+        val bitmap = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+        val center = sizePx / 2f
+        val ringWidth = visibleDiameter / 6f
+        val radius = visibleDiameter / 2f - ringWidth
+        val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.parseColor("#3B5998")
+            style = Paint.Style.FILL
+        }
+        val ringPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = android.graphics.Color.WHITE
+            style = Paint.Style.STROKE
+            strokeWidth = ringWidth
+        }
+        canvas.drawCircle(center, center, radius, fillPaint)
+        if (highlight) {
+            // Trou blanc central -> aspect anneau/cible qui distingue le point de départ.
+            val holePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = android.graphics.Color.WHITE
+                style = Paint.Style.FILL
+            }
+            canvas.drawCircle(center, center, radius * 0.42f, holePaint)
+        }
+        canvas.drawCircle(center, center, radius, ringPaint)
+        return BitmapDrawable(context.resources, bitmap)
+    }
+
     fun refreshMeasureLayers(map: MapView) {
         measureOverlay.items.clear()
         val myLoc = myCurrentLoc ?: locationOverlayRef?.myLocation
+        val measurePointIcon = createMeasurePointIcon(highlight = false)
+        val measureLoopAnchorIcon = createMeasurePointIcon(highlight = true)
 
         fun formatMeasureDistance(dist: Double): String {
             val isMi = AppConfig.distanceUnit.intValue == 1
@@ -1618,24 +1747,58 @@ fun MapScreen(
             measureOverlay.add(labelMarker)
         }
 
-        if (measuredMapPoints.isNotEmpty()) {
-            if (myLoc != null) {
-                measuredMapPoints.forEachIndexed { pointIndex, point ->
-                    if (measuredMapPointLocationLinks.getOrNull(pointIndex) == true) {
-                        addMeasureSegment(myLoc, point) {
-                            if (measuredMapPoints.size > 1) {
-                                measuredMapPointLocationLinks[pointIndex] = false
-                            } else {
-                                removeManualMeasurePoint(pointIndex)
-                            }
-                        }
-                    }
-                }
+        // Pastille cliquable matérialisant un sommet. highlight = point de départ d'une chaîne
+        // fermable (affiché en cible). onTap gère le clic (fermeture de boucle ou suppression).
+        fun addMeasurePointMarker(point: GeoPoint, highlight: Boolean, onTap: () -> Unit) {
+            val marker = Marker(map).apply {
+                position = point
+                setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_CENTER)
+                icon = if (highlight) measureLoopAnchorIcon else measurePointIcon
+                infoWindow = null
             }
+            marker.setOnMarkerClickListener { _, _ ->
+                onTap()
+                refreshMeasureLayers(map)
+                true
+            }
+            measureOverlay.add(marker)
+        }
 
-            measuredMapPoints.zipWithNext().forEachIndexed { segmentIndex, (startPoint, endPoint) ->
-                addMeasureSegment(startPoint, endPoint) {
-                    removeManualMeasurePoint(segmentIndex + 1)
+        fun resolveVertex(vertex: MeasureVertex): GeoPoint? = when (vertex) {
+            is MeasureVertex.Fixed -> vertex.point
+            MeasureVertex.CurrentLocation -> myLoc
+        }
+
+        // 1) Un trait + une étiquette de distance entre deux sommets consécutifs reliés.
+        for (index in 1 until measuredVertices.size) {
+            if (measuredLinkedToPrev.getOrNull(index) != true) continue
+            val start = resolveVertex(measuredVertices[index - 1]) ?: continue
+            val end = resolveVertex(measuredVertices[index]) ?: continue
+            addMeasureSegment(start, end) { deleteMeasureSegment(index) }
+        }
+
+        // 2) Trait de fermeture (dernier sommet -> premier) quand la boucle est fermée.
+        if (measuredLoopClosed && isMeasureLoopClosable()) {
+            val loopStart = resolveVertex(measuredVertices.last())
+            val loopEnd = resolveVertex(measuredVertices.first())
+            if (loopStart != null && loopEnd != null) {
+                addMeasureSegment(loopStart, loopEnd) { measuredLoopClosed = false }
+            }
+        }
+
+        // 3) Pastilles des sommets, ajoutées EN DERNIER pour être AU-DESSUS des traits : un tap sur un
+        //    point atteint ainsi la pastille et non le trait qui passe dessous. Le tout premier point
+        //    est compris (y compris « ma position »), ce qui montre que le tap a été pris en compte.
+        //    Cliquer le point de départ ferme (ou rouvre) la boucle ; sinon un tap supprime le point.
+        measuredVertices.forEachIndexed { index, vertex ->
+            val point = resolveVertex(vertex) ?: return@forEachIndexed
+            val isLoopAnchor = index == 0 && !measuredLoopClosed && isMeasureLoopClosable()
+            addMeasurePointMarker(point, highlight = isLoopAnchor) {
+                if (index == 0 && (measuredLoopClosed || isMeasureLoopClosable())) {
+                    toggleMeasureLoop()
+                } else {
+                    removeMeasureVertex(index, reconnect = AppConfig.measureReconnectOnDelete.value)
+                    pruneOrphanMeasureVertices()
                 }
             }
         }
@@ -1696,12 +1859,25 @@ fun MapScreen(
             override fun singleTapConfirmedHelper(p: GeoPoint): Boolean {
                 if (!isMeasuringMode) return false
                 val map = mapViewRef ?: return true
-                myCurrentLoc ?: locationOverlayRef?.myLocation ?: return true
 
-                addManualMeasurePoint(
-                    GeoPoint(p.latitude, p.longitude),
-                    startFromLocationIfFirst = true
-                )
+                // Si le tap tombe sur (ou tout près de) la position de l'utilisateur, on ajoute un
+                // sommet « ma position » qui se recalcule en direct ; sinon un point fixe sur la carte.
+                val myLoc = myCurrentLoc ?: locationOverlayRef?.myLocation
+                val tappedOnMyLocation = myLoc != null && run {
+                    val projection = map.projection
+                    val tapPixel = projection.toPixels(p, null)
+                    val locationPixel = projection.toPixels(myLoc, null)
+                    val dx = (tapPixel.x - locationPixel.x).toDouble()
+                    val dy = (tapPixel.y - locationPixel.y).toDouble()
+                    val thresholdPx = 28f * context.resources.displayMetrics.density
+                    dx * dx + dy * dy <= thresholdPx * thresholdPx
+                }
+
+                if (tappedOnMyLocation) {
+                    addMeasureVertex(MeasureVertex.CurrentLocation)
+                } else {
+                    addMeasureVertex(MeasureVertex.Fixed(GeoPoint(p.latitude, p.longitude)))
+                }
                 refreshMeasureLayers(map)
                 return true
             }
@@ -1875,10 +2051,7 @@ fun MapScreen(
                 snippet = item.subtitle(context)
                 setOnMarkerClickListener { clickedMarker, mapView ->
                     if (isMeasuringMode) {
-                        addManualMeasurePoint(
-                            GeoPoint(item.latitude, item.longitude),
-                            startFromLocationIfFirst = myCurrentLoc != null || locationOverlayRef?.myLocation != null
-                        )
+                        addMeasureVertex(MeasureVertex.Fixed(GeoPoint(item.latitude, item.longitude)))
                         refreshMeasureLayers(map)
                     } else if (item.isCluster) {
                         val targetPoint = GeoPoint(item.latitude, item.longitude)
@@ -2015,10 +2188,7 @@ fun MapScreen(
 
                         setOnMarkerClickListener { _, _ ->
                             if (isMeasuringMode) {
-                                addManualMeasurePoint(
-                                    GeoPoint(mainAntenna.latitude, mainAntenna.longitude),
-                                    startFromLocationIfFirst = myCurrentLoc != null || locationOverlayRef?.myLocation != null
-                                )
+                                addMeasureVertex(MeasureVertex.Fixed(GeoPoint(mainAntenna.latitude, mainAntenna.longitude)))
                                 refreshMeasureLayers(map)
                             } else {
                                 handleSupportTapFromMap(map, filteredSiteAntennas)
@@ -2126,10 +2296,7 @@ fun MapScreen(
                         // L'action de clic reste unique et propre !
                         setOnMarkerClickListener { _, _ ->
                             if (isMeasuringMode) {
-                                addManualMeasurePoint(
-                                    GeoPoint(mainAntenna.latitude, mainAntenna.longitude),
-                                    startFromLocationIfFirst = myCurrentLoc != null || locationOverlayRef?.myLocation != null
-                                )
+                                addMeasureVertex(MeasureVertex.Fixed(GeoPoint(mainAntenna.latitude, mainAntenna.longitude)))
                                 refreshMeasureLayers(map)
                             } else {
                                 handleSupportTapFromMap(map, filteredSiteAntennas)
@@ -2294,13 +2461,13 @@ fun MapScreen(
     }
 
     LaunchedEffect(myCurrentLoc) {
-        if (isMeasuringMode && (measuredSites.isNotEmpty() || measuredMapPoints.isNotEmpty())) {
+        if (isMeasuringMode && (measuredSites.isNotEmpty() || measuredVertices.isNotEmpty())) {
             mapViewRef?.let { refreshMeasureLayers(it) }
         }
     }
 
-    LaunchedEffect(isMeasuringMode, measuredMapPoints.size, measuredMapPointLocationLinks.size, mapViewRef) {
-        if (isMeasuringMode && measuredMapPoints.isNotEmpty()) {
+    LaunchedEffect(isMeasuringMode, measuredVertices.size, measuredLinkedToPrev.size, measuredLoopClosed, mapViewRef) {
+        if (isMeasuringMode && measuredVertices.isNotEmpty()) {
             mapViewRef?.let { refreshMeasureLayers(it) }
         }
     }
@@ -3119,7 +3286,7 @@ fun MapScreen(
             Spacer(modifier = Modifier.height(deleteButtonSpacer))
 
             AnimatedVisibility(
-                visible = measuredSites.isNotEmpty() || measuredMapPoints.isNotEmpty(),
+                visible = measuredSites.isNotEmpty() || measuredVertices.isNotEmpty(),
                 enter = fadeIn(),
                 exit = fadeOut()
             ) {
@@ -3707,6 +3874,11 @@ fun MapScreen(
                 onSpeedometerChange = {
                     AppConfig.showSpeedometer.value = it
                     prefs.edit().putBoolean(MapDisplayPrefs.showSpeedometer.key, it).apply()
+                },
+                measureReconnectOnDelete = AppConfig.measureReconnectOnDelete.value,
+                onMeasureReconnectChange = {
+                    AppConfig.measureReconnectOnDelete.value = it
+                    prefs.edit().putBoolean(MapDisplayPrefs.measureReconnectOnDelete.key, it).apply()
                 },
                 onDismiss = { showMapPageSettingsSheet = false },
                 onBack = { showMapPageSettingsSheet = false },

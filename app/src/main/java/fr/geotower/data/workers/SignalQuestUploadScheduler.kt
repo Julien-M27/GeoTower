@@ -26,6 +26,10 @@ object SignalQuestUploadScheduler {
     // des l'etat ENQUEUED (avant tout setProgress), sans relire le manifeste sur le disque.
     private const val OPERATOR_TAG_PREFIX = "sq_operator:"
 
+    // Un envoi vers plusieurs operateurs cree un work par operateur, tous marques du meme batchId :
+    // l'overlay attend la fin de TOUT le lot pour afficher un seul recapitulatif par operateur.
+    private const val BATCH_TAG_PREFIX = "sq_batch:"
+
     fun uploadIdFromTags(tags: Set<String>): String? {
         return tags.firstOrNull { it.startsWith(UPLOAD_ID_TAG_PREFIX) }
             ?.removePrefix(UPLOAD_ID_TAG_PREFIX)
@@ -38,9 +42,15 @@ object SignalQuestUploadScheduler {
             ?.takeIf { it.isNotBlank() }
     }
 
-    fun enqueue(context: Context, manifest: SignalQuestUploadManifest): UUID {
+    fun batchIdFromTags(tags: Set<String>): String? {
+        return tags.firstOrNull { it.startsWith(BATCH_TAG_PREFIX) }
+            ?.removePrefix(BATCH_TAG_PREFIX)
+            ?.takeIf { it.isNotBlank() }
+    }
+
+    fun enqueue(context: Context, manifest: SignalQuestUploadManifest, batchId: String? = null): UUID {
         val appContext = context.applicationContext
-        val request = buildRequest(manifest)
+        val request = buildRequest(manifest, batchId)
         WorkManager.getInstance(appContext).enqueueUniqueWork(
             UNIQUE_WORK_NAME,
             ExistingWorkPolicy.APPEND_OR_REPLACE,
@@ -49,17 +59,21 @@ object SignalQuestUploadScheduler {
         return request.id
     }
 
-    private fun buildRequest(manifest: SignalQuestUploadManifest): OneTimeWorkRequest {
+    private fun buildRequest(manifest: SignalQuestUploadManifest, batchId: String?): OneTimeWorkRequest {
         val uploadData = workDataOf(
             SignalQuestUploadQueue.INPUT_UPLOAD_ID to manifest.uploadId
         )
 
-        return OneTimeWorkRequestBuilder<SignalQuestUploadWorker>()
+        val builder = OneTimeWorkRequestBuilder<SignalQuestUploadWorker>()
             .setInputData(uploadData)
             .addTag("sq_upload_${manifest.siteId}")
             .addTag(GLOBAL_TAG)
             .addTag(UPLOAD_ID_TAG_PREFIX + manifest.uploadId)
             .addTag(OPERATOR_TAG_PREFIX + manifest.operator)
+        if (!batchId.isNullOrBlank()) {
+            builder.addTag(BATCH_TAG_PREFIX + batchId)
+        }
+        return builder
             .setConstraints(
                 Constraints.Builder()
                     .setRequiredNetworkType(NetworkType.CONNECTED)

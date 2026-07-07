@@ -33,6 +33,7 @@ import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadQueueException
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.NotificationIconResources
+import fr.geotower.utils.OperatorColors
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.first
@@ -422,8 +423,11 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         notificationId: Int
     ): Notification {
         ensureNotificationChannel()
-        val title = APP_NOTIFICATION_TITLE
-        val message = applicationContext.getString(R.string.notification_signalquest_upload_progress, current, total)
+        val operatorLabel = OperatorColors.specForKey(manifest.operator)?.label ?: manifest.operator
+        val title = applicationContext.getString(R.string.notification_signalquest_upload_to_operator, operatorLabel)
+        val message = manifest.address?.takeIf { it.isNotBlank() }?.let { address ->
+            applicationContext.getString(R.string.notification_signalquest_upload_progress_address, address, current, total)
+        } ?: applicationContext.getString(R.string.notification_signalquest_upload_progress, current, total)
         val progressPercent = progressPercent(current, total)
         val shortCriticalText = "$current/$total"
         val pendingIntent = createUploadPendingIntent(manifest, notificationId)

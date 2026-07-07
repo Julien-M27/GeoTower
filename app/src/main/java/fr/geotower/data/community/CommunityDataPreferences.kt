@@ -204,6 +204,53 @@ object CommunityDataPreferences {
         editor.apply()
     }
 
+    /**
+     * Une photo favorite enregistrée : le site (id_support ou id_anfr en repli), le « bucket »
+     * (ex. "signalquest_orange" ou "cellularfr") et l'identifiant stable de la photo favorite.
+     */
+    data class FavoritePhotoEntry(
+        val siteId: String,
+        val bucketId: String,
+        val photoId: String
+    )
+
+    /**
+     * Énumère toutes les photos favorites enregistrées, tous sites et opérateurs confondus.
+     * Le parsing reste ici pour rester cohérent avec [sitePhotoFavoritePrefKey] : la clé vaut
+     * `site_photo_favorite_{siteId}_{bucketId}`, où `siteId` est numérique (sans underscore),
+     * on coupe donc sur le premier underscore suivant le préfixe.
+     */
+    fun favoritePhotoEntries(prefs: SharedPreferences): List<FavoritePhotoEntry> {
+        return prefs.all.entries
+            .asSequence()
+            .filter { it.key.startsWith(SITE_PHOTO_FAVORITE_KEY_PREFIX) }
+            .mapNotNull { entry ->
+                val photoId = (entry.value as? String)?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+                val remainder = entry.key.removePrefix(SITE_PHOTO_FAVORITE_KEY_PREFIX)
+                val separator = remainder.indexOf('_')
+                if (separator <= 0 || separator >= remainder.lastIndex) return@mapNotNull null
+                FavoritePhotoEntry(
+                    siteId = remainder.substring(0, separator),
+                    bucketId = remainder.substring(separator + 1),
+                    photoId = photoId
+                )
+            }
+            .toList()
+    }
+
+    /** Source de base ("signalquest" ou "cellularfr") derrière un bucket de favori. */
+    fun favoriteBucketBaseSourceId(bucketId: String): String {
+        return if (bucketId.startsWith(SOURCE_CELLULARFR)) SOURCE_CELLULARFR else SOURCE_SIGNALQUEST
+    }
+
+    /** Clé opérateur encodée dans un bucket SignalQuest (ex. "signalquest_orange" -> "orange"), sinon null. */
+    fun favoriteBucketOperatorKey(bucketId: String): String? {
+        if (!bucketId.startsWith(SOURCE_SIGNALQUEST)) return null
+        return bucketId.removePrefix(SOURCE_SIGNALQUEST)
+            .removePrefix("_")
+            .takeIf { it.isNotBlank() }
+    }
+
     fun orderedPhotoSourceIdsForOperatorKeys(
         prefs: SharedPreferences,
         operatorKeys: Iterable<String>

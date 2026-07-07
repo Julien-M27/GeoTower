@@ -187,6 +187,8 @@
     <string name="notification_app_update_available_title">Nouvelle version GeoTower</string>
     <string name="notification_app_update_available_desc">GeoTower %1$s est disponible. Touchez pour ouvrir le téléchargement.</string>
     <string name="notification_signalquest_upload_progress">Envoi en cours (%1$d/%2$d)...</string>
+    <string name="notification_signalquest_upload_to_operator">Envoi vers %1$s</string>
+    <string name="notification_signalquest_upload_progress_address">%1$s · %2$d/%3$d</string>
     <string name="notification_signalquest_upload_retry">Échec réseau, nouvel essai plus tard.</string>
     <string name="operator_count">↓ Nombre d\'opérateurs : %1$d</string>
     <string name="upload_history_no_photo_recorded">Aucune photo enregistrée</string>
@@ -1320,6 +1322,7 @@
     <string name="shared_photo_support_title">Photos partagées en attente</string>
     <string name="shared_photo_support_no_operator">Aucun opérateur compatible sur ce support.</string>
     <string name="shared_photo_support_select_one">Sélectionnez au moins un opérateur.</string>
+    <string name="shared_photo_operator_uploading">envoi en cours</string>
     <string name="appstrings_uploading_title">Envoi en cours</string>
     <string name="appstrings_validate">Valider</string>
     <string name="appstrings_version">Version</string>
@@ -2143,4 +2146,26 @@
     <string name="appstrings_release_v1961_support_picker">Quand plusieurs supports partagent les mêmes coordonnées, un sélecteur permet de choisir lequel ouvrir</string>
     <string name="appstrings_release_v1961_upload_plurals">Envoi de photos : progression, résultats et notifications corrigés au singulier/pluriel, avec l\'opérateur ciblé et le statut « Annulé »</string>
     <string name="appstrings_release_v1961_upload_support_select">Après le partage, sélection du support cible directement sur la carte</string>
+    <string name="appstrings_measure_tool_title">Outil de mesure</string>
+    <string name="appstrings_measure_delete_mode_desc">Choisissez ce qui arrive aux autres traits quand vous en supprimez un.</string>
+    <string name="appstrings_measure_delete_independent">Indépendant (les autres traits ne bougent pas)</string>
+    <string name="appstrings_measure_delete_reconnect">Reconnecter (recalcule avec le point précédent)</string>
+    <!-- Photos favorites (Réglages > Préférences) -->
+    <string name="photos_favorites_title">Photos favorites</string>
+    <string name="photos_favorites_desc">Retrouvez et gérez les photos de site mises en favori.</string>
+    <string name="photos_favorites_refresh">Actualiser</string>
+    <string name="photos_favorites_loading_title">Chargement des photos favorites…</string>
+    <string name="photos_favorites_loading_desc">GeoTower rassemble vos photos favorites et leurs sites.</string>
+    <string name="photos_favorites_empty_title">Aucune photo favorite</string>
+    <string name="photos_favorites_empty_desc">Ouvrez la galerie photo d\'un site et appuyez sur le cœur pour ajouter un favori.</string>
+    <string name="photos_favorites_site_ref">N° %1$s</string>
+    <string name="photos_favorites_site_fallback_title">Site N° %1$s</string>
+    <string name="photos_favorites_photo_unavailable">Photo indisponible</string>
+    <string name="photos_favorites_remove_title">Retirer des favoris ?</string>
+    <string name="photos_favorites_remove_message">Cette photo sera retirée de vos favoris. Vous pourrez la remettre plus tard.</string>
+    <string name="photos_favorites_remove_confirm">Retirer</string>
+    <string name="appstrings_release_v1962_favorite_photos_page">Nouvelle page « Photos favorites » pour retrouver et gérer les photos de site mises en favori, avec rafraîchissement et retrait</string>
+    <string name="appstrings_release_v1962_favorite_star">Ajout ou retrait d\'un favori via le cœur dans la galerie photos d\'un site</string>
+    <string name="appstrings_release_v1962_measure_delete_mode">Outil de mesure : à la suppression d\'un segment, choix entre « Indépendant » (les autres ne bougent pas) et « Reconnecter » (recalcul avec le point précédent)</string>
+    <string name="appstrings_release_v1962_upload_notification">Notification d\'envoi de photos enrichie : opérateur ciblé et progression avec l\'adresse</string>
 </resources>

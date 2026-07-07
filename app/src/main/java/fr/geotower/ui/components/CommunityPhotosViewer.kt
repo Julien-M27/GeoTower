@@ -659,7 +659,7 @@ private data class PhotoExportFile(
     val mimeType: String
 )
 
-private suspend fun copyCommunityPhotoToClipboard(context: Context, photo: CommunityPhoto) {
+internal suspend fun copyCommunityPhotoToClipboard(context: Context, photo: CommunityPhoto) {
     val exportFile = withContext(Dispatchers.IO) {
         cacheRemotePhotoForExport(context, photo)
     }
@@ -668,7 +668,7 @@ private suspend fun copyCommunityPhotoToClipboard(context: Context, photo: Commu
     }
 }
 
-private suspend fun saveCommunityPhotoToGallery(context: Context, photo: CommunityPhoto) {
+internal suspend fun saveCommunityPhotoToGallery(context: Context, photo: CommunityPhoto) {
     val exportFile = withContext(Dispatchers.IO) {
         cacheRemotePhotoForExport(context, photo)
     }
@@ -1870,7 +1870,7 @@ fun CommunityPhotosSectionShared(
 }
 
 @Composable
-private fun PhotoViewerActionButton(
+internal fun PhotoViewerActionButton(
     imageVector: ImageVector,
     contentDescription: String,
     backgroundColor: Color,
@@ -1948,7 +1948,7 @@ private fun PhotoInfoButton(
 }
 
 @Composable
-private fun PhotoExifDialog(
+internal fun PhotoExifDialog(
     photo: CommunityPhoto,
     onDismiss: () -> Unit
 ) {

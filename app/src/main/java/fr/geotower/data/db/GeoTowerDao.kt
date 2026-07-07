@@ -7,6 +7,7 @@ import fr.geotower.data.models.AntenneDbEntity
 import fr.geotower.data.models.CoverageSiteLocationEntity
 import fr.geotower.data.models.DbCluster
 import fr.geotower.data.models.FaisceauxEntity
+import fr.geotower.data.models.FavoriteScopeSiteRow
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.RefTypeAntenneDbEntity
@@ -1262,4 +1263,23 @@ interface GeoTowerDao {
         WHERE t.id_anfr = :idAnfr
     """)
     suspend fun getTechniqueByAnfr(idAnfr: String): List<TechniqueEntity>
+
+    @Query("""
+        SELECT
+            s.id_anfr AS id_anfr,
+            s.id_support AS id_support,
+            t.adresse AS adresse,
+            o.libelle AS operateur,
+            c.nom AS commune,
+            l.latitude AS latitude,
+            l.longitude AS longitude
+        FROM support s
+        LEFT JOIN technique t ON s.id_anfr = t.id_anfr
+        LEFT JOIN localisation l ON s.id_anfr = l.id_anfr
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN ref_commune c ON l.code_insee = c.code_insee
+        WHERE s.id_support = :scopeId OR s.id_anfr = :scopeId
+        LIMIT 60
+    """)
+    suspend fun getFavoriteScopeSiteRows(scopeId: String): List<FavoriteScopeSiteRow>
 }

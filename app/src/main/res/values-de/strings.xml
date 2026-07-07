@@ -187,6 +187,8 @@
     <string name="notification_app_update_available_title">Neue GeoTower-Version</string>
     <string name="notification_app_update_available_desc">GeoTower %1$s ist verfügbar. Tippe, um den Download zu öffnen.</string>
     <string name="notification_signalquest_upload_progress">Upload läuft (%1$d/%2$d)...</string>
+    <string name="notification_signalquest_upload_to_operator">Upload an %1$s</string>
+    <string name="notification_signalquest_upload_progress_address">%1$s · %2$d/%3$d</string>
     <string name="notification_signalquest_upload_retry">Netzwerkfehler, später wird erneut versucht.</string>
     <string name="operator_count">↓ Anzahl Betreiber: %1$d</string>
     <string name="upload_history_no_photo_recorded">Kein Foto gespeichert</string>
@@ -1320,6 +1322,7 @@
     <string name="shared_photo_support_title">Geteilte Fotos warten</string>
     <string name="shared_photo_support_no_operator">Kein kompatibler Betreiber auf diesem Support.</string>
     <string name="shared_photo_support_select_one">Wählen Sie mindestens einen Betreiber aus.</string>
+    <string name="shared_photo_operator_uploading">Upload läuft</string>
     <string name="appstrings_uploading_title">Upload läuft</string>
     <string name="appstrings_validate">Bestätigen</string>
     <string name="appstrings_version">Version</string>
@@ -2143,4 +2146,26 @@
     <string name="appstrings_release_v1961_support_picker">Wenn mehrere Träger dieselben Koordinaten teilen, kann über eine Auswahl gewählt werden, welcher geöffnet wird</string>
     <string name="appstrings_release_v1961_upload_plurals">Foto-Upload: Fortschritt, Ergebnisse und Benachrichtigungen jetzt korrekt in Singular/Plural, mit dem Zielbetreiber und dem Status „Abgebrochen“</string>
     <string name="appstrings_release_v1961_upload_support_select">Nach dem Teilen den Zielträger direkt auf der Karte auswählen</string>
+    <string name="appstrings_measure_tool_title">Messwerkzeug</string>
+    <string name="appstrings_measure_delete_mode_desc">Lege fest, was mit den anderen Linien passiert, wenn du eine löschst.</string>
+    <string name="appstrings_measure_delete_independent">Unabhängig (die anderen Linien bleiben unverändert)</string>
+    <string name="appstrings_measure_delete_reconnect">Neu verbinden (mit dem vorherigen Punkt neu berechnen)</string>
+    <!-- Lieblingsfotos (Einstellungen > Präferenzen) -->
+    <string name="photos_favorites_title">Lieblingsfotos</string>
+    <string name="photos_favorites_desc">Finde und verwalte die als Favorit markierten Standortfotos.</string>
+    <string name="photos_favorites_refresh">Aktualisieren</string>
+    <string name="photos_favorites_loading_title">Lieblingsfotos werden geladen…</string>
+    <string name="photos_favorites_loading_desc">GeoTower sammelt deine favorisierten Fotos und ihre Standorte.</string>
+    <string name="photos_favorites_empty_title">Keine Lieblingsfotos</string>
+    <string name="photos_favorites_empty_desc">Öffne die Fotogalerie eines Standorts und tippe auf das Herz, um einen Favoriten hinzuzufügen.</string>
+    <string name="photos_favorites_site_ref">Nr. %1$s</string>
+    <string name="photos_favorites_site_fallback_title">Standort Nr. %1$s</string>
+    <string name="photos_favorites_photo_unavailable">Foto nicht verfügbar</string>
+    <string name="photos_favorites_remove_title">Aus Favoriten entfernen?</string>
+    <string name="photos_favorites_remove_message">Dieses Foto wird aus deinen Favoriten entfernt. Du kannst es später wieder hinzufügen.</string>
+    <string name="photos_favorites_remove_confirm">Entfernen</string>
+    <string name="appstrings_release_v1962_favorite_photos_page">Neue Seite „Favoriten-Fotos“, um die markierten Standortfotos zu finden und zu verwalten, mit Aktualisierung und Entfernen</string>
+    <string name="appstrings_release_v1962_favorite_star">Favorit über das Herz in der Fotogalerie eines Standorts hinzufügen oder entfernen</string>
+    <string name="appstrings_release_v1962_measure_delete_mode">Messwerkzeug: beim Löschen eines Abschnitts zwischen „Unabhängig“ (die anderen bleiben) und „Neu verbinden“ (Neuberechnung mit dem vorherigen Punkt) wählen</string>
+    <string name="appstrings_release_v1962_upload_notification">Reichhaltigere Foto-Upload-Benachrichtigung: Zielbetreiber und Fortschritt mit Adresse</string>
 </resources>

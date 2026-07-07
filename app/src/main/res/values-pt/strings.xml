@@ -187,6 +187,8 @@
     <string name="notification_app_update_available_title">Nova versão do GeoTower</string>
     <string name="notification_app_update_available_desc">GeoTower %1$s está disponível. Toque para abrir a transferência.</string>
     <string name="notification_signalquest_upload_progress">A enviar (%1$d/%2$d)...</string>
+    <string name="notification_signalquest_upload_to_operator">A enviar para %1$s</string>
+    <string name="notification_signalquest_upload_progress_address">%1$s · %2$d/%3$d</string>
     <string name="notification_signalquest_upload_retry">Erro de rede, nova tentativa mais tarde.</string>
     <string name="operator_count">↓ Número de operadoras: %1$d</string>
     <string name="upload_history_no_photo_recorded">Nenhuma foto registada</string>
@@ -1320,6 +1322,7 @@
     <string name="shared_photo_support_title">Fotos compartilhadas pendentes</string>
     <string name="shared_photo_support_no_operator">Nenhuma operadora compatível neste suporte.</string>
     <string name="shared_photo_support_select_one">Selecione pelo menos uma operadora.</string>
+    <string name="shared_photo_operator_uploading">envio em curso</string>
     <string name="appstrings_uploading_title">Enviando</string>
     <string name="appstrings_validate">Validar</string>
     <string name="appstrings_version">Versão</string>
@@ -2143,4 +2146,26 @@
     <string name="appstrings_release_v1961_support_picker">Quando vários suportes partilham as mesmas coordenadas, um seletor permite escolher qual abrir</string>
     <string name="appstrings_release_v1961_upload_plurals">Envio de fotos: progresso, resultados e notificações agora corretos no singular/plural, com a operadora de destino e o estado «Cancelado»</string>
     <string name="appstrings_release_v1961_upload_support_select">Após a partilha, selecione o suporte de destino diretamente no mapa</string>
+    <string name="appstrings_measure_tool_title">Ferramenta de medição</string>
+    <string name="appstrings_measure_delete_mode_desc">Escolha o que acontece às outras linhas ao eliminar uma.</string>
+    <string name="appstrings_measure_delete_independent">Independente (as outras linhas não se movem)</string>
+    <string name="appstrings_measure_delete_reconnect">Reconectar (recalcular com o ponto anterior)</string>
+    <!-- Fotos favoritas (Definições > Preferências) -->
+    <string name="photos_favorites_title">Fotos favoritas</string>
+    <string name="photos_favorites_desc">Encontre e faça a gestão das fotos de sites marcadas como favoritas.</string>
+    <string name="photos_favorites_refresh">Atualizar</string>
+    <string name="photos_favorites_loading_title">A carregar as fotos favoritas…</string>
+    <string name="photos_favorites_loading_desc">O GeoTower está a reunir as suas fotos favoritas e os respetivos sites.</string>
+    <string name="photos_favorites_empty_title">Sem fotos favoritas</string>
+    <string name="photos_favorites_empty_desc">Abra a galeria de fotos de um site e toque no coração para adicionar um favorito.</string>
+    <string name="photos_favorites_site_ref">N.º %1$s</string>
+    <string name="photos_favorites_site_fallback_title">Site n.º %1$s</string>
+    <string name="photos_favorites_photo_unavailable">Foto indisponível</string>
+    <string name="photos_favorites_remove_title">Remover dos favoritos?</string>
+    <string name="photos_favorites_remove_message">Esta foto será removida dos seus favoritos. Poderá adicioná-la novamente mais tarde.</string>
+    <string name="photos_favorites_remove_confirm">Remover</string>
+    <string name="appstrings_release_v1962_favorite_photos_page">Nova página «Fotos favoritas» para encontrar e gerir as fotos de site marcadas, com atualização e remoção</string>
+    <string name="appstrings_release_v1962_favorite_star">Adicionar ou remover um favorito com o coração na galeria de fotos de um site</string>
+    <string name="appstrings_release_v1962_measure_delete_mode">Ferramenta de medição: ao eliminar um segmento, escolha entre «Independente» (os outros não se movem) e «Reconectar» (recalcular com o ponto anterior)</string>
+    <string name="appstrings_release_v1962_upload_notification">Notificação de envio de fotos enriquecida: operadora de destino e progresso com o endereço</string>
 </resources>

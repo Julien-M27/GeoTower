@@ -16,6 +16,7 @@ import fr.geotower.data.models.AntenneDbEntity
 import fr.geotower.data.models.CoverageSiteLocationEntity
 import fr.geotower.data.models.DbCluster
 import fr.geotower.data.models.FaisceauxEntity
+import fr.geotower.data.models.FavoriteScopeSiteRow
 import fr.geotower.data.models.FrequencyDetailsCodec
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.LiveSiteResponseDto
@@ -1110,6 +1111,19 @@ class AnfrRepository(
 
         return queryLocalDatabase(emptyList()) {
             getTechniqueByAnfr(idAnfr)
+        }
+    }
+
+    /**
+     * Résout un identifiant de « scope favori » (id_support, ou id_anfr en repli) vers les
+     * antennes correspondantes, afin d'afficher adresse/commune/opérateur sur la page des
+     * photos favorites. Lecture seule ; renvoie une liste vide si la base locale est indisponible.
+     */
+    suspend fun getFavoriteScopeSiteRows(scopeId: String): List<FavoriteScopeSiteRow> {
+        val normalized = scopeId.trim()
+        if (normalized.isBlank()) return emptyList()
+        return queryLocalDatabase(emptyList()) {
+            getFavoriteScopeSiteRows(normalized)
         }
     }
 

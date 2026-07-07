@@ -187,6 +187,8 @@
     <string name="notification_app_update_available_title">Nuova versione GeoTower</string>
     <string name="notification_app_update_available_desc">GeoTower %1$s è disponibile. Tocca per aprire il download.</string>
     <string name="notification_signalquest_upload_progress">Invio in corso (%1$d/%2$d)...</string>
+    <string name="notification_signalquest_upload_to_operator">Invio verso %1$s</string>
+    <string name="notification_signalquest_upload_progress_address">%1$s · %2$d/%3$d</string>
     <string name="notification_signalquest_upload_retry">Errore di rete, nuovo tentativo più tardi.</string>
     <string name="operator_count">↓ Numero di operatori: %1$d</string>
     <string name="upload_history_no_photo_recorded">Nessuna foto registrata</string>
@@ -1320,6 +1322,7 @@
     <string name="shared_photo_support_title">Foto condivise in attesa</string>
     <string name="shared_photo_support_no_operator">Nessun operatore compatibile su questo supporto.</string>
     <string name="shared_photo_support_select_one">Seleziona almeno un operatore.</string>
+    <string name="shared_photo_operator_uploading">invio in corso</string>
     <string name="appstrings_uploading_title">Invio in corso</string>
     <string name="appstrings_validate">Conferma</string>
     <string name="appstrings_version">Versione</string>
@@ -2143,4 +2146,26 @@
     <string name="appstrings_release_v1961_support_picker">Quando più supporti condividono le stesse coordinate, un selettore permette di scegliere quale aprire</string>
     <string name="appstrings_release_v1961_upload_plurals">Invio di foto: avanzamento, risultati e notifiche ora corretti al singolare/plurale, con l\'operatore di destinazione e lo stato «Annullato»</string>
     <string name="appstrings_release_v1961_upload_support_select">Dopo la condivisione, seleziona il supporto di destinazione direttamente sulla mappa</string>
+    <string name="appstrings_measure_tool_title">Strumento di misura</string>
+    <string name="appstrings_measure_delete_mode_desc">Scegli cosa succede alle altre linee quando ne elimini una.</string>
+    <string name="appstrings_measure_delete_independent">Indipendente (le altre linee non si spostano)</string>
+    <string name="appstrings_measure_delete_reconnect">Ricollega (ricalcola con il punto precedente)</string>
+    <!-- Foto preferite (Impostazioni > Preferenze) -->
+    <string name="photos_favorites_title">Foto preferite</string>
+    <string name="photos_favorites_desc">Trova e gestisci le foto dei siti aggiunte ai preferiti.</string>
+    <string name="photos_favorites_refresh">Aggiorna</string>
+    <string name="photos_favorites_loading_title">Caricamento delle foto preferite…</string>
+    <string name="photos_favorites_loading_desc">GeoTower sta raccogliendo le tue foto preferite e i relativi siti.</string>
+    <string name="photos_favorites_empty_title">Nessuna foto preferita</string>
+    <string name="photos_favorites_empty_desc">Apri la galleria foto di un sito e tocca il cuore per aggiungere un preferito.</string>
+    <string name="photos_favorites_site_ref">N. %1$s</string>
+    <string name="photos_favorites_site_fallback_title">Sito n. %1$s</string>
+    <string name="photos_favorites_photo_unavailable">Foto non disponibile</string>
+    <string name="photos_favorites_remove_title">Rimuovere dai preferiti?</string>
+    <string name="photos_favorites_remove_message">Questa foto verrà rimossa dai preferiti. Potrai aggiungerla di nuovo più tardi.</string>
+    <string name="photos_favorites_remove_confirm">Rimuovi</string>
+    <string name="appstrings_release_v1962_favorite_photos_page">Nuova pagina «Foto preferite» per trovare e gestire le foto dei siti aggiunte ai preferiti, con aggiornamento e rimozione</string>
+    <string name="appstrings_release_v1962_favorite_star">Aggiungi o rimuovi un preferito con il cuore nella galleria foto di un sito</string>
+    <string name="appstrings_release_v1962_measure_delete_mode">Strumento di misura: eliminando un segmento, scegli tra «Indipendente» (gli altri non si spostano) e «Riconnetti» (ricalcolo con il punto precedente)</string>
+    <string name="appstrings_release_v1962_upload_notification">Notifica di invio foto arricchita: operatore di destinazione e avanzamento con l\'indirizzo</string>
 </resources>

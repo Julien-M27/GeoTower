@@ -135,7 +135,9 @@ data class SignalQuestUploadManifest(
     val stripExifBeforeUpload: Boolean = true,
     val anfrCode: String? = null,
     val nationalSiteCode: String? = null,
-    val sourceCode: String? = null
+    val sourceCode: String? = null,
+    // Adresse postale du site (issue de la base ANFR), affichee dans la notification d'envoi.
+    val address: String? = null
 )
 
 object SignalQuestUploadManifestCodec {
@@ -227,7 +229,8 @@ object SignalQuestUploadQueue {
         operator: String,
         description: String,
         uriStrings: List<String>,
-        stripExifBeforeUpload: Boolean = true
+        stripExifBeforeUpload: Boolean = true,
+        address: String? = null
     ): SignalQuestUploadManifest {
         cleanupStaleFiles(context)
 
@@ -298,7 +301,8 @@ object SignalQuestUploadQueue {
                 description = description,
                 createdAtMillis = createdAtMillis,
                 files = files,
-                stripExifBeforeUpload = stripExifBeforeUpload
+                stripExifBeforeUpload = stripExifBeforeUpload,
+                address = address?.trim()?.takeIf { it.isNotBlank() }
             )
             manifestFile(uploadDir).writeText(SignalQuestUploadManifestCodec.encode(manifest))
             return manifest

@@ -337,6 +337,21 @@ data class FaisceauxEntity(
     @ColumnInfo(name = "azimuts_fh") val azimutsFh: String?
 )
 
+/**
+ * Projection used to resolve a favorite-photo scope id (id_support, or id_anfr en repli)
+ * vers des informations affichables (adresse, commune, opérateur, coordonnées).
+ * Une ligne par antenne rattachée au support.
+ */
+data class FavoriteScopeSiteRow(
+    @ColumnInfo(name = "id_anfr") val idAnfr: String,
+    @ColumnInfo(name = "id_support") val idSupport: String?,
+    @ColumnInfo(name = "adresse") val adresse: String?,
+    @ColumnInfo(name = "operateur") val operateur: String?,
+    @ColumnInfo(name = "commune") val commune: String?,
+    @ColumnInfo(name = "latitude") val latitude: Double?,
+    @ColumnInfo(name = "longitude") val longitude: Double?
+)
+
 data class DbCluster(
     @ColumnInfo(name = "centerLat") val centerLat: Double,
     @ColumnInfo(name = "centerLon") val centerLon: Double,

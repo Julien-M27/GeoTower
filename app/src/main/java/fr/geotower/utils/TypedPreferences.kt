@@ -55,6 +55,9 @@ object MapDisplayPrefs {
     val showBouygues = BooleanPreference("show_bouygues", true)
     val showFree = BooleanPreference("show_free", true)
     val showSpeedometer = BooleanPreference("show_speedometer", true)
+    // Outil de mesure : au moment de supprimer un trait, faut-il reconnecter la chaîne
+    // (recalcule avec le point d'avant) ou laisser les autres traits inchangés ?
+    val measureReconnectOnDelete = BooleanPreference("measure_reconnect_on_delete", false)
     val showLocationMarker = BooleanPreference(AppConfig.PREF_SHOW_MAP_LOCATION_MARKER, true)
     val showRadioSites = BooleanPreference(AppConfig.PREF_SHOW_RADIO_SITES, false)
     val showAzimuthLines = BooleanPreference(AppConfig.PREF_SHOW_AZIMUTH_LINES, AppConfig.DEFAULT_SHOW_AZIMUTH_LINES)

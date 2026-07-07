@@ -975,6 +975,7 @@ fun MapSettingsSheet(
     showScale: Boolean, onScaleChange: (Boolean) -> Unit,
     showAttribution: Boolean, onAttributionChange: (Boolean) -> Unit,
     showSpeedometer: Boolean, onSpeedometerChange: (Boolean) -> Unit,
+    measureReconnectOnDelete: Boolean, onMeasureReconnectChange: (Boolean) -> Unit,
     onDismiss: () -> Unit, onBack: () -> Unit,
     sheetState: SheetState, useOneUi: Boolean, bubbleColor: Color
 ) {
@@ -1044,6 +1045,37 @@ fun MapSettingsSheet(
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_scale_option), showMapLocation = showScale, onLocationChange = onScaleChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_attribution_option), showMapLocation = showAttribution, onLocationChange = onAttributionChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                 }
+
+                // --- OUTIL DE MESURE : comportement à la suppression d'un trait ---
+                Spacer(modifier = Modifier.height(sizing.spacing(20.dp)))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                Text(
+                    text = stringResource(R.string.appstrings_measure_tool_title),
+                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = stringResource(R.string.appstrings_measure_delete_mode_desc),
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(4.dp), bottom = sizing.spacing(12.dp))
+                )
+                Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
+                    SettingsRadioItem(
+                        stringResource(R.string.appstrings_measure_delete_independent),
+                        !measureReconnectOnDelete,
+                        useOneUi,
+                        bubbleColor
+                    ) { onMeasureReconnectChange(false) }
+                    SettingsRadioItem(
+                        stringResource(R.string.appstrings_measure_delete_reconnect),
+                        measureReconnectOnDelete,
+                        useOneUi,
+                        bubbleColor
+                    ) { onMeasureReconnectChange(true) }
+                }
             }
 
             Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
@@ -1062,6 +1094,7 @@ fun MapSettingsSheet(
                     onSpeedometerChange(true)
                     onScaleChange(true)
                     onAttributionChange(true)
+                    onMeasureReconnectChange(false)
                 }
             }) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)

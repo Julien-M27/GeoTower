@@ -81,6 +81,9 @@ object AppConfig {
     val defaultSignalQuestCoverageOperatorKeys = setOf(OperatorColors.ORANGE_KEY)
 
     var showSpeedometer = mutableStateOf(true)
+    // Outil de mesure : true = supprimer un trait reconnecte la chaîne (recalcule avec le point
+    // précédent) ; false = les autres traits ne bougent pas (comportement par défaut).
+    var measureReconnectOnDelete = mutableStateOf(false)
     var showMapLocationMarker = mutableStateOf(true)
     var showRadioSites = mutableStateOf(false)
     var showRadioTv = mutableStateOf(false)
@@ -254,6 +257,7 @@ object AppConfig {
         selectedSignalQuestCoverageOperatorKeys.value = loadSignalQuestCoverageOperatorKeys(prefs)
         showTheoreticalCoverage.value = prefs.getBoolean(PREF_SHOW_THEORETICAL_COVERAGE, false)
         showSpeedometer.value = MapDisplayPrefs.showSpeedometer.read(prefs)
+        measureReconnectOnDelete.value = MapDisplayPrefs.measureReconnectOnDelete.read(prefs)
 
         showSitesInService.value = MapDisplayPrefs.showSitesInService.read(prefs)
         showSitesOutOfService.value = MapDisplayPrefs.showSitesOutOfService.read(prefs)

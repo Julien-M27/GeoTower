@@ -187,6 +187,8 @@
     <string name="notification_app_update_available_title">New GeoTower version</string>
     <string name="notification_app_update_available_desc">GeoTower %1$s is available. Tap to open the download.</string>
     <string name="notification_signalquest_upload_progress">Uploading (%1$d/%2$d)...</string>
+    <string name="notification_signalquest_upload_to_operator">Uploading to %1$s</string>
+    <string name="notification_signalquest_upload_progress_address">%1$s · %2$d/%3$d</string>
     <string name="notification_signalquest_upload_retry">Network error, retrying later.</string>
     <string name="operator_count">↓ Number of operators: %1$d</string>
     <string name="upload_history_no_photo_recorded">No photo recorded</string>
@@ -1320,6 +1322,7 @@
     <string name="shared_photo_support_title">Shared photos pending</string>
     <string name="shared_photo_support_no_operator">No compatible operator on this support.</string>
     <string name="shared_photo_support_select_one">Select at least one operator.</string>
+    <string name="shared_photo_operator_uploading">upload in progress</string>
     <string name="appstrings_uploading_title">Uploading</string>
     <string name="appstrings_validate">Validate</string>
     <string name="appstrings_version">Version</string>
@@ -2143,4 +2146,26 @@
     <string name="appstrings_release_v1961_support_picker">When several supports share the same coordinates, a picker lets you choose which one to open</string>
     <string name="appstrings_release_v1961_upload_plurals">Photo upload: progress, results and notifications now correct for singular/plural, with the target operator and a Cancelled status</string>
     <string name="appstrings_release_v1961_upload_support_select">After sharing, select the target support directly on the map</string>
+    <string name="appstrings_measure_tool_title">Measurement tool</string>
+    <string name="appstrings_measure_delete_mode_desc">Choose what happens to the other segments when you delete one.</string>
+    <string name="appstrings_measure_delete_independent">Independent (the other segments don\'t move)</string>
+    <string name="appstrings_measure_delete_reconnect">Reconnect (recalculate with the previous point)</string>
+    <!-- Favorite photos page (Settings > Preferences) -->
+    <string name="photos_favorites_title">Favorite photos</string>
+    <string name="photos_favorites_desc">Find and manage the site photos you starred.</string>
+    <string name="photos_favorites_refresh">Refresh</string>
+    <string name="photos_favorites_loading_title">Loading favorite photos…</string>
+    <string name="photos_favorites_loading_desc">GeoTower is gathering your starred photos and their sites.</string>
+    <string name="photos_favorites_empty_title">No favorite photos</string>
+    <string name="photos_favorites_empty_desc">Open a site\'s photo gallery and tap the heart to add a favorite.</string>
+    <string name="photos_favorites_site_ref">No. %1$s</string>
+    <string name="photos_favorites_site_fallback_title">Site No. %1$s</string>
+    <string name="photos_favorites_photo_unavailable">Photo unavailable</string>
+    <string name="photos_favorites_remove_title">Remove from favorites?</string>
+    <string name="photos_favorites_remove_message">This photo will be removed from your favorites. You can add it back later.</string>
+    <string name="photos_favorites_remove_confirm">Remove</string>
+    <string name="appstrings_release_v1962_favorite_photos_page">New Favorite photos page to find and manage the site photos you starred, with refresh and removal</string>
+    <string name="appstrings_release_v1962_favorite_star">Add or remove a favorite with the heart in a site\'s photo gallery</string>
+    <string name="appstrings_release_v1962_measure_delete_mode">Measurement tool: when deleting a segment, choose between Independent (the others don\'t move) and Reconnect (recalculate with the previous point)</string>
+    <string name="appstrings_release_v1962_upload_notification">Richer photo upload notification: target operator and progress with the address</string>
 </resources>

@@ -58,6 +58,7 @@ import fr.geotower.ui.screens.onboarding.FirstStartScreen
 import fr.geotower.ui.screens.home.HomeScreen
 import fr.geotower.ui.screens.help.HelpScreen
 import fr.geotower.ui.screens.settings.SettingsScreen
+import fr.geotower.ui.screens.settings.PhotosFavoritesScreen
 import fr.geotower.ui.screens.coverage.TheoreticalCoverageScreen
 import fr.geotower.ui.screens.emitters.ElevationProfileScreen
 import fr.geotower.ui.screens.emitters.NearEmittersSupportWrapperScreen
@@ -752,6 +753,16 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
+                            // Photos favorites (ouvert depuis Réglages ▸ Préférences)
+                            composable("photos_favorites") {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    PhotosFavoritesScreen(
+                                        navController = navController,
+                                        repository = repository
+                                    )
+                                }
+                            }
+
                             composable("photo_upload_history") {
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.PHOTO_UPLOAD_HISTORY)) {
@@ -1009,7 +1020,7 @@ class MainActivity : ComponentActivity() {
                             // --- 3. ÉCRAN D'ENVOI SIGNAL QUEST ---
                             composable(
                                 // ✅ AJOUT DE &azimuts={azimuts} À LA FIN
-                                route = "sq_upload/{siteId}/{operatorName}?draftId={draftId}&lat={lat}&lon={lon}&azimuts={azimuts}&operatorNames={operatorNames}&keepDraft={keepDraft}",
+                                route = "sq_upload/{siteId}/{operatorName}?draftId={draftId}&lat={lat}&lon={lon}&azimuts={azimuts}&operatorNames={operatorNames}&address={address}&keepDraft={keepDraft}",
                                 arguments = listOf(
                                     navArgument("siteId") { type = NavType.StringType },
                                     navArgument("operatorName") { type = NavType.StringType },
@@ -1020,6 +1031,7 @@ class MainActivity : ComponentActivity() {
                                     // ✅ NOUVEAU ARGUMENT
                                     navArgument("azimuts") { type = NavType.StringType; defaultValue = "" },
                                     navArgument("operatorNames") { type = NavType.StringType; defaultValue = "" },
+                                    navArgument("address") { type = NavType.StringType; defaultValue = "" },
                                     navArgument("keepDraft") { type = NavType.BoolType; defaultValue = false }
                                 )
                             ) { backStackEntry ->
@@ -1034,6 +1046,9 @@ class MainActivity : ComponentActivity() {
                                 val decodedAzimuts = android.net.Uri.decode(azimutsStr)
                                 val operatorNamesRaw = backStackEntry.arguments?.getString("operatorNames") ?: ""
                                 val operatorNames = decodeUploadOperatorNames(operatorNamesRaw).ifEmpty { listOf(operatorName) }
+                                val uploadAddress = android.net.Uri.decode(backStackEntry.arguments?.getString("address") ?: "")
+                                    .trim()
+                                    .takeIf { it.isNotBlank() }
                                 val keepDraft = backStackEntry.arguments?.getBoolean("keepDraft") ?: false
 
                                 val uris = remember(draftId) {
@@ -1073,6 +1088,9 @@ class MainActivity : ComponentActivity() {
                                             }
                                             lifecycleScope.launch {
                                                 try {
+                                                    // Un batchId commun a tous les operateurs de cet envoi permet a l'overlay
+                                                    // d'attendre la fin du lot complet avant d'afficher le recapitulatif.
+                                                    val batchId = java.util.UUID.randomUUID().toString()
                                                     withContext(Dispatchers.IO) {
                                                         targetOperators.ifEmpty { listOf(operatorName) }.forEach { targetOperator ->
                                                             val manifest = SignalQuestUploadQueue.createUpload(
@@ -1081,10 +1099,11 @@ class MainActivity : ComponentActivity() {
                                                                 operator = targetOperator,
                                                                 description = description,
                                                                 uriStrings = finalUris,
-                                                                stripExifBeforeUpload = stripExifBeforeUpload
+                                                                stripExifBeforeUpload = stripExifBeforeUpload,
+                                                                address = uploadAddress
                                                             )
 
-                                                            SignalQuestUploadScheduler.enqueue(applicationContext, manifest)
+                                                            SignalQuestUploadScheduler.enqueue(applicationContext, manifest, batchId)
                                                         }
                                                     }
 

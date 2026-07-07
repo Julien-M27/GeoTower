@@ -62,6 +62,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.draw.alpha
+import androidx.compose.runtime.collectAsState
+import androidx.work.WorkInfo
+import androidx.work.WorkManager
+import fr.geotower.data.workers.SignalQuestUploadScheduler
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -572,15 +577,38 @@ fun SupportDetailScreen(
         }
     }
 
+    // Opérateurs de CE site ayant déjà un envoi en cours (RUNNING/ENQUEUED) : leur case sera
+    // grisée pour empêcher un second envoi simultané vers la même cible.
+    val uploadSiteTagId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId
+    val activeUploadWorkInfos by remember(uploadSiteTagId) {
+        WorkManager.getInstance(context).getWorkInfosByTagFlow("sq_upload_$uploadSiteTagId")
+    }.collectAsState(initial = emptyList())
+    val uploadingOperatorParams = remember(activeUploadWorkInfos) {
+        activeUploadWorkInfos
+            .filter { it.state == WorkInfo.State.RUNNING || it.state == WorkInfo.State.ENQUEUED }
+            .mapNotNull { SignalQuestUploadScheduler.operatorParamFromTags(it.tags) }
+            .toSet()
+    }
+
+    LaunchedEffect(uploadingOperatorParams) {
+        if (uploadingOperatorParams.isNotEmpty()) {
+            selectedSharedPhotoOperatorKeys = selectedSharedPhotoOperatorKeys.filterNot { key ->
+                sharedPhotoUploadOperators.firstOrNull { it.key == key }?.uploadOperator in uploadingOperatorParams
+            }.toSet()
+        }
+    }
+
     fun openSharedPhotoUpload() {
         val draftId = pendingPhotoDraftId ?: return
         val selectedOperators = sharedPhotoUploadOperators
             .filter { it.key in selectedSharedPhotoOperatorKeys }
+            .filterNot { it.uploadOperator in uploadingOperatorParams }
             .distinctBy { it.uploadOperator }
         val firstOperator = selectedOperators.firstOrNull() ?: return
         val targetAntenna = firstOperator.antenna
         val supportUploadId = physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId
         val encodedOperators = Uri.encode(selectedOperators.joinToString("|") { it.uploadOperator })
+        val uploadAddress = techniquesMap[targetAntenna.idAnfr]?.adresse?.trim().orEmpty()
 
         navController.navigate(
             "sq_upload/${Uri.encode(supportUploadId)}/${Uri.encode(firstOperator.uploadOperator)}" +
@@ -589,6 +617,7 @@ fun SupportDetailScreen(
                 "&lon=${targetAntenna.longitude}" +
                 "&azimuts=${Uri.encode(targetAntenna.azimuts ?: "")}" +
                 "&operatorNames=$encodedOperators" +
+                "&address=${Uri.encode(uploadAddress)}" +
                 "&keepDraft=true"
         )
     }
@@ -848,6 +877,7 @@ fun SupportDetailScreen(
                             photoCount = pendingSharedPhotoUris.size,
                             operators = sharedPhotoUploadOperators,
                             selectedOperatorKeys = selectedSharedPhotoOperatorKeys,
+                            uploadingOperatorParams = uploadingOperatorParams,
                             onToggleOperator = { key ->
                                 selectedSharedPhotoOperatorKeys = if (key in selectedSharedPhotoOperatorKeys) {
                                     selectedSharedPhotoOperatorKeys - key
@@ -1217,6 +1247,7 @@ private fun SupportSharedPhotoUploadCard(
     photoCount: Int,
     operators: List<SupportSharedPhotoUploadOperator>,
     selectedOperatorKeys: Set<String>,
+    uploadingOperatorParams: Set<String>,
     onToggleOperator: (String) -> Unit,
     onUpload: () -> Unit,
     cardBgColor: Color,
@@ -1262,16 +1293,22 @@ private fun SupportSharedPhotoUploadCard(
                 )
             } else {
                 operators.forEach { operator ->
+                    val isUploading = operator.uploadOperator in uploadingOperatorParams
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onToggleOperator(operator.key) }
+                            .then(
+                                if (isUploading) Modifier
+                                else Modifier.clickable { onToggleOperator(operator.key) }
+                            )
+                            .alpha(if (isUploading) 0.45f else 1f)
                             .padding(vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Checkbox(
-                            checked = operator.key in selectedOperatorKeys,
-                            onCheckedChange = { onToggleOperator(operator.key) }
+                            checked = operator.key in selectedOperatorKeys && !isUploading,
+                            onCheckedChange = if (isUploading) null else { { onToggleOperator(operator.key) } },
+                            enabled = !isUploading
                         )
                         Box(
                             modifier = Modifier
@@ -1284,6 +1321,14 @@ private fun SupportSharedPhotoUploadCard(
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold
                         )
+                        if (isUploading) {
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = stringResource(R.string.shared_photo_operator_uploading),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp
+                            )
+                        }
                     }
                 }
 
