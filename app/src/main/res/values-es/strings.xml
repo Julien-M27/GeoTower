@@ -268,6 +268,8 @@
     <string name="appstrings_about_database_not_installed">No instalado</string>
     <string name="appstrings_about_dev">Desarrollo</string>
     <string name="appstrings_about_download_new_database">Descargar la nueva base</string>
+    <string name="appstrings_about_download_app_title">Descargar la última versión</string>
+    <string name="appstrings_about_download_app_desc">Obtén la versión más reciente de GeoTower.</string>
     <string name="appstrings_about_intro">GeoTower te permite localizar antenas móviles a tu alrededor e identificar las tecnologías disponibles.</string>
     <string name="appstrings_about_new">Novedades</string>
     <string name="appstrings_about_presentation">Presentación</string>

@@ -343,6 +343,8 @@
     <string name="appstrings_about_database_not_installed">Not installed</string>
     <string name="appstrings_about_dev">Development</string>
     <string name="appstrings_about_download_new_database">Download the new database</string>
+    <string name="appstrings_about_download_app_title">Download the latest version</string>
+    <string name="appstrings_about_download_app_desc">Get the most recent version of GeoTower.</string>
     <string name="appstrings_about_intro">GeoTower allows you to locate cell towers around you and identify available technologies.</string>
     <string name="appstrings_about_new">What\'s New</string>
     <string name="appstrings_about_presentation">Presentation</string>

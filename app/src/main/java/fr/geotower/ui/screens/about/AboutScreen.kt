@@ -34,6 +34,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Folder
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
@@ -914,6 +915,7 @@ fun SectionVersions(
 
     SectionTitle(stringResource(R.string.appstrings_about_versions_title))
     val cardColor = if (bubbleColor == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else bubbleColor
+    val uriHandler = LocalUriHandler.current
 
     Card(
         colors = CardDefaults.cardColors(containerColor = cardColor),
@@ -946,6 +948,24 @@ fun SectionVersions(
     Spacer(modifier = Modifier.height(12.dp))
 
     Surface(
+        onClick = { uriHandler.openUri(GEOTOWER_APP_DOWNLOAD_URL) },
+        shape = cardShape,
+        color = cardColor,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.width(12.dp))
+            Column {
+                Text(stringResource(R.string.appstrings_about_download_app_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.appstrings_about_download_app_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
+
+    Spacer(modifier = Modifier.height(12.dp))
+
+    Surface(
         onClick = onOpenDiagnostic,
         shape = cardShape,
         color = cardColor,
@@ -961,6 +981,9 @@ fun SectionVersions(
         }
     }
 }
+
+private const val GEOTOWER_APP_DOWNLOAD_URL =
+    "https://kdrive.infomaniak.com/app/share/2149816/6d30423f-ac8b-4509-9857-86684d3a2e03"
 
 private fun readQuarterlyDataVersion(db: SQLiteDatabase): String {
     return try {

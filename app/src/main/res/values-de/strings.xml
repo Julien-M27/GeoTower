@@ -268,6 +268,8 @@
     <string name="appstrings_about_database_not_installed">Nicht installiert</string>
     <string name="appstrings_about_dev">Entwicklung</string>
     <string name="appstrings_about_download_new_database">Neue Datenbank herunterladen</string>
+    <string name="appstrings_about_download_app_title">Neueste Version herunterladen</string>
+    <string name="appstrings_about_download_app_desc">Hol dir die aktuellste Version von GeoTower.</string>
     <string name="appstrings_about_intro">GeoTower ermöglicht es dir, Mobilfunkstandorte in deiner Umgebung zu finden und verfügbare Technologien zu erkennen.</string>
     <string name="appstrings_about_new">Neuigkeiten</string>
     <string name="appstrings_about_presentation">Präsentation</string>

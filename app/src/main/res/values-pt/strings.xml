@@ -268,6 +268,8 @@
     <string name="appstrings_about_database_not_installed">Não instalada</string>
     <string name="appstrings_about_dev">Desenvolvimento</string>
     <string name="appstrings_about_download_new_database">Transfira a nova base</string>
+    <string name="appstrings_about_download_app_title">Transferir a versão mais recente</string>
+    <string name="appstrings_about_download_app_desc">Obtenha a versão mais recente do GeoTower.</string>
     <string name="appstrings_about_intro">A GeoTower permite-lhe localizar torres de celular à sua volta e identificar as tecnologias disponibles.</string>
     <string name="appstrings_about_new">Novidades</string>
     <string name="appstrings_about_presentation">Apresentação</string>
