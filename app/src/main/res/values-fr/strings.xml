@@ -2168,4 +2168,36 @@
     <string name="appstrings_release_v1962_favorite_star">Ajout ou retrait d\'un favori via le cœur dans la galerie photos d\'un site</string>
     <string name="appstrings_release_v1962_measure_delete_mode">Outil de mesure : à la suppression d\'un segment, choix entre « Indépendant » (les autres ne bougent pas) et « Reconnecter » (recalcul avec le point précédent)</string>
     <string name="appstrings_release_v1962_upload_notification">Notification d\'envoi de photos enrichie : opérateur ciblé et progression avec l\'adresse</string>
+    <!-- Mode faible consommation -->
+    <string name="appstrings_low_power_title">Mode faible consommation</string>
+    <string name="appstrings_low_power_desc">Réduit l\'usage de la batterie, des données et du processeur. Réversible à tout moment.</string>
+    <string name="appstrings_low_power_level_normal">Normal</string>
+    <string name="appstrings_low_power_level_normal_desc">Aucune restriction. Comportement standard.</string>
+    <string name="appstrings_low_power_level_eco">Éco</string>
+    <string name="appstrings_low_power_level_eco_desc">Économies équilibrées : GPS moins fréquent, carte allégée, images en qualité réduite.</string>
+    <string name="appstrings_low_power_level_ecoplus">Éco+</string>
+    <string name="appstrings_low_power_level_ecoplus_desc">Économies maximales : tuiles hors-ligne, couverture théorique plus grossière, animations coupées.</string>
+    <string name="appstrings_low_power_follow_system_title">Suivre l\'économie d\'énergie système</string>
+    <string name="appstrings_low_power_follow_system_desc">Passe en Éco automatiquement quand l\'économie d\'énergie d\'Android est active.</string>
+    <string name="appstrings_low_power_forced_by_system">Niveau relevé automatiquement par l\'économie d\'énergie du système.</string>
+    <string name="appstrings_local_build_title">Générer la base localement</string>
+    <string name="appstrings_local_build_desc">Reconstruit la base depuis les données ouvertes officielles ANFR, sur l\'appareil. Avancé — téléphones performants uniquement. Consomme des données mobiles, du temps et de la batterie ; Wi-Fi conseillé.</string>
+    <string name="appstrings_local_build_action">Générer localement</string>
+    <string name="appstrings_local_build_running">Génération…</string>
+    <string name="appstrings_local_build_unavailable">Non disponible sur cet appareil (nécessite 6 Go de RAM et 1 Go libre).</string>
+    <string name="appstrings_local_build_phase_resolving">Recherche des sources officielles</string>
+    <string name="appstrings_local_build_phase_downloading">Téléchargement des données ANFR</string>
+    <string name="appstrings_local_build_phase_reading">Lecture de l\'observatoire ANFR</string>
+    <string name="appstrings_local_build_phase_reading_supports">Lecture des supports et antennes</string>
+    <string name="appstrings_local_build_phase_processing">Calcul des technologies et fréquences</string>
+    <string name="appstrings_local_build_phase_antennas">Calcul des azimuts d\'antennes</string>
+    <string name="appstrings_local_build_phase_details">Assemblage des détails de fréquences</string>
+    <string name="appstrings_local_build_phase_inserting">Écriture de la base de données</string>
+    <string name="appstrings_local_build_phase_stats">Calcul des statistiques</string>
+    <string name="appstrings_local_build_phase_finalizing">Finalisation de la base</string>
+    <string name="appstrings_local_build_phase_installing">Installation</string>
+    <string name="appstrings_local_build_notif_title">Génération de la base</string>
+    <string name="appstrings_local_build_notif_done">Base générée. Appuyez pour ouvrir.</string>
+    <string name="appstrings_local_build_notif_failed">Échec de la génération : %1$s</string>
+    <string name="appstrings_local_build_lines">%1$s lignes</string>
 </resources>

@@ -78,6 +78,7 @@ import fr.geotower.data.RadioRepository
 import fr.geotower.data.api.CellularFrApi
 import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
@@ -133,6 +134,7 @@ fun SupportDetailScreen(
     onCloseSplitScreen: () -> Unit = {},
     onAntennaClick: (String) -> Unit = {}
 ) {
+    SecureScreenEffect(RemoteFeatureFlags.SecureScreens.SUPPORT_DETAIL)
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val uiStyle = LocalGeoTowerUiStyle.current

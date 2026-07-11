@@ -176,6 +176,39 @@ object DatabaseDownloader {
         }
     }
 
+    /**
+     * Installe une base `geotower_fr.db` produite localement (builder on-device) via le **meme**
+     * chemin atomique que le telechargement : validation structurelle, fermeture de Room, swap
+     * `.backup`/rename, reconstruction des index, etat VALID. `builtFile` doit etre sur le meme
+     * volume que la base installee (idealement `context.getDatabasePath("$DB_NAME.localbuild")`).
+     */
+    internal suspend fun installBuiltDatabase(context: Context, builtFile: File): Boolean =
+        withContext(Dispatchers.IO) {
+            val validation = GeoTowerDatabaseValidator.validateDatabaseFile(builtFile)
+            if (!validation.isValid) {
+                AppLogger.w(TAG, "Locally built database validation failed: ${validation.reason}")
+                if (builtFile.exists()) builtFile.delete()
+                return@withContext false
+            }
+
+            val dbFile = context.getDatabasePath(DB_NAME)
+            dbFile.parentFile?.mkdirs()
+            val backupFile = context.getDatabasePath("$DB_NAME.backup")
+
+            AppDatabase.closeDatabase()
+            deleteSqliteSidecars(dbFile)
+
+            if (!installValidatedDatabase(builtFile, dbFile, backupFile)) {
+                if (builtFile.exists()) builtFile.delete()
+                return@withContext false
+            }
+
+            GeoTowerDatabaseIndexes.applyToFile(dbFile)
+            GeoTowerDatabaseValidator.clearInstalledDatabaseInvalid(context)
+            updateCachedDatabaseState(GeoTowerDatabaseValidator.LocalDatabaseState.VALID)
+            true
+        }
+
     private fun readVerifiedDatabaseInfo(): DownloadManifestDatabase? {
         return readVerifiedDownloadManifest()
             ?.database

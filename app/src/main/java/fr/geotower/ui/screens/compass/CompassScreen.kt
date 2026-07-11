@@ -94,6 +94,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.LiveDatabaseUsageWarningDialog
 import fr.geotower.ui.components.LocationUnavailableBanner
@@ -102,6 +103,7 @@ import fr.geotower.ui.screens.settings.CompassSettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.ui.screens.map.MapViewModel
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.PowerProfile
 import fr.geotower.utils.LocationReadiness
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.locationReadiness
@@ -120,6 +122,7 @@ fun CompassScreen(
     navController: NavController,
     viewModel: MapViewModel
 ) {
+    SecureScreenEffect(RemoteFeatureFlags.SecureScreens.COMPASS)
     val context = LocalContext.current
     val activity = LocalActivity.current
     val configuration = LocalConfiguration.current
@@ -266,7 +269,7 @@ fun CompassScreen(
         }
 
         if (rotationSensor != null) {
-            sensorManager.registerListener(listener, rotationSensor, SensorManager.SENSOR_DELAY_GAME)
+            sensorManager.registerListener(listener, rotationSensor, PowerProfile.compassSensorDelay)
         }
         onDispose { sensorManager.unregisterListener(listener) }
     }
@@ -577,8 +580,13 @@ fun CompassScreen(
                         Text(text = stringResource(R.string.appstrings_nearby_antennas_azimuth), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                         HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
 
+                        // Tri mémoïsé (hors composition) + clés stables : évite de re-trier la liste et
+                        // de recréer tous les items à chaque recomposition de la feuille.
+                        val sortedClusterSites = remember(selectedClusterSites) {
+                            selectedClusterSites.sortedBy { it.distance }
+                        }
                         LazyColumn {
-                            items(selectedClusterSites.sortedBy { it.distance }) { site ->
+                            items(sortedClusterSites, key = { it.id }) { site ->
                                 Row(
                                     modifier = Modifier.fillMaxWidth().clickable {
                                         selectedClusterSites = emptyList()

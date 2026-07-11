@@ -73,8 +73,8 @@ fun SplashScreen(
             }
         }
 
-        // Temps d'affichage pour laisser le LoadingIndicator s'animer
-        delay(2200L)
+        // Temps d'affichage pour laisser le LoadingIndicator s'animer (raccourci en mode faible conso).
+        delay(if (fr.geotower.utils.PowerProfile.richAnimations) 2200L else 600L)
 
         navController.navigate(nextDestination) {
             popUpTo("splash") { inclusive = true }
@@ -109,11 +109,18 @@ fun SplashScreen(
 
             Spacer(modifier = Modifier.height(60.dp))
 
-            // ✅ NOUVEAU : Loading Indicator Expressive de Material 3
-            LoadingIndicator(
-                modifier = Modifier.size(48.dp),
-                color = MaterialTheme.colorScheme.primary
-            )
+            // Loading Indicator Expressive M3 en temps normal, cercle simple en mode faible conso.
+            if (fr.geotower.utils.PowerProfile.richAnimations) {
+                LoadingIndicator(
+                    modifier = Modifier.size(48.dp),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            } else {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(48.dp),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
 
             Spacer(modifier = Modifier.height(24.dp))
 

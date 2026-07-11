@@ -86,7 +86,9 @@ import androidx.navigation.NavController
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.R
@@ -177,6 +179,7 @@ fun ThroughputCalculatorScreen(
     onCloseSplitScreen: () -> Unit = {},
     incomingConfig: String? = null
 ) {
+    SecureScreenEffect(RemoteFeatureFlags.SecureScreens.THROUGHPUT_CALCULATOR)
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE) }
     // A throughput deep link (QR share) carries the settings as a compact config string. Apply it to

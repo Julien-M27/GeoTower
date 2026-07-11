@@ -70,6 +70,7 @@ import androidx.navigation.NavController
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.data.coverage.CoverageComputer
 import fr.geotower.data.coverage.CoverageRequest
 import fr.geotower.data.coverage.SiteCoverage
@@ -110,6 +111,7 @@ fun TheoreticalCoverageScreen(
     repository: AnfrRepository,
     idAnfr: String
 ) {
+    SecureScreenEffect(RemoteFeatureFlags.SecureScreens.THEORETICAL_COVERAGE)
     val context = LocalContext.current
     val prefs = context.getSharedPreferences(COVERAGE_DEFAULTS_PREFS, Context.MODE_PRIVATE)
     val scope = rememberCoroutineScope()
@@ -188,7 +190,11 @@ fun TheoreticalCoverageScreen(
         progress = null
         computeJob = scope.launch {
             try {
-                val request = buildRequest(quality, includeObstacles, frequencyMHz, tiltDeg.toDouble())
+                // Mode faible conso (Éco+) : force l'aperçu + coupe les obstacles → bien moins de requêtes IGN.
+                val ecoPreview = fr.geotower.utils.PowerProfile.coverageQualityPreview
+                val effectiveQuality = if (ecoPreview) 0 else quality
+                val effectiveObstacles = includeObstacles && !ecoPreview
+                val request = buildRequest(effectiveQuality, effectiveObstacles, frequencyMHz, tiltDeg.toDouble())
                 val result = CoverageComputer.compute(
                     repository = repository,
                     idAnfr = idAnfr,
@@ -214,34 +220,40 @@ fun TheoreticalCoverageScreen(
         val mv = mapRef ?: return
         val cov = coverage ?: return
         if (mv.width <= 0 || mv.height <= 0) return
-        runCatching {
-            val mapBitmap = android.graphics.Bitmap.createBitmap(mv.width, mv.height, android.graphics.Bitmap.Config.ARGB_8888)
-            mv.draw(android.graphics.Canvas(mapBitmap))
-            val (radius, angular, sample) = qualityParams(quality)
-            val params = "≈ ${(radius / 1000).toInt()} km · ${angular.toInt()}° · ${sample.toInt()} m · $frequencyMHz MHz · tilt ${tiltDeg.roundToInt()}°"
-            val image = TheoreticalCoverageShareGenerator.create(
-                title = context.getString(R.string.appstrings_coverage_button),
-                subtitle = "ANFR ${cov.idAnfr}" + (cov.operator?.let { " · $it" } ?: ""),
-                paramsLine = params,
-                disclaimer = context.getString(R.string.appstrings_coverage_disclaimer_short),
-                source = "Source : IGN RGE ALTI / BD TOPO · © OpenStreetMap",
-                mapBitmap = mapBitmap,
-                forceDark = false
-            )
-            val imagesDir = java.io.File(context.cacheDir, "images").apply { mkdirs() }
-            val file = java.io.File(imagesDir, "coverage_${cov.idAnfr}.png")
-            file.outputStream().use { image.compress(android.graphics.Bitmap.CompressFormat.PNG, 95, it) }
-            val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
-            val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
-                type = "image/png"
-                putExtra(android.content.Intent.EXTRA_STREAM, uri)
-                addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        // Capture de la MapView sur le thread principal (obligatoire : c'est une View), puis composition
+        // de l'image + compression PNG + écriture disque sur IO (lourd), enfin le chooser de retour sur Main.
+        scope.launch {
+            runCatching {
+                val mapBitmap = android.graphics.Bitmap.createBitmap(mv.width, mv.height, android.graphics.Bitmap.Config.ARGB_8888)
+                mv.draw(android.graphics.Canvas(mapBitmap))
+                val (radius, angular, sample) = qualityParams(quality)
+                val params = "≈ ${(radius / 1000).toInt()} km · ${angular.toInt()}° · ${sample.toInt()} m · $frequencyMHz MHz · tilt ${tiltDeg.roundToInt()}°"
+                val uri = withContext(Dispatchers.IO) {
+                    val image = TheoreticalCoverageShareGenerator.create(
+                        title = context.getString(R.string.appstrings_coverage_button),
+                        subtitle = "ANFR ${cov.idAnfr}" + (cov.operator?.let { " · $it" } ?: ""),
+                        paramsLine = params,
+                        disclaimer = context.getString(R.string.appstrings_coverage_disclaimer_short),
+                        source = "Source : IGN RGE ALTI / BD TOPO · © OpenStreetMap",
+                        mapBitmap = mapBitmap,
+                        forceDark = false
+                    )
+                    val imagesDir = java.io.File(context.cacheDir, "images").apply { mkdirs() }
+                    val file = java.io.File(imagesDir, "coverage_${cov.idAnfr}.png")
+                    file.outputStream().use { image.compress(android.graphics.Bitmap.CompressFormat.PNG, 95, it) }
+                    androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                }
+                val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                    type = "image/png"
+                    putExtra(android.content.Intent.EXTRA_STREAM, uri)
+                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                }
+                // FLAG_ACTIVITY_NEW_TASK requis : contexte localisé (LocaleProvider), pas une Activity → sinon crash OnePlus.
+                context.startActivity(android.content.Intent.createChooser(intent, context.getString(R.string.appstrings_coverage_share)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            }.onFailure {
+                AppLogger.w("TheoreticalCoverage", "share failed", it)
+                android.widget.Toast.makeText(context, context.getString(R.string.appstrings_error), android.widget.Toast.LENGTH_SHORT).show()
             }
-            // FLAG_ACTIVITY_NEW_TASK requis : contexte localisé (LocaleProvider), pas une Activity → sinon crash OnePlus.
-            context.startActivity(android.content.Intent.createChooser(intent, context.getString(R.string.appstrings_coverage_share)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-        }.onFailure {
-            AppLogger.w("TheoreticalCoverage", "share failed", it)
-            android.widget.Toast.makeText(context, context.getString(R.string.appstrings_error), android.widget.Toast.LENGTH_SHORT).show()
         }
     }
 

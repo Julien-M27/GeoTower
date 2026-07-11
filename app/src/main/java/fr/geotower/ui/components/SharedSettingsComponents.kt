@@ -85,7 +85,9 @@ fun CustomSliderCard(
     footerText: String? = null,
     enabled: Boolean = true
 ) {
-    var currentIndex by remember { mutableFloatStateOf(steps.indexOf(currentValue).coerceAtLeast(0).toFloat()) }
+    // Clé sur currentValue : le slider se resynchronise quand la valeur est imposée de l'extérieur
+    // (ex. mode faible consommation qui déplace le curseur), pas seulement via l'interaction utilisateur.
+    var currentIndex by remember(currentValue) { mutableFloatStateOf(steps.indexOf(currentValue).coerceAtLeast(0).toFloat()) }
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val accentColor = MaterialTheme.colorScheme.primary
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent

@@ -8,6 +8,7 @@ import android.graphics.Path
 import android.graphics.Point
 import android.graphics.RadialGradient
 import android.graphics.Shader
+import fr.geotower.data.coverage.LatLon
 import fr.geotower.data.coverage.SiteCoverage
 import org.osmdroid.util.GeoPoint
 import org.osmdroid.views.Projection
@@ -33,22 +34,34 @@ class TheoreticalCoverageOverlay(context: Context) : Overlay() {
     }
 
     private var coverage: SiteCoverage? = null
+    // Contours géographiques précalculés (un par secteur non vide). Le tri + la trigonométrie de
+    // SectorViewshed.outline() sont faits UNE fois ici, pas à chaque frame : draw() ne fait plus que
+    // projeter ces points (toPixels dépend du zoom/pan, donc reste par frame).
+    private var outlines: List<List<LatLon>> = emptyList()
     private var tint: Int = DEFAULT_TINT
 
     fun setCoverage(next: SiteCoverage?, color: Int = DEFAULT_TINT) {
         coverage = next
         tint = color
+        outlines = if (next == null || next.isEmpty) {
+            emptyList()
+        } else {
+            next.sectors.mapNotNull { sector ->
+                sector.outline(next.siteLat, next.siteLon).takeIf { it.size >= 2 }
+            }
+        }
     }
 
     fun clear() {
         coverage = null
+        outlines = emptyList()
     }
 
     val hasCoverage: Boolean get() = coverage?.isEmpty == false
 
     override fun draw(canvas: Canvas, projection: Projection) {
         val cov = coverage ?: return
-        if (cov.isEmpty) return
+        if (outlines.isEmpty()) return
 
         projection.toPixels(GeoPoint(cov.siteLat, cov.siteLon), point)
         val siteX = point.x.toFloat()
@@ -56,9 +69,7 @@ class TheoreticalCoverageOverlay(context: Context) : Overlay() {
 
         val path = Path().apply { fillType = Path.FillType.WINDING }
         var maxRadiusPx = 0f
-        for (sector in cov.sectors) {
-            val outline = sector.outline(cov.siteLat, cov.siteLon)
-            if (outline.size < 2) continue
+        for (outline in outlines) {
             var first = true
             for (ll in outline) {
                 projection.toPixels(GeoPoint(ll.latitude, ll.longitude), point)

@@ -99,6 +99,7 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.NominatimApi
 import fr.geotower.data.api.NominatimGeoPoint
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.map.FilterToggleButton
@@ -198,6 +199,7 @@ fun NearEmittersScreen(
     repository: AnfrRepository,
     onSupportClick: ((UiSite, String?) -> Unit)? = null
 ) {
+    SecureScreenEffect(RemoteFeatureFlags.SecureScreens.NEARBY)
     val context = LocalContext.current
     val activity = LocalActivity.current
 

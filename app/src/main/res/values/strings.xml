@@ -2186,4 +2186,36 @@
     <string name="appstrings_release_v1962_favorite_star">Add or remove a favorite with the heart in a site\'s photo gallery</string>
     <string name="appstrings_release_v1962_measure_delete_mode">Measurement tool: when deleting a segment, choose between Independent (the others don\'t move) and Reconnect (recalculate with the previous point)</string>
     <string name="appstrings_release_v1962_upload_notification">Richer photo upload notification: target operator and progress with the address</string>
+    <!-- Low power mode -->
+    <string name="appstrings_low_power_title">Low power mode</string>
+    <string name="appstrings_low_power_desc">Reduces battery, data and CPU usage. Fully reversible at any time.</string>
+    <string name="appstrings_low_power_level_normal">Normal</string>
+    <string name="appstrings_low_power_level_normal_desc">No restriction. Standard behaviour.</string>
+    <string name="appstrings_low_power_level_eco">Eco</string>
+    <string name="appstrings_low_power_level_eco_desc">Balanced savings: less frequent GPS, lighter map, reduced image quality.</string>
+    <string name="appstrings_low_power_level_ecoplus">Eco+</string>
+    <string name="appstrings_low_power_level_ecoplus_desc">Maximum savings: offline tiles, coarser theoretical coverage, animations off.</string>
+    <string name="appstrings_low_power_follow_system_title">Follow system power saver</string>
+    <string name="appstrings_low_power_follow_system_desc">Automatically switch to Eco when Android battery saver is on.</string>
+    <string name="appstrings_low_power_forced_by_system">Level raised automatically by the system battery saver.</string>
+    <string name="appstrings_local_build_title">Generate database locally</string>
+    <string name="appstrings_local_build_desc">Rebuild the database from official ANFR open data, on this device. Advanced — high-end phones only. Uses mobile data, time and battery; Wi-Fi recommended.</string>
+    <string name="appstrings_local_build_action">Generate locally</string>
+    <string name="appstrings_local_build_running">Generating…</string>
+    <string name="appstrings_local_build_unavailable">Not available on this device (needs 6 GB RAM and 1 GB free).</string>
+    <string name="appstrings_local_build_phase_resolving">Finding official sources</string>
+    <string name="appstrings_local_build_phase_downloading">Downloading ANFR data</string>
+    <string name="appstrings_local_build_phase_reading">Reading the ANFR observatory</string>
+    <string name="appstrings_local_build_phase_reading_supports">Reading supports and antennas</string>
+    <string name="appstrings_local_build_phase_processing">Computing technologies and frequencies</string>
+    <string name="appstrings_local_build_phase_antennas">Computing antenna azimuths</string>
+    <string name="appstrings_local_build_phase_details">Assembling frequency details</string>
+    <string name="appstrings_local_build_phase_inserting">Writing the database</string>
+    <string name="appstrings_local_build_phase_stats">Computing statistics</string>
+    <string name="appstrings_local_build_phase_finalizing">Finalising the database</string>
+    <string name="appstrings_local_build_phase_installing">Installing</string>
+    <string name="appstrings_local_build_notif_title">Generating the database</string>
+    <string name="appstrings_local_build_notif_done">Database generated. Tap to open.</string>
+    <string name="appstrings_local_build_notif_failed">Generation failed: %1$s</string>
+    <string name="appstrings_local_build_lines">%1$s rows</string>
 </resources>

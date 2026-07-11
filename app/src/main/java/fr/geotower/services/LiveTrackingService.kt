@@ -218,13 +218,23 @@ class LiveTrackingService : Service() {
 
     private fun liveLocationUpdateIntervalMillis(): Long {
         val prefs = getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
-        val seconds = LiveTrackingPrefs.locationUpdateIntervalSeconds(prefs)
+        val userSeconds = LiveTrackingPrefs.locationUpdateIntervalSeconds(prefs)
+        // Mode faible conso : plancher d'intervalle (ne descend jamais sous, mais respecte un réglage plus long).
+        val floor = fr.geotower.utils.PowerProfile.liveIntervalFloorSeconds
+        val seconds = if (floor > 0) maxOf(userSeconds, floor) else userSeconds
         return TimeUnit.SECONDS.toMillis(seconds.toLong())
     }
 
     private fun liveLocationPriority(): Int {
         val prefs = getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
-        return LiveTrackingPrefs.locationPriority(prefs)
+        val userPriority = LiveTrackingPrefs.locationPriority(prefs)
+        // Mode faible conso : impose au moins BALANCED, mais respecte un réglage user encore plus économe
+        // (codes GMS : HIGH=100 < BALANCED=102 < LOW_POWER=104, le plus haut = le plus économe).
+        return if (fr.geotower.utils.PowerProfile.gpsBalanced) {
+            maxOf(userPriority, LiveTrackingPrefs.PRIORITY_BALANCED_POWER_ACCURACY)
+        } else {
+            userPriority
+        }
     }
 
     private fun processLocationUpdate(location: Location) {

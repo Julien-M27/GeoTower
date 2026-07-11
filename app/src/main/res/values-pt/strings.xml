@@ -2168,4 +2168,36 @@
     <string name="appstrings_release_v1962_favorite_star">Adicionar ou remover um favorito com o coração na galeria de fotos de um site</string>
     <string name="appstrings_release_v1962_measure_delete_mode">Ferramenta de medição: ao eliminar um segmento, escolha entre «Independente» (os outros não se movem) e «Reconectar» (recalcular com o ponto anterior)</string>
     <string name="appstrings_release_v1962_upload_notification">Notificação de envio de fotos enriquecida: operadora de destino e progresso com o endereço</string>
+    <!-- Modo de baixo consumo -->
+    <string name="appstrings_low_power_title">Modo de baixo consumo</string>
+    <string name="appstrings_low_power_desc">Reduz o uso de bateria, dados e CPU. Reversível a qualquer momento.</string>
+    <string name="appstrings_low_power_level_normal">Normal</string>
+    <string name="appstrings_low_power_level_normal_desc">Sem restrições. Comportamento padrão.</string>
+    <string name="appstrings_low_power_level_eco">Eco</string>
+    <string name="appstrings_low_power_level_eco_desc">Poupança equilibrada: GPS menos frequente, mapa mais leve, imagens em qualidade reduzida.</string>
+    <string name="appstrings_low_power_level_ecoplus">Eco+</string>
+    <string name="appstrings_low_power_level_ecoplus_desc">Poupança máxima: blocos offline, cobertura teórica mais grosseira, animações desativadas.</string>
+    <string name="appstrings_low_power_follow_system_title">Seguir a poupança de energia do sistema</string>
+    <string name="appstrings_low_power_follow_system_desc">Muda para Eco automaticamente quando a poupança de bateria do Android está ativa.</string>
+    <string name="appstrings_low_power_forced_by_system">Nível elevado automaticamente pela poupança de energia do sistema.</string>
+    <string name="appstrings_local_build_title">Gerar a base localmente</string>
+    <string name="appstrings_local_build_desc">Reconstrói a base a partir dos dados abertos oficiais da ANFR, no aparelho. Avançado — apenas telefones potentes. Consome dados móveis, tempo e bateria; Wi-Fi recomendado.</string>
+    <string name="appstrings_local_build_action">Gerar localmente</string>
+    <string name="appstrings_local_build_running">A gerar…</string>
+    <string name="appstrings_local_build_unavailable">Indisponível neste aparelho (requer 6 GB de RAM e 1 GB livre).</string>
+    <string name="appstrings_local_build_phase_resolving">A procurar as fontes oficiais</string>
+    <string name="appstrings_local_build_phase_downloading">A transferir os dados ANFR</string>
+    <string name="appstrings_local_build_phase_reading">A ler o observatório ANFR</string>
+    <string name="appstrings_local_build_phase_reading_supports">A ler suportes e antenas</string>
+    <string name="appstrings_local_build_phase_processing">A calcular tecnologias e frequências</string>
+    <string name="appstrings_local_build_phase_antennas">A calcular os azimutes das antenas</string>
+    <string name="appstrings_local_build_phase_details">A montar os detalhes de frequências</string>
+    <string name="appstrings_local_build_phase_inserting">A escrever a base de dados</string>
+    <string name="appstrings_local_build_phase_stats">A calcular as estatísticas</string>
+    <string name="appstrings_local_build_phase_finalizing">A finalizar a base</string>
+    <string name="appstrings_local_build_phase_installing">A instalar</string>
+    <string name="appstrings_local_build_notif_title">Geração da base</string>
+    <string name="appstrings_local_build_notif_done">Base gerada. Toque para abrir.</string>
+    <string name="appstrings_local_build_notif_failed">Falha na geração: %1$s</string>
+    <string name="appstrings_local_build_lines">%1$s linhas</string>
 </resources>

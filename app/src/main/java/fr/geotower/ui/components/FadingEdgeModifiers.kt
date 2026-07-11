@@ -12,13 +12,14 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.PowerProfile
 
 fun Modifier.geoTowerFadingEdge(
     scrollState: ScrollState,
     fadeHeight: Dp = 80.dp,
     requireScrollableContent: Boolean = false
 ): Modifier {
-    if (!AppConfig.isBlurEnabled.value) return this
+    if (!AppConfig.isBlurEnabled.value || !PowerProfile.richAnimations) return this
 
     return this
         .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)
@@ -64,7 +65,7 @@ fun Modifier.geoTowerLazyListFadingEdge(
     lazyListState: LazyListState,
     fadeHeight: Dp = 80.dp
 ): Modifier {
-    if (!AppConfig.isBlurEnabled.value) return this
+    if (!AppConfig.isBlurEnabled.value || !PowerProfile.richAnimations) return this
 
     return this
         .graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)

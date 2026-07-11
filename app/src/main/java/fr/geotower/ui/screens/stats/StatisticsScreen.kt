@@ -29,6 +29,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavController
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.data.ActiveSupportRadioCounts
 import fr.geotower.data.db.RadioStatRow
 import fr.geotower.data.db.WeeklyRadioStatRow
@@ -433,6 +435,7 @@ private suspend fun loadFrequencyStatsData(
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
+    SecureScreenEffect(RemoteFeatureFlags.SecureScreens.STATS)
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
     val isSystemDark = isSystemInDarkTheme()

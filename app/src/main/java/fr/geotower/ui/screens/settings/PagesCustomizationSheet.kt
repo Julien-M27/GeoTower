@@ -1029,7 +1029,8 @@ fun MapSettingsSheet(
             if (showAzimuthSettings) {
                 Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_azimuth_lines_option), showMapLocation = showAzimuths, onLocationChange = onAzimuthsChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
-                    SimpleSwitchCard(stringResource(R.string.appstrings_map_azimuth_cones_option), showMapLocation = showAzimuthsCone, onLocationChange = onAzimuthsConeChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
+                    // Mode faible conso : les cônes sont forcés OFF → on montre le toggle éteint et grisé.
+                    SimpleSwitchCard(stringResource(R.string.appstrings_map_azimuth_cones_option), showMapLocation = showAzimuthsCone && !fr.geotower.utils.PowerProfile.isEco, onLocationChange = onAzimuthsConeChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, enabled = !fr.geotower.utils.PowerProfile.isEco)
                 }
             } else {
                 Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
@@ -1107,7 +1108,7 @@ fun MapSettingsSheet(
 }
 
 @Composable
-fun SimpleSwitchCard(title: String, showMapLocation: Boolean, onLocationChange: (Boolean) -> Unit, shape: androidx.compose.ui.graphics.Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean) {
+fun SimpleSwitchCard(title: String, showMapLocation: Boolean, onLocationChange: (Boolean) -> Unit, shape: androidx.compose.ui.graphics.Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, enabled: Boolean = true) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val switchColor = MaterialTheme.colorScheme.primary
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
@@ -1126,6 +1127,7 @@ fun SimpleSwitchCard(title: String, showMapLocation: Boolean, onLocationChange: 
                 checked = showMapLocation,
                 onCheckedChange = onLocationChange,
                 useOneUi = useOneUi,
+                enabled = enabled,
                 checkedColor = switchColor
             )
         }

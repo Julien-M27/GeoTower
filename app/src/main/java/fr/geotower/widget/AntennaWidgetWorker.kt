@@ -112,9 +112,11 @@ class AntennaWidgetWorker(
             val fusedLocationClient = LocationServices.getFusedLocationProviderClient(context)
 
             // 🚀 REQUÊTE GPS (On augmente à 20 secondes pour laisser le temps au capteur de s'allumer)
+            // Mode faible conso : BALANCED au lieu de HIGH_ACCURACY (widget périodique en arrière-plan).
+            val widgetGpsPriority = if (fr.geotower.utils.PowerProfile.gpsBalanced) Priority.PRIORITY_BALANCED_POWER_ACCURACY else Priority.PRIORITY_HIGH_ACCURACY
             var location: Location? = withTimeoutOrNull(20000L) {
                 fusedLocationClient.getCurrentLocation(
-                    Priority.PRIORITY_HIGH_ACCURACY,
+                    widgetGpsPriority,
                     CancellationTokenSource().token
                 ).await()
             }

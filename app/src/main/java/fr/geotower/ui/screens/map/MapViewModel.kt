@@ -317,7 +317,7 @@ class MapViewModel(
                         south = bounds.south,
                         east = bounds.east,
                         west = bounds.west,
-                        days = SIGNALQUEST_COVERAGE_DAYS,
+                        days = fr.geotower.utils.PowerProfile.coveragePointDays,
                         limit = perOperatorLimit
                     )
 

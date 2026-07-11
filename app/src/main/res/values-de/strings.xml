@@ -2168,4 +2168,36 @@
     <string name="appstrings_release_v1962_favorite_star">Favorit über das Herz in der Fotogalerie eines Standorts hinzufügen oder entfernen</string>
     <string name="appstrings_release_v1962_measure_delete_mode">Messwerkzeug: beim Löschen eines Abschnitts zwischen „Unabhängig“ (die anderen bleiben) und „Neu verbinden“ (Neuberechnung mit dem vorherigen Punkt) wählen</string>
     <string name="appstrings_release_v1962_upload_notification">Reichhaltigere Foto-Upload-Benachrichtigung: Zielbetreiber und Fortschritt mit Adresse</string>
+    <!-- Energiesparmodus -->
+    <string name="appstrings_low_power_title">Energiesparmodus</string>
+    <string name="appstrings_low_power_desc">Reduziert Akku-, Daten- und CPU-Verbrauch. Jederzeit umkehrbar.</string>
+    <string name="appstrings_low_power_level_normal">Normal</string>
+    <string name="appstrings_low_power_level_normal_desc">Keine Einschränkung. Standardverhalten.</string>
+    <string name="appstrings_low_power_level_eco">Öko</string>
+    <string name="appstrings_low_power_level_eco_desc">Ausgewogenes Sparen: selteneres GPS, leichtere Karte, reduzierte Bildqualität.</string>
+    <string name="appstrings_low_power_level_ecoplus">Öko+</string>
+    <string name="appstrings_low_power_level_ecoplus_desc">Maximales Sparen: Offline-Kacheln, gröbere theoretische Abdeckung, Animationen aus.</string>
+    <string name="appstrings_low_power_follow_system_title">Systemsparmodus folgen</string>
+    <string name="appstrings_low_power_follow_system_desc">Automatisch zu Öko wechseln, wenn Androids Energiesparmodus aktiv ist.</string>
+    <string name="appstrings_low_power_forced_by_system">Stufe automatisch durch den System-Energiesparmodus angehoben.</string>
+    <string name="appstrings_local_build_title">Datenbank lokal erzeugen</string>
+    <string name="appstrings_local_build_desc">Erstellt die Datenbank aus offiziellen offenen ANFR-Daten direkt auf dem Gerät. Fortgeschritten — nur leistungsstarke Telefone. Verbraucht mobile Daten, Zeit und Akku; WLAN empfohlen.</string>
+    <string name="appstrings_local_build_action">Lokal erzeugen</string>
+    <string name="appstrings_local_build_running">Wird erzeugt…</string>
+    <string name="appstrings_local_build_unavailable">Auf diesem Gerät nicht verfügbar (benötigt 6 GB RAM und 1 GB frei).</string>
+    <string name="appstrings_local_build_phase_resolving">Offizielle Quellen werden gesucht</string>
+    <string name="appstrings_local_build_phase_downloading">ANFR-Daten werden heruntergeladen</string>
+    <string name="appstrings_local_build_phase_reading">ANFR-Observatorium wird gelesen</string>
+    <string name="appstrings_local_build_phase_reading_supports">Standorte und Antennen werden gelesen</string>
+    <string name="appstrings_local_build_phase_processing">Technologien und Frequenzen werden berechnet</string>
+    <string name="appstrings_local_build_phase_antennas">Antennen-Azimute werden berechnet</string>
+    <string name="appstrings_local_build_phase_details">Frequenzdetails werden zusammengestellt</string>
+    <string name="appstrings_local_build_phase_inserting">Datenbank wird geschrieben</string>
+    <string name="appstrings_local_build_phase_stats">Statistiken werden berechnet</string>
+    <string name="appstrings_local_build_phase_finalizing">Datenbank wird abgeschlossen</string>
+    <string name="appstrings_local_build_phase_installing">Wird installiert</string>
+    <string name="appstrings_local_build_notif_title">Datenbank wird erzeugt</string>
+    <string name="appstrings_local_build_notif_done">Datenbank erzeugt. Zum Öffnen tippen.</string>
+    <string name="appstrings_local_build_notif_failed">Erzeugung fehlgeschlagen: %1$s</string>
+    <string name="appstrings_local_build_lines">%1$s Zeilen</string>
 </resources>

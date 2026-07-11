@@ -152,9 +152,16 @@ data class RemoteFeatureFlagConfig(
     val workers: Map<String, Boolean>,
     val platform: Map<String, Boolean>,
     val limits: Map<String, Int>,
+    val secureScreens: Map<String, Boolean>,
     val homeAnnouncement: RemoteHomeAnnouncement
 ) {
     fun isScreenEnabled(screenId: String): Boolean = screens[screenId] ?: true
+
+    /**
+     * Vrai si l'écran doit bloquer les captures d'écran (FLAG_SECURE).
+     * Défaut = false (autorisé) : le blocage est un opt-in piloté par le serveur.
+     */
+    fun isScreenSecure(screenId: String): Boolean = secureScreens[screenId] ?: false
 
     fun isMenuEnabled(menuId: String): Boolean = menus[menuId] ?: true
 
@@ -216,6 +223,23 @@ object RemoteFeatureFlags {
         const val THROUGHPUT_CALCULATOR = "throughputCalculator"
         const val SIGNALQUEST_UPLOAD = "signalQuestUpload"
         const val FIRST_START = "firstStart"
+    }
+
+    /**
+     * Écrans dont la capture d'écran peut être bloquée à distance (section `secureScreens` du features.json).
+     * Les identifiants reprennent ceux de [Screens]. Défaut serveur/client = false (captures autorisées).
+     */
+    object SecureScreens {
+        const val MAP = "map"
+        const val NEARBY = "nearby"
+        const val COMPASS = "compass"
+        const val STATS = "stats"
+        const val SITE_DETAIL = "siteDetail"
+        const val SUPPORT_DETAIL = "supportDetail"
+        const val SITE_SPEEDTESTS = "siteSpeedtests"
+        const val ELEVATION_PROFILE = "elevationProfile"
+        const val THEORETICAL_COVERAGE = "theoreticalCoverage"
+        const val THROUGHPUT_CALCULATOR = "throughputCalculator"
     }
 
     object Menus {
@@ -509,6 +533,18 @@ object RemoteFeatureFlags {
             Limits.COVERAGE_DEFAULT_TILT_DEG to 5,
             Limits.COVERAGE_DEFAULT_VBEAM_DEG to 10
         ),
+        secureScreens = mapOf(
+            SecureScreens.MAP to false,
+            SecureScreens.NEARBY to false,
+            SecureScreens.COMPASS to false,
+            SecureScreens.STATS to false,
+            SecureScreens.SITE_DETAIL to false,
+            SecureScreens.SUPPORT_DETAIL to false,
+            SecureScreens.SITE_SPEEDTESTS to false,
+            SecureScreens.ELEVATION_PROFILE to false,
+            SecureScreens.THEORETICAL_COVERAGE to false,
+            SecureScreens.THROUGHPUT_CALCULATOR to false
+        ),
         homeAnnouncement = RemoteHomeAnnouncement()
     )
 
@@ -530,6 +566,8 @@ object RemoteFeatureFlags {
     fun isPlatformEnabled(platformId: String): Boolean = currentConfig.value.isPlatformEnabled(platformId)
 
     fun limitOrDefault(limitId: String, defaultValue: Int): Int = currentConfig.value.limitOrDefault(limitId, defaultValue)
+
+    fun isScreenSecure(screenId: String): Boolean = currentConfig.value.isScreenSecure(screenId)
 
     fun loadCached(context: Context) {
         val prefs = prefs(context)
@@ -591,6 +629,7 @@ object RemoteFeatureFlags {
                 workers = mergeBooleanMap(defaultConfig.workers, root.booleanMap("workers")),
                 platform = mergeBooleanMap(defaultConfig.platform, root.booleanMap("platform")),
                 limits = mergeIntMap(defaultConfig.limits, root.intMap("limits")),
+                secureScreens = mergeBooleanMap(defaultConfig.secureScreens, root.booleanMap("secureScreens")),
                 homeAnnouncement = root.homeAnnouncementOrDefault()
             )
         }.getOrNull()

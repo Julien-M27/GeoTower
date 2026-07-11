@@ -141,6 +141,7 @@ import fr.geotower.data.upload.SignalQuestUploadDraftStore
 import fr.geotower.data.api.GeoTowerDataCoverage
 import fr.geotower.data.api.NominatimApi
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.RadioMapMarker
 import fr.geotower.data.models.SiteHsEntity
@@ -151,6 +152,7 @@ import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.PowerProfile
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.LocationReadiness
@@ -864,6 +866,7 @@ fun MapScreen(
     viewModel: MapViewModel,
     photoDraftId: String? = null
 ) {
+    SecureScreenEffect(RemoteFeatureFlags.SecureScreens.MAP)
     val context = LocalContext.current
     val activity = LocalActivity.current
     val resources = LocalResources.current
@@ -2143,7 +2146,7 @@ fun MapScreen(
             }
 
             fun buildAntennaMarkers(antennas: List<LocalisationEntity>): List<AntennaMarker> {
-                val groupedSites = antennas.groupBy { "${it.latitude}_${it.longitude}" }.values.take(6000)
+                val groupedSites = antennas.groupBy { "${it.latitude}_${it.longitude}" }.values.take(PowerProfile.mapMarkerCap)
 
                 return groupedSites.mapNotNull { siteAntennas ->
                     val filteredSiteAntennas = siteAntennas.mapNotNull { antenna ->
@@ -2237,7 +2240,7 @@ fun MapScreen(
                 }
             } else {
                 // 🔍 MODE MICRO
-                val groupedSites = antennasList.groupBy { "${it.latitude}_${it.longitude}" }.values.take(6000)
+                val groupedSites = antennasList.groupBy { "${it.latitude}_${it.longitude}" }.values.take(PowerProfile.mapMarkerCap)
 
                 // ✅ RETOUR À map : 1 seul marqueur définitif par pylône
                 val newMarkers = groupedSites.mapNotNull { siteAntennas ->
@@ -2327,6 +2330,7 @@ fun MapScreen(
         safePrimaryColor,
         AppConfig.showAzimuths.value,
         AppConfig.showAzimuthsCone.value,
+        PowerProfile.level, // mode faible conso : reconstruit + invalide (cônes/plafond/repère)
         AppConfig.selectedOperatorKeys.value,
         AppConfig.showSitesInService.value,
         AppConfig.showSitesOutOfService.value,
@@ -2653,7 +2657,7 @@ fun MapScreen(
                             // ✅ 2. LE RESTE DU CALCUL AVEC SON PETIT DÉLAI ANTI-LAG
                             searchJob?.cancel()
                             searchJob = scope.launch {
-                                delay(MAP_RELOAD_DEBOUNCE_MS)
+                                delay(PowerProfile.mapReloadDebounceMs)
 
                                 val snapshot = visibleViewportSnapshot()
                                 currentZoom = snapshot.zoom
@@ -2697,6 +2701,9 @@ fun MapScreen(
             },
             update = { map ->
                 var shouldInvalidateMap = false
+
+                // Mode faible conso (Éco+) : coupe le téléchargement de tuiles (rendu cache/offline uniquement).
+                map.setUseDataConnection(!PowerProfile.mapTilesOfflineOnly)
 
                 // Mise à jour de la boussole (ton code actuel)
                 (locationOverlayRef as? CustomLocationOverlay)?.let { overlay ->
@@ -4387,7 +4394,6 @@ open class CustomLocationOverlay(
     private val themeFillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { style = android.graphics.Paint.Style.FILL; color = primaryColor }
     private val themeStrokePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { style = android.graphics.Paint.Style.STROKE; color = primaryColor; strokeCap = android.graphics.Paint.Cap.ROUND }
     private val whiteFillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { style = android.graphics.Paint.Style.FILL; color = android.graphics.Color.WHITE }
-    private val pulsePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { style = android.graphics.Paint.Style.STROKE; color = primaryColor; strokeWidth = 3f }
 
     override fun drawMyLocation(
         canvas: android.graphics.Canvas,
@@ -4416,7 +4422,7 @@ open class CustomLocationOverlay(
 
         canvas.save()
         canvas.translate(pt.x.toFloat(), pt.y.toFloat())
-        canvas.rotate(currentCompassAzimuth)
+        canvas.rotate(if (PowerProfile.mapCompassRotation) currentCompassAzimuth else 0f)
 
         // ❌ Le cône (beamPath) et l'effet radar (pulsePaint) ont été retirés d'ici
 
@@ -4597,7 +4603,7 @@ class AntennaMarker(
 
         // 🚨 NOUVEAU : On lit les préférences en direct
         val showLines = fr.geotower.utils.AppConfig.showAzimuths.value
-        val showCones = fr.geotower.utils.AppConfig.showAzimuthsCone.value
+        val showCones = PowerProfile.drawAzimuthCones
 
         // On ne rentre dans le bloc que si au moins l'un des deux est activé
         if (zoom >= 14.0 && (showLines || showCones)) {
@@ -4804,10 +4810,18 @@ private class SignalQuestCoverageOverlay(context: Context) : org.osmdroid.views.
         if (points.isEmpty()) return
 
         val radius = 3.6f * density
+        // Culling viewport : on ne rasterise (drawCircle) que les points à l'écran (+ marge). Sur un
+        // zoom serré, l'écrasante majorité des ~5000 points est hors cadre → autant d'appels évités.
+        val margin = radius + 1f
+        val maxX = canvas.width + margin
+        val maxY = canvas.height + margin
         points.forEach { coveragePoint ->
             projection.toPixels(GeoPoint(coveragePoint.latitude, coveragePoint.longitude), point)
+            val px = point.x
+            val py = point.y
+            if (px < -margin || px > maxX || py < -margin || py > maxY) return@forEach
             fillPaint.color = rsrpColor(coveragePoint.signalStrength)
-            canvas.drawCircle(point.x.toFloat(), point.y.toFloat(), radius, fillPaint)
+            canvas.drawCircle(px.toFloat(), py.toFloat(), radius, fillPaint)
         }
     }
 

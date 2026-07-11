@@ -28,6 +28,8 @@ object AppConfig {
     const val PREF_SHOW_ONLY_ZB_SITES = "show_only_zb_sites"
     const val DEFAULT_SHOW_AZIMUTH_LINES = true
     const val DEFAULT_SHOW_AZIMUTH_CONES = false
+    const val PREF_LOW_POWER_LEVEL = "low_power_level"
+    const val PREF_LOW_POWER_FOLLOW_SYSTEM = "low_power_follow_system"
 
     // --- Apparence ---
     var themeMode = mutableIntStateOf(0)
@@ -59,6 +61,12 @@ object AppConfig {
 
     //Notifications live
     var enableLiveNotifications = mutableStateOf(false)
+
+    // --- Mode faible consommation ---
+    // 0 = Normal, 1 = Éco (équilibré), 2 = Éco+ (agressif). Le niveau effectif est calculé par PowerProfile.
+    var lowPowerLevel = mutableIntStateOf(0)
+    // Aligne le niveau sur l'économie d'énergie d'Android (force au moins Éco quand le système est en éco).
+    var lowPowerFollowSystem = mutableStateOf(false)
 
     // --- UNITÉS DE MESURE ---
     // 0 = Kilomètres (km), 1 = Miles (mi)
@@ -305,6 +313,10 @@ object AppConfig {
 
         //Notifications live
         enableLiveNotifications.value = prefs.getBoolean("enable_live_notifications", false)
+
+        // Mode faible consommation (0 Normal / 1 Éco / 2 Éco+)
+        lowPowerLevel.intValue = prefs.getInt(PREF_LOW_POWER_LEVEL, 0)
+        lowPowerFollowSystem.value = prefs.getBoolean(PREF_LOW_POWER_FOLLOW_SYSTEM, false)
 
         // ✅ CHARGEMENT DU STYLE D'AFFICHAGE (avec la nouvelle valeur par défaut)
         displayStyle.intValue = prefs.getInt("display_style", defaultDisplayStyle)

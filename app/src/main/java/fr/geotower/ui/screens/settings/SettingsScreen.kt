@@ -672,6 +672,7 @@ fun SettingsScreen(
             entry(context.getString(R.string.settings_app_language), "langue language francais anglais traduction locale", 2) { showLanguageSheet = true }
             entry(context.getString(R.string.settings_units_title), "unites units distance vitesse metre km mesure imperial", 2) { showUnitSheet = true }
             entry(context.getString(R.string.appstrings_update_notif_setting_title), "notification mise a jour update base donnees alerte", 2)
+            entry(context.getString(R.string.appstrings_low_power_title), "faible consommation economie batterie eco energie basse performance low power mode", 2)
             entry(context.getString(R.string.appstrings_live_notification_title), "notification live suivi temps reel antenne direct", 2)
             entry(context.getString(R.string.appstrings_widget_refresh_title), "widget frequence rafraichissement synchronisation accueil", 2)
             if (isWideScreen) {
@@ -2204,6 +2205,88 @@ fun SectionPreferences(
     )
     Spacer(Modifier.height(12.dp))
 
+    // ========================================================
+    // ✅ MODE FAIBLE CONSOMMATION (Normal / Éco / Éco+)
+    // ========================================================
+    val lowPowerLevel by AppConfig.lowPowerLevel
+    val lowPowerFollowSystem by AppConfig.lowPowerFollowSystem
+    // Niveau EFFECTIF (manuel, ou relevé par l'économie d'énergie système) → la sélection le reflète, réactif.
+    val effectiveLowPowerLevel = fr.geotower.utils.PowerProfile.level
+    fun applyLowPowerLevel(newLevel: Int) {
+        AppConfig.lowPowerLevel.intValue = newLevel
+        prefs.edit().putInt(AppConfig.PREF_LOW_POWER_LEVEL, newLevel).apply()
+        // Applique à chaud la priorité/intervalle GPS au service live s'il tourne.
+        LiveTrackingController.refreshLocationSettings(context)
+    }
+    Surface(
+        shape = shape,
+        border = border,
+        color = if (useOneUi) bubbleColor else Color.Transparent,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.fillMaxWidth().padding(sizing.spacing(16.dp))) {
+            Text(
+                stringResource(R.string.appstrings_low_power_title),
+                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                stringResource(R.string.appstrings_low_power_desc),
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(12.dp))
+            NavigationModeOption(
+                title = stringResource(R.string.appstrings_low_power_level_normal),
+                desc = stringResource(R.string.appstrings_low_power_level_normal_desc),
+                isSelected = effectiveLowPowerLevel == 0,
+                useOneUi = useOneUi,
+                onClick = { applyLowPowerLevel(0) }
+            )
+            Spacer(Modifier.height(8.dp))
+            NavigationModeOption(
+                title = stringResource(R.string.appstrings_low_power_level_eco),
+                desc = stringResource(R.string.appstrings_low_power_level_eco_desc),
+                isSelected = effectiveLowPowerLevel == 1,
+                useOneUi = useOneUi,
+                onClick = { applyLowPowerLevel(1) }
+            )
+            Spacer(Modifier.height(8.dp))
+            NavigationModeOption(
+                title = stringResource(R.string.appstrings_low_power_level_ecoplus),
+                desc = stringResource(R.string.appstrings_low_power_level_ecoplus_desc),
+                isSelected = effectiveLowPowerLevel == 2,
+                useOneUi = useOneUi,
+                onClick = { applyLowPowerLevel(2) }
+            )
+            if (effectiveLowPowerLevel > lowPowerLevel) {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    stringResource(R.string.appstrings_low_power_forced_by_system),
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+    Spacer(Modifier.height(12.dp))
+
+    PreferenceSwitchCard(
+        title = stringResource(R.string.appstrings_low_power_follow_system_title),
+        desc = stringResource(R.string.appstrings_low_power_follow_system_desc),
+        checked = lowPowerFollowSystem,
+        onCheckedChange = { isChecked ->
+            AppConfig.lowPowerFollowSystem.value = isChecked
+            prefs.edit().putBoolean(AppConfig.PREF_LOW_POWER_FOLLOW_SYSTEM, isChecked).apply()
+            LiveTrackingController.refreshLocationSettings(context)
+        },
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi
+    )
+    Spacer(Modifier.height(12.dp))
+
     // --- NOUVEAU : NOTIFICATION LIVE ---
     val liveNotifsEnabled by AppConfig.enableLiveNotifications
     val isOperatorSelected = op != "Aucun"
@@ -2252,9 +2335,14 @@ fun SectionPreferences(
 
     if (liveNotifsEnabled) {
         Spacer(Modifier.height(12.dp))
+        // Mode faible conso : le slider suit la valeur imposée par le niveau (grisé tant qu'il pilote).
+        val intervalFloor = fr.geotower.utils.PowerProfile.liveIntervalFloorSeconds
+        val intervalImposedByEco = intervalFloor > 0
+        val effectiveInterval = if (intervalImposedByEco) maxOf(liveLocationIntervalSeconds, intervalFloor) else liveLocationIntervalSeconds
         fr.geotower.ui.components.CustomSliderCard(
             title = stringResource(R.string.appstrings_live_location_refresh_title),
-            currentValue = liveLocationIntervalSeconds,
+            currentValue = effectiveInterval,
+            enabled = !intervalImposedByEco,
             steps = LiveTrackingPrefs.LOCATION_UPDATE_INTERVAL_OPTIONS_SECONDS,
             labels = LiveTrackingPrefs.LOCATION_UPDATE_INTERVAL_OPTIONS_SECONDS.map { "$it s" },
             onValueChange = { newIntervalSeconds ->
@@ -2281,9 +2369,13 @@ fun SectionPreferences(
             stringResource(R.string.appstrings_live_location_accuracy_balanced),
             stringResource(R.string.appstrings_live_location_accuracy_high)
         )
+        // Mode faible conso : impose au moins BALANCED → le slider se cale dessus (grisé), sauf réglage plus économe.
+        val priorityImposedByEco = fr.geotower.utils.PowerProfile.gpsBalanced
+        val effectivePriority = if (priorityImposedByEco) maxOf(liveLocationPriority, LiveTrackingPrefs.PRIORITY_BALANCED_POWER_ACCURACY) else liveLocationPriority
         fr.geotower.ui.components.CustomSliderCard(
             title = stringResource(R.string.appstrings_live_location_accuracy_title),
-            currentValue = liveLocationPriority,
+            currentValue = effectivePriority,
+            enabled = !priorityImposedByEco,
             steps = LiveTrackingPrefs.LOCATION_PRIORITY_OPTIONS,
             labels = priorityLabels,
             onValueChange = { newPriority ->
@@ -2693,6 +2785,15 @@ fun SectionDatabase(
         Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
         fr.geotower.ui.components.RadioDatabaseDownloadCard(
+            useOneUi = useOneUi,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor
+        )
+
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+        fr.geotower.ui.components.LocalDbBuildCard(
             useOneUi = useOneUi,
             shape = shape,
             border = border,

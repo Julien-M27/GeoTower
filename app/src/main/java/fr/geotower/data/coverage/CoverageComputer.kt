@@ -1,11 +1,18 @@
 package fr.geotower.data.coverage
 
 import fr.geotower.data.AnfrRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Résout un site (position + opérateur + antennes + hauteur de repli) puis calcule sa couverture.
  * Logique partagée entre l'overlay carte ([fr.geotower.ui.screens.map.MapViewModel]) et l'écran-outil
  * dédié, pour qu'ils produisent exactement le même résultat à paramètres égaux.
+ *
+ * Tout le corps s'exécute sur [Dispatchers.Default] : le calcul CPU (résolution des émetteurs, grille
+ * terrain, viewshed par antenne) ne doit jamais tourner sur le thread principal (jank/ANR). Les accès
+ * réseau internes rebasculent d'eux-mêmes sur [Dispatchers.IO] (cf. CoverageEngineFactory) et les DAO
+ * Room `suspend` gèrent leur propre executor — les envelopper ici ne les bloque pas.
  */
 object CoverageComputer {
     suspend fun compute(
@@ -15,8 +22,8 @@ object CoverageComputer {
         maxPointsPerRequest: Int,
         maxConcurrentRequests: Int,
         onProgress: (done: Int, total: Int) -> Unit = { _, _ -> }
-    ): SiteCoverage? {
-        val site = repository.getCoverageSiteLocation(idAnfr) ?: return null
+    ): SiteCoverage? = withContext(Dispatchers.Default) {
+        val site = repository.getCoverageSiteLocation(idAnfr) ?: return@withContext null
         val antennas = repository.getAntennesForCoverage(idAnfr)
         val typeLabels = repository.getAntennaTypes().associate { it.taeId to it.libelle }
         // hauteur connue des antennes, sinon hauteur du support (structure), sinon 15 m.
@@ -36,6 +43,6 @@ object CoverageComputer {
             maxPointsPerRequest = maxPointsPerRequest,
             maxConcurrentRequests = maxConcurrentRequests
         )
-        return engine.compute(resolved, request, onProgress)
+        engine.compute(resolved, request, onProgress)
     }
 }

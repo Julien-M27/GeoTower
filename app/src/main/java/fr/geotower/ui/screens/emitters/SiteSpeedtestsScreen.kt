@@ -72,6 +72,8 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import fr.geotower.R
 import fr.geotower.data.api.SignalQuestClient
+import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.data.api.SignalQuestPlmnFilter
 import fr.geotower.data.api.SignalQuestSpeedtestSortMetric
 import fr.geotower.data.api.SqSpeedtestData
@@ -110,6 +112,7 @@ fun SiteSpeedtestsScreen(
     mcc: Int? = null,
     mnc: Int? = null
 ) {
+    SecureScreenEffect(RemoteFeatureFlags.SecureScreens.SITE_SPEEDTESTS)
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs = remember(context) { context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE) }

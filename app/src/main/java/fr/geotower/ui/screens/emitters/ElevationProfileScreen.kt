@@ -81,6 +81,8 @@ import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.ElevationProfileApi
+import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
@@ -124,6 +126,7 @@ fun ElevationProfileScreen(
     isSplitScreen: Boolean = false,
     onCloseSplitScreen: () -> Unit = {}
 ) {
+    SecureScreenEffect(RemoteFeatureFlags.SecureScreens.ELEVATION_PROFILE)
     val context = LocalContext.current
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode

@@ -118,6 +118,7 @@ import fr.geotower.data.api.SqSpeedtestData
 import fr.geotower.data.api.bestSignalQuestSpeedtestByMetric
 import fr.geotower.data.api.filterBySignalQuestPlmn
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.physicalSiteKey
@@ -185,6 +186,7 @@ fun SiteDetailScreen(
     onOpenElevationProfile: ((String) -> Unit)? = null,
     onOpenThroughputCalculator: ((String) -> Unit)? = null
 ) {
+    SecureScreenEffect(RemoteFeatureFlags.SecureScreens.SITE_DETAIL)
     val context = androidx.compose.ui.platform.LocalContext.current
     var isReady by remember { mutableStateOf(false) } // ✅ NOUVEAU : État de chargement
 

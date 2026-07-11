@@ -4,6 +4,7 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonObject
 import com.google.gson.JsonParser
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.coverage.BuildingIndex
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.Request
 import kotlin.math.atan2
@@ -74,14 +75,14 @@ object ElevationProfileApi {
             )
         }.getOrNull() ?: return terrain
 
+        // Index spatial : chaque point ne teste qu'une poignée de bâtiments (sa cellule) au lieu de TOUS
+        // (jusqu'à 5000 en ville) → O(N) au lieu de O(N×M). surfaceAltitude renvoie déjà
+        // max(terrain, toits des bâtiments couvrant le point).
+        val index = BuildingIndex(buildings)
         val overlaidPoints = terrain.points.map { point ->
-            val rooftop = buildings
-                .asSequence()
-                .filter { it.contains(point.longitude, point.latitude) }
-                .map { it.topAltitude(point.elevation) }
-                .maxOrNull()
-            if (rooftop != null && rooftop > point.elevation) {
-                point.copy(elevation = rooftop)
+            val surface = index.surfaceAltitude(point.longitude, point.latitude, point.elevation)
+            if (surface > point.elevation) {
+                point.copy(elevation = surface)
             } else {
                 point
             }
