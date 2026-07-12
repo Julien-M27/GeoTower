@@ -2201,6 +2201,14 @@
     <string name="appstrings_local_build_title">Generate database locally</string>
     <string name="appstrings_local_build_desc">Rebuild the database from official ANFR open data, on this device. Advanced — high-end phones only. Uses mobile data, time and battery; Wi-Fi recommended.</string>
     <string name="appstrings_local_build_action">Generate locally</string>
+    <string name="appstrings_local_build_packs_title">What to generate?</string>
+    <string name="appstrings_local_build_pack_mobile">Mobile</string>
+    <string name="appstrings_local_build_pack_mobile_desc">2G · 3G · 4G · 5G — operators</string>
+    <string name="appstrings_local_build_pack_radio">Radio &amp; TV</string>
+    <string name="appstrings_local_build_pack_radio_desc">FM, DAB+ broadcast, television</string>
+    <string name="appstrings_local_build_pack_nonmobile">Non-mobile technical</string>
+    <string name="appstrings_local_build_pack_nonmobile_desc">Microwave links, private networks, rail…</string>
+    <string name="appstrings_local_build_packs_hint">The ANFR file (required) is shared. Unchecking \"Mobile\" also skips the ~500 MB observatory download.</string>
     <string name="appstrings_local_build_running">Generating…</string>
     <string name="appstrings_local_build_unavailable">Not available on this device (needs 6 GB RAM and 1 GB free).</string>
     <string name="appstrings_local_build_phase_resolving">Finding official sources</string>

@@ -82,6 +82,7 @@ object RadioDbBuilder {
         references: AnfrReferences,
         config: RadioBuildConfig,
         onProgress: (percent: Int, processed: Long) -> Unit = { _, _ -> },
+        allowedServiceMask: Int = -1,
     ): RadioBuildResult {
         prepareSchema(db)
         val sink = RadioStagingSink(db, references.typeAntenne)
@@ -91,7 +92,7 @@ object RadioDbBuilder {
         for (row in sources.emetteurs) sink.emetteur(row)
         for (row in sources.bandes) sink.bande(row)
         sink.finish()
-        return buildFromStaging(db, references, config, onProgress)
+        return buildFromStaging(db, references, config, onProgress, allowedServiceMask)
     }
 
     /** Pragmas + schema final + tables de staging. Appele par [build] et par le pipeline (sink partage). */
@@ -203,12 +204,20 @@ object RadioDbBuilder {
         }
     }
 
-    /** Calcul + emission (classification -> tables finales), depuis un staging deja peuple. */
+    /**
+     * Calcul + emission (classification -> tables finales), depuis un staging deja peuple.
+     *
+     * [allowedServiceMask] filtre les sites emis par categorie de service (bits [RadioServiceMasks]) :
+     * un site n'est emis que si `serviceMask & allowedServiceMask != 0`. Defaut -1 = tous les services.
+     * Permet de ne construire que « Radio/TV » (bit BROADCAST) ou que le « non-mobile technique »
+     * (NON_BROADCAST) selon le choix de l'utilisateur.
+     */
     fun buildFromStaging(
         db: SqlDatabase,
         references: AnfrReferences,
         config: RadioBuildConfig,
         onProgress: (percent: Int, processed: Long) -> Unit = { _, _ -> },
+        allowedServiceMask: Int = -1,
     ): RadioBuildResult {
         val actorLabels = references.exploitant
         val natureLabels = references.nature
@@ -318,7 +327,8 @@ object RadioDbBuilder {
             val sta = row.getString("sta") ?: ""
             val sup = row.getString("sup") ?: ""
             val agg = aggregates[compositeKey(sta, sup)]
-            if (agg != null) {
+            // Filtre par categorie de service : un site avec au moins un service demande est emis.
+            if (agg != null && (agg.serviceMask and allowedServiceMask) != 0) {
                 val natId = row.getIntOrNull("nat_id")
                 val tpoId = row.getIntOrNull("tpo_id")
                 val heightDm = row.getIntOrNull("height_dm")

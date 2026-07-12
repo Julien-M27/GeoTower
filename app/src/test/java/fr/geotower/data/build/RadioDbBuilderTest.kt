@@ -8,6 +8,7 @@ import java.sql.DriverManager
 import java.util.Base64
 import java.util.zip.InflaterInputStream
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -95,12 +96,13 @@ class RadioDbBuilderTest {
         typeAntenne = mapOf("10" to "Antenne broadcast"),
     )
 
-    private fun buildRadio(): File {
+    private fun buildRadio(allowedServiceMask: Int = -1): File {
         val file = File.createTempFile("geotower_radio_test", ".db").apply { deleteOnExit() }
         JdbcSqlDatabase(file.absolutePath).use { db ->
             RadioDbBuilder.build(
                 db, sources(), references(),
                 RadioBuildConfig(version = "20260701_1200", zipVersion = "sup_2026_07.zip", dateMajAnfr = "2026-07-01"),
+                allowedServiceMask = allowedServiceMask,
             )
         }
         return file
@@ -150,6 +152,24 @@ class RadioDbBuilderTest {
             assertEquals("S7", site["sup_id"])
             assertEquals(0, (site["antenna_count"] as Number).toInt())
             assertMask(RadioServiceMasks.PRIVATE, site["service_mask"])
+        }
+    }
+
+    @Test
+    fun filtersSitesByAllowedServiceMask() {
+        // Broadcast seul : ne garde que les sites Radio/TV (2 = DAB, 6 = FM). Exclut RAIL/RADAR/PRIVATE.
+        DriverManager.getConnection("jdbc:sqlite:${buildRadio(RadioServiceMasks.BROADCAST).absolutePath}").use { conn ->
+            assertEquals(2L, conn.count("non_mobile_site"))
+            assertNotNull(conn.one("SELECT * FROM non_mobile_site WHERE sta_nm_anfr = '0000000002'"))
+            assertNotNull(conn.one("SELECT * FROM non_mobile_site WHERE sta_nm_anfr = '0000000006'"))
+            assertNull(conn.one("SELECT * FROM non_mobile_site WHERE sta_nm_anfr = '0000000003'"))
+        }
+        // Non-broadcast : ne garde que le technique (3 = RAIL, 4 = RADAR, 7 = PRIVATE). Exclut Radio/TV.
+        DriverManager.getConnection("jdbc:sqlite:${buildRadio(RadioServiceMasks.NON_BROADCAST).absolutePath}").use { conn ->
+            assertEquals(3L, conn.count("non_mobile_site"))
+            assertNull(conn.one("SELECT * FROM non_mobile_site WHERE sta_nm_anfr = '0000000002'"))
+            assertNotNull(conn.one("SELECT * FROM non_mobile_site WHERE sta_nm_anfr = '0000000003'"))
+            assertNotNull(conn.one("SELECT * FROM non_mobile_site WHERE sta_nm_anfr = '0000000007'"))
         }
     }
 

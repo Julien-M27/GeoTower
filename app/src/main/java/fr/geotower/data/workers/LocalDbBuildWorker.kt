@@ -76,7 +76,12 @@ class LocalDbBuildWorker(
         }
 
         try {
-            val result = LocalDbBuildPipeline().run(context) { phase, percent, detail ->
+            val packs = LocalDbBuildPipeline.Packs(
+                mobile = inputData.getBoolean(KEY_PACK_MOBILE, true),
+                radioBroadcast = inputData.getBoolean(KEY_PACK_RADIO_BROADCAST, true),
+                nonMobileTech = inputData.getBoolean(KEY_PACK_NONMOBILE, true),
+            )
+            val result = LocalDbBuildPipeline().run(context, packs) { phase, percent, detail ->
                 phaseOrdinal.set(phase.ordinal)
                 percentValue.set(percent)
                 detailValue.set(detail.orEmpty())
@@ -229,21 +234,41 @@ class LocalDbBuildWorker(
         const val KEY_PROGRESS = "progress"
         const val KEY_PHASE = "phase"
         const val KEY_DETAIL = "detail"
+        const val KEY_PACK_MOBILE = "pack_mobile"
+        const val KEY_PACK_RADIO_BROADCAST = "pack_radio_broadcast"
+        const val KEY_PACK_NONMOBILE = "pack_nonmobile"
 
         private const val TAG = "GeoTowerDb"
         private const val PROGRESS_NOTIFICATION_ID = 471_001
         private const val RESULT_NOTIFICATION_ID = 471_002
 
-        fun buildRequest() = OneTimeWorkRequestBuilder<LocalDbBuildWorker>()
-            .setConstraints(
-                Constraints.Builder()
-                    .setRequiredNetworkType(NetworkType.CONNECTED)
-                    .build(),
-            )
-            .build()
+        fun buildRequest(mobile: Boolean, radioBroadcast: Boolean, nonMobileTech: Boolean) =
+            OneTimeWorkRequestBuilder<LocalDbBuildWorker>()
+                .setConstraints(
+                    Constraints.Builder()
+                        .setRequiredNetworkType(NetworkType.CONNECTED)
+                        .build(),
+                )
+                .setInputData(
+                    workDataOf(
+                        KEY_PACK_MOBILE to mobile,
+                        KEY_PACK_RADIO_BROADCAST to radioBroadcast,
+                        KEY_PACK_NONMOBILE to nonMobileTech,
+                    ),
+                )
+                .build()
 
-        fun enqueue(workManager: WorkManager) {
-            workManager.enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.KEEP, buildRequest())
+        fun enqueue(
+            workManager: WorkManager,
+            mobile: Boolean = true,
+            radioBroadcast: Boolean = true,
+            nonMobileTech: Boolean = true,
+        ) {
+            workManager.enqueueUniqueWork(
+                UNIQUE_WORK_NAME,
+                ExistingWorkPolicy.KEEP,
+                buildRequest(mobile, radioBroadcast, nonMobileTech),
+            )
         }
     }
 }

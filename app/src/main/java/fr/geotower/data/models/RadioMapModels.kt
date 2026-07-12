@@ -17,6 +17,9 @@ object RadioServiceMasks {
 
     const val ALL = BROADCAST or PRIVATE or RAIL or TRANSPORT or FH or SATELLITE or RADAR or OTHER
 
+    /** Tout le non-mobile SAUF la diffusion Radio/TV (faisceaux, reseaux prives, ferroviaire, transport, etc.). */
+    const val NON_BROADCAST = PRIVATE or RAIL or TRANSPORT or FH or SATELLITE or RADAR or OTHER
+
     @StringRes
     fun labelRes(mask: Int): Int {
         return when {
