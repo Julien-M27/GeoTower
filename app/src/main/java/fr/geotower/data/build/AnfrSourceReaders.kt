@@ -1,10 +1,13 @@
 package fr.geotower.data.build
 
+import java.io.BufferedInputStream
 import java.io.BufferedReader
 import java.io.Closeable
 import java.io.File
 import java.io.FileInputStream
 import java.io.InputStream
+import java.io.InputStreamReader
+import java.nio.charset.Charset
 import java.util.zip.ZipEntry
 import java.util.zip.ZipFile
 
@@ -19,14 +22,59 @@ import java.util.zip.ZipFile
 object AnfrCsvParser {
 
     private const val BOM = 0xFEFF
+    private const val SNIFF_SIZE = 65536
+
+    /** Windows-1252 (surensemble de Latin-1) pour les vieux exports ANFR non-UTF-8 ; repli ISO-8859-1. */
+    private val WINDOWS_1252: Charset = runCatching { Charset.forName("windows-1252") }.getOrDefault(Charsets.ISO_8859_1)
 
     /**
      * Parcourt un flux CSV/TXT : 1re ligne = entete, puis lignes de donnees. Ferme le flux en fin.
      * Si `delimiter` est null, le separateur est **devine** d'apres l'entete (`;`, `,` ou tab) —
      * indispensable car l'export d4c de l'observatoire ANFR n'utilise pas toujours `;`.
      */
-    fun iterator(input: InputStream, delimiter: Char? = null): Iterator<AnfrCsvRow> =
-        CsvRowIterator(input.bufferedReader(Charsets.UTF_8), delimiter)
+    fun iterator(input: InputStream, delimiter: Char? = null): Iterator<AnfrCsvRow> {
+        val buffered = BufferedInputStream(input, SNIFF_SIZE * 2)
+        return CsvRowIterator(InputStreamReader(buffered, detectCharset(buffered)).buffered(), delimiter)
+    }
+
+    /**
+     * Detecte l'encodage du flux (UTF-8 vs Windows-1252). Les exports ANFR sont normalement UTF-8, mais
+     * data.gouv heberge aussi de vieux exports en Latin-1. On echantillonne le debut du flux : si une
+     * sequence y est clairement invalide en UTF-8, on lit tout en Windows-1252, sinon en UTF-8.
+     */
+    internal fun detectCharset(input: BufferedInputStream): Charset {
+        input.mark(SNIFF_SIZE + 8)
+        val sample = ByteArray(SNIFF_SIZE)
+        var read = 0
+        while (read < sample.size) {
+            val n = input.read(sample, read, sample.size - read)
+            if (n < 0) break
+            read += n
+        }
+        input.reset()
+        return if (isLikelyUtf8(sample, read)) Charsets.UTF_8 else WINDOWS_1252
+    }
+
+    /** Valide un echantillon comme UTF-8, en tolerant une sequence multi-octets coupee par la fin. */
+    internal fun isLikelyUtf8(bytes: ByteArray, len: Int): Boolean {
+        var i = 0
+        while (i < len) {
+            val b = bytes[i].toInt() and 0xFF
+            val extra = when {
+                b < 0x80 -> 0
+                b in 0xC2..0xDF -> 1
+                b in 0xE0..0xEF -> 2
+                b in 0xF0..0xF4 -> 3
+                else -> return false // octet de tete invalide (0x80-0xC1, 0xF5-0xFF) : pas de l'UTF-8
+            }
+            if (i + extra >= len) return true // sequence coupee par la fin de l'echantillon : on tolere
+            for (k in 1..extra) {
+                if ((bytes[i + k].toInt() and 0xC0) != 0x80) return false // continuation invalide
+            }
+            i += extra + 1
+        }
+        return true
+    }
 
     /** Devine le separateur d'apres l'entete. */
     fun detectDelimiter(header: String?): Char {

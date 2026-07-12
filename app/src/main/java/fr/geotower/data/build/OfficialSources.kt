@@ -77,6 +77,30 @@ object OfficialSources {
     /** URLs des deux ZIP mensuels "Donnees SUP" : donnees (SUP_*) et references. */
     data class MonthlySupUrls(val dataUrl: String, val refUrl: String?)
 
+    /** 8 chiffres en tete d'un nom d'export ANFR = la periode des DONNEES (formats variables). */
+    private val DATA_DATE_REGEX = Regex("""^(\d{8})""")
+
+    /**
+     * Cle de tri **normalisee YYYYMMDD** extraite du prefixe date d'un nom d'export ANFR. Gere DEUX
+     * formats historiques :
+     *  - moderne `YYYYMMDD` (ex. `20260630-export-etalab-data.zip`, depuis ~2018) ;
+     *  - ancien `DDMMYYYY` (ex. `31052018_export_etalab_data.zip`, 2015-2018) — reordonne en YYYYMMDD.
+     * Sans cette normalisation, un tri de CHAINES mettait `31052018` AVANT `20260630` (`'3' > '2'`),
+     * donc l'app choisissait le vieux fichier de mai 2018 (perime + Latin-1). "" si pas de date en tete.
+     */
+    internal fun dataDateKey(filename: String): String {
+        val digits = DATA_DATE_REGEX.find(filename)?.groupValues?.getOrNull(1) ?: return ""
+        // Format moderne : commence par l'annee (19xx/20xx) -> deja triable tel quel.
+        if (digits.startsWith("19") || digits.startsWith("20")) return digits
+        // Ancien format DDMMYYYY : l'annee est en fin -> reordonne AAAAMMJJ.
+        val year = digits.substring(4, 8)
+        return if (year.startsWith("19") || year.startsWith("20")) {
+            year + digits.substring(2, 4) + digits.substring(0, 2)
+        } else {
+            "" // format non reconnu : ne doit pas gagner le tri
+        }
+    }
+
     /**
      * Le dataset data.gouv publie DEUX ZIP par mois : `*-etalab-data.zip` (tables SUP_STATION/
      * SUPPORT/ANTENNE/EMETTEUR/BANDE) et `*-etalab-ref.zip` (referentiels). On retourne les deux
@@ -90,7 +114,7 @@ object OfficialSources {
             null
         } ?: return null
 
-        data class Zip(val url: String, val filename: String, val key: String)
+        data class Zip(val url: String, val filename: String, val dataDate: String, val modified: String)
         val zips = ArrayList<Zip>()
         for (element in resources) {
             val obj = element.takeIf { it.isJsonObject }?.asJsonObject ?: continue
@@ -99,18 +123,27 @@ object OfficialSources {
             val filename = url.substringAfterLast('/').lowercase()
             val isZip = format == "zip" || filename.endsWith(".zip")
             if (!isZip || !isAllowedHost(url)) continue
-            val key = obj.get("last_modified").stringOrNull()
+            // La date des DONNEES est le prefixe du nom de fichier (ex. 20260630-export-etalab-data.zip),
+            // PAS la date d'upload : data.gouv re-publie parfois de vieux exports (last_modified recent
+            // mais donnees de 2022). Trier sur last_modified choisissait alors un fichier perime, plus
+            // petit (sites manquants) ET en Latin-1 (accents casses). On trie donc sur la date de donnees,
+            // normalisee en YYYYMMDD (les vieux exports 2015-2018 sont en DDMMYYYY : voir dataDateKey).
+            val dataDate = dataDateKey(filename)
+            val modified = obj.get("last_modified").stringOrNull()
                 ?: obj.get("created_at").stringOrNull()
                 ?: ""
-            zips.add(Zip(url, filename, key))
+            zips.add(Zip(url, filename, dataDate, modified))
         }
         if (zips.isEmpty()) return null
 
-        val sorted = zips.sortedByDescending { it.key }
-        val ref = sorted.firstOrNull { it.filename.contains("ref") }
-        val data = sorted.firstOrNull { it.filename.contains("data") && it !== ref }
-            ?: sorted.firstOrNull { it !== ref }
+        // Tri par date de donnees (prefixe) DESC, puis last_modified en secours pour les fichiers non dates.
+        val sorted = zips.sortedWith(compareByDescending<Zip> { it.dataDate }.thenByDescending { it.modified })
+        val data = sorted.firstOrNull { it.filename.contains("data") }
+            ?: sorted.firstOrNull { !it.filename.contains("ref") }
             ?: return null
+        // Reference du MEME export (meme date de donnees) de preference, sinon la plus recente.
+        val ref = sorted.firstOrNull { it.filename.contains("ref") && it.dataDate == data.dataDate }
+            ?: sorted.firstOrNull { it.filename.contains("ref") }
         return MonthlySupUrls(data.url, ref?.url)
     }
 
