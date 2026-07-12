@@ -21,6 +21,7 @@ enum class BuildPhase {
     FINALIZING,            // Nettoyage staging + estampilles Room
     INSTALLING,            // Installation atomique de la base
     DONE,
+    RADIO_BUILDING,        // Generation de la base radio annexe (ajoutee en fin : ordinaux stables)
 }
 
 @StringRes
@@ -36,4 +37,5 @@ fun BuildPhase.labelRes(): Int = when (this) {
     BuildPhase.COMPUTING_STATS -> R.string.appstrings_local_build_phase_stats
     BuildPhase.FINALIZING -> R.string.appstrings_local_build_phase_finalizing
     BuildPhase.INSTALLING, BuildPhase.DONE -> R.string.appstrings_local_build_phase_installing
+    BuildPhase.RADIO_BUILDING -> R.string.appstrings_local_build_phase_radio
 }

@@ -4,7 +4,11 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import fr.geotower.R
 import fr.geotower.data.api.DatabaseDownloader
+import fr.geotower.data.api.RadioDatabaseDownloader
 import fr.geotower.data.db.GeoTowerDatabaseValidator
+import fr.geotower.data.db.RadioDatabaseValidator
+import fr.geotower.data.models.RadioServiceMasks
+import fr.geotower.utils.AppLogger
 import java.io.File
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -29,12 +33,32 @@ class LocalDbBuildPipeline(
 ) {
     data class Result(val success: Boolean, val reason: String? = null)
 
+    /**
+     * Ce que l'utilisateur choisit de generer. Le fichier SUP (source de TOUT) est toujours
+     * telecharge ; l'observatoire mobile (~500 Mo) uniquement si [mobile]. [radioBroadcast] = Radio/TV
+     * (diffusion FM/DAB/TV), [nonMobileTech] = le reste non-mobile (faisceaux, reseaux prives, ...).
+     */
+    data class Packs(
+        val mobile: Boolean,
+        val radioBroadcast: Boolean,
+        val nonMobileTech: Boolean,
+    ) {
+        val anyRadio: Boolean get() = radioBroadcast || nonMobileTech
+
+        /** Masque de service autorise pour la base radio (bits [RadioServiceMasks]). */
+        val allowedServiceMask: Int
+            get() = (if (radioBroadcast) RadioServiceMasks.BROADCAST else 0) or
+                (if (nonMobileTech) RadioServiceMasks.NON_BROADCAST else 0)
+    }
+
     suspend fun run(
         context: Context,
+        packs: Packs,
         onProgress: (phase: BuildPhase, percent: Int, detail: String?) -> Unit,
     ): Result = withContext(Dispatchers.IO) {
         val eligibility = LocalBuildCapability.evaluate(context)
         if (!eligibility.eligible) return@withContext Result(false, eligibility.reason)
+        if (!packs.mobile && !packs.anyRadio) return@withContext Result(false, "Aucune donnée sélectionnée")
 
         // noBackupFilesDir (pas cacheDir) : le systeme ne le purge pas en cours de build.
         val workDir = File(context.noBackupFilesDir, "local_db_build").apply { mkdirs() }
@@ -42,6 +66,8 @@ class LocalDbBuildPipeline(
         val refZip = File(workDir, "sup_ref.zip")
         val observatoireCsv = File(workDir, "observatoire.csv")
         val builtFile = context.getDatabasePath("${GeoTowerDatabaseValidator.DB_NAME}.localbuild")
+        val builtRadioFile = context.getDatabasePath("${RadioDatabaseValidator.DB_NAME}.localbuild")
+        var radioDb: AndroidSqlDatabase? = null
 
         try {
             onProgress(BuildPhase.RESOLVING, 0, null)
@@ -81,37 +107,38 @@ class LocalDbBuildPipeline(
                 )
             }.getOrDefault(emptyMap())
 
-            onProgress(BuildPhase.READING_STATIONS, 36, null)
-            val exportHtml = downloader.fetchText(OfficialSources.OBSERVATOIRE_EXPORT_PAGE_URL, MAX_JSON_BYTES)
-            val observatoireUrl = OfficialSources.resolveObservatoireCsvUrl(exportHtml)
-                ?: return@withContext Result(false, "URL de l'observatoire ANFR introuvable (page d'export)")
+            // Observatoire (~500 Mo) = source MOBILE uniquement -> telecharge SEULEMENT si le pack mobile
+            // est demande. Pour un build « non-mobile seul », ces ~500 Mo sont economises.
+            if (packs.mobile) {
+                onProgress(BuildPhase.READING_STATIONS, 36, null)
+                val exportHtml = downloader.fetchText(OfficialSources.OBSERVATOIRE_EXPORT_PAGE_URL, MAX_JSON_BYTES)
+                val observatoireUrl = OfficialSources.resolveObservatoireCsvUrl(exportHtml)
+                    ?: return@withContext Result(false, "URL de l'observatoire ANFR introuvable (page d'export)")
 
-            // Observatoire telecharge dans un FICHIER (retry + completude) plutot que streame :
-            // un flux HTTP peut casser (PROTOCOL_ERROR) en plein build ; un fichier est retryable.
-            var obsError: String? = "Observatoire non telecharge"
-            var obsAttempt = 0
-            var obsPct = -1
-            while (obsAttempt < MAX_ZIP_ATTEMPTS) {
-                obsAttempt++
-                try {
-                    downloader.downloadToFile(observatoireUrl, observatoireCsv, MAX_OBS_BYTES) { copied, total ->
-                        val mb = copied / (1024 * 1024)
-                        val pct = if (total > 0) (36 + copied * 8 / total).toInt().coerceIn(36, 44) else 40
-                        if (pct != obsPct) {
-                            obsPct = pct
-                            onProgress(BuildPhase.READING_STATIONS, pct, "$mb Mo (essai $obsAttempt)")
+                // Observatoire telecharge dans un FICHIER (retry + completude) plutot que streame :
+                // un flux HTTP peut casser (PROTOCOL_ERROR) en plein build ; un fichier est retryable.
+                var obsError: String? = "Observatoire non telecharge"
+                var obsAttempt = 0
+                var obsPct = -1
+                while (obsAttempt < MAX_ZIP_ATTEMPTS) {
+                    obsAttempt++
+                    try {
+                        downloader.downloadToFile(observatoireUrl, observatoireCsv, MAX_OBS_BYTES) { copied, total ->
+                            val mb = copied / (1024 * 1024)
+                            val pct = if (total > 0) (36 + copied * 8 / total).toInt().coerceIn(36, 44) else 40
+                            if (pct != obsPct) {
+                                obsPct = pct
+                                onProgress(BuildPhase.READING_STATIONS, pct, "$mb Mo (essai $obsAttempt)")
+                            }
                         }
+                        obsError = if (observatoireCsv.length() > 1000L) null else "Observatoire vide"
+                        if (obsError == null) break
+                    } catch (e: Exception) {
+                        obsError = "Telechargement de l'observatoire : ${e.message ?: e.javaClass.simpleName}"
                     }
-                    obsError = if (observatoireCsv.length() > 1000L) null else "Observatoire vide"
-                    if (obsError == null) break
-                } catch (e: Exception) {
-                    obsError = "Telechargement de l'observatoire : ${e.message ?: e.javaClass.simpleName}"
                 }
+                if (obsError != null) return@withContext Result(false, obsError)
             }
-            if (obsError != null) return@withContext Result(false, obsError)
-
-            if (builtFile.exists()) builtFile.delete()
-            builtFile.parentFile?.mkdirs()
 
             AnfrMonthlyZip(dataZip).use { data ->
                 val refSource = if (refZip.exists()) AnfrMonthlyZip(refZip) else null
@@ -121,56 +148,127 @@ class LocalDbBuildPipeline(
                     } else {
                         AnfrReferences(communes = communes)
                     }
+                    // Les fichiers SUP alimentent les deux bases ; l'observatoire (weekly) n'existe que pour le mobile.
                     val sources = AnfrSources(
-                        weekly = csvRows { observatoireCsv.inputStream() },
+                        weekly = if (packs.mobile) csvRows { observatoireCsv.inputStream() } else emptyList(),
                         stations = data.rows("SUP_STATION.txt"),
                         bandes = data.rows("SUP_BANDE.txt"),
                         emetteurs = data.rows("SUP_EMETTEUR.txt"),
                         antennes = data.rows("SUP_ANTENNE.txt"),
                         supports = data.rows("SUP_SUPPORT.txt"),
                     )
-                    var buildPercent = 45
-                    val db = AndroidSqlDatabase(SQLiteDatabase.openOrCreateDatabase(builtFile, null))
-                    try {
-                        GeoTowerDbBuilder.build(
-                            db, sources, references, emptyMap(),
-                            BuildConfig(version = buildVersion(), zipVersion = dataZip.name),
-                            onProgress = { phase, processed ->
-                                // Pourcentage clampe monotone : le libelle suit l'etape reelle
-                                // (les lectures s'intercalent avec les calculs) sans faire reculer la barre.
-                                buildPercent = maxOf(buildPercent, percentFor(phase))
-                                val detail = if (processed > 0L) {
-                                    context.getString(R.string.appstrings_local_build_lines, formatCount(processed))
+                    // Radio demandee si un pack radio est coche ET que les references (labels) sont presentes.
+                    val wantRadio = packs.anyRadio && refZip.exists()
+                    if (packs.anyRadio && !refZip.exists() && !packs.mobile) {
+                        return@withContext Result(false, "References ANFR indisponibles pour la base radio")
+                    }
+
+                    if (packs.mobile) {
+                        // === MOBILE (+ radio mutualise si demande) : le ZIP SUP est parse UNE fois,
+                        // GeoTowerDbBuilder « tee » chaque ligne au sink radio (avant ses filtres mobiles). ===
+                        if (builtFile.exists()) builtFile.delete()
+                        builtFile.parentFile?.mkdirs()
+                        if (wantRadio) {
+                            if (builtRadioFile.exists()) builtRadioFile.delete()
+                            builtRadioFile.parentFile?.mkdirs()
+                            radioDb = AndroidSqlDatabase(SQLiteDatabase.openOrCreateDatabase(builtRadioFile, null)).also {
+                                it.execSql("PRAGMA cache_size = -40000")
+                                it.execSql("PRAGMA mmap_size = 268435456")
+                                RadioDbBuilder.prepareSchema(it)
+                            }
+                        }
+                        val radioSink: SupRowSink =
+                            radioDb?.let { RadioDbBuilder.RadioStagingSink(it, references.typeAntenne) } ?: SupRowSink.None
+                        var buildPercent = 45
+                        val db = AndroidSqlDatabase(SQLiteDatabase.openOrCreateDatabase(builtFile, null))
+                        db.execSql("PRAGMA cache_size = -40000")
+                        db.execSql("PRAGMA mmap_size = 268435456")
+                        try {
+                            GeoTowerDbBuilder.build(
+                                db, sources, references, emptyMap(),
+                                BuildConfig(version = buildVersion(), zipVersion = dataZip.name),
+                                onProgress = { phase, processed ->
+                                    buildPercent = maxOf(buildPercent, percentFor(phase))
+                                    onProgress(phase, buildPercent, detailFor(context, processed))
+                                },
+                                supSink = radioSink,
+                            )
+                        } finally {
+                            db.close()
+                        }
+
+                        onProgress(BuildPhase.INSTALLING, 94, null)
+                        // Valide d'abord pour remonter la cause EXACTE (ex. « Table vide: support ») dans l'UI.
+                        val validation = GeoTowerDatabaseValidator.validateDatabaseFile(builtFile)
+                        if (!validation.isValid) {
+                            return@withContext Result(false, "Validation : ${validation.reason ?: "base invalide"}")
+                        }
+                        if (!DatabaseDownloader.installBuiltDatabase(context, builtFile)) {
+                            return@withContext Result(false, "Installation impossible (échange du fichier de base)")
+                        }
+
+                        // Base radio : staging DEJA peuple par le sink -> calcul/emission seulement, filtre par
+                        // categorie(s) choisie(s). Best-effort (base radio optionnelle).
+                        radioDb?.let { rdb ->
+                            runCatching {
+                                RadioDbBuilder.buildFromStaging(
+                                    rdb, references,
+                                    RadioBuildConfig(version = buildVersion(), zipVersion = dataZip.name),
+                                    { percent, processed -> onProgress(BuildPhase.RADIO_BUILDING, percent, detailFor(context, processed)) },
+                                    packs.allowedServiceMask,
+                                )
+                                rdb.close()
+                                val radioValidation = RadioDatabaseValidator.validateDatabaseFile(builtRadioFile)
+                                if (radioValidation.isValid) {
+                                    RadioDatabaseDownloader.installBuiltRadioDatabase(context, builtRadioFile)
                                 } else {
-                                    null
+                                    AppLogger.w("GeoTowerDb", "Local radio DB validation failed: ${radioValidation.reason}")
                                 }
-                                onProgress(phase, buildPercent, detail)
-                            },
+                            }.onFailure { AppLogger.w("GeoTowerDb", "Local radio DB build failed (non-fatal)", it) }
+                        }
+                    } else {
+                        // === RADIO SEUL (standalone) : pas de mobile, pas d'observatoire. RadioDbBuilder parse
+                        // lui-meme les SUP dans son staging puis emet, filtre par categorie(s) choisie(s). ===
+                        if (builtRadioFile.exists()) builtRadioFile.delete()
+                        builtRadioFile.parentFile?.mkdirs()
+                        val rdb = AndroidSqlDatabase(SQLiteDatabase.openOrCreateDatabase(builtRadioFile, null)).also {
+                            it.execSql("PRAGMA cache_size = -40000")
+                            it.execSql("PRAGMA mmap_size = 268435456")
+                        }
+                        radioDb = rdb
+                        RadioDbBuilder.build(
+                            rdb, sources, references,
+                            RadioBuildConfig(version = buildVersion(), zipVersion = dataZip.name),
+                            { percent, processed -> onProgress(BuildPhase.RADIO_BUILDING, percent, detailFor(context, processed)) },
+                            packs.allowedServiceMask,
                         )
-                    } finally {
-                        db.close()
+                        rdb.close()
+
+                        onProgress(BuildPhase.INSTALLING, 94, null)
+                        val radioValidation = RadioDatabaseValidator.validateDatabaseFile(builtRadioFile)
+                        if (!radioValidation.isValid) {
+                            return@withContext Result(false, "Validation radio : ${radioValidation.reason ?: "base invalide"}")
+                        }
+                        if (!RadioDatabaseDownloader.installBuiltRadioDatabase(context, builtRadioFile)) {
+                            return@withContext Result(false, "Installation radio impossible")
+                        }
                     }
                 } finally {
                     refSource?.close()
                 }
             }
 
-            onProgress(BuildPhase.INSTALLING, 94, null)
-            // Valide d'abord pour remonter la cause EXACTE (ex. « Table vide: support ») dans l'UI.
-            val validation = GeoTowerDatabaseValidator.validateDatabaseFile(builtFile)
-            if (!validation.isValid) {
-                return@withContext Result(false, "Validation : ${validation.reason ?: "base invalide"}")
-            }
-            val installed = DatabaseDownloader.installBuiltDatabase(context, builtFile)
             onProgress(BuildPhase.DONE, 100, null)
-            if (installed) Result(true) else Result(false, "Installation impossible (échange du fichier de base)")
+            Result(true)
         } catch (e: Exception) {
             if (builtFile.exists()) builtFile.delete()
             Result(false, e.message ?: "Échec de la génération locale")
         } finally {
+            runCatching { radioDb?.close() }
             dataZip.delete()
             refZip.delete()
             observatoireCsv.delete()
+            if (builtRadioFile.exists()) builtRadioFile.delete()
         }
     }
 
@@ -212,6 +310,10 @@ class LocalDbBuildPipeline(
     }
 
     private fun formatCount(count: Long): String = NumberFormat.getIntegerInstance().format(count)
+
+    /** Detail « live » (compteur de lignes) pour la carte, ou null si rien a afficher. */
+    private fun detailFor(context: Context, processed: Long): String? =
+        if (processed > 0L) context.getString(R.string.appstrings_local_build_lines, formatCount(processed)) else null
 
     private fun buildVersion(): String = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
 

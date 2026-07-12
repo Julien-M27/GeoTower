@@ -39,4 +39,18 @@ class FrequencyDetailsEncoderTest {
         assertNull(FrequencyDetailsEncoder.encode(null))
         assertNull(FrequencyDetailsEncoder.encode(""))
     }
+
+    /**
+     * Non-regression du leak `Deflater` : chaque appel a `encode` allouait un `Deflater` (memoire
+     * NATIVE zlib) jamais libere. Sur des centaines de milliers d'appels (emission on-device des
+     * ~200k+ blobs radio, apres le build mobile), la generation locale finissait en
+     * `OutOfMemoryError` (Deflater.init natif). Cette boucle doit passer sans OOM.
+     */
+    @Test
+    fun manyEncodesDoNotExhaustNativeMemory() {
+        repeat(300_000) { i ->
+            val text = "Systemes: FM x2\nFrequences: $i-${i + 1} MHz\nAntennes: Panneau broadcast: 90 deg (20m)"
+            assertTrue(FrequencyDetailsEncoder.encode(text) != null)
+        }
+    }
 }
