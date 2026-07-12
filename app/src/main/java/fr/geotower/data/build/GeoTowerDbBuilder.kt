@@ -66,6 +66,7 @@ object GeoTowerDbBuilder {
         arcep: Map<Pair<String, String>, ArcepSiteMeta>,
         config: BuildConfig,
         onProgress: (phase: BuildPhase, processed: Long) -> Unit = { _, _ -> },
+        supSink: SupRowSink = SupRowSink.None,
     ): BuildResult {
         val operateurIds = IdRegistry()
         val systemeIds = IdRegistry()
@@ -125,6 +126,7 @@ object GeoTowerDbBuilder {
         onProgress(BuildPhase.READING_SUPPORTS, 0L)
         // 2/ SUP_STATION : dates + exploitant.
         for (row in sources.stations) {
+            supSink.station(row)
             val idAnfr = AnfrParsing.normalizeIdAnfr(row.get("sta_nm_anfr"))
             val acc = stations[idAnfr] ?: continue
             val admId = AnfrParsing.intOrNone(row.get("adm_id"))
@@ -139,6 +141,7 @@ object GeoTowerDbBuilder {
         val bandeInserter = BatchInserter(db, "INSERT INTO stg_bande VALUES (?, ?, ?, ?, ?, ?)")
         var bandeRows = 0L
         for (row in sources.bandes) {
+            supSink.bande(row)
             val emrId = AnfrParsing.cleanText(row.get("emr_id"))
             val fDebRaw = AnfrParsing.cleanText(row.get("ban_nb_f_deb"))
             val fFinRaw = AnfrParsing.cleanText(row.get("ban_nb_f_fin"))
@@ -151,12 +154,15 @@ object GeoTowerDbBuilder {
             if (++bandeRows % EMIT_EVERY == 0L) onProgress(BuildPhase.READING_SUPPORTS, bandeRows)
         }
         bandeInserter.flush()
+        // Index cree APRES le chargement (perf) : requis par buildEmrFreqs (ORDER BY emr_id) et le scan masques.
+        db.execSql("CREATE INDEX ix_stg_bande_emr ON stg_bande(emr_id)")
         buildEmrFreqs(db)
 
         // 4/ SUP_EMETTEUR -> staging (filtre aux stations connues), enregistre les systemes.
         val emetteurInserter = BatchInserter(db, "INSERT INTO stg_emetteur VALUES (?, ?, ?, ?)")
         var emetteurRows = 0L
         for (row in sources.emetteurs) {
+            supSink.emetteur(row)
             val idAnfr = AnfrParsing.normalizeIdAnfr(row.get("sta_nm_anfr"))
             if (!stations.containsKey(idAnfr)) continue
             val emrId = AnfrParsing.cleanText(row.get("emr_id"))
@@ -168,6 +174,13 @@ object GeoTowerDbBuilder {
             if (++emetteurRows % EMIT_EVERY == 0L) onProgress(BuildPhase.READING_SUPPORTS, emetteurRows)
         }
         emetteurInserter.flush()
+        // Index crees APRES le chargement (perf) : requis par le scan masques, applyDetails et applyAzimuts.
+        db.execSql("CREATE INDEX ix_stg_emetteur_emr ON stg_emetteur(emr_id)")
+        db.execSql("CREATE INDEX ix_stg_emetteur_aer ON stg_emetteur(aer_id)")
+        // Index COUVRANT : applyDetails scanne `e` ordonne par id_anfr en lisant systeme/emr_id/aer_id
+        // directement dans l'index (aucun acces rowid), et le GROUP BY id_anfr se fait EN FLUX sur cet
+        // ordre (pas de tri temporaire). Le prefixe id_anfr couvre aussi les autres usages de l'index.
+        db.execSql("CREATE INDEX ix_stg_emetteur_id ON stg_emetteur(id_anfr, systeme, emr_id, aer_id)")
         db.execSql(
             "INSERT OR REPLACE INTO stg_fh_aer SELECT DISTINCT aer_id FROM stg_emetteur " +
                 "WHERE aer_id IS NOT NULL AND aer_id != '' AND UPPER(systeme) LIKE '%FH%'",
@@ -211,6 +224,7 @@ object GeoTowerDbBuilder {
         val antenneInserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_antenne VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
         var antenneRows = 0L
         for (row in sources.antennes) {
+            supSink.antenne(row)
             val idAnfr = AnfrParsing.normalizeIdAnfr(row.get("sta_nm_anfr"))
             if (!stations.containsKey(idAnfr)) continue
             val aerId = AnfrParsing.cleanText(row.get("aer_id"))
@@ -232,6 +246,8 @@ object GeoTowerDbBuilder {
             if (++antenneRows % EMIT_EVERY == 0L) onProgress(BuildPhase.READING_SUPPORTS, antenneRows)
         }
         antenneInserter.flush()
+        // Index cree APRES le chargement (perf) : requis par applyAzimuts (ORDER BY id_anfr).
+        db.execSql("CREATE INDEX ix_stg_antenne_id ON stg_antenne(id_anfr)")
         db.execSql("UPDATE stg_antenne SET is_fh = 1 WHERE aer_id IN (SELECT aer_id FROM stg_fh_aer)")
 
         onProgress(BuildPhase.COMPUTING_ANTENNAS, 0L)
@@ -243,6 +259,7 @@ object GeoTowerDbBuilder {
         val supportInserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_support VALUES (?, ?, ?, ?, ?)")
         var supportRows = 0L
         for (row in sources.supports) {
+            supSink.support(row)
             val idAnfr = AnfrParsing.normalizeIdAnfr(row.get("sta_nm_anfr"))
             val supId = AnfrParsing.cleanText(row.get("sup_id"))
             val acc = stations[idAnfr]
@@ -274,6 +291,7 @@ object GeoTowerDbBuilder {
             if (++supportRows % EMIT_EVERY == 0L) onProgress(BuildPhase.READING_SUPPORTS, supportRows)
         }
         supportInserter.flush()
+        supSink.finish()
 
         // 9/ Fige l'accumulateur station et l'ARCEP sur disque, puis libere la RAM.
         val stationInserter = BatchInserter(
@@ -300,8 +318,8 @@ object GeoTowerDbBuilder {
         arcepInserter.flush()
 
         onProgress(BuildPhase.BUILDING_DETAILS, 0L)
-        // 10/ details_frequences par station : scan ordonne -> streaming sur disque.
-        applyDetails(db)
+        // 10/ details_frequences par station : group_concat en flux (une ligne par station).
+        applyDetails(db, onProgress)
 
         // Ces tables de staging ne servent plus a l'emission finale (SUP_EMETTEUR ~120 Mo) :
         // on libere avant d'ecrire les tables definitives.
@@ -441,42 +459,47 @@ object GeoTowerDbBuilder {
         flush()
     }
 
-    /** Construit `details_frequences` par station (scan ordonne, emetteur x bandes x physique x statut). */
-    private fun applyDetails(db: SqlDatabase) {
+    /**
+     * Construit `details_frequences` par station (emetteur x bandes x physique x statut).
+     *
+     * PERF (phase la plus longue du build on-device) : `group_concat` avec `GROUP BY id_anfr` renvoie
+     * UNE ligne par station (~100 k) au lieu de renvoyer chaque ligne emetteur (~2-3 M) a Kotlin. Le
+     * GROUP BY se fait EN FLUX sur l'ordre de l'index couvrant `ix_stg_emetteur_id` (id_anfr en tete),
+     * donc SANS tri temporaire (cf. EXPLAIN QUERY PLAN : aucun "USE TEMP B-TREE"). C'est la difference
+     * cruciale avec une variante `SELECT DISTINCT ... ORDER BY line` qui, elle, force un tri de ~2,5 M
+     * lignes catastrophique sur Android.
+     *
+     * group_concat renvoie les lignes dans l'ordre du scan (avec doublons possibles) ; la dedup + le tri
+     * alphabetique d'origine sont refaits en Kotlin sur la petite liste de chaque station (~10-25 lignes).
+     * Sortie identique au sortedSet d'origine, cf. tests `aggregatesMultipleEmittersBandsAndAzimutsPerStation`
+     * (tri) et `deduplicatesIdenticalDetailLines` (dedup).
+     */
+    private fun applyDetails(db: SqlDatabase, onProgress: (phase: BuildPhase, processed: Long) -> Unit) {
         val inserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_details VALUES (?, ?)")
-        var currentId: String? = null
-        val lines = sortedSetOf<String>()
-        fun flush() {
-            val id = currentId
-            if (id != null && lines.isNotEmpty()) {
-                FrequencyDetailsEncoder.encode(lines.joinToString("\n"))?.let { inserter.add(listOf(id, it)) }
-            }
-            lines.clear()
-        }
+        // Miroir SQL de la ligne "$systeme : $freqs | $statut | $date | $phys" ; aucun operande NULL
+        // (systeme force a 'Inconnu' au parse, le reste en COALESCE) donc `||` ne produit jamais NULL.
+        val line = "e.systeme || ' : ' || COALESCE(f.freqs_text, '') || ' | ' || " +
+            "COALESCE(s.statut, sf.statut_label, 'Inconnu') || ' | ' || " +
+            "COALESCE(s.emr_dt, '') || ' | ' || COALESCE(ap.physique, 'Azimut non specifie')"
+        var emitted = 0L
         db.query(
-            "SELECT e.id_anfr AS id_anfr, e.systeme AS systeme, COALESCE(f.freqs_text, '') AS freqs, " +
-                "s.statut AS sys_statut, s.emr_dt AS emr_dt, COALESCE(ap.physique, 'Azimut non specifie') AS phys, " +
-                "sf.statut_label AS statut_label " +
+            "SELECT e.id_anfr AS id_anfr, group_concat($line, char(10)) AS details " +
                 "FROM stg_emetteur e " +
                 "LEFT JOIN stg_emr_freqs f ON e.emr_id = f.emr_id " +
                 "LEFT JOIN stg_antenne ap ON e.aer_id = ap.aer_id " +
                 "LEFT JOIN stg_sysstatus s ON e.id_anfr = s.id_anfr AND s.systeme_upper = UPPER(e.systeme) " +
                 "JOIN stg_station_final sf ON e.id_anfr = sf.id_anfr " +
-                "ORDER BY e.id_anfr",
+                "GROUP BY e.id_anfr",
         ) { row ->
-            val id = row.getString("id_anfr") ?: ""
-            if (id != currentId) {
-                flush()
-                currentId = id
+            val id = row.getString("id_anfr")
+            val details = row.getString("details")
+            if (id != null && details != null) {
+                // Reproduit le sortedSet d'origine : dedup + tri alphabetique des lignes de la station.
+                val sorted = details.split('\n').toSortedSet().joinToString("\n")
+                FrequencyDetailsEncoder.encode(sorted)?.let { inserter.add(listOf(id, it)) }
+                if (++emitted % EMIT_EVERY == 0L) onProgress(BuildPhase.BUILDING_DETAILS, emitted)
             }
-            val systeme = row.getString("systeme") ?: "Inconnu"
-            val freqs = row.getString("freqs") ?: ""
-            val statut = row.getString("sys_statut") ?: row.getString("statut_label") ?: "Inconnu"
-            val date = row.getString("emr_dt") ?: ""
-            val phys = row.getString("phys") ?: "Azimut non specifie"
-            lines.add("$systeme : $freqs | $statut | $date | $phys")
         }
-        flush()
         inserter.flush()
     }
 
@@ -499,17 +522,16 @@ object GeoTowerDbBuilder {
         "stg_support", "stg_sysstatus", "stg_station_final", "stg_arcep", "stg_details",
     )
 
+    // NOTE perf : les index SECONDAIRES (ix_stg_*) ne sont PAS crees ici mais APRES le chargement en
+    // masse de chaque table (cf. build()). Inserer des millions de lignes dans une table deja indexee
+    // maintient le B-tree a chaque ligne (anti-pattern) ; construire l'index une fois, apres, est bien
+    // plus rapide. Les cles PRIMARY KEY restent (necessaires aux INSERT OR REPLACE).
     private val STAGING_STATEMENTS = listOf(
         "CREATE TABLE stg_bande (emr_id TEXT, f_deb REAL, f_fin REAL, unite TEXT, f_deb_raw TEXT, f_fin_raw TEXT)",
-        "CREATE INDEX ix_stg_bande_emr ON stg_bande(emr_id)",
         "CREATE TABLE stg_emr_freqs (emr_id TEXT PRIMARY KEY, freqs_text TEXT)",
         "CREATE TABLE stg_emetteur (id_anfr TEXT, emr_id TEXT, aer_id TEXT, systeme TEXT)",
-        "CREATE INDEX ix_stg_emetteur_emr ON stg_emetteur(emr_id)",
-        "CREATE INDEX ix_stg_emetteur_aer ON stg_emetteur(aer_id)",
-        "CREATE INDEX ix_stg_emetteur_id ON stg_emetteur(id_anfr)",
         "CREATE TABLE stg_fh_aer (aer_id TEXT PRIMARY KEY)",
         "CREATE TABLE stg_antenne (aer_id TEXT PRIMARY KEY, id_anfr TEXT, sup_id TEXT, tae_id INTEGER, azimut INTEGER, hauteur_bas REAL, is_fh INTEGER, physique TEXT)",
-        "CREATE INDEX ix_stg_antenne_id ON stg_antenne(id_anfr)",
         "CREATE TABLE stg_support (id_anfr TEXT, sup_id TEXT, nat_id INTEGER, tpo_id INTEGER, hauteur REAL, PRIMARY KEY(id_anfr, sup_id))",
         "CREATE TABLE stg_sysstatus (id_anfr TEXT, systeme_upper TEXT, statut TEXT, emr_dt TEXT, PRIMARY KEY(id_anfr, systeme_upper))",
         "CREATE TABLE stg_station_final (id_anfr TEXT PRIMARY KEY, operateur_id INTEGER, operator_label TEXT, latitude REAL, longitude REAL, statut_id INTEGER, statut_label TEXT, adm_id INTEGER, date_imp TEXT, date_ser TEXT, date_mod TEXT, adresse TEXT, code_insee TEXT, tech_mask INTEGER, band_mask INTEGER, has_active INTEGER, azimuts TEXT, azimuts_fh TEXT)",

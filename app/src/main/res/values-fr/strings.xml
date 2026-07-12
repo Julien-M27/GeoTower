@@ -2183,6 +2183,14 @@
     <string name="appstrings_local_build_title">Générer la base localement</string>
     <string name="appstrings_local_build_desc">Reconstruit la base depuis les données ouvertes officielles ANFR, sur l\'appareil. Avancé — téléphones performants uniquement. Consomme des données mobiles, du temps et de la batterie ; Wi-Fi conseillé.</string>
     <string name="appstrings_local_build_action">Générer localement</string>
+    <string name="appstrings_local_build_packs_title">Que générer ?</string>
+    <string name="appstrings_local_build_pack_mobile">Mobile</string>
+    <string name="appstrings_local_build_pack_mobile_desc">2G · 3G · 4G · 5G — opérateurs</string>
+    <string name="appstrings_local_build_pack_radio">Radios &amp; TV</string>
+    <string name="appstrings_local_build_pack_radio_desc">Diffusion FM, DAB+, télévision</string>
+    <string name="appstrings_local_build_pack_nonmobile">Non-mobile technique</string>
+    <string name="appstrings_local_build_pack_nonmobile_desc">Faisceaux, réseaux privés, ferroviaire…</string>
+    <string name="appstrings_local_build_packs_hint">Le fichier ANFR (obligatoire) est partagé. Décocher « Mobile » évite en plus le téléchargement de l\'observatoire (~500 Mo).</string>
     <string name="appstrings_local_build_running">Génération…</string>
     <string name="appstrings_local_build_unavailable">Non disponible sur cet appareil (nécessite 6 Go de RAM et 1 Go libre).</string>
     <string name="appstrings_local_build_phase_resolving">Recherche des sources officielles</string>
@@ -2196,6 +2204,7 @@
     <string name="appstrings_local_build_phase_stats">Calcul des statistiques</string>
     <string name="appstrings_local_build_phase_finalizing">Finalisation de la base</string>
     <string name="appstrings_local_build_phase_installing">Installation</string>
+    <string name="appstrings_local_build_phase_radio">Génération de la base radio</string>
     <string name="appstrings_local_build_notif_title">Génération de la base</string>
     <string name="appstrings_local_build_notif_done">Base générée. Appuyez pour ouvrir.</string>
     <string name="appstrings_local_build_notif_failed">Échec de la génération : %1$s</string>
