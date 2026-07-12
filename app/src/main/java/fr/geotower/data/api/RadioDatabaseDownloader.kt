@@ -160,6 +160,35 @@ object RadioDatabaseDownloader {
         }
     }
 
+    /**
+     * Installe une base radio `geotower_fr_radio.db` produite localement (builder on-device) via le
+     * **meme** chemin atomique que le telechargement : validation structurelle ([RadioDatabaseValidator]),
+     * suppression des sidecars WAL/SHM, swap `.backup`/rename. Contrairement a la base principale, la
+     * base radio n'est pas geree par Room (ouverte en lecture seule, par requete, par `RadioRepository`),
+     * il n'y a donc ni fermeture Room ni reconstruction d'index a faire. `builtFile` doit etre sur le meme
+     * volume que la base installee (idealement `context.getDatabasePath("$DB_NAME.localbuild")`).
+     */
+    internal suspend fun installBuiltRadioDatabase(context: Context, builtFile: File): Boolean =
+        withContext(Dispatchers.IO) {
+            val validation = RadioDatabaseValidator.validateDatabaseFile(builtFile)
+            if (!validation.isValid) {
+                AppLogger.w(TAG, "Locally built radio database validation failed: ${validation.reason}")
+                if (builtFile.exists()) builtFile.delete()
+                return@withContext false
+            }
+
+            val dbFile = context.getDatabasePath(DB_NAME)
+            dbFile.parentFile?.mkdirs()
+            val backupFile = context.getDatabasePath("$DB_NAME.backup")
+
+            deleteSqliteSidecars(dbFile)
+            if (!installValidatedDatabase(builtFile, dbFile, backupFile)) {
+                if (builtFile.exists()) builtFile.delete()
+                return@withContext false
+            }
+            true
+        }
+
     private fun readVerifiedRadioDatabaseInfo(): DownloadManifestDatabase? {
         return readVerifiedDownloadManifest()
             ?.radioDatabase

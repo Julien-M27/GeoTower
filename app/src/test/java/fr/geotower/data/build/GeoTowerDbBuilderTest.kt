@@ -235,6 +235,52 @@ class GeoTowerDbBuilderTest {
         }
     }
 
+    @Test
+    fun deduplicatesIdenticalDetailLines() {
+        // Deux emetteurs STRICTEMENT identiques (meme emr_id / aer_id / systeme) : la ligne de detail
+        // produite est la meme deux fois. Le regroupement par station (sortedSet dans applyDetails) doit
+        // la dedupliquer -> une seule ligne, sans separateur.
+        val file = File.createTempFile("geotower_dedup_test", ".db").apply { deleteOnExit() }
+        val sources = AnfrSources(
+            weekly = listOf(
+                row(
+                    "sta_nm_anfr" to "4", "coordonnees" to "48.0 2.0", "adm_lb_nom" to "Free",
+                    "statut" to "En service", "generation" to "4G", "emr_lb_systeme" to "LTE 800",
+                    "emr_dt" to "2026-03-01", "date_maj" to "2026-06-01",
+                ),
+            ),
+            stations = listOf(row("sta_nm_anfr" to "4", "adm_id" to "8")),
+            bandes = listOf(row("emr_id" to "E5", "ban_nb_f_deb" to "791", "ban_nb_f_fin" to "801", "ban_fg_unite" to "M")),
+            emetteurs = listOf(
+                row("sta_nm_anfr" to "4", "emr_id" to "E5", "aer_id" to "AE5", "emr_lb_systeme" to "LTE 800"),
+                row("sta_nm_anfr" to "4", "emr_id" to "E5", "aer_id" to "AE5", "emr_lb_systeme" to "LTE 800"),
+            ),
+            antennes = listOf(
+                row("sta_nm_anfr" to "4", "aer_id" to "AE5", "sup_id" to "S4", "tae_id" to "16", "aer_nb_azimut" to "90", "aer_nb_alt_bas" to "20"),
+            ),
+            supports = listOf(
+                row("sta_nm_anfr" to "4", "sup_id" to "S4", "nat_id" to "23", "tpo_id" to "1", "sup_nm_haut" to "25", "com_cd_insee" to "75056"),
+            ),
+        )
+        val references = AnfrReferences(
+            nature = mapOf("23" to "Pylone"),
+            typeAntenne = mapOf("16" to "Panneau"),
+            communes = mapOf("75056" to "PARIS"),
+        )
+
+        JdbcSqlDatabase(file.absolutePath).use { db ->
+            GeoTowerDbBuilder.build(db, sources, references, emptyMap(), BuildConfig(version = "20260601_1200"))
+        }
+
+        DriverManager.getConnection("jdbc:sqlite:${file.absolutePath}").use { conn ->
+            val tech = conn.one("SELECT * FROM technique WHERE id_anfr = '0000000004'")!!
+            assertEquals(
+                "LTE 800 : 791-801 MHz | En service | 2026-03-01 | Panneau : 90° (20m) [AER_ID: AE5]",
+                FrequencyDetailsCodec.decode(tech["details_frequences"] as String?),
+            )
+        }
+    }
+
     private fun Connection.one(sql: String): Map<String, Any?>? {
         createStatement().use { statement ->
             statement.executeQuery(sql).use { rs ->

@@ -2214,6 +2214,7 @@
     <string name="appstrings_local_build_phase_stats">Computing statistics</string>
     <string name="appstrings_local_build_phase_finalizing">Finalising the database</string>
     <string name="appstrings_local_build_phase_installing">Installing</string>
+    <string name="appstrings_local_build_phase_radio">Building the radio database</string>
     <string name="appstrings_local_build_notif_title">Generating the database</string>
     <string name="appstrings_local_build_notif_done">Database generated. Tap to open.</string>
     <string name="appstrings_local_build_notif_failed">Generation failed: %1$s</string>

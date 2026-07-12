@@ -2196,6 +2196,7 @@
     <string name="appstrings_local_build_phase_stats">Calcul des statistiques</string>
     <string name="appstrings_local_build_phase_finalizing">Finalisation de la base</string>
     <string name="appstrings_local_build_phase_installing">Installation</string>
+    <string name="appstrings_local_build_phase_radio">Génération de la base radio</string>
     <string name="appstrings_local_build_notif_title">Génération de la base</string>
     <string name="appstrings_local_build_notif_done">Base générée. Appuyez pour ouvrir.</string>
     <string name="appstrings_local_build_notif_failed">Échec de la génération : %1$s</string>

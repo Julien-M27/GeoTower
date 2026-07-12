@@ -142,6 +142,16 @@ fun LocalDbBuildCard(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                     )
+                    // Detail « live » de l'etape en cours (compteur de lignes) : evite l'impression de
+                    // blocage quand le % de phase reste fige pendant un long calcul.
+                    val phaseDetail = currentBuild?.progress?.getString(LocalDbBuildWorker.KEY_DETAIL).orEmpty()
+                    if (phaseDetail.isNotBlank()) {
+                        Text(
+                            text = phaseDetail,
+                            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                     Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                     OutlinedButton(
                         onClick = {

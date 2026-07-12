@@ -4,7 +4,10 @@ import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import fr.geotower.R
 import fr.geotower.data.api.DatabaseDownloader
+import fr.geotower.data.api.RadioDatabaseDownloader
 import fr.geotower.data.db.GeoTowerDatabaseValidator
+import fr.geotower.data.db.RadioDatabaseValidator
+import fr.geotower.utils.AppLogger
 import java.io.File
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
@@ -42,6 +45,8 @@ class LocalDbBuildPipeline(
         val refZip = File(workDir, "sup_ref.zip")
         val observatoireCsv = File(workDir, "observatoire.csv")
         val builtFile = context.getDatabasePath("${GeoTowerDatabaseValidator.DB_NAME}.localbuild")
+        val builtRadioFile = context.getDatabasePath("${RadioDatabaseValidator.DB_NAME}.localbuild")
+        var radioDb: AndroidSqlDatabase? = null
 
         try {
             onProgress(BuildPhase.RESOLVING, 0, null)
@@ -113,6 +118,21 @@ class LocalDbBuildPipeline(
             if (builtFile.exists()) builtFile.delete()
             builtFile.parentFile?.mkdirs()
 
+            // Mutualisation : la base radio est STAGEE pendant le parse mobile (le ZIP SUP n'est
+            // parse qu'UNE fois pour les deux bases). On prepare la base radio + son sink AVANT le build
+            // mobile ; GeoTowerDbBuilder « tee » chaque ligne SUP au sink (avant ses filtres).
+            val radioEligible = refZip.exists()
+            if (radioEligible) {
+                if (builtRadioFile.exists()) builtRadioFile.delete()
+                builtRadioFile.parentFile?.mkdirs()
+                radioDb = AndroidSqlDatabase(SQLiteDatabase.openOrCreateDatabase(builtRadioFile, null)).also {
+                    it.execSql("PRAGMA cache_size = -40000")
+                    it.execSql("PRAGMA mmap_size = 268435456")
+                    RadioDbBuilder.prepareSchema(it)
+                }
+            }
+            var sharedReferences: AnfrReferences = AnfrReferences(communes = communes)
+
             AnfrMonthlyZip(dataZip).use { data ->
                 val refSource = if (refZip.exists()) AnfrMonthlyZip(refZip) else null
                 try {
@@ -121,6 +141,9 @@ class LocalDbBuildPipeline(
                     } else {
                         AnfrReferences(communes = communes)
                     }
+                    sharedReferences = references
+                    val radioSink: SupRowSink =
+                        radioDb?.let { RadioDbBuilder.RadioStagingSink(it, references.typeAntenne) } ?: SupRowSink.None
                     val sources = AnfrSources(
                         weekly = csvRows { observatoireCsv.inputStream() },
                         stations = data.rows("SUP_STATION.txt"),
@@ -131,13 +154,13 @@ class LocalDbBuildPipeline(
                     )
                     var buildPercent = 45
                     val db = AndroidSqlDatabase(SQLiteDatabase.openOrCreateDatabase(builtFile, null))
+                    db.execSql("PRAGMA cache_size = -40000")
+                    db.execSql("PRAGMA mmap_size = 268435456")
                     try {
                         GeoTowerDbBuilder.build(
                             db, sources, references, emptyMap(),
                             BuildConfig(version = buildVersion(), zipVersion = dataZip.name),
                             onProgress = { phase, processed ->
-                                // Pourcentage clampe monotone : le libelle suit l'etape reelle
-                                // (les lectures s'intercalent avec les calculs) sans faire reculer la barre.
                                 buildPercent = maxOf(buildPercent, percentFor(phase))
                                 val detail = if (processed > 0L) {
                                     context.getString(R.string.appstrings_local_build_lines, formatCount(processed))
@@ -146,6 +169,7 @@ class LocalDbBuildPipeline(
                                 }
                                 onProgress(phase, buildPercent, detail)
                             },
+                            supSink = radioSink,
                         )
                     } finally {
                         db.close()
@@ -162,15 +186,46 @@ class LocalDbBuildPipeline(
                 return@withContext Result(false, "Validation : ${validation.reason ?: "base invalide"}")
             }
             val installed = DatabaseDownloader.installBuiltDatabase(context, builtFile)
+            if (!installed) {
+                return@withContext Result(false, "Installation impossible (échange du fichier de base)")
+            }
+
+            // Base radio : son staging est DEJA peuple (par le sink pendant le build mobile) -> il ne
+            // reste que le calcul/emission, sans re-parser le ZIP. Best-effort (base radio optionnelle).
+            radioDb?.let { rdb ->
+                runCatching {
+                    RadioDbBuilder.buildFromStaging(
+                        rdb, sharedReferences,
+                        RadioBuildConfig(version = buildVersion(), zipVersion = dataZip.name),
+                    ) { percent, processed ->
+                        val detail = if (processed > 0L) {
+                            context.getString(R.string.appstrings_local_build_lines, formatCount(processed))
+                        } else {
+                            null
+                        }
+                        onProgress(BuildPhase.RADIO_BUILDING, percent, detail)
+                    }
+                    rdb.close()
+                    val radioValidation = RadioDatabaseValidator.validateDatabaseFile(builtRadioFile)
+                    if (radioValidation.isValid) {
+                        RadioDatabaseDownloader.installBuiltRadioDatabase(context, builtRadioFile)
+                    } else {
+                        AppLogger.w("GeoTowerDb", "Local radio DB validation failed: ${radioValidation.reason}")
+                    }
+                }.onFailure { AppLogger.w("GeoTowerDb", "Local radio DB build failed (non-fatal)", it) }
+            }
+
             onProgress(BuildPhase.DONE, 100, null)
-            if (installed) Result(true) else Result(false, "Installation impossible (échange du fichier de base)")
+            Result(true)
         } catch (e: Exception) {
             if (builtFile.exists()) builtFile.delete()
             Result(false, e.message ?: "Échec de la génération locale")
         } finally {
+            runCatching { radioDb?.close() }
             dataZip.delete()
             refZip.delete()
             observatoireCsv.delete()
+            if (builtRadioFile.exists()) builtRadioFile.delete()
         }
     }
 
