@@ -1,0 +1,477 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 3,
+    "identityHash": "7bb043414f7cccc573893efa52d4c7dc",
+    "entities": [
+      {
+        "tableName": "localisation",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id_anfr` TEXT NOT NULL, `operateur_id` INTEGER, `latitude` REAL NOT NULL, `longitude` REAL NOT NULL, `azimuts` TEXT, `code_insee` TEXT, `azimuts_fh` TEXT, `tech_mask` INTEGER NOT NULL, `band_mask` INTEGER NOT NULL, PRIMARY KEY(`id_anfr`))",
+        "fields": [
+          {
+            "fieldPath": "idAnfr",
+            "columnName": "id_anfr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "operateurId",
+            "columnName": "operateur_id",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "latitude",
+            "columnName": "latitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "longitude",
+            "columnName": "longitude",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "azimuts",
+            "columnName": "azimuts",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "codeInsee",
+            "columnName": "code_insee",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "azimutsFh",
+            "columnName": "azimuts_fh",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "techMask",
+            "columnName": "tech_mask",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "bandMask",
+            "columnName": "band_mask",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id_anfr"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "technique",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id_anfr` TEXT NOT NULL, `statut_id` INTEGER, `date_implantation` TEXT, `date_service` TEXT, `date_modif` TEXT, `details_frequences` TEXT, `adresse` TEXT, PRIMARY KEY(`id_anfr`))",
+        "fields": [
+          {
+            "fieldPath": "idAnfr",
+            "columnName": "id_anfr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "statutId",
+            "columnName": "statut_id",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dateImplantation",
+            "columnName": "date_implantation",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dateService",
+            "columnName": "date_service",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "dateModif",
+            "columnName": "date_modif",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "detailsFrequences",
+            "columnName": "details_frequences",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "adresse",
+            "columnName": "adresse",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id_anfr"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "support",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id_anfr` TEXT NOT NULL, `id_support` TEXT NOT NULL, `nat_id` INTEGER, `tpo_id` INTEGER, `hauteur` REAL, PRIMARY KEY(`id_anfr`, `id_support`))",
+        "fields": [
+          {
+            "fieldPath": "idAnfr",
+            "columnName": "id_anfr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "idSupport",
+            "columnName": "id_support",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "natId",
+            "columnName": "nat_id",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "tpoId",
+            "columnName": "tpo_id",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "hauteur",
+            "columnName": "hauteur",
+            "affinity": "REAL",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id_anfr",
+            "id_support"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "antenne",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`aer_id` TEXT NOT NULL, `id_anfr` TEXT NOT NULL, `id_support` TEXT, `tae_id` INTEGER, `azimut` INTEGER, `hauteur_bas` REAL, `is_fh` INTEGER NOT NULL, PRIMARY KEY(`aer_id`))",
+        "fields": [
+          {
+            "fieldPath": "aerId",
+            "columnName": "aer_id",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "idAnfr",
+            "columnName": "id_anfr",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "idSupport",
+            "columnName": "id_support",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "taeId",
+            "columnName": "tae_id",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "azimut",
+            "columnName": "azimut",
+            "affinity": "INTEGER",
+            "notNull": false
+          },
+          {
+            "fieldPath": "hauteurBas",
+            "columnName": "hauteur_bas",
+            "affinity": "REAL",
+            "notNull": false
+          },
+          {
+            "fieldPath": "isFh",
+            "columnName": "is_fh",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "aer_id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "ref_operateur",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `libelle` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "libelle",
+            "columnName": "libelle",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "ref_nature",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`nat_id` INTEGER NOT NULL, `libelle` TEXT NOT NULL, PRIMARY KEY(`nat_id`))",
+        "fields": [
+          {
+            "fieldPath": "natId",
+            "columnName": "nat_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "libelle",
+            "columnName": "libelle",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "nat_id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "ref_proprietaire",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`tpo_id` INTEGER NOT NULL, `libelle` TEXT NOT NULL, PRIMARY KEY(`tpo_id`))",
+        "fields": [
+          {
+            "fieldPath": "tpoId",
+            "columnName": "tpo_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "libelle",
+            "columnName": "libelle",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "tpo_id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "ref_type_antenne",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`tae_id` INTEGER NOT NULL, `libelle` TEXT NOT NULL, PRIMARY KEY(`tae_id`))",
+        "fields": [
+          {
+            "fieldPath": "taeId",
+            "columnName": "tae_id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "libelle",
+            "columnName": "libelle",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "tae_id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "ref_systeme",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `libelle` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "libelle",
+            "columnName": "libelle",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "ref_statut",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER NOT NULL, `libelle` TEXT NOT NULL, PRIMARY KEY(`id`))",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "libelle",
+            "columnName": "libelle",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "ref_commune",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`code_insee` TEXT NOT NULL, `nom` TEXT NOT NULL, PRIMARY KEY(`code_insee`))",
+        "fields": [
+          {
+            "fieldPath": "codeInsee",
+            "columnName": "code_insee",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "nom",
+            "columnName": "nom",
+            "affinity": "TEXT",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "code_insee"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      },
+      {
+        "tableName": "metadata",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`version` TEXT NOT NULL, `schema_version` INTEGER NOT NULL, `country_code` TEXT NOT NULL, `country_name` TEXT, `source` TEXT NOT NULL, `date_maj_anfr` TEXT, `zip_version` TEXT, PRIMARY KEY(`version`))",
+        "fields": [
+          {
+            "fieldPath": "version",
+            "columnName": "version",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "schemaVersion",
+            "columnName": "schema_version",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "countryCode",
+            "columnName": "country_code",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "countryName",
+            "columnName": "country_name",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "source",
+            "columnName": "source",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "dateMajAnfr",
+            "columnName": "date_maj_anfr",
+            "affinity": "TEXT",
+            "notNull": false
+          },
+          {
+            "fieldPath": "zipVersion",
+            "columnName": "zip_version",
+            "affinity": "TEXT",
+            "notNull": false
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": false,
+          "columnNames": [
+            "version"
+          ]
+        },
+        "indices": [],
+        "foreignKeys": []
+      }
+    ],
+    "views": [],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '7bb043414f7cccc573893efa52d4c7dc')"
+    ]
+  }
+}
