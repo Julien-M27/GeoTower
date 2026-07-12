@@ -24,6 +24,19 @@ class AnfrSourceReadersTest {
     }
 
     @Test
+    fun readsBothUtf8AndLatin1CsvIdentically() {
+        // Le meme texte accentue, encode en UTF-8 PUIS en Windows-1252 (vieux exports ANFR), doit etre lu
+        // a l'identique : le lecteur detecte l'encodage (data.gouv heberge les deux). C'est le fix du bug
+        // des adresses en "�" (l'app telechargeait un vieil export Latin-1 lu comme de l'UTF-8).
+        val text = "id;lieu\n1;Château d'eau à Mazières\n"
+        for (charset in listOf(Charsets.UTF_8, java.nio.charset.Charset.forName("windows-1252"))) {
+            val rows = AnfrCsvParser.iterator(java.io.ByteArrayInputStream(text.toByteArray(charset)))
+                .asSequence().toList()
+            assertEquals("Château d'eau à Mazières", rows[0].get("lieu"))
+        }
+    }
+
+    @Test
     fun buildsDatabaseFromRawZipAndWeeklyCsv() {
         val weekly = tempFile(
             "anfr_weekly", ".csv",

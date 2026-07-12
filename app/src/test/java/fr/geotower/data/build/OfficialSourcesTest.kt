@@ -38,6 +38,62 @@ class OfficialSourcesTest {
     }
 
     @Test
+    fun picksLatestDataDateNotLatestUpload() {
+        // Cas reel : data.gouv a re-uploade un VIEIL export (donnees mars 2022) avec un last_modified plus
+        // recent que l'export courant (donnees juin 2026). Trier sur last_modified prenait le fichier 2022
+        // (perime + Latin-1) -> on doit choisir par la DATE DES DONNEES (prefixe du nom de fichier).
+        val json = """
+            {
+              "resources": [
+                {"url":"https://static.data.gouv.fr/resources/x/20220331-export-etalab-data.zip","format":"zip","last_modified":"2026-07-03T07:23:57"},
+                {"url":"https://static.data.gouv.fr/resources/x/20220331-export-etalab-ref.zip","format":"zip","last_modified":"2026-07-03T07:20:00"},
+                {"url":"https://static.data.gouv.fr/resources/x/20260630-export-etalab-data.zip","format":"zip","last_modified":"2026-07-02T13:50:21"},
+                {"url":"https://static.data.gouv.fr/resources/x/20260630-export-etalab-ref.zip","format":"zip","last_modified":"2026-07-02T13:48:28"}
+              ]
+            }
+        """.trimIndent()
+
+        val urls = OfficialSources.selectMonthlySupZipUrls(json)!!
+        assertEquals("https://static.data.gouv.fr/resources/x/20260630-export-etalab-data.zip", urls.dataUrl)
+        // La reference doit venir du MEME export (meme date de donnees), pas du ref 2022 re-uploade.
+        assertEquals("https://static.data.gouv.fr/resources/x/20260630-export-etalab-ref.zip", urls.refUrl)
+    }
+
+    @Test
+    fun picksModernYyyymmddOverLegacyDdmmyyyyFilename() {
+        // Cas reel observe sur l'appareil : le dataset contient encore de TRES vieux exports (2015-2018)
+        // dont le nom est en DDMMYYYY (ex. 31052018_export_etalab_data.zip = 31 mai 2018). Trier les
+        // prefixes comme des CHAINES mettait "31052018" AVANT "20260630" ('3' > '2') -> l'app choisissait
+        // le fichier de mai 2018 (32 Mo, ~53 000 sites manquants, Latin-1). La cle de tri doit normaliser
+        // DDMMYYYY -> YYYYMMDD pour que l'export courant gagne.
+        val json = """
+            {
+              "resources": [
+                {"url":"https://static.data.gouv.fr/resources/x/31052018_export_etalab_data.zip","format":"zip","last_modified":"2018-06-05T14:07:19"},
+                {"url":"https://static.data.gouv.fr/resources/x/31052018_export_etalab_ref.zip","format":"zip","last_modified":"2018-06-05T14:06:27"},
+                {"url":"https://static.data.gouv.fr/resources/x/20260630-export-etalab-data.zip","format":"zip","last_modified":"2026-07-02T13:50:21"},
+                {"url":"https://static.data.gouv.fr/resources/x/20260630-export-etalab-ref.zip","format":"zip","last_modified":"2026-07-02T13:48:28"}
+              ]
+            }
+        """.trimIndent()
+
+        val urls = OfficialSources.selectMonthlySupZipUrls(json)!!
+        assertEquals("https://static.data.gouv.fr/resources/x/20260630-export-etalab-data.zip", urls.dataUrl)
+        assertEquals("https://static.data.gouv.fr/resources/x/20260630-export-etalab-ref.zip", urls.refUrl)
+    }
+
+    @Test
+    fun dataDateKeyNormalizesLegacyAndModernFilenames() {
+        // Moderne YYYYMMDD : inchange.
+        assertEquals("20260630", OfficialSources.dataDateKey("20260630-export-etalab-data.zip"))
+        // Ancien DDMMYYYY : reordonne en YYYYMMDD (31/05/2018 -> 20180531).
+        assertEquals("20180531", OfficialSources.dataDateKey("31052018_export_etalab_data.zip"))
+        // Pas de date en tete : chaine vide (ne gagne jamais le tri).
+        assertEquals("", OfficialSources.dataDateKey("tables_supports_antennes_emetteurs_bandes.zip"))
+        assertEquals("", OfficialSources.dataDateKey("export_etalab_data_22122017.zip"))
+    }
+
+    @Test
     fun returnsNullWhenNoZipOrDisallowedHostOrBadJson() {
         assertNull(
             OfficialSources.selectMonthlySupZipUrls(
