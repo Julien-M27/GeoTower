@@ -66,15 +66,26 @@ class LocalDbBuildPipeline(
         val dataZip = File(workDir, "sup_data.zip")
         val refZip = File(workDir, "sup_ref.zip")
         val observatoireCsv = File(workDir, "observatoire.csv")
+        val arcepDir = File(workDir, "arcep").apply { mkdirs() }
         val builtFile = context.getDatabasePath("${GeoTowerDatabaseValidator.DB_NAME}.localbuild")
         val builtRadioFile = context.getDatabasePath("${RadioDatabaseValidator.DB_NAME}.localbuild")
         var radioDb: AndroidSqlDatabase? = null
+        // Enrichissement ARCEP trimestriel (arcep_nidt/is_zb, cf. localisation). Optionnel : telecharge
+        // avec le pack mobile, best-effort — un echec laisse ces champs a null/0 sans casser le build.
+        val arcepFiles = ArrayList<File>()
+        var arcepQuarter: String? = null
 
         try {
             onProgress(BuildPhase.RESOLVING, 0, null)
             val datasetJson = downloader.fetchText(OfficialSources.MONTHLY_SUP_DATASET_API_URL, MAX_JSON_BYTES)
             val monthly = OfficialSources.selectMonthlySupZipUrls(datasetJson)
                 ?: return@withContext Result(false, "ZIP mensuel ANFR introuvable sur data.gouv")
+            // Version « fichier » du mensuel = le VRAI nom ANFR (ex. 20260630-export-etalab-data.zip),
+            // extrait de l'URL data.gouv. On NE stocke PAS dataZip.name ("sup_data.zip", le fichier temporaire
+            // local) : c'est ce prefixe AAAAMMJJ que la section « Versions » de l'A-propos formate en « Juin 2026 »,
+            // a l'identique d'une base telechargee. Fallback sur le nom local si l'URL n'a pas de segment de fichier.
+            val monthlyFileVersion = monthly.dataUrl.substringAfterLast('/').substringBefore('?')
+                .ifBlank { dataZip.name }
 
             onProgress(BuildPhase.DOWNLOADING, 5, null)
             var lastPct = -1
@@ -139,6 +150,21 @@ class LocalDbBuildPipeline(
                     }
                 }
                 if (obsError != null) return@withContext Result(false, obsError)
+
+                // ARCEP trimestriel : resout le listing "last/" (trimestre courant) et telecharge les
+                // CSV de sites (Metropole + Outremer). Entierement best-effort : source d'enrichissement
+                // OPTIONNELLE (arcep_nidt/is_zb), un echec ne doit jamais interrompre la generation.
+                runCatching {
+                    onProgress(BuildPhase.READING_STATIONS, 44, "ARCEP")
+                    val listingHtml = downloader.fetchText(OfficialSources.ARCEP_SITES_LAST_URL, MAX_JSON_BYTES)
+                    OfficialSources.resolveArcepSitesCsvUrls(listingHtml).forEachIndexed { index, url ->
+                        arcepQuarter = arcepQuarter ?: OfficialSources.extractQuarter(url.substringAfterLast('/'))
+                        val dest = File(arcepDir, "arcep_$index.csv")
+                        runCatching { downloader.downloadToFile(url, dest, MAX_ARCEP_BYTES) }
+                            .onSuccess { if (dest.length() > 100L) arcepFiles.add(dest) }
+                            .onFailure { AppLogger.w("GeoTowerDb", "ARCEP CSV download failed (non-fatal): $url", it) }
+                    }
+                }.onFailure { AppLogger.w("GeoTowerDb", "ARCEP resolve failed (non-fatal)", it) }
             }
 
             AnfrMonthlyZip(dataZip).use { data ->
@@ -181,13 +207,15 @@ class LocalDbBuildPipeline(
                         val radioSink: SupRowSink =
                             radioDb?.let { RadioDbBuilder.RadioStagingSink(it, references.typeAntenne) } ?: SupRowSink.None
                         var buildPercent = 45
+                        // Metadonnees ARCEP (arcep_nidt/is_zb) fusionnees depuis les CSV telecharges.
+                        val arcep = parseArcepFiles(arcepFiles)
                         val db = AndroidSqlDatabase(SQLiteDatabase.openOrCreateDatabase(builtFile, null))
                         db.execSql("PRAGMA cache_size = -40000")
                         db.execSql("PRAGMA mmap_size = 268435456")
                         try {
                             GeoTowerDbBuilder.build(
-                                db, sources, references, emptyMap(),
-                                BuildConfig(version = buildVersion(), zipVersion = dataZip.name),
+                                db, sources, references, arcep,
+                                BuildConfig(version = buildVersion(), zipVersion = monthlyFileVersion, quarterlyVersion = arcepQuarter),
                                 onProgress = { phase, processed ->
                                     buildPercent = maxOf(buildPercent, percentFor(phase))
                                     onProgress(phase, buildPercent, detailFor(context, processed))
@@ -215,7 +243,7 @@ class LocalDbBuildPipeline(
                                 val radioVersion = buildVersion()
                                 RadioDbBuilder.buildFromStaging(
                                     rdb, references,
-                                    RadioBuildConfig(version = radioVersion, zipVersion = dataZip.name),
+                                    RadioBuildConfig(version = radioVersion, zipVersion = monthlyFileVersion),
                                     { percent, processed -> onProgress(BuildPhase.RADIO_BUILDING, percent, detailFor(context, processed)) },
                                     packs.allowedServiceMask,
                                 )
@@ -244,7 +272,7 @@ class LocalDbBuildPipeline(
                         val radioVersion = buildVersion()
                         RadioDbBuilder.build(
                             rdb, sources, references,
-                            RadioBuildConfig(version = radioVersion, zipVersion = dataZip.name),
+                            RadioBuildConfig(version = radioVersion, zipVersion = monthlyFileVersion),
                             { percent, processed -> onProgress(BuildPhase.RADIO_BUILDING, percent, detailFor(context, processed)) },
                             packs.allowedServiceMask,
                         )
@@ -276,8 +304,23 @@ class LocalDbBuildPipeline(
             dataZip.delete()
             refZip.delete()
             observatoireCsv.delete()
+            arcepDir.deleteRecursively()
             if (builtRadioFile.exists()) builtRadioFile.delete()
         }
+    }
+
+    /**
+     * Fusionne les CSV ARCEP « sites » telecharges en `(id_anfr, operateur majuscules) -> (nidt, is_zb)`
+     * (port de `load_arcep_site_metadata` cote [RawSourceDownloader.parseArcepSites]). Lecture en flux,
+     * fichier apres fichier ; la map (dizaines de milliers d'entrees) reste en RAM le temps du build.
+     * Vide si aucun fichier — l'enrichissement ARCEP est alors simplement absent (arcep_nidt=null, is_zb=0).
+     */
+    private fun parseArcepFiles(files: List<File>): Map<Pair<String, String>, ArcepSiteMeta> {
+        if (files.isEmpty()) return emptyMap()
+        val rows = Iterable {
+            files.asSequence().flatMap { file -> csvRows { file.inputStream() }.asSequence() }.iterator()
+        }
+        return RawSourceDownloader.parseArcepSites(rows)
     }
 
     /** Verifie que `zip` est une archive ZIP valide contenant SUP_STATION. Retourne la cause si KO, sinon null. */
@@ -331,6 +374,8 @@ class LocalDbBuildPipeline(
         const val MAX_ZIP_BYTES = 900L * 1024 * 1024
         const val MAX_REF_ZIP_BYTES = 64L * 1024 * 1024
         const val MAX_OBS_BYTES = 512L * 1024 * 1024
+        // CSV ARCEP "sites" : Metropole ~20 Mo, Outremer ~1 Mo. Borne large pour tolerer la croissance.
+        const val MAX_ARCEP_BYTES = 128L * 1024 * 1024
         const val MAX_JSON_BYTES = 64L * 1024 * 1024
     }
 }

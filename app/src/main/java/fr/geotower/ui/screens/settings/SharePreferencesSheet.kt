@@ -338,7 +338,7 @@ fun MapSharePreferencesSheet(
             TextButton(
                 onClick = {
                     onAzimuthsChange(true)
-                    onSpeedometerChange(true)
+                    onSpeedometerChange(false)
                     onScaleChange(true)
                     onAttributionChange(true)
                     onQrChange(true)

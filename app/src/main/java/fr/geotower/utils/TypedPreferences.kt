@@ -227,7 +227,7 @@ object SharePrefs {
     val supportConfidentialEnabled = BooleanPreference("share_sup_confidential_enabled", false)
     val supportQrEnabled = BooleanPreference("share_sup_qr_enabled", true)
     val mapAzimuths = BooleanPreference("share_map_azimuths", true)
-    val mapSpeedometer = BooleanPreference("share_map_speedometer", true)
+    val mapSpeedometer = BooleanPreference("share_map_speedometer", false)
     val mapScale = BooleanPreference("share_map_scale", true)
     val mapAttribution = BooleanPreference("share_map_attribution", true)
     val mapQrEnabled = BooleanPreference("share_map_qr_enabled", true)

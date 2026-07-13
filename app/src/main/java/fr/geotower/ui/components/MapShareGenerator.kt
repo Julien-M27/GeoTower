@@ -455,16 +455,21 @@ fun MapShareMenu(
         else -> stringResource(R.string.appstrings_src_osm_desc)
     }
 
+    // Le bouton doit rester géométriquement identique aux autres boutons de la
+    // carte (boussole, position, zoom) qui utilisent MapControlButtonDiameter =
+    // 54.dp BRUT, sans passer par le scaling UI. On garde donc des dp bruts ici,
+    // sinon le bouton partage devient plus petit (~50.dp à la baseline 0.925) et
+    // se retrouve désaligné verticalement par rapport aux autres.
     Surface(
         onClick = { safeClick { showShareSheet = true } },
         shape = CircleShape,
         color = MaterialTheme.colorScheme.surface,
-        shadowElevation = sizing.component(4.dp),
-        border = BorderStroke(sizing.component(1.dp), MaterialTheme.colorScheme.outlineVariant),
-        modifier = Modifier.size(sizing.component(54.dp))
+        shadowElevation = 4.dp,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.size(54.dp)
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(sizing.component(24.dp)))
+            Icon(Icons.Default.Share, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(24.dp))
         }
     }
 

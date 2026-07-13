@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import fr.geotower.R
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DatabaseVersionPolicy
+import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.data.workers.DatabaseDownloadWorker
@@ -330,6 +331,14 @@ fun DatabaseDownloadCard(
                     Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                     Text(text = stringResource(R.string.database_download_progress, (downloadProgress * 100).toInt()), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
 
+                    // Chrono live du temps de telechargement en cours.
+                    DbOperationTimingText(
+                        timingKey = DbOperationTimings.MOBILE_DOWNLOAD,
+                        running = true,
+                        downloaded = true,
+                        modifier = Modifier.padding(top = sizing.spacing(4.dp)),
+                    )
+
                     Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
                     // ✅ NOUVEAU : Le bouton pour annuler le téléchargement via WorkManager
@@ -413,6 +422,17 @@ fun DatabaseDownloadCard(
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
+                )
+            }
+
+            // Duree du dernier telechargement (uniquement pour une base bien telechargee et installee, hors sync).
+            if (isLocallyGenerated == false && !isSyncing && localDbVersion != txtNoDb && localDbVersion != txtUnknown) {
+                DbOperationTimingText(
+                    timingKey = DbOperationTimings.MOBILE_DOWNLOAD,
+                    running = false,
+                    downloaded = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(8.dp)),
+                    textAlign = TextAlign.Center,
                 )
             }
 

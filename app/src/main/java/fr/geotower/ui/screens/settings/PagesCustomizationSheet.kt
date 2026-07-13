@@ -30,6 +30,7 @@ import androidx.compose.material.icons.automirrored.filled.Launch
 import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Explore
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
@@ -977,6 +978,7 @@ fun MapSettingsSheet(
     showSpeedometer: Boolean, onSpeedometerChange: (Boolean) -> Unit,
     measureReconnectOnDelete: Boolean, onMeasureReconnectChange: (Boolean) -> Unit,
     onDismiss: () -> Unit, onBack: () -> Unit,
+    onFiltersClick: (() -> Unit)? = null,
     sheetState: SheetState, useOneUi: Boolean, bubbleColor: Color
 ) {
     val themeMode by AppConfig.themeMode
@@ -1033,6 +1035,20 @@ fun MapSettingsSheet(
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_azimuth_cones_option), showMapLocation = showAzimuthsCone && !fr.geotower.utils.PowerProfile.isEco, onLocationChange = onAzimuthsConeChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, enabled = !fr.geotower.utils.PowerProfile.isEco)
                 }
             } else {
+                // Accès à l'éditeur des filtres carte par défaut — affiché uniquement quand ce panneau
+                // est ouvert depuis les réglages (depuis la carte, les filtres sont déjà via le Menu).
+                val onFilters = onFiltersClick
+                if (onFilters != null) {
+                    NavigationMenuItem(
+                        title = stringResource(R.string.appstrings_map_filters_defaults_menu),
+                        icon = Icons.Default.FilterList,
+                        isSelected = false,
+                        isDark = isDark
+                    ) { onFilters() }
+                    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+                }
                 Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_location_option), showMapLocation = showLocation, onLocationChange = onLocationChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)
                     SimpleSwitchCard(stringResource(R.string.appstrings_map_location_marker_option), showMapLocation = showLocationMarker, onLocationChange = onLocationMarkerChange, shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi)

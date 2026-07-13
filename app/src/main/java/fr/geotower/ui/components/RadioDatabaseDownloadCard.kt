@@ -55,6 +55,7 @@ import fr.geotower.R
 import fr.geotower.data.api.RadioDatabaseDownloader
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DatabaseVersionPolicy
+import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.data.workers.RadioDatabaseDownloadWorker
@@ -249,6 +250,13 @@ fun RadioDatabaseDownloadCard(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
                     )
+                    // Chrono live du temps de telechargement en cours.
+                    DbOperationTimingText(
+                        timingKey = DbOperationTimings.RADIO_DOWNLOAD,
+                        running = true,
+                        downloaded = true,
+                        modifier = Modifier.padding(top = sizing.spacing(4.dp)),
+                    )
                     Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                     OutlinedButton(
                         onClick = {
@@ -323,6 +331,17 @@ fun RadioDatabaseDownloadCard(
                     fontWeight = FontWeight.Medium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     textAlign = TextAlign.Center
+                )
+            }
+
+            // Duree du dernier telechargement de la base radio (uniquement pour une base bien telechargee et installee, hors sync).
+            if (isLocallyGenerated == false && !isSyncing && localVersion != txtNoDb && localVersion != txtUnknown && localVersion != txtInvalidDb) {
+                DbOperationTimingText(
+                    timingKey = DbOperationTimings.RADIO_DOWNLOAD,
+                    running = false,
+                    downloaded = true,
+                    modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(8.dp)),
+                    textAlign = TextAlign.Center,
                 )
             }
 

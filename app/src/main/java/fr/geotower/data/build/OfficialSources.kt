@@ -18,13 +18,15 @@ import java.net.URI
  */
 object OfficialSources {
 
-    /** Hotes HTTPS autorises (incl. les cibles de redirection de data.gouv). */
+    /** Hotes HTTPS autorises (incl. les cibles de redirection de data.gouv et du bucket ARCEP). */
     val ALLOWED_HOSTS = setOf(
         "www.data.gouv.fr",
         "object.files.data.gouv.fr",
         "static.data.gouv.fr",
         "data.anfr.fr",
         "data.arcep.fr",
+        // Les CSV de data.arcep.fr redirigent (302) vers le stockage objet OVH de l'ARCEP.
+        "arcep.s3.rbx.io.cloud.ovh.net",
         "geo.api.gouv.fr",
     )
 
@@ -61,6 +63,48 @@ object OfficialSources {
 
     /** Base du repertoire ARCEP des fichiers "sites" trimestriels (enrichissement optionnel). */
     const val ARCEP_SITES_BASE_URL = "https://data.arcep.fr/mobile/sites/"
+
+    /**
+     * Raccourci ARCEP vers le repertoire du **trimestre courant** ("Mon Reseau Mobile"). Son HTML
+     * liste les CSV de sites du trimestre (Metropole, Outremer, comptage 5G). On resout ce listing
+     * plutot que le repertoire parent : `last/` pointe toujours vers la publication la plus recente.
+     */
+    const val ARCEP_SITES_LAST_URL = "https://data.arcep.fr/mobile/sites/last/"
+
+    /** `href="....csv"` d'un listing ARCEP (liens relatifs ou absolus). */
+    private val ARCEP_CSV_HREF_REGEX = Regex(
+        """href\s*=\s*["']([^"'>]+?\.csv)["']""",
+        RegexOption.IGNORE_CASE,
+    )
+
+    /**
+     * Extrait de la page de listing ARCEP ([ARCEP_SITES_LAST_URL]) les URLs des CSV « sites » a
+     * charger pour l'enrichissement `arcep_nidt`/`is_zb` (Metropole + Outremer), en ecartant les
+     * fichiers de comptage/historique 5G. Les liens du listing sont relatifs au repertoire courant :
+     * on les resout en absolu contre [listingUrl] (dont le slash final est significatif). Ne retourne
+     * que des URLs sur hotes autorises ; liste vide si rien d'exploitable (l'ARCEP est optionnel).
+     */
+    fun resolveArcepSitesCsvUrls(
+        listingHtml: String,
+        listingUrl: String = ARCEP_SITES_LAST_URL,
+    ): List<String> {
+        val base = try {
+            URI(listingUrl)
+        } catch (_: Exception) {
+            return emptyList()
+        }
+        return ARCEP_CSV_HREF_REGEX.findAll(listingHtml)
+            .mapNotNull { match -> runCatching { base.resolve(match.groupValues[1]).toString() }.getOrNull() }
+            .filter { url ->
+                val name = url.substringAfterLast('/').substringBefore('?').lowercase()
+                // Metropole + Outremer, mais PAS "..._5G_historique_comptage.csv" (pas des sites par ligne).
+                name.endsWith(".csv") && name.contains("sites") &&
+                    !name.contains("historique") && !name.contains("comptage")
+            }
+            .filter { isAllowedHost(it) }
+            .distinct()
+            .toList()
+    }
 
     /** Vrai si `url` est en HTTPS, sur un hote autorise, sans userinfo. */
     fun isAllowedHost(url: String): Boolean {

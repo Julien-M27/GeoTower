@@ -155,6 +155,7 @@ import fr.geotower.utils.AppConfig
 import fr.geotower.utils.PowerProfile
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.FrequencyFilterSelection
+import fr.geotower.utils.MapFilterDefaults
 import fr.geotower.utils.LocationReadiness
 import fr.geotower.utils.locationReadiness
 import fr.geotower.utils.openAppLocationSettings
@@ -672,6 +673,7 @@ private fun summarizedActiveFilterSelection(
 private fun buildActiveMapFilterSummary(
     selectedOperatorKeys: Set<String>,
     frequencyFilter: FrequencyFilterSelection,
+    reference: MapFilterDefaults.Reference,
     showSitesInService: Boolean,
     showSitesOutOfService: Boolean,
     hideUndergroundSites: Boolean,
@@ -704,7 +706,7 @@ private fun buildActiveMapFilterSummary(
 ): String? {
     val activeFilters = mutableListOf<String>()
 
-    if (selectedOperatorKeys != OperatorColors.defaultVisibleKeys) {
+    if (selectedOperatorKeys != reference.operatorKeys) {
         val selectedOperators = OperatorColors.all
             .filter { it.key in selectedOperatorKeys }
             .map { it.label }
@@ -721,7 +723,7 @@ private fun buildActiveMapFilterSummary(
         )
     }
 
-    if (!frequencyFilter.isFullyEnabled) {
+    if (frequencyFilter != reference.frequency) {
         val technologyFilters = listOf(
             "2G" to frequencyFilter.show2G,
             "3G" to frequencyFilter.show3G,
@@ -731,7 +733,14 @@ private fun buildActiveMapFilterSummary(
         )
         val selectedTechnologies = technologyFilters.filter { it.second }.map { it.first }
         val hiddenTechnologies = technologyFilters.filterNot { it.second }.map { it.first }
-        if (selectedTechnologies.size != technologyFilters.size) {
+        val referenceTechnologies = listOf(
+            reference.frequency.show2G,
+            reference.frequency.show3G,
+            reference.frequency.show4G,
+            reference.frequency.show5G,
+            reference.frequency.showFh
+        )
+        if (technologyFilters.map { it.second } != referenceTechnologies) {
             activeFilters += "$technologiesLabel: " + summarizedActiveFilterSelection(
                 selectedValues = selectedTechnologies,
                 hiddenValues = hiddenTechnologies,
@@ -742,9 +751,13 @@ private fun buildActiveMapFilterSummary(
         }
 
         val frequencyBandFilters = mutableListOf<Pair<String, Boolean>>()
-        fun addBands(showTechnology: Boolean, technology: String, bands: List<Pair<String, Boolean>>) {
+        var bandsDifferFromDefault = false
+        fun addBands(showTechnology: Boolean, technology: String, bands: List<Triple<String, Boolean, Boolean>>) {
             if (showTechnology) {
-                bands.forEach { (label, isSelected) -> frequencyBandFilters += "$technology $label" to isSelected }
+                bands.forEach { (label, isSelected, referenceSelected) ->
+                    frequencyBandFilters += "$technology $label" to isSelected
+                    if (isSelected != referenceSelected) bandsDifferFromDefault = true
+                }
             }
         }
 
@@ -752,46 +765,46 @@ private fun buildActiveMapFilterSummary(
             frequencyFilter.show2G,
             "2G",
             listOf(
-                "900 MHz" to frequencyFilter.f2G900,
-                "1800 MHz" to frequencyFilter.f2G1800
+                Triple("900 MHz", frequencyFilter.f2G900, reference.frequency.f2G900),
+                Triple("1800 MHz", frequencyFilter.f2G1800, reference.frequency.f2G1800)
             )
         )
         addBands(
             frequencyFilter.show3G,
             "3G",
             listOf(
-                "900 MHz" to frequencyFilter.f3G900,
-                "2100 MHz" to frequencyFilter.f3G2100
+                Triple("900 MHz", frequencyFilter.f3G900, reference.frequency.f3G900),
+                Triple("2100 MHz", frequencyFilter.f3G2100, reference.frequency.f3G2100)
             )
         )
         addBands(
             frequencyFilter.show4G,
             "4G",
             listOf(
-                "700 MHz" to frequencyFilter.f4G700,
-                "800 MHz" to frequencyFilter.f4G800,
-                "900 MHz" to frequencyFilter.f4G900,
-                "1800 MHz" to frequencyFilter.f4G1800,
-                "2100 MHz" to frequencyFilter.f4G2100,
-                "2600 MHz" to frequencyFilter.f4G2600
+                Triple("700 MHz", frequencyFilter.f4G700, reference.frequency.f4G700),
+                Triple("800 MHz", frequencyFilter.f4G800, reference.frequency.f4G800),
+                Triple("900 MHz", frequencyFilter.f4G900, reference.frequency.f4G900),
+                Triple("1800 MHz", frequencyFilter.f4G1800, reference.frequency.f4G1800),
+                Triple("2100 MHz", frequencyFilter.f4G2100, reference.frequency.f4G2100),
+                Triple("2600 MHz", frequencyFilter.f4G2600, reference.frequency.f4G2600)
             )
         )
         addBands(
             frequencyFilter.show5G,
             "5G",
             listOf(
-                "700 MHz" to frequencyFilter.f5G700,
-                "1400 MHz" to frequencyFilter.f5G1400,
-                "2100 MHz" to frequencyFilter.f5G2100,
-                "3500 MHz" to frequencyFilter.f5G3500,
-                "4200 MHz" to frequencyFilter.f5G4200,
-                "26 GHz" to frequencyFilter.f5G26000
+                Triple("700 MHz", frequencyFilter.f5G700, reference.frequency.f5G700),
+                Triple("1400 MHz", frequencyFilter.f5G1400, reference.frequency.f5G1400),
+                Triple("2100 MHz", frequencyFilter.f5G2100, reference.frequency.f5G2100),
+                Triple("3500 MHz", frequencyFilter.f5G3500, reference.frequency.f5G3500),
+                Triple("4200 MHz", frequencyFilter.f5G4200, reference.frequency.f5G4200),
+                Triple("26 GHz", frequencyFilter.f5G26000, reference.frequency.f5G26000)
             )
         )
 
         val selectedBands = frequencyBandFilters.filter { it.second }.map { it.first }
         val hiddenBands = frequencyBandFilters.filterNot { it.second }.map { it.first }
-        if (frequencyBandFilters.isNotEmpty() && selectedBands.size != frequencyBandFilters.size) {
+        if (frequencyBandFilters.isNotEmpty() && bandsDifferFromDefault) {
             activeFilters += "$frequenciesLabel: " + summarizedActiveFilterSelection(
                 selectedValues = selectedBands,
                 hiddenValues = hiddenBands,
@@ -809,11 +822,18 @@ private fun buildActiveMapFilterSummary(
         radioFhLabel.takeIf { showRadioFh },
         radioOtherLabel.takeIf { showRadioOther }
     )
-    if (radioFilters.isNotEmpty()) {
+    val radioDiffersFromDefault = showRadioTv != reference.showRadioTv ||
+        showRadioBroadcast != reference.showRadioBroadcast ||
+        showRadioPrivateMobile != reference.showRadioPrivateMobile ||
+        showRadioFh != reference.showRadioFh ||
+        showRadioOther != reference.showRadioOther
+    if (radioFilters.isNotEmpty() && radioDiffersFromDefault) {
         activeFilters += "$radioLabel: ${compactActiveFilterValues(radioFilters, moreLabel)}"
     }
 
-    if (showSignalQuestCoveragePoints) {
+    if (showSignalQuestCoveragePoints &&
+        (!reference.showSignalQuestCoveragePoints ||
+            selectedSignalQuestCoverageOperatorKeys != reference.signalQuestCoverageOperatorKeys)) {
         val coverageOperators = OperatorColors.metro.filter { it.key in AppConfig.signalQuestCoverageOperatorKeys }
         val selectedCoverageOperators = coverageOperators
             .filter { it.key in selectedSignalQuestCoverageOperatorKeys }
@@ -832,7 +852,8 @@ private fun buildActiveMapFilterSummary(
     }
 
     val siteFilters = mutableListOf<String>()
-    if (showSitesInService != showSitesOutOfService) {
+    if (showSitesInService != reference.showSitesInService ||
+        showSitesOutOfService != reference.showSitesOutOfService) {
         val selectedStatuses = listOfNotNull(
             inServiceLabel.takeIf { showSitesInService },
             outOfServiceLabel.takeIf { showSitesOutOfService }
@@ -849,8 +870,8 @@ private fun buildActiveMapFilterSummary(
             moreLabel = moreLabel
         )
     }
-    if (showOnlyZbSites) siteFilters += onlyZbLabel
-    if (hideUndergroundSites) siteFilters += hideUndergroundLabel
+    if (showOnlyZbSites && !reference.showOnlyZbSites) siteFilters += onlyZbLabel
+    if (hideUndergroundSites && !reference.hideUndergroundSites) siteFilters += hideUndergroundLabel
     if (siteFilters.isNotEmpty()) {
         activeFilters += "$siteDisplayLabel: ${compactActiveFilterValues(siteFilters, moreLabel)}"
     }
@@ -1423,6 +1444,7 @@ fun MapScreen(
     val activeMapFilterSummary = buildActiveMapFilterSummary(
         selectedOperatorKeys = AppConfig.selectedOperatorKeys.value,
         frequencyFilter = FrequencyFilterSelection.fromMapConfig(),
+        reference = MapFilterDefaults.reference(prefs),
         showSitesInService = AppConfig.showSitesInService.value,
         showSitesOutOfService = AppConfig.showSitesOutOfService.value,
         hideUndergroundSites = AppConfig.hideUndergroundSites.value,

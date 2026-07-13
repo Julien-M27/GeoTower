@@ -53,6 +53,7 @@ import fr.geotower.R
 import fr.geotower.data.build.BuildPhase
 import fr.geotower.data.build.labelRes
 import fr.geotower.data.build.LocalBuildCapability
+import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.data.workers.DatabaseDownloadWorker
 import fr.geotower.data.workers.LocalDbBuildWorker
@@ -181,6 +182,12 @@ fun LocalDbBuildCard(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
+                    // Chrono live du temps de generation en cours.
+                    DbOperationTimingText(
+                        timingKey = DbOperationTimings.LOCAL_BUILD,
+                        running = true,
+                        downloaded = false,
+                    )
                     Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                     OutlinedButton(
                         onClick = {
@@ -237,6 +244,12 @@ fun LocalDbBuildCard(
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     )
                                 }
+                                // Duree de la derniere generation locale reussie.
+                                DbOperationTimingText(
+                                    timingKey = DbOperationTimings.LOCAL_BUILD,
+                                    running = false,
+                                    downloaded = false,
+                                )
                             }
                         }
                     }

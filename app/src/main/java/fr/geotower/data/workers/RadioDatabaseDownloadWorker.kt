@@ -23,6 +23,7 @@ import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.api.RadioDatabaseDownloader
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.NotificationIconResources
 import kotlinx.coroutines.CancellationException
@@ -46,6 +47,8 @@ class RadioDatabaseDownloadWorker(
         }
 
         createChannel()
+        // Chrono de telechargement (live pendant, duree finale apres) affiche par RadioDatabaseDownloadCard.
+        DbOperationTimings.markStart(context, DbOperationTimings.RADIO_DOWNLOAD)
         return try {
             setForeground(createForegroundInfo(0))
 
@@ -55,14 +58,17 @@ class RadioDatabaseDownloadWorker(
             }
 
             if (success) {
+                DbOperationTimings.finish(context, DbOperationTimings.RADIO_DOWNLOAD)
                 setProgress(workDataOf(KEY_PROGRESS to 100))
                 showSuccessNotification()
                 Result.success()
             } else {
+                DbOperationTimings.clearStart(context, DbOperationTimings.RADIO_DOWNLOAD)
                 showErrorNotification()
                 Result.failure()
             }
         } catch (e: CancellationException) {
+            DbOperationTimings.clearStart(context, DbOperationTimings.RADIO_DOWNLOAD)
             cancelSafely(notificationId)
             throw e
         } catch (e: Exception) {
@@ -76,6 +82,7 @@ class RadioDatabaseDownloadWorker(
         return if (runAttemptCount < MAX_RETRY_ATTEMPTS) {
             Result.retry()
         } else {
+            DbOperationTimings.clearStart(context, DbOperationTimings.RADIO_DOWNLOAD)
             showErrorNotification()
             Result.failure()
         }

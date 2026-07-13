@@ -37,6 +37,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.workDataOf
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.data.models.OfflineMapCatalog
 import fr.geotower.data.models.OfflineMapDto
 import fr.geotower.data.workers.DownloadNotificationCenter
@@ -337,6 +338,20 @@ fun MapDownloadCard(
                             // 🚨 L'extraction n'existe plus, on affiche juste la progression !
                             val statusText = stringResource(R.string.map_download_progress_inline, progressValue)
                             Text(text = statusText, fontSize = sizing.text(12.sp), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+                            // Chrono live du temps de telechargement de cette carte.
+                            DbOperationTimingText(
+                                timingKey = DbOperationTimings.mapKey(map.mapFilename),
+                                running = true,
+                                downloaded = true,
+                            )
+                        } else if (isDownloaded) {
+                            // Duree du dernier telechargement reussi de cette carte.
+                            DbOperationTimingText(
+                                timingKey = DbOperationTimings.mapKey(map.mapFilename),
+                                running = false,
+                                downloaded = true,
+                                modifier = Modifier.padding(top = sizing.spacing(4.dp)),
+                            )
                         }
                     }
                     if (index < catalog.lastIndex) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))

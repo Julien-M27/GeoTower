@@ -22,6 +22,7 @@ import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.api.DatabaseDownloader
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.db.DbOperationTimings
 import android.content.pm.ServiceInfo
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.NotificationIconResources
@@ -45,6 +46,8 @@ class DatabaseDownloadWorker(
             return Result.success()
         }
         createChannel()
+        // Chrono de telechargement (live pendant, duree finale apres) affiche par DatabaseDownloadCard.
+        DbOperationTimings.markStart(context, DbOperationTimings.MOBILE_DOWNLOAD)
         return try {
 
             // 1. Démarrer en premier plan
@@ -58,14 +61,17 @@ class DatabaseDownloadWorker(
 
             // 3. Fin du téléchargement
             if (success) {
+                DbOperationTimings.finish(context, DbOperationTimings.MOBILE_DOWNLOAD)
                 setProgress(workDataOf(KEY_PROGRESS to 100))
                 showSuccessNotification()
                 Result.success()
             } else {
+                DbOperationTimings.clearStart(context, DbOperationTimings.MOBILE_DOWNLOAD)
                 showErrorNotification()
                 Result.failure()
             }
         } catch (e: CancellationException) {
+            DbOperationTimings.clearStart(context, DbOperationTimings.MOBILE_DOWNLOAD)
             cancelSafely(notificationId)
             throw e
         } catch (e: Exception) {
@@ -79,6 +85,7 @@ class DatabaseDownloadWorker(
         return if (runAttemptCount < MAX_RETRY_ATTEMPTS) {
             Result.retry()
         } else {
+            DbOperationTimings.clearStart(context, DbOperationTimings.MOBILE_DOWNLOAD)
             showErrorNotification()
             Result.failure()
         }

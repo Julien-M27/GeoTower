@@ -19,6 +19,7 @@ import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.api.RetrofitClient
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.NotificationIconResources
 import fr.geotower.utils.OfflineMapDisplayNames
@@ -89,6 +90,10 @@ class MapDownloadWorker(
         val tempMapFile = File(mapsDir.canonicalFile, "${finalMapFile.name}.download")
         val backupMapFile = File(mapsDir.canonicalFile, "${finalMapFile.name}.backup")
 
+        // Chrono de telechargement (live pendant, duree finale apres) affiche par MapDownloadCard.
+        val timingKey = DbOperationTimings.mapKey(mapFilename)
+        DbOperationTimings.markStart(applicationContext, timingKey)
+
         try {
             setProgress(workDataOf("state" to "DOWNLOADING", "progress" to 0))
             if (tempMapFile.exists()) tempMapFile.delete()
@@ -115,6 +120,7 @@ class MapDownloadWorker(
 
                         while (bytes >= 0) {
                             if (isStopped) {
+                                DbOperationTimings.clearStart(applicationContext, timingKey)
                                 tempMapFile.delete()
                                 notificationManager.cancel(progressNotifId)
                                 return@withContext Result.failure()
@@ -157,17 +163,21 @@ class MapDownloadWorker(
             val success = replaceMapAtomically(tempMapFile, finalMapFile, backupMapFile)
 
             return@withContext if (success) {
+                DbOperationTimings.finish(applicationContext, timingKey)
                 showSuccessNotification(mapFilename, mapDisplayName, progressNotifId, resultNotifId)
                 Result.success()
             } else {
+                DbOperationTimings.clearStart(applicationContext, timingKey)
                 tempMapFile.delete()
                 Result.failure()
             }
         } catch (e: CancellationException) {
+            DbOperationTimings.clearStart(applicationContext, timingKey)
             if (tempMapFile.exists()) tempMapFile.delete()
             notificationManager.cancel(progressNotifId)
             throw e
         } catch (e: Exception) {
+            DbOperationTimings.clearStart(applicationContext, timingKey)
             AppLogger.w(TAG, "Map download failed", e)
             if (tempMapFile.exists()) tempMapFile.delete()
             return@withContext Result.failure()

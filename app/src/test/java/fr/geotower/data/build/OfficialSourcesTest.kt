@@ -140,4 +140,56 @@ class OfficialSourcesTest {
             OfficialSources.selectLatestArcepCsvUrl(urls),
         )
     }
+
+    @Test
+    fun allowsArcepOvhRedirectHost() {
+        // Les CSV data.arcep.fr redirigent (302) vers le bucket objet OVH de l'ARCEP.
+        assertTrue(OfficialSources.isAllowedHost("https://arcep.s3.rbx.io.cloud.ovh.net/mobile/sites/2026_T1/x.csv"))
+    }
+
+    @Test
+    fun resolvesArcepSitesCsvUrlsKeepingMetropoleAndOutremer() {
+        // Extrait du HTML reel du listing data.arcep.fr/mobile/sites/last/ (liens relatifs).
+        val html = """
+            <ul id="dir-content">
+              <li class="file"><a href="2026_T1_sites_5G_historique_comptage.csv" class="matomo_download">2026_T1_sites_5G_historique_comptage.csv</a></li>
+              <li class="file"><a href="2026_T1_sites_Metropole.csv" class="matomo_download">2026_T1_sites_Metropole.csv</a></li>
+              <li class="file"><a href="2026_T1_sites_Outremer.csv" class="matomo_download">2026_T1_sites_Outremer.csv</a></li>
+            </ul>
+        """.trimIndent()
+
+        // Metropole + Outremer resolus en absolu sur data.arcep.fr ; le comptage 5G historique est ecarte.
+        assertEquals(
+            listOf(
+                "https://data.arcep.fr/mobile/sites/last/2026_T1_sites_Metropole.csv",
+                "https://data.arcep.fr/mobile/sites/last/2026_T1_sites_Outremer.csv",
+            ),
+            OfficialSources.resolveArcepSitesCsvUrls(html),
+        )
+    }
+
+    @Test
+    fun resolveArcepDropsDisallowedHostsAndAcceptsOvhAbsoluteLinks() {
+        val html = """
+            <a href="2026_T1_sites_Metropole.csv">x</a>
+            <a href="https://evil.example.com/2026_T1_sites_Fake.csv">x</a>
+            <a href="https://arcep.s3.rbx.io.cloud.ovh.net/mobile/sites/2026_T1/2026_T1_sites_Outremer.csv">x</a>
+        """.trimIndent()
+
+        assertEquals(
+            listOf(
+                "https://data.arcep.fr/mobile/sites/last/2026_T1_sites_Metropole.csv",
+                "https://arcep.s3.rbx.io.cloud.ovh.net/mobile/sites/2026_T1/2026_T1_sites_Outremer.csv",
+            ),
+            OfficialSources.resolveArcepSitesCsvUrls(html),
+        )
+    }
+
+    @Test
+    fun resolveArcepReturnsEmptyWhenListingHasNoSitesCsv() {
+        assertEquals(
+            emptyList<String>(),
+            OfficialSources.resolveArcepSitesCsvUrls("<a href=\"../index.html\">up</a>"),
+        )
+    }
 }

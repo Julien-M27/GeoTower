@@ -484,6 +484,9 @@
     <string name="appstrings_map_active_filters_except">außer %1$s</string>
     <string name="appstrings_map_active_filters_more">+%1$d</string>
     <string name="appstrings_map_active_filters_none">keine</string>
+    <string name="appstrings_map_filters_defaults_menu">Filter</string>
+    <string name="appstrings_map_filters_defaults_title">Standardfilter</string>
+    <string name="appstrings_map_filters_defaults_desc">Diese Einstellungen werden zu den Standardfiltern der Karte. Das Banner „Aktive Filter“ erscheint nur, wenn die Karte davon abweicht.</string>
     <string name="appstrings_signalquest_coverage_title">SignalQuest-Abdeckung</string>
     <string name="appstrings_signalquest_coverage_points_label">Abdeckungspunkte</string>
     <string name="appstrings_signalquest_coverage_detail_title">Abdeckungspunkt</string>
@@ -2191,6 +2194,9 @@
     <string name="appstrings_local_build_generated_title">Auf diesem Telefon erstellt</string>
     <string name="appstrings_local_build_generated_mobile">Mobilfunk-Datenbank: %1$s</string>
     <string name="appstrings_local_build_generated_radio">Funkdaten: %1$s</string>
+    <string name="appstrings_db_time_elapsed">Verstrichen: %1$s</string>
+    <string name="appstrings_db_time_generated">Erstellt in %1$s</string>
+    <string name="appstrings_db_time_downloaded">Heruntergeladen in %1$s</string>
     <string name="appstrings_local_build_running">Wird erzeugt…</string>
     <string name="appstrings_local_build_unavailable">Auf diesem Gerät nicht verfügbar (benötigt 6 GB RAM und 1 GB frei).</string>
     <string name="appstrings_local_build_phase_resolving">Offizielle Quellen werden gesucht</string>
@@ -2220,4 +2226,6 @@
     <string name="appstrings_release_v1963_db_provenance">Die Einstellungen unterscheiden jetzt eine auf dem Gerät generierte Datenbank von einer online heruntergeladenen, mit dem Erstellungsdatum und einer Schaltfläche zum Austauschen</string>
     <string name="appstrings_release_v1963_offline_maps_catalog">Die Liste der Offline-Karten erscheint jetzt sofort (in die App eingebetteter Katalog, kein Warten auf den Server)</string>
     <string name="appstrings_release_v1963_site_panel_table">Standortdetails: neue Tabelle des Paneltyps (All-in-One / Schüssel) nach Azimut mit der AER-Kennung, passend zum PDF-Bericht</string>
+    <string name="appstrings_release_v1964_map_filters_defaults">Standard-Kartenfilter: über Seitenanpassung > Antennenkarte > Filter einstellen; das Banner „Aktive Filter“ erscheint dann nur, wenn die Karte von deinem Standard abweicht</string>
+    <string name="appstrings_release_v1964_db_timings">Auf den Datenbanken angezeigte Zeiten: verstrichene Zeit während des Vorgangs, dann „Erstellt in…“ oder „Heruntergeladen in…“</string>
 </resources>

@@ -68,7 +68,35 @@ fun MapSettingsSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val sizing = LocalGeoTowerUiStyle.current.sizing
-    // ✅ AJOUT : Pour pouvoir sauvegarder le paramètre
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface,
+        scrimColor = Color.Transparent,
+        dragHandle = { BottomSheetDefaults.DragHandle() }
+    ) {
+        MapFiltersControls(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = sizing.spacing(24.dp))
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = sizing.spacing(64.dp))
+        )
+    }
+}
+
+/**
+ * Contenu réutilisable du panneau de filtres de la carte (sans conteneur ni scroll, à
+ * fournir par l'appelant via [modifier]). Lit et écrit directement AppConfig +
+ * SharedPreferences ("GeoTowerPrefs") : tout changement s'applique immédiatement à la
+ * carte. Réutilisé tel quel par l'éditeur « Filtres par défaut ».
+ */
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
+@Composable
+fun MapFiltersControls(
+    modifier: Modifier = Modifier
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", android.content.Context.MODE_PRIVATE)
     val featureFlags by RemoteFeatureFlags.config
@@ -138,19 +166,8 @@ fun MapSettingsSheet(
             .apply()
     }
 
-    ModalBottomSheet(
-        onDismissRequest = onDismiss,
-        sheetState = sheetState,
-        containerColor = MaterialTheme.colorScheme.surface,
-        scrimColor = Color.Transparent,
-        dragHandle = { BottomSheetDefaults.DragHandle() }
-    ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = sizing.spacing(24.dp))
-                .verticalScroll(rememberScrollState())
-                .padding(bottom = sizing.spacing(64.dp))
+            modifier = modifier
         ) {
 
             // 1. OPÉRATEURS
@@ -475,7 +492,6 @@ fun MapSettingsSheet(
                 prefs.edit().putBoolean(AppConfig.PREF_HIDE_UNDERGROUND_SITES, it).apply()
             }
         }
-    }
 }
 
 // --- COMPOSANTS UI ---

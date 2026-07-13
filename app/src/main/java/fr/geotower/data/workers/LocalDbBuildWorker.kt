@@ -23,6 +23,7 @@ import fr.geotower.R
 import fr.geotower.data.build.BuildPhase
 import fr.geotower.data.build.LocalDbBuildPipeline
 import fr.geotower.data.build.labelRes
+import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.NotificationIconResources
 import java.util.concurrent.atomic.AtomicInteger
@@ -49,6 +50,8 @@ class LocalDbBuildWorker(
 
     override suspend fun doWork(): Result = coroutineScope {
         createChannel()
+        // Chrono de generation (live pendant, duree finale apres) affiche par LocalDbBuildCard.
+        DbOperationTimings.markStart(context, DbOperationTimings.LOCAL_BUILD)
         setForeground(createForegroundInfo(BuildPhase.RESOLVING, 0, null))
 
         val phaseOrdinal = AtomicInteger(BuildPhase.RESOLVING.ordinal)
@@ -91,19 +94,23 @@ class LocalDbBuildWorker(
             ticker.cancel()
             cancelSafely(PROGRESS_NOTIFICATION_ID)
             if (result.success) {
+                DbOperationTimings.finish(context, DbOperationTimings.LOCAL_BUILD)
                 setProgress(workDataOf(KEY_PROGRESS to 100, KEY_PHASE to BuildPhase.DONE.ordinal))
                 showResult(success = true, reason = null)
                 Result.success()
             } else {
+                DbOperationTimings.clearStart(context, DbOperationTimings.LOCAL_BUILD)
                 AppLogger.w(TAG, "Local DB build failed: ${result.reason}")
                 showResult(success = false, reason = result.reason)
                 Result.failure()
             }
         } catch (e: CancellationException) {
+            DbOperationTimings.clearStart(context, DbOperationTimings.LOCAL_BUILD)
             ticker.cancel()
             cancelSafely(PROGRESS_NOTIFICATION_ID)
             throw e
         } catch (e: Exception) {
+            DbOperationTimings.clearStart(context, DbOperationTimings.LOCAL_BUILD)
             ticker.cancel()
             AppLogger.w(TAG, "Local DB build worker crashed", e)
             cancelSafely(PROGRESS_NOTIFICATION_ID)

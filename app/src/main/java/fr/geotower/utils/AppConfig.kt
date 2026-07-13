@@ -198,7 +198,7 @@ object AppConfig {
 
     // --- PARTAGE PAR DÉFAUT (CARTE) ---
     var shareMapAzimuths = mutableStateOf(true)
-    var shareMapSpeedometer = mutableStateOf(true)
+    var shareMapSpeedometer = mutableStateOf(false)
     var shareMapScale = mutableStateOf(true)
     var shareMapAttribution = mutableStateOf(true)
     var shareMapConfidential = mutableStateOf(false)
@@ -392,7 +392,7 @@ object AppConfig {
 
         // --- CHARGEMENT PARTAGE DE LA CARTE ---
         shareMapAzimuths.value = prefs.getBoolean("share_map_azimuths", true)
-        shareMapSpeedometer.value = prefs.getBoolean("share_map_speedometer", true)
+        shareMapSpeedometer.value = prefs.getBoolean("share_map_speedometer", false)
         shareMapScale.value = prefs.getBoolean("share_map_scale", true)
         shareMapAttribution.value = prefs.getBoolean("share_map_attribution", true)
         shareMapConfidential.value = prefs.getBoolean("share_map_confidential", false)

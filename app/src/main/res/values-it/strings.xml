@@ -484,6 +484,9 @@
     <string name="appstrings_map_active_filters_except">tranne %1$s</string>
     <string name="appstrings_map_active_filters_more">+%1$d</string>
     <string name="appstrings_map_active_filters_none">nessuno</string>
+    <string name="appstrings_map_filters_defaults_menu">Filtri</string>
+    <string name="appstrings_map_filters_defaults_title">Filtri predefiniti</string>
+    <string name="appstrings_map_filters_defaults_desc">Queste impostazioni diventano i filtri predefiniti della mappa. Il banner «Filtri attivi» appare solo quando la mappa se ne discosta.</string>
     <string name="appstrings_signalquest_coverage_title">Copertura SignalQuest</string>
     <string name="appstrings_signalquest_coverage_points_label">Punti di copertura</string>
     <string name="appstrings_signalquest_coverage_detail_title">Punto di copertura</string>
@@ -2191,6 +2194,9 @@
     <string name="appstrings_local_build_generated_title">Generato su questo telefono</string>
     <string name="appstrings_local_build_generated_mobile">Database mobile: %1$s</string>
     <string name="appstrings_local_build_generated_radio">Dati radio: %1$s</string>
+    <string name="appstrings_db_time_elapsed">Tempo trascorso: %1$s</string>
+    <string name="appstrings_db_time_generated">Generato in %1$s</string>
+    <string name="appstrings_db_time_downloaded">Scaricato in %1$s</string>
     <string name="appstrings_local_build_running">Generazione…</string>
     <string name="appstrings_local_build_unavailable">Non disponibile su questo dispositivo (richiede 6 GB di RAM e 1 GB libero).</string>
     <string name="appstrings_local_build_phase_resolving">Ricerca delle fonti ufficiali</string>
@@ -2220,4 +2226,6 @@
     <string name="appstrings_release_v1963_db_provenance">Le impostazioni ora distinguono un database generato sul dispositivo da uno scaricato online, con la data di generazione e un pulsante per sostituire l\'uno con l\'altro</string>
     <string name="appstrings_release_v1963_offline_maps_catalog">L\'elenco delle mappe offline ora appare all\'istante (catalogo integrato nell\'app, senza attendere il server)</string>
     <string name="appstrings_release_v1963_site_panel_table">Dettagli del sito: nuova tabella del tipo di pannello (all-in-one / parabola) per azimut con l\'identificativo AER, in coerenza con il report PDF</string>
+    <string name="appstrings_release_v1964_map_filters_defaults">Filtri mappa predefiniti: impostali da Personalizzazione delle pagine > Mappa delle antenne > Filtri; il banner «Filtri attivi» compare solo quando la mappa differisce dal tuo valore predefinito</string>
+    <string name="appstrings_release_v1964_db_timings">Tempi mostrati sui database: tempo trascorso durante l\'operazione, poi «Generato in…» o «Scaricato in…»</string>
 </resources>

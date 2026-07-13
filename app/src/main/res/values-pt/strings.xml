@@ -484,6 +484,9 @@
     <string name="appstrings_map_active_filters_except">exceto %1$s</string>
     <string name="appstrings_map_active_filters_more">+%1$d</string>
     <string name="appstrings_map_active_filters_none">nenhum</string>
+    <string name="appstrings_map_filters_defaults_menu">Filtros</string>
+    <string name="appstrings_map_filters_defaults_title">Filtros predefinidos</string>
+    <string name="appstrings_map_filters_defaults_desc">Estas definições tornam-se os filtros predefinidos do mapa. O aviso «Filtros ativos» só aparece quando o mapa difere deles.</string>
     <string name="appstrings_signalquest_coverage_title">Cobertura SignalQuest</string>
     <string name="appstrings_signalquest_coverage_points_label">Pontos de cobertura</string>
     <string name="appstrings_signalquest_coverage_detail_title">Ponto de cobertura</string>
@@ -2191,6 +2194,9 @@
     <string name="appstrings_local_build_generated_title">Gerado neste telemóvel</string>
     <string name="appstrings_local_build_generated_mobile">Base de dados móvel: %1$s</string>
     <string name="appstrings_local_build_generated_radio">Dados de rádio: %1$s</string>
+    <string name="appstrings_db_time_elapsed">Tempo decorrido: %1$s</string>
+    <string name="appstrings_db_time_generated">Gerado em %1$s</string>
+    <string name="appstrings_db_time_downloaded">Transferido em %1$s</string>
     <string name="appstrings_local_build_running">A gerar…</string>
     <string name="appstrings_local_build_unavailable">Indisponível neste aparelho (requer 6 GB de RAM e 1 GB livre).</string>
     <string name="appstrings_local_build_phase_resolving">A procurar as fontes oficiais</string>
@@ -2220,4 +2226,6 @@
     <string name="appstrings_release_v1963_db_provenance">As definições agora distinguem uma base de dados gerada no dispositivo de uma transferida online, com a data de geração e um botão para substituir uma pela outra</string>
     <string name="appstrings_release_v1963_offline_maps_catalog">A lista de mapas offline agora aparece instantaneamente (catálogo integrado na app, sem esperar pelo servidor)</string>
     <string name="appstrings_release_v1963_site_panel_table">Detalhes do site: nova tabela do tipo de painel (tudo-em-um / parabólica) por azimute com o identificador AER, em coerência com o relatório PDF</string>
+    <string name="appstrings_release_v1964_map_filters_defaults">Filtros de mapa predefinidos: configure-os em Personalização das páginas > Mapa de antenas > Filtros; o aviso «Filtros ativos» só aparece quando o mapa difere do seu valor predefinido</string>
+    <string name="appstrings_release_v1964_db_timings">Tempos mostrados nas bases de dados: tempo decorrido durante a operação e depois «Gerado em…» ou «Transferido em…»</string>
 </resources>

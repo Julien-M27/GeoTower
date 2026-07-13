@@ -530,6 +530,7 @@ fun SettingsScreen(
     var showPagesCustomizationSheet by remember { mutableStateOf(false) }
     var showCoverageDefaultsSheet by remember { mutableStateOf(false) }
     var showElevationDefaultsSheet by remember { mutableStateOf(false) }
+    var showMapFiltersDefaultsSheet by remember { mutableStateOf(false) }
     var showPreferenceProfilesSheet by remember { mutableStateOf(false) }
     var showFrequenciesSheet by remember { mutableStateOf(false) }
     var showCommunityDataSheet by remember { mutableStateOf(false) }
@@ -1076,6 +1077,14 @@ fun SettingsScreen(
             )
         }
 
+        if (showMapFiltersDefaultsSheet) {
+            MapFiltersDefaultsSheet(
+                onDismiss = { showMapFiltersDefaultsSheet = false },
+                sheetState = sheetState,
+                onBack = { safeClick { showMapFiltersDefaultsSheet = false; showMapSettingsSheet = true } }
+            )
+        }
+
         // ✅ AJOUT : Fenêtre des Unités
         if (showPreferenceProfilesSheet) {
             PreferenceProfilesSheet(
@@ -1355,6 +1364,7 @@ fun SettingsScreen(
                         showMapSettingsSheet = false; showPagesCustomizationSheet = true
                     }
                 },
+                onFiltersClick = { safeClick { showMapSettingsSheet = false; showMapFiltersDefaultsSheet = true } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor

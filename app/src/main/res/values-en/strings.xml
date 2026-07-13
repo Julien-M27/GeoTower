@@ -484,6 +484,9 @@
     <string name="appstrings_map_active_filters_except">except %1$s</string>
     <string name="appstrings_map_active_filters_more">+%1$d</string>
     <string name="appstrings_map_active_filters_none">none</string>
+    <string name="appstrings_map_filters_defaults_menu">Filters</string>
+    <string name="appstrings_map_filters_defaults_title">Default filters</string>
+    <string name="appstrings_map_filters_defaults_desc">These settings become the map\'s default filters. The \"Active filters\" banner only appears when the map differs from them.</string>
     <string name="appstrings_signalquest_coverage_title">SignalQuest coverage</string>
     <string name="appstrings_signalquest_coverage_points_label">Coverage points</string>
     <string name="appstrings_signalquest_coverage_detail_title">Coverage point</string>
@@ -2191,6 +2194,9 @@
     <string name="appstrings_local_build_generated_title">Generated on this phone</string>
     <string name="appstrings_local_build_generated_mobile">Mobile database: %1$s</string>
     <string name="appstrings_local_build_generated_radio">Radio data: %1$s</string>
+    <string name="appstrings_db_time_elapsed">Elapsed: %1$s</string>
+    <string name="appstrings_db_time_generated">Generated in %1$s</string>
+    <string name="appstrings_db_time_downloaded">Downloaded in %1$s</string>
     <string name="appstrings_local_build_running">Generating…</string>
     <string name="appstrings_local_build_unavailable">Not available on this device (needs 6 GB RAM and 1 GB free).</string>
     <string name="appstrings_local_build_phase_resolving">Finding official sources</string>
@@ -2220,4 +2226,6 @@
     <string name="appstrings_release_v1963_db_provenance">Settings now distinguish a database generated on the device from one downloaded online, with the generation date and a button to replace one with the other</string>
     <string name="appstrings_release_v1963_offline_maps_catalog">The offline maps list now appears instantly (catalog embedded in the app, no wait for the server)</string>
     <string name="appstrings_release_v1963_site_panel_table">Site details: new table of the panel type (all-in-one / dish) by azimuth with the AER identifier, matching the PDF report</string>
+    <string name="appstrings_release_v1964_map_filters_defaults">Default map filters: set them from Page customization > Antenna map > Filters; the Active filters banner then only appears when the map differs from your default</string>
+    <string name="appstrings_release_v1964_db_timings">Timings shown on databases: elapsed time during the operation, then Generated in… or Downloaded in…</string>
 </resources>

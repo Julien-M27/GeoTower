@@ -484,6 +484,9 @@
     <string name="appstrings_map_active_filters_except">sauf %1$s</string>
     <string name="appstrings_map_active_filters_more">+%1$d</string>
     <string name="appstrings_map_active_filters_none">aucun</string>
+    <string name="appstrings_map_filters_defaults_menu">Filtres</string>
+    <string name="appstrings_map_filters_defaults_title">Filtres par défaut</string>
+    <string name="appstrings_map_filters_defaults_desc">Ces réglages deviennent les filtres par défaut de la carte. Le bandeau « Filtres actifs » n\'apparaît que lorsque la carte s\'en écarte.</string>
     <string name="appstrings_signalquest_coverage_title">Couverture SignalQuest</string>
     <string name="appstrings_signalquest_coverage_points_label">Points de couverture</string>
     <string name="appstrings_signalquest_coverage_detail_title">Point de couverture</string>
@@ -2191,6 +2194,9 @@
     <string name="appstrings_local_build_generated_title">Généré sur ce téléphone</string>
     <string name="appstrings_local_build_generated_mobile">Base mobile : %1$s</string>
     <string name="appstrings_local_build_generated_radio">Données radio : %1$s</string>
+    <string name="appstrings_db_time_elapsed">Temps écoulé : %1$s</string>
+    <string name="appstrings_db_time_generated">Généré en %1$s</string>
+    <string name="appstrings_db_time_downloaded">Téléchargé en %1$s</string>
     <string name="appstrings_local_build_packs_title">Que générer ?</string>
     <string name="appstrings_local_build_pack_mobile">Mobile</string>
     <string name="appstrings_local_build_pack_mobile_desc">2G · 3G · 4G · 5G — opérateurs</string>
@@ -2220,4 +2226,6 @@
     <string name="appstrings_release_v1963_db_provenance">Les réglages distinguent désormais une base de données générée sur l\'appareil d\'une base téléchargée en ligne, avec la date de génération et un bouton pour remplacer l\'une par l\'autre</string>
     <string name="appstrings_release_v1963_offline_maps_catalog">La liste des cartes hors-ligne s\'affiche instantanément (catalogue embarqué dans l\'app, sans attendre le serveur)</string>
     <string name="appstrings_release_v1963_site_panel_table">Détails du site : nouveau tableau du type de panneau (tout-en-un / parabole) par azimut avec l\'identifiant AER, en cohérence avec le rapport PDF</string>
+    <string name="appstrings_release_v1964_map_filters_defaults">Filtres carte par défaut : réglez-les depuis Personnalisation des pages > Carte des antennes > Filtres ; le bandeau « Filtres actifs » ne s\'affiche alors que si la carte diffère de votre réglage par défaut</string>
+    <string name="appstrings_release_v1964_db_timings">Durées affichées sur les bases de données : temps écoulé pendant l\'opération, puis « Généré en… » ou « Téléchargé en… »</string>
 </resources>
