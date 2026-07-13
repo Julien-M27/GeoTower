@@ -13,7 +13,7 @@ object OfflineMapDownloadValidator {
     fun isValidCatalogEntry(map: OfflineMapDto): Boolean {
         return isAllowedHttpsUrl(map.mapUrl) &&
             isSafeMapFilename(map.mapFilename) &&
-            isValidSha256(map.sha256) &&
+            isOptionalSha256Valid(map.sha256) &&
             maxAllowedDownloadBytes(map.estimatedSizeMb) != null
     }
 
@@ -62,6 +62,9 @@ object OfflineMapDownloadValidator {
         if (!file.isFile || file.length() <= 0L) return false
         if (expectedContentLength > 0L && file.length() != expectedContentLength) return false
         val normalizedSha256 = expectedSha256?.trim().orEmpty()
+        // Catalogue embarqué : aucun hash figé → intégrité assurée par HTTPS + hôte autorisé
+        // + plafond de taille. Un hash fourni (ex. manifeste serveur) reste vérifié strictement.
+        if (normalizedSha256.isEmpty()) return true
         if (!sha256Regex.matches(normalizedSha256)) return false
         return calculateSha256(file).equals(normalizedSha256, ignoreCase = true)
     }
@@ -71,10 +74,21 @@ object OfflineMapDownloadValidator {
         return sha256Regex.matches(normalized)
     }
 
+    /**
+     * SHA256 facultatif : accepté s'il est absent/vide (cas du catalogue embarqué, voir
+     * [fr.geotower.data.models.OfflineMapCatalog]). S'il est présent, il doit rester valide.
+     */
+    fun isOptionalSha256Valid(value: String?): Boolean {
+        return value.isNullOrBlank() || isValidSha256(value)
+    }
+
     fun maxAllowedDownloadBytes(estimatedSizeMb: Int): Long? {
         if (estimatedSizeMb <= 0 || estimatedSizeMb > 10_000) return null
         val estimatedBytes = estimatedSizeMb * 1024L * 1024L
-        return (estimatedBytes * 11L) / 10L
+        // Marge de 50 % : les tailles du catalogue embarqué sont figées et mapsforge fait
+        // grossir ses cartes avec le temps. Le plafond reste un garde-fou anti-emballement
+        // (téléchargement démesuré / disque saturé), pas un contrôle d'intégrité fin.
+        return (estimatedBytes * 3L) / 2L
     }
 
     private fun calculateSha256(file: File): String {

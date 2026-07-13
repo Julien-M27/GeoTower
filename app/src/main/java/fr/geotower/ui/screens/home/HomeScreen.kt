@@ -237,6 +237,13 @@ fun HomeScreen(navController: NavController) {
     // ✅ NOUVEAU : On récupère la progression de 0 à 100
     val downloadProgress = currentWork?.progress?.getInt(DatabaseDownloadWorker.KEY_PROGRESS, 0) ?: 0
 
+    // ✅ Retour visuel immédiat au clic « Télécharger » : WorkManager met un court instant à passer
+    // le worker à ENQUEUED/RUNNING. Ce latch bascule le bandeau en mode « téléchargement » dès le
+    // clic, puis est relâché quand isSyncing prend le relais (voir LaunchedEffect plus bas). Sans lui,
+    // le bandeau clignoterait (disparition « Mise à jour disponible » → réapparition « Téléchargement en cours »).
+    var isDownloadStarting by remember { mutableStateOf(false) }
+    val isDownloading = isSyncing || isDownloadStarting
+
     val localDbState by AppConfig.localDatabaseState
     var wasSyncing by remember { mutableStateOf(isSyncing) }
     var isUpdateAvailable by remember { mutableStateOf(false) }
@@ -268,6 +275,8 @@ fun HomeScreen(navController: NavController) {
     }
 
     LaunchedEffect(isSyncing) {
+        // Le worker a démarré (ENQUEUED/RUNNING) : on relâche le latch de retour visuel immédiat.
+        if (isSyncing) isDownloadStarting = false
         if (!isSyncing && (AppConfig.localDatabaseState.value == null || wasSyncing)) {
             AppConfig.localDatabaseState.value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                 GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context).state
@@ -384,13 +393,13 @@ fun HomeScreen(navController: NavController) {
 
             // ---> 2. LE BANDEAU DE BASE DE DONNÉES (S'affiche juste en dessous si besoin) <---
             val isDbUnavailable = isDbChecked && localDbState != GeoTowerDatabaseValidator.LocalDatabaseState.VALID
-            val isDbBannerVisible = isDbUnavailable || isUpdateAvailable || isSyncing
+            val isDbBannerVisible = isDbUnavailable || isUpdateAvailable || isDownloading
 
             DatabaseWarningBanner(
                 isMissing = isDbMissing,
                 isInvalid = isDbInvalid,
                 isUpdateAvailable = isUpdateAvailable,
-                isDownloading = isSyncing,
+                isDownloading = isDownloading,
                 downloadProgress = downloadProgress,
                 onDownloadClick = {
                     // On cache le bandeau et on lance le téléchargement manuel
@@ -402,6 +411,9 @@ fun HomeScreen(navController: NavController) {
                         RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
                         RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
                     ) {
+                        // Retour visuel immédiat : on bascule le bandeau en « Téléchargement en cours »
+                        // sans attendre que WorkManager passe le worker à ENQUEUED.
+                        isDownloadStarting = true
                         DatabaseDownloadWorker.enqueue(workManager)
                     }
                 }
@@ -1108,6 +1120,7 @@ fun DatabaseWarningBanner(
                 androidx.compose.foundation.layout.Column(modifier = androidx.compose.ui.Modifier.weight(1f)) {
                     androidx.compose.material3.Text(
                         text = when {
+                            isDownloading -> stringResource(R.string.appstrings_downloading_db_banner_title)
                             isInvalid -> stringResource(R.string.appstrings_invalid_db_banner_title)
                             isMissing -> stringResource(R.string.appstrings_missing_db_banner_title)
                             else -> stringResource(R.string.appstrings_update_db_banner_title)
@@ -1116,7 +1129,7 @@ fun DatabaseWarningBanner(
                         color = contentColor,
                         style = androidx.compose.material3.MaterialTheme.typography.titleSmall
                     )
-                    if (isMissing || isInvalid) {
+                    if ((isMissing || isInvalid) && !isDownloading) {
                         androidx.compose.material3.Text(
                             text = if (isInvalid) {
                                 stringResource(R.string.appstrings_invalid_db_banner_desc)

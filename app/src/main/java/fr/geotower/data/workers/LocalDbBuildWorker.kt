@@ -210,9 +210,11 @@ class LocalDbBuildWorker(
     }
 
     private fun settingsPendingIntent(): PendingIntent {
+        // Cible le bloc « generation locale » (LocalDbBuildCard) precisement, pas seulement le haut
+        // de la section « Base de donnees ».
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            data = android.net.Uri.parse("geotower://settings?section=database")
+            data = android.net.Uri.parse("geotower://settings?section=db_local_build")
         }
         return PendingIntent.getActivity(
             context, 0, intent,

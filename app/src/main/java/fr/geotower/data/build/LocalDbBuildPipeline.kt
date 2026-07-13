@@ -6,6 +6,7 @@ import fr.geotower.R
 import fr.geotower.data.api.DatabaseDownloader
 import fr.geotower.data.api.RadioDatabaseDownloader
 import fr.geotower.data.db.GeoTowerDatabaseValidator
+import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.data.models.RadioServiceMasks
 import fr.geotower.utils.AppLogger
@@ -211,16 +212,20 @@ class LocalDbBuildPipeline(
                         // categorie(s) choisie(s). Best-effort (base radio optionnelle).
                         radioDb?.let { rdb ->
                             runCatching {
+                                val radioVersion = buildVersion()
                                 RadioDbBuilder.buildFromStaging(
                                     rdb, references,
-                                    RadioBuildConfig(version = buildVersion(), zipVersion = dataZip.name),
+                                    RadioBuildConfig(version = radioVersion, zipVersion = dataZip.name),
                                     { percent, processed -> onProgress(BuildPhase.RADIO_BUILDING, percent, detailFor(context, processed)) },
                                     packs.allowedServiceMask,
                                 )
                                 rdb.close()
                                 val radioValidation = RadioDatabaseValidator.validateDatabaseFile(builtRadioFile)
                                 if (radioValidation.isValid) {
-                                    RadioDatabaseDownloader.installBuiltRadioDatabase(context, builtRadioFile)
+                                    // Provenance : memorise la version installee pour la distinguer d'un telechargement.
+                                    if (RadioDatabaseDownloader.installBuiltRadioDatabase(context, builtRadioFile)) {
+                                        LocalDbProvenance.recordRadioLocalBuild(context, radioVersion)
+                                    }
                                 } else {
                                     AppLogger.w("GeoTowerDb", "Local radio DB validation failed: ${radioValidation.reason}")
                                 }
@@ -236,9 +241,10 @@ class LocalDbBuildPipeline(
                             it.execSql("PRAGMA mmap_size = 268435456")
                         }
                         radioDb = rdb
+                        val radioVersion = buildVersion()
                         RadioDbBuilder.build(
                             rdb, sources, references,
-                            RadioBuildConfig(version = buildVersion(), zipVersion = dataZip.name),
+                            RadioBuildConfig(version = radioVersion, zipVersion = dataZip.name),
                             { percent, processed -> onProgress(BuildPhase.RADIO_BUILDING, percent, detailFor(context, processed)) },
                             packs.allowedServiceMask,
                         )
@@ -252,6 +258,8 @@ class LocalDbBuildPipeline(
                         if (!RadioDatabaseDownloader.installBuiltRadioDatabase(context, builtRadioFile)) {
                             return@withContext Result(false, "Installation radio impossible")
                         }
+                        // Provenance : memorise la version installee pour la distinguer d'un telechargement.
+                        LocalDbProvenance.recordRadioLocalBuild(context, radioVersion)
                     }
                 } finally {
                     refSource?.close()

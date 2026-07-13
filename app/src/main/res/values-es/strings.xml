@@ -16,6 +16,7 @@
     <string name="settings_section_preferences">Preferencias</string>
     <string name="settings_section_system">Sistema</string>
     <string name="settings_section_database">Base de datos</string>
+    <string name="settings_database_online_title">Base de datos de operadores en línea</string>
     <string name="settings_search_placeholder">Buscar un ajuste</string>
     <string name="settings_search_no_results">Ningún ajuste encontrado</string>
     <string name="settings_app_language">Idioma de la aplicación</string>
@@ -161,6 +162,8 @@
     <string name="database_cancel_download">Cancelar descarga</string>
     <string name="database_up_to_date">Actualizado</string>
     <string name="database_download_antennas">Descargar antenas</string>
+    <string name="database_replace_generated_with_online">Reemplazar la base de datos generada en el teléfono por la versión en línea</string>
+    <string name="database_replace_generated_radio_with_online">Reemplazar los datos de radio generados en el teléfono por la versión en línea</string>
     <string name="database_delete_data">Eliminar datos</string>
     <string name="database_delete_warning_title">Atención</string>
     <string name="database_delete_warning_desc">¿Seguro que quieres eliminar la base de datos?</string>
@@ -1300,6 +1303,7 @@
     <string name="appstrings_unknown_size">Tamaño desconocido</string>
     <string name="appstrings_unknown_status">Estado desconocido</string>
     <string name="appstrings_up_to_date">Actualizado</string>
+    <string name="appstrings_downloading_db_banner_title">Descargando</string>
     <string name="appstrings_update_db_banner_title">Actualización disponible</string>
     <string name="appstrings_update_notif_setting_desc">Recibe una alerta cuando haya una nueva base de datos o APK</string>
     <string name="appstrings_update_notif_setting_title">Notificaciones de actualización</string>
@@ -2090,7 +2094,7 @@
     <string name="appstrings_radio_emitters_count">%1$d transmisores</string>
     <string name="appstrings_radio_antennas_count">%1$d antenas</string>
     <string name="appstrings_radio_cluster_sites">%1$d sitios %2$s</string>
-    <string name="appstrings_radio_data_title">Datos de radio ANFR</string>
+    <string name="appstrings_radio_data_title">Otros datos de radio ANFR en línea</string>
     <string name="appstrings_radio_other_usages">Otros usos de radio ANFR</string>
     <string name="appstrings_position">Posición</string>
     <string name="appstrings_operator_unknown">Operador desconocido</string>
@@ -2183,6 +2187,10 @@
     <string name="appstrings_local_build_title">Generar la base localmente</string>
     <string name="appstrings_local_build_desc">Reconstruye la base a partir de los datos abiertos oficiales de ANFR, en el dispositivo. Avanzado — solo teléfonos potentes. Consume datos móviles, tiempo y batería; se recomienda Wi-Fi.</string>
     <string name="appstrings_local_build_action">Generar localmente</string>
+    <string name="appstrings_local_build_replace_action">Generar localmente y reemplazar la actual</string>
+    <string name="appstrings_local_build_generated_title">Generado en este teléfono</string>
+    <string name="appstrings_local_build_generated_mobile">Base de datos móvil: %1$s</string>
+    <string name="appstrings_local_build_generated_radio">Datos de radio: %1$s</string>
     <string name="appstrings_local_build_running">Generando…</string>
     <string name="appstrings_local_build_unavailable">No disponible en este dispositivo (requiere 6 GB de RAM y 1 GB libre).</string>
     <string name="appstrings_local_build_phase_resolving">Buscando las fuentes oficiales</string>
@@ -2200,4 +2208,16 @@
     <string name="appstrings_local_build_notif_done">Base generada. Toca para abrir.</string>
     <string name="appstrings_local_build_notif_failed">Error en la generación: %1$s</string>
     <string name="appstrings_local_build_lines">%1$s líneas</string>
+    <string name="appstrings_local_build_packs_title">¿Qué generar?</string>
+    <string name="appstrings_local_build_pack_mobile">Móvil</string>
+    <string name="appstrings_local_build_pack_mobile_desc">2G · 3G · 4G · 5G — operadores</string>
+    <string name="appstrings_local_build_pack_radio">Radio &amp; TV</string>
+    <string name="appstrings_local_build_pack_radio_desc">Difusión FM, DAB+, televisión</string>
+    <string name="appstrings_local_build_pack_nonmobile">No móvil (técnico)</string>
+    <string name="appstrings_local_build_pack_nonmobile_desc">Radioenlaces, redes privadas, ferrocarril…</string>
+    <string name="appstrings_local_build_packs_hint">El archivo ANFR (obligatorio) se comparte. Desmarcar \"Móvil\" también evita la descarga del observatorio (~500 MB).</string>
+    <string name="appstrings_local_build_phase_radio">Generando la base de datos de radio</string>
+    <string name="appstrings_release_v1963_db_provenance">Los ajustes ahora distinguen una base de datos generada en el dispositivo de una descargada en línea, con la fecha de generación y un botón para reemplazar una por otra</string>
+    <string name="appstrings_release_v1963_offline_maps_catalog">La lista de mapas sin conexión ahora aparece al instante (catálogo integrado en la app, sin esperar al servidor)</string>
+    <string name="appstrings_release_v1963_site_panel_table">Detalles del sitio: nueva tabla del tipo de panel (todo en uno / parabólica) por acimut con el identificador AER, en coherencia con el informe PDF</string>
 </resources>

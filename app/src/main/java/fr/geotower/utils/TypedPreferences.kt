@@ -273,10 +273,6 @@ object SharePrefs {
                     val addressIndex = indexOf("address")
                     if (addressIndex >= 0) add(addressIndex + 1, "speedtest") else add("speedtest")
                 }
-                if (!contains("photos")) {
-                    val supportIndex = indexOf("support")
-                    if (supportIndex >= 0) add(supportIndex + 1, "photos") else add("photos")
-                }
                 if (!contains("throughput")) {
                     val speedtestIndex = indexOf("speedtest")
                     if (speedtestIndex >= 0) add(speedtestIndex + 1, "throughput") else add("throughput")

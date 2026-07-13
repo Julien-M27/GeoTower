@@ -167,6 +167,47 @@ class SiteFrequenciesBlockParsingTest {
         assertEquals(listOf("FH : 0\u00B0 (-)", "FH : 180\u00B0 (-)"), enriched.single().physDetails)
     }
 
+    @Test
+    fun antennaTypeRowsGroupPanelIdsByAzimutHeightAndType() {
+        val details = """
+            5G NR 2100 (5G) : 1935,3-1950,1 MHz | En service | 2024-06-27 | Panneau : 220 deg (24,6m) [AER_ID: 8002]
+            LTE 1800 (4G) : 1835-1850 MHz | En service | 2024-06-11 | Panneau : 120 deg (24,6m) [AER_ID: 7001]
+            LTE 1800 (4G) : 1835-1850 MHz | En service | 2024-06-11 | Panneau : 120 deg (24,6m) [AER_ID: 7002]
+        """.trimIndent()
+
+        val parsed = parseAndSortFrequencies(
+            freqStr = details,
+            txtUnknown = "Inconnu",
+            txtAzimuthNotSpecified = "Azimut non specifie"
+        )
+
+        val rows = buildAntennaTypeRows(parsed)
+
+        assertEquals(2, rows.size)
+        // Tri par azimut croissant : 120° avant 220°.
+        assertEquals("120°", rows[0].azimut)
+        assertEquals("24,6m", rows[0].hauteur)
+        assertEquals("Panneau", rows[0].rawType)
+        assertEquals(setOf("7001", "7002"), rows[0].ids.toSet())
+        assertEquals("220°", rows[1].azimut)
+        assertEquals(listOf("8002"), rows[1].ids)
+    }
+
+    @Test
+    fun antennaTypeRowsIgnorePanelsWithoutAerId() {
+        val details = """
+            LTE 800 (4G) : 806-821 MHz | En service | 2024-06-11 | Panneau : 90 deg (30m)
+        """.trimIndent()
+
+        val parsed = parseAndSortFrequencies(
+            freqStr = details,
+            txtUnknown = "Inconnu",
+            txtAzimuthNotSpecified = "Azimut non specifie"
+        )
+
+        assertTrue(buildAntennaTypeRows(parsed).isEmpty())
+    }
+
     private fun localisation(azimutsFh: String?): LocalisationEntity {
         return LocalisationEntity(
             idAnfr = "12345",

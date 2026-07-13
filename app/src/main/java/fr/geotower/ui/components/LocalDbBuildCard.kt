@@ -30,6 +30,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +38,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -51,9 +53,12 @@ import fr.geotower.R
 import fr.geotower.data.build.BuildPhase
 import fr.geotower.data.build.labelRes
 import fr.geotower.data.build.LocalBuildCapability
+import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.data.workers.DatabaseDownloadWorker
 import fr.geotower.data.workers.LocalDbBuildWorker
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Carte de reglage "avancee" : generation locale de la base (appareils performants). Opt-in,
@@ -93,6 +98,17 @@ fun LocalDbBuildCard(
     var packMobile by remember { mutableStateOf(true) }
     var packRadioBroadcast by remember { mutableStateOf(false) }
     var packNonMobileTech by remember { mutableStateOf(false) }
+
+    // Provenance des bases installees : distingue « generee sur l'appareil » de « telechargee » et
+    // fournit l'horodatage (metadata.version) du dernier build local. Re-lue a la fin de chaque build.
+    var mobileInfo by remember { mutableStateOf(LocalDbProvenance.Info.NONE) }
+    var radioInfo by remember { mutableStateOf(LocalDbProvenance.Info.NONE) }
+    LaunchedEffect(isBuilding) {
+        withContext(Dispatchers.IO) {
+            mobileInfo = LocalDbProvenance.readMobile(context)
+            radioInfo = LocalDbProvenance.readRadio(context)
+        }
+    }
 
     Surface(
         shape = shape,
@@ -188,6 +204,43 @@ fun LocalDbBuildCard(
                 }
 
                 else -> {
+                    // Recap « genere sur ce telephone » : quelle base a ete generee localement, et quand
+                    // (horodatage = metadata.version du dernier build local encore installe).
+                    val generatedMobile = mobileInfo.takeIf { it.locallyBuilt }
+                        ?.let { LocalDbProvenance.formatBuildTime(it.buildVersionRaw) }
+                    val generatedRadio = radioInfo.takeIf { it.locallyBuilt }
+                        ?.let { LocalDbProvenance.formatBuildTime(it.buildVersionRaw) }
+                    if (generatedMobile != null || generatedRadio != null) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f),
+                            shape = RoundedCornerShape(sizing.component(12.dp)),
+                            modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp)),
+                        ) {
+                            Column(modifier = Modifier.padding(sizing.spacing(12.dp))) {
+                                Text(
+                                    text = stringResource(R.string.appstrings_local_build_generated_title),
+                                    fontWeight = FontWeight.Bold,
+                                    style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                                if (generatedMobile != null) {
+                                    Text(
+                                        text = stringResource(R.string.appstrings_local_build_generated_mobile, generatedMobile),
+                                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                if (generatedRadio != null) {
+                                    Text(
+                                        text = stringResource(R.string.appstrings_local_build_generated_radio, generatedRadio),
+                                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+
                     Text(
                         text = stringResource(R.string.appstrings_local_build_packs_title),
                         fontWeight = FontWeight.Bold,
@@ -219,6 +272,11 @@ fun LocalDbBuildCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(top = sizing.spacing(8.dp)),
                     )
+                    // Un pack coche dont la base est deja installee (telechargee OU generee) sera ecrase :
+                    // le bouton previent alors du remplacement.
+                    val willReplace = (packMobile && mobileInfo.installed) ||
+                        ((packRadioBroadcast || packNonMobileTech) && radioInfo.installed)
+
                     Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                     Button(
                         onClick = {
@@ -237,9 +295,13 @@ fun LocalDbBuildCard(
                         Icon(Icons.Default.Memory, contentDescription = null, modifier = Modifier.size(sizing.component(22.dp)))
                         Spacer(Modifier.width(sizing.spacing(8.dp)))
                         Text(
-                            text = stringResource(R.string.appstrings_local_build_action),
+                            text = stringResource(
+                                if (willReplace) R.string.appstrings_local_build_replace_action
+                                else R.string.appstrings_local_build_action,
+                            ),
                             fontWeight = FontWeight.Bold,
                             style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                            textAlign = TextAlign.Center,
                         )
                     }
                 }
@@ -259,13 +321,15 @@ private fun PackOption(
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val accent = MaterialTheme.colorScheme.primary
+    val optionShape = RoundedCornerShape(sizing.component(12.dp))
     Surface(
         color = if (checked) accent.copy(alpha = 0.10f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f),
-        shape = RoundedCornerShape(sizing.component(12.dp)),
+        shape = optionShape,
         border = if (checked) BorderStroke(1.5.dp, accent.copy(alpha = 0.6f)) else null,
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = sizing.spacing(4.dp))
+            .clip(optionShape)
             .clickable { onToggle() },
     ) {
         Row(

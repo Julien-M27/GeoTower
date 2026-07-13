@@ -37,8 +37,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.workDataOf
 import fr.geotower.data.config.RemoteFeatureFlags
-import fr.geotower.data.api.DownloadManifestVerifier
-import fr.geotower.data.api.RetrofitClient
+import fr.geotower.data.models.OfflineMapCatalog
 import fr.geotower.data.models.OfflineMapDto
 import fr.geotower.data.workers.DownloadNotificationCenter
 import fr.geotower.data.workers.OfflineMapDownloadValidator
@@ -115,35 +114,21 @@ fun MapDownloadCard(
 
     val workInfos by workManager.getWorkInfosByTagFlow("map_download").collectAsState(initial = emptyList())
 
-    var catalog by remember { mutableStateOf<List<OfflineMapDto>>(emptyList()) }
-    var isLoading by remember { mutableStateOf(true) }
-    var isError by remember { mutableStateOf(false) }
+    // Catalogue embarqué dans l'app : affichage instantané, aucune requête serveur (voir
+    // OfflineMapCatalog). Le drapeau distant OFFLINE_MAPS_CATALOG reste un interrupteur d'arrêt.
+    val catalog = remember(canLoadCatalog) {
+        if (canLoadCatalog) {
+            OfflineMapCatalog.entries.filter { OfflineMapDownloadValidator.isValidCatalogEntry(it) }
+        } else {
+            emptyList()
+        }
+    }
     var fileRefreshTrigger by remember { mutableIntStateOf(0) }
     var mapToDelete by remember { mutableStateOf<OfflineMapDto?>(null) }
     var showDeleteAllDialog by remember { mutableStateOf(false) }
     var isExpanded by rememberSaveable(targetMapFilename) { mutableStateOf(targetMapFilename != null) }
 
     val mapsDir = remember { File(context.getExternalFilesDir(null), "maps") }
-
-    LaunchedEffect(canLoadCatalog) {
-        if (!canLoadCatalog) {
-            catalog = emptyList()
-            isLoading = false
-            isError = false
-            return@LaunchedEffect
-        }
-        try {
-            val rawManifest = RetrofitClient.apiService.getDownloadManifest().use { it.string() }
-            catalog = DownloadManifestVerifier.verifyAndParse(rawManifest)
-                ?.maps
-                ?.filter { OfflineMapDownloadValidator.isValidCatalogEntry(it) }
-                .orEmpty()
-        } catch (e: Exception) {
-            isError = true
-        } finally {
-            isLoading = false
-        }
-    }
 
     // Vérifie s'il y a au moins une carte téléchargée pour afficher le bouton "Tout supprimer"
     val hasDownloadedMaps = remember(fileRefreshTrigger, workInfos) {
@@ -198,7 +183,7 @@ fun MapDownloadCard(
                 }
 
                 // 🚀 BOUTON : TOUT TÉLÉCHARGER
-                if (!isLoading && !isError && catalog.isNotEmpty() && canDownloadMaps) {
+                if (catalog.isNotEmpty() && canDownloadMaps) {
                     IconButton(
                         onClick = {
                             safeClick("map_download_all") {
@@ -261,11 +246,6 @@ fun MapDownloadCard(
                 Column {
                     Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
-                    if (isLoading) {
-                        LoadingIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
-                    } else if (isError) {
-                        Text(stringResource(R.string.appstrings_network_error_search), color = MaterialTheme.colorScheme.error, modifier = Modifier.align(Alignment.CenterHorizontally))
-                    } else {
                 catalog.forEachIndexed { index, map ->
                     val displayName = mapDisplayName(map)
                     val currentWork = workInfos.find { it.tags.contains("map_id_${map.id}") }
@@ -397,7 +377,6 @@ fun MapDownloadCard(
                         Text(text = stringResource(R.string.appstrings_delete_all_maps), fontWeight = FontWeight.Bold, style = sizing.textStyle(MaterialTheme.typography.labelLarge))
                     }
                 }
-                    }
                 }
             }
         }

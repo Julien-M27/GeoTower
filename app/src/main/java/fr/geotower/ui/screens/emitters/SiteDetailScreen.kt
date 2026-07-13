@@ -1639,7 +1639,7 @@ fun SiteDetailScreen(
                                 )
                             }
                         }
-                        "freqs" -> { if (showFreqs && canUseSiteFrequencies) fr.geotower.ui.components.SiteFrequenciesBlock(info = info, technique = technique, formattedAzimuths = formattedAzimuths, cardBgColor = cardBgColor, blockShape = blockShape, applyMapFilters = applyMapFilters) }
+                        "freqs" -> { if (showFreqs && canUseSiteFrequencies) fr.geotower.ui.components.SiteFrequenciesBlock(info = info, technique = technique, formattedAzimuths = formattedAzimuths, cardBgColor = cardBgColor, blockShape = blockShape, applyMapFilters = applyMapFilters, showAntennaTypeTable = true) }
                         "links" -> {
                             if (showLinks && canUseSiteExternalLinks && enbAnalyticsTable != null) {
                                 fr.geotower.ui.components.SiteExternalLinksBlock(

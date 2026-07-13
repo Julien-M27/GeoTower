@@ -32,14 +32,15 @@ class OfflineMapDownloadValidatorTest {
     }
 
     @Test
-    fun catalogEntryWithoutSha256IsRejected() {
-        val invalid = mapDto(
+    fun catalogEntryWithoutSha256IsAccepted() {
+        // Catalogue embarqué : les entrées ne figent pas de hash (mapsforge régénère ses cartes).
+        val embedded = mapDto(
             mapUrl = "https://download.mapsforge.org/maps/v5/europe/france/alsace.map",
             mapFilename = "alsace.map",
             sha256 = null
         )
 
-        assertFalse(OfflineMapDownloadValidator.isValidCatalogEntry(invalid))
+        assertTrue(OfflineMapDownloadValidator.isValidCatalogEntry(embedded))
     }
 
     @Test
@@ -132,12 +133,13 @@ class OfflineMapDownloadValidatorTest {
     }
 
     @Test
-    fun downloadedMapRequiresExpectedLengthAndSha256() {
+    fun downloadedMapAllowsMissingSha256ButChecksLengthAndAnyProvidedHash() {
         val mapsDir = Files.createTempDirectory("geotower-maps").toFile()
         val mapFile = mapsDir.resolve("alsace.map")
         try {
             mapFile.writeText("abc")
 
+            // Hash correct fourni (ex. manifeste serveur) → accepté
             assertTrue(
                 OfflineMapDownloadValidator.isValidDownloadedMap(
                     file = mapFile,
@@ -145,13 +147,23 @@ class OfflineMapDownloadValidatorTest {
                     expectedSha256 = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
                 )
             )
-            assertFalse(
+            // Aucun hash (catalogue embarqué) → accepté sur la seule cohérence de taille
+            assertTrue(
                 OfflineMapDownloadValidator.isValidDownloadedMap(
                     file = mapFile,
                     expectedContentLength = 3,
                     expectedSha256 = null
                 )
             )
+            // Aucun hash mais taille attendue incohérente → rejeté
+            assertFalse(
+                OfflineMapDownloadValidator.isValidDownloadedMap(
+                    file = mapFile,
+                    expectedContentLength = 4,
+                    expectedSha256 = null
+                )
+            )
+            // Hash fourni mais incorrect → rejeté
             assertFalse(
                 OfflineMapDownloadValidator.isValidDownloadedMap(
                     file = mapFile,
@@ -165,9 +177,24 @@ class OfflineMapDownloadValidatorTest {
     }
 
     @Test
-    fun maxAllowedDownloadBytesKeepsStrictMargin() {
-        assertEquals(110L * 1024L * 1024L, OfflineMapDownloadValidator.maxAllowedDownloadBytes(100))
+    fun optionalSha256AcceptsAbsentButRejectsMalformed() {
+        assertTrue(OfflineMapDownloadValidator.isOptionalSha256Valid(null))
+        assertTrue(OfflineMapDownloadValidator.isOptionalSha256Valid(""))
+        assertTrue(OfflineMapDownloadValidator.isOptionalSha256Valid("   "))
+        assertTrue(
+            OfflineMapDownloadValidator.isOptionalSha256Valid(
+                "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+            )
+        )
+        assertFalse(OfflineMapDownloadValidator.isOptionalSha256Valid("abc"))
+    }
+
+    @Test
+    fun maxAllowedDownloadBytesKeepsAntiRunawayMargin() {
+        // Marge 1,5x : les tailles du catalogue embarqué sont figées et grossissent avec le temps.
+        assertEquals(150L * 1024L * 1024L, OfflineMapDownloadValidator.maxAllowedDownloadBytes(100))
         assertNull(OfflineMapDownloadValidator.maxAllowedDownloadBytes(0))
+        assertNull(OfflineMapDownloadValidator.maxAllowedDownloadBytes(10_001))
     }
 
     private fun mapDto(

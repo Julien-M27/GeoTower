@@ -16,6 +16,7 @@
     <string name="settings_section_preferences">Préférences</string>
     <string name="settings_section_system">Système</string>
     <string name="settings_section_database">Base de données</string>
+    <string name="settings_database_online_title">Base de données des opérateurs en ligne</string>
     <string name="settings_search_placeholder">Rechercher un paramètre</string>
     <string name="settings_search_no_results">Aucun paramètre trouvé</string>
     <string name="settings_app_language">Langue de l\'application</string>
@@ -161,6 +162,8 @@
     <string name="database_cancel_download">Annuler le téléchargement</string>
     <string name="database_up_to_date">À jour</string>
     <string name="database_download_antennas">Télécharger les antennes</string>
+    <string name="database_replace_generated_with_online">Remplacer la base générée sur le téléphone par celle en ligne</string>
+    <string name="database_replace_generated_radio_with_online">Remplacer les données radio générées sur le téléphone par celles en ligne</string>
     <string name="database_delete_data">Supprimer les données</string>
     <string name="database_delete_warning_title">Attention</string>
     <string name="database_delete_warning_desc">Êtes-vous sûr de vouloir supprimer la base de données ?</string>
@@ -1300,6 +1303,7 @@
     <string name="appstrings_unknown_size">Taille inconnue</string>
     <string name="appstrings_unknown_status">Statut inconnu</string>
     <string name="appstrings_up_to_date">À jour</string>
+    <string name="appstrings_downloading_db_banner_title">Téléchargement en cours</string>
     <string name="appstrings_update_db_banner_title">Mise à jour disponible</string>
     <string name="appstrings_update_notif_setting_desc">Être alerté quand une nouvelle base de données ou une nouvelle APK est disponible</string>
     <string name="appstrings_update_notif_setting_title">Notifications de mise à jour</string>
@@ -2090,7 +2094,7 @@
     <string name="appstrings_radio_emitters_count">%1$d émetteurs</string>
     <string name="appstrings_radio_antennas_count">%1$d antennes</string>
     <string name="appstrings_radio_cluster_sites">%1$d sites %2$s</string>
-    <string name="appstrings_radio_data_title">Données radio ANFR</string>
+    <string name="appstrings_radio_data_title">Autres données radio de l\'ANFR en ligne</string>
     <string name="appstrings_radio_other_usages">Autres usages radio ANFR</string>
     <string name="appstrings_position">Position</string>
     <string name="appstrings_operator_unknown">Opérateur inconnu</string>
@@ -2183,6 +2187,10 @@
     <string name="appstrings_local_build_title">Générer la base localement</string>
     <string name="appstrings_local_build_desc">Reconstruit la base depuis les données ouvertes officielles ANFR, sur l\'appareil. Avancé — téléphones performants uniquement. Consomme des données mobiles, du temps et de la batterie ; Wi-Fi conseillé.</string>
     <string name="appstrings_local_build_action">Générer localement</string>
+    <string name="appstrings_local_build_replace_action">Générer localement et remplacer celle actuellement téléchargée</string>
+    <string name="appstrings_local_build_generated_title">Généré sur ce téléphone</string>
+    <string name="appstrings_local_build_generated_mobile">Base mobile : %1$s</string>
+    <string name="appstrings_local_build_generated_radio">Données radio : %1$s</string>
     <string name="appstrings_local_build_packs_title">Que générer ?</string>
     <string name="appstrings_local_build_pack_mobile">Mobile</string>
     <string name="appstrings_local_build_pack_mobile_desc">2G · 3G · 4G · 5G — opérateurs</string>
@@ -2209,4 +2217,7 @@
     <string name="appstrings_local_build_notif_done">Base générée. Appuyez pour ouvrir.</string>
     <string name="appstrings_local_build_notif_failed">Échec de la génération : %1$s</string>
     <string name="appstrings_local_build_lines">%1$s lignes</string>
+    <string name="appstrings_release_v1963_db_provenance">Les réglages distinguent désormais une base de données générée sur l\'appareil d\'une base téléchargée en ligne, avec la date de génération et un bouton pour remplacer l\'une par l\'autre</string>
+    <string name="appstrings_release_v1963_offline_maps_catalog">La liste des cartes hors-ligne s\'affiche instantanément (catalogue embarqué dans l\'app, sans attendre le serveur)</string>
+    <string name="appstrings_release_v1963_site_panel_table">Détails du site : nouveau tableau du type de panneau (tout-en-un / parabole) par azimut avec l\'identifiant AER, en cohérence avec le rapport PDF</string>
 </resources>

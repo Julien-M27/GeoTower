@@ -57,7 +57,7 @@ class MapDownloadWorker(
 
         if (!OfflineMapDownloadValidator.isAllowedHttpsUrl(mapUrl) ||
             !OfflineMapDownloadValidator.isSafeMapFilename(mapFilename) ||
-            !OfflineMapDownloadValidator.isValidSha256(expectedSha256) ||
+            !OfflineMapDownloadValidator.isOptionalSha256Valid(expectedSha256) ||
             maxAllowedBytes == null
         ) {
             setProgress(workDataOf("error" to "invalid_map_catalog"))

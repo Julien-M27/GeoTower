@@ -42,6 +42,7 @@ import fr.geotower.utils.parseAndSortFrequencies
 import fr.geotower.utils.radioBandCode
 import fr.geotower.utils.radioTechnologyFrequencyLabel
 import kotlin.math.roundToInt
+import java.util.Locale
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
 import fr.geotower.utils.ThroughputDisplayText
@@ -54,7 +55,8 @@ fun SiteFrequenciesBlock(
     cardBgColor: Color,
     blockShape: Shape,
     applyMapFilters: Boolean = false,
-    forceGridDisplay: Boolean = false
+    forceGridDisplay: Boolean = false,
+    showAntennaTypeTable: Boolean = false
 ) {
     val context = LocalContext.current
     val txtFrequenciesTitle = stringResource(R.string.appstrings_frequencies_title)
@@ -139,7 +141,8 @@ fun SiteFrequenciesBlock(
                         txtProjectApproved = txtProjectApproved,
                         txtUnknownStatus = txtUnknownStatus,
                         mapFrequencyFilter = mapFrequencyFilter,
-                        txtPanelIdentifier = txtPanelIdentifier
+                        txtPanelIdentifier = txtPanelIdentifier,
+                        showAntennaTypeTable = showAntennaTypeTable
                     )
                 } else {
                     // 👇 TON CODE ACTUEL COMMENCE ICI 👇
@@ -474,7 +477,8 @@ fun FrequenciesGridView(
     txtProjectApproved: String,
     txtUnknownStatus: String,
     mapFrequencyFilter: FrequencyFilterSelection?,
-    txtPanelIdentifier: String
+    txtPanelIdentifier: String,
+    showAntennaTypeTable: Boolean = false
 ) {
     val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     val headerBgColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
@@ -766,7 +770,8 @@ fun FrequenciesGridView(
                                 textAlign = TextAlign.Center,
                                 maxLines = 1
                             )
-                            if (panelIds.isNotEmpty()) {
+                            // Les identifiants sont déportés dans le tableau « type de panneau » quand il est actif.
+                            if (!showAntennaTypeTable && panelIds.isNotEmpty()) {
                                 Spacer(modifier = Modifier.height(3.dp))
                                 Text(
                                     text = txtPanelIdentifier,
@@ -863,6 +868,266 @@ fun FrequenciesGridView(
                     }
                 }
                 if (azimutIndex < sortedAzimuts.lastIndex) HorizontalDivider(color = borderColor)
+            }
+        }
+    }
+
+    // --- TABLEAU 3 : TYPE DE PANNEAU PAR AZIMUT ---
+    // Parité avec le tableau « Identifiant panneau (AER ID) » du rapport PDF (GeoTowerReportPdf) :
+    // uniquement les panneaux porteurs d'un identifiant AER, regroupés par azimut.
+    if (showAntennaTypeTable) {
+        val antennaTypeRows = buildAntennaTypeRows(parsedBands)
+        AntennaTypeGridTable(
+            rows = antennaTypeRows,
+            borderColor = borderColor,
+            headerBgColor = headerBgColor,
+            subHeaderBgColor = subHeaderBgColor
+        )
+    }
+}
+
+// ==========================================
+// 🚀 TABLEAU 3 : TYPE DE PANNEAU PAR AZIMUT (parité PDF)
+// ==========================================
+internal data class AntennaTypeGridRow(
+    val azimut: String,
+    val hauteur: String,
+    val rawType: String,
+    val ids: List<String>
+)
+
+private val antennaAzimuthNumberRegex = Regex("""-?\d+(?:[.,]\d+)?""")
+
+/**
+ * Construit les lignes du tableau « type de panneau par azimut » à partir des bandes déjà parsées.
+ * Reprend la logique du rapport PDF (buildPdfAntennaIdRows) : seuls les panneaux porteurs d'un
+ * identifiant AER sont retenus, dédupliqués et regroupés par (azimut, hauteur, type).
+ */
+internal fun buildAntennaTypeRows(bands: List<FreqBand>): List<AntennaTypeGridRow> {
+    data class Key(val azimut: String, val hauteur: String, val rawType: String)
+    val grouped = linkedMapOf<Key, LinkedHashSet<String>>()
+    bands.asSequence().flatMap { it.physDetails.asSequence() }.forEach { phys ->
+        val id = extractFrequencyPanelId(phys) ?: return@forEach
+        val display = removeFrequencyPanelIdForDisplay(phys)
+        val hasColon = display.contains(":")
+        val geometry = if (hasColon) display.substringAfter(":").trim() else display.trim()
+        val rawType = if (hasColon) display.substringBefore(":").trim() else ""
+        val azimutNumber = antennaAzimuthNumberRegex
+            .find(geometry.substringBefore("("))
+            ?.value
+            ?.let { formatAntennaAzimuthNumber(it) }
+            ?: return@forEach
+        val rawHauteur = if (geometry.contains("(")) {
+            geometry.substringAfter("(").substringBefore(")").trim()
+        } else {
+            "-"
+        }
+        val hauteur = formatFrequencyHeightForUnit(rawHauteur.ifBlank { "-" })
+        grouped
+            .getOrPut(Key("$azimutNumber°", hauteur, rawType)) { linkedSetOf() }
+            .add(id)
+    }
+    return grouped.entries
+        .sortedWith(
+            compareBy<Map.Entry<Key, LinkedHashSet<String>>> { antennaAzimuthSortKey(it.key.azimut) }
+                .thenByDescending { antennaHeightSortValue(it.key.hauteur) }
+        )
+        .map { (key, ids) ->
+            AntennaTypeGridRow(
+                azimut = key.azimut,
+                hauteur = key.hauteur,
+                rawType = key.rawType,
+                ids = ids.toList()
+            )
+        }
+}
+
+private fun formatAntennaAzimuthNumber(value: String): String {
+    val number = value.replace(',', '.').toDoubleOrNull() ?: return value.trim()
+    return if (number % 1.0 == 0.0) {
+        number.toInt().toString()
+    } else {
+        "%.1f".format(Locale.US, number).trimEnd('0').trimEnd('.')
+    }
+}
+
+private fun antennaAzimuthSortKey(azimut: String): Int {
+    return antennaAzimuthNumberRegex.find(azimut)?.value?.replace(',', '.')?.toDoubleOrNull()?.roundToInt() ?: 9999
+}
+
+private fun antennaHeightSortValue(height: String): Float {
+    return height.replace(',', '.').replace(Regex("[^0-9.-]"), "").toFloatOrNull() ?: -1f
+}
+
+@Composable
+private fun antennaTypeShortLabel(rawType: String): String {
+    if (rawType.isBlank() || rawType == "-") return "-"
+    val normalized = rawType.lowercase(Locale.ROOT)
+    return when {
+        normalized.contains("tout en 1") || normalized.contains("tout en un") ->
+            stringResource(R.string.appstrings_antenna_type_all_in_one_short)
+        normalized.contains("parabol") ->
+            stringResource(R.string.appstrings_antenna_type_dish_short)
+        else -> AnfrDisplayText.antennaType(rawType)
+    }
+}
+
+@Composable
+private fun AntennaTypeGridTable(
+    rows: List<AntennaTypeGridRow>,
+    borderColor: Color,
+    headerBgColor: Color,
+    subHeaderBgColor: Color
+) {
+    if (rows.isEmpty()) return
+    val groupedByAzimut = rows.groupBy { it.azimut }.entries.toList()
+    val context = LocalContext.current
+    val txtPanelIdentifier = stringResource(R.string.appstrings_panel_identifier)
+    val txtPanelIdentifierCopied = stringResource(R.string.appstrings_panel_identifier_copied)
+    val txtCopy = stringResource(R.string.appstrings_copy)
+
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+        border = BorderStroke(1.dp, borderColor),
+        modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            // Titre du tableau 3
+            Box(
+                modifier = Modifier.fillMaxWidth().background(headerBgColor).padding(8.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    stringResource(R.string.appstrings_aer_id_title),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            HorizontalDivider(color = borderColor)
+
+            // En-têtes des colonnes
+            Row(
+                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).background(subHeaderBgColor),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    stringResource(R.string.appstrings_col_azimuth),
+                    modifier = Modifier.weight(0.8f).padding(6.dp),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center
+                )
+                VerticalDivider(color = borderColor)
+                Text(
+                    stringResource(R.string.appstrings_col_height),
+                    modifier = Modifier.weight(0.9f).padding(6.dp),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    maxLines = 1,
+                    textAlign = TextAlign.Center
+                )
+                VerticalDivider(color = borderColor)
+                Text(
+                    stringResource(R.string.appstrings_col_type),
+                    modifier = Modifier.weight(1.2f).padding(6.dp),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center
+                )
+                VerticalDivider(color = borderColor)
+                Text(
+                    stringResource(R.string.appstrings_col_id),
+                    modifier = Modifier.weight(1.3f).padding(6.dp),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 12.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+            HorizontalDivider(color = borderColor)
+
+            // Lignes groupées par azimut (cellule azimut fusionnée)
+            groupedByAzimut.forEachIndexed { azimutIndex, (azimut, azimutRows) ->
+                Row(
+                    modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)
+                        .background(MaterialTheme.colorScheme.surface)
+                ) {
+                    Box(
+                        modifier = Modifier.weight(0.8f).fillMaxHeight(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            azimut,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium,
+                            textAlign = TextAlign.Center,
+                            maxLines = 1,
+                            modifier = Modifier.padding(4.dp)
+                        )
+                    }
+                    VerticalDivider(color = borderColor)
+
+                    Column(modifier = Modifier.weight(3.4f)) { // 0.9 + 1.2 + 1.3 = 3.4
+                        azimutRows.forEachIndexed { rowIndex, row ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    row.hauteur,
+                                    modifier = Modifier.weight(0.9f).padding(vertical = 8.dp, horizontal = 4.dp),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1
+                                )
+                                VerticalDivider(color = borderColor)
+                                Text(
+                                    antennaTypeShortLabel(row.rawType),
+                                    modifier = Modifier.weight(1.2f).padding(vertical = 8.dp, horizontal = 4.dp),
+                                    fontSize = 12.sp,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    textAlign = TextAlign.Center
+                                )
+                                VerticalDivider(color = borderColor)
+                                Column(
+                                    modifier = Modifier.weight(1.3f).padding(vertical = 4.dp, horizontal = 2.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    row.ids.forEach { id ->
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Text(
+                                                text = id,
+                                                fontSize = 11.sp,
+                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                textAlign = TextAlign.Center,
+                                                lineHeight = 14.sp
+                                            )
+                                            IconButton(
+                                                onClick = {
+                                                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                                    clipboard.setPrimaryClip(ClipData.newPlainText(txtPanelIdentifier, id))
+                                                    Toast.makeText(context, txtPanelIdentifierCopied, Toast.LENGTH_SHORT).show()
+                                                },
+                                                modifier = Modifier.size(24.dp)
+                                            ) {
+                                                Icon(
+                                                    imageVector = Icons.Default.ContentCopy,
+                                                    contentDescription = txtCopy,
+                                                    tint = MaterialTheme.colorScheme.primary,
+                                                    modifier = Modifier.size(16.dp)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            if (rowIndex < azimutRows.lastIndex) HorizontalDivider(color = borderColor)
+                        }
+                    }
+                }
+                if (azimutIndex < groupedByAzimut.lastIndex) HorizontalDivider(color = borderColor)
             }
         }
     }

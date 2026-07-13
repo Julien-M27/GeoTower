@@ -228,6 +228,11 @@ fun SettingsScreen(
     val offlineMapsBringIntoViewRequester = remember { BringIntoViewRequester() }
     var shouldBringDatabaseIntoView by remember(initialSection) { mutableStateOf(initialSection == "database") }
     var shouldBringOfflineMapsIntoView by remember(initialSection) { mutableStateOf(initialSection == "offline_maps") }
+    // Cible fine du bloc « generation locale » (LocalDbBuildCard), 3e carte de la section base de
+    // donnees : la notif de fin de generation doit y arriver precisement, pas au titre de section.
+    val localDbBuildBringIntoViewRequester = remember { BringIntoViewRequester() }
+    var localDbBuildBounds by remember { mutableStateOf(SettingsSectionBounds()) }
+    var shouldBringLocalDbBuildIntoView by remember(initialSection) { mutableStateOf(initialSection == "db_local_build") }
 
     var themeMode by AppConfig.themeMode
     var isOledMode by AppConfig.isOledMode
@@ -312,10 +317,11 @@ fun SettingsScreen(
     }
 
     LaunchedEffect(initialSection) {
-        if (initialSection == "database" || initialSection == "offline_maps") {
+        if (initialSection == "database" || initialSection == "offline_maps" || initialSection == "db_local_build") {
             activeSectionIndex = 4
             shouldBringDatabaseIntoView = initialSection == "database"
             shouldBringOfflineMapsIntoView = initialSection == "offline_maps"
+            shouldBringLocalDbBuildIntoView = initialSection == "db_local_build"
         }
     }
 
@@ -328,6 +334,20 @@ fun SettingsScreen(
             kotlinx.coroutines.delay(250)
             alignAnchorToViewportTop(sectionRootPositions[4])
             shouldBringDatabaseIntoView = false
+        }
+    }
+
+    // Scroll fin vers la carte « generation locale » (LocalDbBuildCard) : depuis la notif de fin de
+    // generation. On attend que la carte soit mesuree (localDbBuildBounds.isValid) avant d'aligner.
+    LaunchedEffect(shouldBringLocalDbBuildIntoView, scrollState.maxValue, navMode, isWideScreen, localDbBuildBounds.isValid) {
+        if (shouldBringLocalDbBuildIntoView && (navMode == 0 || !isWideScreen) && scrollState.maxValue > 0 && localDbBuildBounds.isValid) {
+            kotlinx.coroutines.delay(120)
+            localDbBuildBringIntoViewRequester.bringIntoView()
+            kotlinx.coroutines.delay(80)
+            alignAnchorToViewportTop(localDbBuildBounds.top)
+            kotlinx.coroutines.delay(250)
+            alignAnchorToViewportTop(localDbBuildBounds.top)
+            shouldBringLocalDbBuildIntoView = false
         }
     }
 
@@ -914,7 +934,7 @@ fun SettingsScreen(
                                 )
                             } else {
                             if (navMode == 0 || !isExpanded) {
-                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, { showPreferenceProfilesSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; offlineMapsBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) }, scrollViewportTop, scrollViewportBottom, scrollState.value, scrollState.maxValue, targetMapFilename = offlineMapsTargetFilename, onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) }, onOfflineMapsExpandedChange = { offlineMapsExpandedForNavigation = it }, onOpenDiagnostic = { navController.navigate("diagnostic") }, onPhotosFavorites = { navController.navigate("photos_favorites") })
+                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, { showPreferenceProfilesSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; offlineMapsBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) }, scrollViewportTop, scrollViewportBottom, scrollState.value, scrollState.maxValue, targetMapFilename = offlineMapsTargetFilename, onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) }, onOfflineMapsExpandedChange = { offlineMapsExpandedForNavigation = it }, onOpenDiagnostic = { navController.navigate("diagnostic") }, onPhotosFavorites = { navController.navigate("photos_favorites") }, localDbBuildSectionModifier = Modifier.bringIntoViewRequester(localDbBuildBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; localDbBuildBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) })
                             } else {
                                 when (activeSectionIndex) {
                                     0 -> SectionApparence(themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true })
@@ -1898,7 +1918,8 @@ fun AllSettingsContent(
     onTargetMapPositioned: (Float, Int) -> Unit = { _, _ -> },
     onOfflineMapsExpandedChange: (Boolean) -> Unit = {},
     onOpenDiagnostic: () -> Unit = {},
-    onPhotosFavorites: () -> Unit = {}
+    onPhotosFavorites: () -> Unit = {},
+    localDbBuildSectionModifier: Modifier = Modifier
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(modifier = appearanceSectionModifier.fillMaxWidth()) {
@@ -1933,7 +1954,8 @@ fun AllSettingsContent(
         scrollMaxValue,
         targetMapFilename,
         onTargetMapPositioned,
-        onOfflineMapsExpandedChange = onOfflineMapsExpandedChange
+        onOfflineMapsExpandedChange = onOfflineMapsExpandedChange,
+        localDbBuildModifier = localDbBuildSectionModifier
     )
 }
 
@@ -2713,7 +2735,7 @@ fun SectionSysteme(
     SectionTitle(stringResource(R.string.settings_section_system));
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
-    Surface(onClick = { safeClick("system_app_details_settings") { ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply { data = Uri.fromParts("package", ctx.packageName, null) }) } }, shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
+    Surface(onClick = { safeClick("system_app_details_settings") { runCatching { ctx.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply { data = Uri.fromParts("package", ctx.packageName, null); addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) }) } } }, shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Default.Settings, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(sizing.component(24.dp)))
             Spacer(Modifier.width(sizing.spacing(16.dp)))
@@ -2761,7 +2783,8 @@ fun SectionDatabase(
     scrollMaxValue: Int = 0,
     targetMapFilename: String? = null,
     onTargetMapPositioned: (Float, Int) -> Unit = { _, _ -> },
-    onOfflineMapsExpandedChange: (Boolean) -> Unit = {}
+    onOfflineMapsExpandedChange: (Boolean) -> Unit = {},
+    localDbBuildModifier: Modifier = Modifier
 ) {
     var showResetDialog by remember { mutableStateOf(false) }
     val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
@@ -2779,7 +2802,7 @@ fun SectionDatabase(
             shape = shape,
             border = border,
             bubbleColor = bubbleColor,
-            title = stringResource(R.string.settings_section_database)
+            title = stringResource(R.string.settings_database_online_title)
         )
 
         Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
@@ -2793,12 +2816,14 @@ fun SectionDatabase(
 
         Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
-        fr.geotower.ui.components.LocalDbBuildCard(
-            useOneUi = useOneUi,
-            shape = shape,
-            border = border,
-            bubbleColor = bubbleColor
-        )
+        Box(modifier = localDbBuildModifier.fillMaxWidth()) {
+            fr.geotower.ui.components.LocalDbBuildCard(
+                useOneUi = useOneUi,
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor
+            )
+        }
     }
 
     Spacer(modifier = Modifier.height(sizing.spacing(16.dp))) // Espace entre les deux cartes
