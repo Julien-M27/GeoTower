@@ -59,6 +59,7 @@ import fr.geotower.ui.screens.home.HomeScreen
 import fr.geotower.ui.screens.help.HelpScreen
 import fr.geotower.ui.screens.settings.SettingsScreen
 import fr.geotower.ui.screens.settings.PhotosFavoritesScreen
+import fr.geotower.ui.screens.settings.OutageSourceScreen
 import fr.geotower.ui.screens.coverage.TheoreticalCoverageScreen
 import fr.geotower.ui.screens.emitters.ElevationProfileScreen
 import fr.geotower.ui.screens.emitters.NearEmittersSupportWrapperScreen
@@ -757,6 +758,16 @@ class MainActivity : ComponentActivity() {
                             composable("photos_favorites") {
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     PhotosFavoritesScreen(
+                                        navController = navController,
+                                        repository = repository
+                                    )
+                                }
+                            }
+
+                            // Source des pannes (ouvert depuis Réglages ▸ au-dessus de la base de données)
+                            composable("outage_source") {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    OutageSourceScreen(
                                         navController = navController,
                                         repository = repository
                                     )

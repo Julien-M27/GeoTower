@@ -5138,6 +5138,175 @@ fun shareFullSiteCapture(
     }
 }
 
+/**
+ * Génère un PDF multi-pages pour un support : une page par opérateur présent.
+ * Chaque page réutilise la mise en page PDF mono-opérateur (GeoTowerPdfAntennaReportContent).
+ * Les stations multiples d'un même opérateur sont regroupées : on retient la plus complète.
+ */
+fun shareSupportMultiOperatorPdf(
+    context: Context,
+    currentView: View,
+    siteId: String,
+    antennas: List<LocalisationEntity>,
+    physique: PhysiqueEntity?,
+    techniquesMap: Map<String, TechniqueEntity>,
+    hsDataMap: Map<String, fr.geotower.data.models.SiteHsEntity>,
+    distanceStr: String,
+    mapBitmap: Bitmap?,
+    incMap: Boolean,
+    incConfidential: Boolean,
+    incQrCode: Boolean,
+    chooserTitle: String,
+    txtPdfDownloaded: String,
+    txtInitError: String,
+    destination: ShareImageDestination = ShareImageDestination.Pdf,
+    onComplete: (() -> Unit)? = null
+) {
+    // Une page par opérateur : on regroupe les stations d'un même opérateur et on garde la plus fournie.
+    val perOperatorPages = antennas
+        .groupBy { (it.operateur ?: "").trim() }
+        .values
+        .map { group ->
+            group.maxByOrNull { a ->
+                (techniquesMap[a.idAnfr]?.technologies?.takeIf { it.isNotBlank() } ?: a.frequences ?: "").length
+            } ?: group.first()
+        }
+
+    if (perOperatorPages.isEmpty()) {
+        onComplete?.invoke()
+        return
+    }
+
+    val rootView = currentView.rootView as ViewGroup
+    val pageBitmaps = mutableListOf<Bitmap>()
+    val targetWidthPx = 800.dpToPx(context)
+
+    fun finishAndExport() {
+        try {
+            if (pageBitmaps.isEmpty()) return
+            val safeId = (physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId).shareSafeFilePart()
+            val fileName = "GeoTower_support_$safeId.pdf"
+            if (destination == ShareImageDestination.PdfDownload) {
+                val ok = downloadGeoTowerReportPdf(context, pageBitmaps, fileName)
+                Toast.makeText(context, if (ok) txtPdfDownloaded else txtInitError, Toast.LENGTH_SHORT).show()
+            } else {
+                shareGeoTowerReportPdf(
+                    context = context,
+                    bitmaps = pageBitmaps,
+                    fileName = fileName,
+                    chooserTitle = chooserTitle
+                )
+            }
+        } catch (e: Exception) {
+            AppLogger.w(TAG_SHARE_IMAGE, "Support multi-operator PDF export failed", e)
+            Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
+        } finally {
+            onComplete?.invoke()
+        }
+    }
+
+    fun renderPageAt(index: Int) {
+        if (index >= perOperatorPages.size) {
+            finishAndExport()
+            return
+        }
+        val antenna = perOperatorPages[index]
+        val technique = techniquesMap[antenna.idAnfr]
+        val composeView = ComposeView(context).apply {
+            setViewTreeLifecycleOwner(currentView.findViewTreeLifecycleOwner())
+            setViewTreeSavedStateRegistryOwner(currentView.findViewTreeSavedStateRegistryOwner())
+            setViewTreeViewModelStoreOwner(currentView.findViewTreeViewModelStoreOwner())
+            setContent {
+                MaterialTheme(colorScheme = lightColorScheme()) {
+                    Surface(color = Color.White) {
+                        GeoTowerPdfAntennaReportContent(
+                            context = context,
+                            info = antenna,
+                            physique = physique,
+                            technique = technique,
+                            hsDataMap = hsDataMap,
+                            speedtestData = null,
+                            distanceStr = distanceStr,
+                            txtAddressLabel = stringResource(R.string.appstrings_address_label),
+                            txtNotSpecified = stringResource(R.string.appstrings_not_specified),
+                            txtGpsLabel = stringResource(R.string.appstrings_gps_label),
+                            txtSupportHeight = stringResource(R.string.appstrings_support_height),
+                            txtDistanceLabel = stringResource(R.string.appstrings_distance_label),
+                            txtFromMyPosition = stringResource(R.string.appstrings_from_my_position),
+                            txtGeneratedBy = stringResource(R.string.appstrings_generated_by),
+                            txtimplementation = stringResource(R.string.appstrings_implementation),
+                            txtLastModification = stringResource(R.string.appstrings_last_modification),
+                            txtIdentifiers = stringResource(R.string.appstrings_identifiers),
+                            txtIdNumber = stringResource(R.string.appstrings_id_number),
+                            txtAnfrStationNumber = stringResource(R.string.appstrings_anfr_station_number),
+                            txtDates = stringResource(R.string.appstrings_dates),
+                            txtIdSupportLabel = stringResource(R.string.appstrings_id_support_label),
+                            txtSupportDetailsTitle = stringResource(R.string.appstrings_support_details_title),
+                            txtSupportNature = stringResource(R.string.appstrings_support_nature),
+                            txtOwner = stringResource(R.string.appstrings_owner),
+                            txtExploitant = stringResource(R.string.appstrings_exploitant),
+                            mapBitmap = mapBitmap,
+                            photoBitmaps = emptyList(),
+                            txtCommunityPhotosTitle = "",
+                            incPhotos = false,
+                            incMap = incMap,
+                            incSupport = true,
+                            incIds = true,
+                            incDates = true,
+                            incAddress = true,
+                            incFreqs = true,
+                            incSpeedtest = false,
+                            incThroughput = false,
+                            incConfidential = incConfidential,
+                            incQrCode = incQrCode,
+                            shareOrder = listOf("map", "support", "ids", "dates", "address", "freq", "status")
+                        )
+                    }
+                }
+            }
+        }
+
+        try {
+            if (composeView.parent != null) (composeView.parent as ViewGroup).removeView(composeView)
+            composeView.translationX = 10000f
+            rootView.addView(composeView, ViewGroup.LayoutParams(targetWidthPx, ViewGroup.LayoutParams.WRAP_CONTENT))
+        } catch (e: Exception) {
+            AppLogger.w(TAG_SHARE_IMAGE, "Support PDF page setup failed", e)
+            renderPageAt(index + 1)
+            return
+        }
+
+        composeView.postDelayed({
+            try {
+                val widthSpec = View.MeasureSpec.makeMeasureSpec(targetWidthPx, View.MeasureSpec.EXACTLY)
+                val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
+                composeView.measure(widthSpec, heightSpec)
+                composeView.layout(0, 0, composeView.measuredWidth, composeView.measuredHeight)
+                if (composeView.measuredWidth > 0 && composeView.measuredHeight > 0) {
+                    val raw = Bitmap.createBitmap(composeView.measuredWidth, composeView.measuredHeight, Bitmap.Config.ARGB_8888)
+                    composeView.draw(Canvas(raw))
+                    // Plafonne la résolution pour tenir plusieurs pages en mémoire sans perte visible.
+                    val cappedWidth = 1400
+                    val page = if (raw.width > cappedWidth) {
+                        val scaledHeight = (raw.height.toLong() * cappedWidth / raw.width).toInt().coerceAtLeast(1)
+                        Bitmap.createScaledBitmap(raw, cappedWidth, scaledHeight, true).also { if (it != raw) raw.recycle() }
+                    } else {
+                        raw
+                    }
+                    pageBitmaps.add(page)
+                }
+            } catch (e: Exception) {
+                AppLogger.w(TAG_SHARE_IMAGE, "Support PDF page capture failed", e)
+            } finally {
+                if (composeView.parent != null) rootView.removeView(composeView)
+                renderPageAt(index + 1)
+            }
+        }, 450)
+    }
+
+    renderPageAt(0)
+}
+
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun ShareGenerationDialog(message: String) {
@@ -5785,6 +5954,7 @@ fun SupportShareMenu(
     val txtPhotoCopiedToClipboard = stringResource(R.string.appstrings_photo_copied_to_clipboard)
     val txtMove = stringResource(R.string.appstrings_move)
     val txtInitError = stringResource(R.string.appstrings_init_error)
+    val txtPdfDownloaded = stringResource(R.string.appstrings_pdf_downloaded)
     val txtRadioEntriesTitle = stringResource(R.string.appstrings_radio_share_block_support_entries)
 
     Button(
@@ -5971,6 +6141,43 @@ fun SupportShareMenu(
                 }
             }
 
+            fun startSupportPdfExport(destination: ShareImageDestination) {
+                if (isGeneratingShare) return
+                isGeneratingShare = true
+                generationMessage = txtShareImagePreparingInProgress
+                showSelectionSheet = false
+                globalMapRef?.let { map -> map.controller.setZoom(17.5); map.controller.setCenter(org.osmdroid.util.GeoPoint(mainInfo.latitude, mainInfo.longitude)) }
+                scope.launch {
+                    currentView.postDelayed({
+                        try {
+                            val mapBmp = if (incMap) { try { globalMapRef?.let { map -> val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888); map.draw(Canvas(bmp)); bmp } } catch (e: Exception) { null } } else null
+                            shareSupportMultiOperatorPdf(
+                                context = context,
+                                currentView = currentView,
+                                siteId = siteId,
+                                antennas = antennas,
+                                physique = physique,
+                                techniquesMap = techniquesMap,
+                                hsDataMap = hsDataMap,
+                                distanceStr = distanceStr,
+                                mapBitmap = mapBmp,
+                                incMap = incMap,
+                                incConfidential = incConfidential,
+                                incQrCode = incQrCode,
+                                chooserTitle = txtShareSiteVia,
+                                txtPdfDownloaded = txtPdfDownloaded,
+                                txtInitError = txtInitError,
+                                destination = destination,
+                                onComplete = { isGeneratingShare = false }
+                            )
+                        } catch (e: Exception) {
+                            AppLogger.w(TAG_SHARE_IMAGE, "Support PDF generation failed", e)
+                            isGeneratingShare = false
+                        }
+                    }, 300)
+                }
+            }
+
             ShareImageActionButtons(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -5985,7 +6192,13 @@ fun SupportShareMenu(
                 txtCopyImage = txtCopyImage,
                 txtGenerateImage = txtGenerateImage,
                 onCopyClick = { startSupportImageExport(ShareImageDestination.Clipboard) },
-                onShareClick = { startSupportImageExport(ShareImageDestination.Share) }
+                onShareClick = { startSupportImageExport(ShareImageDestination.Share) },
+                onPdfClick = { startSupportPdfExport(ShareImageDestination.Pdf) },
+                pdfContentDescription = stringResource(R.string.appstrings_radio_share_export_pdf),
+                onPdfDownloadClick = { startSupportPdfExport(ShareImageDestination.PdfDownload) },
+                pdfDownloadContentDescription = stringResource(R.string.appstrings_pdf_download),
+                showCopyIcon = false,
+                showShareIcon = false
             )
             }
         }

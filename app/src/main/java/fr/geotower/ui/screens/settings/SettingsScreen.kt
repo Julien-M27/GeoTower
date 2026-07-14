@@ -935,31 +935,44 @@ fun SettingsScreen(
                                 )
                             } else {
                             if (navMode == 0 || !isExpanded) {
-                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, { showPreferenceProfilesSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; offlineMapsBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) }, scrollViewportTop, scrollViewportBottom, scrollState.value, scrollState.maxValue, targetMapFilename = offlineMapsTargetFilename, onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) }, onOfflineMapsExpandedChange = { offlineMapsExpandedForNavigation = it }, onOpenDiagnostic = { navController.navigate("diagnostic") }, onPhotosFavorites = { navController.navigate("photos_favorites") }, localDbBuildSectionModifier = Modifier.bringIntoViewRequester(localDbBuildBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; localDbBuildBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) })
+                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, { showPreferenceProfilesSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; offlineMapsBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) }, scrollViewportTop, scrollViewportBottom, scrollState.value, scrollState.maxValue, targetMapFilename = offlineMapsTargetFilename, onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) }, onOfflineMapsExpandedChange = { offlineMapsExpandedForNavigation = it }, onOpenDiagnostic = { navController.navigate("diagnostic") }, onPhotosFavorites = { navController.navigate("photos_favorites") }, onOutageSource = { navController.navigate("outage_source") }, localDbBuildSectionModifier = Modifier.bringIntoViewRequester(localDbBuildBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; localDbBuildBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) })
                             } else {
                                 when (activeSectionIndex) {
                                     0 -> SectionApparence(themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true })
                                     1 -> SectionCartographie(mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick)
                                     2 -> SectionPreferences(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, { showPreferenceProfilesSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, onPhotosFavorites = { navController.navigate("photos_favorites") })
                                     3 -> SectionSysteme(context, cardShape, border = cardBorder, bubbleColor = bubbleBaseColor, useOneUi = useOneUi, safeClick = safeClick, onOpenDiagnostic = { navController.navigate("diagnostic") })
-                                    4 -> SectionDatabase(
-                                        isExpanded,
-                                        cardShape,
-                                        bubbleBaseColor,
-                                        useOneUi,
-                                        repository,
-                                        scope,
-                                        context,
-                                        viewportTop = scrollViewportTop,
-                                        viewportBottom = scrollViewportBottom,
-                                        scrollValue = scrollState.value,
-                                        scrollMaxValue = scrollState.maxValue,
-                                        targetMapFilename = offlineMapsTargetFilename,
-                                        onTargetMapPositioned = { top, height ->
-                                            offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height)
-                                        },
-                                        onOfflineMapsExpandedChange = { offlineMapsExpandedForNavigation = it }
-                                    )
+                                    4 -> Column {
+                                        PreferenceActionCard(
+                                            title = stringResource(R.string.outage_source_settings_title),
+                                            desc = stringResource(R.string.outage_source_settings_desc),
+                                            onClick = { navController.navigate("outage_source") },
+                                            shape = cardShape,
+                                            border = cardBorder,
+                                            bubbleColor = bubbleBaseColor,
+                                            useOneUi = useOneUi,
+                                            safeClick = safeClick
+                                        )
+                                        Spacer(Modifier.height(sizing.spacing(12.dp)))
+                                        SectionDatabase(
+                                            isExpanded,
+                                            cardShape,
+                                            bubbleBaseColor,
+                                            useOneUi,
+                                            repository,
+                                            scope,
+                                            context,
+                                            viewportTop = scrollViewportTop,
+                                            viewportBottom = scrollViewportBottom,
+                                            scrollValue = scrollState.value,
+                                            scrollMaxValue = scrollState.maxValue,
+                                            targetMapFilename = offlineMapsTargetFilename,
+                                            onTargetMapPositioned = { top, height ->
+                                                offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height)
+                                            },
+                                            onOfflineMapsExpandedChange = { offlineMapsExpandedForNavigation = it }
+                                        )
+                                    }
                                 }
                             }
                             }
@@ -1929,6 +1942,7 @@ fun AllSettingsContent(
     onOfflineMapsExpandedChange: (Boolean) -> Unit = {},
     onOpenDiagnostic: () -> Unit = {},
     onPhotosFavorites: () -> Unit = {},
+    onOutageSource: () -> Unit = {},
     localDbBuildSectionModifier: Modifier = Modifier
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -1948,6 +1962,17 @@ fun AllSettingsContent(
         SectionSysteme(ctx, shape, border, bubbleColor, useOneUi, safeClick, onOpenDiagnostic)
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
+    PreferenceActionCard(
+        title = stringResource(R.string.outage_source_settings_title),
+        desc = stringResource(R.string.outage_source_settings_desc),
+        onClick = onOutageSource,
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi,
+        safeClick = safeClick
+    )
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
     SectionDatabase(
         isWide,
         shape,

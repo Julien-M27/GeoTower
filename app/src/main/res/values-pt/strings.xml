@@ -2228,4 +2228,31 @@
     <string name="appstrings_release_v1963_site_panel_table">Detalhes do site: nova tabela do tipo de painel (tudo-em-um / parabólica) por azimute com o identificador AER, em coerência com o relatório PDF</string>
     <string name="appstrings_release_v1964_map_filters_defaults">Filtros de mapa predefinidos: configure-os em Personalização das páginas > Mapa de antenas > Filtros; o aviso «Filtros ativos» só aparece quando o mapa difere do seu valor predefinido</string>
     <string name="appstrings_release_v1964_db_timings">Tempos mostrados nas bases de dados: tempo decorrido durante a operação e depois «Gerado em…» ou «Transferido em…»</string>
+    <!-- Origem das falhas (geração local) -->
+    <string name="outage_source_settings_title">Origem das falhas</string>
+    <string name="outage_source_settings_desc">Servidor ou geração local</string>
+    <string name="outage_source_intro">Escolha de onde vêm as falhas de rede: o servidor GeoTower ou uma geração no seu dispositivo a partir dos ficheiros oficiais das operadoras.</string>
+    <string name="outage_source_mode_title">Gerar as falhas localmente</string>
+    <string name="outage_source_mode_desc">Descarrega os ficheiros das operadoras e calcula as falhas neste dispositivo em vez de usar o servidor.</string>
+    <string name="outage_source_frequency_title">Frequência de geração</string>
+    <string name="outage_source_frequency_unit">%1$d h</string>
+    <string name="outage_source_frequency_footer">Duração da cache e período em segundo plano, se ativado.</string>
+    <string name="outage_source_background_title">Gerar em segundo plano</string>
+    <string name="outage_source_background_desc">Regenera periodicamente mesmo com a app fechada (consome bateria e dados).</string>
+    <string name="outage_source_generate_now">Gerar agora</string>
+    <string name="outage_source_generating">A gerar…</string>
+    <string name="outage_source_last_generated">Última geração: %1$s</string>
+    <string name="outage_source_never">Nunca gerado</string>
+    <string name="outage_source_generated_count">%1$d falhas</string>
+    <!-- Geração das falhas: notificação em direto + etapas -->
+    <string name="outage_gen_notif_title">A gerar as falhas</string>
+    <string name="outage_gen_channel_name">Geração das falhas</string>
+    <string name="outage_gen_step_download">A descarregar os ficheiros das operadoras</string>
+    <string name="outage_gen_step_geocode">A geolocalizar as falhas</string>
+    <string name="outage_gen_step_finalize">A finalizar</string>
+    <string name="outage_gen_step_done">Concluído</string>
+    <string name="outage_gen_notif_done">%1$d falhas geradas</string>
+    <string name="appstrings_release_section_outages">Falhas de rede</string>
+    <string name="appstrings_release_v1965_outage_local_source">Escolha a origem das falhas: o servidor GeoTower ou uma geração diretamente no seu dispositivo a partir dos ficheiros oficiais das operadoras</string>
+    <string name="appstrings_release_v1965_outage_generation">Novo ecrã «Origem das falhas»: frequência de geração, geração em segundo plano (opcional), botão «Gerar agora», data e número de falhas geradas, com notificação de progresso</string>
 </resources>

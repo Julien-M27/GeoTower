@@ -9,6 +9,7 @@ import fr.geotower.data.models.DbCluster
 import fr.geotower.data.models.FaisceauxEntity
 import fr.geotower.data.models.FavoriteScopeSiteRow
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.models.OutageGeocodeSiteRow
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.RefTypeAntenneDbEntity
 import fr.geotower.data.models.TechniqueEntity
@@ -75,6 +76,27 @@ interface GeoTowerDao {
         AND l.longitude BETWEEN :minLon AND :maxLon
     """)
     suspend fun getLocalisationsInBox(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<LocalisationEntity>
+
+    // --- Géocodage des pannes générées localement (fr.geotower.data.outages) ---
+    // Projections minimales, adossées aux index existants idx_localisation_insee et
+    // idx_localisation_lat_lon (cf. GeoTowerDatabaseIndexes).
+
+    @Query("""
+        SELECT l.id_anfr, l.latitude, l.longitude, o.libelle AS operateur
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.code_insee = :codeInsee
+    """)
+    suspend fun getGeocodeSitesByInsee(codeInsee: String): List<OutageGeocodeSiteRow>
+
+    @Query("""
+        SELECT l.id_anfr, l.latitude, l.longitude, o.libelle AS operateur
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+    """)
+    suspend fun getGeocodeSitesInBox(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<OutageGeocodeSiteRow>
 
     // Dates ANFR au format "JJ/MM/AAAA" -> on reconstruit "AAAAMMJJ" pour un MIN chronologique correct.
     @Query("""

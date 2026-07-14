@@ -2228,4 +2228,31 @@
     <string name="appstrings_release_v1963_site_panel_table">Standortdetails: neue Tabelle des Paneltyps (All-in-One / Schüssel) nach Azimut mit der AER-Kennung, passend zum PDF-Bericht</string>
     <string name="appstrings_release_v1964_map_filters_defaults">Standard-Kartenfilter: über Seitenanpassung > Antennenkarte > Filter einstellen; das Banner „Aktive Filter“ erscheint dann nur, wenn die Karte von deinem Standard abweicht</string>
     <string name="appstrings_release_v1964_db_timings">Auf den Datenbanken angezeigte Zeiten: verstrichene Zeit während des Vorgangs, dann „Erstellt in…“ oder „Heruntergeladen in…“</string>
+    <!-- Störungsquelle (lokale Erzeugung) -->
+    <string name="outage_source_settings_title">Störungsquelle</string>
+    <string name="outage_source_settings_desc">Server oder lokale Erzeugung</string>
+    <string name="outage_source_intro">Wählen Sie, woher die Netzstörungen stammen: vom GeoTower-Server oder auf dem Gerät aus den offiziellen Betreiberdateien erzeugt.</string>
+    <string name="outage_source_mode_title">Störungen lokal erzeugen</string>
+    <string name="outage_source_mode_desc">Lädt die Betreiberdateien herunter und berechnet die Störungen auf diesem Gerät statt über den Server.</string>
+    <string name="outage_source_frequency_title">Erzeugungsintervall</string>
+    <string name="outage_source_frequency_unit">%1$d Std.</string>
+    <string name="outage_source_frequency_footer">Gültigkeitsdauer des Caches und Hintergrundintervall, falls aktiviert.</string>
+    <string name="outage_source_background_title">Im Hintergrund erzeugen</string>
+    <string name="outage_source_background_desc">Erzeugt regelmäßig neu, auch wenn die App geschlossen ist (verbraucht Akku und Daten).</string>
+    <string name="outage_source_generate_now">Jetzt erzeugen</string>
+    <string name="outage_source_generating">Wird erzeugt…</string>
+    <string name="outage_source_last_generated">Zuletzt erzeugt: %1$s</string>
+    <string name="outage_source_never">Nie erzeugt</string>
+    <string name="outage_source_generated_count">%1$d Störungen</string>
+    <!-- Störungserzeugung: Live-Benachrichtigung + Schritte -->
+    <string name="outage_gen_notif_title">Störungen werden erzeugt</string>
+    <string name="outage_gen_channel_name">Störungserzeugung</string>
+    <string name="outage_gen_step_download">Betreiberdateien werden geladen</string>
+    <string name="outage_gen_step_geocode">Störungen werden geolokalisiert</string>
+    <string name="outage_gen_step_finalize">Abschluss</string>
+    <string name="outage_gen_step_done">Fertig</string>
+    <string name="outage_gen_notif_done">%1$d Störungen erzeugt</string>
+    <string name="appstrings_release_section_outages">Netzstörungen</string>
+    <string name="appstrings_release_v1965_outage_local_source">Wähle die Quelle der Störungen: der GeoTower-Server oder eine Generierung direkt auf deinem Gerät aus den offiziellen Betreiberdateien</string>
+    <string name="appstrings_release_v1965_outage_generation">Neuer Bildschirm „Störungsquelle“: Generierungsfrequenz, optionale Hintergrundgenerierung, Schaltfläche „Jetzt generieren“, Datum und Anzahl der generierten Störungen, mit Fortschrittsbenachrichtigung</string>
 </resources>

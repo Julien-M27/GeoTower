@@ -2228,4 +2228,31 @@
     <string name="appstrings_release_v1963_site_panel_table">Detalles del sitio: nueva tabla del tipo de panel (todo en uno / parabólica) por acimut con el identificador AER, en coherencia con el informe PDF</string>
     <string name="appstrings_release_v1964_map_filters_defaults">Filtros de mapa predeterminados: configúralos desde Personalización de páginas > Mapa de antenas > Filtros; el aviso «Filtros activos» solo aparece cuando el mapa difiere de tu valor predeterminado</string>
     <string name="appstrings_release_v1964_db_timings">Tiempos mostrados en las bases de datos: tiempo transcurrido durante la operación y luego «Generado en…» o «Descargado en…»</string>
+    <!-- Origen de las incidencias (generación local) -->
+    <string name="outage_source_settings_title">Origen de las incidencias</string>
+    <string name="outage_source_settings_desc">Servidor o generación local</string>
+    <string name="outage_source_intro">Elige de dónde provienen las incidencias de red: el servidor de GeoTower o una generación en tu dispositivo a partir de los archivos oficiales de los operadores.</string>
+    <string name="outage_source_mode_title">Generar las incidencias localmente</string>
+    <string name="outage_source_mode_desc">Descarga los archivos de los operadores y calcula las incidencias en este dispositivo en lugar de usar el servidor.</string>
+    <string name="outage_source_frequency_title">Frecuencia de generación</string>
+    <string name="outage_source_frequency_unit">%1$d h</string>
+    <string name="outage_source_frequency_footer">Duración de la caché y periodo en segundo plano si está activado.</string>
+    <string name="outage_source_background_title">Generar en segundo plano</string>
+    <string name="outage_source_background_desc">Regenera periódicamente incluso con la app cerrada (consume batería y datos).</string>
+    <string name="outage_source_generate_now">Generar ahora</string>
+    <string name="outage_source_generating">Generando…</string>
+    <string name="outage_source_last_generated">Última generación: %1$s</string>
+    <string name="outage_source_never">Nunca generado</string>
+    <string name="outage_source_generated_count">%1$d incidencias</string>
+    <!-- Generación de incidencias: notificación en directo + pasos -->
+    <string name="outage_gen_notif_title">Generando incidencias</string>
+    <string name="outage_gen_channel_name">Generación de incidencias</string>
+    <string name="outage_gen_step_download">Descargando archivos de operadores</string>
+    <string name="outage_gen_step_geocode">Geolocalizando incidencias</string>
+    <string name="outage_gen_step_finalize">Finalizando</string>
+    <string name="outage_gen_step_done">Listo</string>
+    <string name="outage_gen_notif_done">%1$d incidencias generadas</string>
+    <string name="appstrings_release_section_outages">Cortes de red</string>
+    <string name="appstrings_release_v1965_outage_local_source">Elige el origen de los cortes: el servidor de GeoTower o una generación directamente en tu dispositivo a partir de los archivos oficiales de los operadores</string>
+    <string name="appstrings_release_v1965_outage_generation">Nueva pantalla «Origen de los cortes»: frecuencia de generación, generación en segundo plano (opcional), botón «Generar ahora», fecha y número de cortes generados, con notificación de progreso</string>
 </resources>

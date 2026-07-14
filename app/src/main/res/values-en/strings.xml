@@ -2228,4 +2228,31 @@
     <string name="appstrings_release_v1963_site_panel_table">Site details: new table of the panel type (all-in-one / dish) by azimuth with the AER identifier, matching the PDF report</string>
     <string name="appstrings_release_v1964_map_filters_defaults">Default map filters: set them from Page customization > Antenna map > Filters; the Active filters banner then only appears when the map differs from your default</string>
     <string name="appstrings_release_v1964_db_timings">Timings shown on databases: elapsed time during the operation, then Generated in… or Downloaded in…</string>
+    <!-- Outage source (local generation) -->
+    <string name="outage_source_settings_title">Outage source</string>
+    <string name="outage_source_settings_desc">Server or on-device generation</string>
+    <string name="outage_source_intro">Choose where network outages come from: the GeoTower server, or generated on your device from the operators\' official files.</string>
+    <string name="outage_source_mode_title">Generate outages locally</string>
+    <string name="outage_source_mode_desc">Downloads the operator files and computes outages on this device instead of using the server.</string>
+    <string name="outage_source_frequency_title">Generation frequency</string>
+    <string name="outage_source_frequency_unit">%1$d h</string>
+    <string name="outage_source_frequency_footer">Cache lifetime, and background period when enabled.</string>
+    <string name="outage_source_background_title">Generate in the background</string>
+    <string name="outage_source_background_desc">Periodically regenerates even when the app is closed (uses battery and data).</string>
+    <string name="outage_source_generate_now">Generate now</string>
+    <string name="outage_source_generating">Generating…</string>
+    <string name="outage_source_last_generated">Last generated: %1$s</string>
+    <string name="outage_source_never">Never generated</string>
+    <string name="outage_source_generated_count">%1$d outages</string>
+    <!-- Outage generation: live notification + steps -->
+    <string name="outage_gen_notif_title">Generating outages</string>
+    <string name="outage_gen_channel_name">Outage generation</string>
+    <string name="outage_gen_step_download">Downloading operator files</string>
+    <string name="outage_gen_step_geocode">Geocoding outages</string>
+    <string name="outage_gen_step_finalize">Finalizing</string>
+    <string name="outage_gen_step_done">Done</string>
+    <string name="outage_gen_notif_done">%1$d outages generated</string>
+    <string name="appstrings_release_section_outages">Network outages</string>
+    <string name="appstrings_release_v1965_outage_local_source">Choose where outages come from: the GeoTower server, or generated right on your device from the operators\' official files</string>
+    <string name="appstrings_release_v1965_outage_generation">New Outage source screen: generation frequency, optional background generation, a Generate now button, last generation date and count, with a progress notification</string>
 </resources>

@@ -28,6 +28,12 @@ object OfficialSources {
         // Les CSV de data.arcep.fr redirigent (302) vers le stockage objet OVH de l'ARCEP.
         "arcep.s3.rbx.io.cloud.ovh.net",
         "geo.api.gouv.fr",
+        // Fichiers officiels de pannes des operateurs (generation LOCALE des sites HS,
+        // fr.geotower.data.outages) — memes URLs que le builder serveur build_sites_hs.py.
+        "mobile.free.fr",
+        "www.sfr.fr",
+        "www.bouyguestelecom.fr",
+        "couverture-mobile.orange.fr",
     )
 
     /** API data.gouv du dataset "Donnees SUP" a interroger pour trouver le ZIP mensuel courant. */

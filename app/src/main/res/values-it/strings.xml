@@ -2228,4 +2228,31 @@
     <string name="appstrings_release_v1963_site_panel_table">Dettagli del sito: nuova tabella del tipo di pannello (all-in-one / parabola) per azimut con l\'identificativo AER, in coerenza con il report PDF</string>
     <string name="appstrings_release_v1964_map_filters_defaults">Filtri mappa predefiniti: impostali da Personalizzazione delle pagine > Mappa delle antenne > Filtri; il banner «Filtri attivi» compare solo quando la mappa differisce dal tuo valore predefinito</string>
     <string name="appstrings_release_v1964_db_timings">Tempi mostrati sui database: tempo trascorso durante l\'operazione, poi «Generato in…» o «Scaricato in…»</string>
+    <!-- Origine dei guasti (generazione locale) -->
+    <string name="outage_source_settings_title">Origine dei guasti</string>
+    <string name="outage_source_settings_desc">Server o generazione locale</string>
+    <string name="outage_source_intro">Scegli da dove provengono i guasti di rete: il server GeoTower o una generazione sul tuo dispositivo dai file ufficiali degli operatori.</string>
+    <string name="outage_source_mode_title">Genera i guasti localmente</string>
+    <string name="outage_source_mode_desc">Scarica i file degli operatori e calcola i guasti su questo dispositivo invece di usare il server.</string>
+    <string name="outage_source_frequency_title">Frequenza di generazione</string>
+    <string name="outage_source_frequency_unit">%1$d h</string>
+    <string name="outage_source_frequency_footer">Durata della cache e periodo in background se attivo.</string>
+    <string name="outage_source_background_title">Genera in background</string>
+    <string name="outage_source_background_desc">Rigenera periodicamente anche ad app chiusa (consuma batteria e dati).</string>
+    <string name="outage_source_generate_now">Genera ora</string>
+    <string name="outage_source_generating">Generazione in corso…</string>
+    <string name="outage_source_last_generated">Ultima generazione: %1$s</string>
+    <string name="outage_source_never">Mai generato</string>
+    <string name="outage_source_generated_count">%1$d guasti</string>
+    <!-- Generazione dei guasti: notifica in tempo reale + passaggi -->
+    <string name="outage_gen_notif_title">Generazione dei guasti</string>
+    <string name="outage_gen_channel_name">Generazione dei guasti</string>
+    <string name="outage_gen_step_download">Download dei file degli operatori</string>
+    <string name="outage_gen_step_geocode">Geolocalizzazione dei guasti</string>
+    <string name="outage_gen_step_finalize">Finalizzazione</string>
+    <string name="outage_gen_step_done">Completato</string>
+    <string name="outage_gen_notif_done">%1$d guasti generati</string>
+    <string name="appstrings_release_section_outages">Interruzioni di rete</string>
+    <string name="appstrings_release_v1965_outage_local_source">Scegli l\'origine delle interruzioni: il server GeoTower o una generazione direttamente sul tuo dispositivo dai file ufficiali degli operatori</string>
+    <string name="appstrings_release_v1965_outage_generation">Nuova schermata «Origine delle interruzioni»: frequenza di generazione, generazione in background (opzionale), pulsante «Genera ora», data e numero di interruzioni generate, con notifica di avanzamento</string>
 </resources>

@@ -27,6 +27,12 @@ import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.models.SiteHsEntity
+import fr.geotower.data.outages.LocalOutageGenerator
+import fr.geotower.data.outages.LocalOutageProvider
+import fr.geotower.data.outages.NoOutageProgress
+import fr.geotower.data.outages.OutageLocalCache
+import fr.geotower.data.outages.OutageLocalConfig
+import fr.geotower.data.outages.OutageProgressCallback
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.FrequencyFilterSelection
@@ -343,6 +349,17 @@ class AnfrRepository(
 
     private val dao: GeoTowerDao
         get() = AppDatabase.getDatabase(context).geoTowerDao()
+
+    // Génération LOCALE des pannes (opt-in) : config + cache/TTL, adossés à la base ANFR locale.
+    private val outageLocalConfig by lazy { OutageLocalConfig(context) }
+    private val localOutageProvider by lazy {
+        LocalOutageProvider(
+            cache = OutageLocalCache(context),
+            frequencyMillis = { outageLocalConfig.frequencyMillis },
+            markGenerated = { outageLocalConfig.lastGeneratedAtMillis = it },
+            generate = { lastUpdate, progress -> LocalOutageGenerator.create(dao).generate(lastUpdate, progress) },
+        )
+    }
 
     private suspend fun <T> queryLocalDatabase(defaultValue: T, block: suspend GeoTowerDao.() -> T): T {
         return try {
@@ -1313,10 +1330,14 @@ class AnfrRepository(
     // 3. PANNES RÉSEAU (Nouveau système GeoJSON GeoTower)
     // =================================================================
     suspend fun getSitesHs(): List<SiteHsEntity> {
-        if (
-            !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.OUTAGES_DATA) ||
-            !RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.OUTAGES_GEOTOWER)
-        ) {
+        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.OUTAGES_DATA)) {
+            return emptyList()
+        }
+        // Source « générée localement » : télécharge les CSV opérateurs + géocode via la base ANFR.
+        if (outageLocalConfig.useLocalSource) {
+            return localOutageProvider.getSites()
+        }
+        if (!RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.OUTAGES_GEOTOWER)) {
             return emptyList()
         }
         return try {
@@ -1430,6 +1451,14 @@ class AnfrRepository(
             emptyList()
         }
     }
+
+    /**
+     * Force une génération LOCALE des pannes (bouton « Générer maintenant » et planification en fond),
+     * en ignorant le TTL du cache. Renvoie la liste produite (ou l'ancien cache si la génération échoue).
+     */
+    suspend fun regenerateLocalSitesHs(
+        onProgress: OutageProgressCallback = NoOutageProgress,
+    ): List<SiteHsEntity> = localOutageProvider.regenerate(force = true, onProgress = onProgress)
 
     private fun org.json.JSONObject.optNullableString(name: String): String? {
         return if (isNull(name)) null else optString(name)

@@ -205,6 +205,14 @@ data class RefTypeAntenneDbEntity(
     @ColumnInfo(name = "libelle") val libelle: String
 )
 
+/** Projection minimale pour le géocodage des pannes locales : position + opérateur d'un site ANFR. */
+data class OutageGeocodeSiteRow(
+    @ColumnInfo(name = "id_anfr") val idAnfr: String,
+    @ColumnInfo(name = "latitude") val latitude: Double,
+    @ColumnInfo(name = "longitude") val longitude: Double,
+    @ColumnInfo(name = "operateur") val operateur: String?
+)
+
 /** Projection légère pour la couverture théorique : position + opérateur + hauteur de support d'un site. */
 data class CoverageSiteLocationEntity(
     @ColumnInfo(name = "id_anfr") val idAnfr: String,

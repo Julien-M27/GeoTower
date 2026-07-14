@@ -2228,4 +2228,31 @@
     <string name="appstrings_release_v1963_site_panel_table">Détails du site : nouveau tableau du type de panneau (tout-en-un / parabole) par azimut avec l\'identifiant AER, en cohérence avec le rapport PDF</string>
     <string name="appstrings_release_v1964_map_filters_defaults">Filtres carte par défaut : réglez-les depuis Personnalisation des pages > Carte des antennes > Filtres ; le bandeau « Filtres actifs » ne s\'affiche alors que si la carte diffère de votre réglage par défaut</string>
     <string name="appstrings_release_v1964_db_timings">Durées affichées sur les bases de données : temps écoulé pendant l\'opération, puis « Généré en… » ou « Téléchargé en… »</string>
+    <!-- Source des pannes (génération locale) -->
+    <string name="outage_source_settings_title">Source des pannes</string>
+    <string name="outage_source_settings_desc">Serveur ou génération locale</string>
+    <string name="outage_source_intro">Choisissez d\'où viennent les pannes réseau : le serveur GeoTower, ou une génération sur votre appareil à partir des fichiers officiels des opérateurs.</string>
+    <string name="outage_source_mode_title">Générer les pannes localement</string>
+    <string name="outage_source_mode_desc">Télécharge les fichiers opérateurs et calcule les pannes sur cet appareil au lieu d\'utiliser le serveur.</string>
+    <string name="outage_source_frequency_title">Fréquence de génération</string>
+    <string name="outage_source_frequency_unit">%1$d h</string>
+    <string name="outage_source_frequency_footer">Durée de validité du cache, et période en arrière-plan si activé.</string>
+    <string name="outage_source_background_title">Générer en arrière-plan</string>
+    <string name="outage_source_background_desc">Régénère périodiquement même quand l\'app est fermée (consomme batterie et données).</string>
+    <string name="outage_source_generate_now">Générer maintenant</string>
+    <string name="outage_source_generating">Génération en cours…</string>
+    <string name="outage_source_last_generated">Dernière génération : %1$s</string>
+    <string name="outage_source_never">Jamais généré</string>
+    <string name="outage_source_generated_count">%1$d pannes</string>
+    <!-- Génération des pannes : notification live + étapes -->
+    <string name="outage_gen_notif_title">Génération des pannes</string>
+    <string name="outage_gen_channel_name">Génération des pannes</string>
+    <string name="outage_gen_step_download">Téléchargement des fichiers opérateurs</string>
+    <string name="outage_gen_step_geocode">Géocodage des pannes</string>
+    <string name="outage_gen_step_finalize">Finalisation</string>
+    <string name="outage_gen_step_done">Terminé</string>
+    <string name="outage_gen_notif_done">%1$d pannes générées</string>
+    <string name="appstrings_release_section_outages">Pannes réseau</string>
+    <string name="appstrings_release_v1965_outage_local_source">Choix de la source des pannes : le serveur GeoTower, ou une génération directement sur votre appareil à partir des fichiers officiels des opérateurs</string>
+    <string name="appstrings_release_v1965_outage_generation">Nouvel écran « Source des pannes » : fréquence de génération, génération en arrière-plan (optionnelle), bouton « Générer maintenant », date et nombre de pannes générées, avec notification de progression</string>
 </resources>
