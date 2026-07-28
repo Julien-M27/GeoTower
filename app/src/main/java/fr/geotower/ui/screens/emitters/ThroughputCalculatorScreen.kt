@@ -111,7 +111,9 @@ import fr.geotower.ui.components.extractThroughputAzimuths
 import fr.geotower.ui.components.extractThroughputPanelHeightMeters
 import fr.geotower.ui.components.formatThroughputDistanceMeters
 import fr.geotower.ui.components.formatThroughputMbps
+import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.geoTowerFadingEdge
+import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.ui.components.isPlannedThroughputBand
 import fr.geotower.ui.components.isThroughputBandEnabledByDefault
 import fr.geotower.ui.components.resolveThroughputBandwidth
@@ -123,10 +125,12 @@ import fr.geotower.ui.components.ThroughputConeDistance as ConeDistance
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.settings.ThroughputCalculationDefaultsSheet
 import fr.geotower.ui.screens.settings.ThroughputCalculatorSettingsSheet
+import fr.geotower.ui.theme.GeoTowerExportUiStyleProvider
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.FreqBand
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.SitePagePrefs
 import fr.geotower.utils.ThroughputPrefs
 import fr.geotower.utils.parseAndSortFrequencies
@@ -532,17 +536,18 @@ private fun LoadingPane(padding: PaddingValues, mainBgColor: Color) {
 
 @Composable
 private fun MessagePane(padding: PaddingValues, mainBgColor: Color, message: String) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Box(
         modifier = Modifier
             .padding(top = padding.calculateTopPadding())
             .fillMaxSize()
             .background(mainBgColor)
-            .padding(24.dp),
+            .padding(sizing.spacing(24.dp)),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = message,
-            style = MaterialTheme.typography.bodyLarge,
+            style = sizing.textStyle(MaterialTheme.typography.bodyLarge),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )
@@ -572,18 +577,24 @@ private fun ThroughputContent(
     visibleBlocks: Map<ThroughputBlock, Boolean>,
     onConeMapReady: (org.osmdroid.views.MapView) -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val scrollState = rememberScrollState()
 
-    Column(
+    Box(
         modifier = Modifier
             .padding(top = padding.calculateTopPadding())
             .fillMaxSize()
             .background(mainBgColor)
             .navigationBarsPadding()
+    ) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
             .geoTowerFadingEdge(scrollState)
+            .pageScrollbar(PageScrollPrefs.THROUGHPUT_CALCULATOR, scrollState)
             .verticalScroll(scrollState)
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(sizing.spacing(16.dp)),
+        verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
     ) {
         blockOrder.forEach { block ->
             if (visibleBlocks[block] != true) return@forEach
@@ -618,7 +629,7 @@ private fun ThroughputContent(
                             Text(
                                 text = stringResource(R.string.appstrings_throughput_no_bands),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(16.dp)
+                                modifier = Modifier.padding(sizing.spacing(16.dp))
                             )
                         }
                     } else {
@@ -628,7 +639,9 @@ private fun ThroughputContent(
                 ThroughputBlock.Assumptions -> ThroughputAssumptionsCard(result, cardBgColor, blockShape)
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(sizing.spacing(8.dp)))
+    }
+    PageScrollEdgeButtons(PageScrollPrefs.THROUGHPUT_CALCULATOR, scrollState)
     }
 }
 
@@ -690,6 +703,10 @@ fun ThroughputShareContent(
         ThroughputBlock.entries.associateWith { prefs.getBoolean(it.prefKey, true) }
     }
 
+    // Rendu hors ecran (ComposeView -> bitmap) : les cartes ci-dessous sont partagees avec l'ecran
+    // et lisent LocalGeoTowerUiStyle. On le fournit ici a echelle neutre, sinon l'export plante et
+    // l'image exportee changerait de taille selon le slider.
+    GeoTowerExportUiStyleProvider {
     Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
         blockOrder.forEach { block ->
             if (visibleBlocks[block] != true) return@forEach
@@ -715,6 +732,7 @@ fun ThroughputShareContent(
             }
         }
     }
+    }
 }
 
 @Composable
@@ -724,25 +742,27 @@ private fun ThroughputShareConeCard(
     blockShape: Shape,
     coneMapBitmap: android.graphics.Bitmap? = null
 ) {
+    // Toujours rendu sous GeoTowerExportUiStyleProvider (echelle neutre) : l'export reste identique.
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val coneDistance = result.coneDistance
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
             Text(
                 text = stringResource(R.string.appstrings_throughput_estimated_optimal_distance_title),
-                style = MaterialTheme.typography.titleMedium,
+                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             if (coneDistance == null) {
                 Text(
                     text = stringResource(R.string.appstrings_throughput_cone_height_unavailable),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
                 Text(
                     text = formatThroughputDistanceMeters(coneDistance.centerMeters),
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = sizing.textStyle(MaterialTheme.typography.headlineSmall),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -751,29 +771,29 @@ private fun ThroughputShareConeCard(
                         formatThroughputDistanceMeters(coneDistance.nearMeters),
                         formatThroughputDistanceMeters(coneDistance.farMeters)
                     ),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = stringResource(R.string.appstrings_throughput_cone_assumption),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (coneMapBitmap != null) {
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(sizing.spacing(4.dp)))
                     Image(
                         bitmap = coneMapBitmap.asImageBitmap(),
                         contentDescription = null,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(180.dp)
+                            .height(sizing.component(180.dp))
                             .clip(RoundedCornerShape(12.dp))
                             .border(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f), RoundedCornerShape(12.dp)),
                         contentScale = ContentScale.Crop
                     )
                     Text(
                         text = stringResource(R.string.appstrings_throughput_cone_map_explanation),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -789,6 +809,7 @@ private fun ThroughputHeaderCard(
     cardBgColor: Color,
     blockShape: Shape
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val supportHeightLabel = physique?.hauteur?.let { formatHeightMeters(it) }
     val unknown = stringResource(R.string.appstrings_unknown)
     val supportLabel = stringResource(R.string.appstrings_speedtests_support_label)
@@ -806,37 +827,37 @@ private fun ThroughputHeaderCard(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 14.dp),
+                .padding(horizontal = sizing.spacing(20.dp), vertical = sizing.spacing(14.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             OperatorLogoOrFallback(
                 operatorName = operatorName,
                 operatorColor = operatorColor,
-                modifier = Modifier.size(72.dp)
+                modifier = Modifier.size(sizing.component(72.dp))
             )
-            Spacer(Modifier.width(18.dp))
+            Spacer(Modifier.width(sizing.spacing(18.dp)))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = operatorName,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = sizing.textStyle(MaterialTheme.typography.headlineSmall),
                     fontWeight = FontWeight.Black,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(Modifier.height(4.dp))
+                Spacer(Modifier.height(sizing.spacing(4.dp)))
                 Text(
                     text = ThroughputDisplayText.headerSite(site.idAnfr),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 supportHeightLabel?.let { supportHeight ->
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(sizing.spacing(4.dp)))
                     Text(
                         text = "$supportLabel $supportHeight",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = sizing.textStyle(MaterialTheme.typography.labelMedium),
                         color = operatorColor,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
@@ -854,6 +875,7 @@ private fun OperatorLogoOrFallback(
     operatorColor: Color,
     modifier: Modifier = Modifier
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val logoRes = getDetailLogoRes(operatorName)
     if (logoRes != null) {
         Image(
@@ -872,7 +894,7 @@ private fun OperatorLogoOrFallback(
                 text = operatorName?.take(1)?.uppercase()?.ifBlank { "?" } ?: "?",
                 color = Color.White,
                 fontWeight = FontWeight.Bold,
-                fontSize = 28.sp
+                fontSize = sizing.text(28.sp)
             )
         }
     }
@@ -880,19 +902,20 @@ private fun OperatorLogoOrFallback(
 
 @Composable
 private fun ThroughputSummaryCard(result: ThroughputResult, cardBgColor: Color, blockShape: Shape) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalArrangement = Arrangement.spacedBy(sizing.spacing(14.dp))) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
                 Text(
                     text = stringResource(R.string.appstrings_throughput_estimated_radio_title),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp), modifier = Modifier.fillMaxWidth()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp)), modifier = Modifier.fillMaxWidth()) {
                 ThroughputMetric(
                     label = stringResource(R.string.appstrings_throughput_download_label),
                     value = formatThroughputMbps(result.totalDownMbps),
@@ -906,12 +929,12 @@ private fun ThroughputSummaryCard(result: ThroughputResult, cardBgColor: Color, 
             }
             Text(
                 text = stringResource(R.string.appstrings_throughput_summary_upload_note),
-                style = MaterialTheme.typography.bodySmall,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             Text(
                 text = ThroughputDisplayText.includedBandsCount(result.includedBands.size, result.bands.size),
-                style = MaterialTheme.typography.bodySmall,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -920,9 +943,10 @@ private fun ThroughputSummaryCard(result: ThroughputResult, cardBgColor: Color, 
 
 @Composable
 private fun ThroughputMetric(label: String, value: String, modifier: Modifier = Modifier) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(modifier = modifier) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(value, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Text(label, style = sizing.textStyle(MaterialTheme.typography.labelMedium), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = sizing.textStyle(MaterialTheme.typography.headlineSmall), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
     }
 }
 
@@ -936,6 +960,7 @@ private fun ThroughputConeCard(
     onCustomSettingsChange: ((CustomModulationSettings) -> Unit)? = null,
     onConeMapReady: (org.osmdroid.views.MapView) -> Unit = {}
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val coneDistance = result.coneDistance
     val selectedMapPoint = customSettings?.let { settings ->
         val latitude = settings.selectedLatitude
@@ -1043,23 +1068,23 @@ private fun ThroughputConeCard(
     }
 
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
             Text(
                 text = stringResource(R.string.appstrings_throughput_estimated_optimal_distance_title),
-                style = MaterialTheme.typography.titleMedium,
+                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             if (coneDistance == null) {
                 Text(
                     text = stringResource(R.string.appstrings_throughput_cone_height_unavailable),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             } else {
                 Text(
                     text = formatThroughputDistanceMeters(coneDistance.centerMeters),
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = sizing.textStyle(MaterialTheme.typography.headlineSmall),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -1068,26 +1093,26 @@ private fun ThroughputConeCard(
                         formatThroughputDistanceMeters(coneDistance.nearMeters),
                         formatThroughputDistanceMeters(coneDistance.farMeters)
                     ),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
                     text = stringResource(R.string.appstrings_throughput_cone_assumption),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 if (customSettings != null && onCustomSettingsChange != null) {
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(sizing.spacing(4.dp)))
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                     Text(
                         text = stringResource(R.string.appstrings_throughput_receiver_height_title),
-                        style = MaterialTheme.typography.labelLarge,
+                        style = sizing.textStyle(MaterialTheme.typography.labelLarge),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
                         text = stringResource(R.string.appstrings_throughput_receiver_height_desc),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     SignalSlider(
@@ -1109,16 +1134,16 @@ private fun ThroughputConeCard(
                     )
                 }
                 if (coneMapOverlay != null) {
-                    Spacer(Modifier.height(4.dp))
+                    Spacer(Modifier.height(sizing.spacing(4.dp)))
                     if (customSettings != null && onCustomSettingsChange != null) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                         Text(
                             text = stringResource(R.string.appstrings_throughput_custom_position_title),
-                            style = MaterialTheme.typography.labelLarge,
+                            style = sizing.textStyle(MaterialTheme.typography.labelLarge),
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
                         )
-                        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
                             Button(
                                 modifier = Modifier.fillMaxWidth(),
                                 enabled = !isResolvingPosition,
@@ -1127,9 +1152,9 @@ private fun ThroughputConeCard(
                                 Icon(
                                     imageVector = Icons.Default.MyLocation,
                                     contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(sizing.component(18.dp))
                                 )
-                                Spacer(Modifier.width(8.dp))
+                                Spacer(Modifier.width(sizing.spacing(8.dp)))
                                 Text(if (isResolvingPosition) locatingText else stringResource(R.string.appstrings_throughput_use_current_position))
                             }
                             OutlinedButton(
@@ -1142,9 +1167,9 @@ private fun ThroughputConeCard(
                                 Icon(
                                     imageVector = Icons.Default.Map,
                                     contentDescription = null,
-                                    modifier = Modifier.size(18.dp)
+                                    modifier = Modifier.size(sizing.component(18.dp))
                                 )
-                                Spacer(Modifier.width(8.dp))
+                                Spacer(Modifier.width(sizing.spacing(8.dp)))
                                 Text(stringResource(R.string.appstrings_throughput_choose_map_point))
                             }
                             if (hasPositionCorrection) {
@@ -1155,9 +1180,9 @@ private fun ThroughputConeCard(
                                     Icon(
                                         imageVector = Icons.Default.Close,
                                         contentDescription = null,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(sizing.component(18.dp))
                                     )
-                                    Spacer(Modifier.width(8.dp))
+                                    Spacer(Modifier.width(sizing.spacing(8.dp)))
                                     Text(stringResource(R.string.appstrings_throughput_clear_position))
                                 }
                             }
@@ -1165,7 +1190,7 @@ private fun ThroughputConeCard(
                         positionStatusMessage?.let { message ->
                             Text(
                                 text = message,
-                                style = MaterialTheme.typography.bodySmall,
+                                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                                 color = if (isChoosingPoint) {
                                     MaterialTheme.colorScheme.primary
                                 } else {
@@ -1207,7 +1232,7 @@ private fun ThroughputConeCard(
                     )
                     Text(
                         text = stringResource(R.string.appstrings_throughput_cone_map_explanation),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -1221,17 +1246,18 @@ private fun PositionAnalysisSummary(
     analysis: PositionAnalysis?,
     scenario: PositionScenario
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     if (analysis == null) {
         Text(
             text = stringResource(R.string.appstrings_throughput_position_no_selection),
-            style = MaterialTheme.typography.bodySmall,
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
             text = ThroughputDisplayText.customSelectedPosition(
                 ThroughputDisplayText.positionScenarioLabel(scenario.id)
             ),
-            style = MaterialTheme.typography.bodySmall,
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         return
@@ -1251,23 +1277,23 @@ private fun PositionAnalysisSummary(
         null -> stringResource(R.string.appstrings_throughput_position_azimuth_unknown)
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))) {
         Text(
             text = ThroughputDisplayText.customSelectedPosition(
                 ThroughputDisplayText.positionScenarioLabel(analysis.scenario.id)
             ),
-            style = MaterialTheme.typography.bodySmall,
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold
         )
         Text(
             text = ThroughputDisplayText.positionDistance(formatThroughputDistanceMeters(analysis.distanceMeters)),
-            style = MaterialTheme.typography.bodySmall,
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         Text(
             text = azimuthText,
-            style = MaterialTheme.typography.bodySmall,
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = if (analysis.isInsideAzimuth == false) {
                 MaterialTheme.colorScheme.error
             } else {
@@ -1282,7 +1308,7 @@ private fun PositionAnalysisSummary(
                     far = formatThroughputDistanceMeters(cone.farMeters)
                 )
             } ?: stringResource(R.string.appstrings_throughput_position_cone_unavailable),
-            style = MaterialTheme.typography.bodySmall,
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -1302,11 +1328,12 @@ private fun ThroughputControlsCard(
     enabledBandKeys: Set<String>,
     onBandEnabledChange: (String, Boolean) -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
             Text(
                 text = stringResource(R.string.appstrings_throughput_frequencies_label),
-                style = MaterialTheme.typography.titleMedium,
+                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -1314,7 +1341,7 @@ private fun ThroughputControlsCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
             ) {
                 FilterChip(selected = include4G, onClick = { onInclude4GChange(!include4G) }, label = { Text("4G") })
                 FilterChip(selected = include5G, onClick = { onInclude5GChange(!include5G) }, label = { Text("5G") })
@@ -1328,11 +1355,11 @@ private fun ThroughputControlsCard(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                 Text(
                     text = stringResource(R.string.appstrings_throughput_included_bands_title),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = sizing.textStyle(MaterialTheme.typography.labelLarge),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))) {
                     bands.forEach { band ->
                         BandCheckboxRow(
                             band = band,
@@ -1352,10 +1379,11 @@ private fun CustomModulationControls(
     onSettingsChange: (CustomModulationSettings) -> Unit,
     useOneUi: Boolean
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
         Text(
             text = stringResource(R.string.appstrings_throughput_custom_modulation_title),
-            style = MaterialTheme.typography.labelLarge,
+            style = sizing.textStyle(MaterialTheme.typography.labelLarge),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
@@ -1392,13 +1420,13 @@ private fun CustomModulationControls(
 
         Text(
             text = stringResource(R.string.appstrings_throughput_custom_signal_title),
-            style = MaterialTheme.typography.labelLarge,
+            style = sizing.textStyle(MaterialTheme.typography.labelLarge),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
             text = stringResource(R.string.appstrings_throughput_custom_signal_desc),
-            style = MaterialTheme.typography.bodySmall,
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         SignalSlider(
@@ -1450,13 +1478,13 @@ private fun CustomModulationControls(
 
         Text(
             text = stringResource(R.string.appstrings_throughput_custom_terminal_title),
-            style = MaterialTheme.typography.labelLarge,
+            style = sizing.textStyle(MaterialTheme.typography.labelLarge),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
             text = stringResource(R.string.appstrings_throughput_custom_terminal_desc),
-            style = MaterialTheme.typography.bodySmall,
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         CustomChoiceRow(
@@ -1485,7 +1513,7 @@ private fun CustomModulationControls(
         val nrImpact = (customThroughputMultipliers(5, settings).down * 100).roundToInt()
         Text(
             text = ThroughputDisplayText.customImpact(lteImpact, nrImpact),
-            style = MaterialTheme.typography.bodySmall,
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.Bold
         )
@@ -1503,13 +1531,14 @@ private fun CustomCalculationExplanation(
     lteImpactPercent: Int,
     nrImpactPercent: Int
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val maxLteCarriers = settings.lteAggregation.maxLteCarriers
 
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
         Text(
             text = stringResource(R.string.appstrings_throughput_custom_explanation_title),
-            style = MaterialTheme.typography.labelLarge,
+            style = sizing.textStyle(MaterialTheme.typography.labelLarge),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
@@ -1549,16 +1578,17 @@ private fun CustomExplanationLine(
     title: String,
     description: String
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(2.dp))) {
         Text(
             text = title,
-            style = MaterialTheme.typography.labelMedium,
+            style = sizing.textStyle(MaterialTheme.typography.labelMedium),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
             text = description,
-            style = MaterialTheme.typography.bodySmall,
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }
@@ -1576,6 +1606,7 @@ private fun SignalSlider(
     onValueChange: (Float) -> Unit,
     valueLabel: (@Composable (Int) -> String)? = null
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val roundedValue = value.roundToInt().coerceIn(valueRange.start.roundToInt(), valueRange.endInclusive.roundToInt())
     val valueSpan = (valueRange.endInclusive - valueRange.start).coerceAtLeast(1f)
     val valueFraction = ((roundedValue - valueRange.start) / valueSpan).coerceIn(0f, 1f)
@@ -1584,10 +1615,10 @@ private fun SignalSlider(
     val activeTrackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f)
     val dotColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.28f)
     val valueText = valueLabel?.invoke(roundedValue) ?: "$roundedValue $unit"
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(2.dp))) {
         Text(
             text = if (label.isBlank()) valueText else "$label : $valueText",
-            style = MaterialTheme.typography.bodySmall,
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         if (useOneUi) {
@@ -1599,13 +1630,13 @@ private fun SignalSlider(
                 thumb = {
                     Box(
                         modifier = Modifier
-                            .size(22.dp)
+                            .size(sizing.component(22.dp))
                             .background(MaterialTheme.colorScheme.surface, CircleShape)
                             .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
                     )
                 },
                 track = { _ ->
-                    Canvas(modifier = Modifier.fillMaxWidth().height(12.dp)) {
+                    Canvas(modifier = Modifier.fillMaxWidth().height(sizing.component(12.dp))) {
                         val centerY = size.height / 2
                         drawLine(
                             color = inactiveTrackColor,
@@ -1653,10 +1684,11 @@ private fun CustomChoiceRow(
     optionLabel: @Composable (String) -> String,
     onSelect: (String) -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(6.dp))) {
         Text(
             text = title,
-            style = MaterialTheme.typography.labelLarge,
+            style = sizing.textStyle(MaterialTheme.typography.labelLarge),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface
         )
@@ -1664,7 +1696,7 @@ private fun CustomChoiceRow(
             modifier = Modifier
                 .fillMaxWidth()
                 .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
         ) {
             options.forEach { option ->
                 FilterChip(
@@ -1686,16 +1718,17 @@ private fun ModulationSlider(
     onSelectedIndexChange: (Int) -> Unit,
     useOneUi: Boolean
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val coercedIndex = selectedIndex.coerceIn(0, options.lastIndex)
     val selectedOption = options[coercedIndex]
     val onSliderChange: (Float) -> Unit = { value ->
         onSelectedIndexChange(value.roundToInt().coerceIn(0, options.lastIndex))
     }
 
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(2.dp))) {
         Text(
             text = "$label : ${selectedOption.label}",
-            style = MaterialTheme.typography.bodySmall,
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         if (useOneUi) {
@@ -1707,13 +1740,13 @@ private fun ModulationSlider(
                 thumb = {
                     Box(
                         modifier = Modifier
-                            .size(24.dp)
+                            .size(sizing.component(24.dp))
                             .background(MaterialTheme.colorScheme.surface, CircleShape)
                             .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
                     )
                 },
                 track = { _ ->
-                    Canvas(modifier = Modifier.fillMaxWidth().height(14.dp)) {
+                    Canvas(modifier = Modifier.fillMaxWidth().height(sizing.component(14.dp))) {
                         val centerY = size.height / 2
                         drawLine(
                             color = Color.Gray.copy(alpha = 0.3f),
@@ -1750,21 +1783,22 @@ private fun BandCheckboxRow(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Checkbox(checked = checked, onCheckedChange = onCheckedChange)
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(sizing.spacing(2.dp))) {
             Text(
                 text = band.label,
-                style = MaterialTheme.typography.bodyMedium,
+                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = "${band.frequencyDetails} - ${formatBandwidth(band.bandwidthMHz)}",
-                style = MaterialTheme.typography.bodySmall,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -1773,11 +1807,12 @@ private fun BandCheckboxRow(
 
 @Composable
 private fun ThroughputBandsCard(result: ThroughputResult, cardBgColor: Color, blockShape: Shape) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
             Text(
                 text = stringResource(R.string.appstrings_throughput_frequencies_and_modulation_title),
-                style = MaterialTheme.typography.titleMedium,
+                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -1790,6 +1825,7 @@ private fun ThroughputBandsCard(result: ThroughputResult, cardBgColor: Color, bl
 
 @Composable
 private fun ThroughputBandRow(band: ThroughputBandResult) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val contentColor = if (band.isIncluded) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
     val metricColor = if (band.isIncluded && band.downAggregationExcludedReason == null) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
     val estimatedText = stringResource(R.string.appstrings_throughput_estimated_suffix)
@@ -1807,7 +1843,7 @@ private fun ThroughputBandRow(band: ThroughputBandResult) {
     }
 
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(sizing.spacing(2.dp))) {
             Text(band.label, fontWeight = FontWeight.Bold, color = contentColor)
             ThroughputDetailLine(
                 label = stringResource(R.string.appstrings_throughput_frequencies_label),
@@ -1821,43 +1857,44 @@ private fun ThroughputBandRow(band: ThroughputBandResult) {
             )
             Text(
                 text = bandDetail,
-                style = MaterialTheme.typography.bodySmall,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = contentColor
             )
             if (coneLabel != null) {
                 Text(
                     text = coneLabel,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                     color = contentColor
                 )
             }
             if (!band.isIncluded && band.excludedReason != null) {
                 Text(
                     text = ThroughputDisplayText.translateExcludedReason(band.excludedReason),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                     color = MaterialTheme.colorScheme.error
                 )
             }
             if (band.isIncluded && band.downAggregationExcludedReason != null) {
                 Text(
                     text = ThroughputDisplayText.translateExcludedReason(band.downAggregationExcludedReason),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
         Column(horizontalAlignment = Alignment.End) {
             Text(formatThroughputMbps(band.downMbps), fontWeight = FontWeight.Bold, color = metricColor)
-            Text(formatThroughputMbps(band.upMbps), style = MaterialTheme.typography.bodySmall, color = metricColor)
+            Text(formatThroughputMbps(band.upMbps), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = metricColor)
         }
     }
 }
 
 @Composable
 private fun ThroughputDetailLine(label: String, value: String, color: Color) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Text(
         text = "$label : $value",
-        style = MaterialTheme.typography.bodySmall,
+        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
         color = color
     )
 }
@@ -1868,30 +1905,31 @@ private fun ThroughputAssumptionsCard(
     cardBgColor: Color,
     blockShape: Shape
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
             Text(
                 text = stringResource(R.string.appstrings_throughput_read_as_estimate_title),
-                style = MaterialTheme.typography.titleMedium,
+                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = stringResource(R.string.appstrings_throughput_disclaimer),
-                style = MaterialTheme.typography.bodyMedium,
+                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (result.warnings.isNotEmpty()) {
                 Text(
                     text = stringResource(R.string.appstrings_throughput_attention_title),
-                    style = MaterialTheme.typography.labelLarge,
+                    style = sizing.textStyle(MaterialTheme.typography.labelLarge),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 result.warnings.take(4).forEach { warning ->
                     Text(
                         text = "- ${ThroughputDisplayText.translateWarning(warning)}",
-                        style = MaterialTheme.typography.bodySmall,
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -1899,13 +1937,13 @@ private fun ThroughputAssumptionsCard(
             if (result.assumptions.isNotEmpty()) {
                 Text(
                     text = ThroughputDisplayText.calculationAssumptions(localizedThroughputAssumptions(result.assumptions)),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
             Text(
                 text = ThroughputDisplayText.sources(ThroughputDisplayText.translateSourceSummary(result.sourceSummary)),
-                style = MaterialTheme.typography.bodySmall,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }

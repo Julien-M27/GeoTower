@@ -16,6 +16,14 @@
     <string name="settings_section_preferences">Preferencias</string>
     <string name="settings_section_system">Sistema</string>
     <string name="settings_section_database">Base de datos</string>
+    <string name="settings_section_background">Notificaciones y segundo plano</string>
+    <string name="settings_hub_background_desc">Notificación en directo, actualizaciones, batería, widget</string>
+    <string name="settings_sections_home_subtitle">Elige una categoría</string>
+    <string name="settings_hub_appearance_desc">Tema, colores, icono, tamaño, disposición</string>
+    <string name="settings_hub_mapping_desc">Mapa base, estilo IGN, mapas sin conexión</string>
+    <string name="settings_hub_preferences_desc">Operador, idioma, unidades, páginas, enlaces, compartir</string>
+    <string name="settings_hub_system_desc">Permisos y diagnóstico</string>
+    <string name="settings_hub_database_desc">Descargas, generación local, procesamiento local</string>
     <string name="settings_database_online_title">Base de datos de operadores en línea</string>
     <string name="settings_search_placeholder">Buscar un ajuste</string>
     <string name="settings_search_no_results">Ningún ajuste encontrado</string>
@@ -161,6 +169,15 @@
     <string name="database_download_progress">Descargando: %1$d%%</string>
     <string name="database_cancel_download">Cancelar descarga</string>
     <string name="database_up_to_date">Actualizado</string>
+    <string name="enb_database_title">Identificadores eNB / gNB</string>
+    <string name="appstrings_site_network_ids_title">Identificadores de red</string>
+    <string name="appstrings_site_network_ids_option">Identificadores de red (eNB / gNB)</string>
+    <string name="appstrings_site_network_ids_source">Fuente: eNB Analytics</string>
+    <string name="appstrings_site_network_ids_about_action">Acerca de eNB Analytics</string>
+    <string name="appstrings_site_network_ids_about">eNB Analytics es un proyecto independiente y voluntario de análisis automatizado de las redes 4G y 5G. Sus colaboradores registran las celdas que encuentran en sus desplazamientos mediante su aplicación Android, y esos datos se contrastan con los de la ANFR.\n\nEl proyecto publica mapas 4G y 5G por operador, herramientas de búsqueda de antenas y análisis de zonas sin cobertura y de áreas TAC. Cubre Francia (incluidos los territorios de ultramar), Mónaco, España, Portugal, Luxemburgo y Suiza.\n\nProyecto independiente, sin vínculo con los operadores cubiertos. GeoTower redistribuye sus identificadores eNB y gNB con su autorización.</string>
+    <string name="enb_database_download_action">Descargar los identificadores</string>
+    <string name="enb_database_row_count">Identificadores: %1$s</string>
+    <string name="enb_database_source_attribution">Fuente: eNB Analytics</string>
     <string name="database_download_antennas">Descargar antenas</string>
     <string name="database_replace_generated_with_online">Reemplazar la base de datos generada en el teléfono por la versión en línea</string>
     <string name="database_replace_generated_radio_with_online">Reemplazar los datos de radio generados en el teléfono por la versión en línea</string>
@@ -338,6 +355,9 @@
     <string name="appstrings_col_freqs">Frecuencias</string>
     <string name="appstrings_col_height">Altura</string>
     <string name="appstrings_col_id">ID</string>
+    <string name="appstrings_col_panel_size">Tamaño panel</string>
+    <string name="appstrings_pdf_table_continued">%1$s (continuación)</string>
+    <string name="appstrings_pdf_page_indicator">Página %1$d / %2$d</string>
     <string name="appstrings_col_type">Tipo</string>
     <string name="appstrings_col_service">En servicio</string>
     <string name="appstrings_col_state">Estado</string>
@@ -393,6 +413,11 @@
     <string name="appstrings_photo_download">Descargar imagen</string>
     <string name="appstrings_pdf_download">Descargar PDF</string>
     <string name="appstrings_pdf_downloaded">PDF descargado</string>
+    <string name="appstrings_pdf_downloaded_desc">Guardado en Descargas/GeoTower como %1$s.</string>
+    <string name="appstrings_pdf_open_folder">Abrir ubicación</string>
+    <string name="appstrings_pdf_open_error">Ninguna aplicación puede abrir este PDF</string>
+    <string name="appstrings_pdf_report_generating">Generando el informe PDF</string>
+    <string name="appstrings_pdf_report_channel_name">Informe PDF de GeoTower</string>
     <string name="appstrings_photo_copied_to_clipboard">Imagen copiada al portapapeles</string>
     <string name="appstrings_photo_saved_to_gallery">Imagen guardada en la galería</string>
     <string name="appstrings_photo_export_failed">No se puede exportar la imagen</string>
@@ -1100,6 +1125,7 @@
     <string name="appstrings_site_display_title">Visualización de sitios</string>
     <string name="appstrings_hide_underground_sites_label">Ocultar sitios subterráneos</string>
     <string name="appstrings_show_only_zb_sites_label">Solo ZB</string>
+    <string name="appstrings_sites_project_label">Planificado</string>
     <string name="appstrings_site_elevation_profile_option">Botón Perfil altimétrico</string>
     <string name="appstrings_site_freq_filters_title">Filtros de frecuencias de la antena</string>
     <string name="appstrings_site_freqs_option">Frecuencias, espectro y azimuts</string>
@@ -1339,6 +1365,7 @@
     <string name="appstrings_version_db_label">Versión\nde la base</string>
     <string name="appstrings_version_radio_db_label">Base anexa\nde radio</string>
     <string name="appstrings_version_hs_label">Datos de\nsitios HS</string>
+    <string name="appstrings_version_hs_local_label">Sitios HS generados\nen este teléfono</string>
     <string name="appstrings_version_monthly_label">Datos\nmensuales</string>
     <string name="appstrings_version_quarterly_label">Datos\ntrimestrales</string>
     <string name="appstrings_version_time_at">a las</string>
@@ -1986,6 +2013,8 @@
     <string name="appstrings_diagnostic_desc">Estado de datos, permisos, notificaciones y almacenamiento</string>
     <string name="appstrings_diagnostic_loading_title">Comprobando GeoTower</string>
     <string name="appstrings_diagnostic_loading_desc">Leyendo datos locales sin iniciar descargas.</string>
+    <string name="appstrings_diagnostic_scanning">Análisis en curso…</string>
+    <string name="appstrings_diagnostic_scanning_hint">Los resultados anteriores siguen visibles durante el análisis.</string>
     <string name="appstrings_diagnostic_refresh">Actualizar</string>
     <string name="appstrings_diagnostic_copy_report">Copiar informe</string>
     <string name="appstrings_diagnostic_report_copied">Informe de diagnóstico copiado</string>
@@ -2064,6 +2093,7 @@
     <string name="appstrings_diagnostic_detail_notifications_channels_blocked">Canales bloqueados: %1$s</string>
     <string name="appstrings_diagnostic_detail_storage_db_antennas">Base de antenas: %1$s</string>
     <string name="appstrings_diagnostic_detail_storage_db_radio">Base de radio: %1$s</string>
+    <string name="appstrings_diagnostic_detail_storage_db_enb">Base eNB / gNB: %1$s</string>
     <string name="appstrings_diagnostic_detail_storage_maps">Mapas sin conexión: %1$s</string>
     <string name="appstrings_diagnostic_detail_storage_cache">Caché: %1$s</string>
     <string name="appstrings_diagnostic_detail_storage_available">Almacenamiento disponible para la app: %1$s</string>
@@ -2230,29 +2260,98 @@
     <string name="appstrings_release_v1964_db_timings">Tiempos mostrados en las bases de datos: tiempo transcurrido durante la operación y luego «Generado en…» o «Descargado en…»</string>
     <!-- Origen de las incidencias (generación local) -->
     <string name="outage_source_settings_title">Origen de las incidencias</string>
-    <string name="outage_source_settings_desc">Servidor o generación local</string>
-    <string name="outage_source_intro">Elige de dónde provienen las incidencias de red: el servidor de GeoTower o una generación en tu dispositivo a partir de los archivos oficiales de los operadores.</string>
-    <string name="outage_source_mode_title">Generar las incidencias localmente</string>
-    <string name="outage_source_mode_desc">Descarga los archivos de los operadores y calcula las incidencias en este dispositivo en lugar de usar el servidor.</string>
-    <string name="outage_source_frequency_title">Frecuencia de generación</string>
+    <string name="outage_source_settings_desc">Servidor o procesamiento local</string>
+    <string name="outage_source_intro">Elige de dónde provienen las incidencias de red: el servidor de GeoTower u obtenidas en tu dispositivo a partir de los archivos oficiales de los operadores.</string>
+    <string name="outage_source_mode_title">Obtener las incidencias en el dispositivo</string>
+    <string name="outage_source_mode_desc">Descarga los archivos oficiales de los operadores y prepara las incidencias en este dispositivo en lugar de usar el servidor.</string>
+    <string name="outage_source_frequency_title">Frecuencia de actualización</string>
     <string name="outage_source_frequency_unit">%1$d h</string>
     <string name="outage_source_frequency_footer">Duración de la caché y periodo en segundo plano si está activado.</string>
-    <string name="outage_source_background_title">Generar en segundo plano</string>
-    <string name="outage_source_background_desc">Regenera periódicamente incluso con la app cerrada (consume batería y datos).</string>
-    <string name="outage_source_generate_now">Generar ahora</string>
-    <string name="outage_source_generating">Generando…</string>
-    <string name="outage_source_last_generated">Última generación: %1$s</string>
-    <string name="outage_source_never">Nunca generado</string>
+    <string name="outage_source_background_title">Actualizar en segundo plano</string>
+    <string name="outage_source_background_desc">Se actualiza periódicamente incluso con la app cerrada (consume batería y datos).</string>
+    <string name="outage_source_generate_now">Actualizar ahora</string>
+    <string name="outage_source_generating">Actualizando…</string>
+    <string name="outage_source_last_generated">Última actualización: %1$s</string>
+    <string name="outage_source_never">Nunca actualizado</string>
     <string name="outage_source_generated_count">%1$d incidencias</string>
-    <!-- Generación de incidencias: notificación en directo + pasos -->
-    <string name="outage_gen_notif_title">Generando incidencias</string>
-    <string name="outage_gen_channel_name">Generación de incidencias</string>
+    <!-- Actualización de incidencias: notificación en directo + pasos -->
+    <string name="outage_gen_notif_title">Actualizando incidencias</string>
+    <string name="outage_gen_channel_name">Actualización de incidencias</string>
     <string name="outage_gen_step_download">Descargando archivos de operadores</string>
-    <string name="outage_gen_step_geocode">Geolocalizando incidencias</string>
+    <string name="outage_gen_step_geocode">Localizando incidencias</string>
     <string name="outage_gen_step_finalize">Finalizando</string>
     <string name="outage_gen_step_done">Listo</string>
-    <string name="outage_gen_notif_done">%1$d incidencias generadas</string>
+    <string name="outage_gen_notif_done">%1$d incidencias obtenidas</string>
     <string name="appstrings_release_section_outages">Cortes de red</string>
-    <string name="appstrings_release_v1965_outage_local_source">Elige el origen de los cortes: el servidor de GeoTower o una generación directamente en tu dispositivo a partir de los archivos oficiales de los operadores</string>
-    <string name="appstrings_release_v1965_outage_generation">Nueva pantalla «Origen de los cortes»: frecuencia de generación, generación en segundo plano (opcional), botón «Generar ahora», fecha y número de cortes generados, con notificación de progreso</string>
+    <string name="appstrings_release_v1965_outage_local_source">Elige el origen de los cortes: el servidor de GeoTower o una obtención directamente en tu dispositivo a partir de los archivos oficiales de los operadores</string>
+    <string name="appstrings_release_v1965_outage_generation">Nueva pantalla «Origen de los cortes»: frecuencia de actualización, actualización en segundo plano (opcional), botón «Actualizar ahora», fecha y número de cortes obtenidos, con notificación de progreso</string>
+    <!-- Procesamiento local de datos (modo de autonomía del servidor) -->
+    <string name="local_mode_settings_title">Procesamiento local de datos</string>
+    <string name="local_mode_settings_desc">Elegir qué se procesa en el dispositivo en lugar del servidor</string>
+    <string name="local_mode_intro">Elige cuántos datos se procesan en tu dispositivo en lugar de ser proporcionados por el servidor GeoTower. La configuración sigue controlándose de forma remota en todos los niveles.</string>
+    <string name="local_mode_remote_disabled">El procesamiento local está desactivado de forma remota.</string>
+    <string name="local_mode_level_off_title">Servidor (predeterminado)</string>
+    <string name="local_mode_level_off_desc">Todo se descarga y es proporcionado por el servidor GeoTower.</string>
+    <string name="local_mode_level_outages_title">Incidencias en el dispositivo</string>
+    <string name="local_mode_level_outages_desc">Los sitios con incidencias se obtienen de los operadores y se ubican en tu dispositivo. La base de datos y lo demás permanecen en el servidor.</string>
+    <string name="local_mode_level_data_title">Base de datos + incidencias en local</string>
+    <string name="local_mode_level_data_desc">Además, la base de datos se genera en tu dispositivo (si es compatible) en lugar de descargarse.</string>
+    <string name="local_mode_level_full_title">Autonomía máxima</string>
+    <string name="local_mode_level_full_desc">Además, detiene las fotos comunitarias y sus envíos, la comprobación de actualizaciones y la API en vivo. La configuración remota sigue activa.</string>
+    <string name="local_mode_maps_note">Los mapas, la altimetría y la búsqueda de direcciones siguen usando sus servicios en línea.</string>
+    <string name="local_mode_db_eligible">Este dispositivo puede generar la base de datos localmente.</string>
+    <string name="local_mode_db_ineligible">Este dispositivo no puede generar la base de datos localmente (RAM/almacenamiento): sigue descargándose del servidor.</string>
+    <string name="local_mode_build_hint">La generación descarga varios cientos de MB y tarda unos minutos: se recomienda wifi y cargador.</string>
+    <string name="local_mode_download_disabled">Procesamiento local activo: descarga del servidor desactivada.</string>
+
+    <!-- Aides au défilement (barre latérale + boutons haut/bas) -->
+    <string name="appstrings_page_scrollbar_option">Barra de desplazamiento lateral</string>
+    <string name="appstrings_page_scroll_top_option">Botón «ir arriba del todo»</string>
+    <string name="appstrings_page_scroll_bottom_option">Botón «ir abajo del todo»</string>
+    <string name="appstrings_pages_scrollbar_all_option">Barra de desplazamiento en todas las páginas</string>
+    <string name="appstrings_pages_scroll_top_all_option">Botón «ir arriba del todo» en todas las páginas</string>
+    <string name="appstrings_pages_scroll_bottom_all_option">Botón «ir abajo del todo» en todas las páginas</string>
+    <string name="appstrings_pages_scroll_aids_all_desc">Aplica el ajuste a todas las páginas con desplazamiento a la vez.</string>
+
+    <!-- Bandeau « serveur injoignable » (accueil) -->
+    <string name="appstrings_server_unreachable_banner_title">Servidor no disponible</string>
+    <string name="appstrings_server_unreachable_banner_desc">Las funciones en línea de GeoTower no están disponibles.</string>
+    <string name="appstrings_server_unreachable_info_button">Ver qué no está disponible</string>
+    <string name="appstrings_server_unreachable_dialog_title">Servidor GeoTower no disponible</string>
+    <string name="appstrings_server_unreachable_dialog_intro">Tu dispositivo está conectado a Internet, pero el servidor de GeoTower no responde: mantenimiento, una avería temporal o una red que lo bloquea (VPN, wifi de empresa, DNS…).</string>
+    <string name="appstrings_server_unreachable_dialog_unavailable_title">No disponible mientras no responda</string>
+    <string name="appstrings_server_unreachable_dialog_unavailable_list">• Descarga y actualización de la base de datos de antenas\n• Comprobación de actualizaciones de la aplicación\n• Incidencias (salvo que el procesamiento local las obtenga en el dispositivo)\n• Fotos de la comunidad, envío de fotos y pruebas de velocidad\n• Descarga de los mapas sin conexión\n• Anuncios y ajustes remotos (los últimos recibidos siguen aplicándose)\n• La base «live», usada cuando no hay ninguna base instalada</string>
+    <string name="appstrings_server_unreachable_dialog_available_title">Sigue funcionando</string>
+    <string name="appstrings_server_unreachable_dialog_available_list">• La base ya instalada: búsqueda, fichas de emplazamientos, estadísticas, favoritos\n• El mapa, la brújula, las mediciones y el seguimiento en directo\n• Los mapas base, la altimetría y la búsqueda de direcciones (servicios independientes)\n• Los mapas sin conexión ya descargados y la generación local de la base</string>
+    <string name="appstrings_server_unreachable_dialog_retry_hint">La aplicación lo reintenta automáticamente cada minuto y cada vez que vuelves a la pantalla de inicio.</string>
+
+    <!-- Historique des sites/supports partagés ou exportés -->
+    <string name="share_history_title">Historial de comparticiones</string>
+    <string name="share_history_desc">Sitios y soportes que has compartido o exportado</string>
+    <string name="share_history_empty">Todavía no hay comparticiones. Los sitios y soportes que compartas o exportes en PDF aparecerán aquí.</string>
+    <string name="share_history_clear">Borrar el historial</string>
+    <string name="share_history_clear_title">¿Borrar el historial de comparticiones?</string>
+    <string name="share_history_clear_desc">Se eliminarán de este dispositivo todas las comparticiones registradas.</string>
+    <string name="share_history_kind_mobile_site">Sitio móvil</string>
+    <string name="share_history_kind_mobile_support">Soporte (torre)</string>
+    <string name="share_history_kind_radio_site">Sitio de radio</string>
+    <string name="share_history_kind_radio_support">Soporte de radio</string>
+    <string name="share_history_dest_share">Imagen compartida</string>
+    <string name="share_history_dest_clipboard">Imagen copiada</string>
+    <string name="share_history_dest_pdf">PDF compartido</string>
+    <string name="share_history_dest_pdf_download">PDF descargado</string>
+    <string name="share_history_station_ref">Estación %1$s</string>
+    <string name="share_history_support_ref">Soporte %1$s</string>
+    <string name="share_history_open_unavailable">No hay ninguna ficha que abrir para esta entrada.</string>
+    <string name="histories_title">Historiales</string>
+    <string name="histories_desc">Envíos de fotos y comparticiones registrados en este dispositivo.</string>
+    <string name="share_history_none">Ninguna compartición registrada</string>
+    <string name="upload_history_card_desc">Fotos enviadas a SignalQuest desde este dispositivo</string>
+    <string name="histories_settings_title">Ajustes de los historiales</string>
+    <string name="upload_history_settings_title">Ajustes del historial de envíos</string>
+    <string name="share_history_settings_title">Ajustes del historial de comparticiones</string>
+    <string name="history_option_date_bar">Barra lateral de fechas</string>
+    <string name="upload_history_option_thumbnails">Miniaturas de las fotos</string>
+    <string name="share_history_option_counter">Contador al principio de la lista</string>
+    <string name="share_history_option_address">Dirección del sitio</string>
 </resources>

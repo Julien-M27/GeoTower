@@ -2,6 +2,7 @@ package fr.geotower.utils
 
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.SiteHsEntity
+import fr.geotower.data.models.isDeclaredActive
 import fr.geotower.data.models.physicalSiteKey
 
 private const val HS_OPERATOR_WILDCARD = "*"
@@ -16,16 +17,22 @@ fun activeOperatorKeysForSiteStatusFilter(
     antennas: List<LocalisationEntity>,
     sitesHs: Collection<SiteHsEntity>,
     showSitesInService: Boolean,
-    showSitesOutOfService: Boolean
+    showSitesOutOfService: Boolean,
+    showProjectSites: Boolean
 ): Set<String>? {
-    if (showSitesInService && showSitesOutOfService) return null
+    if (showSitesInService && showSitesOutOfService && showProjectSites) return null
 
     val hsOperatorMap = buildHsOperatorMap(sitesHs)
     return antennas
         .flatMap { antenna ->
+            // Statuts exclusifs : un site sans aucune émission en service est « en projet ».
+            val isProjectSite = !antenna.isDeclaredActive()
             OperatorColors.keysFor(antenna.operateur).filter { operatorKey ->
-                val isHs = isOperatorDeclaredHs(antenna, operatorKey, hsOperatorMap)
-                if (isHs) showSitesOutOfService else showSitesInService
+                when {
+                    isProjectSite -> showProjectSites
+                    isOperatorDeclaredHs(antenna, operatorKey, hsOperatorMap) -> showSitesOutOfService
+                    else -> showSitesInService
+                }
             }
         }
         .toSet()

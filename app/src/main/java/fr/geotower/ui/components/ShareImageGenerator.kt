@@ -10,6 +10,7 @@ import android.graphics.Canvas
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
+import androidx.annotation.StringRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -61,12 +62,19 @@ import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import fr.geotower.data.api.RetrofitClient
+import fr.geotower.data.api.SignalQuestOperators
+import fr.geotower.data.api.SignalQuestSpeedtestSortMetric
+import fr.geotower.data.api.fetchBestSignalQuestSpeedtest
+import fr.geotower.data.community.CommunityDataPreferences
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.RadioMapMarker
 import fr.geotower.data.models.RadioReportSummaryFields
 import fr.geotower.data.models.reportSummaryFields
 import fr.geotower.data.models.PhysiqueEntity // ✅ NOUVEAU
 import fr.geotower.data.models.TechniqueEntity // ✅ NOUVEAU
+import fr.geotower.data.share.ShareHistoryStore
+import fr.geotower.ui.screens.settings.SiteSpeedtestsPagePreferences
 import fr.geotower.ui.screens.emitters.CommunityPhoto
 import fr.geotower.ui.screens.emitters.DEFAULT_ELEVATION_PROFILE_FREQUENCY_MHZ
 import fr.geotower.ui.screens.emitters.extractElevationProfileAntennaHeightsByFrequency
@@ -92,9 +100,14 @@ import fr.geotower.utils.formatSpectrumDisplayDetails
 import fr.geotower.utils.parseAndSortFrequencies
 import fr.geotower.utils.radioBandCode
 import fr.geotower.utils.radioTechnologyFrequencyLabel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import okhttp3.Request
 import java.io.File
 import java.io.FileOutputStream
@@ -112,6 +125,8 @@ import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 private const val TAG_SHARE_IMAGE = "GeoTower"
 private const val SHARE_PHOTO_MAX_COUNT = 3
 private const val SHARE_PHOTO_MAX_BYTES = 12L * 1024L * 1024L
+/** Au-delà, le rapport PDF est généré sans les speedtests plutôt que de faire attendre l'utilisateur. */
+private const val REPORT_SPEEDTEST_TIMEOUT_MS = 12_000L
 
 enum class ShareImageDestination {
     Share,
@@ -122,6 +137,14 @@ enum class ShareImageDestination {
 
 private fun ShareImageDestination.isPdfExport(): Boolean {
     return this == ShareImageDestination.Pdf || this == ShareImageDestination.PdfDownload
+}
+
+/** Code stocké dans l'historique des partages : l'énumération elle-même n'est pas sérialisée. */
+private fun ShareImageDestination.historyKey(): String = when (this) {
+    ShareImageDestination.Share -> ShareHistoryStore.DEST_SHARE
+    ShareImageDestination.Clipboard -> ShareHistoryStore.DEST_CLIPBOARD
+    ShareImageDestination.Pdf -> ShareHistoryStore.DEST_PDF
+    ShareImageDestination.PdfDownload -> ShareHistoryStore.DEST_PDF_DOWNLOAD
 }
 
 private fun shareOrCopyImageUris(
@@ -178,6 +201,56 @@ private suspend fun loadSharePhotoBitmaps(photos: List<CommunityPhoto>): List<Bi
                 .onFailure { AppLogger.w(TAG_SHARE_IMAGE, "Share photo load failed", it) }
                 .getOrNull()
         }
+    }
+}
+
+/**
+ * Meilleur speedtest SignalQuest de chaque station du support, indexé par `id_anfr`. Les stations
+ * sont interrogées en parallèle : un support mutualisé en compte plusieurs et chacune a son propre
+ * relevé. Les opérateurs dont la source communautaire est coupée sont ignorés.
+ */
+private suspend fun loadBestSpeedtestsForReport(
+    antennas: List<LocalisationEntity>,
+    prefs: android.content.SharedPreferences,
+    supportId: String?
+): Map<String, fr.geotower.data.api.SqSpeedtestData> {
+    val eligible = antennas.filter { antenna ->
+        antenna.idAnfr.isNotBlank() &&
+            SignalQuestOperators.supportsSpeedtests(antenna.operateur) &&
+            CommunityDataPreferences.isSignalQuestSpeedtestEnabled(prefs, antenna.operateur)
+    }
+    if (eligible.isEmpty()) return emptyMap()
+
+    val metric = SignalQuestSpeedtestSortMetric.fromStorageKey(
+        prefs.getString(
+            SiteSpeedtestsPagePreferences.BEST_METRIC,
+            SiteSpeedtestsPagePreferences.DEFAULT_BEST_METRIC
+        )
+    )
+    return coroutineScope {
+        eligible
+            .map { antenna ->
+                async {
+                    val best = try {
+                        fetchBestSignalQuestSpeedtest(
+                            operator = antenna.operateur,
+                            supportId = supportId,
+                            anfrCode = antenna.idAnfr,
+                            metric = metric
+                        )
+                    } catch (e: CancellationException) {
+                        // Ne jamais avaler l'annulation : c'est elle qui arme le délai côté appelant.
+                        throw e
+                    } catch (e: Exception) {
+                        AppLogger.w(TAG_SHARE_IMAGE, "Report speedtest load failed", e)
+                        null
+                    }
+                    antenna.idAnfr to best
+                }
+            }
+            .awaitAll()
+            .mapNotNull { (idAnfr, best) -> best?.let { idAnfr to it } }
+            .toMap()
     }
 }
 
@@ -779,6 +852,18 @@ fun RadioShareMenu(
                     if (isGeneratingShare || (isSupportShare && selectedBlockIds.isEmpty())) return
                     isGeneratingShare = true
                     showContentSheet = false
+                    ShareHistoryStore.record(
+                        context = context,
+                        kind = if (isSupportShare) ShareHistoryStore.KIND_RADIO_SUPPORT else ShareHistoryStore.KIND_RADIO_SITE,
+                        destination = destination.historyKey(),
+                        supportId = marker.supportId,
+                        stationId = marker.stationId,
+                        label = marker.networkName(context),
+                        address = marker.addressSummary,
+                        latitude = marker.latitude,
+                        longitude = marker.longitude,
+                        itemCount = if (isSupportShare) markers.count { !it.isCluster } else 1
+                    )
                     currentView.postDelayed({
                         if (isSupportShare) {
                             shareRadioSupportCapture(
@@ -1029,8 +1114,10 @@ private fun shareRadioCapture(
                 if (destination.isPdfExport()) {
                     val fileName = "${filePrefix}_$safeId.pdf"
                     if (destination == ShareImageDestination.PdfDownload) {
-                        if (downloadGeoTowerReportPdf(context, listOf(bitmap), fileName)) {
-                            Toast.makeText(context, context.getString(R.string.appstrings_pdf_downloaded), Toast.LENGTH_SHORT).show()
+                        val savedUri = downloadGeoTowerReportPdf(context, listOf(bitmap), fileName)
+                        if (savedUri != null) {
+                            PdfDownloadNotice.show(savedUri, fileName)
+                            PdfReportNotifier.showDownloaded(context, savedUri, fileName)
                         } else {
                             Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
                         }
@@ -1999,7 +2086,12 @@ private fun GeoTowerPdfAntennaReportContent(
     incThroughput: Boolean,
     incConfidential: Boolean,
     incQrCode: Boolean,
-    shareOrder: List<String>
+    shareOrder: List<String>,
+    tables: PdfReportTables,
+    tableSlice: PdfReportTableSlice,
+    pageLabel: String = "",
+    bearingStr: String = "",
+    txtBearingLabel: String = ""
 ) {
     val cardBgColor = Color(0xFFF4F0FA)
     val accentColor = Color(0xFF0EA2D7)
@@ -2015,8 +2107,8 @@ private fun GeoTowerPdfAntennaReportContent(
 
     Column(
         modifier = Modifier
-            .width(800.dp)
-            .height(1135.dp)
+            .width(PDF_PAGE_WIDTH_DP.dp)
+            .height(PDF_PAGE_HEIGHT_DP.dp)
             .background(Color.White)
             .padding(start = 16.dp, top = 10.dp, end = 16.dp, bottom = 4.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -2025,8 +2117,26 @@ private fun GeoTowerPdfAntennaReportContent(
             info = info,
             techSummary = techSummary,
             accentColor = accentColor,
-            cardBgColor = cardBgColor
+            cardBgColor = cardBgColor,
+            pageLabel = pageLabel
         )
+
+        // Page de suite : plus de colonne de gauche, les tableaux occupent toute la largeur.
+        if (tableSlice.isContinuation) {
+            GeoTowerPdfFrequenciesCard(
+                tables = tables,
+                slice = tableSlice,
+                cardBgColor = cardBgColor,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            )
+            GeoTowerPdfFooter(
+                qrBitmap = if (incQrCode) qrBitmap else null,
+                txtGeneratedBy = txtGeneratedBy
+            )
+            return@Column
+        }
 
         Row(
             modifier = Modifier
@@ -2115,12 +2225,28 @@ private fun GeoTowerPdfAntennaReportContent(
                         val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() }
                             ?: stringResource(R.string.appstrings_not_specified)
                         GeoTowerPdfInfoLine(txtAddressLabel, fullAddress, textMutedColor)
-                        if (!incConfidential) {
+                        if (incConfidential) {
+                            GeoTowerPdfInfoLine(
+                                txtGpsLabel,
+                                stringResource(R.string.appstrings_distance_hidden),
+                                textMutedColor
+                            )
+                        } else {
                             GeoTowerPdfInfoLine(
                                 txtGpsLabel,
                                 String.format(Locale.US, "%.5f, %.5f", info.latitude, info.longitude),
                                 textMutedColor
                             )
+                            distanceStr.takeIf { it.isNotBlank() }?.let { distance ->
+                                GeoTowerPdfInfoLine(
+                                    txtDistanceLabel,
+                                    "$distance $txtFromMyPosition",
+                                    textMutedColor
+                                )
+                            }
+                            bearingStr.takeIf { it.isNotBlank() && txtBearingLabel.isNotBlank() }?.let { bearing ->
+                                GeoTowerPdfInfoLine(txtBearingLabel, bearing, textMutedColor)
+                            }
                         }
                     }
                 }
@@ -2141,6 +2267,9 @@ private fun GeoTowerPdfAntennaReportContent(
                 }
 
                 if (incThroughput && hasBlock("throughput")) {
+                    // Dernier bloc de la colonne, donc le seul flexible : `weight(fill = false)` le
+                    // borne à la place restante (la page a une hauteur fixe et rogne le dépassement)
+                    // et `heightIn` garde le gabarit habituel quand il y a de la marge.
                     ShareThroughputCalculatorBlock(
                         info = info,
                         technique = technique,
@@ -2152,7 +2281,8 @@ private fun GeoTowerPdfAntennaReportContent(
                         maxIncludedBands = Int.MAX_VALUE,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(246.dp)
+                            .heightIn(max = 246.dp)
+                            .weight(1f, fill = false)
                     )
                 }
             }
@@ -2165,8 +2295,8 @@ private fun GeoTowerPdfAntennaReportContent(
             ) {
                 if (incFreqs && hasBlock("freq")) {
                     GeoTowerPdfFrequenciesCard(
-                        info = info,
-                        technique = technique,
+                        tables = tables,
+                        slice = tableSlice,
                         cardBgColor = cardBgColor,
                         modifier = Modifier
                             .fillMaxWidth()
@@ -2198,43 +2328,19 @@ private fun GeoTowerPdfAntennaReportContent(
 
 @Composable
 private fun GeoTowerPdfFrequenciesCard(
-    info: LocalisationEntity,
-    technique: TechniqueEntity?,
+    tables: PdfReportTables,
+    slice: PdfReportTableSlice,
     cardBgColor: Color,
     modifier: Modifier = Modifier
 ) {
-    val txtUnknown = stringResource(R.string.appstrings_unknown)
-    val txtAzimuthNotSpecified = stringResource(R.string.appstrings_azimuth_not_specified)
     val txtDateNotSpecifiedAnfr = stringResource(R.string.appstrings_date_not_specified_anfr)
     val txtInService = stringResource(R.string.appstrings_in_service)
     val txtTechnically = stringResource(R.string.appstrings_technically)
     val txtProjectApproved = stringResource(R.string.appstrings_project_approved)
     val txtUnknownStatus = stringResource(R.string.appstrings_unknown_status)
-    val rawFreqs = technique?.detailsFrequences ?: info.frequences
-    val parsedBands = remember(
-        rawFreqs,
-        info.azimutsFh,
-        info.techMask,
-        info.bandMask,
-        info.statut,
-        technique?.technologies,
-        technique?.statut,
-        technique?.dateService,
-        technique?.dateImplantation,
-        technique?.dateModif
-    ) {
-        addMicrowaveFallbackBands(
-            bands = parseAndSortFrequencies(rawFreqs, txtUnknown, txtAzimuthNotSpecified),
-            info = info,
-            technique = technique,
-            rawFreqs = rawFreqs,
-            txtUnknown = txtUnknown
-        ).filter { pdfShouldDisplayFrequencyBand(it) }
-    }
-    val antennaRows = remember(parsedBands) { buildPdfAntennaSummaryRows(parsedBands) }
-    val antennaIdRows = remember(parsedBands) { buildPdfAntennaIdRows(parsedBands) }
-    val maxEmitterRows = 8
-    val maxAntennaRows = 8
+    val emitterBands = tables.bands.subList(slice.emitterFrom, slice.emitterTo)
+    val antennaRows = tables.antennaRows.subList(slice.antennaFrom, slice.antennaTo)
+    val antennaIdRows = tables.antennaIdRows.subList(slice.idFrom, slice.idTo)
 
     GeoTowerPdfCard(
         title = stringResource(R.string.appstrings_frequencies_title),
@@ -2242,7 +2348,7 @@ private fun GeoTowerPdfFrequenciesCard(
         cardBgColor = cardBgColor,
         modifier = modifier
     ) {
-        if (parsedBands.isEmpty()) {
+        if (tables.bands.isEmpty()) {
             Text(
                 stringResource(R.string.appstrings_bands_not_specified),
                 fontSize = 10.sp,
@@ -2255,54 +2361,70 @@ private fun GeoTowerPdfFrequenciesCard(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(7.dp)
         ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                GeoTowerPdfTableTitle(stringResource(R.string.appstrings_emitters_table_title))
-                GeoTowerPdfEmitterHeader()
-                parsedBands.take(maxEmitterRows).forEach { band ->
-                    val statusType = classifyFrequencyStatus(band.status)
-                    val statusText = when (statusType) {
-                        FrequencyStatusType.InService -> txtInService
-                        FrequencyStatusType.TechnicallyOperational -> txtTechnically
-                        FrequencyStatusType.Approved -> txtProjectApproved
-                        FrequencyStatusType.Unknown -> txtUnknownStatus
-                    }
-                    val statusColor = when (statusType) {
-                        FrequencyStatusType.InService -> Color(0xFF4CAF50)
-                        FrequencyStatusType.TechnicallyOperational -> Color(0xFF0EA2D7)
-                        FrequencyStatusType.Approved -> Color(0xFF2196F3)
-                        FrequencyStatusType.Unknown -> MaterialTheme.colorScheme.onSurfaceVariant
-                    }
-                    val dateFormatted = formatDateToFrench(band.date)
-                    val dateDisplay = if (dateFormatted.isNotBlank() && dateFormatted != "-") {
-                        dateFormatted
-                    } else {
-                        txtDateNotSpecifiedAnfr
-                    }
-                    GeoTowerPdfEmitterRow(
-                        label = pdfFrequencyBandLabel(band),
-                        date = dateDisplay,
-                        status = statusText,
-                        statusColor = statusColor
+            if (emitterBands.isNotEmpty()) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    GeoTowerPdfTableTitle(
+                        pdfTableTitle(R.string.appstrings_emitters_table_title, slice.emitterFrom > 0)
                     )
-                }
-                if (parsedBands.size > maxEmitterRows) {
-                    GeoTowerPdfOverflowLine("+ ${parsedBands.size - maxEmitterRows}")
+                    GeoTowerPdfEmitterHeader()
+                    emitterBands.forEach { band ->
+                        val statusType = classifyFrequencyStatus(band.status)
+                        val statusText = when (statusType) {
+                            FrequencyStatusType.InService -> txtInService
+                            FrequencyStatusType.TechnicallyOperational -> txtTechnically
+                            FrequencyStatusType.Approved -> txtProjectApproved
+                            FrequencyStatusType.Unknown -> txtUnknownStatus
+                        }
+                        val statusColor = when (statusType) {
+                            FrequencyStatusType.InService -> Color(0xFF4CAF50)
+                            FrequencyStatusType.TechnicallyOperational -> Color(0xFF0EA2D7)
+                            FrequencyStatusType.Approved -> Color(0xFF2196F3)
+                            FrequencyStatusType.Unknown -> MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                        val dateFormatted = formatDateToFrench(band.date)
+                        val dateDisplay = if (dateFormatted.isNotBlank() && dateFormatted != "-") {
+                            dateFormatted
+                        } else {
+                            txtDateNotSpecifiedAnfr
+                        }
+                        GeoTowerPdfEmitterRow(
+                            label = pdfFrequencyBandLabel(band),
+                            date = dateDisplay,
+                            status = statusText,
+                            statusColor = statusColor
+                        )
+                    }
                 }
             }
 
-            Column(modifier = Modifier.fillMaxWidth()) {
-                GeoTowerPdfTableTitle(stringResource(R.string.appstrings_antennas_table_title))
-                GeoTowerPdfAntennaHeader()
-                antennaRows.take(maxAntennaRows).forEach { row ->
-                    GeoTowerPdfAntennaRow(row)
+            if (antennaRows.isNotEmpty()) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    GeoTowerPdfTableTitle(
+                        pdfTableTitle(R.string.appstrings_antennas_table_title, slice.antennaFrom > 0)
+                    )
+                    GeoTowerPdfAntennaHeader()
+                    antennaRows.forEach { row ->
+                        GeoTowerPdfAntennaRow(row)
+                    }
                 }
-                if (antennaRows.size > maxAntennaRows) {
-                    GeoTowerPdfOverflowLine("+ ${antennaRows.size - maxAntennaRows}")
-                }
-                GeoTowerPdfAntennaIdTable(antennaIdRows)
+            }
+
+            if (antennaIdRows.isNotEmpty()) {
+                GeoTowerPdfAntennaIdTable(rows = antennaIdRows, isContinued = slice.idFrom > 0)
+            }
+
+            if (slice.droppedRows > 0) {
+                GeoTowerPdfOverflowLine("+ ${slice.droppedRows}")
             }
         }
     }
+}
+
+/** Titre de tableau, suffixé « (suite) » quand la page reprend un tableau commencé plus haut. */
+@Composable
+private fun pdfTableTitle(@StringRes titleRes: Int, isContinued: Boolean): String {
+    val title = stringResource(titleRes)
+    return if (isContinued) stringResource(R.string.appstrings_pdf_table_continued, title) else title
 }
 
 @Composable
@@ -2363,10 +2485,11 @@ private fun GeoTowerPdfAntennaHeader() {
                 .padding(vertical = 5.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            GeoTowerPdfHeaderCell(stringResource(R.string.appstrings_col_azimuth), Modifier.weight(0.75f))
-            GeoTowerPdfHeaderCell(stringResource(R.string.appstrings_col_height), Modifier.weight(0.75f))
-            GeoTowerPdfHeaderCell(stringResource(R.string.appstrings_col_band), Modifier.weight(1.2f))
-            GeoTowerPdfHeaderCell(stringResource(R.string.appstrings_col_freqs), Modifier.weight(1.4f))
+            GeoTowerPdfHeaderCell(stringResource(R.string.appstrings_col_azimuth), Modifier.weight(0.7f))
+            GeoTowerPdfHeaderCell(stringResource(R.string.appstrings_col_height), Modifier.weight(0.65f))
+            GeoTowerPdfHeaderCell(stringResource(R.string.appstrings_col_panel_size), Modifier.weight(0.6f))
+            GeoTowerPdfHeaderCell(stringResource(R.string.appstrings_col_band), Modifier.weight(1.1f))
+            GeoTowerPdfHeaderCell(stringResource(R.string.appstrings_col_freqs), Modifier.weight(1.45f))
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     }
@@ -2380,16 +2503,17 @@ private fun GeoTowerPdfAntennaRow(row: PdfAntennaSummaryRow) {
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        GeoTowerPdfBodyCell(row.azimuth, Modifier.weight(0.75f), fontWeight = FontWeight.SemiBold)
-        GeoTowerPdfBodyCell(row.height, Modifier.weight(0.75f))
-        GeoTowerPdfBodyCell(row.bands, Modifier.weight(1.2f), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
-        GeoTowerPdfBodyCell(row.frequencies, Modifier.weight(1.4f))
+        GeoTowerPdfBodyCell(row.azimuth, Modifier.weight(0.7f), fontWeight = FontWeight.SemiBold)
+        GeoTowerPdfBodyCell(row.height, Modifier.weight(0.65f))
+        GeoTowerPdfBodyCell(row.panelSize, Modifier.weight(0.6f))
+        GeoTowerPdfBodyCell(row.bands, Modifier.weight(1.1f), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+        GeoTowerPdfBodyCell(row.frequencies, Modifier.weight(1.45f))
     }
     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.25f))
 }
 
 @Composable
-private fun GeoTowerPdfAntennaIdTable(rows: List<PdfAntennaIdRow>) {
+private fun GeoTowerPdfAntennaIdTable(rows: List<PdfAntennaIdRow>, isContinued: Boolean = false) {
     if (rows.isEmpty()) return
     Column(
         modifier = Modifier
@@ -2397,7 +2521,7 @@ private fun GeoTowerPdfAntennaIdTable(rows: List<PdfAntennaIdRow>) {
             .padding(top = 6.dp)
     ) {
         Text(
-            text = stringResource(R.string.appstrings_aer_id_title),
+            text = pdfTableTitle(R.string.appstrings_aer_id_title, isContinued),
             modifier = Modifier.fillMaxWidth(),
             fontSize = 8.sp,
             lineHeight = 9.sp,
@@ -2417,8 +2541,7 @@ private fun GeoTowerPdfAntennaIdTable(rows: List<PdfAntennaIdRow>) {
             GeoTowerPdfHeaderCell(stringResource(R.string.appstrings_col_id), Modifier.weight(1.35f))
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-        val visibleRows = rows.take(6)
-        val groupedRows = visibleRows.groupBy { it.azimuth }
+        val groupedRows = rows.groupBy { it.azimuth }
         groupedRows.entries.forEachIndexed { groupIndex, (azimuth, entries) ->
             val groupHeight = (24 * entries.size).dp
             Row(
@@ -2453,7 +2576,11 @@ private fun GeoTowerPdfAntennaIdTable(rows: List<PdfAntennaIdRow>) {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             GeoTowerPdfBodyCell(row.height, Modifier.weight(0.65f))
-                            GeoTowerPdfBodyCell(pdfAntennaTypeLabel(row.type), Modifier.weight(1f))
+                            GeoTowerPdfBodyCell(
+                                // La taille du panneau complète le type traduit, comme sur la fiche site.
+                                appendPanelDimensionToType(pdfAntennaTypeLabel(row.type), row.dimension),
+                                Modifier.weight(1f)
+                            )
                             GeoTowerPdfBodyCell(row.ids, Modifier.weight(1.35f))
                         }
                         if (index < entries.lastIndex) {
@@ -2465,9 +2592,6 @@ private fun GeoTowerPdfAntennaIdTable(rows: List<PdfAntennaIdRow>) {
             if (groupIndex < groupedRows.size - 1) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.22f))
             }
-        }
-        if (rows.size > visibleRows.size) {
-            GeoTowerPdfOverflowLine("+ ${rows.size - visibleRows.size}")
         }
     }
 }
@@ -2539,7 +2663,8 @@ private fun GeoTowerPdfHeader(
     info: LocalisationEntity,
     techSummary: String,
     accentColor: Color,
-    cardBgColor: Color
+    cardBgColor: Color,
+    pageLabel: String = ""
 ) {
     Surface(
         color = cardBgColor,
@@ -2557,7 +2682,7 @@ private fun GeoTowerPdfHeader(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "GEOTOWER",
+                    text = if (pageLabel.isBlank()) "GEOTOWER" else "GEOTOWER • $pageLabel",
                     fontSize = 8.sp,
                     lineHeight = 9.sp,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -2741,6 +2866,22 @@ private fun GeoTowerPdfSpeedtestCard(
                 unit = "ms",
                 label = stringResource(R.string.appstrings_speedtest_ping)
             )
+        }
+        // Un relevé sans date n'est pas interprétable dans un rapport archivé.
+        speedtestData.timestamp?.take(10)?.takeIf { it.isNotBlank() }?.let { rawDate ->
+            val date = formatDateToFrench(rawDate)
+            if (date.isNotBlank() && date != "-") {
+                Text(
+                    text = date,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 3.dp),
+                    fontSize = 8.sp,
+                    lineHeight = 9.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.End
+                )
+            }
         }
     }
 }
@@ -3048,9 +3189,169 @@ private fun formatGeoTowerPdfFooterTime(date: Date, locale: Locale): String {
     }
 }
 
+/** Tableaux du rapport PDF d'une station, calculés une seule fois puis découpés en pages. */
+private data class PdfReportTables(
+    val bands: List<FreqBand>,
+    val antennaRows: List<PdfAntennaSummaryRow>,
+    val antennaIdRows: List<PdfAntennaIdRow>
+)
+
+/**
+ * Portion de tableaux rendue sur une page. Le flux est ordonné (émetteurs, puis antennes,
+ * puis identifiants) : une page reprend exactement là où la précédente s'est arrêtée.
+ */
+internal data class PdfReportTableSlice(
+    val emitterFrom: Int = 0,
+    val emitterTo: Int = 0,
+    val antennaFrom: Int = 0,
+    val antennaTo: Int = 0,
+    val idFrom: Int = 0,
+    val idTo: Int = 0,
+    /** Page de suite : en-tête + tableaux pleine largeur, sans les cartes de gauche ni le statut. */
+    val isContinuation: Boolean = false,
+    /** Lignes abandonnées faute de pages (plafond de sécurité), signalées par « + N ». */
+    val droppedRows: Int = 0
+)
+
+// Gabarit de la page PDF (ratio A4 : 800 / 1135 ≈ 595 / 842).
+private const val PDF_PAGE_WIDTH_DP = 800f
+private const val PDF_PAGE_HEIGHT_DP = 1135f
+/** Résolution de rendu d'une page : ~170 dpi sur A4, compromis lisibilité / mémoire. */
+private const val PDF_PAGE_MAX_WIDTH_PX = 1400
+
+/** Blocs affichés sur une page du rapport support (l'ordre de rendu est fixé par la maquette). */
+private val SUPPORT_PDF_BLOCKS =
+    listOf("map", "support", "ids", "dates", "address", "photos", "speedtest", "throughput", "freq", "status")
+
+// Hauteurs relevées sur la maquette PDF, volontairement majorées : la carte des fréquences
+// a une hauteur fixe et rogne ce qui dépasse, mieux vaut une page de plus qu'un tableau coupé.
+private const val PDF_TABLE_SECTION_COST_DP = 50f
+private const val PDF_TABLE_ROW_DP = 32f
+private const val PDF_ID_SECTION_COST_DP = 40f
+/** 24 dp de ligne + le liseré et la marge du groupe d'azimut quand la ligne est seule. */
+private const val PDF_ID_ROW_DP = 27f
+/** Place disponible pour les tableaux sur la première page (colonne de droite, carte de statut incluse). */
+internal const val PDF_TABLE_SPACE_FIRST_PAGE_DP = 838f
+internal const val PDF_TABLE_SPACE_FIRST_PAGE_NO_STATUS_DP = 973f
+/** Place disponible sur une page de suite : toute la hauteur utile, toute la largeur. */
+private const val PDF_TABLE_SPACE_CONTINUATION_DP = 973f
+private const val PDF_MAX_PAGES_PER_STATION = 12
+
+private fun buildPdfReportTables(
+    info: LocalisationEntity,
+    technique: TechniqueEntity?,
+    txtUnknown: String,
+    txtAzimuthNotSpecified: String
+): PdfReportTables {
+    val rawFreqs = technique?.detailsFrequences ?: info.frequences
+    val bands = addMicrowaveFallbackBands(
+        bands = parseAndSortFrequencies(rawFreqs, txtUnknown, txtAzimuthNotSpecified),
+        info = info,
+        technique = technique,
+        rawFreqs = rawFreqs,
+        txtUnknown = txtUnknown
+    ).filter { pdfShouldDisplayFrequencyBand(it) }
+    return PdfReportTables(
+        bands = bands,
+        antennaRows = buildPdfAntennaSummaryRows(bands),
+        antennaIdRows = buildPdfAntennaIdRows(bands)
+    )
+}
+
+private fun planPdfReportTableSlices(
+    tables: PdfReportTables,
+    includeTables: Boolean,
+    firstPageSpaceDp: Float
+): List<PdfReportTableSlice> = planPdfReportTableSlices(
+    emitterCount = if (includeTables) tables.bands.size else 0,
+    antennaCount = if (includeTables) tables.antennaRows.size else 0,
+    idCount = if (includeTables) tables.antennaIdRows.size else 0,
+    firstPageSpaceDp = firstPageSpaceDp
+)
+
+/**
+ * Découpe les tableaux d'une station en pages A4. La première page garde la mise en page
+ * historique (cartes à gauche, tableaux à droite) ; les suivantes n'affichent que la suite
+ * des tableaux, pleine largeur, jusqu'à ce que tout soit publié.
+ */
+internal fun planPdfReportTableSlices(
+    emitterCount: Int,
+    antennaCount: Int,
+    idCount: Int,
+    firstPageSpaceDp: Float = PDF_TABLE_SPACE_FIRST_PAGE_DP
+): List<PdfReportTableSlice> {
+    if (emitterCount + antennaCount + idCount == 0) return listOf(PdfReportTableSlice())
+
+    val slices = mutableListOf<PdfReportTableSlice>()
+    var emitter = 0
+    var antenna = 0
+    var id = 0
+    while (slices.size < PDF_MAX_PAGES_PER_STATION) {
+        val isContinuation = slices.isNotEmpty()
+        var space = if (isContinuation) PDF_TABLE_SPACE_CONTINUATION_DP else firstPageSpaceDp
+        var emitterEnd = emitter
+        var antennaEnd = antenna
+        var idEnd = id
+
+        if (emitter < emitterCount && space >= PDF_TABLE_SECTION_COST_DP + PDF_TABLE_ROW_DP) {
+            val rows = minOf(
+                emitterCount - emitter,
+                ((space - PDF_TABLE_SECTION_COST_DP) / PDF_TABLE_ROW_DP).toInt()
+            )
+            emitterEnd = emitter + rows
+            space -= PDF_TABLE_SECTION_COST_DP + rows * PDF_TABLE_ROW_DP
+        }
+        if (emitterEnd >= emitterCount && antenna < antennaCount &&
+            space >= PDF_TABLE_SECTION_COST_DP + PDF_TABLE_ROW_DP
+        ) {
+            val rows = minOf(
+                antennaCount - antenna,
+                ((space - PDF_TABLE_SECTION_COST_DP) / PDF_TABLE_ROW_DP).toInt()
+            )
+            antennaEnd = antenna + rows
+            space -= PDF_TABLE_SECTION_COST_DP + rows * PDF_TABLE_ROW_DP
+        }
+        if (antennaEnd >= antennaCount && id < idCount &&
+            space >= PDF_ID_SECTION_COST_DP + PDF_ID_ROW_DP
+        ) {
+            val rows = minOf(
+                idCount - id,
+                ((space - PDF_ID_SECTION_COST_DP) / PDF_ID_ROW_DP).toInt()
+            )
+            idEnd = id + rows
+        }
+
+        val placedNothing = emitterEnd == emitter && antennaEnd == antenna && idEnd == id
+        if (placedNothing && isContinuation) break
+
+        slices += PdfReportTableSlice(
+            emitterFrom = emitter,
+            emitterTo = emitterEnd,
+            antennaFrom = antenna,
+            antennaTo = antennaEnd,
+            idFrom = id,
+            idTo = idEnd,
+            isContinuation = isContinuation
+        )
+        emitter = emitterEnd
+        antenna = antennaEnd
+        id = idEnd
+        if (emitter >= emitterCount && antenna >= antennaCount && id >= idCount) break
+    }
+
+    val dropped = (emitterCount - emitter) + (antennaCount - antenna) + (idCount - id)
+    if (dropped > 0 && slices.isNotEmpty()) {
+        slices[slices.lastIndex] = slices.last().copy(droppedRows = dropped)
+        AppLogger.w(TAG_SHARE_IMAGE, "Report PDF truncated: $dropped table rows dropped after ${slices.size} pages")
+    }
+    return slices.ifEmpty { listOf(PdfReportTableSlice()) }
+}
+
 private data class PdfAntennaSummaryRow(
     val azimuth: String,
     val height: String,
+    /** Taille des panneaux (tag `[DIM: ...]`) de la bande, déjà formatée dans l'unité utilisateur. */
+    val panelSize: String,
     val bands: String,
     val frequencies: String
 )
@@ -3059,20 +3360,24 @@ private data class PdfAntennaPosition(
     val azimuth: String,
     val height: String,
     val id: String?,
-    val type: String = "-"
+    val type: String = "-",
+    /** Dimension du panneau, séparée du type pour ne pas casser la traduction ANFR. */
+    val dimension: String? = null
 )
 
 private data class PdfAntennaIdRow(
     val azimuth: String,
     val height: String,
     val type: String,
+    val dimension: String?,
     val ids: String
 )
 
 private data class PdfAntennaIdKey(
     val azimuth: String,
     val height: String,
-    val type: String
+    val type: String,
+    val dimension: String?
 )
 
 private val pdfAntennaIdRegex = Regex("""\[(?:AER_)?ID\s*:\s*([^\]]+)]""", RegexOption.IGNORE_CASE)
@@ -3096,9 +3401,17 @@ private fun buildPdfAntennaSummaryRows(bands: List<FreqBand>): List<PdfAntennaSu
             .distinct()
             .joinToString(", ")
             .ifBlank { "-" }
+        // Taille de panneau : seule colonne qui couvre aussi les panneaux sans AER_ID
+        // (le tableau des identifiants, lui, ne liste que les panneaux identifiés).
+        val panelSizes = positions
+            .mapNotNull { it.dimension }
+            .distinct()
+            .joinToString(", ")
+            .ifBlank { "-" }
         PdfAntennaSummaryRow(
             azimuth = azimuths,
             height = heights,
+            panelSize = panelSizes,
             bands = pdfFrequencyBandLabel(band).replace("\n", " "),
             frequencies = pdfCompactFrequencyText(band)
         )
@@ -3115,7 +3428,8 @@ private fun buildPdfAntennaIdRows(bands: List<FreqBand>): List<PdfAntennaIdRow> 
             PdfAntennaIdKey(
                 azimuth = position.azimuth,
                 height = position.height,
-                type = position.type
+                type = position.type,
+                dimension = position.dimension
             )
         ) { linkedSetOf() }.add(id)
     }
@@ -3132,6 +3446,7 @@ private fun buildPdfAntennaIdRows(bands: List<FreqBand>): List<PdfAntennaIdRow> 
                 azimuth = position.azimuth,
                 height = position.height,
                 type = position.type,
+                dimension = position.dimension,
                 ids = ids.joinToString(", ")
             )
         }
@@ -3149,8 +3464,17 @@ private fun pdfExtractShareAntennaPosition(detail: String): PdfAntennaPosition {
         azimuth = pdfFormatAzimuths(rawAzimuth),
         height = pdfExtractAntennaHeight(body),
         id = pdfAntennaIdRegex.find(normalized)?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotBlank() },
-        type = pdfExtractAntennaType(withoutTags, body)
+        // Type gardé pur : la dimension collée ici ferait échouer la traduction AnfrDisplayText.
+        type = pdfExtractAntennaType(withoutTags, body),
+        // `withoutTags` a déjà perdu le tag [DIM: ...] : la dimension se relit sur la chaîne brute.
+        dimension = pdfExtractAntennaDimension(normalized)
     )
+}
+
+/** Dimension du panneau pour les tableaux PDF, dans l'unité et le format des autres hauteurs. */
+private fun pdfExtractAntennaDimension(detail: String): String? {
+    val meters = extractRawPanelDimension(detail)?.let { pdfParseMeters(it) } ?: return null
+    return formatSharePanelHeightMeters(meters)
 }
 
 private fun pdfExtractAntennaGeometryBody(value: String): String {
@@ -3225,33 +3549,6 @@ private fun pdfParseMeters(value: String): Double? {
         .trim()
         .replace(',', '.')
         .toDoubleOrNull()
-}
-
-private fun pdfExtractAntennaPosition(detail: String): PdfAntennaPosition {
-    if (detail == "-") return PdfAntennaPosition("-", "-", null)
-    val normalized = detail.replace("Â°", "\u00B0")
-    val prefixColonIndex = normalized.indexOf(':')
-    val parenIndex = normalized.indexOf('(')
-    val body = if (prefixColonIndex >= 0 && (parenIndex < 0 || prefixColonIndex < parenIndex)) {
-        normalized.substring(prefixColonIndex + 1).trim()
-    } else {
-        normalized.trim()
-    }
-    val rawAzimuth = body.substringBefore("(")
-        .replace("\u00B0", "")
-        .replace("deg", "", ignoreCase = true)
-        .trim()
-    val azimuth = rawAzimuth.takeIf { it.isNotBlank() }?.let { "$it\u00B0" } ?: "-"
-    val rawHeight = if (body.contains("(")) body.substringAfter("(").substringBefore(")").trim() else "-"
-    val height = rawHeight.takeIf { it.isNotBlank() && it != "-" }?.let {
-        val meters = it.replace("m", "", ignoreCase = true).trim().replace(',', '.').toDoubleOrNull()
-        if (meters != null) formatSharePanelHeightMeters(meters) else it
-    } ?: "-"
-    return PdfAntennaPosition(
-        azimuth = azimuth,
-        height = height,
-        id = pdfAntennaIdRegex.find(normalized)?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotBlank() }
-    )
 }
 
 private fun pdfAzimuthSortKey(azimuth: String): Int {
@@ -3387,59 +3684,47 @@ fun shareFullAntennaCapture(
     txtCopiedToClipboard: String = "",
     onComplete: (() -> Unit)? = null
 ) {
+    // Le rapport PDF a son propre moteur multi-pages : il ne passe pas par la capture d'image.
+    if (destination.isPdfExport()) {
+        shareAntennaReportPdf(
+            context = context,
+            currentView = currentView,
+            info = info,
+            physique = physique,
+            technique = technique,
+            hsDataMap = hsDataMap,
+            speedtestData = speedtestData,
+            distanceStr = distanceStr,
+            bearingStr = bearingStr,
+            mapBitmap = mapBitmap,
+            photoBitmaps = photoBitmaps,
+            txtCommunityPhotosTitle = txtCommunityPhotosTitle,
+            incPhotos = incPhotos,
+            incMap = incMap,
+            incSupport = incSupport,
+            incIds = incIds,
+            incDates = incDates,
+            incAddress = incAddress,
+            incFreqs = incFreqs,
+            incSpeedtest = incSpeedtest,
+            incThroughput = incThroughput,
+            incConfidential = incConfidential,
+            incQrCode = incQrCode,
+            shareOrder = shareOrder,
+            chooserTitle = txtShareSiteVia,
+            txtInitError = txtInitError,
+            destination = destination,
+            onComplete = onComplete
+        )
+        return
+    }
+
     val composeView = ComposeView(context).apply {
         setViewTreeLifecycleOwner(currentView.findViewTreeLifecycleOwner())
         setViewTreeSavedStateRegistryOwner(currentView.findViewTreeSavedStateRegistryOwner())
         setViewTreeViewModelStoreOwner(currentView.findViewTreeViewModelStoreOwner())
         setContent {
-            val isPdfReport = destination.isPdfExport()
-            MaterialTheme(colorScheme = if (isPdfReport) lightColorScheme() else if (forceDarkTheme) darkColorScheme() else lightColorScheme()) {
-                if (isPdfReport) {
-                    Surface(color = Color.White) {
-                        GeoTowerPdfAntennaReportContent(
-                            context = context,
-                            info = info,
-                            physique = physique,
-                            technique = technique,
-                            hsDataMap = hsDataMap,
-                            speedtestData = speedtestData,
-                            distanceStr = distanceStr,
-                            txtAddressLabel = txtAddressLabel,
-                            txtNotSpecified = txtNotSpecified,
-                            txtGpsLabel = txtGpsLabel,
-                            txtSupportHeight = txtSupportHeight,
-                            txtDistanceLabel = txtDistanceLabel,
-                            txtFromMyPosition = txtFromMyPosition,
-                            txtGeneratedBy = txtGeneratedBy,
-                            txtimplementation = txtimplementation,
-                            txtLastModification = txtLastModification,
-                            txtIdentifiers = txtIdentifiers,
-                            txtIdNumber = txtIdNumber,
-                            txtAnfrStationNumber = txtAnfrStationNumber,
-                            txtDates = txtDates,
-                            txtIdSupportLabel = txtIdSupportLabel,
-                            txtSupportDetailsTitle = txtSupportDetailsTitle,
-                            txtSupportNature = txtSupportNature,
-                            txtOwner = txtOwner,
-                            txtExploitant = txtExploitant,
-                            mapBitmap = mapBitmap,
-                            photoBitmaps = photoBitmaps,
-                            txtCommunityPhotosTitle = txtCommunityPhotosTitle,
-                            incPhotos = incPhotos,
-                            incMap = incMap,
-                            incSupport = incSupport,
-                            incIds = incIds,
-                            incDates = incDates,
-                            incAddress = incAddress,
-                            incFreqs = incFreqs,
-                            incSpeedtest = incSpeedtest,
-                            incThroughput = incThroughput,
-                            incConfidential = incConfidential,
-                            incQrCode = incQrCode,
-                            shareOrder = shareOrder
-                        )
-                    }
-                } else {
+            MaterialTheme(colorScheme = if (forceDarkTheme) darkColorScheme() else lightColorScheme()) {
                 Surface(color = Color.Transparent) { // ⚠️ TRÈS IMPORTANT : Fond transparent pour ne pas colorer le vide
 
                     val distanceUnit = AppConfig.distanceUnit.intValue
@@ -4323,18 +4608,29 @@ fun shareFullAntennaCapture(
                                                                                 6.dp
                                                                             )
                                                                         )
+                                                                            val panelDimension =
+                                                                                extractFrequencyPanelDimension(
+                                                                                    physDetail
+                                                                                )
+                                                                            val detailWithoutDimension =
+                                                                                removePanelDimensionTag(
+                                                                                    physDetail
+                                                                                )
                                                                             val typePart =
-                                                                                physDetail.substringBefore(
+                                                                                detailWithoutDimension.substringBefore(
                                                                                     " : "
                                                                                 ).trim()
                                                                             val restPart =
-                                                                                physDetail.substringAfter(
+                                                                                detailWithoutDimension.substringAfter(
                                                                                     " : ",
                                                                                     ""
                                                                                 ).trim()
                                                                             val translatedType =
-                                                                                AnfrDisplayText.antennaType(
-                                                                                    typePart
+                                                                                appendPanelDimensionToType(
+                                                                                    AnfrDisplayText.antennaType(
+                                                                                        typePart
+                                                                                    ),
+                                                                                    panelDimension
                                                                                 )
                                                                             val finalPhysText =
                                                                                 if (restPart.isNotEmpty()) "$translatedType : $restPart" else translatedType
@@ -4688,17 +4984,28 @@ fun shareFullAntennaCapture(
                                                                         6.dp
                                                                     )
                                                                 )
+                                                                    val panelDimension =
+                                                                        extractFrequencyPanelDimension(
+                                                                            physDetail
+                                                                        )
+                                                                    val detailWithoutDimension =
+                                                                        removePanelDimensionTag(
+                                                                            physDetail
+                                                                        )
                                                                     val typePart =
-                                                                        physDetail.substringBefore(" : ")
+                                                                        detailWithoutDimension.substringBefore(" : ")
                                                                             .trim()
                                                                     val restPart =
-                                                                        physDetail.substringAfter(
+                                                                        detailWithoutDimension.substringAfter(
                                                                             " : ",
                                                                             ""
                                                                         ).trim()
                                                                     val translatedType =
-                                                                        AnfrDisplayText.antennaType(
-                                                                            typePart
+                                                                        appendPanelDimensionToType(
+                                                                            AnfrDisplayText.antennaType(
+                                                                                typePart
+                                                                            ),
+                                                                            panelDimension
                                                                         )
                                                                     val finalPhysText =
                                                                         if (restPart.isNotEmpty()) "$translatedType : $restPart" else translatedType
@@ -4760,7 +5067,6 @@ fun shareFullAntennaCapture(
             }
         }
     }
-    }
 
     val rootView = currentView.rootView as ViewGroup
     composeView.translationX = 10000f
@@ -4771,10 +5077,8 @@ fun shareFullAntennaCapture(
         }
 
         // ✅ CORRECTION : On s'assure que la vue fait 800dp de large si elle est scindée
-        // Le PDF utilise toujours le rendu large (design 2 colonnes), sans découpage.
         val isSplit = incSplitImage && incFreqs
-        val wideRender = isSplit || destination.isPdfExport()
-        val expectedWidthDp = if (wideRender) 800 else 400
+        val expectedWidthDp = if (isSplit) 800 else 400
         rootView.addView(composeView, ViewGroup.LayoutParams(expectedWidthDp.dpToPx(context), ViewGroup.LayoutParams.WRAP_CONTENT))
 
     } catch (e: Exception) {
@@ -4786,9 +5090,8 @@ fun shareFullAntennaCapture(
     composeView.postDelayed({
         try {
             val isSplit = incSplitImage && incFreqs
-            val wideRender = isSplit || destination.isPdfExport()
             // Si on split, la largeur demandée est de 800dp (400 x 2)
-            val expectedWidthDp = if (wideRender) 800 else 400
+            val expectedWidthDp = if (isSplit) 800 else 400
             val widthSpec = View.MeasureSpec.makeMeasureSpec(expectedWidthDp.dpToPx(context), View.MeasureSpec.EXACTLY)
             val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
             composeView.measure(widthSpec, heightSpec)
@@ -4802,28 +5105,6 @@ fun shareFullAntennaCapture(
                 rootView.removeView(composeView)
                 val imagesDir = File(context.cacheDir, "images")
                 imagesDir.mkdirs()
-
-                if (destination.isPdfExport()) {
-                    val pdfBitmaps = java.util.ArrayList<Bitmap>()
-                    pdfBitmaps.add(fullBitmap)
-                    val fileName = "GeoTower_rapport_${info.idAnfr}.pdf"
-                    if (destination == ShareImageDestination.PdfDownload) {
-                        if (downloadGeoTowerReportPdf(context, pdfBitmaps, fileName)) {
-                            Toast.makeText(context, context.getString(R.string.appstrings_pdf_downloaded), Toast.LENGTH_SHORT).show()
-                        } else {
-                            Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
-                        }
-                    } else {
-                        shareGeoTowerReportPdf(
-                            context = context,
-                            bitmaps = pdfBitmaps,
-                            fileName = fileName,
-                            chooserTitle = txtShareSiteVia
-                        )
-                    }
-                    onComplete?.invoke()
-                    return@postDelayed
-                }
 
                 val urisToShare = java.util.ArrayList<Uri>()
 
@@ -5138,10 +5419,27 @@ fun shareFullSiteCapture(
     }
 }
 
+/** « Orange · 1234567 » : station identifiée dans la notification de génération. */
+private fun LocalisationEntity.reportStationLabel(): String {
+    return listOf(operateur.orEmpty(), idAnfr)
+        .filter { it.isNotBlank() }
+        .joinToString(" · ")
+}
+
+/** Une page du rapport PDF support : la station concernée et la tranche de tableaux à publier. */
+private data class PdfSupportPagePlan(
+    val info: LocalisationEntity,
+    val technique: TechniqueEntity?,
+    val tables: PdfReportTables,
+    val slice: PdfReportTableSlice
+)
+
 /**
- * Génère un PDF multi-pages pour un support : une page par opérateur présent.
- * Chaque page réutilise la mise en page PDF mono-opérateur (GeoTowerPdfAntennaReportContent).
- * Les stations multiples d'un même opérateur sont regroupées : on retient la plus complète.
+ * Génère un PDF multi-pages pour un support : toutes les stations de tous les opérateurs, dans
+ * l'ordre des opérateurs. Chaque station ouvre une page reprenant la mise en page PDF mono-station
+ * (GeoTowerPdfAntennaReportContent), suivie d'autant de pages de suite que ses tableaux le demandent
+ * — aucune ligne n'est tronquée. Les pages sont écrites en PNG temporaires puis relues une par une
+ * à l'écriture du PDF, pour ne pas garder tout le rapport en mémoire.
  */
 fun shareSupportMultiOperatorPdf(
     context: Context,
@@ -5157,61 +5455,304 @@ fun shareSupportMultiOperatorPdf(
     incConfidential: Boolean,
     incQrCode: Boolean,
     chooserTitle: String,
-    txtPdfDownloaded: String,
     txtInitError: String,
+    bearingStr: String = "",
+    photoBitmaps: List<Bitmap> = emptyList(),
+    txtCommunityPhotosTitle: String = "",
+    incSupport: Boolean = true,
+    incPhotos: Boolean = false,
+    /** Meilleur speedtest SignalQuest par station (clé = `id_anfr`), vide si l'option est coupée. */
+    speedtestByStation: Map<String, fr.geotower.data.api.SqSpeedtestData> = emptyMap(),
+    incSpeedtest: Boolean = false,
+    incThroughput: Boolean = false,
     destination: ShareImageDestination = ShareImageDestination.Pdf,
     onComplete: (() -> Unit)? = null
 ) {
-    // Une page par opérateur : on regroupe les stations d'un même opérateur et on garde la plus fournie.
-    val perOperatorPages = antennas
+    // Toutes les stations, regroupées par opérateur : un support mutualisé en déclare plusieurs par
+    // opérateur (technos séparées, faisceaux hertziens…) et chacune porte ses propres fréquences.
+    val stations = antennas
         .groupBy { (it.operateur ?: "").trim() }
         .values
-        .map { group ->
-            group.maxByOrNull { a ->
-                (techniquesMap[a.idAnfr]?.technologies?.takeIf { it.isNotBlank() } ?: a.frequences ?: "").length
-            } ?: group.first()
-        }
+        .flatMap { group -> group.sortedBy { it.idAnfr } }
 
-    if (perOperatorPages.isEmpty()) {
+    if (stations.isEmpty()) {
+        PdfReportNotifier.cancelProgress(context)
         onComplete?.invoke()
         return
     }
 
-    val rootView = currentView.rootView as ViewGroup
-    val pageBitmaps = mutableListOf<Bitmap>()
-    val targetWidthPx = 800.dpToPx(context)
+    val txtUnknown = context.getString(R.string.appstrings_unknown)
+    val txtAzimuthNotSpecified = context.getString(R.string.appstrings_azimuth_not_specified)
+    val firstPageSpaceDp = if (AppConfig.shareSiteStatus.value) {
+        PDF_TABLE_SPACE_FIRST_PAGE_DP
+    } else {
+        PDF_TABLE_SPACE_FIRST_PAGE_NO_STATUS_DP
+    }
+    val pagePlans = stations.flatMap { station ->
+        val technique = techniquesMap[station.idAnfr]
+        val tables = buildPdfReportTables(station, technique, txtUnknown, txtAzimuthNotSpecified)
+        planPdfReportTableSlices(
+            tables = tables,
+            includeTables = true,
+            firstPageSpaceDp = firstPageSpaceDp
+        ).map { slice -> PdfSupportPagePlan(station, technique, tables, slice) }
+    }
+
+    val safeId = (physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId).shareSafeFilePart()
+    exportGeoTowerPdfPages(
+        context = context,
+        currentView = currentView,
+        pageCount = pagePlans.size,
+        fileName = "GeoTower_support_$safeId.pdf",
+        chooserTitle = chooserTitle,
+        txtInitError = txtInitError,
+        destination = destination,
+        onComplete = onComplete,
+        pageDetail = { index -> pagePlans[index].info.reportStationLabel() }
+    ) { index, pageLabel ->
+        val plan = pagePlans[index]
+        GeoTowerPdfAntennaReportContent(
+            context = context,
+            info = plan.info,
+            physique = physique,
+            technique = plan.technique,
+            hsDataMap = hsDataMap,
+            speedtestData = speedtestByStation[plan.info.idAnfr],
+            distanceStr = distanceStr,
+            txtAddressLabel = stringResource(R.string.appstrings_address_label),
+            txtNotSpecified = stringResource(R.string.appstrings_not_specified),
+            txtGpsLabel = stringResource(R.string.appstrings_gps_label),
+            txtSupportHeight = stringResource(R.string.appstrings_support_height),
+            txtDistanceLabel = stringResource(R.string.appstrings_distance_label),
+            txtFromMyPosition = stringResource(R.string.appstrings_from_my_position),
+            txtGeneratedBy = stringResource(R.string.appstrings_generated_by),
+            txtimplementation = stringResource(R.string.appstrings_implementation),
+            txtLastModification = stringResource(R.string.appstrings_last_modification),
+            txtIdentifiers = stringResource(R.string.appstrings_identifiers),
+            txtIdNumber = stringResource(R.string.appstrings_id_number),
+            txtAnfrStationNumber = stringResource(R.string.appstrings_anfr_station_number),
+            txtDates = stringResource(R.string.appstrings_dates),
+            txtIdSupportLabel = stringResource(R.string.appstrings_id_support_label),
+            txtSupportDetailsTitle = stringResource(R.string.appstrings_support_details_title),
+            txtSupportNature = stringResource(R.string.appstrings_support_nature),
+            txtOwner = stringResource(R.string.appstrings_owner),
+            txtExploitant = stringResource(R.string.appstrings_exploitant),
+            mapBitmap = mapBitmap,
+            photoBitmaps = photoBitmaps,
+            txtCommunityPhotosTitle = txtCommunityPhotosTitle,
+            incPhotos = incPhotos && photoBitmaps.isNotEmpty(),
+            incMap = incMap,
+            incSupport = incSupport,
+            incIds = true,
+            incDates = true,
+            incAddress = true,
+            incFreqs = true,
+            incSpeedtest = incSpeedtest,
+            incThroughput = incThroughput,
+            incConfidential = incConfidential,
+            incQrCode = incQrCode,
+            shareOrder = SUPPORT_PDF_BLOCKS,
+            tables = plan.tables,
+            tableSlice = plan.slice,
+            pageLabel = pageLabel,
+            bearingStr = bearingStr,
+            txtBearingLabel = stringResource(R.string.appstrings_bearing_label)
+        )
+    }
+}
+
+/**
+ * Rapport PDF d'une seule station (fiche antenne). Même moteur que le rapport support :
+ * une page d'identité puis autant de pages de suite que les tableaux en réclament.
+ */
+private fun shareAntennaReportPdf(
+    context: Context,
+    currentView: View,
+    info: LocalisationEntity,
+    physique: PhysiqueEntity?,
+    technique: TechniqueEntity?,
+    hsDataMap: Map<String, fr.geotower.data.models.SiteHsEntity>,
+    speedtestData: fr.geotower.data.api.SqSpeedtestData?,
+    distanceStr: String,
+    bearingStr: String,
+    mapBitmap: Bitmap?,
+    photoBitmaps: List<Bitmap>,
+    txtCommunityPhotosTitle: String,
+    incPhotos: Boolean,
+    incMap: Boolean,
+    incSupport: Boolean,
+    incIds: Boolean,
+    incDates: Boolean,
+    incAddress: Boolean,
+    incFreqs: Boolean,
+    incSpeedtest: Boolean,
+    incThroughput: Boolean,
+    incConfidential: Boolean,
+    incQrCode: Boolean,
+    shareOrder: List<String>,
+    chooserTitle: String,
+    txtInitError: String,
+    destination: ShareImageDestination,
+    onComplete: (() -> Unit)? = null
+) {
+    val tables = buildPdfReportTables(
+        info = info,
+        technique = technique,
+        txtUnknown = context.getString(R.string.appstrings_unknown),
+        txtAzimuthNotSpecified = context.getString(R.string.appstrings_azimuth_not_specified)
+    )
+    // La colonne de droite partage sa hauteur avec la carte de statut quand celle-ci est affichée.
+    val hasStatusCard = AppConfig.shareSiteStatus.value && shareOrder.contains("status")
+    val slices = planPdfReportTableSlices(
+        tables = tables,
+        includeTables = incFreqs && shareOrder.contains("freq"),
+        firstPageSpaceDp = if (hasStatusCard) {
+            PDF_TABLE_SPACE_FIRST_PAGE_DP
+        } else {
+            PDF_TABLE_SPACE_FIRST_PAGE_NO_STATUS_DP
+        }
+    )
+
+    exportGeoTowerPdfPages(
+        context = context,
+        currentView = currentView,
+        pageCount = slices.size,
+        fileName = "GeoTower_rapport_${info.idAnfr.shareSafeFilePart()}.pdf",
+        chooserTitle = chooserTitle,
+        txtInitError = txtInitError,
+        destination = destination,
+        onComplete = onComplete,
+        pageDetail = { info.reportStationLabel() }
+    ) { index, pageLabel ->
+        GeoTowerPdfAntennaReportContent(
+            context = context,
+            info = info,
+            physique = physique,
+            technique = technique,
+            hsDataMap = hsDataMap,
+            speedtestData = speedtestData,
+            distanceStr = distanceStr,
+            txtAddressLabel = stringResource(R.string.appstrings_address_label),
+            txtNotSpecified = stringResource(R.string.appstrings_not_specified),
+            txtGpsLabel = stringResource(R.string.appstrings_gps_label),
+            txtSupportHeight = stringResource(R.string.appstrings_support_height),
+            txtDistanceLabel = stringResource(R.string.appstrings_distance_label),
+            txtFromMyPosition = stringResource(R.string.appstrings_from_my_position),
+            txtGeneratedBy = stringResource(R.string.appstrings_generated_by),
+            txtimplementation = stringResource(R.string.appstrings_implementation),
+            txtLastModification = stringResource(R.string.appstrings_last_modification),
+            txtIdentifiers = stringResource(R.string.appstrings_identifiers),
+            txtIdNumber = stringResource(R.string.appstrings_id_number),
+            txtAnfrStationNumber = stringResource(R.string.appstrings_anfr_station_number),
+            txtDates = stringResource(R.string.appstrings_dates),
+            txtIdSupportLabel = stringResource(R.string.appstrings_id_support_label),
+            txtSupportDetailsTitle = stringResource(R.string.appstrings_support_details_title),
+            txtSupportNature = stringResource(R.string.appstrings_support_nature),
+            txtOwner = stringResource(R.string.appstrings_owner),
+            txtExploitant = stringResource(R.string.appstrings_exploitant),
+            mapBitmap = mapBitmap,
+            photoBitmaps = photoBitmaps,
+            txtCommunityPhotosTitle = txtCommunityPhotosTitle,
+            incPhotos = incPhotos,
+            incMap = incMap,
+            incSupport = incSupport,
+            incIds = incIds,
+            incDates = incDates,
+            incAddress = incAddress,
+            incFreqs = incFreqs,
+            incSpeedtest = incSpeedtest,
+            incThroughput = incThroughput,
+            incConfidential = incConfidential,
+            incQrCode = incQrCode,
+            shareOrder = shareOrder,
+            tables = tables,
+            tableSlice = slices[index],
+            pageLabel = pageLabel,
+            bearingStr = bearingStr,
+            txtBearingLabel = stringResource(R.string.appstrings_bearing_label)
+        )
+    }
+}
+
+/**
+ * Rend séquentiellement les pages d'un rapport PDF hors écran (une page = un bitmap au gabarit A4),
+ * spoole chacune en PNG temporaire, puis partage ou enregistre le document.
+ */
+private fun exportGeoTowerPdfPages(
+    context: Context,
+    currentView: View,
+    pageCount: Int,
+    fileName: String,
+    chooserTitle: String,
+    txtInitError: String,
+    destination: ShareImageDestination,
+    onComplete: (() -> Unit)?,
+    /** Station rendue par la page, affichée dans la notification de progression. */
+    pageDetail: (pageIndex: Int) -> String = { "" },
+    pageContent: @Composable (pageIndex: Int, pageLabel: String) -> Unit
+) {
+    val rootView = currentView.rootView as? ViewGroup
+    if (pageCount <= 0 || rootView == null) {
+        PdfReportNotifier.cancelProgress(context)
+        onComplete?.invoke()
+        return
+    }
+
+    val spoolDir = File(context.cacheDir, "pdf_pages")
+    val pageFiles = mutableListOf<File>()
+    val targetWidthPx = PDF_PAGE_WIDTH_DP.toInt().dpToPx(context)
+    runCatching {
+        spoolDir.mkdirs()
+        spoolDir.listFiles()?.forEach { it.delete() }
+    }
 
     fun finishAndExport() {
         try {
-            if (pageBitmaps.isEmpty()) return
-            val safeId = (physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId).shareSafeFilePart()
-            val fileName = "GeoTower_support_$safeId.pdf"
+            if (pageFiles.isEmpty()) {
+                Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
+                return
+            }
+            val pages = GeoTowerReportPdfPages.Spooled(pageFiles.toList())
             if (destination == ShareImageDestination.PdfDownload) {
-                val ok = downloadGeoTowerReportPdf(context, pageBitmaps, fileName)
-                Toast.makeText(context, if (ok) txtPdfDownloaded else txtInitError, Toast.LENGTH_SHORT).show()
+                val savedUri = downloadGeoTowerReportPdf(context, pages, fileName)
+                if (savedUri != null) {
+                    // Le rapport est enregistré : on propose de l'ouvrir plutôt qu'un simple toast.
+                    PdfDownloadNotice.show(savedUri, fileName)
+                    PdfReportNotifier.showDownloaded(context, savedUri, fileName)
+                } else {
+                    Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
+                }
             } else {
                 shareGeoTowerReportPdf(
                     context = context,
-                    bitmaps = pageBitmaps,
+                    pages = pages,
                     fileName = fileName,
                     chooserTitle = chooserTitle
                 )
             }
         } catch (e: Exception) {
-            AppLogger.w(TAG_SHARE_IMAGE, "Support multi-operator PDF export failed", e)
+            AppLogger.w(TAG_SHARE_IMAGE, "Report PDF export failed", e)
             Toast.makeText(context, txtInitError, Toast.LENGTH_SHORT).show()
         } finally {
+            // Le PDF est écrit : les pages intermédiaires n'ont plus de raison d'occuper le cache.
+            pageFiles.forEach { runCatching { it.delete() } }
+            PdfReportNotifier.cancelProgress(context)
             onComplete?.invoke()
         }
     }
 
     fun renderPageAt(index: Int) {
-        if (index >= perOperatorPages.size) {
+        if (index >= pageCount) {
             finishAndExport()
             return
         }
-        val antenna = perOperatorPages[index]
-        val technique = techniquesMap[antenna.idAnfr]
+        val pageLabel = context.getString(R.string.appstrings_pdf_page_indicator, index + 1, pageCount)
+        PdfReportNotifier.showProgress(
+            context = context,
+            pageNumber = index + 1,
+            pageCount = pageCount,
+            detail = pageDetail(index)
+        )
         val composeView = ComposeView(context).apply {
             setViewTreeLifecycleOwner(currentView.findViewTreeLifecycleOwner())
             setViewTreeSavedStateRegistryOwner(currentView.findViewTreeSavedStateRegistryOwner())
@@ -5219,48 +5760,7 @@ fun shareSupportMultiOperatorPdf(
             setContent {
                 MaterialTheme(colorScheme = lightColorScheme()) {
                     Surface(color = Color.White) {
-                        GeoTowerPdfAntennaReportContent(
-                            context = context,
-                            info = antenna,
-                            physique = physique,
-                            technique = technique,
-                            hsDataMap = hsDataMap,
-                            speedtestData = null,
-                            distanceStr = distanceStr,
-                            txtAddressLabel = stringResource(R.string.appstrings_address_label),
-                            txtNotSpecified = stringResource(R.string.appstrings_not_specified),
-                            txtGpsLabel = stringResource(R.string.appstrings_gps_label),
-                            txtSupportHeight = stringResource(R.string.appstrings_support_height),
-                            txtDistanceLabel = stringResource(R.string.appstrings_distance_label),
-                            txtFromMyPosition = stringResource(R.string.appstrings_from_my_position),
-                            txtGeneratedBy = stringResource(R.string.appstrings_generated_by),
-                            txtimplementation = stringResource(R.string.appstrings_implementation),
-                            txtLastModification = stringResource(R.string.appstrings_last_modification),
-                            txtIdentifiers = stringResource(R.string.appstrings_identifiers),
-                            txtIdNumber = stringResource(R.string.appstrings_id_number),
-                            txtAnfrStationNumber = stringResource(R.string.appstrings_anfr_station_number),
-                            txtDates = stringResource(R.string.appstrings_dates),
-                            txtIdSupportLabel = stringResource(R.string.appstrings_id_support_label),
-                            txtSupportDetailsTitle = stringResource(R.string.appstrings_support_details_title),
-                            txtSupportNature = stringResource(R.string.appstrings_support_nature),
-                            txtOwner = stringResource(R.string.appstrings_owner),
-                            txtExploitant = stringResource(R.string.appstrings_exploitant),
-                            mapBitmap = mapBitmap,
-                            photoBitmaps = emptyList(),
-                            txtCommunityPhotosTitle = "",
-                            incPhotos = false,
-                            incMap = incMap,
-                            incSupport = true,
-                            incIds = true,
-                            incDates = true,
-                            incAddress = true,
-                            incFreqs = true,
-                            incSpeedtest = false,
-                            incThroughput = false,
-                            incConfidential = incConfidential,
-                            incQrCode = incQrCode,
-                            shareOrder = listOf("map", "support", "ids", "dates", "address", "freq", "status")
-                        )
+                        pageContent(index, pageLabel)
                     }
                 }
             }
@@ -5271,7 +5771,7 @@ fun shareSupportMultiOperatorPdf(
             composeView.translationX = 10000f
             rootView.addView(composeView, ViewGroup.LayoutParams(targetWidthPx, ViewGroup.LayoutParams.WRAP_CONTENT))
         } catch (e: Exception) {
-            AppLogger.w(TAG_SHARE_IMAGE, "Support PDF page setup failed", e)
+            AppLogger.w(TAG_SHARE_IMAGE, "Report PDF page setup failed", e)
             renderPageAt(index + 1)
             return
         }
@@ -5285,18 +5785,23 @@ fun shareSupportMultiOperatorPdf(
                 if (composeView.measuredWidth > 0 && composeView.measuredHeight > 0) {
                     val raw = Bitmap.createBitmap(composeView.measuredWidth, composeView.measuredHeight, Bitmap.Config.ARGB_8888)
                     composeView.draw(Canvas(raw))
-                    // Plafonne la résolution pour tenir plusieurs pages en mémoire sans perte visible.
-                    val cappedWidth = 1400
-                    val page = if (raw.width > cappedWidth) {
-                        val scaledHeight = (raw.height.toLong() * cappedWidth / raw.width).toInt().coerceAtLeast(1)
-                        Bitmap.createScaledBitmap(raw, cappedWidth, scaledHeight, true).also { if (it != raw) raw.recycle() }
+                    val page = if (raw.width > PDF_PAGE_MAX_WIDTH_PX) {
+                        val scaledHeight = (raw.height.toLong() * PDF_PAGE_MAX_WIDTH_PX / raw.width)
+                            .toInt()
+                            .coerceAtLeast(1)
+                        Bitmap.createScaledBitmap(raw, PDF_PAGE_MAX_WIDTH_PX, scaledHeight, true)
+                            .also { if (it != raw) raw.recycle() }
                     } else {
                         raw
                     }
-                    pageBitmaps.add(page)
+                    // Spool immédiat : une seule page plein format vit en mémoire à la fois.
+                    val pageFile = File(spoolDir, "page_${"%03d".format(pageFiles.size + 1)}.png")
+                    FileOutputStream(pageFile).use { page.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                    page.recycle()
+                    pageFiles.add(pageFile)
                 }
             } catch (e: Exception) {
-                AppLogger.w(TAG_SHARE_IMAGE, "Support PDF page capture failed", e)
+                AppLogger.w(TAG_SHARE_IMAGE, "Report PDF page capture failed", e)
             } finally {
                 if (composeView.parent != null) rootView.removeView(composeView)
                 renderPageAt(index + 1)
@@ -5696,6 +6201,17 @@ fun AntennaShareMenu(
                 isGeneratingShare = true
                 generationMessage = txtShareImageGenerationInProgress
                 showSelectionSheet = false
+                ShareHistoryStore.record(
+                    context = context,
+                    kind = ShareHistoryStore.KIND_MOBILE_SITE,
+                    destination = destination.historyKey(),
+                    supportId = physique?.idSupport,
+                    stationId = info.idAnfr,
+                    label = info.operateur,
+                    address = technique?.adresse,
+                    latitude = info.latitude,
+                    longitude = info.longitude
+                )
                 val isPdfDestination = destination.isPdfExport()
                 val shareOnlyElevationProfile = !isPdfDestination && isOnlyElevationProfileSelected(
                     shareOrder = shareOrder,
@@ -5910,6 +6426,18 @@ fun SupportShareMenu(
         mutableStateOf(normalizeSupportShareOrder(SharePrefs.supportOrder(prefs), hasRadioEntries))
     }
 
+    // Le PDF détaille chaque station : il reprend donc les préférences du rapport de site pour le
+    // meilleur speedtest et le débit théorique, sous réserve des flags distants correspondants.
+    val featureFlags by RemoteFeatureFlags.config
+    val incReportSpeedtest = AppConfig.siteShowSpeedtest.value &&
+        SharePrefs.siteSpeedtestEnabled.read(prefs) &&
+        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_SPEEDTESTS) &&
+        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_SPEEDTESTS) &&
+        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_SPEEDTESTS)
+    val incReportThroughput = SharePrefs.siteThroughputEnabled.read(prefs) &&
+        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THROUGHPUT_CALCULATOR) &&
+        featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_THROUGHPUT_CALCULATOR)
+
     // ✅ FORCE LE RECHARGEMENT À CHAQUE OUVERTURE
     LaunchedEffect(showShareSheet) {
         if (showShareSheet) {
@@ -5954,8 +6482,9 @@ fun SupportShareMenu(
     val txtPhotoCopiedToClipboard = stringResource(R.string.appstrings_photo_copied_to_clipboard)
     val txtMove = stringResource(R.string.appstrings_move)
     val txtInitError = stringResource(R.string.appstrings_init_error)
-    val txtPdfDownloaded = stringResource(R.string.appstrings_pdf_downloaded)
     val txtRadioEntriesTitle = stringResource(R.string.appstrings_radio_share_block_support_entries)
+    // Identifie le support dans la notification de génération.
+    val supportReportLabel = physique?.idSupport?.takeIf { it.isNotBlank() } ?: siteId
 
     Button(
         onClick = { safeClick { showShareSheet = true } },
@@ -6103,11 +6632,30 @@ fun SupportShareMenu(
                 }
             }
 
+            // L'historique retient l'identifiant de route du support (celui qui a ouvert la page),
+            // pas `physique.idSupport` : c'est lui qui permet de rouvrir la fiche à l'identique.
+            fun recordSupportShare(destination: ShareImageDestination) {
+                ShareHistoryStore.record(
+                    context = context,
+                    kind = ShareHistoryStore.KIND_MOBILE_SUPPORT,
+                    destination = destination.historyKey(),
+                    supportId = siteId,
+                    label = antennas.mapNotNull { it.operateur?.takeIf { name -> name.isNotBlank() } }
+                        .distinct()
+                        .joinToString(", "),
+                    address = techniquesMap[mainInfo.idAnfr]?.adresse,
+                    latitude = mainInfo.latitude,
+                    longitude = mainInfo.longitude,
+                    itemCount = antennas.size
+                )
+            }
+
             fun startSupportImageExport(destination: ShareImageDestination) {
                 if (isGeneratingShare) return
                 isGeneratingShare = true
                 generationMessage = txtShareImagePreparingInProgress
                 showSelectionSheet = false
+                recordSupportShare(destination)
                 globalMapRef?.let { map -> map.controller.setZoom(17.5); map.controller.setCenter(org.osmdroid.util.GeoPoint(mainInfo.latitude, mainInfo.longitude)) }
                 scope.launch {
                     val sharePhotoBitmaps = if (incPhotos && hasSharePhotos && shareOrder.contains("photos")) {
@@ -6146,8 +6694,29 @@ fun SupportShareMenu(
                 isGeneratingShare = true
                 generationMessage = txtShareImagePreparingInProgress
                 showSelectionSheet = false
+                recordSupportShare(destination)
+                // La collecte des speedtests précède le rendu : on signale la génération dès maintenant.
+                PdfReportNotifier.showPreparing(context, supportReportLabel)
                 globalMapRef?.let { map -> map.controller.setZoom(17.5); map.controller.setCenter(org.osmdroid.util.GeoPoint(mainInfo.latitude, mainInfo.longitude)) }
                 scope.launch {
+                    val sharePhotoBitmaps = if (incPhotos && hasSharePhotos && shareOrder.contains("photos")) {
+                        loadSharePhotoBitmaps(visibleSharePhotos)
+                    } else {
+                        emptyList()
+                    }
+                    // Une page de rapport = une station : on va chercher le meilleur speedtest de
+                    // chacune. Sur réseau lent, le PDF part sans les speedtests plutôt que d'attendre.
+                    val speedtestByStation = if (incReportSpeedtest) {
+                        withTimeoutOrNull(REPORT_SPEEDTEST_TIMEOUT_MS) {
+                            loadBestSpeedtestsForReport(
+                                antennas = antennas,
+                                prefs = prefs,
+                                supportId = physique?.idSupport
+                            )
+                        } ?: emptyMap()
+                    } else {
+                        emptyMap()
+                    }
                     currentView.postDelayed({
                         try {
                             val mapBmp = if (incMap) { try { globalMapRef?.let { map -> val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888); map.draw(Canvas(bmp)); bmp } } catch (e: Exception) { null } } else null
@@ -6165,13 +6734,21 @@ fun SupportShareMenu(
                                 incConfidential = incConfidential,
                                 incQrCode = incQrCode,
                                 chooserTitle = txtShareSiteVia,
-                                txtPdfDownloaded = txtPdfDownloaded,
                                 txtInitError = txtInitError,
+                                bearingStr = bearingStr,
+                                photoBitmaps = sharePhotoBitmaps,
+                                txtCommunityPhotosTitle = txtCommunityPhotosTitle,
+                                incSupport = incSupport,
+                                incPhotos = incPhotos,
+                                speedtestByStation = speedtestByStation,
+                                incSpeedtest = incReportSpeedtest,
+                                incThroughput = incReportThroughput,
                                 destination = destination,
                                 onComplete = { isGeneratingShare = false }
                             )
                         } catch (e: Exception) {
                             AppLogger.w(TAG_SHARE_IMAGE, "Support PDF generation failed", e)
+                            PdfReportNotifier.cancelProgress(context)
                             isGeneratingShare = false
                         }
                     }, 300)

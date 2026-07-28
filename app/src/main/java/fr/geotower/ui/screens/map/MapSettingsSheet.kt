@@ -58,6 +58,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 private val OperatorFilterButtonHeight = 76.dp
+
+/** Jaune/orange « projet », identique au statut affiché sur la fiche site (SiteStatusCard). */
+internal val ProjectFilterColor = Color(0xFFFFA000)
 private const val PREF_OPERATOR_FILTER_METRO_EXPANDED = "map_operator_filter_metro_expanded"
 private const val PREF_OPERATOR_FILTER_OVERSEAS_EXPANDED = "map_operator_filter_overseas_expanded"
 
@@ -127,6 +130,7 @@ fun MapFiltersControls(
     var showSitesInService by AppConfig.showSitesInService
     var showSitesOutOfService by AppConfig.showSitesOutOfService
     var hideUndergroundSites by AppConfig.hideUndergroundSites
+    var showProjectSites by AppConfig.showProjectSites
     var showOnlyZbSites by AppConfig.showOnlyZbSites
 
     // Variables Technos
@@ -466,6 +470,18 @@ fun MapFiltersControls(
                 ) {
                     showSitesOutOfService = it
                     prefs.edit().putBoolean("show_sites_out_of_service", it).apply()
+                }
+
+                // Sites dont AUCUNE émission n'est en service (pas ceux qui ont seulement
+                // quelques nouvelles fréquences en projet).
+                SelectableButton(
+                    label = stringResource(R.string.appstrings_sites_project_label),
+                    isSelected = showProjectSites,
+                    modifier = Modifier.weight(1f),
+                    selectedColor = ProjectFilterColor
+                ) {
+                    showProjectSites = it
+                    prefs.edit().putBoolean(AppConfig.PREF_SHOW_PROJECT_SITES, it).apply()
                 }
             }
 

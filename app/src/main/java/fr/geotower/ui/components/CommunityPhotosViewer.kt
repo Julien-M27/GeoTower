@@ -94,14 +94,15 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import coil.compose.AsyncImage
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.data.api.RetrofitClient
+import fr.geotower.ui.components.PhotoAsyncImage
 import fr.geotower.ui.components.SharedMiniMapCard
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
@@ -1130,6 +1131,7 @@ fun CommunityPhotosSectionShared(
     val txtPhotoSavedToGallery = stringResource(R.string.appstrings_photo_saved_to_gallery)
     val txtPhotoExportFailed = stringResource(R.string.appstrings_photo_export_failed)
     var photoExportInProgress by remember { mutableStateOf(false) }
+    val sizing = LocalGeoTowerUiSizing.current
 
     fun runPhotoExport(successMessage: String, action: suspend () -> Unit) {
         if (photoExportInProgress) return
@@ -1153,13 +1155,13 @@ fun CommunityPhotosSectionShared(
         elevation = CardDefaults.cardElevation(0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.PhotoCamera, null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                 Text(sectionTitle, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             }
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
             if (!isOnline) {
                 Column(
@@ -1173,22 +1175,22 @@ fun CommunityPhotosSectionShared(
                         imageVector = Icons.Default.CloudOff,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(48.dp)
+                        modifier = Modifier.size(sizing.component(48.dp))
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                     Text(
                         text = stringResource(R.string.appstrings_community_photos_offline),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         textAlign = TextAlign.Center,
                         fontWeight = FontWeight.Medium,
-                        style = MaterialTheme.typography.bodyMedium
+                        style = sizing.textStyle(MaterialTheme.typography.bodyMedium)
                     )
                 }
 
                 if (placeholderRes != null) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                     LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)),
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         item {
@@ -1197,7 +1199,7 @@ fun CommunityPhotosSectionShared(
                                 contentDescription = stringResource(R.string.appstrings_support_image_desc),
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
-                                    .size(120.dp)
+                                    .size(sizing.component(120.dp))
                                     .clip(thumbnailShape)
                                     .background(MaterialTheme.colorScheme.surfaceVariant)
                                     .clickable { showPlaceholderFullScreen = true }
@@ -1207,7 +1209,7 @@ fun CommunityPhotosSectionShared(
                 }
             } else {
                 // 🌐 LOGIQUE EN LIGNE
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)), modifier = Modifier.fillMaxWidth()) {
 
                     // 🚨 VÉRIFICATION : EST-CE QUE L'OPÉRATEUR EST FREE ?
                     if (operatorName != null && operatorName.contains("FREE", ignoreCase = true)) {
@@ -1216,20 +1218,18 @@ fun CommunityPhotosSectionShared(
                             itemsIndexed(filteredPhotos, key = { _, photo -> photo.url }) { index, photo ->
                                 Box(
                                     modifier = Modifier
-                                        .size(120.dp)
+                                        .size(sizing.component(120.dp))
                                         .clip(thumbnailShape)
                                         .clickable {
                                             selectedPhotosSnapshot = filteredPhotos
                                             selectedPhotoIndex = index
                                         }
                                 ) {
-                                    AsyncImage(
+                                    PhotoAsyncImage(
                                         model = photo.url,
                                         contentDescription = stringResource(R.string.appstrings_site_photo_desc),
                                         contentScale = ContentScale.Crop,
-                                        error = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
                                         fallback = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
-                                        placeholder = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
                                         modifier = Modifier.fillMaxSize()
                                     )
                                 }
@@ -1239,13 +1239,13 @@ fun CommunityPhotosSectionShared(
                         if (filteredPhotos.isNotEmpty() && placeholderRes != null) {
                             item {
                                 Box(
-                                    modifier = Modifier.height(120.dp),
+                                    modifier = Modifier.height(sizing.component(120.dp)),
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .width(2.dp)
-                                            .height(80.dp)
+                                            .width(sizing.component(2.dp))
+                                            .height(sizing.component(80.dp))
                                             .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                                     )
                                 }
@@ -1260,7 +1260,7 @@ fun CommunityPhotosSectionShared(
                                     contentDescription = stringResource(R.string.appstrings_support_image_desc),
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
-                                        .size(120.dp)
+                                        .size(sizing.component(120.dp))
                                         .clip(thumbnailShape)
                                         .background(MaterialTheme.colorScheme.surfaceVariant)
                                         .clickable { showPlaceholderFullScreen = true }
@@ -1272,7 +1272,7 @@ fun CommunityPhotosSectionShared(
                             item {
                                 Box(
                                     modifier = Modifier
-                                        .size(120.dp)
+                                        .size(sizing.component(120.dp))
                                         .clip(thumbnailShape)
                                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
                                         .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), thumbnailShape)
@@ -1287,16 +1287,16 @@ fun CommunityPhotosSectionShared(
                                             imageVector = Icons.Default.Outbox,
                                             contentDescription = null,
                                             tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(28.dp)
+                                            modifier = Modifier.size(sizing.component(28.dp))
                                         )
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                                         Text(
                                             text = stringResource(R.string.appstrings_upload_photos_prompt),
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary,
-                                            style = MaterialTheme.typography.bodySmall,
+                                            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                                             textAlign = TextAlign.Center,
-                                            modifier = Modifier.padding(horizontal = 8.dp)
+                                            modifier = Modifier.padding(horizontal = sizing.spacing(8.dp))
                                         )
                                     }
                                 }
@@ -1310,20 +1310,18 @@ fun CommunityPhotosSectionShared(
                             itemsIndexed(filteredPhotos, key = { _, photo -> photo.url }) { index, photo ->
                                 Box(
                                     modifier = Modifier
-                                        .size(120.dp)
+                                        .size(sizing.component(120.dp))
                                         .clip(thumbnailShape)
                                         .clickable {
                                             selectedPhotosSnapshot = filteredPhotos
                                             selectedPhotoIndex = index
                                         }
                                 ) {
-                                    AsyncImage(
+                                    PhotoAsyncImage(
                                         model = photo.url,
                                         contentDescription = stringResource(R.string.appstrings_site_photo_desc),
                                         contentScale = ContentScale.Crop,
-                                        error = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
                                         fallback = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
-                                        placeholder = painterResource(id = placeholderRes ?: R.drawable.chateau_deau),
                                         modifier = Modifier.fillMaxSize()
                                     )
                                 }
@@ -1335,13 +1333,13 @@ fun CommunityPhotosSectionShared(
                         if (filteredPhotos.isNotEmpty() && placeholderRes != null) {
                             item {
                                 Box(
-                                    modifier = Modifier.height(120.dp), // Même hauteur que le carrousel
+                                    modifier = Modifier.height(sizing.component(120.dp)), // Même hauteur que le carrousel
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .width(2.dp) // Épaisseur de la ligne
-                                            .height(80.dp) // Un peu plus petite que les photos pour faire élégant
+                                            .width(sizing.component(2.dp)) // Épaisseur de la ligne
+                                            .height(sizing.component(80.dp)) // Un peu plus petite que les photos pour faire élégant
                                             .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                                     )
                                 }
@@ -1356,7 +1354,7 @@ fun CommunityPhotosSectionShared(
                                     contentDescription = stringResource(R.string.appstrings_support_image_desc),
                                     contentScale = ContentScale.Crop,
                                     modifier = Modifier
-                                        .size(120.dp)
+                                        .size(sizing.component(120.dp))
                                         .clip(thumbnailShape)
                                         .background(MaterialTheme.colorScheme.surfaceVariant)
                                         .clickable { showPlaceholderFullScreen = true }
@@ -1370,7 +1368,7 @@ fun CommunityPhotosSectionShared(
                             item {
                                 Box(
                                     modifier = Modifier
-                                        .size(120.dp)
+                                        .size(sizing.component(120.dp))
                                         .clip(thumbnailShape)
                                         .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f))
                                         .border(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.5f), thumbnailShape)
@@ -1385,16 +1383,16 @@ fun CommunityPhotosSectionShared(
                                             imageVector = Icons.Default.Outbox,
                                             contentDescription = null,
                                             tint = MaterialTheme.colorScheme.primary,
-                                            modifier = Modifier.size(28.dp)
+                                            modifier = Modifier.size(sizing.component(28.dp))
                                         )
-                                        Spacer(modifier = Modifier.height(8.dp))
+                                        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                                         Text(
                                             text = stringResource(R.string.appstrings_upload_photos_prompt),
                                             fontWeight = FontWeight.Bold,
                                             color = MaterialTheme.colorScheme.primary,
-                                            style = MaterialTheme.typography.bodySmall,
+                                            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                                             textAlign = TextAlign.Center,
-                                            modifier = Modifier.padding(horizontal = 8.dp)
+                                            modifier = Modifier.padding(horizontal = sizing.spacing(8.dp))
                                         )
                                     }
                                 }
@@ -1432,7 +1430,7 @@ fun CommunityPhotosSectionShared(
                         onClick = { showPlaceholderFullScreen = false },
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(top = 20.dp, end = 4.dp)
+                            .padding(top = sizing.spacing(20.dp), end = sizing.spacing(4.dp))
                             .background(overlayButtonBg, shape = CircleShape)
                     ) {
                         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_close), tint = viewerContentColor)
@@ -1442,10 +1440,10 @@ fun CommunityPhotosSectionShared(
                         modifier = Modifier
                             .align(Alignment.BottomStart)
                             .padding(
-                                start = 16.dp,
+                                start = sizing.spacing(16.dp),
                                 bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 12.dp
                             ),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         PhotoViewerActionButton(
@@ -1643,10 +1641,12 @@ fun CommunityPhotosSectionShared(
                                 )
                         ) {
                             // --- On utilise filteredPhotos ---
-                            AsyncImage(
+                            PhotoAsyncImage(
                                 model = viewerPhotos[page].url,
                                 contentDescription = stringResource(R.string.appstrings_full_screen_photo_desc),
                                 contentScale = ContentScale.Fit,
+                                containerColor = Color.Transparent,
+                                indicatorColor = viewerContentColor,
                                 onSuccess = { state ->
                                     val drawable = state.result.drawable
                                     if (drawable.intrinsicWidth > 0 && drawable.intrinsicHeight > 0) {
@@ -1669,9 +1669,9 @@ fun CommunityPhotosSectionShared(
                     if (pagerState.currentPage > 0) {
                         IconButton(
                             onClick = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
-                            modifier = Modifier.align(Alignment.CenterStart).padding(start = photoStartPadding).size(28.dp).background(overlayButtonBg, CircleShape)
+                            modifier = Modifier.align(Alignment.CenterStart).padding(start = photoStartPadding).size(sizing.component(28.dp)).background(overlayButtonBg, CircleShape)
                         ) {
-                            Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.appstrings_previous), tint = viewerContentColor, modifier = Modifier.size(20.dp))
+                            Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = stringResource(R.string.appstrings_previous), tint = viewerContentColor, modifier = Modifier.size(sizing.component(20.dp)))
                         }
                     }
 
@@ -1679,30 +1679,30 @@ fun CommunityPhotosSectionShared(
                     if (pagerState.currentPage < viewerPhotos.size - 1) {
                         IconButton(
                             onClick = { coroutineScope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
-                            modifier = Modifier.align(Alignment.CenterEnd).padding(end = photoEndPadding).size(28.dp).background(overlayButtonBg, CircleShape)
+                            modifier = Modifier.align(Alignment.CenterEnd).padding(end = photoEndPadding).size(sizing.component(28.dp)).background(overlayButtonBg, CircleShape)
                         ) {
-                            Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.appstrings_next), tint = viewerContentColor, modifier = Modifier.size(20.dp))
+                            Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.appstrings_next), tint = viewerContentColor, modifier = Modifier.size(sizing.component(20.dp)))
                         }
                     }
 
                     // --- TEXTES EN HAUT ---
                     Row(
-                        modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(top = 28.dp, start = 56.dp, end = 56.dp),
+                        modifier = Modifier.fillMaxWidth().align(Alignment.TopCenter).padding(top = sizing.spacing(28.dp), start = sizing.spacing(56.dp), end = sizing.spacing(56.dp)),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(
                             text = fullScreenTitle,
                             color = viewerContentColor,
-                            style = MaterialTheme.typography.titleLarge.copy(shadow = if (isDark) androidx.compose.ui.graphics.Shadow(color = Color.Black, blurRadius = 8f) else null),
+                            style = sizing.textStyle(MaterialTheme.typography.titleLarge).copy(shadow = if (isDark) androidx.compose.ui.graphics.Shadow(color = Color.Black, blurRadius = 8f) else null),
                             fontWeight = FontWeight.Bold,
                             textAlign = TextAlign.Center
                         )
                     }
 
                     Row(
-                        modifier = Modifier.align(Alignment.TopStart).padding(top = 28.dp, start = 12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.align(Alignment.TopStart).padding(top = sizing.spacing(28.dp), start = sizing.spacing(12.dp)),
+                        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (canFavoriteCurrentPhoto) {
@@ -1722,7 +1722,7 @@ fun CommunityPhotosSectionShared(
                             selectedPhotosSnapshot = emptyList()
                             coroutineScope.launch { dismissOffset.snapTo(0f) }
                         },
-                        modifier = Modifier.align(Alignment.TopEnd).padding(top = 20.dp, end = 4.dp).background(overlayButtonBg, shape = CircleShape)
+                        modifier = Modifier.align(Alignment.TopEnd).padding(top = sizing.spacing(20.dp), end = sizing.spacing(4.dp)).background(overlayButtonBg, shape = CircleShape)
                     ) {
                         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_close), tint = viewerContentColor)
                     }
@@ -1735,7 +1735,7 @@ fun CommunityPhotosSectionShared(
                         horizontalAlignment = Alignment.Start
                     ) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (hasCurrentPhotoInfo) {
@@ -1772,17 +1772,17 @@ fun CommunityPhotosSectionShared(
                             )
                         }
                         if (hasCurrentPhotoCaption) {
-                            Spacer(modifier = Modifier.height(8.dp))
+                            Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                             Column(
-                                modifier = Modifier.background(overlayButtonBg, badgeShape).padding(horizontal = 12.dp, vertical = 8.dp),
+                                modifier = Modifier.background(overlayButtonBg, badgeShape).padding(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(8.dp)),
                                 horizontalAlignment = Alignment.Start
                             ) {
                                 if (!currentPhoto.author.isNullOrBlank() && currentPhoto.author != "null") {
-                                    Text(text = stringResource(R.string.photo_by_author, currentPhoto.author), color = viewerContentColor, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold)
+                                    Text(text = stringResource(R.string.photo_by_author, currentPhoto.author), color = viewerContentColor, style = sizing.textStyle(MaterialTheme.typography.labelMedium), fontWeight = FontWeight.Bold)
                                 }
                                 val formattedDate = formatPhotoDate(currentPhoto.date)
                                 if (formattedDate.isNotEmpty()) {
-                                    Text(text = stringResource(R.string.photo_on_date, formattedDate), color = viewerContentColor.copy(alpha = 0.8f), style = MaterialTheme.typography.labelSmall)
+                                    Text(text = stringResource(R.string.photo_on_date, formattedDate), color = viewerContentColor.copy(alpha = 0.8f), style = sizing.textStyle(MaterialTheme.typography.labelSmall))
                                 }
                             }
                         }
@@ -1791,13 +1791,13 @@ fun CommunityPhotosSectionShared(
                     // --- COMPTEUR (On utilise filteredPhotos.size) ---
                     if (viewerPhotos.size > 1) {
                         Column(
-                            modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = photoBottomPadding, end = photoEndPadding).background(overlayButtonBg, pillButtonShape).padding(horizontal = 12.dp, vertical = 6.dp),
+                            modifier = Modifier.align(Alignment.BottomEnd).padding(bottom = photoBottomPadding, end = photoEndPadding).background(overlayButtonBg, pillButtonShape).padding(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(6.dp)),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
-                            Icon(imageVector = Icons.Default.Collections, contentDescription = null, tint = viewerContentColor, modifier = Modifier.size(18.dp))
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(text = "${pagerState.currentPage + 1} / ${viewerPhotos.size}", color = viewerContentColor, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.Bold)
+                            Icon(imageVector = Icons.Default.Collections, contentDescription = null, tint = viewerContentColor, modifier = Modifier.size(sizing.component(18.dp)))
+                            Spacer(modifier = Modifier.height(sizing.spacing(2.dp)))
+                            Text(text = "${pagerState.currentPage + 1} / ${viewerPhotos.size}", color = viewerContentColor, style = sizing.textStyle(MaterialTheme.typography.labelSmall), fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -1811,7 +1811,7 @@ fun CommunityPhotosSectionShared(
                                 .padding(bottom = photoBottomPadding)
                                 .onSizeChanged { containerWidth = it.width }
                                 .background(color = if (isDark) Color(0xFF2C2C2C) else Color(0xFFF0F0F0), shape = CircleShape)
-                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .padding(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(6.dp))
                                 .pointerInput(viewerPhotos.size) {
                                     detectDragGestures { change, _ ->
                                         if (containerWidth > 0) {
@@ -1827,7 +1827,7 @@ fun CommunityPhotosSectionShared(
                                 },
                             contentAlignment = Alignment.Center
                         ) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)), verticalAlignment = Alignment.CenterVertically) {
                                 val maxDots = 5
                                 val startDot = (pagerState.currentPage - maxDots / 2).coerceIn(0, maxOf(0, viewerPhotos.size - maxDots))
                                 val endDot = minOf(startDot + maxDots, viewerPhotos.size)
@@ -1844,7 +1844,7 @@ fun CommunityPhotosSectionShared(
                                     val animatedWidth by animateDpAsState(targetValue = if (isActive) 18.dp else 8.dp, animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessLow), label = "pillWidth")
 
                                     Box(
-                                        modifier = Modifier.height(24.dp).width(if (isActive) 24.dp else 12.dp).clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {
+                                        modifier = Modifier.height(sizing.component(24.dp)).width(sizing.component(if (isActive) 24.dp else 12.dp)).clickable(interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, indication = null) {
                                             coroutineScope.launch { pagerState.animateScrollToPage(iteration) }
                                         },
                                         contentAlignment = Alignment.Center
@@ -1878,18 +1878,19 @@ internal fun PhotoViewerActionButton(
     enabled: Boolean,
     onClick: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     IconButton(
         onClick = onClick,
         enabled = enabled,
         modifier = Modifier
-            .size(32.dp)
+            .size(sizing.component(32.dp))
             .background(backgroundColor, CircleShape)
     ) {
         Icon(
             imageVector = imageVector,
             contentDescription = contentDescription,
             tint = contentColor.copy(alpha = if (enabled) 1f else 0.38f),
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(sizing.component(18.dp))
         )
     }
 }
@@ -1919,7 +1920,7 @@ private fun PhotoFavoriteButton(
                 }
             ),
             tint = if (isFavorite) favoritePhotoColor else contentColor,
-            modifier = Modifier.size(18.dp)
+            modifier = Modifier.size(sizing.component(18.dp))
         )
     }
 }

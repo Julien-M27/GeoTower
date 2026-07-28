@@ -29,12 +29,12 @@ fun MappingOptionsBlock(
     // 1. Les 4 fournisseurs répartis sur 2 lignes pour ne pas écraser l'interface
     Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)), verticalAlignment = Alignment.CenterVertically) {
-            // Si on passe sur OSM et qu'on était en Satellite (2), on repasse en Clair (0) automatiquement
-            SettingsOptionCard(stringResource(R.string.mapping_provider_osm), Icons.Default.Public, mapProvider == 1, { safeClick("mapping_provider_osm") { onMapProviderChange(1); if (ignStyle == 2) onIgnStyleChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+            SettingsOptionCard(stringResource(R.string.mapping_provider_osm), Icons.Default.Public, mapProvider == 1, { safeClick("mapping_provider_osm") { onMapProviderChange(1) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
             SettingsOptionCard(stringResource(R.string.mapping_provider_ign), Icons.Default.Layers, mapProvider == 0, { safeClick("mapping_provider_ign") { onMapProviderChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
         }
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)), verticalAlignment = Alignment.CenterVertically) {
-            SettingsOptionCard(stringResource(R.string.mapping_provider_maplibre), Icons.Default.Explore, mapProvider == 2, { safeClick("mapping_provider_maplibre") { onMapProviderChange(2) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
+            // MapLibre n'a pas de vue satellite : on repasse en Clair (0) automatiquement
+            SettingsOptionCard(stringResource(R.string.mapping_provider_maplibre), Icons.Default.Explore, mapProvider == 2, { safeClick("mapping_provider_maplibre") { onMapProviderChange(2); if (ignStyle == 2) onIgnStyleChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
             SettingsOptionCard(stringResource(R.string.mapping_provider_topo), Icons.Default.Terrain, mapProvider == 3, { safeClick("mapping_provider_topo") { onMapProviderChange(3) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
         }
     }
@@ -55,8 +55,8 @@ fun MappingOptionsBlock(
                 SettingsOptionCard(stringResource(R.string.appearance_theme_light), Icons.Default.WbSunny, ignStyle == 0, { safeClick("mapping_style_light") { onIgnStyleChange(0) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
                 SettingsOptionCard(stringResource(R.string.appearance_theme_dark), Icons.Default.NightsStay, ignStyle == 1, { safeClick("mapping_style_dark") { onIgnStyleChange(1) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
 
-                // Le Satellite ne s'affiche QUE si on est sur l'IGN (mapProvider == 0)
-                if (mapProvider == 0) {
+                // Le Satellite s'affiche pour l'IGN (0) et pour OSM (1)
+                if (mapProvider == 0 || mapProvider == 1) {
                     SettingsOptionCard(stringResource(R.string.mapping_style_satellite), Icons.Default.Image, ignStyle == 2, { safeClick("mapping_style_satellite") { onIgnStyleChange(2) } }, Modifier.weight(1f), shape, border, bubbleColor, useOneUi)
                 }
             }

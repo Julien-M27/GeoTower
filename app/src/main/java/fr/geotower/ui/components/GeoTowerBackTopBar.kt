@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 
 @Composable
 fun GeoTowerBackTopBar(
@@ -39,6 +40,7 @@ fun GeoTowerBackTopBar(
     actionsWidth: Dp = 48.dp,
     actions: (@Composable RowScope.() -> Unit)? = null
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     GeoTowerBackTopBar(
         onBack = onBack,
         modifier = modifier,
@@ -50,7 +52,7 @@ fun GeoTowerBackTopBar(
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleLarge,
+            style = sizing.textStyle(MaterialTheme.typography.titleLarge),
             fontWeight = FontWeight.Bold,
             color = contentColor,
             maxLines = 1,
@@ -71,11 +73,15 @@ fun GeoTowerBackTopBar(
     actions: (@Composable RowScope.() -> Unit)? = null,
     titleContent: @Composable BoxScope.() -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    // La largeur reservee aux actions doit suivre l'echelle, sinon le titre se decentre
+    // quand les IconButton grossissent.
+    val scaledActionsWidth = sizing.component(actionsWidth)
     Row(
         modifier = modifier
             .fillMaxWidth()
             .background(backgroundColor)
-            .padding(vertical = 2.dp),
+            .padding(vertical = sizing.spacing(2.dp)),
         verticalAlignment = Alignment.CenterVertically
     ) {
         IconButton(onClick = onBack, enabled = backEnabled) {
@@ -91,10 +97,10 @@ fun GeoTowerBackTopBar(
             content = titleContent
         )
         if (actions == null) {
-            Spacer(Modifier.width(actionsWidth))
+            Spacer(Modifier.width(scaledActionsWidth))
         } else {
             Row(
-                modifier = Modifier.width(actionsWidth),
+                modifier = Modifier.width(scaledActionsWidth),
                 horizontalArrangement = Arrangement.End,
                 verticalAlignment = Alignment.CenterVertically,
                 content = actions

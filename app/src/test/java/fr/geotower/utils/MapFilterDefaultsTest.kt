@@ -17,6 +17,7 @@ class MapFilterDefaultsTest {
         assertTrue(ref.frequency.isFullyEnabled)
         assertTrue(ref.showSitesInService)
         assertTrue(ref.showSitesOutOfService)
+        assertTrue(ref.showProjectSites)
         assertFalse(ref.hideUndergroundSites)
         assertFalse(ref.showOnlyZbSites)
         assertFalse(ref.showRadioTv)
@@ -33,6 +34,7 @@ class MapFilterDefaultsTest {
         val prefs = FakePrefs(
             "filter_default_show_sites_out_of_service" to false,
             "filter_default_hide_underground_sites" to true,
+            "filter_default_show_project_sites" to false,
             "filter_default_show_techno_2g" to false,
             "filter_default_f5g_3500" to false,
             "filter_default_show_radio_tv" to true
@@ -42,6 +44,7 @@ class MapFilterDefaultsTest {
 
         assertFalse(ref.showSitesOutOfService)
         assertTrue(ref.hideUndergroundSites)
+        assertFalse(ref.showProjectSites)
         assertFalse(ref.frequency.show2G)
         assertFalse(ref.frequency.f5G3500)
         assertTrue(ref.showRadioTv)

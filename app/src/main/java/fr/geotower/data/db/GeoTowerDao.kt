@@ -77,6 +77,47 @@ interface GeoTowerDao {
     """)
     suspend fun getLocalisationsInBox(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<LocalisationEntity>
 
+    /**
+     * Sites « totalement en projet » d'une zone : aucune émission en service.
+     * Même critère que [fr.geotower.data.models.isDeclaredActive] côté Kotlin, poussé en SQL
+     * pour ne pas ramener toute la France quand le filtre « En projet uniquement » est actif
+     * (le LIKE de SQLite est insensible à la casse sur l'ASCII).
+     */
+    @Query("""
+        SELECT
+            l.id_anfr,
+            COALESCE(o.libelle, 'Inconnu') AS operateur,
+            l.latitude,
+            l.longitude,
+            l.azimuts,
+            l.code_insee,
+            l.azimuts_fh,
+            l.tech_mask,
+            l.band_mask,
+            l.arcep_nidt,
+            l.is_zb,
+            COALESCE(st.libelle, '') AS statut,
+            COALESCE(t.has_active, 0) AS has_active,
+            COALESCE(NULLIF(t.date_service, ''), NULLIF(t.date_implantation, '')) AS date_service,
+            CASE WHEN EXISTS (
+                SELECT 1
+                FROM support underground_support
+                LEFT JOIN ref_nature underground_nature ON underground_support.nat_id = underground_nature.nat_id
+                WHERE underground_support.id_anfr = l.id_anfr
+                AND underground_nature.libelle = 'Intérieur sous-terrain'
+            ) THEN 1 ELSE 0 END AS has_underground_support
+        FROM localisation l
+        LEFT JOIN ref_operateur o ON l.operateur_id = o.id
+        LEFT JOIN technique t ON l.id_anfr = t.id_anfr
+        LEFT JOIN ref_statut st ON t.statut_id = st.id
+        WHERE l.latitude BETWEEN :minLat AND :maxLat
+        AND l.longitude BETWEEN :minLon AND :maxLon
+        AND COALESCE(t.has_active, 0) = 0
+        AND COALESCE(st.libelle, '') NOT LIKE '%en service%'
+        AND COALESCE(st.libelle, '') NOT LIKE '%techniquement%'
+    """)
+    suspend fun getProjectLocalisationsInBox(minLat: Double, maxLat: Double, minLon: Double, maxLon: Double): List<LocalisationEntity>
+
     // --- Géocodage des pannes générées localement (fr.geotower.data.outages) ---
     // Projections minimales, adossées aux index existants idx_localisation_insee et
     // idx_localisation_lat_lon (cf. GeoTowerDatabaseIndexes).
@@ -1059,6 +1100,13 @@ interface GeoTowerDao {
     """)
     suspend fun searchAntennasByAddress(query: String, limit: Int): List<LocalisationEntity>
 
+    /**
+     * Les trois comparaisons sur `id_support` portent sur des expressions **constantes** (elles ne
+     * dépendent pas de la ligne) : SQLite peut donc utiliser `idx_support_id_support`. La forme
+     * précédente, `CAST(id_support AS INTEGER) = CAST(:exactId AS INTEGER)`, obligeait à balayer
+     * toute la table `support` à chaque ouverture de fiche. Les variantes couvrent les zéros de
+     * tête côté paramètre (id_anfr complété sur 10 chiffres) comme côté base.
+     */
     @Query("""
         SELECT
             l.id_anfr,
@@ -1101,7 +1149,13 @@ interface GeoTowerDao {
                 :exactId != ''
                 AND
                 :exactId NOT GLOB '*[^0-9]*'
-                AND CAST(id_support AS INTEGER) = CAST(:exactId AS INTEGER)
+                AND id_support = CAST(CAST(:exactId AS INTEGER) AS TEXT)
+            )
+            OR (
+                :exactId != ''
+                AND
+                :exactId NOT GLOB '*[^0-9]*'
+                AND id_support = printf('%010d', CAST(:exactId AS INTEGER))
             )
         )
     """)

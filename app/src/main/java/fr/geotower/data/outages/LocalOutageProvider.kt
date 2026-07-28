@@ -19,7 +19,7 @@ import java.util.Locale
 class LocalOutageProvider(
     private val cache: OutageLocalCache,
     private val frequencyMillis: () -> Long,
-    private val markGenerated: (Long) -> Unit,
+    private val markGenerated: (generatedAtMillis: Long, sites: List<SiteHsEntity>) -> Unit,
     private val generate: suspend (sourceLastUpdate: String?, onProgress: OutageProgressCallback) -> LocalOutageGenerator.GenerationResult,
     private val clock: () -> Long = { System.currentTimeMillis() },
 ) {
@@ -49,7 +49,7 @@ class LocalOutageProvider(
             onProgress(OutageGenerationStep.FINALIZE, GEOCODE_PERCENT_END + 5, null)
             val generatedAt = clock()
             cache.save(CachedOutages(generatedAt, today, result.sites))
-            markGenerated(generatedAt)
+            markGenerated(generatedAt, result.sites)
             onProgress(OutageGenerationStep.DONE, 100, null)
             result.sites
         } catch (e: CancellationException) {

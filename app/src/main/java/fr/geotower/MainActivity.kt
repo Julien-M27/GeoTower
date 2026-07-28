@@ -59,6 +59,8 @@ import fr.geotower.ui.screens.home.HomeScreen
 import fr.geotower.ui.screens.help.HelpScreen
 import fr.geotower.ui.screens.settings.SettingsScreen
 import fr.geotower.ui.screens.settings.PhotosFavoritesScreen
+import fr.geotower.ui.screens.settings.ShareHistoryScreen
+import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.ui.screens.settings.OutageSourceScreen
 import fr.geotower.ui.screens.coverage.TheoreticalCoverageScreen
 import fr.geotower.ui.screens.emitters.ElevationProfileScreen
@@ -467,6 +469,7 @@ class MainActivity : ComponentActivity() {
         AppConfig.mapProvider.intValue = appPrefs.getInt("map_provider", 1)
         AppConfig.ignStyle.intValue = appPrefs.getInt("ign_style", 0)
         AppConfig.navMode.intValue = appPrefs.getInt("nav_mode", 0)
+        AppConfig.settingsSectionsMode.value = appPrefs.getBoolean(AppConfig.PREF_SETTINGS_SECTIONS_MODE, true)
         AppConfig.defaultOperator.value = appPrefs.getString("default_operator", "Aucun") ?: "Aucun"
         AppConfig.loadSavedFilters(appPrefs)
         // ========================================================
@@ -764,12 +767,82 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            // Source des pannes (ouvert depuis Réglages ▸ au-dessus de la base de données)
-                            composable("outage_source") {
+                            // Source des pannes (ouvert depuis Réglages ▸ au-dessus de la base de
+                            // données, ou depuis la notification de génération des pannes).
+                            composable(
+                                route = "outage_source",
+                                deepLinks = listOf(navDeepLink { uriPattern = "geotower://outage_source" })
+                            ) {
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     OutageSourceScreen(
                                         navController = navController,
                                         repository = repository
+                                    )
+                                }
+                            }
+
+                            // Traitement local des données (niveaux 0..3), ouvert depuis Réglages.
+                            composable("local_mode") {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    fr.geotower.ui.screens.settings.LocalModeScreen(
+                                        navController = navController,
+                                        repository = repository
+                                    )
+                                }
+                            }
+
+                            // Aiguillage vers les deux journaux locaux (bouton unique d'« À propos ») ;
+                            // les Réglages, eux, listent les deux pages séparément.
+                            composable("histories") {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    fr.geotower.ui.screens.settings.HistoriesScreen(
+                                        onNavigateBack = { navController.popBackStack() },
+                                        onOpenPhotoUploadHistory = { navController.navigate("photo_upload_history") },
+                                        onOpenShareHistory = { navController.navigate("share_history") }
+                                    )
+                                }
+                            }
+
+                            // Historique des sites/supports partagés ou exportés (ouvert depuis Réglages).
+                            composable("share_history") {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    ShareHistoryScreen(
+                                        onNavigateBack = { navController.popBackStack() },
+                                        onOpenEntry = { entry ->
+                                            // La fiche affiche la distance depuis le dernier point cliqué :
+                                            // on le repositionne sur l'élément rouvert.
+                                            if (entry.latitude != null && entry.longitude != null) {
+                                                getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+                                                    .edit()
+                                                    .putFloat("clicked_lat", entry.latitude.toFloat())
+                                                    .putFloat("clicked_lon", entry.longitude.toFloat())
+                                                    .apply()
+                                            }
+                                            val route = when (entry.kind) {
+                                                ShareHistoryStore.KIND_MOBILE_SITE ->
+                                                    entry.stationId.takeIf { it.isNotBlank() }
+                                                        ?.let { "site_detail/${Uri.encode(it)}" }
+                                                        ?: entry.supportId.takeIf { it.isNotBlank() }
+                                                            ?.let { "support_detail/${Uri.encode(it)}" }
+                                                ShareHistoryStore.KIND_RADIO_SITE ->
+                                                    entry.stationId.takeIf { it.isNotBlank() }
+                                                        ?.let { "radio_site_detail/${Uri.encode(it)}/${Uri.encode(entry.supportId)}" }
+                                                        ?: entry.supportId.takeIf { it.isNotBlank() }
+                                                            ?.let { "support_detail/${Uri.encode(it)}" }
+                                                else ->
+                                                    entry.supportId.takeIf { it.isNotBlank() }
+                                                        ?.let { "support_detail/${Uri.encode(it)}" }
+                                            }
+                                            if (route != null) {
+                                                navController.navigate(route)
+                                            } else {
+                                                Toast.makeText(
+                                                    this@MainActivity,
+                                                    getString(R.string.share_history_open_unavailable),
+                                                    Toast.LENGTH_SHORT
+                                                ).show()
+                                            }
+                                        }
                                     )
                                 }
                             }
@@ -1146,6 +1219,9 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         )
+
+                        // Rapport PDF enregistré : propose de l'ouvrir ou d'ouvrir les Téléchargements.
+                        fr.geotower.ui.components.PdfDownloadResultDialog()
 
                         // ✅ NOUVEAU : On écoute la page sur laquelle se trouve l'utilisateur
                         val navBackStackEntry by navController.currentBackStackEntryAsState()

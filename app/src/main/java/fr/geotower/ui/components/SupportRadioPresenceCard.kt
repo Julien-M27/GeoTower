@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
@@ -43,6 +44,7 @@ fun SupportRadioPresenceCard(
     modifier: Modifier = Modifier,
     onRadioClick: (RadioMapMarker) -> Unit = {}
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     if (radioMarkers.isEmpty()) return
 
     Surface(
@@ -53,16 +55,16 @@ fun SupportRadioPresenceCard(
             modifier = Modifier
                 .clip(blockShape)
                 .background(cardBgColor)
-                .padding(16.dp)
+                .padding(sizing.spacing(16.dp))
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Default.WifiTethering,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(22.dp)
+                    modifier = Modifier.size(sizing.component(22.dp))
                 )
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                 Text(
                     text = stringResource(R.string.appstrings_radio_other_usages),
                     modifier = Modifier.weight(1f),
@@ -72,11 +74,11 @@ fun SupportRadioPresenceCard(
             }
 
             HorizontalDivider(
-                modifier = Modifier.padding(vertical = 12.dp),
+                modifier = Modifier.padding(vertical = sizing.spacing(12.dp)),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             )
 
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
                 radioMarkers.forEach { marker ->
                     SupportRadioItem(
                         marker = marker,
@@ -93,18 +95,19 @@ private fun SupportRadioItem(
     marker: RadioMapMarker,
     onClick: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = androidx.compose.ui.platform.LocalContext.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .clickable(onClick = onClick)
-            .padding(vertical = 6.dp),
+            .padding(vertical = sizing.spacing(6.dp)),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(
             modifier = Modifier
-                .size(54.dp)
+                .size(sizing.component(54.dp))
                 .clip(RoundedCornerShape(8.dp))
                 .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)),
             contentAlignment = Alignment.Center
@@ -115,7 +118,7 @@ private fun SupportRadioItem(
                 size = 34.dp
             )
         }
-        Spacer(modifier = Modifier.width(14.dp))
+        Spacer(modifier = Modifier.width(sizing.spacing(14.dp)))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = marker.networkName(context),
@@ -123,14 +126,14 @@ private fun SupportRadioItem(
                 overflow = TextOverflow.Ellipsis,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
-                fontSize = 16.sp
+                fontSize = sizing.text(16.sp)
             )
             Text(
                 text = marker.broadcastProgramSummary ?: marker.systemSummary ?: marker.subtitle(context),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontSize = 13.sp,
+                fontSize = sizing.text(13.sp),
                 fontWeight = FontWeight.SemiBold
             )
         }
@@ -138,7 +141,7 @@ private fun SupportRadioItem(
             imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(26.dp)
+            modifier = Modifier.size(sizing.component(26.dp))
         )
     }
 }

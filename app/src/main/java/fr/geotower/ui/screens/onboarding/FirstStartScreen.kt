@@ -80,6 +80,7 @@ import fr.geotower.ui.components.SafeClick
 import fr.geotower.ui.components.colorPaletteFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.screens.settings.PreferenceProfilesSheet
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.services.LiveTrackingController
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLocale
@@ -215,6 +216,7 @@ fun FirstStartScreen(
     val isSystemDark = isSystemInDarkTheme()
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemDark)
     val isOled by AppConfig.isOledMode
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     val cardShape = if (useOneUi) RoundedCornerShape(28.dp) else RoundedCornerShape(12.dp)
     val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
@@ -233,7 +235,7 @@ fun FirstStartScreen(
             modifier = Modifier
                 .padding(innerPadding)
                 .fillMaxSize()
-                .padding(horizontal = 24.dp),
+                .padding(horizontal = sizing.spacing(24.dp)),
         ) {
 
             PagerIndicator(totalSteps = totalSteps, currentStep = currentStep)
@@ -247,7 +249,7 @@ fun FirstStartScreen(
                     state = pagerState,
                     modifier = Modifier.fillMaxSize(),
                     // Permet un espace entre les pages lors du swipe pour un meilleur rendu
-                    pageSpacing = 16.dp,
+                    pageSpacing = sizing.spacing(16.dp),
                     // Rend le swipe inactif vers l'avant si la page n'est pas débloquée
                     userScrollEnabled = true,
                     verticalAlignment = Alignment.Top
@@ -299,7 +301,7 @@ fun FirstStartScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
             val hasLocationPermission =
                 ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
@@ -371,15 +373,15 @@ fun FirstStartScreen(
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(56.dp),
+                    .height(sizing.component(56.dp)),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = MaterialTheme.colorScheme.onPrimary
                 ),
                 shape = RoundedCornerShape(28.dp)
             ) {
-                Text(text = buttonText, fontSize = 18.sp)
-                Spacer(modifier = Modifier.width(8.dp))
+                Text(text = buttonText, fontSize = sizing.text(18.sp))
+                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                 if (currentStep == totalSteps - 1) {
                     Icon(Icons.Default.Check, contentDescription = null)
                 } else if (currentStep > 0) {
@@ -570,59 +572,60 @@ fun StepPreferencesDesign(
 ) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     var defaultOperator by AppConfig.defaultOperator
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        Spacer(modifier = Modifier.height(16.dp))
-        Icon(Icons.Outlined.Tune, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+        Icon(Icons.Outlined.Tune, null, modifier = Modifier.size(sizing.component(80.dp)), tint = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
-        Text(stringResource(R.string.settings_section_preferences), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(stringResource(R.string.onboarding_preferences_desc), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.settings_section_preferences), style = sizing.textStyle(MaterialTheme.typography.headlineMedium), fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+        Text(stringResource(R.string.onboarding_preferences_desc), textAlign = TextAlign.Center, style = sizing.textStyle(MaterialTheme.typography.bodyLarge), color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
 
         // --- CARTE PROFILS DE PRÉFÉRENCES ---
         Surface(onClick = { onSafeClick("onboarding_preference_profiles") { onOpenPreferenceProfilesSheet() } }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
-            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.preference_profiles_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(stringResource(R.string.preference_profiles_card_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.preference_profiles_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.preference_profiles_card_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
         Surface(onClick = { onSafeClick("onboarding_operator") { onOpenOperatorSheet() } }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
-            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+            Row(modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.settings_default_operator), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(if (defaultOperator == "Aucun") stringResource(R.string.common_select) else stringResource(R.string.common_current_value, defaultOperator), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.settings_default_operator), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                    Text(if (defaultOperator == "Aucun") stringResource(R.string.common_select) else stringResource(R.string.common_current_value, defaultOperator), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 val operatorLogoRes = OperatorLogos.drawableRes(defaultOperator)
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (operatorLogoRes != null) { Image(painter = painterResource(id = operatorLogoRes), contentDescription = null, modifier = Modifier.size(32.dp).clip(RoundedCornerShape(6.dp))); Spacer(modifier = Modifier.width(12.dp)) }
+                    if (operatorLogoRes != null) { Image(painter = painterResource(id = operatorLogoRes), contentDescription = null, modifier = Modifier.size(sizing.component(32.dp)).clip(RoundedCornerShape(6.dp))); Spacer(modifier = Modifier.width(sizing.spacing(12.dp))) }
                     Icon(imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = stringResource(R.string.common_select), tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
         // --- CARTE UNITÉS ---
         Surface(onClick = { onSafeClick("onboarding_unit") { onOpenUnitSheet() } }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
-            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp)), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.settings_units_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.settings_units_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
                     val unitDesc = if(AppConfig.distanceUnit.intValue == 0) "km, km/h" else "mi, mph"
-                    Text(unitDesc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(unitDesc, style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) { Text(text = "📏", fontSize = 24.sp) }
-                    Spacer(Modifier.width(8.dp))
+                    Box(modifier = Modifier.size(sizing.component(32.dp)), contentAlignment = Alignment.Center) { Text(text = "📏", fontSize = sizing.text(24.sp)) }
+                    Spacer(Modifier.width(sizing.spacing(8.dp)))
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -675,48 +678,49 @@ fun StepWelcomeDesign(
     val displayIcon = if (currentIconRes != 0) currentIconRes else fr.geotower.utils.AppIconManager.getLogoResId(context)
 
     val appLanguage by AppConfig.appLanguage
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
         // On remplace le R.mipmap... par notre variable dynamique
-        DrawableImage(resId = displayIcon, modifier = Modifier.size(150.dp))
+        DrawableImage(resId = displayIcon, modifier = Modifier.size(sizing.component(150.dp)))
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
-        Text(stringResource(R.string.brand_geotower), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.height(8.dp))
+        Text(stringResource(R.string.brand_geotower), style = sizing.textStyle(MaterialTheme.typography.headlineMedium), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
         Text(
             text = stringResource(R.string.onboarding_welcome_desc),
             textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.bodyLarge,
+            style = sizing.textStyle(MaterialTheme.typography.bodyLarge),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
         // --- CARTE LANGUE (déplacée ici pour le choix dès le 1er écran) ---
         val flag = AppLocale.languageFlag(appLanguage)
         val displayLanguage = stringResource(AppLocale.languageDisplayNameRes(appLanguage))
         Surface(onClick = { onSafeClick("onboarding_language") { onOpenLanguageSheet() } }, color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
-            Row(modifier = Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp)), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text(stringResource(R.string.settings_app_language), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(stringResource(R.string.common_current_value, displayLanguage), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.settings_app_language), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.common_current_value, displayLanguage), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(modifier = Modifier.size(32.dp), contentAlignment = Alignment.Center) { Text(text = flag, fontSize = 24.sp) }
-                    Spacer(Modifier.width(8.dp))
+                    Box(modifier = Modifier.size(sizing.component(32.dp)), contentAlignment = Alignment.Center) { Text(text = flag, fontSize = sizing.text(24.sp)) }
+                    Spacer(Modifier.width(sizing.spacing(8.dp)))
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
         ) {
             PermissionDetailItem(
                 icon = Icons.Default.LocationOn,
@@ -739,25 +743,26 @@ fun StepWelcomeDesign(
 
 @Composable
 fun StepLocationPermissionDesign() {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        Spacer(modifier = Modifier.height(16.dp))
-        Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+        Icon(Icons.Default.LocationOn, null, modifier = Modifier.size(sizing.component(80.dp)), tint = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
-        Text(stringResource(R.string.onboarding_location_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(8.dp))
+        Text(stringResource(R.string.onboarding_location_title), style = sizing.textStyle(MaterialTheme.typography.headlineMedium), fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
         Text(
             text = stringResource(R.string.onboarding_location_desc),
             textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.bodyLarge,
+            style = sizing.textStyle(MaterialTheme.typography.bodyLarge),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
         ) {
             PermissionDetailItem(
                 icon = Icons.Default.LocationOn,
@@ -780,25 +785,26 @@ fun StepLocationPermissionDesign() {
 
 @Composable
 fun StepNotificationsPermissionDesign() {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        Spacer(modifier = Modifier.height(16.dp))
-        Icon(Icons.Default.Notifications, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+        Icon(Icons.Default.Notifications, null, modifier = Modifier.size(sizing.component(80.dp)), tint = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
-        Text(stringResource(R.string.onboarding_notifications_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(8.dp))
+        Text(stringResource(R.string.onboarding_notifications_title), style = sizing.textStyle(MaterialTheme.typography.headlineMedium), fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
         Text(
             text = stringResource(R.string.onboarding_notifications_desc),
             textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.bodyLarge,
+            style = sizing.textStyle(MaterialTheme.typography.bodyLarge),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
         ) {
             PermissionDetailItem(
                 icon = Icons.Default.Notifications,
@@ -832,26 +838,27 @@ fun StepLiveNotificationsDesign(
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val liveNotifsEnabled by AppConfig.enableLiveNotifications
     val hasOperator = defaultOperator != "Aucun"
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        Spacer(modifier = Modifier.height(16.dp))
-        Icon(Icons.Default.Notifications, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+        Icon(Icons.Default.Notifications, null, modifier = Modifier.size(sizing.component(80.dp)), tint = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
-        Text(stringResource(R.string.onboarding_live_notifications_title), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(8.dp))
+        Text(stringResource(R.string.onboarding_live_notifications_title), style = sizing.textStyle(MaterialTheme.typography.headlineMedium), fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
         Text(
             text = stringResource(R.string.onboarding_live_notifications_desc),
             textAlign = TextAlign.Center,
-            style = MaterialTheme.typography.bodyLarge,
+            style = sizing.textStyle(MaterialTheme.typography.bodyLarge),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(sizing.spacing(24.dp)))
 
         Column(
             modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
         ) {
             PermissionDetailItem(
                 icon = Icons.Default.Notifications,
@@ -870,7 +877,7 @@ fun StepLiveNotificationsDesign(
             )
         }
 
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(sizing.spacing(16.dp)))
 
         fr.geotower.ui.components.LiveNotificationCard(
             title = stringResource(R.string.onboarding_live_notifications_title),
@@ -930,6 +937,7 @@ fun StepThemeDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStrok
     var isOled by AppConfig.isOledMode
     var isBlurEnabled by AppConfig.isBlurEnabled
     val uiScalePercent by AppConfig.uiScalePercent
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     fun updateOneUi(enabled: Boolean) {
         val mode = AppUiMode.fromOneUiEnabled(enabled)
@@ -938,15 +946,15 @@ fun StepThemeDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStrok
     }
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        Spacer(modifier = Modifier.height(16.dp))
-        Icon(Icons.Outlined.Smartphone, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+        Icon(Icons.Outlined.Smartphone, null, modifier = Modifier.size(sizing.component(80.dp)), tint = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
-        Text(stringResource(R.string.settings_section_appearance), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(stringResource(R.string.onboarding_theme_desc), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.settings_section_appearance), style = sizing.textStyle(MaterialTheme.typography.headlineMedium), fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+        Text(stringResource(R.string.onboarding_theme_desc), textAlign = TextAlign.Center, style = sizing.textStyle(MaterialTheme.typography.bodyLarge), color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
 
         // --- APPEL AU COMPOSANT CENTRALISÉ ---
         fr.geotower.ui.components.AppearanceOptionsBlock(
@@ -964,14 +972,14 @@ fun StepThemeDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStrok
             shape = cardShape, border = cardBorder, bubbleColor = bubbleColor, safeClick = onSafeClick
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
         fr.geotower.ui.components.ColorPalettePickerContent(
             useOneUi = useOneUi,
             bubbleColor = bubbleColor
         )
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
     }
 }
 
@@ -982,20 +990,21 @@ fun StepMapDesign(useOneUi: Boolean, bubbleColor: Color, onSafeClick: SafeClick)
 
     var mapProvider by AppConfig.mapProvider
     var ignStyle by AppConfig.ignStyle
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     val cardShape = if (useOneUi) RoundedCornerShape(28.dp) else RoundedCornerShape(12.dp)
     val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        Spacer(modifier = Modifier.height(16.dp))
-        Icon(Icons.Default.Map, null, modifier = Modifier.size(80.dp), tint = MaterialTheme.colorScheme.primary)
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+        Icon(Icons.Default.Map, null, modifier = Modifier.size(sizing.component(80.dp)), tint = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
-        Text(stringResource(R.string.settings_section_mapping), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(stringResource(R.string.onboarding_mapping_desc), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.settings_section_mapping), style = sizing.textStyle(MaterialTheme.typography.headlineMedium), fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+        Text(stringResource(R.string.onboarding_mapping_desc), textAlign = TextAlign.Center, style = sizing.textStyle(MaterialTheme.typography.bodyLarge), color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
 
         // --- APPEL AU COMPOSANT CENTRALISÉ ---
         fr.geotower.ui.components.MappingOptionsBlock(
@@ -1016,21 +1025,22 @@ fun StepMapDesign(useOneUi: Boolean, bubbleColor: Color, onSafeClick: SafeClick)
 // ==========================================
 @Composable
 fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStroke?, bubbleColor: Color, onSafeClick: SafeClick) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
         Icon(
             painter = painterResource(R.drawable.ic_material_database),
             contentDescription = null,
-            modifier = Modifier.size(80.dp),
+            modifier = Modifier.size(sizing.component(80.dp)),
             tint = MaterialTheme.colorScheme.primary
         )
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
-        Text(stringResource(R.string.settings_section_database), style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.Bold)
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(stringResource(R.string.onboarding_offline_desc), textAlign = TextAlign.Center, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(stringResource(R.string.settings_section_database), style = sizing.textStyle(MaterialTheme.typography.headlineMedium), fontWeight = FontWeight.Bold)
+        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+        Text(stringResource(R.string.onboarding_offline_desc), textAlign = TextAlign.Center, style = sizing.textStyle(MaterialTheme.typography.bodyLarge), color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-        Spacer(modifier = Modifier.height(32.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
 
         // 🚀 APPEL DU NOUVEAU COMPOSANT PARTAGÉ
         fr.geotower.ui.components.DatabaseDownloadCard(
@@ -1042,7 +1052,7 @@ fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderSt
             onSafeClick = onSafeClick
         )
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
         fr.geotower.ui.components.RadioDatabaseDownloadCard(
             useOneUi = useOneUi,
@@ -1057,6 +1067,7 @@ fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderSt
 
 @Composable
 fun PermissionDetailItem(icon: ImageVector, title: String, description: String) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
@@ -1066,28 +1077,28 @@ fun PermissionDetailItem(icon: ImageVector, title: String, description: String) 
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(14.dp),
+                .padding(sizing.spacing(14.dp)),
             verticalAlignment = Alignment.Top
         ) {
             Surface(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.size(40.dp)
+                modifier = Modifier.size(sizing.component(40.dp))
             ) {
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(sizing.component(20.dp))
                     )
                 }
             }
-            Spacer(modifier = Modifier.width(14.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(14.dp)))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(text = description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(text = title, style = sizing.textStyle(MaterialTheme.typography.titleSmall), fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.height(sizing.spacing(2.dp)))
+                Text(text = description, style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -1095,12 +1106,13 @@ fun PermissionDetailItem(icon: ImageVector, title: String, description: String) 
 
 @Composable
 fun PagerIndicator(totalSteps: Int, currentStep: Int) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Row(horizontalArrangement = Arrangement.Center, modifier = Modifier.fillMaxWidth()) {
         repeat(totalSteps) { index ->
             val isActive = index == currentStep
             val color = if (isActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
-            val width = if (isActive) 32.dp else 12.dp
-            Box(modifier = Modifier.padding(horizontal = 4.dp).height(8.dp).width(width).clip(RoundedCornerShape(4.dp)).background(color))
+            val width = if (isActive) sizing.component(32.dp) else sizing.component(12.dp)
+            Box(modifier = Modifier.padding(horizontal = sizing.spacing(4.dp)).height(sizing.component(8.dp)).width(width).clip(RoundedCornerShape(4.dp)).background(color))
         }
     }
 }

@@ -32,6 +32,22 @@ class AnfrParsingTest {
     }
 
     @Test
+    fun antennaDimensionTextKeepsRawFrenchNotationAndDropsUndeclaredValues() {
+        // Notation ANFR conservee telle quelle, suffixee de l'unite (metres).
+        assertEquals("1,5m", AnfrParsing.antennaDimensionText("1,5"))
+        assertEquals("1,5m", AnfrParsing.antennaDimensionText(" 1,5 "))
+        assertEquals("0.6m", AnfrParsing.antennaDimensionText("0.6"))
+        assertEquals("3m", AnfrParsing.antennaDimensionText("3"))
+        // Dimension non declaree par l'ANFR : aucun tag a emettre.
+        assertNull(AnfrParsing.antennaDimensionText(null))
+        assertNull(AnfrParsing.antennaDimensionText(""))
+        assertNull(AnfrParsing.antennaDimensionText("N/A"))
+        assertNull(AnfrParsing.antennaDimensionText("0"))
+        assertNull(AnfrParsing.antennaDimensionText("0,0"))
+        assertNull(AnfrParsing.antennaDimensionText("abc"))
+    }
+
+    @Test
     fun floatOrNoneMatchesPythonSemantics() {
         assertEquals(48.85, AnfrParsing.floatOrNone("48,85")!!, 1e-9)
         assertEquals(48.85, AnfrParsing.floatOrNone("48.85")!!, 1e-9)

@@ -100,6 +100,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -114,9 +115,7 @@ import fr.geotower.data.api.CellMapperNetwork
 import fr.geotower.data.api.CellularFrApi
 import fr.geotower.data.api.SignalQuestOperators
 import fr.geotower.data.api.SignalQuestSpeedtestSortMetric
-import fr.geotower.data.api.SqSpeedtestData
-import fr.geotower.data.api.bestSignalQuestSpeedtestByMetric
-import fr.geotower.data.api.filterBySignalQuestPlmn
+import fr.geotower.data.api.fetchBestSignalQuestSpeedtest
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.data.community.CommunityDataPreferences
@@ -138,7 +137,9 @@ import fr.geotower.ui.components.GeoTowerPullToRefreshBox
 import fr.geotower.ui.components.MiniMapViewMode
 import fr.geotower.ui.components.RadioShareMenu
 import fr.geotower.ui.components.RadioUsageIcon
+import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.geoTowerFadingEdge
+import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
@@ -156,6 +157,7 @@ import fr.geotower.utils.activeOperatorKeysForSiteStatusFilter
 import fr.geotower.utils.combineOperatorKeyFilters
 import fr.geotower.utils.OperatorColors
 import fr.geotower.utils.OperatorLogos
+import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.SitePagePrefs
 import fr.geotower.utils.formatTechnologies
 import fr.geotower.utils.formatSiteDistanceMeters
@@ -171,7 +173,6 @@ private const val TAG_SITE_DETAIL = "GeoTower"
 private const val TAG_SPEEDTEST = "GeoTowerUpload"
 private const val SIGNAL_QUEST_PACKAGE_NAME = "com.sfrmap.android"
 private const val SIGNAL_QUEST_PLAY_STORE_URL = "https://play.google.com/store/apps/details?id=com.sfrmap.android"
-private const val SIGNALQUEST_SPEEDTEST_PAGE_SIZE = 100
 private const val ARCEP_ALERT_URL = "https://jalerte.arcep.fr/"
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
@@ -286,6 +287,8 @@ fun SiteDetailScreen(
     var isSpeedtestLoading by remember { mutableStateOf(false) }
 
     var technique by remember { mutableStateOf<TechniqueEntity?>(null) }
+    // Identifiants eNB/gNB du pylône pour cet opérateur (base optionnelle geotower_fr_enb.db).
+    var networkIds by remember { mutableStateOf(fr.geotower.data.EnbRepository.SiteNetworkIds()) }
     var hsDataMap by remember { mutableStateOf<Map<String, fr.geotower.data.models.SiteHsEntity>>(emptyMap()) } // 🚨 AJOUT
     var userLocation by remember { mutableStateOf<Location?>(null) }
     var communityPhotos by remember { mutableStateOf<List<CommunityPhoto>>(emptyList()) }
@@ -557,6 +560,7 @@ fun SiteDetailScreen(
     val showPhotos by AppConfig.siteShowPhotos
     var showPanelHeights by remember { mutableStateOf(SitePagePrefs.panelHeights.read(prefs)) }
     var showIds by remember { mutableStateOf(SitePagePrefs.ids.read(prefs)) }
+    var showNetworkIds by remember { mutableStateOf(SitePagePrefs.networkIds.read(prefs)) }
     var showOpenMap by remember { mutableStateOf(SitePagePrefs.openMap.read(prefs)) }
     var showElevationProfile by remember { mutableStateOf(SitePagePrefs.elevationProfile.read(prefs)) }
     var showTheoreticalCoverage by remember { mutableStateOf(SitePagePrefs.theoreticalCoverage.read(prefs)) }
@@ -612,7 +616,8 @@ fun SiteDetailScreen(
             // 🚨 TÉLÉCHARGEMENT DES PANNES
             try {
                 val anchor = localData
-                val allHs = repository.getSitesHs()
+                // Cache mémoire côté repository ; le pull-to-refresh force un rechargement.
+                val allHs = repository.getSitesHs(forceRefresh = isRefreshing)
 
                 // Antennes du même site physique (autres opérateurs du support) pour la propagation ZB.
                 val siteKey = anchor.physicalSiteKey()
@@ -725,73 +730,20 @@ fun SiteDetailScreen(
         val currentPhysique = physique
         if (currentAntenna == null || currentAntenna.idAnfr.isBlank()) return@LaunchedEffect
 
-        val plmn = SignalQuestOperators.speedtestPlmnFor(currentAntenna.operateur)
-        val apiOperator = SignalQuestOperators.operatorParamFor(currentAntenna.operateur)
-        val fallbackOperator = apiOperator.takeIf { plmn == null }
-
         if (
             fr.geotower.utils.AppConfig.siteShowSpeedtest.value &&
             canUseSiteSpeedtests &&
-            (plmn != null || fallbackOperator != null) &&
+            SignalQuestOperators.supportsSpeedtests(currentAntenna.operateur) &&
             CommunityDataPreferences.isSignalQuestSpeedtestEnabled(prefs, currentAntenna.operateur)
         ) {
             speedtestData = null
             isSpeedtestLoading = true
             try {
-                val supportSiteId = currentPhysique?.idSupport?.trim()?.takeIf { it.isNotEmpty() }
-                val anfrCodeToSend = currentAntenna.idAnfr.trim().takeIf { it.isNotEmpty() }
-
-                AppLogger.d(TAG_SPEEDTEST, "Speedtest request siteId=$supportSiteId anfr=$anfrCodeToSend operator=$fallbackOperator mcc=${plmn?.mcc} mnc=${plmn?.mnc}")
-
-                val allSpeedtests = mutableListOf<SqSpeedtestData>()
-                var offset = 0
-                var total: Int? = null
-                while (true) {
-                    val response = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                        fr.geotower.data.api.SignalQuestClient.api.getSiteSpeedtests(
-                            siteId = supportSiteId,
-                            anfrCode = anfrCodeToSend,
-                            nationalSiteCode = anfrCodeToSend,
-                            sourceCode = anfrCodeToSend,
-                            operator = fallbackOperator,
-                            mcc = plmn?.mcc,
-                            mnc = plmn?.mnc,
-                            bestOnly = false,
-                            limit = SIGNALQUEST_SPEEDTEST_PAGE_SIZE,
-                            offset = offset
-                        )
-                    }
-
-                    AppLogger.d(TAG_SPEEDTEST, "Speedtest response code=${response.code()} offset=$offset")
-
-                    if (response.isSuccessful) {
-                        val body = response.body()
-                        val rawPage = body?.data.orEmpty()
-                        val page = rawPage.filterBySignalQuestPlmn(plmn)
-                        allSpeedtests += page
-                        total = body?.meta?.total ?: total
-                        val totalValue = total
-                        val fetchedCount = offset + rawPage.size
-
-                        AppLogger.d(TAG_SPEEDTEST, "Speedtest page raw=${rawPage.size} filtered=${page.size} mcc=${plmn?.mcc} mnc=${plmn?.mnc}")
-
-                        if (
-                            rawPage.size < SIGNALQUEST_SPEEDTEST_PAGE_SIZE ||
-                            rawPage.isEmpty() ||
-                            (totalValue != null && fetchedCount >= totalValue)
-                        ) {
-                            break
-                        }
-                        offset = fetchedCount
-                    } else {
-                        response.errorBody()?.close()
-                        AppLogger.d(TAG_SPEEDTEST, "Speedtest API failure code=${response.code()}")
-                        AppLogger.w(TAG_SPEEDTEST, "SignalQuest speedtest API failure")
-                        break
-                    }
-                }
-                speedtestData = allSpeedtests.bestSignalQuestSpeedtestByMetric(
-                    SignalQuestSpeedtestSortMetric.fromStorageKey(speedtestBestMetric)
+                speedtestData = fetchBestSignalQuestSpeedtest(
+                    operator = currentAntenna.operateur,
+                    supportId = currentPhysique?.idSupport,
+                    anfrCode = currentAntenna.idAnfr,
+                    metric = SignalQuestSpeedtestSortMetric.fromStorageKey(speedtestBestMetric)
                 )
                 AppLogger.d(TAG_SPEEDTEST, "Speedtest data=$speedtestData")
             } catch (e: kotlinx.coroutines.CancellationException) {
@@ -866,6 +818,19 @@ fun SiteDetailScreen(
     val txtWhichMap = stringResource(R.string.appstrings_which_map)
     val txtIdSupportCopy = stringResource(R.string.appstrings_id_support_copy)
 
+    // Identifiants réseau : lecture locale d'une base optionnelle, hors du chemin bloquant du site.
+    // Le bloc ne s'affiche pas si elle est absente ou si le pylône n'a aucun eNB/gNB rattaché.
+    LaunchedEffect(physique?.idSupport, antenna?.operateur, showNetworkIds) {
+        networkIds = if (showNetworkIds) {
+            fr.geotower.data.EnbRepository(context).getIdentifiersForSupport(
+                idSupport = physique?.idSupport,
+                operator = antenna?.operateur
+            )
+        } else {
+            fr.geotower.data.EnbRepository.SiteNetworkIds()
+        }
+    }
+
     val supportDetailRoute = remember(
         physique?.idSupport,
         antenna?.idAnfr,
@@ -939,7 +904,7 @@ fun SiteDetailScreen(
                 ) {
                     Text(
                         text = txtSiteDetailsTitle,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center,
@@ -948,7 +913,7 @@ fun SiteDetailScreen(
                             clipboard.setPrimaryClip(ClipData.newPlainText(txtIdSupportCopy, antennaId.toString()))
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             Toast.makeText(context, "$txtIdCopied : $antennaId", Toast.LENGTH_SHORT).show()
-                        }.padding(horizontal = 16.dp, vertical = 4.dp)
+                        }.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(4.dp))
                     )
                 }
                 GeoTowerNavigationBreadcrumbBar(
@@ -1028,7 +993,8 @@ fun SiteDetailScreen(
                     antennas = listOf(info),
                     sitesHs = hsDataMap.values,
                     showSitesInService = AppConfig.showSitesInService.value,
-                    showSitesOutOfService = AppConfig.showSitesOutOfService.value
+                    showSitesOutOfService = AppConfig.showSitesOutOfService.value,
+                    showProjectSites = AppConfig.showProjectSites.value
                 )
             } else {
                 null
@@ -1247,8 +1213,8 @@ fun SiteDetailScreen(
                 modifier = Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().background(mainBgColor)
             ) {
                 Column(
-                    modifier = Modifier.fillMaxSize().geoTowerFadingEdge(scrollState).verticalScroll(scrollState).padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier = Modifier.fillMaxSize().geoTowerFadingEdge(scrollState).pageScrollbar(PageScrollPrefs.SITE, scrollState).verticalScroll(scrollState).padding(sizing.spacing(16.dp)),
+                    verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
                 ) {
                 val formattedAzimuths = remember(info.azimuts) {
                     if (info.azimuts.isNullOrBlank()) ""
@@ -1356,6 +1322,7 @@ fun SiteDetailScreen(
                                 techStatus = realTechStatus,
                                 outageDetails = hsEntity,
                                 onAlertArcep = if (canUseSiteExternalLinks) {
+    val sizing = LocalGeoTowerUiSizing.current
                                     { safeClick("alert_arcep_${info.idAnfr}") { openWebsiteUrl(ARCEP_ALERT_URL) } }
                                 } else {
                                     null
@@ -1371,22 +1338,22 @@ fun SiteDetailScreen(
                                     shape = blockShape,
                                     colors = CardDefaults.cardColors(containerColor = cardBgColor)
                                 ) {
-                                    Row(modifier = Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Row(modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
                                         val opNameDisplay = info.operateur ?: stringResource(R.string.appstrings_unknown)
                                         val logoRes = getDetailLogoRes(opNameDisplay)
 
-                                        if (logoRes != null) { Image(painter = painterResource(id = logoRes), contentDescription = null, modifier = Modifier.size(72.dp).clip(RoundedCornerShape(8.dp))) }
-                                        else { Box(modifier = Modifier.size(72.dp).background(getOperatorColor(opNameDisplay), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Text(text = opNameDisplay.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = 24.sp) } }
-                                        Spacer(modifier = Modifier.width(16.dp))
+                                        if (logoRes != null) { Image(painter = painterResource(id = logoRes), contentDescription = null, modifier = Modifier.size(sizing.component(72.dp)).clip(RoundedCornerShape(8.dp))) }
+                                        else { Box(modifier = Modifier.size(sizing.component(72.dp)).background(getOperatorColor(opNameDisplay), RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) { Text(text = opNameDisplay.take(1).uppercase(), color = Color.White, fontWeight = FontWeight.Bold, fontSize = sizing.text(24.sp)) } }
+                                        Spacer(modifier = Modifier.width(sizing.spacing(16.dp)))
                                         Column(modifier = Modifier.weight(1f)) {
-                                            Text(text = opNameDisplay, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
-                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Text(text = opNameDisplay, style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                                            Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
                                             val rawTechs = technique?.technologies?.takeIf { it.isNotBlank() } ?: info.frequences
                                             val realTechs = formatTechnologies(rawTechs, stringResource(R.string.appstrings_unknown))
-                                            Text(text = realTechs, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                            Text(text = realTechs, style = sizing.textStyle(MaterialTheme.typography.bodyLarge), color = MaterialTheme.colorScheme.onSurfaceVariant)
                                         }
                                         if (info.isZb == 1) {
-                                            Spacer(modifier = Modifier.width(12.dp))
+                                            Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
                                             Box(
                                                 modifier = Modifier
                                                     .size(width = 72.dp, height = 48.dp)
@@ -1400,7 +1367,7 @@ fun SiteDetailScreen(
                                                     text = "ZB",
                                                     color = MaterialTheme.colorScheme.onTertiaryContainer,
                                                     fontWeight = FontWeight.Black,
-                                                    fontSize = 18.sp
+                                                    fontSize = sizing.text(18.sp)
                                                 )
                                             }
                                         }
@@ -1410,23 +1377,23 @@ fun SiteDetailScreen(
                         }
                         "bearing_height" -> {
                             if (showBearingHeight) {
-                                Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
                                     val rotation = bearingStr.replace("°", "").toFloatOrNull() ?: 0f
                                     Card(modifier = Modifier.weight(1f).fillMaxHeight(), shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
-                                        Column(modifier = Modifier.padding(16.dp).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
-                                            Text(txtBearingLabel.replace(" : ", ""), style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
-                                            Spacer(Modifier.height(8.dp))
-                                            Icon(Icons.Default.Navigation, null, Modifier.size(40.dp).rotate(rotation), tint = MaterialTheme.colorScheme.primary)
-                                            Spacer(Modifier.height(8.dp))
+                                        Column(modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
+                                            Text(txtBearingLabel.replace(" : ", ""), style = sizing.textStyle(MaterialTheme.typography.labelMedium), textAlign = TextAlign.Center)
+                                            Spacer(Modifier.height(sizing.spacing(8.dp)))
+                                            Icon(Icons.Default.Navigation, null, Modifier.size(sizing.component(40.dp)).rotate(rotation), tint = MaterialTheme.colorScheme.primary)
+                                            Spacer(Modifier.height(sizing.spacing(8.dp)))
                                             Text(bearingStr, fontWeight = FontWeight.Bold)
                                         }
                                     }
                                     Card(modifier = Modifier.weight(1f).fillMaxHeight(), shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
-                                        Column(modifier = Modifier.padding(16.dp).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
-                                            Text(txtSupportHeight.replace(" : ", ""), style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
-                                            Spacer(Modifier.height(8.dp))
-                                            Icon(Icons.Default.VerticalAlignTop, null, Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary)
-                                            Spacer(Modifier.height(8.dp))
+                                        Column(modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
+                                            Text(txtSupportHeight.replace(" : ", ""), style = sizing.textStyle(MaterialTheme.typography.labelMedium), textAlign = TextAlign.Center)
+                                            Spacer(Modifier.height(sizing.spacing(8.dp)))
+                                            Icon(Icons.Default.VerticalAlignTop, null, Modifier.size(sizing.component(40.dp)), tint = MaterialTheme.colorScheme.primary)
+                                            Spacer(Modifier.height(sizing.spacing(8.dp)))
                                             Text(formatSiteHeightMeters(physique?.hauteur), fontWeight = FontWeight.Bold)
                                         }
                                     }
@@ -1509,11 +1476,20 @@ fun SiteDetailScreen(
                                 )
                             }
                         }
+                        "network_ids" -> {
+                            if (showNetworkIds) {
+                                fr.geotower.ui.components.SiteNetworkIdsBlock(
+                                    identifiers = networkIds,
+                                    cardBgColor = cardBgColor,
+                                    blockShape = blockShape
+                                )
+                            }
+                        }
                         "open_map" -> {
                             if (showOpenMap) {
                                 Button(
                                     onClick = { safeClick { openMapAt(info.latitude, info.longitude) } },
-                                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                                    modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
                                     shape = buttonShape,
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -1521,9 +1497,9 @@ fun SiteDetailScreen(
                                     )
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(24.dp))
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text(stringResource(R.string.appstrings_open_map), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
+                                        Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+                                        Text(stringResource(R.string.appstrings_open_map), fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp))
                                     }
                                 }
                             }
@@ -1532,7 +1508,7 @@ fun SiteDetailScreen(
                             if (showElevationProfile && canUseElevationProfile) {
                                 Button(
                                     onClick = { safeClick { openElevationProfile(info.idAnfr) } },
-                                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                                    modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
                                     shape = buttonShape,
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.primary,
@@ -1540,9 +1516,9 @@ fun SiteDetailScreen(
                                     )
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Terrain, contentDescription = null, modifier = Modifier.size(24.dp))
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text(stringResource(R.string.appstrings_elevation_profile_button), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        Icon(Icons.Default.Terrain, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
+                                        Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+                                        Text(stringResource(R.string.appstrings_elevation_profile_button), fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp))
                                     }
                                 }
                             }
@@ -1556,7 +1532,7 @@ fun SiteDetailScreen(
                                             navController.navigate("theoretical_coverage/${info.idAnfr}")
                                         }
                                     },
-                                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                                    modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
                                     shape = buttonShape,
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -1564,9 +1540,9 @@ fun SiteDetailScreen(
                                     )
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(24.dp))
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text(stringResource(R.string.appstrings_coverage_button), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
+                                        Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+                                        Text(stringResource(R.string.appstrings_coverage_button), fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp))
                                     }
                                 }
                             }
@@ -1575,7 +1551,7 @@ fun SiteDetailScreen(
                             if (showThroughputCalculator && canUseThroughputCalculator) {
                                 Button(
                                     onClick = { safeClick { openThroughputCalculator(info.idAnfr) } },
-                                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                                    modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
                                     shape = buttonShape,
                                     colors = ButtonDefaults.buttonColors(
                                         containerColor = MaterialTheme.colorScheme.tertiaryContainer,
@@ -1583,20 +1559,20 @@ fun SiteDetailScreen(
                                     )
                                 ) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(24.dp))
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text(stringResource(R.string.appstrings_throughput_calculator_button), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        Icon(Icons.Default.Speed, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
+                                        Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+                                        Text(stringResource(R.string.appstrings_throughput_calculator_button), fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp))
                                     }
                                 }
                             }
                         }
                         "nav" -> {
                             if (showNav && canUseExternalNavigation) {
-                                Button(onClick = { safeClick { showNavigationSheet = true } }, modifier = Modifier.fillMaxWidth().height(56.dp), shape = buttonShape, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) {
+                                Button(onClick = { safeClick { showNavigationSheet = true } }, modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)), shape = buttonShape, colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary, contentColor = MaterialTheme.colorScheme.onPrimary)) {
                                     Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(24.dp))
-                                        Spacer(modifier = Modifier.width(12.dp))
-                                        Text(txtNavToSite, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                        Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
+                                        Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+                                        Text(txtNavToSite, fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp))
                                     }
                                 }
                             }
@@ -1673,8 +1649,9 @@ fun SiteDetailScreen(
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(24.dp).navigationBarsPadding())
+                Spacer(modifier = Modifier.height(sizing.component(24.dp)).navigationBarsPadding())
             }
+                PageScrollEdgeButtons(PageScrollPrefs.SITE, scrollState)
             }
 
             if (showSiteSettingsSheet) {
@@ -1718,6 +1695,11 @@ fun SiteDetailScreen(
                     onIdsChange = {
                         showIds = it
                         prefs.edit().putBoolean(SitePagePrefs.ids.key, it).apply()
+                    },
+                    showNetworkIds = showNetworkIds,
+                    onNetworkIdsChange = {
+                        showNetworkIds = it
+                        prefs.edit().putBoolean(SitePagePrefs.networkIds.key, it).apply()
                     },
                     showOpenMap = showOpenMap,
                     onOpenMapChange = {
@@ -1923,7 +1905,7 @@ fun SiteDetailScreen(
                     containerColor = sheetBgColor,
                     title = { Text(stringResource(R.string.appstrings_add_photos), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface) },
                     text = {
-                        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
                             if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SITE_PHOTO_CAMERA)) {
                                 Button(
                                     onClick = {
@@ -1932,12 +1914,12 @@ fun SiteDetailScreen(
                                             launchCameraCaptureWithStorageCheck()
                                         }
                                     },
-                                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                                    modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
                                     shape = buttonShape,
                                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
                                 ) {
                                     Icon(Icons.Default.PhotoCamera, null)
-                                    Spacer(Modifier.width(8.dp))
+                                    Spacer(Modifier.width(sizing.spacing(8.dp)))
                                     Text(stringResource(R.string.appstrings_camera), fontWeight = FontWeight.Bold)
                                 }
                             }
@@ -1949,13 +1931,13 @@ fun SiteDetailScreen(
                                             photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                                         }
                                     },
-                                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                                    modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
                                     shape = buttonShape,
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
                                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                                 ) {
                                     Icon(Icons.Default.PhotoLibrary, null)
-                                    Spacer(Modifier.width(8.dp))
+                                    Spacer(Modifier.width(sizing.spacing(8.dp)))
                                     Text(stringResource(R.string.appstrings_gallery), fontWeight = FontWeight.Bold)
                                 }
                             }
@@ -1966,13 +1948,13 @@ fun SiteDetailScreen(
                                         documentPickerLauncher.launch(arrayOf("image/*"))
                                     }
                                 },
-                                modifier = Modifier.fillMaxWidth().height(56.dp),
+                                modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
                                 shape = buttonShape,
                                 colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.onSurface),
                                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
                             ) {
                                 Icon(Icons.Default.FolderOpen, null)
-                                Spacer(Modifier.width(8.dp))
+                                Spacer(Modifier.width(sizing.spacing(8.dp)))
                                 Text(stringResource(R.string.appstrings_external_photo_files), fontWeight = FontWeight.Bold)
                             }
                         }
@@ -1992,6 +1974,7 @@ fun RadioSiteDetailScreen(
     stationId: String,
     supportId: String
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     val context = androidx.compose.ui.platform.LocalContext.current
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
@@ -2104,10 +2087,11 @@ fun RadioSiteDetailScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .geoTowerFadingEdge(scrollState)
+                        .pageScrollbar(PageScrollPrefs.SITE, scrollState)
                         .verticalScroll(scrollState)
                         .navigationBarsPadding()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                        .padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(12.dp)),
+                    verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
                 ) {
                     RadioSiteHeaderCard(site, cardBgColor, blockShape)
 
@@ -2231,7 +2215,7 @@ fun RadioSiteDetailScreen(
                         }
                     }
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(sizing.spacing(20.dp)))
                 }
             }
 
@@ -2244,6 +2228,7 @@ fun RadioSiteDetailScreen(
                     useOneUi = useOneUi
                 )
             }
+            PageScrollEdgeButtons(PageScrollPrefs.SITE, scrollState)
         }
     }
 }
@@ -2254,6 +2239,7 @@ private fun RadioSiteHeaderCard(
     cardBgColor: Color,
     blockShape: RoundedCornerShape
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     val context = androidx.compose.ui.platform.LocalContext.current
     Card(
         shape = blockShape,
@@ -2262,12 +2248,12 @@ private fun RadioSiteHeaderCard(
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
-            modifier = Modifier.padding(16.dp).fillMaxWidth(),
+            modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Box(
                 modifier = Modifier
-                    .size(72.dp)
+                    .size(sizing.component(72.dp))
                     .clip(RoundedCornerShape(8.dp))
                     .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.62f)),
                 contentAlignment = Alignment.Center
@@ -2278,18 +2264,18 @@ private fun RadioSiteHeaderCard(
                     size = 48.dp
                 )
             }
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(16.dp)))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = marker.networkName(context),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
-                Spacer(modifier = Modifier.height(3.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(3.dp)))
                 Text(
                     text = marker.systemSummary ?: stringResource(RadioServiceMasks.labelRes(marker.serviceMask)),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -2307,24 +2293,25 @@ private fun RadioSiteInfoCard(
     leadingContent: (@Composable () -> Unit)? = null,
     content: @Composable () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     Card(
         shape = blockShape,
         colors = CardDefaults.cardColors(containerColor = cardBgColor),
         elevation = CardDefaults.cardElevation(0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (leadingContent != null) {
                     leadingContent()
                 } else {
                     Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                 Text(text = title, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             }
             HorizontalDivider(
-                modifier = Modifier.padding(vertical = 12.dp),
+                modifier = Modifier.padding(vertical = sizing.spacing(12.dp)),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             )
             content()
@@ -2368,9 +2355,10 @@ private fun RadioSiteBearingHeightRow(
     cardBgColor: Color,
     blockShape: RoundedCornerShape
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     Row(
         modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max),
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
     ) {
         val rotation = bearingStr.removeSuffix("\u00B0").toFloatOrNull() ?: 0f
         Card(
@@ -2380,19 +2368,19 @@ private fun RadioSiteBearingHeightRow(
             elevation = CardDefaults.cardElevation(0.dp)
         ) {
             Column(
-                modifier = Modifier.padding(16.dp).fillMaxSize(),
+                modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(stringResource(R.string.appstrings_radio_share_cap_measured_short), style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
-                Spacer(Modifier.height(8.dp))
+                Text(stringResource(R.string.appstrings_radio_share_cap_measured_short), style = sizing.textStyle(MaterialTheme.typography.labelMedium), textAlign = TextAlign.Center)
+                Spacer(Modifier.height(sizing.spacing(8.dp)))
                 Icon(
                     Icons.Default.Navigation,
                     contentDescription = null,
-                    modifier = Modifier.size(40.dp).rotate(rotation),
+                    modifier = Modifier.size(sizing.component(40.dp)).rotate(rotation),
                     tint = MaterialTheme.colorScheme.primary
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(sizing.spacing(8.dp)))
                 Text(bearingStr, fontWeight = FontWeight.Bold)
             }
         }
@@ -2404,19 +2392,19 @@ private fun RadioSiteBearingHeightRow(
             elevation = CardDefaults.cardElevation(0.dp)
         ) {
             Column(
-                modifier = Modifier.padding(16.dp).fillMaxSize(),
+                modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxSize(),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.SpaceBetween
             ) {
-                Text(stringResource(R.string.appstrings_radio_share_support_height_short), style = MaterialTheme.typography.labelMedium, textAlign = TextAlign.Center)
-                Spacer(Modifier.height(8.dp))
+                Text(stringResource(R.string.appstrings_radio_share_support_height_short), style = sizing.textStyle(MaterialTheme.typography.labelMedium), textAlign = TextAlign.Center)
+                Spacer(Modifier.height(sizing.spacing(8.dp)))
                 Icon(
                     Icons.Default.VerticalAlignTop,
                     contentDescription = null,
-                    modifier = Modifier.size(40.dp),
+                    modifier = Modifier.size(sizing.component(40.dp)),
                     tint = MaterialTheme.colorScheme.primary
                 )
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(sizing.spacing(8.dp)))
                 Text(marker.supportHeightSummary ?: "--", fontWeight = FontWeight.Bold)
             }
         }
@@ -2451,10 +2439,11 @@ private fun RadioSiteActionButtons(
     onNavigate: () -> Unit,
     shareButton: @Composable () -> Unit
 ) {
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    val sizing = LocalGeoTowerUiSizing.current
+    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
         Button(
             onClick = onOpenMap,
-            modifier = Modifier.fillMaxWidth().height(56.dp),
+            modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
             shape = buttonShape,
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -2462,15 +2451,15 @@ private fun RadioSiteActionButtons(
             )
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(24.dp))
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(stringResource(R.string.appstrings_open_map), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
+                Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+                Text(stringResource(R.string.appstrings_open_map), fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp))
             }
         }
 
         Button(
             onClick = onNavigate,
-            modifier = Modifier.fillMaxWidth().height(56.dp),
+            modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
             shape = buttonShape,
             colors = ButtonDefaults.buttonColors(
                 containerColor = MaterialTheme.colorScheme.primary,
@@ -2478,9 +2467,9 @@ private fun RadioSiteActionButtons(
             )
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(24.dp))
-                Spacer(modifier = Modifier.width(12.dp))
-                Text(stringResource(R.string.appstrings_nav_to_site), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
+                Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+                Text(stringResource(R.string.appstrings_nav_to_site), fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp))
             }
         }
 

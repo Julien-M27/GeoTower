@@ -12,6 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.data.models.LocalisationEntity // ✅ NOUVEL IMPORT
 import fr.geotower.utils.AppConfig
 import java.util.Locale
@@ -25,6 +26,7 @@ fun SitePanelHeightsBlock(
     cardBgColor: Color,
     blockShape: Shape
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val txtPanelHeightsTitle = stringResource(R.string.appstrings_panel_heights_title)
 
     val distanceUnit = AppConfig.distanceUnit.intValue
@@ -42,14 +44,14 @@ fun SitePanelHeightsBlock(
 
     if (formattedHeights.isNotEmpty()) {
         Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor), elevation = CardDefaults.cardElevation(0.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+            Column(modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxWidth()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.FormatLineSpacing, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                     Text(text = txtPanelHeightsTitle, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
                 }
-                HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-                Text(text = formattedHeights, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                Text(text = formattedHeights, style = sizing.textStyle(MaterialTheme.typography.bodyLarge), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             }
         }
     }

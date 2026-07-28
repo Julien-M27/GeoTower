@@ -81,9 +81,13 @@ import fr.geotower.data.api.filterBySignalQuestPlmn
 import fr.geotower.data.api.sortedBySignalQuestMetric
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.GeoTowerPullToRefreshBox
+import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.geoTowerLazyListFadingEdge
 import fr.geotower.ui.components.oneUiActionButtonShape
+import fr.geotower.ui.components.pageScrollbar
+import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.ui.screens.settings.SiteSpeedtestsPagePreferences
 import fr.geotower.ui.screens.settings.SiteSpeedtestsSettingsSheet
 import fr.geotower.utils.AppConfig
@@ -113,6 +117,7 @@ fun SiteSpeedtestsScreen(
     mnc: Int? = null
 ) {
     SecureScreenEffect(RemoteFeatureFlags.SecureScreens.SITE_SPEEDTESTS)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val prefs = remember(context) { context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE) }
@@ -367,9 +372,10 @@ fun SiteSpeedtestsScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .navigationBarsPadding()
-                    .geoTowerLazyListFadingEdge(listState),
+                    .geoTowerLazyListFadingEdge(listState)
+                    .pageScrollbar(PageScrollPrefs.SPEEDTESTS, listState),
                 contentPadding = PaddingValues(start = 16.dp, top = 12.dp, end = 16.dp, bottom = 24.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
             ) {
             item {
                 SiteSpeedtestsBanner(
@@ -409,10 +415,10 @@ fun SiteSpeedtestsScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(140.dp),
+                                .height(sizing.component(140.dp)),
                             contentAlignment = Alignment.Center
                         ) {
-                            LoadingIndicator(modifier = Modifier.size(40.dp))
+                            LoadingIndicator(modifier = Modifier.size(sizing.component(40.dp)))
                         }
                     }
                 }
@@ -461,7 +467,7 @@ fun SiteSpeedtestsScreen(
                                 enabled = !isLoadingMore,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(52.dp),
+                                    .height(sizing.component(52.dp)),
                                 shape = buttonShape,
                                 colors = ButtonDefaults.buttonColors(
                                     containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -469,7 +475,7 @@ fun SiteSpeedtestsScreen(
                                 )
                             ) {
                                 if (isLoadingMore) {
-                                    LoadingIndicator(modifier = Modifier.size(24.dp))
+                                    LoadingIndicator(modifier = Modifier.size(sizing.component(24.dp)))
                                 } else {
                                     Text(stringResource(R.string.appstrings_speedtests_load_more), fontWeight = FontWeight.Bold)
                                 }
@@ -479,6 +485,7 @@ fun SiteSpeedtestsScreen(
                 }
             }
         }
+            PageScrollEdgeButtons(PageScrollPrefs.SPEEDTESTS, listState)
     }
     }
 
@@ -551,6 +558,7 @@ private fun SiteSpeedtestsBanner(
     shape: Shape,
     contentColor: Color
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val operatorName = speedtestsOperatorDisplayName(operator, stringResource(R.string.appstrings_unknown))
     val logoRes = OperatorLogos.drawableRes(operator)
     val supportValue = siteId ?: stringResource(R.string.appstrings_unavailable)
@@ -563,19 +571,19 @@ private fun SiteSpeedtestsBanner(
         elevation = CardDefaults.cardElevation(0.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(20.dp), vertical = sizing.spacing(14.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (logoRes != null) {
                 Image(
                     painter = painterResource(id = logoRes),
                     contentDescription = null,
-                    modifier = Modifier.size(72.dp).clip(RoundedCornerShape(8.dp))
+                    modifier = Modifier.size(sizing.component(72.dp)).clip(RoundedCornerShape(8.dp))
                 )
             } else {
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
+                        .size(sizing.component(72.dp))
                         .background(speedtestsOperatorColor(operatorName), RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -583,42 +591,42 @@ private fun SiteSpeedtestsBanner(
                         text = operatorName.trim().take(1).uppercase().ifBlank { "?" },
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 28.sp
+                        fontSize = sizing.text(28.sp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(18.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(18.dp)))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = operatorName,
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = sizing.textStyle(MaterialTheme.typography.headlineSmall),
                     fontWeight = FontWeight.Black,
                     color = contentColor,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
                 Text(
                     text = "${stringResource(R.string.appstrings_speedtests_support_label)} : $supportValue",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                     color = contentColor.copy(alpha = 0.74f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = "${stringResource(R.string.appstrings_speedtests_anfr_label)} : $anfrValue",
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                     color = contentColor.copy(alpha = 0.74f),
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
                 speedtestCountText?.let { count ->
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
                     Text(
                         text = count,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = sizing.textStyle(MaterialTheme.typography.labelMedium),
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
@@ -639,9 +647,10 @@ private fun SiteSpeedtestsHeader(
     totalCount: Int?,
     loadedCount: Int
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))
     ) {
         val identifiers = buildList {
             siteId?.let { add("Site $it") }
@@ -655,14 +664,14 @@ private fun SiteSpeedtestsHeader(
 
         Text(
             text = contextLine,
-            style = MaterialTheme.typography.bodyMedium,
+            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
         if (loadedCount > 0) {
             val countText = totalCount?.let { "$loadedCount / $it" } ?: loadedCount.toString()
             Text(
                 text = countText,
-                style = MaterialTheme.typography.labelMedium,
+                style = sizing.textStyle(MaterialTheme.typography.labelMedium),
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.SemiBold
             )
@@ -688,15 +697,16 @@ private fun SpeedtestsSortModeSelector(
     bgColor: Color
 ) {
     val chipScrollState = rememberScrollState()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = bgColor.copy(alpha = 0.58f),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
             Text(
                 text = stringResource(R.string.appstrings_speedtests_sort_title),
-                style = MaterialTheme.typography.titleSmall,
+                style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -704,8 +714,8 @@ private fun SpeedtestsSortModeSelector(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(chipScrollState)
-                    .padding(top = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(top = sizing.spacing(10.dp)),
+                horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
             ) {
                 SpeedtestsSortModeChip(
                     label = stringResource(R.string.appstrings_speedtests_sort_average),
@@ -734,6 +744,7 @@ private fun SpeedtestsSortModeChip(
     onClick: () -> Unit
 ) {
     val shape = RoundedCornerShape(10.dp)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val borderColor = if (selected) {
         MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
     } else {
@@ -756,8 +767,8 @@ private fun SpeedtestsSortModeChip(
     ) {
         Text(
             text = label,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = sizing.spacing(14.dp), vertical = sizing.spacing(8.dp)),
+            style = sizing.textStyle(MaterialTheme.typography.labelLarge),
             fontWeight = FontWeight.Bold,
             softWrap = false
         )
@@ -804,6 +815,7 @@ private fun SpeedtestsMessageCard(
     onRetry: (() -> Unit)?,
     buttonShape: androidx.compose.ui.graphics.Shape
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Card(
         modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = bgColor),
@@ -812,9 +824,9 @@ private fun SpeedtestsMessageCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(18.dp),
+                .padding(sizing.spacing(18.dp)),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
         ) {
             Text(
                 text = text,
@@ -842,6 +854,7 @@ private fun SpeedtestListCard(
     showNetworkDetails: Boolean,
     showCoordinates: Boolean
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
     val contentColor = MaterialTheme.colorScheme.onSurface
     val dateText = remember(speedtest.timestamp) { formatSpeedtestTimestamp(context, speedtest.timestamp) }
@@ -876,8 +889,8 @@ private fun SpeedtestListCard(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(sizing.spacing(16.dp)),
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -886,14 +899,14 @@ private fun SpeedtestListCard(
             ) {
                 Text(
                     text = dateText ?: speedtest.id.orEmpty().ifBlank { "--" },
-                    style = MaterialTheme.typography.titleSmall,
+                    style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
                 speedtest.connectionType?.takeIf { it.isNotBlank() }?.let { connection ->
                     Text(
                         text = connection,
-                        style = MaterialTheme.typography.labelLarge,
+                        style = sizing.textStyle(MaterialTheme.typography.labelLarge),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -974,27 +987,29 @@ private fun SpeedtestMetric(
     unit: String,
     color: Color
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(imageVector = icon, contentDescription = label, tint = color, modifier = Modifier.size(26.dp))
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(text = value, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        Text(text = unit, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
-        Text(text = label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(imageVector = icon, contentDescription = label, tint = color, modifier = Modifier.size(sizing.component(26.dp)))
+        Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
+        Text(text = value, fontWeight = FontWeight.Bold, fontSize = sizing.text(18.sp))
+        Text(text = unit, fontSize = sizing.text(10.sp), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+        Text(text = label, fontSize = sizing.text(11.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
 private fun SpeedtestDetailLine(label: String, value: String) {
-    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(2.dp))) {
         Text(
             text = label,
-            style = MaterialTheme.typography.labelMedium,
+            style = sizing.textStyle(MaterialTheme.typography.labelMedium),
             color = MaterialTheme.colorScheme.primary,
             fontWeight = FontWeight.SemiBold
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodySmall,
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
     }

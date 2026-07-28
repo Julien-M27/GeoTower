@@ -23,6 +23,57 @@ class AnfrSourceReadersTest {
         assertEquals(listOf("a\"b", "c"), AnfrCsvParser.splitLine("\"a\"\"b\";c"))
     }
 
+    /**
+     * Les lignes de donnees ne passent PAS par [AnfrCsvParser.splitLine] (reserve a l'entete) mais
+     * par le decoupage direct en tableau : ce test rejoue sur le flux complet les memes cas que
+     * `splitLineHandlesDelimiterEmptyAndQuotedFields`, plus les deux cas propres au tableau de
+     * taille fixe (ligne plus courte que l'entete -> colonne nulle, ligne plus longue -> surplus
+     * ignore).
+     */
+    @Test
+    fun iteratorParsesQuotedShortAndOverlongDataRows() {
+        val csv = listOf(
+            "c1;c2;c3",
+            "\"a;b\";c;d",
+            "\"a\"\"b\";c;d",
+            "a;;c",
+            "a;b;",
+            "a;b",
+            "a;b;c;surplus",
+        ).joinToString("\n")
+
+        val rows = csvRows { csv.byteInputStream() }.toList()
+
+        assertEquals(listOf("a;b", "c", "d"), rows[0].cells())
+        assertEquals(listOf("a\"b", "c", "d"), rows[1].cells())
+        assertEquals(listOf("a", "", "c"), rows[2].cells())
+        assertEquals(listOf("a", "b", ""), rows[3].cells())
+        assertEquals(listOf("a", "b", null), rows[4].cells())
+        assertEquals(listOf("a", "b", "c"), rows[5].cells())
+    }
+
+    /**
+     * L'entete est normalise une fois et partage par toutes les lignes du fichier : le builder
+     * mobile interroge en minuscules, le sink radio en majuscules, et les deux doivent designer la
+     * meme colonne sans que la memorisation des graphies ne les confonde.
+     */
+    @Test
+    fun columnAccessIsCaseAndWhitespaceInsensitiveAcrossRows() {
+        val csv = "STA_NM_ANFR;Emr_Id\n0001;E1\n0002;E2"
+
+        val rows = csvRows { csv.byteInputStream() }.toList()
+
+        for (row in rows) {
+            assertEquals(row.get("STA_NM_ANFR"), row.get("sta_nm_anfr"))
+            assertEquals(row.get("EMR_ID"), row.get(" emr_id "))
+        }
+        assertEquals("0002", rows[1].get("sta_nm_anfr"))
+        assertEquals("E2", rows[1].get("emr_id"))
+        assertEquals(null, rows[1].get("colonne_absente"))
+    }
+
+    private fun AnfrCsvRow.cells(): List<String?> = listOf(get("c1"), get("c2"), get("c3"))
+
     @Test
     fun readsBothUtf8AndLatin1CsvIdentically() {
         // Le meme texte accentue, encode en UTF-8 PUIS en Windows-1252 (vieux exports ANFR), doit etre lu

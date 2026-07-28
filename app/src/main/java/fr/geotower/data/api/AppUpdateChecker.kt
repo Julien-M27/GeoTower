@@ -53,7 +53,9 @@ object AppUpdateChecker {
     )
 
     suspend fun getLatestRelease(): AppReleaseInfo? {
-        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.APP_UPDATE_CHECK)) {
+        if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.APP_UPDATE_CHECK) ||
+            fr.geotower.utils.AppConfig.blockCommunityAndUpdates()
+        ) {
             return null
         }
         return withContext(Dispatchers.IO) {

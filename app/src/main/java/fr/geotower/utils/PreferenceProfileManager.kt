@@ -112,6 +112,7 @@ object PreferenceProfileManager {
         "map_provider",
         "ign_style",
         "nav_mode",
+        AppConfig.PREF_SETTINGS_SECTIONS_MODE,
         "display_style",
         "distance_unit",
         "speed_unit",
@@ -151,6 +152,7 @@ object PreferenceProfileManager {
         AppConfig.PREF_SIGNALQUEST_COVERAGE_OPERATOR_KEYS,
         AppConfig.PREF_HIDE_UNDERGROUND_SITES,
         AppConfig.PREF_SHOW_ONLY_ZB_SITES,
+        AppConfig.PREF_SHOW_PROJECT_SITES,
         AppLogoDrawingResources.PREF_KEY
     )
 
@@ -213,12 +215,15 @@ object PreferenceProfileManager {
         "app_language" to "Préférences",
         "distance_unit" to "Préférences",
         "speed_unit" to "Préférences",
-        "nav_mode" to "Préférences",
-        "display_style" to "Préférences",
-        "enable_update_notifications" to "Préférences",
-        "enable_live_notifications" to "Préférences",
-        "widget_sync_freq" to "Préférences",
-        "live_tracking_location_update_interval_seconds" to "Préférences",
+        // Mise en page des réglages : même section que le reste de l'apparence.
+        "nav_mode" to "Apparence",
+        AppConfig.PREF_SETTINGS_SECTIONS_MODE to "Apparence",
+        "display_style" to "Apparence",
+        // Ce qui tourne hors de l'app, comme dans les réglages.
+        "enable_update_notifications" to "Notifications",
+        "enable_live_notifications" to "Notifications",
+        "widget_sync_freq" to "Notifications",
+        "live_tracking_location_update_interval_seconds" to "Notifications",
         "startup_page" to "Pages",
         "pages_order" to "Pages",
         "external_links_order" to "Liens externes",
@@ -249,6 +254,7 @@ object PreferenceProfileManager {
         "distance_unit" to "Unité de distance",
         "speed_unit" to "Unité de vitesse",
         "nav_mode" to "Navigation des paramètres",
+        AppConfig.PREF_SETTINGS_SECTIONS_MODE to "Navigation des paramètres (téléphone)",
         "display_style" to "Style d'affichage",
         "enable_update_notifications" to "Notifications de mise à jour",
         "enable_live_notifications" to "Notification live",
@@ -553,6 +559,7 @@ object PreferenceProfileManager {
         AppConfig.mapProvider.intValue = prefs.getInt("map_provider", 1)
         AppConfig.ignStyle.intValue = prefs.getInt("ign_style", 0)
         AppConfig.navMode.intValue = prefs.getInt("nav_mode", 0)
+        AppConfig.settingsSectionsMode.value = prefs.getBoolean(AppConfig.PREF_SETTINGS_SECTIONS_MODE, true)
         AppConfig.defaultOperator.value = prefs.getString("default_operator", "Aucun") ?: "Aucun"
         AppConfig.uiScalePercent.intValue = AppConfig.readUiScalePercent(prefs)
         AppConfig.loadSavedFilters(prefs)

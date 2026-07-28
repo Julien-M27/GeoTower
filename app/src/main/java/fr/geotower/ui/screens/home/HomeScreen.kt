@@ -69,6 +69,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
@@ -101,8 +102,14 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import fr.geotower.data.workers.AppUpdateNotifier
 import fr.geotower.data.workers.DatabaseDownloadWorker
+import fr.geotower.data.api.ServerStatus
 import fr.geotower.ui.components.LocationUnavailableBanner
+import fr.geotower.ui.components.PageScrollEdgeButtons
+import fr.geotower.ui.components.ServerUnreachableBanner
+import fr.geotower.ui.components.rememberServerReachabilityState
+import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.ui.components.rememberSafeClick
+import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.ui.theme.GeoTowerUiSizing
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppLogoDrawingResources
@@ -128,6 +135,7 @@ private data class HomeMenuButtonMetrics(
 @SuppressLint("UnusedBoxWithConstraintsScope")
 @Composable
 fun HomeScreen(navController: NavController) {
+    val sizing = LocalGeoTowerUiSizing.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope() // ✅ AJOUT CRUCIAL ICI
     val logoResId by AppIconManager.currentIconRes
@@ -223,6 +231,11 @@ fun HomeScreen(navController: NavController) {
 
     // ---> 1. AJOUT : ON ÉCOUTE LE RÉSEAU ICI <---
     val isOnline by fr.geotower.utils.rememberNetworkConnectivityState()
+
+    // ---> ÉTAT DU SERVEUR GEOTOWER (réseau présent mais API muette : maintenance, panne, blocage) <---
+    // Distinct du bandeau hors-ligne : on ne l'affiche que si l'appareil a bien du réseau.
+    val serverStatus by rememberServerReachabilityState(isOnline)
+    val isServerUnreachable = isOnline && serverStatus == ServerStatus.UNREACHABLE
 
     LaunchedEffect(Unit) {
         if (logoResId == 0) AppIconManager.getLogoResId(context)
@@ -357,16 +370,16 @@ fun HomeScreen(navController: NavController) {
                 // On utilise expand/shrink pour que ça écarte la page doucement
                 enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
                 exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
-                modifier = Modifier.fillMaxWidth().padding(top = 16.dp, start = 16.dp, end = 16.dp)
+                modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(16.dp), start = sizing.spacing(16.dp), end = sizing.spacing(16.dp))
             ) {
                 Surface(
                     color = MaterialTheme.colorScheme.errorContainer,
                     shape = RoundedCornerShape(16.dp),
                     shadowElevation = 2.dp,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp) // Petite marge sous le bandeau
+                    modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(8.dp)) // Petite marge sous le bandeau
                 ) {
                     Row(
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier.padding(sizing.spacing(16.dp)),
                         horizontalArrangement = Arrangement.Center,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -375,7 +388,7 @@ fun HomeScreen(navController: NavController) {
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.onErrorContainer
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
+                        Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
                         Text(
                             text = stringResource(R.string.appstrings_offline_message),
                             color = MaterialTheme.colorScheme.onErrorContainer,
@@ -384,6 +397,9 @@ fun HomeScreen(navController: NavController) {
                     }
                 }
             }
+
+            // ---> LE BANDEAU « SERVEUR INJOIGNABLE » (réseau OK, mais l'API GeoTower ne répond pas) <---
+            ServerUnreachableBanner(visible = isServerUnreachable)
 
             // ---> LE BANDEAU DE LOCALISATION DÉSACTIVÉE (permission coupée OU GPS éteint) <---
             LocationUnavailableBanner(
@@ -394,6 +410,9 @@ fun HomeScreen(navController: NavController) {
             // ---> 2. LE BANDEAU DE BASE DE DONNÉES (S'affiche juste en dessous si besoin) <---
             val isDbUnavailable = isDbChecked && localDbState != GeoTowerDatabaseValidator.LocalDatabaseState.VALID
             val isDbBannerVisible = isDbUnavailable || isUpdateAvailable || isDownloading
+            // Un bandeau occupe le haut de l'écran : on masque le logo (et on passe en grille sur
+            // grand écran) comme le font déjà le hors-ligne et le bandeau base de données.
+            val hideHomeLogo = isDbBannerVisible || isServerUnreachable
 
             DatabaseWarningBanner(
                 isMissing = isDbMissing,
@@ -439,17 +458,23 @@ fun HomeScreen(navController: NavController) {
                 val showBottomHelpButton = showHelpButton && isHelpButtonAtBottom
                 val isBottomHelpButtonStart = helpButtonPosition == "bottom_start"
                 val helpButtonPadding = when {
-                    isHelpButtonAtBottom -> PaddingValues(start = 20.dp, top = 20.dp, end = 20.dp, bottom = 2.dp)
-                    helpButtonPosition == "top_end" -> PaddingValues(start = 20.dp, top = 72.dp, end = 20.dp, bottom = 20.dp)
+                    isHelpButtonAtBottom -> PaddingValues(start = sizing.spacing(20.dp), top = sizing.spacing(20.dp), end = sizing.spacing(20.dp), bottom = sizing.spacing(2.dp))
+                    helpButtonPosition == "top_end" -> PaddingValues(start = sizing.spacing(20.dp), top = sizing.spacing(72.dp), end = sizing.spacing(20.dp), bottom = sizing.spacing(20.dp))
                     else -> PaddingValues(20.dp)
                 }
 
                 Box(modifier = Modifier.fillMaxSize()) {
+                    // Une seule disposition est composée à la fois ; les trois états sont
+                    // déclarés ici pour que la pastille « haut / bas » sache laquelle piloter.
+                    val menuScrollState = rememberScrollState()
+                    val foldScrollState = rememberScrollState()
+                    val phoneScrollState = rememberScrollState()
+
                     HomeQuitButton(
                         onClick = onQuit,
                         modifier = Modifier
                             .align(Alignment.TopEnd)
-                            .padding(top = 12.dp, end = 12.dp)
+                            .padding(top = sizing.spacing(12.dp), end = sizing.spacing(12.dp))
                             .zIndex(3f)
                     )
 
@@ -475,20 +500,20 @@ fun HomeScreen(navController: NavController) {
                                 DrawableImage(
                                     resId = displayLogoResId,
                                     modifier = Modifier
-                                        .size(if (isCompactLandscape) 128.dp else 220.dp)
+                                        .size(sizing.component(if (isCompactLandscape) 128.dp else 220.dp))
                                         .clip(RoundedCornerShape(if (isCompactLandscape) 24.dp else 36.dp))
                                 )
-                                Spacer(modifier = Modifier.height(if (isCompactLandscape) 14.dp else 24.dp))
+                                Spacer(modifier = Modifier.height(sizing.spacing(if (isCompactLandscape) 14.dp else 24.dp)))
                                 Text(
                                     text = "GeoTower",
-                                    style = MaterialTheme.typography.displayLarge,
+                                    style = sizing.textStyle(MaterialTheme.typography.displayLarge),
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary,
-                                    fontSize = if (isCompactLandscape) 44.sp else 64.sp,
+                                    fontSize = sizing.text(if (isCompactLandscape) 44.sp else 64.sp),
                                     textAlign = TextAlign.Center,
                                     modifier = Modifier.fillMaxWidth()
                                 )
-                                Spacer(modifier = Modifier.height(if (isCompactLandscape) 10.dp else 18.dp))
+                                Spacer(modifier = Modifier.height(sizing.spacing(if (isCompactLandscape) 10.dp else 18.dp)))
                                 LandscapeHomeInfoActions(
                                     navController = navController,
                                     version = appVersion,
@@ -506,7 +531,8 @@ fun HomeScreen(navController: NavController) {
                                 Column(
                                     modifier = Modifier
                                         .widthIn(max = if (isCompactLandscape) 620.dp else 700.dp)
-                                        .verticalScroll(rememberScrollState()),
+                                        .pageScrollbar(PageScrollPrefs.HOME, menuScrollState)
+                                        .verticalScroll(menuScrollState),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     MenuButtonsList(
@@ -515,7 +541,7 @@ fun HomeScreen(navController: NavController) {
                                         buttonBgColor = buttonBgColor,
                                         paleColor = paleColor,
                                         onPaleColor = onPaleColor,
-                                        isOnline = isOnline && !isDbBannerVisible,
+                                        isOnline = isOnline && !hideHomeLogo,
                                         logoResId = displayLogoResId,
                                         isExpanded = true,
                                         isGrid = true,
@@ -531,14 +557,15 @@ fun HomeScreen(navController: NavController) {
                         val showLogo = prefsFold.getBoolean("show_home_logo", true)
 
                         // ✅ CORRECTION : Si pas de logo OU pas de réseau OU BANDEAU AFFICHE, on passe en mode Grille
-                        val isGrid = !showLogo || !isOnline || isDbBannerVisible
+                        val isGrid = !showLogo || !isOnline || hideHomeLogo
 
                         Column(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = minHeight)
-                                .verticalScroll(rememberScrollState())
-                                .padding(horizontal = 32.dp, vertical = 24.dp),
+                                .pageScrollbar(PageScrollPrefs.HOME, foldScrollState)
+                                .verticalScroll(foldScrollState)
+                                .padding(horizontal = sizing.spacing(32.dp), vertical = sizing.spacing(24.dp)),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Spacer(modifier = Modifier.weight(1f))
@@ -547,29 +574,29 @@ fun HomeScreen(navController: NavController) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
                                     text = "GeoTower",
-                                    style = MaterialTheme.typography.displayLarge,
+                                    style = sizing.textStyle(MaterialTheme.typography.displayLarge),
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary,
-                                    fontSize = 64.sp,
+                                    fontSize = sizing.text(64.sp),
                                     textAlign = TextAlign.Center,
-                                    modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(32.dp))
                                 )
 
                                 if (isGrid) {
                                     // --- DISPOSITION EN GRILLE ---
-                                    MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !isDbBannerVisible, displayLogoResId, isExpanded, isGrid = true)
+                                    MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !hideHomeLogo, displayLogoResId, isExpanded, isGrid = true)
                                 } else {
                                     // --- DISPOSITION CÔTE À CÔTE (Classique) ---
                                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                             DrawableImage(
                                                 resId = displayLogoResId,
-                                                modifier = Modifier.size(280.dp).clip(RoundedCornerShape(32.dp))
+                                                modifier = Modifier.size(sizing.component(280.dp)).clip(RoundedCornerShape(32.dp))
                                             )
                                         }
                                         Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-                                            // ✅ CORRECTION : On passe "isOnline && !isDbBannerVisible" pour forcer le masquage du logo sur tous les appareils si besoin
-                                            MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !isDbBannerVisible, displayLogoResId, isExpanded, isGrid = false)
+                                            // ✅ CORRECTION : On passe "isOnline && !hideHomeLogo" pour forcer le masquage du logo sur tous les appareils si besoin
+                                            MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !hideHomeLogo, displayLogoResId, isExpanded, isGrid = false)
                                         }
                                     }
                                 }
@@ -577,7 +604,7 @@ fun HomeScreen(navController: NavController) {
 
                             Spacer(modifier = Modifier.weight(1f))
 
-                            Spacer(modifier = Modifier.height(32.dp))
+                            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
                             AboutSection(
                                 navController = navController,
                                 version = appVersion,
@@ -594,8 +621,9 @@ fun HomeScreen(navController: NavController) {
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .heightIn(min = minHeight)
-                                .verticalScroll(rememberScrollState())
-                                .padding(horizontal = 24.dp, vertical = 8.dp),
+                                .pageScrollbar(PageScrollPrefs.HOME, phoneScrollState)
+                                .verticalScroll(phoneScrollState)
+                                .padding(horizontal = sizing.spacing(24.dp), vertical = sizing.spacing(8.dp)),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Spacer(modifier = Modifier.weight(1f))
@@ -604,15 +632,15 @@ fun HomeScreen(navController: NavController) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 Text(
                                     text = "GeoTower",
-                                    style = MaterialTheme.typography.displayLarge,
+                                    style = sizing.textStyle(MaterialTheme.typography.displayLarge),
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary,
-                                    fontSize = 48.sp,
+                                    fontSize = sizing.text(48.sp),
                                     textAlign = TextAlign.Center,
-                                    modifier = Modifier.fillMaxWidth().padding(bottom = 32.dp)
+                                    modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(32.dp))
                                 )
                                 // ✅ CORRECTION : On passe la condition ici aussi pour le téléphone
-                                MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !isDbBannerVisible, displayLogoResId, isExpanded, isGrid = false)
+                                MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !hideHomeLogo, displayLogoResId, isExpanded, isGrid = false)
                             }
 
                             Spacer(modifier = Modifier.weight(1f))
@@ -626,7 +654,7 @@ fun HomeScreen(navController: NavController) {
                                 helpContentColor = onPaleColor,
                                 onHelpClick = { safeClick { navController.navigate("help") { launchSingleTop = true } } }
                             )
-                            Spacer(modifier = Modifier.height(24.dp))
+                            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
                         }
                     }
 
@@ -644,6 +672,15 @@ fun HomeScreen(navController: NavController) {
                             Icon(Icons.AutoMirrored.Filled.Help, contentDescription = stringResource(R.string.appstrings_home_help_settings))
                         }
                     }
+
+                    PageScrollEdgeButtons(
+                        page = PageScrollPrefs.HOME,
+                        scrollState = when {
+                            isLandscape -> menuScrollState
+                            isExpanded -> foldScrollState
+                            else -> phoneScrollState
+                        }
+                    )
                 }
             }
         }
@@ -675,6 +712,7 @@ private fun HomeAnnouncementBanner(
     dismissedKey: String,
     onDismiss: (String) -> Unit
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     val languageTag = LocalConfiguration.current.locales[0]?.toLanguageTag()
     val localizedText = announcement.localizedText(languageTag)
     val currentDismissKey = announcement.dismissKey()
@@ -691,7 +729,7 @@ private fun HomeAnnouncementBanner(
         visible = isVisible,
         enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
         exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
-        modifier = Modifier.fillMaxWidth().padding(top = 16.dp, start = 16.dp, end = 16.dp)
+        modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(16.dp), start = sizing.spacing(16.dp), end = sizing.spacing(16.dp))
     ) {
         val containerColor = when (announcement.severity) {
             "error" -> MaterialTheme.colorScheme.errorContainer
@@ -716,47 +754,47 @@ private fun HomeAnnouncementBanner(
             color = containerColor,
             shape = RoundedCornerShape(16.dp),
             shadowElevation = 2.dp,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(8.dp))
         ) {
             Row(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(sizing.spacing(16.dp)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
                     tint = contentColor,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(sizing.component(24.dp))
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
                 Column(modifier = Modifier.weight(1f)) {
                     if (localizedText.title.isNotBlank()) {
                         Text(
                             text = localizedText.title,
                             color = contentColor,
                             fontWeight = FontWeight.Bold,
-                            style = MaterialTheme.typography.titleSmall
+                            style = sizing.textStyle(MaterialTheme.typography.titleSmall)
                         )
                     }
                     if (localizedText.message.isNotBlank()) {
                         Text(
                             text = localizedText.message,
                             color = contentColor,
-                            style = MaterialTheme.typography.bodySmall
+                            style = sizing.textStyle(MaterialTheme.typography.bodySmall)
                         )
                     }
                     if (actionUrl != null) {
                         TextButton(
                             onClick = { uriHandler.openUri(actionUrl) },
                             colors = ButtonDefaults.textButtonColors(contentColor = contentColor),
-                            contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp)
+                            contentPadding = PaddingValues(horizontal = sizing.spacing(0.dp), vertical = sizing.spacing(4.dp))
                         ) {
                             Text(openLabel, fontWeight = FontWeight.Bold)
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.OpenInNew,
                                 contentDescription = null,
-                                modifier = Modifier.size(16.dp)
+                                modifier = Modifier.size(sizing.component(16.dp))
                             )
                         }
                     }
@@ -782,29 +820,30 @@ private fun LandscapeHomeInfoActions(
     showHelpButton: Boolean,
     onHelpClick: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             TextButton(onClick = { navController.navigate("about") }) {
-                Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(18.dp))
-                Spacer(modifier = Modifier.width(6.dp))
+                Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(sizing.component(18.dp)))
+                Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
                 Text(
                     text = stringResource(R.string.nav_about),
                     fontWeight = FontWeight.SemiBold,
-                    fontSize = 14.sp
+                    fontSize = sizing.text(14.sp)
                 )
             }
 
             if (showHelpButton) {
                 TextButton(onClick = onHelpClick) {
-                    Icon(Icons.AutoMirrored.Filled.Help, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Icon(Icons.AutoMirrored.Filled.Help, contentDescription = null, modifier = Modifier.size(sizing.component(18.dp)))
+                    Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
                     Text(
                         text = stringResource(R.string.nav_help),
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 14.sp
+                        fontSize = sizing.text(14.sp)
                     )
                 }
             }
@@ -813,7 +852,7 @@ private fun LandscapeHomeInfoActions(
         Text(
             text = version,
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
-            style = MaterialTheme.typography.labelSmall,
+            style = sizing.textStyle(MaterialTheme.typography.labelSmall),
             textAlign = TextAlign.Center
         )
     }
@@ -832,6 +871,7 @@ fun MenuButtonsList(
     isGrid: Boolean = false,
     compact: Boolean = false
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val showLogo = prefs.getBoolean("show_home_logo", true)
@@ -863,7 +903,7 @@ fun MenuButtonsList(
                     buttons.add {
                         DrawableImage(
                             resId = logoResId,
-                            modifier = Modifier.padding(vertical = 8.dp).size(150.dp).clip(RoundedCornerShape(24.dp))
+                            modifier = Modifier.padding(vertical = sizing.spacing(8.dp)).size(sizing.component(150.dp)).clip(RoundedCornerShape(24.dp))
                         )
                     }
                 }
@@ -936,6 +976,7 @@ fun AboutSection(
     helpContentColor: Color = Color.Unspecified,
     onHelpClick: (() -> Unit)? = null
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     val helpContent = if (helpContentColor == Color.Unspecified) {
         MaterialTheme.colorScheme.onPrimaryContainer
     } else {
@@ -951,19 +992,19 @@ fun AboutSection(
             TextButton(onClick = { navController.navigate("about") }) {
                 // Utilise primary pour l'icône au lieu de paleColor
                 Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = stringResource(R.string.nav_about), color = MaterialTheme.colorScheme.onSurface, fontSize = 18.sp)
+                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                Text(text = stringResource(R.string.nav_about), color = MaterialTheme.colorScheme.onSurface, fontSize = sizing.text(18.sp))
             }
-            Text(text = version, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), style = MaterialTheme.typography.labelSmall)
+            Text(text = version, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), style = sizing.textStyle(MaterialTheme.typography.labelSmall))
         }
 
         // En bas à gauche : le bouton Aides s'il est configuré à gauche
         Row(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(top = 12.dp),
+                .padding(top = sizing.spacing(12.dp)),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
         ) {
             if (showBottomHelpButton && onHelpClick != null && alignHelpStart) {
                 FloatingActionButton(
@@ -984,7 +1025,7 @@ fun AboutSection(
                 contentColor = helpContent,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .padding(top = 12.dp)
+                    .padding(top = sizing.spacing(12.dp))
             ) {
                 Icon(Icons.AutoMirrored.Filled.Help, contentDescription = stringResource(R.string.appstrings_home_help_settings))
             }
@@ -1080,12 +1121,13 @@ fun DatabaseWarningBanner(
     downloadProgress: Int, // ✅ NOUVEAU PARAMÈTRE
     onDownloadClick: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     androidx.compose.animation.AnimatedVisibility(
         visible = isMissing || isInvalid || isUpdateAvailable || isDownloading,
         enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
         exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
         // ✅ AJOUT DES MARGES (Comme pour le bandeau hors-ligne)
-        modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp)
+        modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))
     ) {
         val containerColor = if (isMissing || isInvalid) {
             androidx.compose.material3.MaterialTheme.colorScheme.errorContainer
@@ -1108,7 +1150,7 @@ fun DatabaseWarningBanner(
             androidx.compose.foundation.layout.Row(
                 modifier = androidx.compose.ui.Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                    .padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(12.dp)),
                 verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
             ) {
                 androidx.compose.material3.Icon(
@@ -1116,7 +1158,7 @@ fun DatabaseWarningBanner(
                     contentDescription = null,
                     tint = contentColor
                 )
-                androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(12.dp))
+                androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(sizing.component(12.dp)))
                 androidx.compose.foundation.layout.Column(modifier = androidx.compose.ui.Modifier.weight(1f)) {
                     androidx.compose.material3.Text(
                         text = when {
@@ -1145,21 +1187,21 @@ fun DatabaseWarningBanner(
                 // ✅ NOUVEAU : Si ça télécharge, on affiche l'animation WavyLoader + LE POURCENTAGE
                 if (isDownloading) {
                     androidx.compose.foundation.layout.Row(
-                        modifier = androidx.compose.ui.Modifier.height(36.dp).width(100.dp),
+                        modifier = androidx.compose.ui.Modifier.height(sizing.component(36.dp)).width(sizing.component(100.dp)),
                         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
                         horizontalArrangement = androidx.compose.foundation.layout.Arrangement.End // On aligne à droite
                     ) {
                         // ✅ CORRECTION : Utilisation de CircularWavyProgressIndicator
                         CircularWavyProgressIndicator(
-                            modifier = androidx.compose.ui.Modifier.size(24.dp),
+                            modifier = androidx.compose.ui.Modifier.size(sizing.component(24.dp)),
                             color = contentColor
                         )
-                        androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(8.dp))
+                        androidx.compose.foundation.layout.Spacer(androidx.compose.ui.Modifier.width(sizing.component(8.dp)))
                         androidx.compose.material3.Text(
                             text = "$downloadProgress %",
                             color = contentColor,
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                            fontSize = 13.sp
+                            fontSize = sizing.text(13.sp)
                         )
                     }
                 } else {
@@ -1170,13 +1212,13 @@ fun DatabaseWarningBanner(
                             containerColor = contentColor,
                             contentColor = containerColor
                         ),
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                        modifier = androidx.compose.ui.Modifier.height(36.dp)
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(4.dp)),
+                        modifier = androidx.compose.ui.Modifier.height(sizing.component(36.dp))
                     ) {
                         androidx.compose.material3.Text(
                             text = stringResource(R.string.appstrings_btn_download_banner),
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
-                            fontSize = 12.sp
+                            fontSize = sizing.text(12.sp)
                         )
                     }
                 }

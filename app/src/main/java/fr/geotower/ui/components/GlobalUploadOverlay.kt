@@ -19,6 +19,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.work.WorkInfo
@@ -55,6 +56,7 @@ private data class BatchOperatorResult(
 fun GlobalUploadOverlay(
     onOpenUploadHistory: () -> Unit = {}
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
 
@@ -207,15 +209,15 @@ fun GlobalUploadOverlay(
                 ?.let { SignalQuestUploadScheduler.operatorParamFromTags(it) }
                 ?.let { OperatorColors.specForKey(it) }
 
-            Surface(shape = blockShape, color = sheetBgColor, shadowElevation = 8.dp, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                Column(modifier = Modifier.padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(20.dp)) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(stringResource(R.string.appstrings_uploading_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+            Surface(shape = blockShape, color = sheetBgColor, shadowElevation = 8.dp, modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp))) {
+                Column(modifier = Modifier.padding(sizing.spacing(24.dp)).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(sizing.spacing(20.dp))) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))) {
+                        Text(stringResource(R.string.appstrings_uploading_title), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
 
                         operatorSpec?.let { spec ->
                             Text(
                                 text = stringResource(R.string.upload_target_operator, spec.label),
-                                style = MaterialTheme.typography.titleMedium,
+                                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                                 fontWeight = FontWeight.SemiBold,
                                 color = Color(spec.colorArgb),
                                 textAlign = TextAlign.Center
@@ -224,7 +226,7 @@ fun GlobalUploadOverlay(
                     }
 
                     CircularWavyProgressIndicator(
-                        modifier = Modifier.size(56.dp),
+                        modifier = Modifier.size(sizing.component(56.dp)),
                         color = MaterialTheme.colorScheme.primary
                     )
 
@@ -233,11 +235,11 @@ fun GlobalUploadOverlay(
                     } else {
                         stringResource(R.string.appstrings_upload_preparing)
                     }
-                    Text(textProgress, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(textProgress, style = sizing.textStyle(MaterialTheme.typography.bodyLarge), color = MaterialTheme.colorScheme.onSurfaceVariant)
 
                     Column(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                        verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))
                     ) {
                         OutlinedButton(
                             onClick = {
@@ -300,8 +302,8 @@ fun GlobalUploadOverlay(
             onDismissRequest = { /* L'utilisateur doit cliquer sur le bouton */ },
             properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false)
         ) {
-            Surface(shape = blockShape, color = sheetBgColor, shadowElevation = 8.dp, modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                Column(modifier = Modifier.padding(24.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Surface(shape = blockShape, color = sheetBgColor, shadowElevation = 8.dp, modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp))) {
+                Column(modifier = Modifier.padding(sizing.spacing(24.dp)).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
                     val thumbnailPath = successThumbnailPath
                     if (thumbnailPath != null) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -310,7 +312,7 @@ fun GlobalUploadOverlay(
                                 contentDescription = null,
                                 contentScale = ContentScale.Crop,
                                 modifier = Modifier
-                                    .size(72.dp)
+                                    .size(sizing.component(72.dp))
                                     .clip(RoundedCornerShape(18.dp))
                             )
                             if (totalPhotos > 1) {
@@ -321,24 +323,24 @@ fun GlobalUploadOverlay(
                                 ) {
                                     Text(
                                         text = "+${totalPhotos - 1}",
-                                        style = MaterialTheme.typography.titleSmall,
+                                        style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                                         fontWeight = FontWeight.ExtraBold,
-                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+                                        modifier = Modifier.padding(horizontal = sizing.spacing(8.dp), vertical = sizing.spacing(6.dp))
                                     )
                                 }
                             }
                         }
                     } else {
-                        Icon(finalIcon, contentDescription = null, tint = iconColor, modifier = Modifier.size(64.dp))
+                        Icon(finalIcon, contentDescription = null, tint = iconColor, modifier = Modifier.size(sizing.component(64.dp)))
                     }
 
-                    Text(stringResource(R.string.appstrings_upload_finished_title), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
+                    Text(stringResource(R.string.appstrings_upload_finished_title), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
 
                     if (isMultiOperator) {
                         // Un envoi vers plusieurs opérateurs : détail par opérateur.
                         Column(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                            verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
                         ) {
                             batchResults.forEach { result ->
                                 Row(
@@ -348,30 +350,30 @@ fun GlobalUploadOverlay(
                                     result.colorArgb?.let { argb ->
                                         Box(
                                             modifier = Modifier
-                                                .size(10.dp)
+                                                .size(sizing.component(10.dp))
                                                 .clip(CircleShape)
                                                 .background(Color(argb))
                                         )
-                                        Spacer(modifier = Modifier.width(10.dp))
+                                        Spacer(modifier = Modifier.width(sizing.spacing(10.dp)))
                                     }
                                     Text(
                                         text = result.label,
-                                        style = MaterialTheme.typography.bodyLarge,
+                                        style = sizing.textStyle(MaterialTheme.typography.bodyLarge),
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface,
                                         modifier = Modifier.weight(1f)
                                     )
                                     Text(
                                         text = "${result.successCount}/${result.total}",
-                                        style = MaterialTheme.typography.bodyLarge,
+                                        style = sizing.textStyle(MaterialTheme.typography.bodyLarge),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
                                     Icon(
                                         imageVector = if (result.isFullSuccess) Icons.Default.CheckCircle else Icons.Default.Warning,
                                         contentDescription = null,
                                         tint = if (result.isFullSuccess) Color(0xFF4CAF50) else MaterialTheme.colorScheme.error,
-                                        modifier = Modifier.size(18.dp)
+                                        modifier = Modifier.size(sizing.component(18.dp))
                                     )
                                 }
                             }
@@ -379,7 +381,7 @@ fun GlobalUploadOverlay(
                     } else {
                         Text(
                             text = finishedDialogMessageOverride ?: pluralStringResource(R.plurals.upload_result, totalPhotos, finalSuccessCount, totalPhotos),
-                            style = MaterialTheme.typography.bodyLarge,
+                            style = sizing.textStyle(MaterialTheme.typography.bodyLarge),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center
                         )
@@ -388,13 +390,13 @@ fun GlobalUploadOverlay(
                     if (hasErrors) {
                         Text(
                             text = stringResource(R.string.appstrings_upload_error_warning),
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                             color = MaterialTheme.colorScheme.error,
                             textAlign = TextAlign.Center
                         )
                     }
 
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(8.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
                     Text(
                         text = pluralStringResource(
@@ -402,13 +404,13 @@ fun GlobalUploadOverlay(
                             lifetimeScore + finalSuccessCount,
                             lifetimeScore + finalSuccessCount
                         ),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.primary,
                         textAlign = TextAlign.Center
                     )
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
 
                     OutlinedButton(
                         onClick = {

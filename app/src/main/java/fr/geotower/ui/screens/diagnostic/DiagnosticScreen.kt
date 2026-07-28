@@ -12,10 +12,24 @@ import android.database.sqlite.SQLiteDatabase
 import android.net.Uri
 import android.os.Build
 import android.os.StatFs
+import android.os.SystemClock
 import android.provider.Settings
 import android.text.format.Formatter
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,9 +59,12 @@ import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
@@ -62,7 +79,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -71,7 +90,9 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
@@ -82,12 +103,17 @@ import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.data.workers.OfflineMapDownloadValidator
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.GeoTowerLoadingMessage
+import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.geoTowerFadingEdge
+import fr.geotower.ui.components.pageScrollbar
+import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.LiveTrackingPrefs
+import fr.geotower.utils.PowerProfile
 import fr.geotower.utils.PreferenceStores
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -97,6 +123,15 @@ import java.util.Locale
 
 private const val SETTINGS_DATABASE_ROUTE = "settings?section=database"
 private const val SETTINGS_OFFLINE_MAPS_ROUTE = "settings?section=offline_maps"
+
+// --- Animation d'analyse ------------------------------------------------------------------------
+// Une analyse ne dure souvent que quelques dizaines de millisecondes : sans durée plancher,
+// l'animation clignoterait sans qu'on la voie. Les anciens résultats restent affichés (estompés)
+// jusqu'à ce que les nouveaux soient prêts, pour ne jamais laisser l'écran vide.
+private const val SCAN_MIN_ANIMATION_MS = 700L
+private const val SCAN_STALE_CONTENT_ALPHA = 0.45f
+private const val SCAN_SPIN_PERIOD_MS = 1300
+private const val SCAN_PULSE_PERIOD_MS = 900
 
 @Composable
 fun DiagnosticScreen(navController: NavController) {
@@ -108,12 +143,25 @@ fun DiagnosticScreen(navController: NavController) {
     var isRefreshing by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     val uiStyle = LocalGeoTowerUiStyle.current
+    val sizing = LocalGeoTowerUiSizing.current
 
     fun refresh() {
+        if (isRefreshing) return
         scope.launch {
             isRefreshing = true
-            state = buildDiagnosticState(context.applicationContext, liveFallbackEnabled)
-            isRefreshing = false
+            val startedAt = SystemClock.elapsedRealtime()
+            try {
+                // Les anciennes valeurs restent à l'écran : `state` n'est remplacé qu'une fois la
+                // nouvelle analyse terminée (et l'animation vue).
+                val next = buildDiagnosticState(context.applicationContext, liveFallbackEnabled)
+                if (PowerProfile.richAnimations) {
+                    val elapsed = SystemClock.elapsedRealtime() - startedAt
+                    if (elapsed < SCAN_MIN_ANIMATION_MS) delay(SCAN_MIN_ANIMATION_MS - elapsed)
+                }
+                state = next
+            } finally {
+                isRefreshing = false
+            }
         }
     }
 
@@ -134,14 +182,20 @@ fun DiagnosticScreen(navController: NavController) {
                 backEnabled = !safeBackNavigation.isLocked,
                 actionsWidth = 56.dp,
                 actions = {
+                    val refreshLabel = stringResource(R.string.appstrings_diagnostic_refresh)
+                    val scanningLabel = stringResource(R.string.appstrings_diagnostic_scanning)
                     IconButton(
                         onClick = { refresh() },
                         enabled = !isRefreshing
                     ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = stringResource(R.string.appstrings_diagnostic_refresh)
-                        )
+                        if (isRefreshing) {
+                            DiagnosticScanningRefreshIcon(contentDescription = scanningLabel)
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = refreshLabel
+                            )
+                        }
                     }
                 }
             )
@@ -162,42 +216,65 @@ fun DiagnosticScreen(navController: NavController) {
                 )
             }
         } else {
+            // Pendant une analyse les résultats précédents restent lisibles, simplement estompés.
+            val staleAlpha by animateFloatAsState(
+                targetValue = if (isRefreshing) SCAN_STALE_CONTENT_ALPHA else 1f,
+                animationSpec = tween(durationMillis = if (PowerProfile.richAnimations) 320 else 0),
+                label = "diagnostic-stale-alpha"
+            )
             Column(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(uiStyle.backgroundColor)
                     .padding(innerPadding)
-                    .geoTowerFadingEdge(scrollState, fadeHeight = uiStyle.sizing.component(72.dp))
-                    .verticalScroll(scrollState)
-                    .navigationBarsPadding()
-                    .padding(
-                        horizontal = uiStyle.sizing.spacing(18.dp),
-                        vertical = uiStyle.sizing.spacing(12.dp)
-                    ),
-                verticalArrangement = Arrangement.spacedBy(uiStyle.sizing.spacing(14.dp))
             ) {
-                DiagnosticGlobalCard(
-                    state = currentState,
-                    onRefresh = { refresh() },
-                    onCopyReport = { copyDiagnosticReport(context, currentState.report) }
-                )
+                DiagnosticScanProgressBar(visible = isRefreshing)
 
-                DiagnosticStatusGrid(items = currentState.items)
-
-                currentState.items.forEach { item ->
-                    DiagnosticItemCard(
-                        item = item,
-                        onAction = { action -> handleDiagnosticAction(context, navController, action) }
-                    )
-                }
-
-                Button(
-                    onClick = { copyDiagnosticReport(context, currentState.report) },
-                    modifier = Modifier.fillMaxWidth()
+                Box(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .geoTowerFadingEdge(scrollState, fadeHeight = uiStyle.sizing.component(72.dp))
+                        .pageScrollbar(PageScrollPrefs.DIAGNOSTIC, scrollState)
+                        .verticalScroll(scrollState)
+                        .navigationBarsPadding()
+                        .padding(
+                            horizontal = uiStyle.sizing.spacing(18.dp),
+                            vertical = uiStyle.sizing.spacing(12.dp)
+                        ),
+                    verticalArrangement = Arrangement.spacedBy(uiStyle.sizing.spacing(14.dp))
                 ) {
-                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(stringResource(R.string.appstrings_diagnostic_copy_report))
+                    DiagnosticGlobalCard(
+                        state = currentState,
+                        isRefreshing = isRefreshing,
+                        onRefresh = { refresh() },
+                        onCopyReport = { copyDiagnosticReport(context, currentState.report) }
+                    )
+
+                    Column(
+                        modifier = Modifier.alpha(staleAlpha),
+                        verticalArrangement = Arrangement.spacedBy(uiStyle.sizing.spacing(14.dp))
+                    ) {
+                        DiagnosticStatusGrid(items = currentState.items)
+
+                        currentState.items.forEach { item ->
+                            DiagnosticItemCard(
+                                item = item,
+                                onAction = { action -> handleDiagnosticAction(context, navController, action) }
+                            )
+                        }
+                    }
+
+                    Button(
+                        onClick = { copyDiagnosticReport(context, currentState.report) },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(sizing.component(18.dp)))
+                        Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                        Text(stringResource(R.string.appstrings_diagnostic_copy_report))
+                    }
+                }
+                PageScrollEdgeButtons(PageScrollPrefs.DIAGNOSTIC, scrollState)
                 }
             }
         }
@@ -207,13 +284,18 @@ fun DiagnosticScreen(navController: NavController) {
 @Composable
 private fun DiagnosticGlobalCard(
     state: DiagnosticState,
+    isRefreshing: Boolean,
     onRefresh: () -> Unit,
     onCopyReport: () -> Unit
 ) {
     val uiStyle = LocalGeoTowerUiStyle.current
     val sizing = uiStyle.sizing
     val statusLabel = state.globalSeverity.localizedLabel()
-    val contentDescription = "${state.globalTitle}. $statusLabel. ${state.globalSummary}"
+    val scanningLabel = stringResource(R.string.appstrings_diagnostic_scanning)
+    val contentDescription = buildString {
+        append("${state.globalTitle}. $statusLabel. ${state.globalSummary}")
+        if (isRefreshing) append(" $scanningLabel")
+    }
     val generatedAtLabel = stringResource(R.string.appstrings_diagnostic_detail_generated_at, state.generatedAt)
 
     Card(
@@ -231,7 +313,7 @@ private fun DiagnosticGlobalCard(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top
             ) {
-                DiagnosticStatusOrb(state.globalSeverity)
+                DiagnosticStatusOrb(state.globalSeverity, scanning = isRefreshing)
                 Spacer(modifier = Modifier.width(sizing.spacing(14.dp)))
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -254,23 +336,53 @@ private fun DiagnosticGlobalCard(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
             Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
 
-            Text(
-                text = generatedAtLabel,
-                style = sizing.textStyle(MaterialTheme.typography.labelMedium),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+            if (isRefreshing) {
+                Text(
+                    text = scanningLabel,
+                    style = sizing.textStyle(MaterialTheme.typography.labelMedium),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(sizing.spacing(2.dp)))
+                Text(
+                    text = stringResource(R.string.appstrings_diagnostic_scanning_hint),
+                    style = sizing.textStyle(MaterialTheme.typography.labelSmall),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                Text(
+                    text = generatedAtLabel,
+                    style = sizing.textStyle(MaterialTheme.typography.labelMedium),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
 
             Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
 
             Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
-                Button(onClick = onRefresh, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(stringResource(R.string.appstrings_diagnostic_refresh))
+                Button(
+                    onClick = onRefresh,
+                    enabled = !isRefreshing,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    if (isRefreshing) {
+                        DiagnosticScanningRefreshIcon(
+                            contentDescription = null,
+                            size = sizing.component(18.dp)
+                        )
+                    } else {
+                        Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(sizing.component(18.dp)))
+                    }
+                    Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                    Text(
+                        text = stringResource(R.string.appstrings_diagnostic_refresh),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
                 TextButton(onClick = onCopyReport, modifier = Modifier.weight(1f)) {
-                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(18.dp))
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Icon(Icons.Default.ContentCopy, contentDescription = null, modifier = Modifier.size(sizing.component(18.dp)))
+                    Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
                     Text(stringResource(R.string.appstrings_diagnostic_copy_report))
                 }
             }
@@ -461,46 +573,137 @@ private fun DiagnosticItemCard(
 }
 
 @Composable
-private fun DiagnosticStatusOrb(severity: DiagnosticSeverity) {
-    Surface(
-        color = severity.containerColor(),
-        contentColor = severity.contentColor(),
-        shape = RoundedCornerShape(999.dp)
+private fun DiagnosticStatusOrb(severity: DiagnosticSeverity, scanning: Boolean) {
+    val sizing = LocalGeoTowerUiSizing.current
+    val orbSize = sizing.component(46.dp)
+    // Anneau indéterminé autour de la pastille : le statut précédent reste visible pendant l'analyse.
+    val ringSize = sizing.component(58.dp)
+
+    Box(
+        modifier = Modifier.size(ringSize),
+        contentAlignment = Alignment.Center
     ) {
-        Box(
-            modifier = Modifier
-                .size(LocalGeoTowerUiStyle.current.sizing.component(46.dp)),
-            contentAlignment = Alignment.Center
+        val pulse = if (scanning) diagnosticScanPulse() else 1f
+        Surface(
+            color = severity.containerColor(),
+            contentColor = severity.contentColor(),
+            shape = RoundedCornerShape(999.dp),
+            modifier = Modifier.graphicsLayer {
+                scaleX = pulse
+                scaleY = pulse
+            }
         ) {
-            Icon(
-                imageVector = severity.icon(),
-                contentDescription = null,
-                modifier = Modifier.size(LocalGeoTowerUiStyle.current.sizing.component(26.dp))
+            Box(
+                modifier = Modifier.size(orbSize),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = severity.icon(),
+                    contentDescription = null,
+                    modifier = Modifier.size(sizing.component(26.dp))
+                )
+            }
+        }
+        if (scanning) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(ringSize),
+                color = MaterialTheme.colorScheme.primary,
+                trackColor = Color.Transparent,
+                strokeWidth = sizing.component(3.dp)
             )
         }
     }
 }
 
+/** Battement discret de la pastille pendant l'analyse (neutralisé en mode faible consommation). */
+@Composable
+private fun diagnosticScanPulse(): Float {
+    if (!PowerProfile.richAnimations) return 1f
+    val transition = rememberInfiniteTransition(label = "diagnostic-scan-pulse")
+    val pulse by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 1.06f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = SCAN_PULSE_PERIOD_MS, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "diagnostic-scan-pulse-value"
+    )
+    return pulse
+}
+
+/**
+ * Icône « actualiser » qui tourne tant que l'analyse est en cours. N'est composée que pendant
+ * l'analyse : la transition infinie s'arrête d'elle-même une fois les résultats affichés.
+ */
+@Composable
+private fun DiagnosticScanningRefreshIcon(
+    contentDescription: String?,
+    modifier: Modifier = Modifier,
+    size: Dp? = null
+) {
+    val rotation = if (PowerProfile.richAnimations) {
+        val transition = rememberInfiniteTransition(label = "diagnostic-scan-spin")
+        val angle by transition.animateFloat(
+            initialValue = 0f,
+            targetValue = 360f,
+            animationSpec = infiniteRepeatable(
+                animation = tween(durationMillis = SCAN_SPIN_PERIOD_MS, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart
+            ),
+            label = "diagnostic-scan-spin-value"
+        )
+        angle
+    } else {
+        0f
+    }
+    Icon(
+        imageVector = Icons.Default.Refresh,
+        contentDescription = contentDescription,
+        tint = LocalContentColor.current,
+        modifier = modifier
+            .then(if (size != null) Modifier.size(size) else Modifier)
+            .graphicsLayer { rotationZ = rotation }
+    )
+}
+
+/** Fine barre indéterminée sous la barre de titre, visible uniquement pendant l'analyse. */
+@Composable
+private fun DiagnosticScanProgressBar(visible: Boolean) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = expandVertically() + fadeIn(),
+        exit = shrinkVertically() + fadeOut()
+    ) {
+        LinearProgressIndicator(
+            modifier = Modifier.fillMaxWidth(),
+            color = MaterialTheme.colorScheme.primary,
+            trackColor = MaterialTheme.colorScheme.surfaceVariant
+        )
+    }
+}
+
 @Composable
 private fun DiagnosticStatusBadge(severity: DiagnosticSeverity) {
+    val sizing = LocalGeoTowerUiSizing.current
     Surface(
         color = severity.containerColor(),
         contentColor = severity.contentColor(),
         shape = RoundedCornerShape(999.dp)
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = sizing.spacing(10.dp), vertical = sizing.spacing(6.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = severity.icon(),
                 contentDescription = null,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(sizing.component(16.dp))
             )
-            Spacer(modifier = Modifier.width(5.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(5.dp)))
             Text(
                 text = severity.localizedLabel(),
-                style = MaterialTheme.typography.labelMedium,
+                style = sizing.textStyle(MaterialTheme.typography.labelMedium),
                 fontWeight = FontWeight.Bold
             )
         }
@@ -830,6 +1033,7 @@ private fun buildNotificationsItem(context: Context, prefs: android.content.Shar
 private fun buildStorageItem(context: Context): DiagnosticItem {
     val antennaDb = context.getDatabasePath(GeoTowerDatabaseValidator.DB_NAME)
     val radioDb = context.getDatabasePath(RadioDatabaseValidator.DB_NAME)
+    val enbDb = context.getDatabasePath(fr.geotower.data.db.EnbDatabaseValidator.DB_NAME)
     val mapsDir = context.getExternalFilesDir(null)?.let { File(it, "maps") }
     val mapFiles = mapsDir?.let { OfflineMapDownloadValidator.listSafeMapFiles(it) }.orEmpty()
     val mapsSize = mapFiles.sumOf { it.lengthOrZero() }
@@ -838,10 +1042,11 @@ private fun buildStorageItem(context: Context): DiagnosticItem {
         val stat = StatFs(context.filesDir.path)
         stat.availableBytes
     }.getOrDefault(0L)
-    val knownSize = antennaDb.lengthOrZero() + radioDb.lengthOrZero() + mapsSize + cacheSize
+    val knownSize = antennaDb.lengthOrZero() + radioDb.lengthOrZero() + enbDb.lengthOrZero() + mapsSize + cacheSize
     val details = listOf(
         context.getString(R.string.appstrings_diagnostic_detail_storage_db_antennas, formatBytes(context, antennaDb.lengthOrZero())),
         context.getString(R.string.appstrings_diagnostic_detail_storage_db_radio, formatBytes(context, radioDb.lengthOrZero())),
+        context.getString(R.string.appstrings_diagnostic_detail_storage_db_enb, formatBytes(context, enbDb.lengthOrZero())),
         context.getString(R.string.appstrings_diagnostic_detail_storage_maps, formatBytes(context, mapsSize)),
         context.getString(R.string.appstrings_diagnostic_detail_storage_cache, formatBytes(context, cacheSize)),
         context.getString(R.string.appstrings_diagnostic_detail_storage_available, formatBytes(context, available))

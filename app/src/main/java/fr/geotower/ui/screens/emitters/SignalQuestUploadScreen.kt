@@ -97,6 +97,7 @@ import coil.compose.AsyncImage
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.GeoTowerSwitch
 import fr.geotower.ui.components.rememberSafeClick
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.utils.AppConfig
@@ -131,6 +132,7 @@ fun SignalQuestUploadScreen(
     onStartUpload: (List<String>, String, Boolean, List<String>) -> Unit
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     val safeClick = rememberSafeClick()
     var isBackNavigationLocked by remember { mutableStateOf(false) }
@@ -364,7 +366,7 @@ fun SignalQuestUploadScreen(
                 .padding(padding)
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(20.dp),
+                .padding(sizing.spacing(20.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             // --- 2. CARROUSEL OU IMAGE CENTRÉE ---
@@ -383,8 +385,8 @@ fun SignalQuestUploadScreen(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center
                     ) {
-                        Icon(Icons.Default.PhotoCamera, null, modifier = Modifier.size(48.dp), tint = activeColor)
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Icon(Icons.Default.PhotoCamera, null, modifier = Modifier.size(sizing.component(48.dp)), tint = activeColor)
+                        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                         Text(
                             text = stringResource(R.string.appstrings_add_photos),
                             color = textColor,
@@ -600,18 +602,18 @@ fun SignalQuestUploadScreen(
                                         modifier = Modifier
                                             .align(Alignment.TopEnd)
                                             // NOUVEAU : 16.dp pour OneUI (radius 32), 8.dp pour Classique (radius 24)
-                                            .padding(if (useOneUi) 16.dp else 8.dp)
+                                            .padding(sizing.spacing(if (useOneUi) 16.dp else 8.dp))
                                             .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                                            .size(32.dp)
+                                            .size(sizing.component(32.dp))
                                     ) {
-                                        Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                        Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(sizing.component(16.dp)))
                                     }
                                     PhotoPositionBadge(
                                         position = index + 1,
                                         total = currentUris.size,
                                         modifier = Modifier
                                             .align(Alignment.BottomEnd)
-                                            .padding(if (useOneUi) 16.dp else 8.dp)
+                                            .padding(sizing.spacing(if (useOneUi) 16.dp else 8.dp))
                                     )
                                 }
                             }
@@ -643,7 +645,7 @@ fun SignalQuestUploadScreen(
                                         Icons.Default.Add,
                                         null,
                                         modifier = Modifier
-                                            .size(36.dp)
+                                            .size(sizing.component(36.dp))
                                             .graphicsLayer {
                                                 scaleX = addPhotoIconScale
                                                 scaleY = addPhotoIconScale
@@ -690,25 +692,25 @@ fun SignalQuestUploadScreen(
                                 enabled = false,
                                 modifier = Modifier
                                     .align(Alignment.TopEnd)
-                                    .padding(if (useOneUi) 16.dp else 8.dp)
+                                    .padding(sizing.spacing(if (useOneUi) 16.dp else 8.dp))
                                     .background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                                    .size(32.dp)
+                                    .size(sizing.component(32.dp))
                             ) {
-                                Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(16.dp))
+                                Icon(Icons.Default.Close, null, tint = Color.White, modifier = Modifier.size(sizing.component(16.dp)))
                             }
                             PhotoPositionBadge(
                                 position = draggedPosition,
                                 total = currentUris.size,
                                 modifier = Modifier
                                     .align(Alignment.BottomEnd)
-                                    .padding(if (useOneUi) 16.dp else 8.dp)
+                                    .padding(sizing.spacing(if (useOneUi) 16.dp else 8.dp))
                             )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
             Surface(
                 onClick = { stripExifBeforeUpload = !stripExifBeforeUpload },
@@ -723,7 +725,7 @@ fun SignalQuestUploadScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                        .padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(14.dp)),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -731,7 +733,7 @@ fun SignalQuestUploadScreen(
                         contentDescription = null,
                         tint = if (stripExifBeforeUpload) activeColor else textColor.copy(alpha = 0.7f)
                     )
-                    Spacer(Modifier.width(16.dp))
+                    Spacer(Modifier.width(sizing.spacing(16.dp)))
                     Text(
                         text = stringResource(R.string.appstrings_upload_sq_strip_exif),
                         modifier = Modifier.weight(1f),
@@ -747,7 +749,7 @@ fun SignalQuestUploadScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
             // --- 3. CHAMP DESCRIPTION ---
             OutlinedTextField(
@@ -759,25 +761,25 @@ fun SignalQuestUploadScreen(
                 colors = OutlinedTextFieldDefaults.colors(unfocusedContainerColor = surfaceColor, focusedContainerColor = surfaceColor, unfocusedTextColor = textColor, focusedTextColor = textColor)
             )
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
             // Récapitulatif
             Card(modifier = Modifier.fillMaxWidth(), shape = blockShape, colors = CardDefaults.cardColors(containerColor = surfaceColor)) {
-                Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Default.Info, null, tint = activeColor)
-                    Spacer(Modifier.width(16.dp))
+                    Spacer(Modifier.width(sizing.spacing(16.dp)))
                     Column {
                         Text("${stringResource(R.string.appstrings_upload_sq_target_site)} $siteId", fontWeight = FontWeight.Bold, color = textColor)
                         Text(
                             "${stringResource(if (targetOperatorNames.size > 1) R.string.appstrings_upload_sq_target_operators else R.string.appstrings_upload_sq_target_operator)} $targetOperatorLabel",
-                            fontSize = 14.sp,
+                            fontSize = sizing.text(14.sp),
                             color = textColor.copy(alpha = 0.7f)
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
 
             // --- 4. BOUTON D'ENVOI ---
             Button(
@@ -789,17 +791,17 @@ fun SignalQuestUploadScreen(
                     }
                 },
                 enabled = currentUris.isNotEmpty(),
-                modifier = Modifier.fillMaxWidth().height(56.dp),
+                modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
                 shape = buttonShape,
                 colors = ButtonDefaults.buttonColors(containerColor = activeColor)
             ) {
                 Icon(Icons.Default.CloudUpload, null)
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
                 Text(pluralStringResource(R.plurals.upload_sq_button, currentUris.size, currentUris.size), fontWeight = FontWeight.Bold)
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
-            Text(stringResource(R.string.appstrings_upload_sq_limit), fontSize = 12.sp, color = textColor.copy(alpha = 0.5f))
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+            Text(stringResource(R.string.appstrings_upload_sq_limit), fontSize = sizing.text(12.sp), color = textColor.copy(alpha = 0.5f))
         }
 
         if (showImageSourceDialog) {
@@ -812,7 +814,7 @@ fun SignalQuestUploadScreen(
                 containerColor = dialogContainerColor,
                 title = { Text(stringResource(R.string.appstrings_add_photos), fontWeight = FontWeight.Bold, color = textColor) },
                 text = {
-                    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
                         Button(
                             onClick = {
                                 safeClick {
@@ -821,12 +823,12 @@ fun SignalQuestUploadScreen(
                                     launchCameraCaptureWithStorageCheck()
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                            modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
                             shape = buttonShape,
                             colors = ButtonDefaults.buttonColors(containerColor = activeColor)
                         ) {
                             Icon(Icons.Default.PhotoCamera, null)
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(sizing.spacing(8.dp)))
                             Text(stringResource(R.string.appstrings_camera), fontWeight = FontWeight.Bold)
                         }
                         OutlinedButton(
@@ -837,13 +839,13 @@ fun SignalQuestUploadScreen(
                                     photoPickerLauncher.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                            modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
                             shape = buttonShape,
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = textColor),
                             border = BorderStroke(1.dp, textColor.copy(alpha = 0.3f))
                         ) {
                             Icon(Icons.Default.PhotoLibrary, null)
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(sizing.spacing(8.dp)))
                             Text(stringResource(R.string.appstrings_gallery), fontWeight = FontWeight.Bold)
                         }
                         OutlinedButton(
@@ -854,13 +856,13 @@ fun SignalQuestUploadScreen(
                                     documentPickerLauncher.launch(arrayOf("image/*"))
                                 }
                             },
-                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                            modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
                             shape = buttonShape,
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = textColor),
                             border = BorderStroke(1.dp, textColor.copy(alpha = 0.3f))
                         ) {
                             Icon(Icons.Default.FolderOpen, null)
-                            Spacer(Modifier.width(8.dp))
+                            Spacer(Modifier.width(sizing.spacing(8.dp)))
                             Text(stringResource(R.string.appstrings_external_photo_files), fontWeight = FontWeight.Bold)
                         }
                     }
@@ -879,7 +881,7 @@ fun SignalQuestUploadScreen(
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
                     ) {
                         Text(text = pluralStringResource(R.plurals.upload_confirm_message, currentUris.size, currentUris.size))
 
@@ -887,7 +889,7 @@ fun SignalQuestUploadScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(160.dp)
+                                .height(sizing.component(160.dp))
                                 .clip(mapShape)
                                 .border(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f), mapShape)
                         ) {
@@ -973,7 +975,7 @@ fun SignalQuestUploadScreen(
                                         }
 
                                         val newSource = when (effectiveProvider) {
-                                            1 -> MapUtils.OSM_Source
+                                            1 -> if (ignStyle == 2) MapUtils.EsriSource.SATELLITE else MapUtils.OSM_Source
                                             2 -> if (ignStyle == 1) {
                                                 org.osmdroid.tileprovider.tilesource.XYTileSource("MapLibreDark", 1, 20, 256, ".png", arrayOf("https://basemaps.cartocdn.com/rastertiles/dark_all/"))
                                             } else {
@@ -1035,13 +1037,14 @@ private fun PhotoPositionBadge(
     total: Int,
     modifier: Modifier = Modifier
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Text(
         text = "$position/$total",
         color = Color.White,
-        fontSize = 13.sp,
+        fontSize = sizing.text(13.sp),
         fontWeight = FontWeight.Bold,
         modifier = modifier
             .background(Color.Black.copy(alpha = 0.62f), RoundedCornerShape(999.dp))
-            .padding(horizontal = 10.dp, vertical = 5.dp)
+            .padding(horizontal = sizing.spacing(10.dp), vertical = sizing.spacing(5.dp))
     )
 }

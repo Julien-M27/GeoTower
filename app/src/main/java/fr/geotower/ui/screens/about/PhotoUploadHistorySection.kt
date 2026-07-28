@@ -1,16 +1,14 @@
 package fr.geotower.ui.screens.about
 
+import android.content.Context
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -21,13 +19,11 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -43,6 +39,7 @@ import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Error
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Image
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -50,50 +47,51 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import fr.geotower.data.upload.ExternalPhotoUploadHistoryEntry
 import fr.geotower.data.upload.ExternalPhotoUploadHistoryStore
 import fr.geotower.data.upload.ExternalPhotoUploadHistoryValidator
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.GeoTowerDateScrollbar
+import fr.geotower.ui.components.PageScrollEdgeButtons
+import fr.geotower.ui.components.pageScrollbar
+import fr.geotower.ui.components.formatHistoryDateTime
+import fr.geotower.ui.components.formatHistoryStorageBytes
 import fr.geotower.ui.components.geoTowerLazyListFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.PageScrollPrefs
+import fr.geotower.utils.PreferenceStores
+import fr.geotower.ui.screens.settings.HistoryPageOption
+import fr.geotower.ui.screens.settings.HistoryPagePreferences
+import fr.geotower.ui.screens.settings.HistoryPageSettingsSheet
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlin.math.roundToInt
 import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
@@ -110,6 +108,7 @@ fun PhotoUploadHistoryShortcut(
     val context = LocalContext.current
     val safeClick = rememberSafeClick()
     var historyCount by remember { mutableStateOf(0) }
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     LaunchedEffect(Unit) {
         historyCount = ExternalPhotoUploadHistoryStore.read(context).size
@@ -128,15 +127,15 @@ fun PhotoUploadHistoryShortcut(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(sizing.spacing(16.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(Icons.Default.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = stringResource(R.string.appstrings_upload_history_title),
-                    style = MaterialTheme.typography.titleSmall,
+                    style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                     fontWeight = FontWeight.Bold
                 )
                 Text(
@@ -145,7 +144,7 @@ fun PhotoUploadHistoryShortcut(
                     } else {
                         pluralStringResource(R.plurals.upload_history_recorded, historyCount, historyCount)
                     },
-                    style = MaterialTheme.typography.bodySmall,
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -158,6 +157,7 @@ fun PhotoUploadHistoryShortcut(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PhotoUploadHistoryScreen(
     onNavigateBack: () -> Unit,
@@ -167,6 +167,13 @@ fun PhotoUploadHistoryScreen(
     val context = LocalContext.current
     val appContext = context.applicationContext
     val listState = rememberLazyListState()
+    val prefs = remember(appContext) {
+        appContext.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+    }
+    var showSettingsSheet by remember { mutableStateOf(false) }
+    val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var showThumbnails by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.UPLOAD_THUMBNAILS)) }
+    var showDateBar by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.UPLOAD_DATE_BAR)) }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
     var historyItems by remember { mutableStateOf<List<ExternalPhotoUploadHistoryEntry>>(emptyList()) }
     var selectedIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
@@ -233,6 +240,7 @@ fun PhotoUploadHistoryScreen(
         MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
     }
     val cardShape = if (AppConfig.useOneUiDesign) RoundedCornerShape(24.dp) else RoundedCornerShape(12.dp)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     Scaffold(
         containerColor = pageColor,
@@ -242,7 +250,7 @@ fun PhotoUploadHistoryScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .background(pageColor)
-                        .padding(top = 2.dp, bottom = 6.dp),
+                        .padding(top = sizing.spacing(2.dp), bottom = sizing.spacing(6.dp)),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     TextButton(
@@ -251,14 +259,14 @@ fun PhotoUploadHistoryScreen(
                                 selectedIds = if (isAllSelected) emptyList() else historyItems.map { it.id }
                             }
                         },
-                        modifier = Modifier.padding(start = 4.dp)
+                        modifier = Modifier.padding(start = sizing.spacing(4.dp))
                     ) {
                         Text(if (isAllSelected) stringResource(R.string.appstrings_clear_all) else stringResource(R.string.appstrings_select_all))
                     }
                     Spacer(modifier = Modifier.weight(1f))
                     IconButton(
                         onClick = { selectedIds = emptyList() },
-                        modifier = Modifier.padding(end = 4.dp)
+                        modifier = Modifier.padding(end = sizing.spacing(4.dp))
                     ) {
                         Icon(Icons.Default.Close, contentDescription = stringResource(R.string.appstrings_cancel))
                     }
@@ -271,7 +279,16 @@ fun PhotoUploadHistoryScreen(
                             onNavigateBack()
                         }
                     },
-                    backgroundColor = pageColor
+                    backgroundColor = pageColor,
+                    actions = {
+                        IconButton(onClick = { showSettingsSheet = true }) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.appstrings_settings_title),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
                 )
             }
         }
@@ -285,16 +302,17 @@ fun PhotoUploadHistoryScreen(
                 state = listState,
                 modifier = Modifier
                     .fillMaxSize()
-                    .geoTowerLazyListFadingEdge(listState),
+                    .geoTowerLazyListFadingEdge(listState)
+                    .pageScrollbar(PageScrollPrefs.PHOTO_UPLOAD_HISTORY, listState),
                 contentPadding = PaddingValues(
-                    start = 16.dp,
-                    top = 16.dp,
-                    end = 16.dp,
-                    bottom = 16.dp +
+                    start = sizing.spacing(16.dp),
+                    top = sizing.spacing(16.dp),
+                    end = sizing.spacing(16.dp),
+                    bottom = sizing.spacing(16.dp) +
                         WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() +
-                        if (isSelectionMode) 76.dp else 0.dp
+                        if (isSelectionMode) sizing.spacing(76.dp) else 0.dp
                 ),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
             ) {
                 if (historyItems.isEmpty()) {
                     item {
@@ -305,9 +323,9 @@ fun PhotoUploadHistoryScreen(
                         ) {
                             Text(
                                 text = stringResource(R.string.appstrings_upload_history_empty),
-                                style = MaterialTheme.typography.bodyMedium,
+                                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(16.dp)
+                                modifier = Modifier.padding(sizing.spacing(16.dp))
                             )
                         }
                     }
@@ -328,6 +346,7 @@ fun PhotoUploadHistoryScreen(
                         ) {
                             PhotoUploadHistoryRow(
                                 item = item,
+                                showThumbnail = showThumbnails,
                                 isSelected = isSelected,
                                 isSelectionMode = isSelectionMode,
                                 onOpenSite = { supportId ->
@@ -353,10 +372,10 @@ fun PhotoUploadHistoryScreen(
                                 },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(top = 8.dp, bottom = 24.dp)
+                                    .padding(top = sizing.spacing(8.dp), bottom = sizing.spacing(24.dp))
                             ) {
-                                Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(sizing.component(18.dp)))
+                                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                                 Text("${stringResource(R.string.appstrings_upload_history_clear)} (${formatUploadHistoryBytes(totalFreedBytes)})")
                             }
                         }
@@ -364,15 +383,19 @@ fun PhotoUploadHistoryScreen(
                 }
             }
 
-            UploadHistoryDateScrollbar(
+            PageScrollEdgeButtons(PageScrollPrefs.PHOTO_UPLOAD_HISTORY, listState)
+
+            GeoTowerDateScrollbar(
                 listState = listState,
-                items = historyItems,
+                timestamps = remember(historyItems, showDateBar) {
+                    if (showDateBar) historyItems.map { it.createdAtMillis } else emptyList()
+                },
                 modifier = Modifier
                     .align(Alignment.CenterEnd)
                     .fillMaxHeight()
                     .padding(
-                        top = 12.dp,
-                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 12.dp
+                        top = sizing.spacing(12.dp),
+                        bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + sizing.spacing(12.dp)
                     )
             )
 
@@ -381,9 +404,9 @@ fun PhotoUploadHistoryScreen(
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
                         .padding(
-                            start = 16.dp,
-                            end = 16.dp,
-                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 16.dp
+                            start = sizing.spacing(16.dp),
+                            end = sizing.spacing(16.dp),
+                            bottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + sizing.spacing(16.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -398,13 +421,49 @@ fun PhotoUploadHistoryScreen(
                         },
                         shape = floatingShape
                     ) {
-                        Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(18.dp))
-                        Spacer(modifier = Modifier.width(8.dp))
+                        Icon(Icons.Default.DeleteSweep, contentDescription = null, modifier = Modifier.size(sizing.component(18.dp)))
+                        Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                         Text("${stringResource(R.string.appstrings_delete)} (${selectedIds.size}) - ${formatUploadHistoryBytes(selectedFreedBytes)}")
                     }
                 }
             }
         }
+    }
+
+    if (showSettingsSheet) {
+        HistoryPageSettingsSheet(
+            title = stringResource(R.string.upload_history_settings_title),
+            page = PageScrollPrefs.PHOTO_UPLOAD_HISTORY,
+            options = listOf(
+                HistoryPageOption(
+                    title = stringResource(R.string.upload_history_option_thumbnails),
+                    checked = showThumbnails,
+                    onCheckedChange = {
+                        showThumbnails = it
+                        HistoryPagePreferences.write(prefs, HistoryPagePreferences.UPLOAD_THUMBNAILS, it)
+                    }
+                ),
+                HistoryPageOption(
+                    title = stringResource(R.string.history_option_date_bar),
+                    checked = showDateBar,
+                    onCheckedChange = {
+                        showDateBar = it
+                        HistoryPagePreferences.write(prefs, HistoryPagePreferences.UPLOAD_DATE_BAR, it)
+                    }
+                )
+            ),
+            onReset = {
+                showThumbnails = HistoryPagePreferences.DEFAULT_ENABLED
+                showDateBar = HistoryPagePreferences.DEFAULT_ENABLED
+                HistoryPagePreferences.write(prefs, HistoryPagePreferences.UPLOAD_THUMBNAILS, HistoryPagePreferences.DEFAULT_ENABLED)
+                HistoryPagePreferences.write(prefs, HistoryPagePreferences.UPLOAD_DATE_BAR, HistoryPagePreferences.DEFAULT_ENABLED)
+            },
+            onDismiss = { showSettingsSheet = false },
+            onBack = { showSettingsSheet = false },
+            sheetState = settingsSheetState,
+            useOneUi = AppConfig.useOneUiDesign,
+            bubbleColor = cardColor
+        )
     }
 
     if (showClearDialog) {
@@ -448,12 +507,14 @@ fun PhotoUploadHistoryScreen(
 @OptIn(ExperimentalFoundationApi::class)
 private fun PhotoUploadHistoryRow(
     item: ExternalPhotoUploadHistoryEntry,
+    showThumbnail: Boolean,
     isSelected: Boolean,
     isSelectionMode: Boolean,
     onOpenSite: (String) -> Unit,
     onSelect: () -> Unit,
     onToggleSelection: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val statusLabel = uploadHistoryStatusLabel(item.status)
     val statusColor = when (item.status) {
         ExternalPhotoUploadHistoryStore.STATUS_SUCCESS -> Color(0xFF4CAF50)
@@ -483,36 +544,38 @@ private fun PhotoUploadHistoryRow(
                 },
                 onLongClick = onSelect
             )
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = sizing.spacing(14.dp), vertical = sizing.spacing(12.dp)),
         verticalAlignment = Alignment.CenterVertically
     ) {
         if (isSelectionMode) {
             SelectionIndicator(isSelected)
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
         }
-        HistoryThumbnail(item.thumbnailPath)
-        Spacer(modifier = Modifier.width(14.dp))
+        if (showThumbnail) {
+            HistoryThumbnail(item.thumbnailPath)
+            Spacer(modifier = Modifier.width(sizing.spacing(14.dp)))
+        }
         Column(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(3.dp)
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(3.dp))
         ) {
             Text(
                 text = "${item.sourceName} - ${item.operator}",
-                style = MaterialTheme.typography.bodyMedium,
+                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = "${stringResource(R.string.appstrings_upload_sq_target_site)} ${item.supportId}",
-                style = MaterialTheme.typography.bodySmall,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = "${formatUploadHistoryDate(item.createdAtMillis)} - $statusLabel",
-                style = MaterialTheme.typography.bodySmall,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -523,18 +586,18 @@ private fun PhotoUploadHistoryRow(
                 shape = RoundedCornerShape(8.dp)
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                    modifier = Modifier.padding(horizontal = sizing.spacing(8.dp), vertical = sizing.spacing(3.dp)),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(statusIcon, contentDescription = null, modifier = Modifier.size(14.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
+                    Icon(statusIcon, contentDescription = null, modifier = Modifier.size(sizing.component(14.dp)))
+                    Spacer(modifier = Modifier.width(sizing.spacing(4.dp)))
                     Text(
                         text = if (item.stripExifBeforeUpload) {
                             stringResource(R.string.upload_history_exif_removed)
                         } else {
                             stringResource(R.string.upload_history_exif_kept)
                         },
-                        style = MaterialTheme.typography.labelSmall,
+                        style = sizing.textStyle(MaterialTheme.typography.labelSmall),
                         fontWeight = FontWeight.SemiBold
                     )
                 }
@@ -555,16 +618,17 @@ private fun uploadHistoryStatusLabel(status: String): String = when (status) {
 
 @Composable
 private fun SelectionIndicator(isSelected: Boolean) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Surface(
         shape = CircleShape,
         color = if (isSelected) MaterialTheme.colorScheme.primary else Color.Transparent,
         contentColor = if (isSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.outline,
         border = if (isSelected) null else BorderStroke(2.dp, MaterialTheme.colorScheme.outline),
-        modifier = Modifier.size(24.dp)
+        modifier = Modifier.size(sizing.component(24.dp))
     ) {
         Box(contentAlignment = Alignment.Center) {
             if (isSelected) {
-                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(sizing.component(16.dp)))
             }
         }
     }
@@ -572,10 +636,11 @@ private fun SelectionIndicator(isSelected: Boolean) {
 
 @Composable
 private fun HistoryThumbnail(thumbnailPath: String?) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val shape = RoundedCornerShape(8.dp)
     Box(
         modifier = Modifier
-            .size(68.dp)
+            .size(sizing.component(68.dp))
             .clip(shape)
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
@@ -595,166 +660,12 @@ private fun HistoryThumbnail(thumbnailPath: String?) {
                 Icons.Default.Image,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(28.dp)
+                modifier = Modifier.size(sizing.component(28.dp))
             )
         }
     }
 }
 
-// Barre de défilement latérale : pouce ancré au bord droit, bulle affichant le jour d'envoi des
-// photos visibles, et saut direct dans la liste en tirant le pouce. Elle apparaît pendant le
-// défilement et s'efface toute seule après une courte inactivité.
-@Composable
-private fun UploadHistoryDateScrollbar(
-    listState: LazyListState,
-    items: List<ExternalPhotoUploadHistoryEntry>,
-    modifier: Modifier = Modifier
-) {
-    if (items.isEmpty()) return
+private fun formatUploadHistoryDate(timestamp: Long): String = formatHistoryDateTime(timestamp)
 
-    val scope = rememberCoroutineScope()
-    var isDragging by remember { mutableStateOf(false) }
-    var dragFraction by remember { mutableFloatStateOf(0f) }
-
-    // Position du pouce alignée sur le défilement réel (progression inter-élément comprise).
-    val listFraction by remember {
-        derivedStateOf {
-            val layoutInfo = listState.layoutInfo
-            val visibleItems = layoutInfo.visibleItemsInfo
-            if (visibleItems.isEmpty()) {
-                0f
-            } else {
-                val denominator = (layoutInfo.totalItemsCount - visibleItems.size).coerceAtLeast(1)
-                val firstItem = visibleItems.first()
-                val firstItemProgress = -firstItem.offset.toFloat() / firstItem.size.coerceAtLeast(1)
-                ((firstItem.index + firstItemProgress) / denominator).coerceIn(0f, 1f)
-            }
-        }
-    }
-
-    val isScrollable = listState.canScrollForward || listState.canScrollBackward
-    val isActive = isDragging || listState.isScrollInProgress
-    var isBarVisible by remember { mutableStateOf(false) }
-    LaunchedEffect(isActive, isScrollable) {
-        if (isActive && isScrollable) {
-            isBarVisible = true
-        } else {
-            delay(1400)
-            isBarVisible = false
-        }
-    }
-    val barAlpha by animateFloatAsState(
-        targetValue = if (isBarVisible) 1f else 0f,
-        label = "uploadHistoryScrollbarAlpha"
-    )
-    if (barAlpha < 0.01f) return
-
-    val fraction = if (isDragging) dragFraction else listFraction
-    val labelIndex = if (isDragging) {
-        (dragFraction * (items.size - 1)).roundToInt()
-    } else {
-        listState.firstVisibleItemIndex
-    }.coerceIn(0, items.lastIndex)
-    val dayLabel = formatUploadHistoryDay(items[labelIndex].createdAtMillis)
-
-    BoxWithConstraints(modifier = modifier.alpha(barAlpha)) {
-        val thumbHeightPx = with(LocalDensity.current) { UPLOAD_HISTORY_SCROLLBAR_THUMB_HEIGHT.toPx() }
-        val maxOffsetPx = (constraints.maxHeight - thumbHeightPx).coerceAtLeast(0f)
-
-        fun fractionForPointer(y: Float): Float {
-            if (maxOffsetPx <= 0f) return 0f
-            return ((y - thumbHeightPx / 2f) / maxOffsetPx).coerceIn(0f, 1f)
-        }
-
-        fun scrollToFraction(value: Float) {
-            dragFraction = value
-            val targetIndex = (value * (items.size - 1)).roundToInt().coerceIn(0, items.lastIndex)
-            scope.launch { listState.scrollToItem(targetIndex) }
-        }
-
-        // Zone de prise en main : toute la hauteur du bord droit.
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .fillMaxHeight()
-                .width(24.dp)
-                .pointerInput(items.size, maxOffsetPx) {
-                    detectVerticalDragGestures(
-                        onDragStart = { startOffset ->
-                            isDragging = true
-                            scrollToFraction(fractionForPointer(startOffset.y))
-                        },
-                        onDragEnd = { isDragging = false },
-                        onDragCancel = { isDragging = false },
-                        onVerticalDrag = { change, _ ->
-                            change.consume()
-                            scrollToFraction(fractionForPointer(change.position.y))
-                        }
-                    )
-                }
-        )
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .offset { IntOffset(0, (fraction * maxOffsetPx).roundToInt()) }
-                .height(UPLOAD_HISTORY_SCROLLBAR_THUMB_HEIGHT)
-        ) {
-            Surface(
-                color = MaterialTheme.colorScheme.primaryContainer,
-                contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                shape = CircleShape,
-                shadowElevation = 4.dp
-            ) {
-                Text(
-                    text = dayLabel,
-                    style = MaterialTheme.typography.labelLarge,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
-                )
-            }
-            Box(
-                modifier = Modifier
-                    .padding(end = 3.dp)
-                    .width(6.dp)
-                    .fillMaxHeight()
-                    .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
-            )
-        }
-    }
-}
-
-private val UPLOAD_HISTORY_SCROLLBAR_THUMB_HEIGHT = 48.dp
-
-private fun formatUploadHistoryDay(timestamp: Long): String {
-    return runCatching {
-        SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(Date(timestamp))
-    }.getOrDefault("-")
-}
-
-private fun formatUploadHistoryDate(timestamp: Long): String {
-    return runCatching {
-        SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date(timestamp))
-    }.getOrDefault("-")
-}
-
-private fun formatUploadHistoryBytes(bytes: Long): String {
-    if (bytes <= 0L) return "0 o"
-    val units = listOf("o", "Ko", "Mo", "Go")
-    var value = bytes.toDouble()
-    var unitIndex = 0
-    while (value >= 1024.0 && unitIndex < units.lastIndex) {
-        value /= 1024.0
-        unitIndex++
-    }
-    return if (unitIndex == 0) {
-        "${bytes} ${units[unitIndex]}"
-    } else {
-        val pattern = if (value >= 10.0) "%.0f %s" else "%.1f %s"
-        String.format(Locale.getDefault(), pattern, value, units[unitIndex])
-    }
-}
+private fun formatUploadHistoryBytes(bytes: Long): String = formatHistoryStorageBytes(bytes)

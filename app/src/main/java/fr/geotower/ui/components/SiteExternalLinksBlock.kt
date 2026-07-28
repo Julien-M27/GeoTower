@@ -38,6 +38,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.R
 import fr.geotower.data.api.CellMapperLinks
 import fr.geotower.data.api.SignalQuestOperators
@@ -58,6 +59,7 @@ fun SiteExternalLinksBlock(
     onShowEnb: () -> Unit,
     onShowAnfr: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
     val txtExternalLinks = stringResource(R.string.appstrings_external_links)
     val txtOpenApp = stringResource(R.string.appstrings_open)
@@ -77,15 +79,15 @@ fun SiteExternalLinksBlock(
     val showEnbAnalytics by remember { mutableStateOf(prefs.getBoolean("link_enbanalytics", true)) }
 
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor), modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Public, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                 Text(text = txtExternalLinks, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             }
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                 externalLinksOrder.forEach { block ->
                     when (block) {
                         "cartoradio" -> {
@@ -176,22 +178,23 @@ fun SiteExternalLinksBlock(
 
 @Composable
 private fun CommunityLinkRow(btnText: String, txtOpen: String, logoRes: Int, buttonShape: Shape, onClick: () -> Unit) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         if (logoRes == R.drawable.logo_cellmapper) {
             Box(
                 modifier = Modifier
-                    .size(48.dp)
+                    .size(sizing.component(48.dp))
                     .clip(RoundedCornerShape(8.dp))
                     .background(Color.White)
-                    .padding(5.dp),
+                    .padding(sizing.spacing(5.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Image(painter = painterResource(id = logoRes), contentDescription = null, modifier = Modifier.fillMaxSize())
             }
         } else {
-            Image(painter = painterResource(id = logoRes), contentDescription = null, modifier = Modifier.size(48.dp).clip(RoundedCornerShape(8.dp)))
+            Image(painter = painterResource(id = logoRes), contentDescription = null, modifier = Modifier.size(sizing.component(48.dp)).clip(RoundedCornerShape(8.dp)))
         }
-        Spacer(modifier = Modifier.width(16.dp))
+        Spacer(modifier = Modifier.width(sizing.spacing(16.dp)))
         Button(onClick = onClick, modifier = Modifier.weight(1f), shape = buttonShape) {
             Text(text = "$txtOpen $btnText", fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
         }

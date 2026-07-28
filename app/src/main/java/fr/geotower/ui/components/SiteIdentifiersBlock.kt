@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.data.models.LocalisationEntity // ✅ NOUVEL IMPORT
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
@@ -35,6 +36,7 @@ fun SiteIdentifiersBlock(
     cardBgColor: Color,
     blockShape: Shape
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
 
     val txtIdentifiers = stringResource(R.string.appstrings_identifiers)
@@ -47,13 +49,13 @@ fun SiteIdentifiersBlock(
     val txtIdUnavailable = stringResource(R.string.appstrings_id_unavailable)
 
     Card(shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor), elevation = CardDefaults.cardElevation(0.dp), modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Tag, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                 Text(text = txtIdentifiers, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             }
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
             val idSupportValue = idSupport ?: txtNotSpecified // ✅ ON UTILISE LE VRAI ID SUPPORT
             InfoLine(
@@ -70,7 +72,7 @@ fun SiteIdentifiersBlock(
                 }
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
 
             val anfrLabelClean = txtAnfrStationNumber.replace(" : ", "")
             val idAnfrValue = info.idAnfr.takeIf { it.isNotBlank() } ?: txtNotSpecified // ✅ ON RÉCUPÈRE L'ID ANFR
@@ -89,7 +91,7 @@ fun SiteIdentifiersBlock(
                 }
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
 
             val arcepNidtValue = info.arcepNidt?.takeIf { it.isNotBlank() } ?: txtNotSpecified
             InfoLine(

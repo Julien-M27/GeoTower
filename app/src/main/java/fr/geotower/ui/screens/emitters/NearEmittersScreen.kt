@@ -41,8 +41,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardArrowDown
-import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Place
@@ -87,6 +85,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.core.app.ActivityCompat
 import androidx.navigation.NavController
 import fr.geotower.R
@@ -94,7 +93,10 @@ import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.GeoTowerPullToRefreshBox
 import fr.geotower.ui.components.LiveDatabaseUsageWarningDialog
 import fr.geotower.ui.components.LocationUnavailableMessage
+import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.geoTowerLazyListFadingEdge
+import fr.geotower.ui.components.pageScrollbar
+import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.NominatimApi
 import fr.geotower.data.api.NominatimGeoPoint
@@ -104,6 +106,7 @@ import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.map.FilterToggleButton
 import fr.geotower.ui.screens.map.FreqRow
+import fr.geotower.ui.screens.map.ProjectFilterColor
 import fr.geotower.ui.screens.map.SectionTitle
 import fr.geotower.ui.screens.map.SelectableButton
 import fr.geotower.ui.screens.settings.NearbySettingsSheet
@@ -128,6 +131,7 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.SiteHsEntity
+import fr.geotower.data.models.isDeclaredActive
 import androidx.compose.runtime.saveable.rememberSaveable
 import java.text.Normalizer
 import java.util.Locale
@@ -163,6 +167,8 @@ data class UiSite(
     val supportText: String = "",
     val isZb: Boolean = false,
     val hasUnderground: Boolean = false,
+    /** Aucune émission en service sur le site (statut ANFR entièrement « en projet »). */
+    val isEntirelyProject: Boolean = false,
     val searchText: String = ""
 )
 
@@ -199,6 +205,7 @@ fun NearEmittersScreen(
     repository: AnfrRepository,
     onSupportClick: ((UiSite, String?) -> Unit)? = null
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     SecureScreenEffect(RemoteFeatureFlags.SecureScreens.NEARBY)
     val context = LocalContext.current
     val activity = LocalActivity.current
@@ -319,6 +326,7 @@ fun NearEmittersScreen(
     // Filtres « Affichage des sites » partagés avec la carte (zone blanche, hors service, souterrains)
     val showSitesInService by AppConfig.showSitesInService
     val showSitesOutOfService by AppConfig.showSitesOutOfService
+    val showProjectSites by AppConfig.showProjectSites
     val showOnlyZbSites by AppConfig.showOnlyZbSites
     val hideUndergroundSites by AppConfig.hideUndergroundSites
 
@@ -493,12 +501,12 @@ fun NearEmittersScreen(
     // Recherche locale instantanee; les resultats globaux arrivent ensuite depuis un cache separe.
     val filteredSites = remember(
         sites, searchQuery, maxItemsToShow, remoteSearchQuery, remoteSearchSites,
-        showSitesInService, showSitesOutOfService, showOnlyZbSites, hideUndergroundSites, hsOperatorMap
+        showSitesInService, showSitesOutOfService, showProjectSites, showOnlyZbSites, hideUndergroundSites, hsOperatorMap
     ) {
         val query = searchQuery.trim()
         if (query.isEmpty()) {
             return@remember sites
-                .applyNearbyDisplayFilters(showSitesInService, showSitesOutOfService, showOnlyZbSites, hideUndergroundSites, hsOperatorMap)
+                .applyNearbyDisplayFilters(showSitesInService, showSitesOutOfService, showProjectSites, showOnlyZbSites, hideUndergroundSites, hsOperatorMap)
                 .take(maxItemsToShow)
         }
 
@@ -507,7 +515,7 @@ fun NearEmittersScreen(
         val matchingRemoteSites = if (remoteSearchQuery == query) remoteSearchSites else emptyList()
         (localMatches + matchingRemoteSites)
             .distinctBy { it.id }
-            .applyNearbyDisplayFilters(showSitesInService, showSitesOutOfService, showOnlyZbSites, hideUndergroundSites, hsOperatorMap)
+            .applyNearbyDisplayFilters(showSitesInService, showSitesOutOfService, showProjectSites, showOnlyZbSites, hideUndergroundSites, hsOperatorMap)
             .sortedBy { it.distance }
             .take(maxItemsToShow)
     }
@@ -791,14 +799,14 @@ fun NearEmittersScreen(
                 when (block) {
                     "search" -> {
                         if (showSearchBar) {
-                            Column(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+                            Column(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(8.dp))) {
                                 OutlinedTextField(
                                     value = searchQuery,
                                     onValueChange = {
                                         searchQuery = it
                                         maxItemsToShow = 100
                                     },
-                                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                                    modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp)),
                                     placeholder = { Text(stringResource(R.string.appstrings_search_city_or_id)) },
                                     leadingIcon = { Icon(Icons.Default.Search, null) },
                                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
@@ -809,7 +817,7 @@ fun NearEmittersScreen(
                                     ),
                                     trailingIcon = {
                                         if (isSearchingRemote) {
-                                            LoadingIndicator(modifier = Modifier.size(20.dp), color = MaterialTheme.colorScheme.primary)
+                                            LoadingIndicator(modifier = Modifier.size(sizing.component(20.dp)), color = MaterialTheme.colorScheme.primary)
                                         } else if (searchQuery.isNotEmpty()) {
                                             IconButton(onClick = { searchQuery = "" }) { Icon(Icons.Default.Close, stringResource(R.string.appstrings_clear)) }
                                         }
@@ -838,12 +846,12 @@ fun NearEmittersScreen(
                                     Row(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(start = 32.dp, end = 8.dp, top = 8.dp),
+                                            .padding(start = sizing.spacing(32.dp), end = sizing.spacing(8.dp), top = sizing.spacing(8.dp)),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
                                             text = pluralStringResource(R.plurals.sites_found, filteredSites.size, filteredSites.size),
-                                            style = MaterialTheme.typography.labelMedium,
+                                            style = sizing.textStyle(MaterialTheme.typography.labelMedium),
                                             color = MaterialTheme.colorScheme.secondary
                                         )
                                         Spacer(modifier = Modifier.weight(1f))
@@ -886,30 +894,30 @@ fun NearEmittersScreen(
                                     searchCenter == null && filteredSites.isEmpty() && !isSearchingRemote -> {
                                         Column(modifier = Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                                             LoadingIndicator()
-                                            Spacer(modifier = Modifier.height(8.dp))
-                                            Text(stringResource(R.string.appstrings_search_gps), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+                                            Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+                                            Text(stringResource(R.string.appstrings_search_gps), style = sizing.textStyle(MaterialTheme.typography.bodyMedium), color = MaterialTheme.colorScheme.onSurface)
                                         }
                                     }
                                     filteredSites.isEmpty() && (isLoading || isSearchingRemote || isResolvingInitialLocation) -> {
                                         Column(
                                             modifier = Modifier
                                                 .align(Alignment.Center)
-                                                .padding(horizontal = 32.dp),
+                                                .padding(horizontal = sizing.spacing(32.dp)),
                                             horizontalAlignment = Alignment.CenterHorizontally
                                         ) {
                                             LoadingIndicator()
-                                            Spacer(modifier = Modifier.height(12.dp))
+                                            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                                             Text(
                                                 text = stringResource(R.string.appstrings_nearby_loading_title),
-                                                style = MaterialTheme.typography.titleSmall,
+                                                style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                                                 fontWeight = FontWeight.Bold,
                                                 color = MaterialTheme.colorScheme.onSurface,
                                                 textAlign = TextAlign.Center
                                             )
-                                            Spacer(modifier = Modifier.height(4.dp))
+                                            Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
                                             Text(
                                                 text = stringResource(R.string.appstrings_nearby_loading_desc),
-                                                style = MaterialTheme.typography.bodySmall,
+                                                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 textAlign = TextAlign.Center
                                             )
@@ -921,15 +929,18 @@ fun NearEmittersScreen(
                                     else -> {
                                         LazyColumn(
                                             state = lazyListState,
-                                            modifier = Modifier.fillMaxSize().geoTowerLazyListFadingEdge(lazyListState),
+                                            modifier = Modifier
+                                                .fillMaxSize()
+                                                .geoTowerLazyListFadingEdge(lazyListState)
+                                                .pageScrollbar(PageScrollPrefs.NEARBY, lazyListState),
                                             // 🚨 CORRECTION : On ajoute l'espacement de la barre de navigation à la fin
                                             contentPadding = PaddingValues(
-                                                start = 16.dp,
-                                                top = 16.dp,
-                                                end = 16.dp,
-                                                bottom = 16.dp + androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+                                                start = sizing.spacing(16.dp),
+                                                top = sizing.spacing(16.dp),
+                                                end = sizing.spacing(16.dp),
+                                                bottom = sizing.spacing(16.dp) + androidx.compose.foundation.layout.WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
                                             ),
-                                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                                            verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
                                         ) {
                                             items(filteredSites, key = { it.idSupport ?: "${it.id}_${it.latitude}_${it.longitude}" }) { site ->
                                                 EmitterCard(
@@ -973,7 +984,7 @@ fun NearEmittersScreen(
                                                                 maxItemsToShow += NEARBY_VISIBLE_PAGE_SIZE
                                                             }
                                                         },
-                                                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 24.dp),
+                                                        modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(8.dp), bottom = sizing.spacing(24.dp)),
                                                         shape = RoundedCornerShape(16.dp),
                                                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                                                     ) {
@@ -983,60 +994,9 @@ fun NearEmittersScreen(
                                             }
                                         }
 
-                                        val showScrollButtons by androidx.compose.runtime.remember {
-                                            androidx.compose.runtime.derivedStateOf { lazyListState.firstVisibleItemIndex > 0 }
-                                        }
-                                        val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
-
-                                        val buttonBgColor = if (isDark) {
-                                            Color(0xFF2C2C2C).copy(alpha = 0.85f)
-                                        } else {
-                                            Color(0xFFF2F2F2).copy(alpha = 0.85f)
-                                        }
-                                        val iconColor = MaterialTheme.colorScheme.onSurface
-
-                                        androidx.compose.animation.AnimatedVisibility(
-                                            visible = showScrollButtons,
-                                            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically(initialOffsetY = { it }),
-                                            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.slideOutVertically(targetOffsetY = { it }),
-                                            modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp)
-                                        ) {
-                                            androidx.compose.material3.Surface(
-                                                shape = RoundedCornerShape(32.dp),
-                                                color = buttonBgColor,
-                                                shadowElevation = 0.dp,
-                                                border = androidx.compose.foundation.BorderStroke(0.5.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-                                            ) {
-                                                Row(
-                                                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-                                                    horizontalArrangement = Arrangement.Center,
-                                                    verticalAlignment = Alignment.CenterVertically
-                                                ) {
-                                                    IconButton(onClick = {
-                                                        coroutineScope.launch { lazyListState.animateScrollToItemSmoothly(0) }
-                                                    }) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.KeyboardArrowUp,
-                                                            contentDescription = stringResource(R.string.appstrings_top),
-                                                            tint = iconColor
-                                                        )
-                                                    }
-
-                                                    IconButton(onClick = {
-                                                        coroutineScope.launch {
-                                                            val lastIndex = lazyListState.layoutInfo.totalItemsCount - 1
-                                                            if (lastIndex > 0) lazyListState.animateScrollToItemSmoothly(lastIndex)
-                                                        }
-                                                    }) {
-                                                        Icon(
-                                                            imageVector = Icons.Default.KeyboardArrowDown,
-                                                            contentDescription = stringResource(R.string.appstrings_bottom),
-                                                            tint = iconColor
-                                                        )
-                                                    }
-                                                }
-                                            }
-                                        }
+                                        // Pastille « haut / bas de page » : les deux boutons sont
+                                        // désormais réglables séparément (Perso. des pages).
+                                        PageScrollEdgeButtons(PageScrollPrefs.NEARBY, lazyListState)
                                     }
                                 }
                             }
@@ -1109,6 +1069,7 @@ private fun NearbyFrequencyFilterSheet(
 
     var showSitesInService by AppConfig.showSitesInService
     var showSitesOutOfService by AppConfig.showSitesOutOfService
+    var showProjectSites by AppConfig.showProjectSites
     var showOnlyZbSites by AppConfig.showOnlyZbSites
     var hideUndergroundSites by AppConfig.hideUndergroundSites
 
@@ -1216,6 +1177,16 @@ private fun NearbyFrequencyFilterSheet(
                     showSitesOutOfService = it
                     prefs.edit().putBoolean("show_sites_out_of_service", it).apply()
                 }
+
+                SelectableButton(
+                    label = stringResource(R.string.appstrings_sites_project_label),
+                    isSelected = showProjectSites,
+                    modifier = Modifier.weight(1f),
+                    selectedColor = ProjectFilterColor
+                ) {
+                    showProjectSites = it
+                    prefs.edit().putBoolean(AppConfig.PREF_SHOW_PROJECT_SITES, it).apply()
+                }
             }
 
             Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
@@ -1242,26 +1213,6 @@ private fun NearbyFrequencyFilterSheet(
             }
         }
     }
-}
-
-private suspend fun LazyListState.animateScrollToItemSmoothly(targetIndex: Int) {
-    val lastIndex = layoutInfo.totalItemsCount - 1
-    if (lastIndex < 0) return
-
-    val target = targetIndex.coerceIn(0, lastIndex)
-
-    // Longueur du « ralenti » final, en nombre d'items animés jusqu'à la cible.
-    val tailItems = 10
-    val current = firstVisibleItemIndex
-
-    // 1) On saute quasi tout instantanément, jusqu'à quelques items avant la cible...
-    if (kotlin.math.abs(target - current) > tailItems) {
-        val jumpTo = if (target > current) target - tailItems else target + tailItems
-        scrollToItem(jumpTo.coerceIn(0, lastIndex))
-    }
-
-    // 2) ...puis animation de ralenti (décélération) sur les derniers éléments jusqu'à la cible.
-    animateScrollToItem(target)
 }
 
 
@@ -1408,6 +1359,7 @@ fun EmitterCard(
     priorityOperatorKey: String? = null,
     onClick: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     val isMi = AppConfig.distanceUnit.intValue == 1
     val distanceLabel = formatNearbyDistanceLabel(site.distance, isMi)
 
@@ -1419,12 +1371,12 @@ fun EmitterCard(
         border = cardBorder,
         elevation = CardDefaults.cardElevation(if (useOneUi) 0.dp else 2.dp)
     ) {
-        Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(sizing.spacing(12.dp)), verticalAlignment = Alignment.CenterVertically) {
 
-            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(64.dp)) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.width(sizing.component(64.dp))) {
                 Box(
                     modifier = Modifier
-                        .size(42.dp)
+                        .size(sizing.component(42.dp))
                         .clip(RoundedCornerShape(12.dp))
                         .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
@@ -1433,14 +1385,14 @@ fun EmitterCard(
                         imageVector = Icons.Default.Place,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(sizing.component(24.dp))
                     )
                 }
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
 
                 Text(
                     text = distanceLabel.primaryText,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.labelMedium),
                     fontWeight = FontWeight.ExtraBold,
                     color = MaterialTheme.colorScheme.primary,
                     textAlign = TextAlign.Center,
@@ -1450,7 +1402,7 @@ fun EmitterCard(
                 distanceLabel.secondaryText?.let { secondaryText ->
                     Text(
                         text = secondaryText,
-                        style = MaterialTheme.typography.labelMedium,
+                        style = sizing.textStyle(MaterialTheme.typography.labelMedium),
                         fontWeight = FontWeight.ExtraBold,
                         color = MaterialTheme.colorScheme.primary,
                         textAlign = TextAlign.Center,
@@ -1460,15 +1412,15 @@ fun EmitterCard(
                 }
             }
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
 
             OperatorGrid(operators = site.operators, priorityOperatorKey = priorityOperatorKey)
 
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
 
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = site.address, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
-                Text(text = site.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(text = site.address, style = sizing.textStyle(MaterialTheme.typography.bodyMedium), fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, color = MaterialTheme.colorScheme.onSurface)
+                Text(text = site.description, style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
 
             Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -1478,6 +1430,7 @@ fun EmitterCard(
 
 @Composable
 fun OperatorGrid(operators: List<String>, priorityOperatorKey: String? = null) {
+    val sizing = LocalGeoTowerUiSizing.current
     val defaultOp = AppConfig.defaultOperator.value.uppercase()
     val baseOrder = OperatorColors.orderedKeys
     val priorityList = mutableListOf<String>()
@@ -1497,18 +1450,18 @@ fun OperatorGrid(operators: List<String>, priorityOperatorKey: String? = null) {
 
     Column(
         modifier = Modifier
-            .size(56.dp)
+            .size(sizing.component(56.dp))
             .clip(RoundedCornerShape(6.dp))
     ) {
         Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
             GridCell(opName = displayOps.getOrNull(0), modifier = Modifier.weight(1f))
-            Spacer(modifier = Modifier.width(2.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(2.dp)))
             GridCell(opName = displayOps.getOrNull(1), modifier = Modifier.weight(1f))
         }
-        Spacer(modifier = Modifier.height(2.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(2.dp)))
         Row(modifier = Modifier.weight(1f).fillMaxWidth()) {
             GridCell(opName = displayOps.getOrNull(2), modifier = Modifier.weight(1f))
-            Spacer(modifier = Modifier.width(2.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(2.dp)))
             GridCell(opName = displayOps.getOrNull(3), modifier = Modifier.weight(1f))
         }
     }
@@ -1636,6 +1589,7 @@ private suspend fun mapAntennasToUiSites(
             .distinct()
         val isZb = list.any { it.isZb == 1 }
         val hasUnderground = list.any { it.hasUndergroundSupport == 1 }
+        val isEntirelyProject = list.none { it.isDeclaredActive() }
 
         val techniques = list.mapNotNull { techniquesById[it.idAnfr] }
         val physiques = list.flatMap { physiquesById[it.idAnfr].orEmpty() }
@@ -1703,6 +1657,7 @@ private suspend fun mapAntennasToUiSites(
             supportText = supportText,
             isZb = isZb,
             hasUnderground = hasUnderground,
+            isEntirelyProject = isEntirelyProject,
             searchText = searchText
         )
     }
@@ -1774,11 +1729,16 @@ private fun nearbyHsOperatorsForSite(site: UiSite, hsOperatorMap: Map<String, Se
 private fun List<UiSite>.applyNearbyDisplayFilters(
     showInService: Boolean,
     showOutOfService: Boolean,
+    showProject: Boolean,
     showOnlyZb: Boolean,
     hideUnderground: Boolean,
     hsOperatorMap: Map<String, Set<String>>
 ): List<UiSite> = filter { site ->
-    val statusOk = when {
+    // Statuts exclusifs, comme sur la carte : un site sans aucune émission en service
+    // relève de « En projet », pas de « En service ».
+    val statusOk = if (site.isEntirelyProject) {
+        showProject
+    } else when {
         showInService && showOutOfService -> true
         !showInService && !showOutOfService -> false
         else -> {

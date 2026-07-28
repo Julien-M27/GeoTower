@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.graphics.ColorUtils
 import fr.geotower.R
@@ -96,6 +97,7 @@ fun SharedMiniMapCard(
     fitSelectedPointRequest: Int = 0,
     activeOperatorKeys: Set<String>? = null
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
     val currentOnMapTap by rememberUpdatedState(onMapTap)
     val currentAllowGestures by rememberUpdatedState(allowGestures)
@@ -151,7 +153,7 @@ fun SharedMiniMapCard(
         stringResource(R.string.appstrings_mini_map_switch_to_user)
     }
 
-    Box(modifier = modifier.height(200.dp).clip(blockShape).border(cardBorder ?: BorderStroke(0.dp, Color.Transparent), blockShape)) {
+    Box(modifier = modifier.height(sizing.component(200.dp)).clip(blockShape).border(cardBorder ?: BorderStroke(0.dp, Color.Transparent), blockShape)) {
         AndroidView(
             modifier = Modifier.fillMaxSize(),
             factory = { ctx ->
@@ -285,7 +287,7 @@ fun SharedMiniMapCard(
 
                     // ⚠️ ATTENTION : on utilise "effectiveProvider" ici !
                     val newSource = when (effectiveProvider) {
-                        1 -> MapUtils.OSM_Source
+                        1 -> if (ignStyle == 2) MapUtils.EsriSource.SATELLITE else MapUtils.OSM_Source
                         2 -> if (ignStyle == 1) {
                             org.osmdroid.tileprovider.tilesource.XYTileSource("MapLibreDark", 1, 20, 256, ".png", arrayOf("https://basemaps.cartocdn.com/rastertiles/dark_all/"))
                         } else {
@@ -391,9 +393,9 @@ fun SharedMiniMapCard(
                 map.invalidate()
             }
         )
-        Column(modifier = Modifier.align(Alignment.BottomEnd).padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Surface(onClick = { mapRef?.controller?.zoomIn() }, shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), shadowElevation = 4.dp, modifier = Modifier.size(38.dp)) { Icon(Icons.Default.Add, null, modifier = Modifier.padding(6.dp)) }
-            Surface(onClick = { mapRef?.controller?.zoomOut() }, shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), shadowElevation = 4.dp, modifier = Modifier.size(38.dp)) { Icon(Icons.Default.Remove, null, modifier = Modifier.padding(6.dp)) }
+        Column(modifier = Modifier.align(Alignment.BottomEnd).padding(sizing.spacing(12.dp)), verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
+            Surface(onClick = { mapRef?.controller?.zoomIn() }, shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), shadowElevation = 4.dp, modifier = Modifier.size(sizing.component(38.dp))) { Icon(Icons.Default.Add, null, modifier = Modifier.padding(sizing.spacing(6.dp))) }
+            Surface(onClick = { mapRef?.controller?.zoomOut() }, shape = CircleShape, color = MaterialTheme.colorScheme.surface.copy(alpha = 0.85f), shadowElevation = 4.dp, modifier = Modifier.size(sizing.component(38.dp))) { Icon(Icons.Default.Remove, null, modifier = Modifier.padding(sizing.spacing(6.dp))) }
         }
         if (showViewModeToggle) {
             Surface(
@@ -410,13 +412,13 @@ fun SharedMiniMapCard(
                 shape = CircleShape,
                 color = MaterialTheme.colorScheme.surface.copy(alpha = if (canUseUserView) 0.88f else 0.58f),
                 shadowElevation = 4.dp,
-                modifier = Modifier.align(Alignment.TopEnd).padding(12.dp).size(38.dp)
+                modifier = Modifier.align(Alignment.TopEnd).padding(sizing.spacing(12.dp)).size(sizing.component(38.dp))
             ) {
                 Icon(
                     imageVector = if (effectiveViewMode == MiniMapViewMode.UserToAntenna) Icons.Default.Map else Icons.Default.MyLocation,
                     contentDescription = toggleContentDescription,
                     tint = MaterialTheme.colorScheme.onSurface.copy(alpha = if (canUseUserView) 1f else 0.45f),
-                    modifier = Modifier.padding(7.dp)
+                    modifier = Modifier.padding(sizing.spacing(7.dp))
                 )
             }
         }

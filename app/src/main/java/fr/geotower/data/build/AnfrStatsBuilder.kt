@@ -78,8 +78,16 @@ object AnfrStatsBuilder {
 
     private val NUMBER_REGEX = Regex("""\d{2,5}""")
 
+    /**
+     * PERF : pas de `DISTINCT`. `support` a pour cle primaire `(id_anfr, id_support)` et les quatre
+     * jointures qui suivent sont toutes 1:1 sur une cle primaire (`localisation.id_anfr`,
+     * `ref_operateur.id`, `technique.id_anfr`, `ref_statut.id`) : chaque ligne de `support` produit
+     * donc exactement une ligne de resultat et le `DISTINCT` ne pouvait rien eliminer. Il forcait
+     * en revanche SQLite a trier toutes les lignes dans un B-tree temporaire — sur disque, puisque
+     * le build tourne en `temp_store = FILE` — en y transportant le blob `details_frequences`.
+     */
     private val CURRENT_STATS_QUERY = """
-        SELECT DISTINCT
+        SELECT
             s.id_anfr,
             s.id_support,
             UPPER(TRIM(o.libelle)) AS operator_name,
@@ -96,7 +104,18 @@ object AnfrStatsBuilder {
         LEFT JOIN ref_statut st ON t.statut_id = st.id
     """.trimIndent()
 
+    /**
+     * Caches des deux helpers bases sur [normalizedText] : la decomposition NFKD est couteuse et
+     * ces fonctions sont appelees une fois par support pour [statsOperatorName], et une fois par
+     * ligne de detail — soit plusieurs millions de fois — pour [isActiveStatus], alors que les
+     * valeurs distinctes se comptent sur les doigts. Vides a chaque build.
+     */
+    private val activeStatusCache = HashMap<String, Boolean>()
+    private val overseasOperatorCache = HashMap<String, String>()
+
     fun populateCurrentStats(db: SqlDatabase): Int {
+        activeStatusCache.clear()
+        overseasOperatorCache.clear()
         val totals = HashMap<Triple<String, String, String>, MutableSet<String>>()
         val actives = HashMap<Triple<String, String, String>, MutableSet<String>>()
 
@@ -248,6 +267,10 @@ object AnfrStatsBuilder {
 
     private fun statsOperatorName(operatorName: String, codeInsee: String?): String {
         if (!isOverseasCodeInsee(codeInsee)) return operatorName
+        return overseasOperatorCache.getOrPut(operatorName) { overseasOperatorName(operatorName) }
+    }
+
+    private fun overseasOperatorName(operatorName: String): String {
         val normalized = normalizedText(operatorName).uppercase()
         if (OVERSEAS_MARKERS.any { normalized.contains(it) }) return operatorName
         return when {
@@ -265,9 +288,9 @@ object AnfrStatsBuilder {
     }
 
     /** Python `is_active_status` (version stats, sur texte normalise sans accents). */
-    private fun isActiveStatus(status: String?): Boolean {
+    private fun isActiveStatus(status: String?): Boolean = activeStatusCache.getOrPut(status ?: "") {
         val normalized = normalizedText(status)
-        return normalized.contains("en service") || normalized.contains("techniquement operationnel")
+        normalized.contains("en service") || normalized.contains("techniquement operationnel")
     }
 
     /** Python `normalized_text` : trim + minuscules + suppression des accents (NFKD). */

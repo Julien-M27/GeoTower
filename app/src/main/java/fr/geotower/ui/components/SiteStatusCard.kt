@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.unit.sp
 import java.text.DateFormat
 import java.text.SimpleDateFormat
@@ -71,6 +72,7 @@ fun SiteStatusCard(
     outageDetails: SiteHsEntity? = null,
     onAlertArcep: (() -> Unit)? = null
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     // Couleurs
     val colorOk = Color(0xFF4CAF50) // Vert
     val colorKo = Color(0xFFE53935) // Rouge
@@ -95,7 +97,7 @@ fun SiteStatusCard(
         shape = blockShape,
         colors = CardDefaults.cardColors(containerColor = cardBgColor)
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
             // --- SECTION 1 : EN-TÊTE ---
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -104,7 +106,7 @@ fun SiteStatusCard(
             ) {
                 Text(
                     text = stringResource(R.string.appstrings_status_title),
-                    style = MaterialTheme.typography.titleMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.primary
                 )
@@ -131,15 +133,15 @@ fun SiteStatusCard(
                             else -> stringResource(R.string.appstrings_status_functional)
                         },
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
+                        fontSize = sizing.text(14.sp),
                         color = statusColor
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
                     Icon(
                         imageVector = statusIcon,
                         contentDescription = null,
                         tint = statusColor,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(sizing.component(20.dp))
                     )
                 }
             }
@@ -152,10 +154,10 @@ fun SiteStatusCard(
                 outageText
             }
             if (displayIsOutage && !outageBodyText.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                 Text(
                     text = outageBodyText,
-                    fontSize = 13.sp,
+                    fontSize = sizing.text(13.sp),
                     color = colorKo,
                     modifier = Modifier.fillMaxWidth(),
                     textAlign = TextAlign.Start
@@ -167,8 +169,8 @@ fun SiteStatusCard(
                 val formattedRestorationDate = formatOutageStatusDate(outageExpectedRestorationDate)
 
                 if (formattedStartDate != null || formattedRestorationDate != null) {
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Spacer(modifier = Modifier.height(sizing.spacing(6.dp)))
+                    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(2.dp))) {
                         OutageDateLine(
                             label = stringResource(R.string.appstrings_outage_start_date),
                             value = formattedStartDate
@@ -191,7 +193,7 @@ fun SiteStatusCard(
             }
 
             if (onAlertArcep != null) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                 OutlinedButton(
                     onClick = onAlertArcep,
                     modifier = Modifier.fillMaxWidth()
@@ -199,9 +201,9 @@ fun SiteStatusCard(
                     Icon(
                         imageVector = Icons.AutoMirrored.Filled.Launch,
                         contentDescription = null,
-                        modifier = Modifier.size(18.dp)
+                        modifier = Modifier.size(sizing.component(18.dp))
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                     Text(
                         text = stringResource(R.string.appstrings_alert_arcep_action),
                         fontWeight = FontWeight.Bold
@@ -209,9 +211,9 @@ fun SiteStatusCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
             // --- SECTION 2 : GRILLE DES SERVICES ---
             val technologies = listOf("2G", "3G", "4G", "5G")
@@ -223,13 +225,13 @@ fun SiteStatusCard(
                 ) {
                     IconButton(
                         onClick = { showLegendDialog = true },
-                        modifier = Modifier.size(32.dp)
+                        modifier = Modifier.size(sizing.component(32.dp))
                     ) {
                         Icon(
                             imageVector = Icons.Default.Info,
                             contentDescription = stringResource(R.string.appstrings_status_legend_open_desc),
                             tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(sizing.component(20.dp))
                         )
                     }
                 }
@@ -237,7 +239,7 @@ fun SiteStatusCard(
                     Text(
                         text = tech,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 14.sp,
+                        fontSize = sizing.text(14.sp),
                         textAlign = TextAlign.Center,
                         modifier = Modifier.weight(1f),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -245,7 +247,7 @@ fun SiteStatusCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
             ServiceRow(
                 serviceName = stringResource(R.string.appstrings_service_voice),
@@ -254,7 +256,7 @@ fun SiteStatusCard(
                 statusSelector = { _, it -> it.isVoixOk },
                 projectSelector = { _, it -> it.isProject || it.isVoixProject }
             )
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
             ServiceRow(
                 serviceName = stringResource(R.string.appstrings_service_internet),
                 technologies = technologies,
@@ -263,9 +265,9 @@ fun SiteStatusCard(
                 projectSelector = { tech, it -> tech != "2G" && (it.isProject || it.isInternetProject) }
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
             // --- SECTION 3 : PIED DE PAGE ---
             val sourceDate = formatOutageStatusDate(outageDetails?.sourceLastUpdate)
@@ -276,7 +278,7 @@ fun SiteStatusCard(
             }
             Text(
                 text = footerText,
-                fontSize = 12.sp,
+                fontSize = sizing.text(12.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = TextAlign.End
@@ -373,15 +375,16 @@ private fun OutageDetailsSection(
     details: SiteHsEntity,
     techStatus: Map<String, ServiceStatus>
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     var expanded by remember(details.idAnfr, details.dateDebut, details.dateFin) {
         mutableStateOf(false)
     }
 
-    Spacer(modifier = Modifier.height(10.dp))
+    Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
     TextButton(
         onClick = { expanded = !expanded },
         modifier = Modifier.fillMaxWidth(),
-        contentPadding = PaddingValues(horizontal = 0.dp, vertical = 4.dp)
+        contentPadding = PaddingValues(horizontal = sizing.spacing(0.dp), vertical = sizing.spacing(4.dp))
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -491,7 +494,7 @@ private fun OutageDetailsSection(
         technologyStatusRow("$dataLabel 5G", details.data5g, "5G") { it.isInternetProject }
     ).filterNotNull()
 
-    Spacer(modifier = Modifier.height(14.dp))
+    Spacer(modifier = Modifier.height(sizing.spacing(14.dp)))
     OutageDetailGroup(stringResource(R.string.appstrings_outage_site_section), identityRows)
     OutageDetailGroup(stringResource(R.string.appstrings_outage_incident_section), causeRows + dateRows)
     OutageDetailGroup(stringResource(R.string.appstrings_outage_services_section), rawStatusRows)
@@ -499,17 +502,18 @@ private fun OutageDetailsSection(
 
 @Composable
 private fun OutageDetailGroup(title: String, rows: List<OutageDetailDisplayRow>) {
+    val sizing = LocalGeoTowerUiSizing.current
     if (rows.isEmpty()) return
 
     Text(
         text = title,
-        fontSize = 12.sp,
+        fontSize = sizing.text(12.sp),
         fontWeight = FontWeight.Bold,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+        modifier = Modifier.padding(top = sizing.spacing(8.dp), bottom = sizing.spacing(4.dp))
     )
 
-    Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(3.dp))) {
         rows.forEach { row ->
             OutageDetailLine(label = row.label, value = row.value)
         }
@@ -518,21 +522,22 @@ private fun OutageDetailGroup(title: String, rows: List<OutageDetailDisplayRow>)
 
 @Composable
 private fun OutageDetailLine(label: String, value: String) {
+    val sizing = LocalGeoTowerUiSizing.current
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
         verticalAlignment = Alignment.Top
     ) {
         Text(
             text = label,
-            fontSize = 11.sp,
+            fontSize = sizing.text(11.sp),
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(0.9f)
         )
         Text(
             text = value,
-            fontSize = 11.sp,
+            fontSize = sizing.text(11.sp),
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1.2f)
         )
@@ -541,9 +546,10 @@ private fun OutageDetailLine(label: String, value: String) {
 
 @Composable
 private fun OutageDateLine(label: String, value: String, color: Color) {
+    val sizing = LocalGeoTowerUiSizing.current
     Text(
         text = "$label : $value",
-        fontSize = 12.sp,
+        fontSize = sizing.text(12.sp),
         color = color,
         modifier = Modifier.fillMaxWidth(),
         textAlign = TextAlign.Start
@@ -598,6 +604,7 @@ private fun ServiceRow(
     statusSelector: (String, ServiceStatus) -> Boolean?,
     projectSelector: (String, ServiceStatus) -> Boolean
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     val colorOk = Color(0xFF4CAF50)
     val colorKo = Color(0xFFE53935)
     val colorProject = Color(0xFFFFA000)
@@ -609,7 +616,7 @@ private fun ServiceRow(
     ) {
         Text(
             text = serviceName,
-            fontSize = 13.sp,
+            fontSize = sizing.text(13.sp),
             fontWeight = FontWeight.Medium,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1.5f)
@@ -626,10 +633,10 @@ private fun ServiceRow(
             ) {
                 // 🚨 NOUVEAU : Logique d'affichage de la case (Priorité au projet)
                 when {
-                    isProj -> Text("~", color = colorProject, fontWeight = FontWeight.Bold, fontSize = 22.sp)
-                    status == true -> Icon(Icons.Default.Check, null, tint = colorOk, modifier = Modifier.size(20.dp))
-                    status == false -> Icon(Icons.Default.Close, null, tint = colorKo, modifier = Modifier.size(20.dp))
-                    else -> Icon(Icons.Default.Remove, null, tint = colorNeutral, modifier = Modifier.size(20.dp))
+                    isProj -> Text("~", color = colorProject, fontWeight = FontWeight.Bold, fontSize = sizing.text(22.sp))
+                    status == true -> Icon(Icons.Default.Check, null, tint = colorOk, modifier = Modifier.size(sizing.component(20.dp)))
+                    status == false -> Icon(Icons.Default.Close, null, tint = colorKo, modifier = Modifier.size(sizing.component(20.dp)))
+                    else -> Icon(Icons.Default.Remove, null, tint = colorNeutral, modifier = Modifier.size(sizing.component(20.dp)))
                 }
             }
         }

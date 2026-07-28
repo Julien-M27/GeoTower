@@ -92,6 +92,31 @@ val LocalGeoTowerUiStyle = staticCompositionLocalOf<GeoTowerUiStyle> {
     error("LocalGeoTowerUiStyle is not provided")
 }
 
+/**
+ * Echelle neutre (x1) : les valeurs passees a [GeoTowerUiSizing] ressortent inchangees.
+ * Sert aux rendus hors ecran (images de partage, PDF), dont les dimensions ne doivent PAS
+ * suivre le reglage de taille d'interface pour que l'export reste deterministe.
+ *
+ * Doit rester declare AVANT [LocalGeoTowerUiSizing] : les proprietes top-level d'un meme fichier
+ * sont initialisees dans l'ordre de declaration, sinon le defaut du CompositionLocal serait null.
+ */
+val GeoTowerUnscaledSizing = GeoTowerUiSizing(
+    scalePercent = GEO_TOWER_UI_SCALE_PERCENT_DEFAULT,
+    componentScale = 1f,
+    spacingScale = 1f,
+    textScale = 1f
+)
+
+/**
+ * Echelle seule, avec un defaut **neutre** (x1) au lieu d'une erreur.
+ *
+ * A utiliser dans les composables partages entre l'ecran et un rendu hors ecran (image de partage,
+ * PDF) : ces rendus se font dans un `ComposeView` cree a la main, dont le `setContent` ne fournit
+ * pas [LocalGeoTowerUiStyle]. Lire le style la-bas ferait planter l'export ; lire ce local-ci
+ * renvoie l'echelle neutre, donc le composant scale dans l'app et garde sa taille a l'export.
+ */
+val LocalGeoTowerUiSizing = staticCompositionLocalOf { GeoTowerUnscaledSizing }
+
 @Composable
 fun rememberGeoTowerUiStyle(): GeoTowerUiStyle {
     val themeMode by AppConfig.themeMode
@@ -152,8 +177,24 @@ private fun geoTowerUiSizing(scalePercent: Int, screenWidthDp: Int): GeoTowerUiS
 
 @Composable
 fun GeoTowerUiStyleProvider(content: @Composable () -> Unit) {
+    val style = rememberGeoTowerUiStyle()
     CompositionLocalProvider(
-        LocalGeoTowerUiStyle provides rememberGeoTowerUiStyle(),
+        LocalGeoTowerUiStyle provides style,
+        LocalGeoTowerUiSizing provides style.sizing,
+        content = content
+    )
+}
+
+/**
+ * Fournit [LocalGeoTowerUiStyle] dans une composition detachee (ComposeView hors ecran, capture
+ * bitmap / PDF). Sans ca, tout composable partage avec l'app qui lit ce CompositionLocal plante
+ * (« LocalGeoTowerUiStyle is not provided »). L'echelle y est neutre : l'image exportee garde
+ * toujours la meme taille, quel que soit le slider.
+ */
+@Composable
+fun GeoTowerExportUiStyleProvider(content: @Composable () -> Unit) {
+    CompositionLocalProvider(
+        LocalGeoTowerUiStyle provides rememberGeoTowerUiStyle().copy(sizing = GeoTowerUnscaledSizing),
         content = content
     )
 }

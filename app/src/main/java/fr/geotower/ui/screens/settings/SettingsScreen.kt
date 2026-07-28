@@ -55,12 +55,16 @@ import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material.icons.filled.WifiTethering
+import androidx.compose.material.icons.outlined.Bookmarks
+import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -103,11 +107,13 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
@@ -123,12 +129,14 @@ import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.HomePrefs
 import fr.geotower.utils.LiveTrackingPrefs
 import fr.geotower.utils.MapDisplayPrefs
+import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.PreferenceStores
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SimCard
@@ -148,7 +156,11 @@ import fr.geotower.ui.components.MiniMapViewMode
 import fr.geotower.ui.components.appLogoDrawingChoiceDescription
 import fr.geotower.ui.components.appLogoDrawingChoiceName
 import fr.geotower.ui.components.appLogoDrawingFamilyName
+import fr.geotower.ui.components.PageScrollEdgeButtons
+import fr.geotower.ui.components.GeoTowerFadingEdgeHeight
 import fr.geotower.ui.components.geoTowerFadingEdge
+import fr.geotower.ui.components.isGeoTowerFadingEdgeActive
+import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
@@ -161,6 +173,32 @@ import fr.geotower.utils.ThroughputPrefs
 import fr.geotower.utils.WidgetPrefs
 import fr.geotower.widget.WidgetUpdateScheduler
 import kotlin.math.roundToInt
+
+// Ordre des sections de réglages : sert d'index à la barre latérale des tablettes, à l'accueil
+// par sections des téléphones, aux ancres de défilement et à l'index de recherche.
+private const val SECTION_APPEARANCE = 0
+private const val SECTION_MAPPING = 1
+private const val SECTION_PREFERENCES = 2
+private const val SECTION_BACKGROUND = 3
+private const val SECTION_SYSTEM = 4
+private const val SECTION_DATABASE = 5
+private const val SECTION_COUNT = 6
+
+// Ancres fines de la section « Base de données » : valeurs possibles du paramètre `section` des
+// liens profonds `geotower://settings?section=…` émis par les notifications de téléchargement
+// (DatabaseDownloadWorker, RadioDatabaseDownloadWorker, EnbDatabaseDownloadWorker,
+// LocalDbBuildWorker, UpdateCheckWorker). Chaque identifiant amène pile sur SA carte, alors que
+// `section=database` s'arrête au titre de la section.
+private const val ANCHOR_DB_MOBILE = "db_mobile"
+private const val ANCHOR_DB_RADIO = "db_radio"
+private const val ANCHOR_DB_ENB = "db_enb"
+private const val ANCHOR_DB_LOCAL_BUILD = "db_local_build"
+private val DATABASE_CARD_ANCHORS = listOf(
+    ANCHOR_DB_MOBILE,
+    ANCHOR_DB_RADIO,
+    ANCHOR_DB_ENB,
+    ANCHOR_DB_LOCAL_BUILD
+)
 
 private data class SettingsSectionBounds(
     val top: Float = Float.NaN,
@@ -214,25 +252,26 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
     val colorPaletteScrollState = rememberScrollState()
-    val sectionBringIntoViewRequesters = remember { List(5) { BringIntoViewRequester() } }
+    val sectionBringIntoViewRequesters = remember { List(SECTION_COUNT) { BringIntoViewRequester() } }
     val sectionRootPositions = remember { mutableStateMapOf<Int, Float>() }
     val sectionBounds = remember { mutableStateMapOf<Int, SettingsSectionBounds>() }
     var scrollViewportTop by remember { mutableFloatStateOf(0f) }
     var scrollViewportBottom by remember { mutableFloatStateOf(0f) }
     var offlineMapsBounds by remember { mutableStateOf(SettingsSectionBounds()) }
-    var offlineMapsExpandedForNavigation by remember { mutableStateOf(false) }
     val offlineMapsTargetFilename = targetOfflineMapFilename?.takeIf { it.isNotBlank() }
     var offlineMapsTargetBounds by remember(offlineMapsTargetFilename) { mutableStateOf(SettingsSectionBounds()) }
     var hasPrimedOfflineMapsTargetScroll by remember(initialSection, offlineMapsTargetFilename) { mutableStateOf(false) }
-    val databaseBringIntoViewRequester = sectionBringIntoViewRequesters[4]
+    val databaseBringIntoViewRequester = sectionBringIntoViewRequesters[SECTION_DATABASE]
     val offlineMapsBringIntoViewRequester = remember { BringIntoViewRequester() }
     var shouldBringDatabaseIntoView by remember(initialSection) { mutableStateOf(initialSection == "database") }
     var shouldBringOfflineMapsIntoView by remember(initialSection) { mutableStateOf(initialSection == "offline_maps") }
-    // Cible fine du bloc « generation locale » (LocalDbBuildCard), 3e carte de la section base de
-    // donnees : la notif de fin de generation doit y arriver precisement, pas au titre de section.
-    val localDbBuildBringIntoViewRequester = remember { BringIntoViewRequester() }
-    var localDbBuildBounds by remember { mutableStateOf(SettingsSectionBounds()) }
-    var shouldBringLocalDbBuildIntoView by remember(initialSection) { mutableStateOf(initialSection == "db_local_build") }
+    // Cibles fines des cartes de la section base de donnees (base mobile, base radio, base eNB,
+    // generation locale) : la notif d'un telechargement doit arriver precisement sur SA carte, pas
+    // au titre de la section.
+    val initialDatabaseCardAnchor = initialSection?.takeIf { it in DATABASE_CARD_ANCHORS }
+    val databaseCardRequesters = remember { DATABASE_CARD_ANCHORS.associateWith { BringIntoViewRequester() } }
+    val databaseCardBounds = remember { mutableStateMapOf<String, SettingsSectionBounds>() }
+    var pendingDatabaseCardAnchor by remember(initialSection) { mutableStateOf(initialDatabaseCardAnchor) }
 
     var themeMode by AppConfig.themeMode
     var isOledMode by AppConfig.isOledMode
@@ -265,12 +304,38 @@ fun SettingsScreen(
     val safeClick = rememberSafeClick()
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
 
+    // TÉLÉPHONE : accueil des réglages par sections (un bouton par section) au lieu de la longue
+    // page unique. `phoneSectionIndex` = null → on est sur l'accueil, sinon section ouverte.
+    // Les grands écrans gardent leur barre latérale (navMode), ce réglage ne les concerne pas.
+    val settingsSectionsMode by AppConfig.settingsSectionsMode
+    val usePhoneSections = !isWideScreen && settingsSectionsMode
+    var phoneSectionIndex by remember { mutableStateOf<Int?>(null) }
+
+    fun openPhoneSection(section: Int?) {
+        phoneSectionIndex = section
+        scope.launch { scrollState.scrollTo(0) }
+    }
+
+    fun setSettingsSectionsMode(enabled: Boolean) {
+        AppConfig.settingsSectionsMode.value = enabled
+        prefs.edit().putBoolean(AppConfig.PREF_SETTINGS_SECTIONS_MODE, enabled).apply()
+        openPhoneSection(null)
+    }
+
     BackHandler(enabled = showColorPalettePage) {
         showColorPalettePage = false
     }
 
     BackHandler(enabled = !showColorPalettePage && !safeBackNavigation.isLocked) {
         safeBackNavigation.navigateBack()
+    }
+
+    // Accueil par sections : le retour remonte d'abord à la liste des sections.
+    BackHandler(
+        enabled = usePhoneSections && phoneSectionIndex != null &&
+            !showColorPalettePage && settingsSearchQuery.isBlank()
+    ) {
+        openPhoneSection(null)
     }
 
     // Recherche active : le retour efface d'abord la recherche au lieu de quitter l'écran.
@@ -285,21 +350,33 @@ fun SettingsScreen(
     val navMode = AppConfig.navMode.intValue
     var activeSectionIndex by remember { mutableIntStateOf(0) }
 
+    // Une seule section à l'écran : mode « pages » des grands écrans (Fold déplié) ou section
+    // ouverte depuis l'accueil par sections d'un téléphone. Sinon tout est empilé sur une page.
+    val showsSingleSection = if (usePhoneSections) phoneSectionIndex != null else navMode != 0 && isWideScreen
+
     // Recherche : actions de navigation déclenchées depuis un résultat.
     fun searchScrollTo(section: Int) {
         settingsSearchQuery = ""
         activeSectionIndex = section
-        pendingSearchScrollSection = section
+        // Accueil par sections : on ouvre directement la section, il n'y a rien à faire défiler.
+        if (usePhoneSections) openPhoneSection(section) else pendingSearchScrollSection = section
     }
     fun searchOpen(action: () -> Unit) {
         settingsSearchQuery = ""
         action()
     }
 
+    // Flou au défilement : les bandes du haut et du bas sont délavées (voir geoTowerFadingEdge).
+    // On vise donc SOUS la bande du haut, sinon le titre de la carte ciblée arrive illisible.
+    val fadeInsetPx = if (isGeoTowerFadingEdgeActive()) {
+        with(LocalDensity.current) { GeoTowerFadingEdgeHeight.toPx() }
+    } else {
+        0f
+    }
     // ✅ NOUVEAU : Auto-scroll vers la section demandée (ex: database)
     suspend fun alignAnchorToViewportTop(anchorRootY: Float?) {
         if (anchorRootY == null || anchorRootY.isNaN() || scrollState.maxValue <= 0) return
-        val target = (scrollState.value + (anchorRootY - scrollViewportTop).roundToInt())
+        val target = (scrollState.value + (anchorRootY - scrollViewportTop - fadeInsetPx).roundToInt())
             .coerceIn(0, scrollState.maxValue)
         scrollState.animateScrollTo(target)
     }
@@ -307,9 +384,16 @@ fun SettingsScreen(
     fun isDisplayedAsMuchAsPossible(bounds: SettingsSectionBounds): Boolean {
         if (bounds.top.isNaN() || bounds.height <= 0 || scrollViewportBottom <= scrollViewportTop) return false
 
-        val viewportHeight = scrollViewportBottom - scrollViewportTop
-        val visibleTop = maxOf(bounds.top, scrollViewportTop)
-        val visibleBottom = minOf(bounds.bottom, scrollViewportBottom)
+        // Zone réellement lisible : le viewport moins les bandes estompées. Le fondu du haut
+        // n'existe qu'une fois qu'on a défilé, celui du bas tant qu'il reste du contenu.
+        val readableTop = scrollViewportTop + if (scrollState.value > 0) fadeInsetPx else 0f
+        val readableBottom = scrollViewportBottom -
+            if (scrollState.value < scrollState.maxValue) fadeInsetPx else 0f
+        if (readableBottom <= readableTop) return false
+
+        val viewportHeight = readableBottom - readableTop
+        val visibleTop = maxOf(bounds.top, readableTop)
+        val visibleBottom = minOf(bounds.bottom, readableBottom)
         val visibleHeight = (visibleBottom - visibleTop).coerceAtLeast(0f)
         val maxVisibleHeight = minOf(bounds.height.toFloat(), viewportHeight)
 
@@ -317,51 +401,61 @@ fun SettingsScreen(
     }
 
     LaunchedEffect(initialSection) {
-        if (initialSection == "database" || initialSection == "offline_maps" || initialSection == "db_local_build") {
-            activeSectionIndex = 4
+        if (initialSection == "database" || initialSection == "offline_maps" || initialDatabaseCardAnchor != null) {
+            // Les cartes hors ligne vivent maintenant dans la section Cartographie.
+            val target = if (initialSection == "offline_maps") SECTION_MAPPING else SECTION_DATABASE
+            activeSectionIndex = target
+            if (usePhoneSections) phoneSectionIndex = target
             shouldBringDatabaseIntoView = initialSection == "database"
             shouldBringOfflineMapsIntoView = initialSection == "offline_maps"
-            shouldBringLocalDbBuildIntoView = initialSection == "db_local_build"
+            pendingDatabaseCardAnchor = initialDatabaseCardAnchor
         }
     }
 
-    LaunchedEffect(shouldBringDatabaseIntoView, scrollState.maxValue, navMode, isWideScreen) {
-        if (shouldBringDatabaseIntoView && (navMode == 0 || !isWideScreen) && scrollState.maxValue > 0) {
+    // Les défilements ciblés valent pour TOUS les modes d'affichage (page unique, accueil par
+    // sections des téléphones, pages des grands écrans/Fold) : le contenu est défilable partout.
+    LaunchedEffect(shouldBringDatabaseIntoView, scrollState.maxValue) {
+        if (shouldBringDatabaseIntoView && scrollState.maxValue > 0) {
             kotlinx.coroutines.delay(120)
             databaseBringIntoViewRequester.bringIntoView()
             kotlinx.coroutines.delay(80)
-            alignAnchorToViewportTop(sectionRootPositions[4])
+            alignAnchorToViewportTop(sectionRootPositions[SECTION_DATABASE])
             kotlinx.coroutines.delay(250)
-            alignAnchorToViewportTop(sectionRootPositions[4])
+            alignAnchorToViewportTop(sectionRootPositions[SECTION_DATABASE])
             shouldBringDatabaseIntoView = false
         }
     }
 
-    // Scroll fin vers la carte « generation locale » (LocalDbBuildCard) : depuis la notif de fin de
-    // generation. On attend que la carte soit mesuree (localDbBuildBounds.isValid) avant d'aligner.
-    LaunchedEffect(shouldBringLocalDbBuildIntoView, scrollState.maxValue, navMode, isWideScreen, localDbBuildBounds.isValid) {
-        if (shouldBringLocalDbBuildIntoView && (navMode == 0 || !isWideScreen) && scrollState.maxValue > 0 && localDbBuildBounds.isValid) {
+    // Scroll fin vers UNE carte de la section base de donnees (celle du telechargement en cours) :
+    // on attend que la carte visee soit mesuree (bounds.isValid) avant d'aligner.
+    val pendingDatabaseCardBounds = pendingDatabaseCardAnchor?.let { databaseCardBounds[it] }
+    LaunchedEffect(
+        pendingDatabaseCardAnchor,
+        scrollState.maxValue,
+        pendingDatabaseCardBounds?.isValid
+    ) {
+        val anchor = pendingDatabaseCardAnchor ?: return@LaunchedEffect
+        val isMeasured = pendingDatabaseCardBounds?.isValid == true
+        if (isMeasured && scrollState.maxValue > 0) {
             kotlinx.coroutines.delay(120)
-            localDbBuildBringIntoViewRequester.bringIntoView()
+            databaseCardRequesters[anchor]?.bringIntoView()
             kotlinx.coroutines.delay(80)
-            alignAnchorToViewportTop(localDbBuildBounds.top)
+            alignAnchorToViewportTop(databaseCardBounds[anchor]?.top)
             kotlinx.coroutines.delay(250)
-            alignAnchorToViewportTop(localDbBuildBounds.top)
-            shouldBringLocalDbBuildIntoView = false
+            alignAnchorToViewportTop(databaseCardBounds[anchor]?.top)
+            pendingDatabaseCardAnchor = null
         }
     }
 
     LaunchedEffect(
         shouldBringOfflineMapsIntoView,
         scrollState.maxValue,
-        navMode,
-        isWideScreen,
         offlineMapsTargetFilename,
         offlineMapsBounds.isValid,
         offlineMapsTargetBounds.isValid,
         hasPrimedOfflineMapsTargetScroll
     ) {
-        if (shouldBringOfflineMapsIntoView && (navMode == 0 || !isWideScreen) && scrollState.maxValue > 0) {
+        if (shouldBringOfflineMapsIntoView && scrollState.maxValue > 0) {
             val hasTargetMap = offlineMapsTargetFilename != null
             val hasTargetBounds = offlineMapsTargetBounds.isValid
             if (hasTargetMap && !hasTargetBounds && hasPrimedOfflineMapsTargetScroll) return@LaunchedEffect
@@ -392,16 +486,20 @@ fun SettingsScreen(
     // (on attend que le contenu normal soit recomposé et mesuré).
     LaunchedEffect(pendingSearchScrollSection, scrollState.maxValue) {
         val target = pendingSearchScrollSection ?: return@LaunchedEffect
-        if (navMode == 0 || !isWideScreen) {
-            var tries = 0
-            while (tries < 25 && (scrollState.maxValue <= 0 || sectionRootPositions[target] == null)) {
-                kotlinx.coroutines.delay(40)
-                tries++
-            }
-            sectionBringIntoViewRequesters[target].bringIntoView()
-            kotlinx.coroutines.delay(80)
-            alignAnchorToViewportTop(sectionRootPositions[target])
+        if (showsSingleSection) {
+            // La section demandée occupe déjà toute la page : rien à chercher, on remonte en haut.
+            scrollState.animateScrollTo(0)
+            pendingSearchScrollSection = null
+            return@LaunchedEffect
         }
+        var tries = 0
+        while (tries < 25 && (scrollState.maxValue <= 0 || sectionRootPositions[target] == null)) {
+            kotlinx.coroutines.delay(40)
+            tries++
+        }
+        sectionBringIntoViewRequesters[target].bringIntoView()
+        kotlinx.coroutines.delay(80)
+        alignAnchorToViewportTop(sectionRootPositions[target])
         pendingSearchScrollSection = null
     }
 
@@ -507,6 +605,7 @@ fun SettingsScreen(
     var pageSiteSupportDetails by remember { mutableStateOf(SitePagePrefs.supportDetails.read(prefs)) }
     var pageSitePanelHeights by remember { mutableStateOf(SitePagePrefs.panelHeights.read(prefs)) }
     var pageSiteIds by remember { mutableStateOf(SitePagePrefs.ids.read(prefs)) }
+    var pageSiteNetworkIds by remember { mutableStateOf(SitePagePrefs.networkIds.read(prefs)) }
     var pageSiteOpenMap by remember { mutableStateOf(SitePagePrefs.openMap.read(prefs)) }
     var pageSiteElevationProfile by remember { mutableStateOf(SitePagePrefs.elevationProfile.read(prefs)) }
     var pageSiteThroughputCalculator by remember { mutableStateOf(SitePagePrefs.throughputCalculator.read(prefs)) }
@@ -619,11 +718,13 @@ fun SettingsScreen(
         when (initialSection) {
             "nearby", "map", "compass", "support", "site", "throughput" -> {
                 kotlinx.coroutines.delay(300)
-                activeSectionIndex = 2
-                if (navMode == 0 || !isWideScreen) {
-                    sectionBringIntoViewRequesters[2].bringIntoView()
+                activeSectionIndex = SECTION_PREFERENCES
+                if (usePhoneSections) {
+                    phoneSectionIndex = SECTION_PREFERENCES
+                } else if (navMode == 0 || !isWideScreen) {
+                    sectionBringIntoViewRequesters[SECTION_PREFERENCES].bringIntoView()
                     kotlinx.coroutines.delay(80)
-                    alignAnchorToViewportTop(sectionRootPositions[2])
+                    alignAnchorToViewportTop(sectionRootPositions[SECTION_PREFERENCES])
                 }
                 when (initialSection) {
                     "nearby" -> showNearbySettingsSheet = true
@@ -638,15 +739,16 @@ fun SettingsScreen(
     }
 
     val menuItems = listOf(
-        Triple(stringResource(R.string.settings_section_appearance), Icons.Outlined.Palette, 0),
-        Triple(stringResource(R.string.settings_section_mapping), Icons.Outlined.Map, 1),
-        Triple(stringResource(R.string.settings_section_preferences), Icons.Outlined.Tune, 2),
-        Triple(stringResource(R.string.settings_section_system), Icons.Outlined.Settings, 3),
-        Triple(stringResource(R.string.settings_section_database), Icons.Outlined.Storage, 4)
+        Triple(stringResource(R.string.settings_section_appearance), Icons.Outlined.Palette, SECTION_APPEARANCE),
+        Triple(stringResource(R.string.settings_section_mapping), Icons.Outlined.Map, SECTION_MAPPING),
+        Triple(stringResource(R.string.settings_section_preferences), Icons.Outlined.Tune, SECTION_PREFERENCES),
+        Triple(stringResource(R.string.settings_section_background), Icons.Outlined.Notifications, SECTION_BACKGROUND),
+        Triple(stringResource(R.string.settings_section_system), Icons.Outlined.Settings, SECTION_SYSTEM),
+        Triple(stringResource(R.string.settings_section_database), Icons.Outlined.Storage, SECTION_DATABASE)
     )
     val sectionRootSnapshot = sectionRootPositions.toMap()
     val sectionBoundsSnapshot = sectionBounds.toMap()
-    val databaseBounds = sectionBoundsSnapshot[4] ?: SettingsSectionBounds()
+    val databaseBounds = sectionBoundsSnapshot[SECTION_DATABASE] ?: SettingsSectionBounds()
     val sectionAnchorModifiers = sectionBringIntoViewRequesters.mapIndexed { index, requester ->
         Modifier
             .bringIntoViewRequester(requester)
@@ -654,6 +756,26 @@ fun SettingsScreen(
                 val top = coordinates.positionInRoot().y
                 sectionRootPositions[index] = top
                 sectionBounds[index] = SettingsSectionBounds(top = top, height = coordinates.size.height)
+            }
+    }
+    // Ancres fines de la section base de données : réutilisées par l'affichage par sections
+    // (téléphone) pour que les notifications gardent leur défilement précis.
+    val offlineMapsAnchorModifier = Modifier
+        .bringIntoViewRequester(offlineMapsBringIntoViewRequester)
+        .onGloballyPositioned { coordinates ->
+            offlineMapsBounds = SettingsSectionBounds(
+                top = coordinates.positionInRoot().y,
+                height = coordinates.size.height
+            )
+        }
+    val databaseCardAnchorModifiers = DATABASE_CARD_ANCHORS.associateWith { anchor ->
+        Modifier
+            .bringIntoViewRequester(databaseCardRequesters.getValue(anchor))
+            .onGloballyPositioned { coordinates ->
+                databaseCardBounds[anchor] = SettingsSectionBounds(
+                    top = coordinates.positionInRoot().y,
+                    height = coordinates.size.height
+                )
             }
     }
 
@@ -673,51 +795,92 @@ fun SettingsScreen(
                 )
             }
 
-            // --- Apparence (0) ---
-            entry(context.getString(R.string.appearance_theme_title), "theme thème clair sombre systeme dark light mode nuit jour couleur apparence", 0)
-            entry(context.getString(R.string.appstrings_color_palette_title), "palette couleur color accent teinte material", 0) { showColorPalettePage = true }
-            entry(context.getString(R.string.appearance_oled_title), "oled noir pur black amoled sombre economie", 0)
-            entry(context.getString(R.string.appearance_one_ui_title), "one ui oneui samsung style interface bulle", 0)
-            entry(context.getString(R.string.appearance_scroll_blur_title), "flou blur defilement transparence effet", 0)
-            entry(context.getString(R.string.appearance_app_icon_title), "icone icon launcher logo application accueil", 0) { showIconSheet = true }
-            entry(context.getString(R.string.appearance_in_app_logo_title), "logo dessin drawing application interne", 0) { showLogoDrawingSheet = true }
-            entry(context.getString(R.string.appearance_menu_size_title), "taille menu size police texte echelle zoom", 0)
-
-            // --- Cartographie (1) ---
-            entry(context.getString(R.string.settings_section_mapping), "carte map fond fournisseur ign osm maplibre topo provider tuiles", 1)
-            entry(context.getString(R.string.mapping_style_title), "style carte clair sombre satellite couleur", 1)
-
-            // --- Préférences (2) ---
-            entry(context.getString(R.string.preference_profiles_title), "profil profils profiles preferences sauvegarde configuration", 2) { showPreferenceProfilesSheet = true }
-            entry(context.getString(R.string.settings_default_operator), "operateur operator orange sfr free bouygues sim defaut", 2) { showOperatorSheet = true }
-            entry(context.getString(R.string.settings_app_language), "langue language francais anglais traduction locale", 2) { showLanguageSheet = true }
-            entry(context.getString(R.string.settings_units_title), "unites units distance vitesse metre km mesure imperial", 2) { showUnitSheet = true }
-            entry(context.getString(R.string.appstrings_update_notif_setting_title), "notification mise a jour update base donnees alerte", 2)
-            entry(context.getString(R.string.appstrings_low_power_title), "faible consommation economie batterie eco energie basse performance low power mode", 2)
-            entry(context.getString(R.string.appstrings_live_notification_title), "notification live suivi temps reel antenne direct", 2)
-            entry(context.getString(R.string.appstrings_widget_refresh_title), "widget frequence rafraichissement synchronisation accueil", 2)
-            if (isWideScreen) {
-                entry(context.getString(R.string.settings_navigation_mode_title), "navigation mode defilement pages scroll", 2)
-                entry(context.getString(R.string.settings_display_style_title), "affichage display plein ecran split divise tablette", 2)
+            // Entrée qui n'appartient à aucune section (elle vit sur l'accueil des réglages) :
+            // on l'étiquette simplement « Paramètres » au lieu d'une section trompeuse.
+            fun directEntry(title: String, keywords: String, icon: ImageVector, action: () -> Unit) {
+                add(
+                    SettingsSearchEntry(
+                        title = title,
+                        keywords = keywords,
+                        sectionLabel = context.getString(R.string.nav_settings),
+                        icon = icon,
+                        onClick = { searchOpen(action) }
+                    )
+                )
             }
+
+            // --- Apparence ---
+            entry(context.getString(R.string.appearance_theme_title), "theme thème clair sombre systeme dark light mode nuit jour couleur apparence", SECTION_APPEARANCE)
+            entry(context.getString(R.string.appstrings_color_palette_title), "palette couleur color accent teinte material", SECTION_APPEARANCE) { showColorPalettePage = true }
+            entry(context.getString(R.string.appearance_oled_title), "oled noir pur black amoled sombre economie", SECTION_APPEARANCE)
+            entry(context.getString(R.string.appearance_one_ui_title), "one ui oneui samsung style interface bulle", SECTION_APPEARANCE)
+            entry(context.getString(R.string.appearance_scroll_blur_title), "flou blur defilement transparence effet", SECTION_APPEARANCE)
+            entry(context.getString(R.string.appearance_app_icon_title), "icone icon launcher logo application accueil", SECTION_APPEARANCE) { showIconSheet = true }
+            entry(context.getString(R.string.appearance_in_app_logo_title), "logo dessin drawing application interne", SECTION_APPEARANCE) { showLogoDrawingSheet = true }
+            entry(context.getString(R.string.appearance_menu_size_title), "taille menu size police texte echelle zoom", SECTION_APPEARANCE)
+            if (isWideScreen) {
+                entry(context.getString(R.string.settings_navigation_mode_title), "navigation mode defilement pages scroll mise en page", SECTION_APPEARANCE)
+                entry(context.getString(R.string.settings_display_style_title), "affichage display plein ecran split divise tablette", SECTION_APPEARANCE)
+            }
+
+            // --- Cartographie ---
+            entry(context.getString(R.string.settings_section_mapping), "carte map fond fournisseur ign osm maplibre topo provider tuiles", SECTION_MAPPING)
+            entry(context.getString(R.string.mapping_style_title), "style carte clair sombre satellite couleur", SECTION_MAPPING)
+            entry(context.getString(R.string.appstrings_offline_maps_title), "cartes hors ligne offline maps telechargement tuiles mapsforge", SECTION_MAPPING)
+
+            // --- Préférences ---
+            entry(context.getString(R.string.settings_default_operator), "operateur operator orange sfr free bouygues sim defaut", SECTION_PREFERENCES) { showOperatorSheet = true }
+            entry(context.getString(R.string.settings_app_language), "langue language francais anglais traduction locale", SECTION_PREFERENCES) { showLanguageSheet = true }
+            entry(context.getString(R.string.settings_units_title), "unites units distance vitesse metre km mesure imperial", SECTION_PREFERENCES) { showUnitSheet = true }
             if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.PAGES_CUSTOMIZATION)) {
-                entry(context.getString(R.string.settings_pages_customization_title), "pages personnalisation accueil carte boussole site support proximite statistiques", 2) { showPagesCustomizationSheet = true }
+                entry(context.getString(R.string.settings_pages_customization_title), "pages personnalisation accueil carte boussole site support proximite statistiques", SECTION_PREFERENCES) { showPagesCustomizationSheet = true }
             }
             if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.EXTERNAL_LINKS_SETTINGS)) {
-                entry(context.getString(R.string.settings_external_links_title), "liens externes links cartoradio sites web", 2) { showExternalLinksSheet = true }
+                entry(context.getString(R.string.settings_external_links_title), "liens externes links cartoradio sites web", SECTION_PREFERENCES) { showExternalLinksSheet = true }
             }
             if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.SHARE_SETTINGS)) {
-                entry(context.getString(R.string.settings_default_share_content_title), "partage share image contenu carte antenne support", 2) { showShareSelectorSheet = true }
+                entry(context.getString(R.string.settings_default_share_content_title), "partage share image contenu carte antenne support", SECTION_PREFERENCES) { showShareSelectorSheet = true }
             }
 
-            // --- Système (3) ---
-            entry(context.getString(R.string.appstrings_manage_permissions), "permissions autorisations systeme application acces", 3)
-            entry(context.getString(R.string.appstrings_diagnostic_title), "diagnostic logs debogage info journal probleme", 3) { navController.navigate("diagnostic") }
+            // --- Notifications et arrière-plan ---
+            entry(context.getString(R.string.appstrings_update_notif_setting_title), "notification mise a jour update base donnees alerte", SECTION_BACKGROUND)
+            entry(context.getString(R.string.appstrings_low_power_title), "faible consommation economie batterie eco energie basse performance low power mode", SECTION_BACKGROUND)
+            entry(context.getString(R.string.appstrings_live_notification_title), "notification live suivi temps reel antenne direct", SECTION_BACKGROUND)
+            entry(context.getString(R.string.appstrings_live_location_accuracy_title), "precision gps position live exactitude", SECTION_BACKGROUND)
+            entry(context.getString(R.string.appstrings_widget_refresh_title), "widget frequence rafraichissement synchronisation accueil", SECTION_BACKGROUND)
 
-            // --- Base de données (4) ---
-            entry(context.getString(R.string.settings_section_database), "base de donnees database telechargement anfr support antenne", 4)
-            entry(context.getString(R.string.appstrings_radio_data_title), "radio donnees frequences base anfr", 4)
-            entry(context.getString(R.string.appstrings_offline_maps_title), "cartes hors ligne offline maps telechargement tuiles", 4)
+            // --- Système ---
+            entry(context.getString(R.string.appstrings_manage_permissions), "permissions autorisations systeme application acces", SECTION_SYSTEM)
+            entry(context.getString(R.string.appstrings_bg_location_perm_title), "position arriere plan background localisation permission autorisation", SECTION_SYSTEM)
+            entry(context.getString(R.string.appstrings_diagnostic_title), "diagnostic logs debogage info journal probleme", SECTION_SYSTEM) { navController.navigate("diagnostic") }
+
+            // --- Base de données ---
+            entry(context.getString(R.string.settings_section_database), "base de donnees database telechargement anfr support antenne", SECTION_DATABASE)
+            entry(context.getString(R.string.appstrings_radio_data_title), "radio donnees frequences base anfr", SECTION_DATABASE)
+            entry(context.getString(R.string.local_mode_settings_title), "traitement local autonomie serveur hors ligne generation", SECTION_DATABASE) { navController.navigate("local_mode") }
+            entry(context.getString(R.string.outage_source_settings_title), "coupures pannes source sites hs operateurs", SECTION_DATABASE) { navController.navigate("outage_source") }
+
+            // --- Entrées directes (hors section) ---
+            directEntry(
+                context.getString(R.string.photos_favorites_title),
+                "photos favorites galerie images preferees",
+                Icons.Default.PhotoLibrary
+            ) { navController.navigate("photos_favorites") }
+            directEntry(
+                context.getString(R.string.appstrings_upload_history_title),
+                "historique envoi photos signalquest upload",
+                Icons.Default.History
+            ) { navController.navigate("photo_upload_history") }
+            directEntry(
+                context.getString(R.string.share_history_title),
+                "historique partages partage export pdf sites supports genere",
+                Icons.Default.History
+            ) { navController.navigate("share_history") }
+            directEntry(
+                context.getString(R.string.preference_profiles_title),
+                "profil profils profiles preferences sauvegarde configuration",
+                Icons.Outlined.Bookmarks
+            ) { showPreferenceProfilesSheet = true }
         }
     }
 
@@ -726,18 +889,16 @@ fun SettingsScreen(
             scrollState.value,
             scrollState.maxValue,
             sectionRootSnapshot,
-            offlineMapsExpandedForNavigation,
             scrollViewportTop
         ) {
             if (sectionRootSnapshot.size >= menuItems.size) {
                 val activationLine = scrollViewportTop + 24f
                 val databaseSectionIndex = menuItems.last().third
                 val regularSectionIndices = menuItems.dropLast(1).map { it.third }.toSet()
+                // La dernière section est difficile à « activer » au défilement : on l'autorise
+                // quand on y arrive par un lien profond.
                 val allowDatabaseSelectionBeforeEnd =
-                    initialSection == "database" ||
-                        initialSection == "offline_maps" ||
-                        offlineMapsTargetFilename != null ||
-                        offlineMapsExpandedForNavigation
+                    initialSection == "database" || initialDatabaseCardAnchor != null
                 val selectableSectionRoots = sectionRootSnapshot.filterKeys {
                     it in regularSectionIndices || (allowDatabaseSelectionBeforeEnd && it == databaseSectionIndex)
                 }
@@ -761,10 +922,12 @@ fun SettingsScreen(
         scrollViewportTop,
         scrollViewportBottom,
         activeSectionIndex,
+        phoneSectionIndex,
         navMode,
         isWideScreen
     ) {
-        val isDatabasePageOpen = isWideScreen && navMode != 0 && activeSectionIndex == 4
+        val isDatabasePageOpen = (isWideScreen && navMode != 0 && activeSectionIndex == SECTION_DATABASE) ||
+            (usePhoneSections && phoneSectionIndex == SECTION_DATABASE)
         if (isDatabasePageOpen || isDisplayedAsMuchAsPossible(databaseBounds)) {
             DownloadNotificationCenter.clearDatabaseSectionNotifications(context)
         }
@@ -778,7 +941,39 @@ fun SettingsScreen(
                 if (showColorPalettePage) {
                     fr.geotower.ui.components.ColorPaletteTopBar(onBack = { showColorPalettePage = false })
                 } else {
-                    SettingsTopBar(onBack = { safeBackNavigation.navigateBack() })
+                    val openSection = phoneSectionIndex?.takeIf { usePhoneSections }
+                    GeoTowerBackTopBar(
+                        title = openSection?.let { menuItems[it].first }
+                            ?: stringResource(R.string.nav_settings),
+                        onBack = {
+                            if (openSection != null) {
+                                openPhoneSection(null)
+                            } else {
+                                safeBackNavigation.navigateBack()
+                            }
+                        },
+                        backgroundColor = MaterialTheme.colorScheme.background,
+                        actions = {
+                            // Bascule « un bouton par section » ↔ « tout sur une page ».
+                            IconButton(
+                                onClick = {
+                                    safeClick("settings_sections_mode") {
+                                        setSettingsSectionsMode(!settingsSectionsMode)
+                                    }
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = if (settingsSectionsMode) {
+                                        Icons.Outlined.ViewAgenda
+                                    } else {
+                                        Icons.Outlined.Dashboard
+                                    },
+                                    contentDescription = stringResource(R.string.settings_navigation_mode_title),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
+                        }
+                    )
                 }
             }
         }
@@ -854,11 +1049,32 @@ fun SettingsScreen(
                                         kotlinx.coroutines.delay(80)
                                         alignAnchorToViewportTop(sectionRootPositions[index])
                                     }
+                                } else {
+                                    // Mode « pages » : la nouvelle section remplace l'ancienne, on
+                                    // repart de son début (sinon on hérite du défilement précédent).
+                                    scope.launch { scrollState.scrollTo(0) }
                                 }
                             }
                         }
                         Spacer(Modifier.height(sizing.spacing(8.dp)))
                         HorizontalDivider(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        // Entrées directes : une galerie et un méta-réglage, pas des sections.
+                        NavigationMenuItem(stringResource(R.string.photos_favorites_title), Icons.Default.PhotoLibrary, false, isDark) {
+                            safeClick { navController.navigate("photos_favorites") }
+                        }
+                        Spacer(Modifier.height(sizing.spacing(8.dp)))
+                        NavigationMenuItem(stringResource(R.string.appstrings_upload_history_title), Icons.Default.History, false, isDark) {
+                            safeClick { navController.navigate("photo_upload_history") }
+                        }
+                        Spacer(Modifier.height(sizing.spacing(8.dp)))
+                        NavigationMenuItem(stringResource(R.string.share_history_title), Icons.Default.Share, false, isDark) {
+                            safeClick { navController.navigate("share_history") }
+                        }
+                        Spacer(Modifier.height(sizing.spacing(8.dp)))
+                        NavigationMenuItem(stringResource(R.string.preference_profiles_title), Icons.Outlined.Bookmarks, false, isDark) {
+                            safeClick { showPreferenceProfilesSheet = true }
+                        }
+                        Spacer(Modifier.height(sizing.spacing(8.dp)))
                         NavigationMenuItem(stringResource(R.string.nav_about), Icons.Outlined.Info, false, isDark) {
                             safeClick {
                                 val currentDestinationId = navController.currentDestination?.id
@@ -902,14 +1118,19 @@ fun SettingsScreen(
                     }
 
                     // --- CONTENU DÉFILANT DES PARAMÈTRES ---
+                    Box(modifier = Modifier.fillMaxSize()) {
                     Box(
                         modifier = Modifier.fillMaxSize()
                             .onGloballyPositioned { coordinates ->
                                 scrollViewportTop = coordinates.positionInRoot().y
                                 scrollViewportBottom = scrollViewportTop + coordinates.size.height
                             }
-                            .then(if (navMode == 0 || !isExpanded) Modifier.geoTowerFadingEdge(scrollState) else Modifier)
-                            .then(if (navMode == 0 || !isExpanded) Modifier.verticalScroll(scrollState) else Modifier)
+                            // Le défilement vaut pour TOUS les modes : en « pages » sur grand écran
+                            // (Fold déplié) une section peut dépasser la hauteur d'écran, et sans
+                            // défilement le bas était simplement inatteignable.
+                            .geoTowerFadingEdge(scrollState)
+                            .pageScrollbar(PageScrollPrefs.SETTINGS, scrollState)
+                            .verticalScroll(scrollState)
                             .padding(horizontal = if (isExpanded) sizing.spacing(48.dp) else sizing.spacing(24.dp))
                             // 🚨 CORRECTION 3 : Marge pour pouvoir scroller jusqu'au bout
                             .navigationBarsPadding()
@@ -934,50 +1155,200 @@ fun SettingsScreen(
                                     useOneUi = useOneUi
                                 )
                             } else {
-                            if (navMode == 0 || !isExpanded) {
-                                AllSettingsContent(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, { showPreferenceProfilesSheet = true }, mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, context, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true }, repository, scope, sectionAnchorModifiers[0], sectionAnchorModifiers[1], sectionAnchorModifiers[2], sectionAnchorModifiers[3], sectionAnchorModifiers[4], Modifier.bringIntoViewRequester(offlineMapsBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; offlineMapsBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) }, scrollViewportTop, scrollViewportBottom, scrollState.value, scrollState.maxValue, targetMapFilename = offlineMapsTargetFilename, onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) }, onOfflineMapsExpandedChange = { offlineMapsExpandedForNavigation = it }, onOpenDiagnostic = { navController.navigate("diagnostic") }, onPhotosFavorites = { navController.navigate("photos_favorites") }, onOutageSource = { navController.navigate("outage_source") }, localDbBuildSectionModifier = Modifier.bringIntoViewRequester(localDbBuildBringIntoViewRequester).onGloballyPositioned { coordinates -> val top = coordinates.positionInRoot().y; localDbBuildBounds = SettingsSectionBounds(top = top, height = coordinates.size.height) })
-                            } else {
-                                when (activeSectionIndex) {
-                                    0 -> SectionApparence(themeMode, { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() }, isOledMode, { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() }, useOneUi, ::updateOneUi, isBlurEnabled, { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() }, logoResId, { showIconSheet = true }, { showLogoDrawingSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, { showColorPalettePage = true })
-                                    1 -> SectionCartographie(mapProvider, { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() }, ignStyle, { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick)
-                                    2 -> SectionPreferences(isExpanded, navMode, { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = 2 }, defaultOperator, { showOperatorSheet = true }, appLanguage, { showLanguageSheet = true }, { showUnitSheet = true }, { showPagesCustomizationSheet = true }, { showCommunityDataSheet = true }, { showExternalLinksSheet = true }, { showShareSelectorSheet = true }, { showPreferenceProfilesSheet = true }, cardShape, cardBorder, bubbleBaseColor, useOneUi, safeClick, onPhotosFavorites = { navController.navigate("photos_favorites") })
-                                    3 -> SectionSysteme(context, cardShape, border = cardBorder, bubbleColor = bubbleBaseColor, useOneUi = useOneUi, safeClick = safeClick, onOpenDiagnostic = { navController.navigate("diagnostic") })
-                                    4 -> Column {
-                                        PreferenceActionCard(
-                                            title = stringResource(R.string.outage_source_settings_title),
-                                            desc = stringResource(R.string.outage_source_settings_desc),
-                                            onClick = { navController.navigate("outage_source") },
-                                            shape = cardShape,
-                                            border = cardBorder,
-                                            bubbleColor = bubbleBaseColor,
-                                            useOneUi = useOneUi,
-                                            safeClick = safeClick
+                            if (usePhoneSections && phoneSectionIndex == null) {
+                                // Téléphone : accueil des réglages, un bouton par section.
+                                SettingsSectionsHome(
+                                    sections = menuItems,
+                                    onSectionClick = { openPhoneSection(it) },
+                                    onShowAll = { setSettingsSectionsMode(false) },
+                                    onPhotosFavorites = { navController.navigate("photos_favorites") },
+                                    onPhotoUploadHistory = { navController.navigate("photo_upload_history") },
+                                    onShareHistory = { navController.navigate("share_history") },
+                                    onPreferenceProfiles = { showPreferenceProfilesSheet = true },
+                                    shape = cardShape,
+                                    border = cardBorder,
+                                    bubbleColor = bubbleBaseColor,
+                                    useOneUi = useOneUi,
+                                    safeClick = safeClick
+                                )
+                            } else if (!usePhoneSections && (navMode == 0 || !isExpanded)) {
+                                AllSettingsContent(
+                                    isWide = isExpanded,
+                                    nav = navMode,
+                                    onNav = { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = SECTION_APPEARANCE },
+                                    theme = themeMode,
+                                    onTheme = { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() },
+                                    oled = isOledMode,
+                                    onOled = { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() },
+                                    oneUi = useOneUi,
+                                    onOneUi = ::updateOneUi,
+                                    blur = isBlurEnabled,
+                                    onBlur = { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() },
+                                    logo = logoResId,
+                                    onIcon = { showIconSheet = true },
+                                    onLogoDrawing = { showLogoDrawingSheet = true },
+                                    op = defaultOperator,
+                                    onOp = { showOperatorSheet = true },
+                                    lang = appLanguage,
+                                    onLang = { showLanguageSheet = true },
+                                    onUnitSettings = { showUnitSheet = true },
+                                    onPages = { showPagesCustomizationSheet = true },
+                                    onExternalLinks = { showExternalLinksSheet = true },
+                                    onSharePrefs = { showShareSelectorSheet = true },
+                                    onPreferenceProfiles = { showPreferenceProfilesSheet = true },
+                                    map = mapProvider,
+                                    onMap = { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() },
+                                    ign = ignStyle,
+                                    onIgn = { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() },
+                                    ctx = context,
+                                    shape = cardShape,
+                                    border = cardBorder,
+                                    bubbleColor = bubbleBaseColor,
+                                    useOneUi = useOneUi,
+                                    safeClick = safeClick,
+                                    onColorPaletteClick = { showColorPalettePage = true },
+                                    repository = repository,
+                                    scope = scope,
+                                    appearanceSectionModifier = sectionAnchorModifiers[SECTION_APPEARANCE],
+                                    mappingSectionModifier = sectionAnchorModifiers[SECTION_MAPPING],
+                                    preferencesSectionModifier = sectionAnchorModifiers[SECTION_PREFERENCES],
+                                    backgroundSectionModifier = sectionAnchorModifiers[SECTION_BACKGROUND],
+                                    systemSectionModifier = sectionAnchorModifiers[SECTION_SYSTEM],
+                                    databaseSectionModifier = sectionAnchorModifiers[SECTION_DATABASE],
+                                    offlineMapsSectionModifier = offlineMapsAnchorModifier,
+                                    viewportTop = scrollViewportTop,
+                                    viewportBottom = scrollViewportBottom,
+                                    scrollValue = scrollState.value,
+                                    scrollMaxValue = scrollState.maxValue,
+                                    targetMapFilename = offlineMapsTargetFilename,
+                                    onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) },
+                                    onOpenDiagnostic = { navController.navigate("diagnostic") },
+                                    onPhotosFavorites = { navController.navigate("photos_favorites") },
+                                    onPhotoUploadHistory = { navController.navigate("photo_upload_history") },
+                                    onShareHistory = { navController.navigate("share_history") },
+                                    onOutageSource = { navController.navigate("outage_source") },
+                                    onLocalMode = { navController.navigate("local_mode") },
+                                    databaseCardModifiers = databaseCardAnchorModifiers
+                                )
+                                if (!isExpanded) {
+                                    // Retour vers l'accueil par sections (pendant du bouton de la barre du haut).
+                                    Spacer(Modifier.height(sizing.spacing(8.dp)))
+                                    TextButton(
+                                        onClick = { setSettingsSectionsMode(true) },
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Outlined.Dashboard,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(sizing.component(20.dp))
                                         )
-                                        Spacer(Modifier.height(sizing.spacing(12.dp)))
-                                        SectionDatabase(
-                                            isExpanded,
-                                            cardShape,
-                                            bubbleBaseColor,
-                                            useOneUi,
-                                            repository,
-                                            scope,
-                                            context,
-                                            viewportTop = scrollViewportTop,
-                                            viewportBottom = scrollViewportBottom,
-                                            scrollValue = scrollState.value,
-                                            scrollMaxValue = scrollState.maxValue,
-                                            targetMapFilename = offlineMapsTargetFilename,
-                                            onTargetMapPositioned = { top, height ->
-                                                offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height)
-                                            },
-                                            onOfflineMapsExpandedChange = { offlineMapsExpandedForNavigation = it }
+                                        Spacer(Modifier.width(sizing.spacing(8.dp)))
+                                        Text(
+                                            text = stringResource(R.string.settings_navigation_pages_desc),
+                                            style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                                            fontWeight = FontWeight.Bold
                                         )
                                     }
                                 }
+                            } else {
+                                // Une seule section : mode « pages » des grands écrans, ou section
+                                // ouverte depuis l'accueil par sections d'un téléphone.
+                                when (if (usePhoneSections) phoneSectionIndex ?: SECTION_APPEARANCE else activeSectionIndex) {
+                                    SECTION_APPEARANCE -> SectionApparence(
+                                        themeMode,
+                                        { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() },
+                                        isOledMode,
+                                        { isOledMode = it; prefs.edit().putBoolean("is_oled_mode", it).apply() },
+                                        useOneUi,
+                                        ::updateOneUi,
+                                        isBlurEnabled,
+                                        { isBlurEnabled = it; prefs.edit().putBoolean("is_blur_enabled", it).apply() },
+                                        logoResId,
+                                        { showIconSheet = true },
+                                        { showLogoDrawingSheet = true },
+                                        cardShape,
+                                        cardBorder,
+                                        bubbleBaseColor,
+                                        useOneUi,
+                                        safeClick,
+                                        { showColorPalettePage = true },
+                                        isWide = isExpanded,
+                                        nav = navMode,
+                                        onNav = { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = SECTION_APPEARANCE }
+                                    )
+                                    SECTION_MAPPING -> SectionCartographie(
+                                        mapProvider,
+                                        { mapProvider = it; prefs.edit().putInt("map_provider", it).apply() },
+                                        ignStyle,
+                                        { ignStyle = it; prefs.edit().putInt("ign_style", it).apply() },
+                                        cardShape,
+                                        cardBorder,
+                                        bubbleBaseColor,
+                                        useOneUi,
+                                        safeClick,
+                                        offlineMapsModifier = offlineMapsAnchorModifier,
+                                        viewportTop = scrollViewportTop,
+                                        viewportBottom = scrollViewportBottom,
+                                        scrollValue = scrollState.value,
+                                        scrollMaxValue = scrollState.maxValue,
+                                        targetMapFilename = offlineMapsTargetFilename,
+                                        onTargetMapPositioned = { top, height ->
+                                            offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height)
+                                        }
+                                    )
+                                    SECTION_PREFERENCES -> SectionPreferences(
+                                        defaultOperator,
+                                        { showOperatorSheet = true },
+                                        appLanguage,
+                                        { showLanguageSheet = true },
+                                        { showUnitSheet = true },
+                                        { showPagesCustomizationSheet = true },
+                                        { showExternalLinksSheet = true },
+                                        { showShareSelectorSheet = true },
+                                        cardShape,
+                                        cardBorder,
+                                        bubbleBaseColor,
+                                        useOneUi,
+                                        safeClick
+                                    )
+                                    SECTION_BACKGROUND -> SectionNotifications(
+                                        defaultOperator,
+                                        cardShape,
+                                        cardBorder,
+                                        bubbleBaseColor,
+                                        useOneUi,
+                                        safeClick
+                                    )
+                                    SECTION_SYSTEM -> SectionSysteme(
+                                        context,
+                                        cardShape,
+                                        border = cardBorder,
+                                        bubbleColor = bubbleBaseColor,
+                                        useOneUi = useOneUi,
+                                        safeClick = safeClick,
+                                        onOpenDiagnostic = { navController.navigate("diagnostic") }
+                                    )
+                                    SECTION_DATABASE -> SectionDatabase(
+                                        cardShape,
+                                        bubbleBaseColor,
+                                        useOneUi,
+                                        repository,
+                                        scope,
+                                        context,
+                                        modifier = sectionAnchorModifiers[SECTION_DATABASE],
+                                        onLocalMode = { navController.navigate("local_mode") },
+                                        onOutageSource = { navController.navigate("outage_source") },
+                                        safeClick = safeClick,
+                                        databaseCardModifiers = databaseCardAnchorModifiers
+                                    )
+                                }
                             }
                             }
-                            Spacer(Modifier.height(48.dp))
+                            Spacer(Modifier.height(sizing.spacing(48.dp)))
                         }
+                    }
+                    // Le contenu défile dans tous les modes : les aides au défilement suivent.
+                    PageScrollEdgeButtons(PageScrollPrefs.SETTINGS, scrollState)
                     }
                 }
             }
@@ -1464,6 +1835,7 @@ fun SettingsScreen(
                 showPhotos = AppConfig.siteShowPhotos.value, onPhotosChange = ::updateSharedPhotosVisibility,
                 showPanelHeights = pageSitePanelHeights, onPanelHeightsChange = { pageSitePanelHeights = it; prefs.edit().putBoolean(SitePagePrefs.panelHeights.key, it).apply() },
                 showIds = pageSiteIds, onIdsChange = { pageSiteIds = it; prefs.edit().putBoolean(SitePagePrefs.ids.key, it).apply() },
+                showNetworkIds = pageSiteNetworkIds, onNetworkIdsChange = { pageSiteNetworkIds = it; prefs.edit().putBoolean(SitePagePrefs.networkIds.key, it).apply() },
                 showOpenMap = pageSiteOpenMap, onOpenMapChange = { pageSiteOpenMap = it; prefs.edit().putBoolean(SitePagePrefs.openMap.key, it).apply() },
                 showElevationProfile = pageSiteElevationProfile, onElevationProfileChange = { pageSiteElevationProfile = it; prefs.edit().putBoolean(SitePagePrefs.elevationProfile.key, it).apply() },
                 showThroughputCalculator = pageSiteThroughputCalculator, onThroughputCalculatorChange = { pageSiteThroughputCalculator = it; prefs.edit().putBoolean(SitePagePrefs.throughputCalculator.key, it).apply() },
@@ -1910,7 +2282,6 @@ fun AllSettingsContent(
     isWide: Boolean, nav: Int, onNav: (Int) -> Unit, theme: Int, onTheme: (Int) -> Unit, oled: Boolean, onOled: (Boolean) -> Unit, oneUi: Boolean, onOneUi: (Boolean) -> Unit, blur: Boolean, onBlur: (Boolean) -> Unit, logo: Int, onIcon: () -> Unit, onLogoDrawing: () -> Unit, op: String, onOp: () -> Unit, lang: String, onLang: () -> Unit,
     onUnitSettings: () -> Unit,
     onPages: () -> Unit,
-    onCommunityData: () -> Unit,
     onExternalLinks: () -> Unit,
     onSharePrefs: () -> Unit,
     onPreferenceProfiles: () -> Unit,
@@ -1930,6 +2301,7 @@ fun AllSettingsContent(
     appearanceSectionModifier: Modifier = Modifier,
     mappingSectionModifier: Modifier = Modifier,
     preferencesSectionModifier: Modifier = Modifier,
+    backgroundSectionModifier: Modifier = Modifier,
     systemSectionModifier: Modifier = Modifier,
     databaseSectionModifier: Modifier = Modifier,
     offlineMapsSectionModifier: Modifier = Modifier,
@@ -1939,42 +2311,45 @@ fun AllSettingsContent(
     scrollMaxValue: Int = 0,
     targetMapFilename: String? = null,
     onTargetMapPositioned: (Float, Int) -> Unit = { _, _ -> },
-    onOfflineMapsExpandedChange: (Boolean) -> Unit = {},
     onOpenDiagnostic: () -> Unit = {},
     onPhotosFavorites: () -> Unit = {},
+    onPhotoUploadHistory: () -> Unit = {},
+    onShareHistory: () -> Unit = {},
     onOutageSource: () -> Unit = {},
-    localDbBuildSectionModifier: Modifier = Modifier
+    onLocalMode: () -> Unit = {},
+    databaseCardModifiers: Map<String, Modifier> = emptyMap()
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(modifier = appearanceSectionModifier.fillMaxWidth()) {
-        SectionApparence(theme, onTheme, oled, onOled, oneUi, onOneUi, blur, onBlur, logo, onIcon, onLogoDrawing, shape, border, bubbleColor, useOneUi, safeClick, onColorPaletteClick)
+        SectionApparence(theme, onTheme, oled, onOled, oneUi, onOneUi, blur, onBlur, logo, onIcon, onLogoDrawing, shape, border, bubbleColor, useOneUi, safeClick, onColorPaletteClick, isWide = isWide, nav = nav, onNav = onNav)
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
     Column(modifier = mappingSectionModifier.fillMaxWidth()) {
-        SectionCartographie(map, onMap, ign, onIgn, shape, border, bubbleColor, useOneUi, safeClick)
+        SectionCartographie(
+            map, onMap, ign, onIgn, shape, border, bubbleColor, useOneUi, safeClick,
+            offlineMapsModifier = offlineMapsSectionModifier,
+            viewportTop = viewportTop,
+            viewportBottom = viewportBottom,
+            scrollValue = scrollValue,
+            scrollMaxValue = scrollMaxValue,
+            targetMapFilename = targetMapFilename,
+            onTargetMapPositioned = onTargetMapPositioned
+        )
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
     Column(modifier = preferencesSectionModifier.fillMaxWidth()) {
-        SectionPreferences(isWide, nav, onNav, op, onOp, lang, onLang, onUnitSettings, onPages, onCommunityData, onExternalLinks, onSharePrefs, onPreferenceProfiles, shape, border, bubbleColor, useOneUi, safeClick, onPhotosFavorites = onPhotosFavorites)
+        SectionPreferences(op, onOp, lang, onLang, onUnitSettings, onPages, onExternalLinks, onSharePrefs, shape, border, bubbleColor, useOneUi, safeClick)
+    }
+    Spacer(Modifier.height(sizing.spacing(32.dp)))
+    Column(modifier = backgroundSectionModifier.fillMaxWidth()) {
+        SectionNotifications(op, shape, border, bubbleColor, useOneUi, safeClick)
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
     Column(modifier = systemSectionModifier.fillMaxWidth()) {
         SectionSysteme(ctx, shape, border, bubbleColor, useOneUi, safeClick, onOpenDiagnostic)
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
-    PreferenceActionCard(
-        title = stringResource(R.string.outage_source_settings_title),
-        desc = stringResource(R.string.outage_source_settings_desc),
-        onClick = onOutageSource,
-        shape = shape,
-        border = border,
-        bubbleColor = bubbleColor,
-        useOneUi = useOneUi,
-        safeClick = safeClick
-    )
-    Spacer(Modifier.height(sizing.spacing(12.dp)))
     SectionDatabase(
-        isWide,
         shape,
         bubbleColor,
         useOneUi,
@@ -1982,32 +2357,55 @@ fun AllSettingsContent(
         scope,
         ctx,
         databaseSectionModifier,
-        offlineMapsSectionModifier,
-        viewportTop,
-        viewportBottom,
-        scrollValue,
-        scrollMaxValue,
-        targetMapFilename,
-        onTargetMapPositioned,
-        onOfflineMapsExpandedChange = onOfflineMapsExpandedChange,
-        localDbBuildModifier = localDbBuildSectionModifier
+        onLocalMode = onLocalMode,
+        onOutageSource = onOutageSource,
+        safeClick = safeClick,
+        databaseCardModifiers = databaseCardModifiers
     )
+    Spacer(Modifier.height(sizing.spacing(32.dp)))
+    SettingsDirectEntries(
+        onPhotosFavorites = onPhotosFavorites,
+        onPhotoUploadHistory = onPhotoUploadHistory,
+        onShareHistory = onShareHistory,
+        onPreferenceProfiles = onPreferenceProfiles,
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi,
+        safeClick = safeClick
+    )
+    // Les grands écrans ont déjà la réinitialisation dans leur barre latérale.
+    if (!isWide) {
+        SettingsResetButton(shape = shape, modifier = Modifier.padding(top = sizing.spacing(24.dp)))
+    }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SectionApparence(
     theme: Int, onTheme: (Int) -> Unit, oled: Boolean, onOled: (Boolean) -> Unit,
     oneUi: Boolean, onOneUi: (Boolean) -> Unit, blur: Boolean, onBlur: (Boolean) -> Unit,
     logo: Int, onIcon: () -> Unit, onLogoDrawing: () -> Unit,
     shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick,
-    onColorPaletteClick: () -> Unit
+    onColorPaletteClick: () -> Unit,
+    // Mise en page des réglages : réservée aux grands écrans. Les téléphones basculent
+    // « par sections » / « page unique » depuis la barre du haut.
+    isWide: Boolean = false,
+    nav: Int = 0,
+    onNav: (Int) -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = context.getSharedPreferences(PreferenceStores.APP, android.content.Context.MODE_PRIVATE)
+    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val uiScalePercent by AppConfig.uiScalePercent
     val logoDrawingChoice by AppConfig.appLogoDrawingChoice
     val isDark = LocalGeoTowerUiStyle.current.isDark
+    val isOledMode by AppConfig.isOledMode
+    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
     val logoDrawingRes = AppLogoDrawingResources.resolve(logoDrawingChoice, logo, isDark)
+    var displayStyle by remember { mutableIntStateOf(prefs.getInt("display_style", 0)) }
+    var showDisplayStylesSheet by remember { mutableStateOf(false) }
 
     SectionTitle(stringResource(R.string.settings_section_appearance))
 
@@ -2029,107 +2427,13 @@ fun SectionApparence(
         onColorPaletteClick = onColorPaletteClick,
         shape = shape, border = border, bubbleColor = bubbleColor, safeClick = safeClick
     )
-}
 
-@Composable
-fun SectionCartographie(map: Int, onMap: (Int) -> Unit, ign: Int, onIgn: (Int) -> Unit, shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick) {
-    SectionTitle(stringResource(R.string.settings_section_mapping))
-
-    fr.geotower.ui.components.MappingOptionsBlock(
-        mapProvider = map,
-        onMapProviderChange = onMap,
-        ignStyle = ign,
-        onIgnStyleChange = onIgn,
-        shape = shape,
-        border = border,
-        bubbleColor = bubbleColor,
-        useOneUi = useOneUi,
-        safeClick = safeClick
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun SectionPreferences(
-    isWide: Boolean, nav: Int, onNav: (Int) -> Unit,
-    op: String, onOp: () -> Unit, lang: String, onLang: () -> Unit,
-    onUnitSettings: () -> Unit,
-    onPages: () -> Unit,
-    onCommunityData: () -> Unit,
-    onExternalLinks: () -> Unit,
-    onSharePrefs: () -> Unit,
-    onPreferenceProfiles: () -> Unit,
-    shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick,
-    onPhotosFavorites: () -> Unit
-) {
-    // NOUVEAU : On récupère le contexte et les préférences ici pour le curseur
-    val context = LocalContext.current
-    val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
-
-    // ✅ NOUVEAU : Le lanceur magique qui déclenche le menu Android spécifique !
-    val featureFlags by RemoteFeatureFlags.config
-    val sizing = LocalGeoTowerUiStyle.current.sizing
-
-    val bgLocationLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
-        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
-        onResult = { /* L'interface de Jetpack Compose se mettra à jour toute seule */ }
-    )
-
-    var widgetFrequency by remember {
-        mutableIntStateOf(WidgetPrefs.syncFrequencyMinutes(prefs))
-    }
-    var liveLocationIntervalSeconds by remember {
-        mutableIntStateOf(LiveTrackingPrefs.locationUpdateIntervalSeconds(prefs))
-    }
-    var liveLocationPriority by remember {
-        mutableIntStateOf(LiveTrackingPrefs.locationPriority(prefs))
-    }
-
-    // Présence d'au moins un widget GeoTower posé : conditionne l'activation du curseur de fréquence
-    // (réévaluée à chaque retour au premier plan, l'utilisateur pouvant ajouter/retirer un widget entre-temps).
-    var hasWidgetInstalled by remember {
-        mutableStateOf(fr.geotower.widget.WidgetUpdateScheduler.hasAnyWidget(context))
-    }
-    val widgetLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    androidx.compose.runtime.DisposableEffect(widgetLifecycleOwner) {
-        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                hasWidgetInstalled = fr.geotower.widget.WidgetUpdateScheduler.hasAnyWidget(context)
-            }
-        }
-        widgetLifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { widgetLifecycleOwner.lifecycle.removeObserver(observer) }
-    }
-    var showWidgetPickerSheet by remember { mutableStateOf(false) }
-
-    // ✅ AJOUT POUR LE STYLE D'AFFICHAGE
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    var displayStyle by remember { mutableIntStateOf(prefs.getInt("display_style", 0)) }
-    var showDisplayStylesSheet by remember { mutableStateOf(false) }
-
-    SectionTitle(stringResource(R.string.settings_section_preferences))
-    val themeMode by AppConfig.themeMode
-    val isOledMode by AppConfig.isOledMode // <-- AJOUT
-    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
-    val paleBgColor = if (isDark) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer
-    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow // <-- AJOUT
-
-    PreferenceActionCard(
-        title = stringResource(R.string.preference_profiles_title),
-        desc = stringResource(R.string.preference_profiles_card_desc),
-        onClick = onPreferenceProfiles,
-        shape = shape,
-        border = border,
-        bubbleColor = bubbleColor,
-        useOneUi = useOneUi,
-        safeClick = safeClick
-    )
-    Spacer(Modifier.height(sizing.spacing(12.dp)))
-
+    // --- MISE EN PAGE DES RÉGLAGES (grands écrans) ---
     if (isWide) {
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
         var showModeSheet by remember { mutableStateOf(false) }
         val cardBg = if (useOneUi) bubbleColor else Color.Transparent
-        Surface(onClick = { showModeSheet = true }, modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp)), shape = shape, border = border, color = cardBg) {
+        Surface(onClick = { showModeSheet = true }, modifier = Modifier.fillMaxWidth(), shape = shape, border = border, color = cardBg) {
             Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.settings_navigation_mode_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
@@ -2167,10 +2471,11 @@ fun SectionPreferences(
         }
     }
 
-    // ✅ NOUVEAU : Option Style d'affichage (uniquement sur grand écran réel)
+    // Style d'affichage plein écran / fractionné : uniquement sur grand écran réel.
     if (minOf(configuration.screenWidthDp, configuration.screenHeightDp) >= 600) {
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
         val cardBg = if (useOneUi) bubbleColor else Color.Transparent
-        Surface(onClick = { safeClick("display_styles_sheet") { showDisplayStylesSheet = true } }, modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp)), shape = shape, border = border, color = cardBg) {
+        Surface(onClick = { safeClick("display_styles_sheet") { showDisplayStylesSheet = true } }, modifier = Modifier.fillMaxWidth(), shape = shape, border = border, color = cardBg) {
             Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text(stringResource(R.string.settings_display_style_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
@@ -2231,10 +2536,174 @@ fun SectionPreferences(
             }
         }
     }
+}
 
-    // ========================================================
-    // ✅ NOUVEAU : NOTIFICATIONS DE MISE À JOUR DE LA BASE
-    // ========================================================
+@Composable
+fun SectionCartographie(
+    map: Int, onMap: (Int) -> Unit, ign: Int, onIgn: (Int) -> Unit,
+    shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick,
+    offlineMapsModifier: Modifier = Modifier,
+    viewportTop: Float = Float.NaN,
+    viewportBottom: Float = Float.NaN,
+    scrollValue: Int = 0,
+    scrollMaxValue: Int = 0,
+    targetMapFilename: String? = null,
+    onTargetMapPositioned: (Float, Int) -> Unit = { _, _ -> }
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    SectionTitle(stringResource(R.string.settings_section_mapping))
+
+    fr.geotower.ui.components.MappingOptionsBlock(
+        mapProvider = map,
+        onMapProviderChange = onMap,
+        ignStyle = ign,
+        onIgnStyleChange = onIgn,
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi,
+        safeClick = safeClick
+    )
+
+    // Les cartes hors ligne sont un fond de carte téléchargé : elles vivent ici, pas dans la
+    // section base de données (qui parle des antennes ANFR).
+    Spacer(Modifier.height(sizing.spacing(16.dp)))
+    Box(modifier = offlineMapsModifier.fillMaxWidth()) {
+        fr.geotower.ui.components.MapDownloadCard(
+            useOneUi = useOneUi,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            viewportTop = viewportTop,
+            viewportBottom = viewportBottom,
+            scrollValue = scrollValue,
+            scrollMaxValue = scrollMaxValue,
+            targetMapFilename = targetMapFilename,
+            onTargetMapPositioned = onTargetMapPositioned
+        )
+    }
+}
+
+@Composable
+fun SectionPreferences(
+    op: String, onOp: () -> Unit, lang: String, onLang: () -> Unit,
+    onUnitSettings: () -> Unit,
+    onPages: () -> Unit,
+    onExternalLinks: () -> Unit,
+    onSharePrefs: () -> Unit,
+    shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick
+) {
+    val featureFlags by RemoteFeatureFlags.config
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+
+    SectionTitle(stringResource(R.string.settings_section_preferences))
+
+    PreferenceOperatorCard(stringResource(R.string.settings_default_operator), op, onOp, shape, border, bubbleColor, useOneUi, safeClick)
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
+
+    PreferenceLanguageCard(stringResource(R.string.settings_app_language), lang, onLang, shape, border, bubbleColor, useOneUi, safeClick)
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
+
+    PreferenceActionCard(
+        title = stringResource(R.string.settings_units_title),
+        desc = stringResource(R.string.settings_units_desc),
+        onClick = onUnitSettings,
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi,
+        safeClick = safeClick,
+        icon = Icons.Default.Straighten
+    )
+
+    if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.PAGES_CUSTOMIZATION)) {
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
+        PreferenceActionCard(
+            title = stringResource(R.string.settings_pages_customization_title),
+            desc = stringResource(R.string.settings_pages_customization_desc),
+            onClick = onPages,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick,
+            icon = Icons.Default.Edit
+        )
+    }
+    if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.EXTERNAL_LINKS_SETTINGS)) {
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
+        PreferenceActionCard(
+            title = stringResource(R.string.settings_external_links_title),
+            desc = stringResource(R.string.settings_external_links_desc),
+            onClick = onExternalLinks,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick,
+            icon = Icons.Default.Language
+        )
+    }
+    if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.SHARE_SETTINGS)) {
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
+        PreferenceActionCard(
+            title = stringResource(R.string.settings_default_share_content_title),
+            desc = stringResource(R.string.settings_default_share_content_desc),
+            onClick = onSharePrefs,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick,
+            icon = Icons.Default.Share
+        )
+    }
+}
+
+/**
+ * Tout ce qui vit hors de l'application : notifications de mise à jour de la base, notification
+ * live et sa précision GPS, mode faible consommation, rafraîchissement du widget.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun SectionNotifications(
+    op: String,
+    shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick
+) {
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+
+    var widgetFrequency by remember {
+        mutableIntStateOf(WidgetPrefs.syncFrequencyMinutes(prefs))
+    }
+    var liveLocationIntervalSeconds by remember {
+        mutableIntStateOf(LiveTrackingPrefs.locationUpdateIntervalSeconds(prefs))
+    }
+    var liveLocationPriority by remember {
+        mutableIntStateOf(LiveTrackingPrefs.locationPriority(prefs))
+    }
+
+    // Présence d'au moins un widget GeoTower posé : conditionne l'activation du curseur de fréquence
+    // (réévaluée à chaque retour au premier plan, l'utilisateur pouvant ajouter/retirer un widget entre-temps).
+    var hasWidgetInstalled by remember {
+        mutableStateOf(fr.geotower.widget.WidgetUpdateScheduler.hasAnyWidget(context))
+    }
+    val widgetLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(widgetLifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                hasWidgetInstalled = fr.geotower.widget.WidgetUpdateScheduler.hasAnyWidget(context)
+            }
+        }
+        widgetLifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { widgetLifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    var showWidgetPickerSheet by remember { mutableStateOf(false) }
+
+    SectionTitle(stringResource(R.string.settings_section_background))
+
+    // --- NOTIFICATIONS DE MISE À JOUR DE LA BASE ---
     val updateNotifsEnabled by fr.geotower.utils.AppConfig.enableUpdateNotifications
 
     PreferenceSwitchCard(
@@ -2260,11 +2729,9 @@ fun SectionPreferences(
         bubbleColor = bubbleColor,
         useOneUi = useOneUi
     )
-    Spacer(Modifier.height(12.dp))
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
 
-    // ========================================================
-    // ✅ MODE FAIBLE CONSOMMATION (Normal / Éco / Éco+)
-    // ========================================================
+    // --- MODE FAIBLE CONSOMMATION (Normal / Éco / Éco+) ---
     val lowPowerLevel by AppConfig.lowPowerLevel
     val lowPowerFollowSystem by AppConfig.lowPowerFollowSystem
     // Niveau EFFECTIF (manuel, ou relevé par l'économie d'énergie système) → la sélection le reflète, réactif.
@@ -2292,7 +2759,7 @@ fun SectionPreferences(
                 style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(sizing.spacing(12.dp)))
             NavigationModeOption(
                 title = stringResource(R.string.appstrings_low_power_level_normal),
                 desc = stringResource(R.string.appstrings_low_power_level_normal_desc),
@@ -2300,7 +2767,7 @@ fun SectionPreferences(
                 useOneUi = useOneUi,
                 onClick = { applyLowPowerLevel(0) }
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
             NavigationModeOption(
                 title = stringResource(R.string.appstrings_low_power_level_eco),
                 desc = stringResource(R.string.appstrings_low_power_level_eco_desc),
@@ -2308,7 +2775,7 @@ fun SectionPreferences(
                 useOneUi = useOneUi,
                 onClick = { applyLowPowerLevel(1) }
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
             NavigationModeOption(
                 title = stringResource(R.string.appstrings_low_power_level_ecoplus),
                 desc = stringResource(R.string.appstrings_low_power_level_ecoplus_desc),
@@ -2317,7 +2784,7 @@ fun SectionPreferences(
                 onClick = { applyLowPowerLevel(2) }
             )
             if (effectiveLowPowerLevel > lowPowerLevel) {
-                Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(sizing.spacing(8.dp)))
                 Text(
                     stringResource(R.string.appstrings_low_power_forced_by_system),
                     style = sizing.textStyle(MaterialTheme.typography.bodySmall),
@@ -2326,7 +2793,7 @@ fun SectionPreferences(
             }
         }
     }
-    Spacer(Modifier.height(12.dp))
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
 
     PreferenceSwitchCard(
         title = stringResource(R.string.appstrings_low_power_follow_system_title),
@@ -2342,9 +2809,9 @@ fun SectionPreferences(
         bubbleColor = bubbleColor,
         useOneUi = useOneUi
     )
-    Spacer(Modifier.height(12.dp))
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
 
-    // --- NOUVEAU : NOTIFICATION LIVE ---
+    // --- NOTIFICATION LIVE ---
     val liveNotifsEnabled by AppConfig.enableLiveNotifications
     val isOperatorSelected = op != "Aucun"
 
@@ -2391,7 +2858,7 @@ fun SectionPreferences(
     )
 
     if (liveNotifsEnabled) {
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
         // Mode faible conso : le slider suit la valeur imposée par le niveau (grisé tant qu'il pilote).
         val intervalFloor = fr.geotower.utils.PowerProfile.liveIntervalFloorSeconds
         val intervalImposedByEco = intervalFloor > 0
@@ -2420,7 +2887,7 @@ fun SectionPreferences(
             useOneUi = useOneUi,
             footerText = stringResource(R.string.appstrings_live_location_refresh_footer)
         )
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
         val priorityLabels = listOf(
             stringResource(R.string.appstrings_live_location_accuracy_low),
             stringResource(R.string.appstrings_live_location_accuracy_balanced),
@@ -2451,191 +2918,7 @@ fun SectionPreferences(
             footerText = stringResource(R.string.appstrings_live_location_accuracy_footer)
         )
     }
-    Spacer(Modifier.height(12.dp))
-
-    PreferenceOperatorCard(stringResource(R.string.settings_default_operator), op, onOp, shape, border, bubbleColor, useOneUi, safeClick)
-    Spacer(Modifier.height(12.dp))
-
-    PreferenceLanguageCard(stringResource(R.string.settings_app_language), lang, onLang, shape, border, bubbleColor, useOneUi, safeClick)
-    Spacer(Modifier.height(12.dp))
-    PreferenceActionCard(
-        title = stringResource(R.string.settings_units_title),
-        desc = stringResource(R.string.settings_units_desc),
-        onClick = onUnitSettings,
-        shape = shape,
-        border = border,
-        bubbleColor = bubbleColor,
-        useOneUi = useOneUi,
-        safeClick = safeClick,
-        icon = Icons.Default.Straighten
-    )
-    Spacer(Modifier.height(12.dp))
-
-    if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.PAGES_CUSTOMIZATION)) {
-        PreferenceActionCard(
-            title = stringResource(R.string.settings_pages_customization_title),
-            desc = stringResource(R.string.settings_pages_customization_desc),
-            onClick = onPages,
-            shape = shape,
-            border = border,
-            bubbleColor = bubbleColor,
-            useOneUi = useOneUi,
-            safeClick = safeClick,
-            icon = Icons.Default.Edit
-        )
-        Spacer(Modifier.height(12.dp))
-    }
-    if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.EXTERNAL_LINKS_SETTINGS)) {
-        PreferenceActionCard(
-            title = stringResource(R.string.settings_external_links_title),
-            desc = stringResource(R.string.settings_external_links_desc),
-            onClick = onExternalLinks,
-            shape = shape,
-            border = border,
-            bubbleColor = bubbleColor,
-            useOneUi = useOneUi,
-            safeClick = safeClick,
-            icon = Icons.Default.Language
-        )
-        Spacer(Modifier.height(12.dp))
-    }
-
-    if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.SHARE_SETTINGS)) {
-        PreferenceActionCard(
-            title = stringResource(R.string.settings_default_share_content_title),
-            desc = stringResource(R.string.settings_default_share_content_desc),
-            onClick = onSharePrefs,
-            shape = shape,
-            border = border,
-            bubbleColor = bubbleColor,
-            useOneUi = useOneUi,
-            safeClick = safeClick,
-            icon = Icons.Default.Share
-        )
-        Spacer(Modifier.height(12.dp))
-    }
-
-    PreferenceActionCard(
-        title = stringResource(R.string.photos_favorites_title),
-        desc = stringResource(R.string.photos_favorites_desc),
-        onClick = onPhotosFavorites,
-        shape = shape,
-        border = border,
-        bubbleColor = bubbleColor,
-        useOneUi = useOneUi,
-        safeClick = safeClick,
-        icon = Icons.Default.PhotoLibrary
-    )
-    Spacer(Modifier.height(12.dp))
-
-    // --- NOUVEAU : BOUTON D'AUTORISATION ARRIÈRE-PLAN ---
-    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
-        val backgroundPermissionLabel = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            runCatching { context.packageManager.backgroundPermissionOptionLabel.toString() }.getOrNull()
-        } else {
-            null
-        }
-
-        // ✅ 1. L'état qui permet à l'interface de se mettre à jour toute seule
-        var isBgLocationGranted by remember {
-            mutableStateOf(
-                androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            )
-        }
-
-        // ✅ 2. On écoute le retour sur l'application pour revérifier la permission instantanément
-        val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-        androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
-            val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
-                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
-                    isBgLocationGranted = androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                }
-            }
-            lifecycleOwner.lifecycle.addObserver(observer)
-            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
-        }
-
-        // ✅ 3. L'animation de disparition fluide (le bloc disparaît si isBgLocationGranted devient true)
-        androidx.compose.animation.AnimatedVisibility(
-            visible = !isBgLocationGranted,
-            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
-            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
-        ) {
-            Column {
-                PreferenceActionCard(
-                    title = stringResource(R.string.appstrings_bg_location_perm_title),
-                    desc = buildString {
-                        append(stringResource(R.string.appstrings_bg_location_perm_desc))
-                        if (!backgroundPermissionLabel.isNullOrBlank()) {
-                            append('\n')
-                            append(backgroundPermissionLabel)
-                        }
-                    },
-                    onClick = {
-                        // ✅ 4. Trouver la VRAIE activité (On déballe le contexte de Compose pour réparer le bug de redirection)
-                        var currentContext = context
-                        while (currentContext is android.content.ContextWrapper && currentContext !is android.app.Activity) {
-                            currentContext = currentContext.baseContext
-                        }
-                        val activity = currentContext as? android.app.Activity
-                        val hasFineLocation = androidx.core.content.ContextCompat.checkSelfPermission(
-                            context,
-                            android.Manifest.permission.ACCESS_FINE_LOCATION
-                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                        val hasCoarseLocation = androidx.core.content.ContextCompat.checkSelfPermission(
-                            context,
-                            android.Manifest.permission.ACCESS_COARSE_LOCATION
-                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-
-                        if (!hasFineLocation && !hasCoarseLocation) {
-                            activity?.requestPermissions(
-                                arrayOf(
-                                    android.Manifest.permission.ACCESS_FINE_LOCATION,
-                                    android.Manifest.permission.ACCESS_COARSE_LOCATION
-                                ),
-                                1005
-                            )
-                            return@PreferenceActionCard
-                        }
-
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.fromParts("package", context.packageName, null)
-                                // FLAG_ACTIVITY_NEW_TASK : LocalContext est le contexte localisé (LocaleProvider),
-                                // pas une Activity → sans ce flag, l'ouverture des réglages échoue silencieusement sur OnePlus.
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            runCatching { context.startActivity(intent) }
-                            return@PreferenceActionCard
-                        }
-
-                        // ✅ 5. Analyser l'état de la permission
-                        val shouldShowRationale = activity?.shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) ?: false
-                        val alreadyAsked = prefs.getBoolean("bg_loc_asked", false)
-
-                        // Si on a déjà demandé, que l'OS refuse d'afficher l'alerte, ET qu'on a bien trouvé l'activité
-                        if (alreadyAsked && !shouldShowRationale && activity != null) {
-                            // Plan B : Le blocage est total (bouton "Ne plus demander" coché), on ouvre les paramètres globaux
-                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.fromParts("package", context.packageName, null)
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) // idem : contexte localisé sans Activity
-                            }
-                            context.startActivity(intent)
-                        } else {
-                            // Plan A : La magie d'Android ! Ouvre le sous-menu "Position"
-                            prefs.edit().putBoolean("bg_loc_asked", true).apply()
-                            bgLocationLauncher.launch(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                        }
-
-                        // ❌ Le Toast a été supprimé !
-                    },
-                    shape = shape, border = border, bubbleColor = MaterialTheme.colorScheme.errorContainer, useOneUi = useOneUi, safeClick = safeClick,
-                    icon = Icons.Default.Place
-                )
-                Spacer(Modifier.height(12.dp))
-            }
-        }
-    }
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
 
     // --- CURSEUR PARTAGÉ (Nettoyé des < 30 min) ---
     fr.geotower.ui.components.CustomSliderCard(
@@ -2667,7 +2950,7 @@ fun SectionPreferences(
     // et que le launcher sait épingler (One UI, etc.). Il déclenche la boîte de dialogue système.
     val canPinWidget = remember { fr.geotower.widget.WidgetUpdateScheduler.canPinWidget(context) }
     if (!hasWidgetInstalled && canPinWidget) {
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
         PreferenceActionCard(
             title = stringResource(R.string.appstrings_widget_add_button_title),
             desc = stringResource(R.string.appstrings_widget_add_button_desc),
@@ -2783,6 +3066,120 @@ fun SectionSysteme(
 
     Spacer(Modifier.height(sizing.spacing(12.dp)))
 
+    // --- AUTORISATION DE POSITION EN ARRIÈRE-PLAN ---
+    // Même sujet que « Gérer les permissions » juste au-dessus : la carte n'apparaît que si
+    // l'autorisation manque encore, et disparaît en douceur dès qu'elle est accordée.
+    if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.Q) {
+        val prefs = ctx.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+        val bgLocationLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+            contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission(),
+            onResult = { /* L'interface de Jetpack Compose se mettra à jour toute seule */ }
+        )
+        val backgroundPermissionLabel = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+            runCatching { ctx.packageManager.backgroundPermissionOptionLabel.toString() }.getOrNull()
+        } else {
+            null
+        }
+
+        // L'état qui permet à l'interface de se mettre à jour toute seule
+        var isBgLocationGranted by remember {
+            mutableStateOf(
+                androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            )
+        }
+
+        // On écoute le retour sur l'application pour revérifier la permission instantanément
+        val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+        androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
+            val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+                if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                    isBgLocationGranted = androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                }
+            }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        }
+
+        androidx.compose.animation.AnimatedVisibility(
+            visible = !isBgLocationGranted,
+            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.expandVertically(),
+            exit = androidx.compose.animation.fadeOut() + androidx.compose.animation.shrinkVertically()
+        ) {
+            Column {
+                PreferenceActionCard(
+                    title = stringResource(R.string.appstrings_bg_location_perm_title),
+                    desc = buildString {
+                        append(stringResource(R.string.appstrings_bg_location_perm_desc))
+                        if (!backgroundPermissionLabel.isNullOrBlank()) {
+                            append('\n')
+                            append(backgroundPermissionLabel)
+                        }
+                    },
+                    onClick = {
+                        // Trouver la VRAIE activité (on déballe le contexte de Compose pour réparer
+                        // le bug de redirection).
+                        var currentContext: Context = ctx
+                        while (currentContext is android.content.ContextWrapper && currentContext !is android.app.Activity) {
+                            currentContext = currentContext.baseContext
+                        }
+                        val activity = currentContext as? android.app.Activity
+                        val hasFineLocation = androidx.core.content.ContextCompat.checkSelfPermission(
+                            ctx,
+                            android.Manifest.permission.ACCESS_FINE_LOCATION
+                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                        val hasCoarseLocation = androidx.core.content.ContextCompat.checkSelfPermission(
+                            ctx,
+                            android.Manifest.permission.ACCESS_COARSE_LOCATION
+                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+                        if (!hasFineLocation && !hasCoarseLocation) {
+                            activity?.requestPermissions(
+                                arrayOf(
+                                    android.Manifest.permission.ACCESS_FINE_LOCATION,
+                                    android.Manifest.permission.ACCESS_COARSE_LOCATION
+                                ),
+                                1005
+                            )
+                            return@PreferenceActionCard
+                        }
+
+                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", ctx.packageName, null)
+                                // FLAG_ACTIVITY_NEW_TASK : LocalContext est le contexte localisé (LocaleProvider),
+                                // pas une Activity → sans ce flag, l'ouverture des réglages échoue silencieusement sur OnePlus.
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            }
+                            runCatching { ctx.startActivity(intent) }
+                            return@PreferenceActionCard
+                        }
+
+                        // Analyser l'état de la permission
+                        val shouldShowRationale = activity?.shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) ?: false
+                        val alreadyAsked = prefs.getBoolean("bg_loc_asked", false)
+
+                        // Si on a déjà demandé, que l'OS refuse d'afficher l'alerte, ET qu'on a bien trouvé l'activité
+                        if (alreadyAsked && !shouldShowRationale && activity != null) {
+                            // Plan B : le blocage est total (« Ne plus demander » coché), on ouvre les paramètres globaux
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                                data = Uri.fromParts("package", ctx.packageName, null)
+                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) // idem : contexte localisé sans Activity
+                            }
+                            ctx.startActivity(intent)
+                        } else {
+                            // Plan A : ouvre le sous-menu « Position » d'Android
+                            prefs.edit().putBoolean("bg_loc_asked", true).apply()
+                            bgLocationLauncher.launch(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+                        }
+                    },
+                    shape = shape, border = border, bubbleColor = MaterialTheme.colorScheme.errorContainer, useOneUi = useOneUi, safeClick = safeClick,
+                    icon = Icons.Default.Place
+                )
+                Spacer(Modifier.height(sizing.spacing(12.dp)))
+            }
+        }
+    }
+
     Surface(
         onClick = { safeClick("system_diagnostic") { onOpenDiagnostic() } },
         shape = shape,
@@ -2803,7 +3200,6 @@ fun SectionSysteme(
 
 @Composable
 fun SectionDatabase(
-    isWideScreen: Boolean,
     shape: Shape,
     bubbleColor: Color,
     useOneUi: Boolean,
@@ -2811,19 +3207,13 @@ fun SectionDatabase(
     scope: kotlinx.coroutines.CoroutineScope,
     context: Context,
     modifier: Modifier = Modifier,
-    offlineMapsModifier: Modifier = Modifier,
-    viewportTop: Float = Float.NaN,
-    viewportBottom: Float = Float.NaN,
-    scrollValue: Int = 0,
-    scrollMaxValue: Int = 0,
-    targetMapFilename: String? = null,
-    onTargetMapPositioned: (Float, Int) -> Unit = { _, _ -> },
-    onOfflineMapsExpandedChange: (Boolean) -> Unit = {},
-    localDbBuildModifier: Modifier = Modifier
+    onLocalMode: () -> Unit = {},
+    onOutageSource: () -> Unit = {},
+    safeClick: SafeClick,
+    databaseCardModifiers: Map<String, Modifier> = emptyMap()
 ) {
-    var showResetDialog by remember { mutableStateOf(false) }
-    val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
     val sizing = LocalGeoTowerUiStyle.current.sizing
+    fun cardAnchor(anchor: String): Modifier = databaseCardModifiers[anchor] ?: Modifier
 
     // On génère la bordure si on n'est pas en OneUI
     val border = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
@@ -2832,26 +3222,43 @@ fun SectionDatabase(
     Column(modifier = modifier.fillMaxWidth()) {
         SectionTitle(stringResource(R.string.settings_section_database))
 
-        fr.geotower.ui.components.DatabaseDownloadCard(
-            useOneUi = useOneUi,
-            shape = shape,
-            border = border,
-            bubbleColor = bubbleColor,
-            title = stringResource(R.string.settings_database_online_title)
-        )
+        Box(modifier = cardAnchor(ANCHOR_DB_MOBILE).fillMaxWidth()) {
+            fr.geotower.ui.components.DatabaseDownloadCard(
+                useOneUi = useOneUi,
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                title = stringResource(R.string.settings_database_online_title)
+            )
+        }
 
         Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
-        fr.geotower.ui.components.RadioDatabaseDownloadCard(
-            useOneUi = useOneUi,
-            shape = shape,
-            border = border,
-            bubbleColor = bubbleColor
-        )
+        Box(modifier = cardAnchor(ANCHOR_DB_RADIO).fillMaxWidth()) {
+            fr.geotower.ui.components.RadioDatabaseDownloadCard(
+                useOneUi = useOneUi,
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor
+            )
+        }
 
         Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
-        Box(modifier = localDbBuildModifier.fillMaxWidth()) {
+        // Identifiants eNB/gNB : donnée du partenaire eNB-Analytics, pas de l'ANFR — d'où
+        // l'attribution portée par la carte elle-même.
+        Box(modifier = cardAnchor(ANCHOR_DB_ENB).fillMaxWidth()) {
+            fr.geotower.ui.components.EnbDatabaseDownloadCard(
+                useOneUi = useOneUi,
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor
+            )
+        }
+
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+        Box(modifier = cardAnchor(ANCHOR_DB_LOCAL_BUILD).fillMaxWidth()) {
             fr.geotower.ui.components.LocalDbBuildCard(
                 useOneUi = useOneUi,
                 shape = shape,
@@ -2859,34 +3266,54 @@ fun SectionDatabase(
                 bubbleColor = bubbleColor
             )
         }
-    }
 
-    Spacer(modifier = Modifier.height(sizing.spacing(16.dp))) // Espace entre les deux cartes
+        // Provenance des données : ces deux écrans décident d'où viennent la base et les sites HS,
+        // ils appartiennent donc à cette section (et non plus « entre deux sections »).
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
-    // 🚀 NOUVEAU : LA CARTE DES CARTES HORS-LIGNE
-    Box(modifier = offlineMapsModifier.fillMaxWidth()) {
-        fr.geotower.ui.components.MapDownloadCard(
-            useOneUi = useOneUi,
+        PreferenceActionCard(
+            title = stringResource(R.string.local_mode_settings_title),
+            desc = stringResource(R.string.local_mode_settings_desc),
+            onClick = onLocalMode,
             shape = shape,
             border = border,
             bubbleColor = bubbleColor,
-            viewportTop = viewportTop,
-            viewportBottom = viewportBottom,
-            scrollValue = scrollValue,
-            scrollMaxValue = scrollMaxValue,
-            targetMapFilename = targetMapFilename,
-            onTargetMapPositioned = onTargetMapPositioned,
-            onExpandedChange = onOfflineMapsExpandedChange
+            useOneUi = useOneUi,
+            safeClick = safeClick
+        )
+
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+        PreferenceActionCard(
+            title = stringResource(R.string.outage_source_settings_title),
+            desc = stringResource(R.string.outage_source_settings_desc),
+            onClick = onOutageSource,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick
         )
     }
 
-    if (!isWideScreen) {
-        Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
-        TextButton(onClick = { showResetDialog = true }, modifier = Modifier.fillMaxWidth()) {
-            Icon(imageVector = Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-            Spacer(Modifier.width(8.dp))
-            Text(text = stringResource(R.string.settings_reset), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
-        }
+}
+
+/**
+ * Réinitialisation globale des réglages. Elle ne dépend d'aucune section : sur téléphone en page
+ * unique elle clôt la liste, ailleurs elle vit à côté de la navigation (barre latérale des
+ * tablettes, accueil par sections).
+ */
+@Composable
+private fun SettingsResetButton(shape: Shape, modifier: Modifier = Modifier) {
+    val context = LocalContext.current
+    val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    var showResetDialog by remember { mutableStateOf(false) }
+
+    TextButton(onClick = { showResetDialog = true }, modifier = modifier.fillMaxWidth()) {
+        Icon(imageVector = Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.error)
+        Spacer(Modifier.width(sizing.spacing(8.dp)))
+        Text(text = stringResource(R.string.settings_reset), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.error)
     }
 
     if (showResetDialog) {
@@ -3234,7 +3661,7 @@ fun NavigationMenuItem(title: String, icon: ImageVector, isSelected: Boolean, is
 }
 
 @Composable
-private fun NavigationModeOption(
+internal fun NavigationModeOption(
     title: String,
     desc: String,
     isSelected: Boolean,
@@ -3387,13 +3814,207 @@ fun IconSheet(
 }
 
 
+/**
+ * Entrées qui ne sont pas des réglages d'une section : deux journaux (photos favorites, historique
+ * des partages) et un méta-réglage qui sauvegarde tous les autres (profils). Rendues à l'identique
+ * sur l'accueil par sections et en fin de page unique ; la barre latérale des tablettes a ses
+ * propres lignes.
+ */
 @Composable
-fun SettingsTopBar(onBack: () -> Unit) {
-    GeoTowerBackTopBar(
-        title = stringResource(R.string.nav_settings),
-        onBack = onBack,
-        backgroundColor = MaterialTheme.colorScheme.background
-    )
+private fun SettingsDirectEntries(
+    onPhotosFavorites: () -> Unit,
+    onPhotoUploadHistory: () -> Unit,
+    onShareHistory: () -> Unit,
+    onPreferenceProfiles: () -> Unit,
+    shape: Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
+    useOneUi: Boolean,
+    safeClick: SafeClick
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Column(modifier = Modifier.fillMaxWidth()) {
+        PreferenceActionCard(
+            title = stringResource(R.string.photos_favorites_title),
+            desc = stringResource(R.string.photos_favorites_desc),
+            onClick = onPhotosFavorites,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick,
+            icon = Icons.Default.PhotoLibrary
+        )
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
+        PreferenceActionCard(
+            title = stringResource(R.string.appstrings_upload_history_title),
+            desc = stringResource(R.string.upload_history_card_desc),
+            onClick = onPhotoUploadHistory,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick,
+            icon = Icons.Default.History
+        )
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
+        PreferenceActionCard(
+            title = stringResource(R.string.share_history_title),
+            desc = stringResource(R.string.share_history_desc),
+            onClick = onShareHistory,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick,
+            icon = Icons.Default.Share
+        )
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
+        PreferenceActionCard(
+            title = stringResource(R.string.preference_profiles_title),
+            desc = stringResource(R.string.preference_profiles_card_desc),
+            onClick = onPreferenceProfiles,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick
+        )
+    }
+}
+
+/**
+ * Accueil des réglages sur téléphone : un bouton par section plutôt que la longue page unique.
+ * La bascule « tout sur une page » est dans la barre du haut et au bas de cet accueil.
+ */
+@Composable
+private fun SettingsSectionsHome(
+    sections: List<Triple<String, ImageVector, Int>>,
+    onSectionClick: (Int) -> Unit,
+    onShowAll: () -> Unit,
+    onPhotosFavorites: () -> Unit,
+    onPhotoUploadHistory: () -> Unit,
+    onShareHistory: () -> Unit,
+    onPreferenceProfiles: () -> Unit,
+    shape: Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
+    useOneUi: Boolean,
+    safeClick: SafeClick
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(
+            text = stringResource(R.string.settings_sections_home_subtitle),
+            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp))
+        )
+        sections.forEach { (title, icon, index) ->
+            SettingsSectionsHomeCard(
+                title = title,
+                desc = settingsSectionDescription(index),
+                icon = icon,
+                onClick = { onSectionClick(index) },
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                useOneUi = useOneUi,
+                safeClick = safeClick
+            )
+            Spacer(Modifier.height(sizing.spacing(12.dp)))
+        }
+        HorizontalDivider(
+            modifier = Modifier.padding(vertical = sizing.spacing(4.dp)),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+        )
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
+        SettingsDirectEntries(
+            onPhotosFavorites = onPhotosFavorites,
+            onPhotoUploadHistory = onPhotoUploadHistory,
+            onShareHistory = onShareHistory,
+            onPreferenceProfiles = onPreferenceProfiles,
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi,
+            safeClick = safeClick
+        )
+        Spacer(Modifier.height(sizing.spacing(8.dp)))
+        TextButton(onClick = onShowAll, modifier = Modifier.fillMaxWidth()) {
+            Icon(
+                imageVector = Icons.Outlined.ViewAgenda,
+                contentDescription = null,
+                modifier = Modifier.size(sizing.component(20.dp))
+            )
+            Spacer(Modifier.width(sizing.spacing(8.dp)))
+            Text(
+                text = stringResource(R.string.settings_navigation_scroll_desc),
+                style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                fontWeight = FontWeight.Bold
+            )
+        }
+        SettingsResetButton(shape = shape)
+    }
+}
+
+/** Résumé de ce que contient chaque section, affiché sous son nom sur l'accueil des réglages. */
+@Composable
+private fun settingsSectionDescription(section: Int): String = when (section) {
+    SECTION_APPEARANCE -> stringResource(R.string.settings_hub_appearance_desc)
+    SECTION_MAPPING -> stringResource(R.string.settings_hub_mapping_desc)
+    SECTION_PREFERENCES -> stringResource(R.string.settings_hub_preferences_desc)
+    SECTION_BACKGROUND -> stringResource(R.string.settings_hub_background_desc)
+    SECTION_SYSTEM -> stringResource(R.string.settings_hub_system_desc)
+    else -> stringResource(R.string.settings_hub_database_desc)
+}
+
+@Composable
+private fun SettingsSectionsHomeCard(
+    title: String,
+    desc: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    shape: Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
+    useOneUi: Boolean,
+    safeClick: SafeClick
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val cardBg = if (useOneUi) bubbleColor else Color.Transparent
+    Surface(
+        onClick = { safeClick("settings_section_$title") { onClick() } },
+        shape = shape,
+        border = border,
+        color = cardBg,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(sizing.component(26.dp))
+            )
+            Spacer(Modifier.width(sizing.spacing(16.dp)))
+            Column(Modifier.weight(1f)) {
+                Text(title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                Text(
+                    text = desc,
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Spacer(Modifier.width(sizing.spacing(8.dp)))
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(sizing.component(24.dp))
+            )
+        }
+    }
 }
 
 @Composable

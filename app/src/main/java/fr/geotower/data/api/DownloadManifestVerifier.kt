@@ -17,6 +17,7 @@ data class DownloadManifest(
     val expiresAt: Long,
     val database: DownloadManifestDatabase?,
     val radioDatabase: DownloadManifestDatabase?,
+    val enbDatabase: DownloadManifestDatabase?,
     val maps: List<OfflineMapDto>
 )
 
@@ -66,6 +67,8 @@ object DownloadManifestVerifier {
             expiresAt = expiresAt,
             database = payload.get("db").asJsonObjectOrNull()?.toDatabase(),
             radioDatabase = payload.get("radio_db").asJsonObjectOrNull()?.toDatabase(),
+            // Absent du manifeste = base eNB coupee cote serveur (kill-switch partenaire).
+            enbDatabase = payload.get("enb_db").asJsonObjectOrNull()?.toDatabase(),
             maps = payload.get("maps")
                 ?.takeIf { it.isJsonArray }
                 ?.asJsonArray

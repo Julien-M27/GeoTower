@@ -24,7 +24,11 @@ import androidx.compose.ui.graphics.StrokeCap
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.components.GeoTowerBreadcrumbItem
 import fr.geotower.ui.components.GeoTowerNavigationBreadcrumbBar
+import androidx.compose.foundation.layout.Box
+import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.geoTowerFadingEdge
+import fr.geotower.ui.components.pageScrollbar
+import fr.geotower.utils.PageScrollPrefs
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.Share
@@ -82,6 +86,7 @@ import fr.geotower.ui.components.SharedMiniMapCard
 import fr.geotower.ui.components.TheoreticalCoverageShareGenerator
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.map.TheoreticalCoverageOverlay
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppLogger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -128,6 +133,7 @@ fun TheoreticalCoverageScreen(
         MaterialTheme.colorScheme.surfaceContainerLow
     }
     val blockShape = RoundedCornerShape(if (useOneUi) 24.dp else 12.dp)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     var site by remember { mutableStateOf<LocalisationEntity?>(null) }
     var antennaRows by remember { mutableStateOf<List<CoverageAntennaRow>>(emptyList()) }
@@ -289,14 +295,15 @@ fun TheoreticalCoverageScreen(
         }
     ) { padding ->
         val scrollState = rememberScrollState()
+        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
         Column(
             modifier = Modifier
-                .padding(padding)
                 .fillMaxSize()
                 .geoTowerFadingEdge(scrollState)
+                .pageScrollbar(PageScrollPrefs.COVERAGE, scrollState)
                 .verticalScroll(scrollState)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(sizing.spacing(16.dp)),
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
         ) {
             // La mini-carte n'est créée QU'UNE FOIS le site chargé : sinon son AndroidView est créé
             // avec un centre placeholder (milieu de la France) et ne se recentre jamais → site/résultat hors écran.
@@ -305,7 +312,7 @@ fun TheoreticalCoverageScreen(
                 androidx.compose.foundation.layout.Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(300.dp),
+                        .height(sizing.component(300.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     androidx.compose.material3.CircularProgressIndicator()
@@ -314,7 +321,7 @@ fun TheoreticalCoverageScreen(
                 SharedMiniMapCard(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(300.dp),
+                        .height(sizing.component(300.dp)),
                     centerLat = loadedSite.latitude,
                     centerLon = loadedSite.longitude,
                     mappedAntennas = listOf(loadedSite),
@@ -337,8 +344,8 @@ fun TheoreticalCoverageScreen(
                 colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = cardBgColor)
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.padding(sizing.spacing(16.dp)),
+                    verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
                 ) {
                     Text(
                         "${stringResource(R.string.appstrings_coverage_quality)} · ≈ $estimatedRequests req",
@@ -360,7 +367,7 @@ fun TheoreticalCoverageScreen(
                             enabled = !isLoading,
                             useOneUi = useOneUi
                         )
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(sizing.spacing(8.dp)))
                         Text(stringResource(R.string.appstrings_coverage_obstacles))
                     }
 
@@ -369,7 +376,7 @@ fun TheoreticalCoverageScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
                     ) {
                         frequencies.forEach { f ->
                             FilterChip(
@@ -398,7 +405,7 @@ fun TheoreticalCoverageScreen(
                         enabled = !isLoading && site != null,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(56.dp),
+                            .height(sizing.component(56.dp)),
                         shape = oneUiActionButtonShape(useOneUi),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = MaterialTheme.colorScheme.primary,
@@ -447,8 +454,8 @@ fun TheoreticalCoverageScreen(
                 colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = cardBgColor)
             ) {
                 Column(
-                    modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                    modifier = Modifier.padding(sizing.spacing(16.dp)),
+                    verticalArrangement = Arrangement.spacedBy(sizing.spacing(6.dp))
                 ) {
                     Text(
                         "${stringResource(R.string.appstrings_coverage_antennas_detected)} (${antennaRows.size})",
@@ -474,7 +481,7 @@ fun TheoreticalCoverageScreen(
                     onClick = { shareCoverage() },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(56.dp),
+                        .height(sizing.component(56.dp)),
                     shape = oneUiActionButtonShape(useOneUi),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -482,8 +489,8 @@ fun TheoreticalCoverageScreen(
                     )
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(24.dp))
-                        Spacer(Modifier.width(12.dp))
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
+                        Spacer(Modifier.width(sizing.spacing(12.dp)))
                         Text(stringResource(R.string.appstrings_coverage_share), fontWeight = FontWeight.Bold)
                     }
                 }
@@ -491,9 +498,11 @@ fun TheoreticalCoverageScreen(
 
             Text(
                 stringResource(R.string.appstrings_coverage_disclaimer_short),
-                style = MaterialTheme.typography.bodySmall,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+        }
+        PageScrollEdgeButtons(PageScrollPrefs.COVERAGE, scrollState)
         }
     }
 
@@ -567,6 +576,7 @@ private fun CoverageSlider(
     enabled: Boolean,
     onValueChange: (Float) -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     if (!useOneUi) {
         Slider(value = value, onValueChange = onValueChange, valueRange = valueRange, steps = steps, enabled = enabled)
         return
@@ -586,16 +596,17 @@ private fun CoverageSlider(
         thumb = {
             androidx.compose.foundation.layout.Box(
                 modifier = Modifier
-                    .size(22.dp)
+                    .size(sizing.component(22.dp))
                     .background(MaterialTheme.colorScheme.surface, CircleShape)
                     .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
             )
         },
         track = {
-            Canvas(modifier = Modifier.fillMaxWidth().height(12.dp)) {
+            Canvas(modifier = Modifier.fillMaxWidth().height(sizing.component(12.dp))) {
                 val centerY = size.height / 2
-                drawLine(inactiveTrack, Offset(0f, centerY), Offset(size.width, centerY), 10.dp.toPx(), StrokeCap.Round)
-                drawLine(activeTrack, Offset(0f, centerY), Offset(size.width * fraction, centerY), 10.dp.toPx(), StrokeCap.Round)
+                val trackWidth = sizing.component(10.dp).toPx()
+                drawLine(inactiveTrack, Offset(0f, centerY), Offset(size.width, centerY), trackWidth, StrokeCap.Round)
+                drawLine(activeTrack, Offset(0f, centerY), Offset(size.width * fraction, centerY), trackWidth, StrokeCap.Round)
                 val radius = if (tickCount > 52) 0.85.dp.toPx() else 1.15.dp.toPx()
                 val lastIndex = (tickCount - 1).coerceAtLeast(1)
                 for (i in 0 until tickCount) {

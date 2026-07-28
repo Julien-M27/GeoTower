@@ -19,6 +19,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 import fr.geotower.R
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.AppLogoDrawingResources
@@ -34,6 +35,7 @@ fun SplashScreen(
     nextDestination: String
 ) {
     val context = LocalContext.current
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val appTitle = stringResource(R.string.brand_geotower)
     val logoResId by AppIconManager.currentIconRes
     val themeMode by AppConfig.themeMode
@@ -94,39 +96,39 @@ fun SplashScreen(
             DrawableImage(
                 resId = displayLogoResId,
                 contentDescription = stringResource(R.string.common_logo),
-                modifier = Modifier.size(150.dp)
+                modifier = Modifier.size(sizing.component(150.dp))
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
             Text(
                 text = appTitle,
-                style = MaterialTheme.typography.headlineLarge,
+                style = sizing.textStyle(MaterialTheme.typography.headlineLarge),
                 color = MaterialTheme.colorScheme.primary,
                 fontWeight = FontWeight.ExtraBold,
-                fontSize = 32.sp
+                fontSize = sizing.text(32.sp)
             )
 
-            Spacer(modifier = Modifier.height(60.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(60.dp)))
 
             // Loading Indicator Expressive M3 en temps normal, cercle simple en mode faible conso.
             if (fr.geotower.utils.PowerProfile.richAnimations) {
                 LoadingIndicator(
-                    modifier = Modifier.size(48.dp),
+                    modifier = Modifier.size(sizing.component(48.dp)),
                     color = MaterialTheme.colorScheme.primary
                 )
             } else {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(48.dp),
+                    modifier = Modifier.size(sizing.component(48.dp)),
                     color = MaterialTheme.colorScheme.primary
                 )
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
             Text(
                 text = stringResource(R.string.loading_app),
-                style = MaterialTheme.typography.labelLarge,
+                style = sizing.textStyle(MaterialTheme.typography.labelLarge),
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
             )
         }

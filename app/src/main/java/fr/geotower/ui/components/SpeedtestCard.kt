@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import androidx.compose.ui.unit.sp
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.data.api.SignalQuestOperators
@@ -83,32 +84,33 @@ private fun SpeedtestCardContent(
     isLoading: Boolean,
     contentColor: Color
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
 
-    Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+    Column(modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxWidth()) {
 
             // Titre du bloc
             Text(
                 text = stringResource(R.string.appstrings_speedtest_title),
-                style = MaterialTheme.typography.titleMedium,
+                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.padding(bottom = 16.dp)
+                modifier = Modifier.padding(bottom = sizing.spacing(16.dp))
             )
 
             // État 1 : En cours de chargement (Appel API)
             if (isLoading) {
-                Box(modifier = Modifier.fillMaxWidth().height(60.dp), contentAlignment = Alignment.Center) {
-                    LoadingIndicator(modifier = Modifier.size(32.dp))
+                Box(modifier = Modifier.fillMaxWidth().height(sizing.component(60.dp)), contentAlignment = Alignment.Center) {
+                    LoadingIndicator(modifier = Modifier.size(sizing.component(32.dp)))
                 }
             }
             // État 2 : Aucun test de débit trouvé
             else if (speedtestData == null) {
                 Text(
                     text = stringResource(R.string.appstrings_speedtest_no_data),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                     color = contentColor.copy(alpha = 0.7f),
-                    modifier = Modifier.padding(bottom = 8.dp)
+                    modifier = Modifier.padding(bottom = sizing.spacing(8.dp))
                 )
             }
             // État 3 : Données reçues avec succès !
@@ -157,9 +159,9 @@ private fun SpeedtestCardContent(
                         
                         Text(
                             text = "$day $monthName $year",
-                            fontSize = 12.sp,
+                            fontSize = sizing.text(12.sp),
                             color = contentColor.copy(alpha = 0.5f),
-                            modifier = Modifier.padding(top = 12.dp).align(Alignment.End)
+                            modifier = Modifier.padding(top = sizing.spacing(12.dp)).align(Alignment.End)
                         )
                     }
                 }
@@ -170,12 +172,13 @@ private fun SpeedtestCardContent(
 // Petit sous-composant privé pour éviter de dupliquer le code des 3 colonnes
 @Composable
 private fun SpeedStatColumn(icon: ImageVector, label: String, value: String, unit: String, color: Color) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(imageVector = icon, contentDescription = label, tint = color, modifier = Modifier.size(28.dp))
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(text = value, fontWeight = FontWeight.Bold, fontSize = 18.sp)
-        Text(text = unit, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), fontWeight = FontWeight.Medium)
-        Spacer(modifier = Modifier.height(2.dp))
-        Text(text = label, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Icon(imageVector = icon, contentDescription = label, tint = color, modifier = Modifier.size(sizing.component(28.dp)))
+        Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
+        Text(text = value, fontWeight = FontWeight.Bold, fontSize = sizing.text(18.sp))
+        Text(text = unit, fontSize = sizing.text(10.sp), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), fontWeight = FontWeight.Medium)
+        Spacer(modifier = Modifier.height(sizing.spacing(2.dp)))
+        Text(text = label, fontSize = sizing.text(11.sp), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

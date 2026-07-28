@@ -11,6 +11,8 @@ object DownloadNotificationCenter {
     const val DB_DOWNLOAD_RESULT_NOTIFICATION_ID = 2102
     const val RADIO_DB_DOWNLOAD_PROGRESS_NOTIFICATION_ID = 2111
     const val RADIO_DB_DOWNLOAD_RESULT_NOTIFICATION_ID = 2112
+    const val ENB_DB_DOWNLOAD_PROGRESS_NOTIFICATION_ID = 2121
+    const val ENB_DB_DOWNLOAD_RESULT_NOTIFICATION_ID = 2122
     const val MAP_DOWNLOAD_CHANNEL_ID = "map_download_channel"
 
     private const val PREFS_NAME = "GeoTowerPrefs"
@@ -57,6 +59,7 @@ object DownloadNotificationCenter {
         manager.cancel(DB_UPDATE_AVAILABLE_NOTIFICATION_ID)
         manager.cancel(DB_DOWNLOAD_RESULT_NOTIFICATION_ID)
         manager.cancel(RADIO_DB_DOWNLOAD_RESULT_NOTIFICATION_ID)
+        manager.cancel(ENB_DB_DOWNLOAD_RESULT_NOTIFICATION_ID)
     }
 
     fun clearOfflineMapNotifications(context: Context, mapFilename: String) {

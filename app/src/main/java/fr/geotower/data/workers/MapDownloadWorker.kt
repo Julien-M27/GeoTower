@@ -69,7 +69,7 @@ class MapDownloadWorker(
         val resultNotifId = DownloadNotificationCenter.mapDownloadResultNotificationId(mapFilename)
         DownloadNotificationCenter.rememberMapDownloadNotification(applicationContext, mapFilename)
 
-        if (!startForegroundOrRetry(mapDisplayName, progressNotifId)) {
+        if (!startForegroundOrRetry(mapFilename, mapDisplayName, progressNotifId)) {
             setProgress(workDataOf("error" to "foreground_unavailable"))
             return@withContext Result.retry()
         }
@@ -138,7 +138,7 @@ class MapDownloadWorker(
                                 if (progress > lastProgress) {
                                     lastProgress = progress
                                     setProgress(workDataOf("state" to "DOWNLOADING", "progress" to progress))
-                                    notificationManager.notify(progressNotifId, createNotification(progress, mapDisplayName, progressNotifId))
+                                    notificationManager.notify(progressNotifId, createNotification(progress, mapFilename, mapDisplayName, progressNotifId))
                                 }
                             }
 
@@ -212,9 +212,9 @@ class MapDownloadWorker(
         return availableBytes > requiredBytes
     }
 
-    private suspend fun startForegroundOrRetry(mapDisplayName: String, progressNotifId: Int): Boolean {
+    private suspend fun startForegroundOrRetry(mapFilename: String, mapDisplayName: String, progressNotifId: Int): Boolean {
         return try {
-            setForeground(createForegroundInfo(0, mapDisplayName, progressNotifId))
+            setForeground(createForegroundInfo(0, mapFilename, mapDisplayName, progressNotifId))
             true
         } catch (e: CancellationException) {
             throw e
@@ -224,8 +224,8 @@ class MapDownloadWorker(
         }
     }
 
-    private fun createForegroundInfo(progress: Int, mapName: String, notifId: Int): ForegroundInfo {
-        val notification = createNotification(progress, mapName, notifId)
+    private fun createForegroundInfo(progress: Int, mapFilename: String, mapName: String, notifId: Int): ForegroundInfo {
+        val notification = createNotification(progress, mapFilename, mapName, notifId)
 
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             ForegroundInfo(notifId, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
@@ -234,12 +234,14 @@ class MapDownloadWorker(
         }
     }
 
-    private fun createNotification(progress: Int, mapName: String, notifId: Int): Notification {
+    private fun createNotification(progress: Int, mapFilename: String, mapName: String, notifId: Int): Notification {
         DownloadNotificationCenter.rememberMapDownloadNotification(applicationContext, notifId)
 
         ensureNotificationChannel()
 
-        val pendingIntent = createOfflineMapsPendingIntent(notifId)
+        // On passe le fichier visé : le clic doit arriver sur la carte en cours de téléchargement,
+        // pas seulement sur le bloc « cartes hors ligne ».
+        val pendingIntent = createOfflineMapsPendingIntent(notifId, mapFilename)
         val title = applicationContext.getString(R.string.notification_map_download_title, mapName)
         val content = applicationContext.getString(R.string.notification_map_download_progress, progress)
         val cancelLabel = applicationContext.getString(R.string.appstrings_download_cancel)

@@ -24,6 +24,9 @@ object DbOperationTimings {
     /** Base radio telechargee ([fr.geotower.data.workers.RadioDatabaseDownloadWorker]). */
     const val RADIO_DOWNLOAD = "db_radio_download"
 
+    /** Base des identifiants eNB/gNB ([fr.geotower.data.workers.EnbDatabaseDownloadWorker]). */
+    const val ENB_DOWNLOAD = "db_enb_download"
+
     /** Generation locale ([fr.geotower.data.workers.LocalDbBuildWorker]), mobile et/ou radio en une passe. */
     const val LOCAL_BUILD = "db_local_build"
 

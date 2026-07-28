@@ -136,16 +136,7 @@ class DatabaseDownloadWorker(
         val content = context.getString(R.string.notification_database_download_progress, progress)
 
         // ✅ AJOUT : Intent pour ouvrir les paramètres DB au clic
-        val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            data = android.net.Uri.parse("geotower://settings?section=database")
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            context,
-            0,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val pendingIntent = settingsPendingIntent(0, showSuccessPopup = false)
         val cancelLabel = context.getString(R.string.appstrings_download_cancel)
         val cancelIntent = WorkManager.getInstance(context).createCancelPendingIntent(id)
         val actionIconRes = NotificationIconResources.smallIconRes(context)
@@ -205,18 +196,7 @@ class DatabaseDownloadWorker(
     }
 
     private fun showSuccessNotification() {
-        val intent = Intent(context, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            data = android.net.Uri.parse("geotower://settings?section=database")
-            putExtra("SHOW_DB_SUCCESS_POPUP", true)
-        }
-
-        val pendingIntent = PendingIntent.getActivity(
-            context,
-            0,
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        val pendingIntent = settingsPendingIntent(1, showSuccessPopup = true)
 
         val title = context.getString(R.string.notification_database_downloaded_title)
         val content = context.getString(R.string.notification_database_downloaded_content)
@@ -243,6 +223,27 @@ class DatabaseDownloadWorker(
             .let { NotificationIconResources.applyTo(it, context) }
             .build()
         notifySafely(DownloadNotificationCenter.DB_DOWNLOAD_RESULT_NOTIFICATION_ID, notification)
+    }
+
+    /**
+     * Cible la carte « base de données mobile » précisément, pas seulement le haut de la section
+     * « Base de données » (les cartes radio / eNB / génération locale ont leurs propres ancres).
+     * Le `requestCode` distingue la notif de progression de celle de fin : sans ça les deux
+     * PendingIntent se confondraient (les extras ne comptent pas dans `filterEquals`) et le clic
+     * sur la progression ouvrirait la popup de succès.
+     */
+    private fun settingsPendingIntent(requestCode: Int, showSuccessPopup: Boolean): PendingIntent {
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            data = android.net.Uri.parse("geotower://settings?section=db_mobile")
+            if (showSuccessPopup) putExtra("SHOW_DB_SUCCESS_POPUP", true)
+        }
+        return PendingIntent.getActivity(
+            context,
+            requestCode,
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 
     companion object {

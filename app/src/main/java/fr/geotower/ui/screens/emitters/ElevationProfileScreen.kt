@@ -87,14 +87,18 @@ import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.TechniqueEntity
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.ui.components.GeoTowerBreadcrumbItem
 import fr.geotower.ui.components.GeoTowerNavigationBreadcrumbBar
 import fr.geotower.ui.components.GeoTowerSwitch
+import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.geoTowerFadingEdge
+import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.OperatorLogos
 import fr.geotower.utils.formatTechnologies
 import fr.geotower.utils.isNetworkAvailable
@@ -127,6 +131,7 @@ fun ElevationProfileScreen(
     onCloseSplitScreen: () -> Unit = {}
 ) {
     SecureScreenEffect(RemoteFeatureFlags.SecureScreens.ELEVATION_PROFILE)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
@@ -381,7 +386,7 @@ fun ElevationProfileScreen(
             .fillMaxSize()
             .background(mainBgColor)
             .navigationBarsPadding()
-            .padding(16.dp)
+            .padding(sizing.spacing(16.dp))
 
         val isOfflineProfileError = profileError == PROFILE_ERROR_OFFLINE
         val isPendingProfileError = profileError == PROFILE_ERROR_OFFLINE_PENDING
@@ -455,11 +460,14 @@ fun ElevationProfileScreen(
                 )
             }
             profile != null -> {
+                Box(modifier = contentModifier) {
                 Column(
-                    modifier = contentModifier
+                    modifier = Modifier
+                        .fillMaxSize()
                         .geoTowerFadingEdge(scrollState)
+                        .pageScrollbar(PageScrollPrefs.ELEVATION_PROFILE, scrollState)
                         .verticalScroll(scrollState),
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
                 ) {
                     val frequency = selectedFrequencyMHz ?: DEFAULT_ELEVATION_PROFILE_FREQUENCY_MHZ
                     val selectedAntennaHeight = antennaHeightsByFrequency[frequency]
@@ -483,13 +491,13 @@ fun ElevationProfileScreen(
                         shape = blockShape,
                         colors = CardDefaults.cardColors(containerColor = cardBgColor)
                     ) {
-                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Column(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Icon(Icons.Default.Terrain, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                                Spacer(Modifier.width(12.dp))
+                                Spacer(Modifier.width(sizing.spacing(12.dp)))
                                 Text(
                                     text = "${stringResource(R.string.appstrings_elevation_profile_distance)} ${formatElevationProfileDistance(profile!!.distanceMeters)}",
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onSurface
                                 )
@@ -512,13 +520,13 @@ fun ElevationProfileScreen(
                             if (includeObstacles && !profile!!.obstaclesIncluded) {
                                 Text(
                                     text = stringResource(R.string.appstrings_elevation_profile_obstacles_unavailable),
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                                     color = MaterialTheme.colorScheme.error
                                 )
                             } else if (profile!!.obstaclesIncluded) {
                                 Text(
                                     text = stringResource(R.string.appstrings_elevation_profile_obstacles_active),
-                                    style = MaterialTheme.typography.bodySmall,
+                                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
@@ -528,7 +536,7 @@ fun ElevationProfileScreen(
                                 frequencyMHz = frequency,
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .height(260.dp)
+                                    .height(sizing.component(260.dp))
                             )
                         }
                     }
@@ -543,6 +551,8 @@ fun ElevationProfileScreen(
                         cardBgColor = cardBgColor,
                         blockShape = blockShape
                     )
+                }
+                PageScrollEdgeButtons(PageScrollPrefs.ELEVATION_PROFILE, scrollState)
                 }
             }
             else -> {
@@ -607,6 +617,7 @@ private fun ElevationProfileOperatorBanner(
     bgColor: Color,
     shape: RoundedCornerShape
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val unknown = stringResource(R.string.appstrings_unknown)
     val operatorName = site.operateur?.trim()?.takeIf { it.isNotEmpty() } ?: unknown
     val operatorColor = OperatorColors.keyFor(operatorName)
@@ -626,7 +637,7 @@ private fun ElevationProfileOperatorBanner(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
+                .padding(sizing.spacing(16.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (logoRes != null) {
@@ -634,13 +645,13 @@ private fun ElevationProfileOperatorBanner(
                     painter = painterResource(id = logoRes),
                     contentDescription = null,
                     modifier = Modifier
-                        .size(72.dp)
+                        .size(sizing.component(72.dp))
                         .clip(RoundedCornerShape(8.dp))
                 )
             } else {
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
+                        .size(sizing.component(72.dp))
                         .background(operatorColor, RoundedCornerShape(8.dp)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -648,34 +659,34 @@ private fun ElevationProfileOperatorBanner(
                         text = operatorName.take(1).uppercase().ifBlank { "?" },
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 26.sp
+                        fontSize = sizing.text(26.sp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(16.dp)))
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = operatorName,
-                    style = MaterialTheme.typography.titleLarge,
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                     fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
                 Text(
                     text = technologies,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
                 Text(
                     text = "ANFR ${site.idAnfr}",
-                    style = MaterialTheme.typography.labelMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.labelMedium),
                     color = operatorColor,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -695,25 +706,26 @@ private fun ProfileLoadingCard(
     shape: RoundedCornerShape,
     modifier: Modifier
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Card(
         modifier = modifier,
         shape = shape,
         colors = CardDefaults.cardColors(containerColor = bgColor)
     ) {
         Column(
-            modifier = Modifier.fillMaxSize().padding(24.dp),
+            modifier = Modifier.fillMaxSize().padding(sizing.spacing(24.dp)),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            LoadingIndicator(modifier = Modifier.size(56.dp))
-            Spacer(Modifier.height(16.dp))
+            LoadingIndicator(modifier = Modifier.size(sizing.component(56.dp)))
+            Spacer(Modifier.height(sizing.spacing(16.dp)))
             Text(
                 message,
                 color = MaterialTheme.colorScheme.onSurface,
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(sizing.spacing(12.dp)))
             Text(
                 detail,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -734,6 +746,7 @@ private fun ProfileMessageCard(
     actionLabel: String? = null,
     onActionClick: (() -> Unit)? = null
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Card(
         modifier = modifier,
         shape = shape,
@@ -742,7 +755,7 @@ private fun ProfileMessageCard(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(24.dp),
+                .padding(sizing.spacing(24.dp)),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -751,9 +764,9 @@ private fun ProfileMessageCard(
                     imageVector = icon,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.size(48.dp)
+                    modifier = Modifier.size(sizing.component(48.dp))
                 )
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(sizing.spacing(16.dp)))
             }
             Text(
                 message,
@@ -762,7 +775,7 @@ private fun ProfileMessageCard(
                 textAlign = TextAlign.Center
             )
             if (!detail.isNullOrBlank()) {
-                Spacer(Modifier.height(12.dp))
+                Spacer(Modifier.height(sizing.spacing(12.dp)))
                 Text(
                     detail,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -770,7 +783,7 @@ private fun ProfileMessageCard(
                 )
             }
             if (actionLabel != null && onActionClick != null) {
-                Spacer(Modifier.height(20.dp))
+                Spacer(Modifier.height(sizing.spacing(20.dp)))
                 Button(onClick = onActionClick) {
                     Text(actionLabel)
                 }
@@ -790,6 +803,7 @@ private fun ProfileStatsCard(
     cardBgColor: Color,
     blockShape: RoundedCornerShape
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
     val gpsCopyLabel = stringResource(R.string.appstrings_gps_coords_copy)
     val coordsCopied = stringResource(R.string.appstrings_coords_copied)
@@ -799,7 +813,7 @@ private fun ProfileStatsCard(
         shape = blockShape,
         colors = CardDefaults.cardColors(containerColor = cardBgColor)
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
             val startHeightMeters = profile.points.first().elevation + USER_EYE_HEIGHT_METERS
             val arrivalHeightMeters = supportHeight?.let { profile.points.last().elevation + it }
             ProfileInfoRow(
@@ -847,15 +861,15 @@ private fun ProfileStatsCard(
             ProfileInfoColumn(stringResource(R.string.appstrings_elevation_profile_fresnel_label), fresnelStatus)
             Text(
                 text = stringResource(R.string.appstrings_elevation_profile_ign_source),
-                style = MaterialTheme.typography.bodySmall,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 6.dp)
+                modifier = Modifier.padding(top = sizing.spacing(6.dp))
             )
             Text(
                 text = stringResource(R.string.appstrings_elevation_profile_fresnel_explanation),
-                style = MaterialTheme.typography.bodySmall,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = 2.dp)
+                modifier = Modifier.padding(top = sizing.spacing(2.dp))
             )
         }
     }
@@ -863,13 +877,14 @@ private fun ProfileStatsCard(
 
 @Composable
 private fun ProfileInfoRow(label: String, value: String, detail: String? = null) {
-    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Column(modifier = Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(sizing.spacing(3.dp))) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(label, modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(label, modifier = Modifier.weight(1f), style = sizing.textStyle(MaterialTheme.typography.bodyMedium), color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 value,
                 modifier = Modifier.weight(1f),
-                style = MaterialTheme.typography.bodyMedium,
+                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
                 textAlign = TextAlign.End
@@ -878,7 +893,7 @@ private fun ProfileInfoRow(label: String, value: String, detail: String? = null)
         if (!detail.isNullOrBlank()) {
             Text(
                 detail,
-                style = MaterialTheme.typography.bodySmall,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
             )
         }
@@ -887,23 +902,24 @@ private fun ProfileInfoRow(label: String, value: String, detail: String? = null)
 
 @Composable
 private fun ProfileInfoColumn(label: String, value: String, onCopy: (() -> Unit)? = null) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(sizing.spacing(3.dp))) {
+            Text(label, style = sizing.textStyle(MaterialTheme.typography.bodyMedium), color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(
                 value,
-                style = MaterialTheme.typography.bodyMedium,
+                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
         }
         if (onCopy != null) {
-            IconButton(onClick = onCopy, modifier = Modifier.size(32.dp)) {
+            IconButton(onClick = onCopy, modifier = Modifier.size(sizing.component(32.dp))) {
                 Icon(
                     imageVector = Icons.Default.ContentCopy,
                     contentDescription = stringResource(R.string.appstrings_copy),
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(sizing.component(18.dp))
                 )
             }
         }
@@ -916,11 +932,12 @@ private fun FrequencySelector(
     selectedFrequencyMHz: Int,
     onFrequencySelected: (Int) -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
     ) {
         frequencies.forEach { frequency ->
             FilterChip(
@@ -937,24 +954,25 @@ private fun ObstaclesToggle(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(sizing.spacing(3.dp))) {
             Text(
                 text = stringResource(R.string.appstrings_elevation_profile_obstacles_label),
-                style = MaterialTheme.typography.bodyMedium,
+                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                 fontWeight = FontWeight.SemiBold,
                 color = MaterialTheme.colorScheme.onSurface
             )
             Text(
                 text = stringResource(R.string.appstrings_elevation_profile_obstacles_detail),
-                style = MaterialTheme.typography.bodySmall,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Spacer(Modifier.width(12.dp))
+        Spacer(Modifier.width(sizing.spacing(12.dp)))
         GeoTowerSwitch(checked = checked, onCheckedChange = onCheckedChange)
     }
 }

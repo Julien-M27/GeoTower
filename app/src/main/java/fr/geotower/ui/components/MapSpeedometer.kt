@@ -12,12 +12,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import androidx.compose.ui.unit.sp
 import fr.geotower.utils.AppConfig
 import kotlin.math.roundToInt
 
 @Composable
 fun MapSpeedometer(speedKmH: Int, modifier: Modifier = Modifier) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     // 1. On lit le choix de l'utilisateur (0 = km/h, 1 = mph)
     val isMph = AppConfig.speedUnit.intValue == 1
 
@@ -38,10 +40,10 @@ fun MapSpeedometer(speedKmH: Int, modifier: Modifier = Modifier) {
     ) {
         Text(
             text = "$displaySpeed $unitLabel",
-            fontSize = 12.sp,
+            fontSize = sizing.text(12.sp),
             fontWeight = FontWeight.Bold,
             color = Color.Black,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            modifier = Modifier.padding(horizontal = sizing.spacing(8.dp), vertical = sizing.spacing(4.dp))
         )
     }
 }

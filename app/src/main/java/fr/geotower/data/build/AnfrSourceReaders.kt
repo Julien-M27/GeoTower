@@ -89,6 +89,64 @@ object AnfrCsvParser {
         }
     }
 
+    /**
+     * Decoupe `line` directement dans `out` (une case par colonne d'en-tete), sans liste
+     * intermediaire : les champs excedentaires sont ignores et les cases non alimentees restent
+     * nulles — exactement le `cells.getOrNull(index)` de la version precedente.
+     *
+     * PERF : appele une fois par ligne de source, soit des dizaines de millions de fois. Le chemin
+     * rapide (ligne sans guillemet, immense majorite des lignes ANFR) se contente de `indexOf` +
+     * `substring` et evite l'accumulateur caractere par caractere.
+     */
+    internal fun splitInto(line: String, delimiter: Char, out: Array<String?>) {
+        if (out.isEmpty()) return
+        if (line.indexOf('"') < 0) {
+            var start = 0
+            var column = 0
+            while (column < out.size) {
+                val next = line.indexOf(delimiter, start)
+                if (next < 0) {
+                    out[column] = line.substring(start)
+                    return
+                }
+                out[column] = line.substring(start, next)
+                start = next + 1
+                column++
+            }
+            return
+        }
+        val field = StringBuilder()
+        var inQuotes = false
+        var column = 0
+        var index = 0
+        while (index < line.length) {
+            val char = line[index]
+            when {
+                inQuotes -> {
+                    if (char == '"') {
+                        if (index + 1 < line.length && line[index + 1] == '"') {
+                            field.append('"')
+                            index++
+                        } else {
+                            inQuotes = false
+                        }
+                    } else {
+                        field.append(char)
+                    }
+                }
+                char == '"' -> inQuotes = true
+                char == delimiter -> {
+                    out[column] = field.toString()
+                    field.setLength(0)
+                    if (++column >= out.size) return
+                }
+                else -> field.append(char)
+            }
+            index++
+        }
+        out[column] = field.toString()
+    }
+
     /** Decoupe une ligne en champs, en gerant les guillemets doubles (`"..."`, `""` = guillemet echappe). */
     fun splitLine(line: String, delimiter: Char = ';'): List<String> {
         val result = ArrayList<String>()
@@ -129,7 +187,7 @@ object AnfrCsvParser {
     ) : Iterator<AnfrCsvRow>, Closeable {
 
         private val delimiter: Char
-        private val header: List<String>
+        private val header: AnfrCsvHeader
         private var pendingLine: String?
 
         init {
@@ -137,8 +195,8 @@ object AnfrCsvParser {
             // Retire un eventuel BOM UTF-8 en tete d'entete.
             if (first != null && first.isNotEmpty() && first[0].code == BOM) first = first.substring(1)
             delimiter = requestedDelimiter ?: detectDelimiter(first)
-            header = first?.let { splitLine(it, delimiter) } ?: emptyList()
-            pendingLine = if (header.isEmpty()) null else reader.readLine()
+            header = AnfrCsvHeader.of(first?.let { splitLine(it, delimiter) } ?: emptyList())
+            pendingLine = if (header.columnCount == 0) null else reader.readLine()
         }
 
         override fun hasNext(): Boolean {
@@ -152,7 +210,9 @@ object AnfrCsvParser {
         override fun next(): AnfrCsvRow {
             val line = pendingLine ?: throw NoSuchElementException()
             pendingLine = reader.readLine()
-            return AnfrCsvRow.of(header, splitLine(line, delimiter))
+            val cells = arrayOfNulls<String>(header.columnCount)
+            splitInto(line, delimiter, cells)
+            return AnfrCsvRow.of(header, cells)
         }
 
         override fun close() {

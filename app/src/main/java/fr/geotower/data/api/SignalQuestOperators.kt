@@ -41,4 +41,12 @@ object SignalQuestOperators {
         return OperatorColors.keysFor(rawOperator)
             .firstNotNullOfOrNull { key -> speedtestPlmnByKey[key] }
     }
+
+    /**
+     * Vrai si l'API speedtest peut être interrogée pour cet opérateur : soit son PLMN est connu,
+     * soit il reste identifiable par le paramètre `operator`.
+     */
+    fun supportsSpeedtests(rawOperator: String?): Boolean {
+        return speedtestPlmnFor(rawOperator) != null || operatorParamFor(rawOperator) != null
+    }
 }

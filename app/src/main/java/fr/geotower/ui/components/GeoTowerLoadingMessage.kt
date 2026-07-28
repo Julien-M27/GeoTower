@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -24,23 +25,24 @@ fun GeoTowerLoadingMessage(
     modifier: Modifier = Modifier,
     indicatorColor: Color = MaterialTheme.colorScheme.primary
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(
-        modifier = modifier.padding(horizontal = 32.dp),
+        modifier = modifier.padding(horizontal = sizing.spacing(32.dp)),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         LoadingIndicator(color = indicatorColor)
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
         Text(
             text = title,
-            style = MaterialTheme.typography.titleSmall,
+            style = sizing.textStyle(MaterialTheme.typography.titleSmall),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
         Text(
             text = detail,
-            style = MaterialTheme.typography.bodySmall,
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center
         )

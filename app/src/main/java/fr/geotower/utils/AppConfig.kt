@@ -1,10 +1,14 @@
 package fr.geotower.utils
 
+import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import fr.geotower.data.build.LocalBuildCapability
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.models.RadioMapCategoryMasks
+import fr.geotower.data.workers.OutageBackgroundScheduler
 
 object AppConfig {
     const val PREF_COLOR_PALETTE = "color_palette"
@@ -26,10 +30,14 @@ object AppConfig {
     const val PREF_SIGNALQUEST_COVERAGE_OPERATOR_KEYS = "signalquest_coverage_operator_keys"
     const val PREF_HIDE_UNDERGROUND_SITES = "hide_underground_sites"
     const val PREF_SHOW_ONLY_ZB_SITES = "show_only_zb_sites"
+    const val PREF_SHOW_PROJECT_SITES = "show_project_sites"
     const val DEFAULT_SHOW_AZIMUTH_LINES = true
     const val DEFAULT_SHOW_AZIMUTH_CONES = false
     const val PREF_LOW_POWER_LEVEL = "low_power_level"
     const val PREF_LOW_POWER_FOLLOW_SYSTEM = "low_power_follow_system"
+
+    // Mode « traitement local » : 0 Serveur / 1 Sites HS / 2 Base+sites / 3 Autonomie max.
+    const val PREF_LOCAL_MODE_LEVEL = "local_mode_level"
 
     // --- Apparence ---
     var themeMode = mutableIntStateOf(0)
@@ -67,6 +75,12 @@ object AppConfig {
     var lowPowerLevel = mutableIntStateOf(0)
     // Aligne le niveau sur l'économie d'énergie d'Android (force au moins Éco quand le système est en éco).
     var lowPowerFollowSystem = mutableStateOf(false)
+
+    // --- Mode « traitement local » (autonomie serveur) ---
+    // Niveau choisi : 0 Serveur / 1 Sites HS local / 2 Base+sites local / 3 Autonomie max.
+    var localModeLevel = mutableIntStateOf(0)
+    // Éligibilité de l'appareil à la génération locale de la base (RAM/stockage), évaluée au runtime.
+    var localBuildEligible = mutableStateOf(false)
 
     // --- UNITÉS DE MESURE ---
     // 0 = Kilomètres (km), 1 = Miles (mi)
@@ -116,6 +130,13 @@ object AppConfig {
     // --- FILTRES : AFFICHAGE DES SITES ---
     var showSitesInService = mutableStateOf(true)
     var showSitesOutOfService = mutableStateOf(true)
+
+    // Troisieme statut, a cote de « En service » / « En Panne » : les sites « totalement en
+    // projet », dont aucune emission n'est en service (has_active = 0 et statut non actif,
+    // cf. LocalisationEntity.isDeclaredActive()). Un site qui n'a que quelques nouvelles
+    // frequences en projet reste, lui, dans le statut « En service ».
+    var showProjectSites = mutableStateOf(true)
+
     var hideUndergroundSites = mutableStateOf(false)
     var showOnlyZbSites = mutableStateOf(false)
 
@@ -209,6 +230,11 @@ object AppConfig {
     // Mode de navigation (0 = Défilant, 1 = Pages)
     var navMode = mutableIntStateOf(0)
 
+    // Téléphone : accueil des réglages par sections (true) ou tout sur une seule page (false).
+    // Le mode « pages » des grands écrans reste piloté par navMode (il a sa barre latérale).
+    const val PREF_SETTINGS_SECTIONS_MODE = "settings_sections_mode"
+    var settingsSectionsMode = mutableStateOf(true)
+
     // --- MODE D'AFFICHAGE ---
     var uiMode = mutableStateOf(AppUiMode.Auto)
     val useOneUiDesign: Boolean
@@ -262,6 +288,7 @@ object AppConfig {
         showSitesOutOfService.value = MapDisplayPrefs.showSitesOutOfService.read(prefs)
         hideUndergroundSites.value = MapDisplayPrefs.hideUndergroundSites.read(prefs)
         showOnlyZbSites.value = MapDisplayPrefs.showOnlyZbSites.read(prefs)
+        showProjectSites.value = MapDisplayPrefs.showProjectSites.read(prefs)
 
         showTechno2G.value = MapDisplayPrefs.showTechno2G.read(prefs)
         showTechno3G.value = MapDisplayPrefs.showTechno3G.read(prefs)
@@ -288,6 +315,37 @@ object AppConfig {
         f5G_3500.value = MapDisplayPrefs.f5G3500.read(prefs)
         f5G_4200.value = MapDisplayPrefs.f5G4200.read(prefs)
         f5G_26000.value = MapDisplayPrefs.f5G26000.read(prefs)
+    }
+
+    // --- Mode « traitement local » : niveau effectif + dérivés ---
+    /** Niveau effectif : le kill-switch distant [RemoteFeatureFlags.Features.LOCAL_MODE_ENABLED] peut forcer 0. */
+    fun effectiveLocalModeLevel(): Int =
+        if (RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.LOCAL_MODE_ENABLED)) {
+            localModeLevel.intValue
+        } else {
+            0
+        }
+
+    /** Niveau ≥ 1 : les sites en panne sont récupérés/localisés sur l'appareil. */
+    fun outagesLocal(): Boolean = effectiveLocalModeLevel() >= 1
+
+    /** Niveau ≥ 2 ET appareil éligible : la base est générée localement (bloque le téléchargement serveur). */
+    fun dbForcedLocal(): Boolean = effectiveLocalModeLevel() >= 2 && localBuildEligible.value
+
+    /** Niveau ≥ 3 : coupe SignalQuest (photos + envoi), la vérif de mise à jour et l'API live. */
+    fun blockCommunityAndUpdates(): Boolean = effectiveLocalModeLevel() >= 3
+
+    /** Applique un niveau : persiste, recalcule l'éligibilité et réconcilie la planif des pannes. */
+    fun setLocalModeLevel(context: Context, level: Int) {
+        val clamped = level.coerceIn(0, 3)
+        localModeLevel.intValue = clamped
+        context.applicationContext
+            .getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+            .edit()
+            .putInt(PREF_LOCAL_MODE_LEVEL, clamped)
+            .apply()
+        localBuildEligible.value = LocalBuildCapability.evaluate(context).eligible
+        OutageBackgroundScheduler.reconcile(context)
     }
 
     // --- FONCTION POUR CHARGER LA MÉMOIRE AU DÉMARRAGE ---
@@ -318,6 +376,9 @@ object AppConfig {
         lowPowerLevel.intValue = prefs.getInt(PREF_LOW_POWER_LEVEL, 0)
         lowPowerFollowSystem.value = prefs.getBoolean(PREF_LOW_POWER_FOLLOW_SYSTEM, false)
 
+        // Mode « traitement local » (niveau 0..3).
+        localModeLevel.intValue = prefs.getInt(PREF_LOCAL_MODE_LEVEL, 0).coerceIn(0, 3)
+
         // ✅ CHARGEMENT DU STYLE D'AFFICHAGE (avec la nouvelle valeur par défaut)
         displayStyle.intValue = prefs.getInt("display_style", defaultDisplayStyle)
 
@@ -327,6 +388,9 @@ object AppConfig {
 
         loadMapDisplayPreferences(prefs)
         statsDisplayMode.value = StatsPreferences.displayMode(prefs)
+
+        // Barre latérale de défilement, activable page par page.
+        PageScrollPrefs.load(prefs)
 
         siteShowTechno2G.value = prefs.getBoolean("site_show_techno_2g", true)
         siteShowTechno3G.value = prefs.getBoolean("site_show_techno_3g", true)

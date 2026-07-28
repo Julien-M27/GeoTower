@@ -128,7 +128,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
@@ -510,8 +512,17 @@ private val operatorSearchSplitRegex = Regex("\\s*(?:[,;/\\u2022]|\\bet\\b|\\+|&
 private val operatorSearchCombiningMarksRegex = Regex("\\p{Mn}+")
 private val operatorSearchNonWordRegex = Regex("[^A-Z0-9]+")
 private val operatorSearchRepeatedSpacesRegex = Regex("\\s+")
+// Tailles de reference (a 100 %) des controles flottants de la carte.
 private val MapControlButtonDiameter = 54.dp
 private val MapSearchBarHeight = 54.dp
+
+// Versions mises a l'echelle du slider de taille d'interface : c'est ce que doivent utiliser
+// tous les composables (boutons flottants, zoom, barre de recherche), sinon ils restent figes.
+private val mapControlButtonDiameter: Dp
+    @Composable get() = LocalGeoTowerUiSizing.current.component(MapControlButtonDiameter)
+
+private val mapSearchBarHeight: Dp
+    @Composable get() = LocalGeoTowerUiSizing.current.component(MapSearchBarHeight)
 
 private fun normalizeOperatorSearchToken(value: String): String {
     return Normalizer.normalize(value, Normalizer.Form.NFD)
@@ -619,11 +630,17 @@ private fun visibleOperatorKeysForAntenna(
     hsOperatorMap: Map<String, Set<String>>,
     showSitesInService: Boolean,
     showSitesOutOfService: Boolean,
+    showProjectSites: Boolean,
     selectedOperatorKeys: Set<String>
 ): List<String> {
+    // Un site sans aucune émission en service relève du statut « En projet », pas de
+    // « En service » : les trois statuts sont exclusifs.
+    val isProjectSite = !antenna.isDeclaredActive()
     return extractOperatorKeys(antenna.operateur).filter { operatorKey ->
         if (!isOperatorSelected(operatorKey, selectedOperatorKeys)) {
             false
+        } else if (isProjectSite) {
+            showProjectSites
         } else if (isOperatorDeclaredHs(antenna, operatorKey, hsOperatorMap)) {
             showSitesOutOfService
         } else {
@@ -676,6 +693,7 @@ private fun buildActiveMapFilterSummary(
     reference: MapFilterDefaults.Reference,
     showSitesInService: Boolean,
     showSitesOutOfService: Boolean,
+    showProjectSites: Boolean,
     hideUndergroundSites: Boolean,
     showOnlyZbSites: Boolean,
     showRadioTv: Boolean,
@@ -693,6 +711,7 @@ private fun buildActiveMapFilterSummary(
     signalQuestCoverageLabel: String,
     inServiceLabel: String,
     outOfServiceLabel: String,
+    projectLabel: String,
     hideUndergroundLabel: String,
     onlyZbLabel: String,
     radioTvLabel: String,
@@ -853,14 +872,17 @@ private fun buildActiveMapFilterSummary(
 
     val siteFilters = mutableListOf<String>()
     if (showSitesInService != reference.showSitesInService ||
-        showSitesOutOfService != reference.showSitesOutOfService) {
+        showSitesOutOfService != reference.showSitesOutOfService ||
+        showProjectSites != reference.showProjectSites) {
         val selectedStatuses = listOfNotNull(
             inServiceLabel.takeIf { showSitesInService },
-            outOfServiceLabel.takeIf { showSitesOutOfService }
+            outOfServiceLabel.takeIf { showSitesOutOfService },
+            projectLabel.takeIf { showProjectSites }
         )
         val hiddenStatuses = listOfNotNull(
             inServiceLabel.takeIf { !showSitesInService },
-            outOfServiceLabel.takeIf { !showSitesOutOfService }
+            outOfServiceLabel.takeIf { !showSitesOutOfService },
+            projectLabel.takeIf { !showProjectSites }
         )
         siteFilters += summarizedActiveFilterSelection(
             selectedValues = selectedStatuses,
@@ -1259,7 +1281,7 @@ fun MapScreen(
     var isTimeSliderVisible by rememberSaveable { mutableStateOf(false) }
     var timeSliderThreshold by rememberSaveable { mutableStateOf<Int?>(null) }
     var timeSliderStats by remember { mutableStateOf(TimeSliderStats(emptyMap(), 0)) }
-    val timeSliderLift = if (isTimeSliderVisible) 104.dp else 0.dp
+    val timeSliderLift = if (isTimeSliderVisible) sizing.component(104.dp) else 0.dp
     val todayDateInt = remember {
         val c = java.util.Calendar.getInstance()
         c.get(java.util.Calendar.YEAR) * 10000 + (c.get(java.util.Calendar.MONTH) + 1) * 100 + c.get(java.util.Calendar.DAY_OF_MONTH)
@@ -1434,6 +1456,7 @@ fun MapScreen(
     val txtOutOfService = stringResource(R.string.appstrings_sites_out_of_service_label)
     val txtHideUndergroundSites = stringResource(R.string.appstrings_hide_underground_sites_label)
     val txtOnlyZbSites = stringResource(R.string.appstrings_show_only_zb_sites_label)
+    val txtProjectSites = stringResource(R.string.appstrings_sites_project_label)
     val txtRadioTv = stringResource(R.string.appstrings_radio_category_tv)
     val txtRadioBroadcast = stringResource(R.string.appstrings_radio_category_radio)
     val txtRadioPrivateMobile = stringResource(R.string.appstrings_radio_category_private_mobile)
@@ -1447,6 +1470,7 @@ fun MapScreen(
         reference = MapFilterDefaults.reference(prefs),
         showSitesInService = AppConfig.showSitesInService.value,
         showSitesOutOfService = AppConfig.showSitesOutOfService.value,
+        showProjectSites = AppConfig.showProjectSites.value,
         hideUndergroundSites = AppConfig.hideUndergroundSites.value,
         showOnlyZbSites = AppConfig.showOnlyZbSites.value,
         showRadioTv = AppConfig.showRadioTv.value,
@@ -1464,6 +1488,7 @@ fun MapScreen(
         signalQuestCoverageLabel = txtSignalQuestCoverage,
         inServiceLabel = txtInService,
         outOfServiceLabel = txtOutOfService,
+        projectLabel = txtProjectSites,
         hideUndergroundLabel = txtHideUndergroundSites,
         onlyZbLabel = txtOnlyZbSites,
         radioTvLabel = txtRadioTv,
@@ -1585,7 +1610,8 @@ fun MapScreen(
         AppConfig.f2G_900.value, AppConfig.f2G_1800.value, AppConfig.f3G_900.value, AppConfig.f3G_2100.value,
         AppConfig.f4G_700.value, AppConfig.f4G_800.value, AppConfig.f4G_900.value, AppConfig.f4G_1800.value, AppConfig.f4G_2100.value, AppConfig.f4G_2600.value,
         AppConfig.f5G_700.value, AppConfig.f5G_1400.value, AppConfig.f5G_2100.value, AppConfig.f5G_3500.value, AppConfig.f5G_4200.value, AppConfig.f5G_26000.value,
-        AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value, AppConfig.showOnlyZbSites.value, sitesHs, currentCityPolygons,
+        AppConfig.showSitesInService.value, AppConfig.showSitesOutOfService.value, AppConfig.hideUndergroundSites.value, AppConfig.showOnlyZbSites.value,
+        AppConfig.showProjectSites.value, sitesHs, currentCityPolygons,
         isTimeSliderVisible, timeSliderThreshold
     ) {
         val computed = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
@@ -1594,6 +1620,7 @@ fun MapScreen(
             val showSitesOutOfService = AppConfig.showSitesOutOfService.value
             val hideUndergroundSites = AppConfig.hideUndergroundSites.value
             val showOnlyZbSites = AppConfig.showOnlyZbSites.value
+            val showProjectSites = AppConfig.showProjectSites.value
             val frequencyFilter = FrequencyFilterSelection.fromMapConfig()
             val hsOperatorMap = buildHsOperatorMap(sitesHs)
 
@@ -1603,6 +1630,7 @@ fun MapScreen(
                     hsOperatorMap = hsOperatorMap,
                     showSitesInService = showSitesInService,
                     showSitesOutOfService = showSitesOutOfService,
+                    showProjectSites = showProjectSites,
                     selectedOperatorKeys = selectedOperators
                 )
 
@@ -2099,6 +2127,7 @@ fun MapScreen(
         val selectedOperators = AppConfig.selectedOperatorKeys.value
         val showSitesInService = AppConfig.showSitesInService.value
         val showSitesOutOfService = AppConfig.showSitesOutOfService.value
+        val showProjectSites = AppConfig.showProjectSites.value
         val frequencyFilter = FrequencyFilterSelection.fromMapConfig()
         val shouldFilterAzimuthsByFrequency =
             !frequencyFilter.isFullyEnabled && (AppConfig.showAzimuths.value || AppConfig.showAzimuthsCone.value)
@@ -2177,6 +2206,7 @@ fun MapScreen(
                             hsOperatorMap = hsOperatorMap,
                             showSitesInService = showSitesInService,
                             showSitesOutOfService = showSitesOutOfService,
+                            showProjectSites = showProjectSites,
                             selectedOperatorKeys = selectedOperators
                         )
 
@@ -2238,6 +2268,7 @@ fun MapScreen(
                             hsOperatorMap = hsOperatorMap,
                             showSitesInService = showSitesInService,
                             showSitesOutOfService = showSitesOutOfService,
+                            showProjectSites = showProjectSites,
                             selectedOperatorKeys = selectedOperators
                         )
                         icon = MapUtils.createClusterIcon(context, activeOps, count, AppConfig.defaultOperator.value)
@@ -2272,6 +2303,7 @@ fun MapScreen(
                             hsOperatorMap = hsOperatorMap,
                             showSitesInService = showSitesInService,
                             showSitesOutOfService = showSitesOutOfService,
+                            showProjectSites = showProjectSites,
                             selectedOperatorKeys = selectedOperators
                         )
 
@@ -2358,6 +2390,7 @@ fun MapScreen(
         AppConfig.showSitesOutOfService.value,
         AppConfig.hideUndergroundSites.value,
         AppConfig.showOnlyZbSites.value,
+        AppConfig.showProjectSites.value,
         AppConfig.showTechnoFH.value,
         AppConfig.showTechno2G.value,
         AppConfig.showTechno3G.value,
@@ -2424,6 +2457,7 @@ fun MapScreen(
         AppConfig.showSitesOutOfService.value,
         AppConfig.hideUndergroundSites.value,
         AppConfig.showOnlyZbSites.value,
+        AppConfig.showProjectSites.value,
         AppConfig.showTechnoFH.value,
         AppConfig.showTechno2G.value,
         AppConfig.showTechno3G.value,
@@ -2788,7 +2822,7 @@ fun MapScreen(
 
                     // ⚠️ ATTENTION : on utilise bien "effectiveProvider" ici !
                     val newSource = when (effectiveProvider) {
-                        1 -> MapUtils.OSM_Source
+                        1 -> if (ignStyle == 2) MapUtils.EsriSource.SATELLITE else MapUtils.OSM_Source
                         2 -> if (ignStyle == 1) {
                             org.osmdroid.tileprovider.tilesource.XYTileSource("MapLibreDark", 1, 20, 256, ".png", arrayOf("https://basemaps.cartocdn.com/rastertiles/dark_all/"))
                         } else {
@@ -2951,7 +2985,7 @@ fun MapScreen(
                 exit = fadeOut() + shrinkHorizontally(shrinkTowards = Alignment.End),
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                .padding(start = 16.dp, end = 16.dp, top = 110.dp)
+                .padding(start = sizing.spacing(16.dp), end = sizing.spacing(16.dp), top = sizing.spacing(110.dp))
         ) {
             MapSearchBar(
                 query = searchQuery,
@@ -2966,35 +3000,35 @@ fun MapScreen(
         }
 
         val compassTopPadding by animateDpAsState(
-            targetValue = if (isSearchActive) 186.dp else 112.dp,
+            targetValue = sizing.spacing(if (isSearchActive) 186.dp else 112.dp),
             label = "compassAnim"
         )
         val toolsTopPadding by animateDpAsState(
-            targetValue = if (isSearchActive) 250.dp else 176.dp,
+            targetValue = sizing.spacing(if (isSearchActive) 250.dp else 176.dp),
             label = "toolsAnim"
         )
         val useCompactCompassPlacement = configuration.screenHeightDp < 600
         val showCompassInMapHeader = showCompass && AppConfig.hasCompass.value && isLandscapeLayout
         val compassEndPadding by animateDpAsState(
             targetValue = if (isLandscapeLayout && !useCompactCompassPlacement) {
-                (maxWidth * 0.12f).coerceIn(144.dp, 320.dp)
+                (maxWidth * 0.12f).coerceIn(sizing.spacing(144.dp), sizing.spacing(320.dp))
             } else {
-                16.dp
+                sizing.spacing(16.dp)
             },
             label = "compassEndAnim"
         )
         val showCompactCompass = showCompass && AppConfig.hasCompass.value &&
             useCompactCompassPlacement && !showCompassInMapHeader
-        val zoomControlsHeight = if (showZoomBtns) 117.dp else 0.dp
+        val zoomControlsHeight = if (showZoomBtns) sizing.component(117.dp) else 0.dp
         val defaultOp by AppConfig.defaultOperator
-        val trackingButtonHeight = if (isLandscapeLayout) MapControlButtonDiameter else 40.dp
-        val trackingButtonSpacing = if (isLandscapeLayout) 1.dp else 8.dp
+        val trackingButtonHeight = if (isLandscapeLayout) mapControlButtonDiameter else sizing.component(40.dp)
+        val trackingButtonSpacing = if (isLandscapeLayout) 1.dp else sizing.spacing(8.dp)
         val trackingRowCount = if (defaultOp != "Aucun") 2 else 1
         val trackingDrawerHeight = (trackingButtonHeight * trackingRowCount.toFloat()) +
             (trackingButtonSpacing * (trackingRowCount - 1).toFloat())
-        val zoomBottomPadding = 32.dp +
+        val zoomBottomPadding = sizing.spacing(32.dp) +
             if (showLocationBtn && canUseMapLocation) {
-                MapControlButtonDiameter + 16.dp
+                mapControlButtonDiameter + sizing.spacing(16.dp)
             } else {
                 0.dp
             }
@@ -3015,7 +3049,7 @@ fun MapScreen(
             // dans la zone dégagée sous le bouton de partage.
             Modifier
                 .align(Alignment.TopStart)
-                .padding(start = 16.dp, top = compassTopPadding + 70.dp)
+                .padding(start = sizing.spacing(16.dp), top = compassTopPadding + 70.dp)
         } else if (!useCompactCompassPlacement) {
             // Portrait, toolbox repliée : place libre en haut à droite, sous la boussole.
             val compassShownTopRight = showCompass && AppConfig.hasCompass.value &&
@@ -3023,9 +3057,9 @@ fun MapScreen(
             Modifier
                 .align(Alignment.TopEnd)
                 .padding(
-                    end = 16.dp,
+                    end = sizing.spacing(16.dp),
                     top = if (compassShownTopRight) {
-                        compassTopPadding + MapControlButtonDiameter + 16.dp
+                        compassTopPadding + mapControlButtonDiameter + sizing.spacing(16.dp)
                     } else {
                         compassTopPadding
                     }
@@ -3034,14 +3068,14 @@ fun MapScreen(
             Modifier
                 .align(Alignment.BottomEnd)
                 .padding(
-                    end = 16.dp + MapControlButtonDiameter + 12.dp,
+                    end = sizing.spacing(16.dp) + mapControlButtonDiameter + sizing.spacing(12.dp),
                     bottom = trackingDrawerLandscapeBottomPadding
                 )
                 .navigationBarsPadding()
         } else {
             Modifier
                 .align(Alignment.TopEnd)
-                .padding(end = 16.dp, top = toolsTopPadding)
+                .padding(end = sizing.spacing(16.dp), top = toolsTopPadding)
         }
 
         // Positions mesurées (px, repère racine) du bas du bouton partage et du haut
@@ -3053,7 +3087,7 @@ fun MapScreen(
         Box(
             modifier = Modifier
                 .align(Alignment.TopStart)
-                .padding(start = 16.dp, top = compassTopPadding)
+                .padding(start = sizing.spacing(16.dp), top = compassTopPadding)
                 .onGloballyPositioned {
                     shareButtonBottomPx = it.positionInRoot().y + it.size.height
                 }
@@ -3079,7 +3113,7 @@ fun MapScreen(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(end = compassEndPadding, top = compassTopPadding)
-                    .size(MapControlButtonDiameter)
+                    .size(mapControlButtonDiameter)
             ) {
                 safeClick {
                     mapViewRef?.mapOrientation = 0f
@@ -3113,7 +3147,7 @@ fun MapScreen(
                     val handle: @Composable () -> Unit = {
                         Box(
                             modifier = Modifier
-                                .height(trackingButtonHeight).width(12.dp)
+                                .height(trackingButtonHeight).width(sizing.component(12.dp))
                                 // ✅ Bords arrondis de tous les côtés pour la poignée
                                 .background(darkMaterialColor, RoundedCornerShape(6.dp))
                                 .clickable { safeClick { isClosestSiteExpanded = !isClosestSiteExpanded } }
@@ -3129,17 +3163,17 @@ fun MapScreen(
                         ) {
                             Button(
                                 onClick = { safeClick { trackNearestAll = !trackNearestAll } },
-                                modifier = Modifier.height(trackingButtonHeight).width(210.dp),
-                                contentPadding = PaddingValues(horizontal = 14.dp),
+                                modifier = Modifier.height(trackingButtonHeight).width(sizing.component(210.dp)),
+                                contentPadding = PaddingValues(horizontal = sizing.spacing(14.dp)),
                                 // ✅ NOUVEAU : Forme de pilule parfaite
                                 shape = RoundedCornerShape(trackingButtonHeight / 2f),
                                 colors = ButtonDefaults.buttonColors(containerColor = darkMaterialColor, contentColor = Color.White)
                             ) {
-                                Icon(Icons.Default.NearMe, null, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(8.dp))
+                                Icon(Icons.Default.NearMe, null, modifier = Modifier.size(sizing.component(18.dp)))
+                                Spacer(Modifier.width(sizing.spacing(8.dp)))
                                 Text(
                                     text = if (trackNearestAll) stringResource(R.string.appstrings_track_global_active) else txtClosestSite,
-                                    fontSize = 11.sp,
+                                    fontSize = sizing.text(11.sp),
                                     fontWeight = FontWeight.Bold
                                 )
                             }
@@ -3150,11 +3184,11 @@ fun MapScreen(
                     // l'intérieur. Ailleurs : poignée d'abord, bouton vers le bord droit.
                     if (measureDrawerOnLeft) {
                         pill()
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
                         handle()
                     } else {
                         handle()
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
                         pill()
                     }
                 }
@@ -3168,7 +3202,7 @@ fun MapScreen(
                         val handle: @Composable () -> Unit = {
                             Box(
                                 modifier = Modifier
-                                    .height(trackingButtonHeight).width(12.dp)
+                                    .height(trackingButtonHeight).width(sizing.component(12.dp))
                                     // ✅ Bords arrondis de tous les côtés
                                     .background(opColor, RoundedCornerShape(6.dp))
                                     .clickable { safeClick { isClosestFavSiteExpanded = !isClosestFavSiteExpanded } }
@@ -3184,17 +3218,17 @@ fun MapScreen(
                             ) {
                                 Button(
                                     onClick = { safeClick { trackNearestFav = !trackNearestFav } },
-                                    modifier = Modifier.height(trackingButtonHeight).width(210.dp),
-                                    contentPadding = PaddingValues(horizontal = 14.dp),
+                                    modifier = Modifier.height(trackingButtonHeight).width(sizing.component(210.dp)),
+                                    contentPadding = PaddingValues(horizontal = sizing.spacing(14.dp)),
                                     // ✅ NOUVEAU : Forme de pilule parfaite
                                     shape = RoundedCornerShape(trackingButtonHeight / 2f),
                                     colors = ButtonDefaults.buttonColors(containerColor = opColor, contentColor = Color.White)
                                 ) {
-                                    Icon(Icons.Default.WifiTethering, null, modifier = Modifier.size(18.dp))
-                                    Spacer(Modifier.width(8.dp))
+                                    Icon(Icons.Default.WifiTethering, null, modifier = Modifier.size(sizing.component(18.dp)))
+                                    Spacer(Modifier.width(sizing.spacing(8.dp)))
                                     Text(
                                         text = if (trackNearestFav) stringResource(R.string.track_operator_active, defaultOp) else "$txtClosestSite $defaultOp",
-                                        fontSize = 11.sp,
+                                        fontSize = sizing.text(11.sp),
                                         fontWeight = FontWeight.Bold
                                     )                            }
                             }
@@ -3204,11 +3238,11 @@ fun MapScreen(
                         // l'intérieur. Ailleurs : poignée d'abord, bouton vers le bord droit.
                         if (measureDrawerOnLeft) {
                             pill()
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
                             handle()
                         } else {
                             handle()
-                            Spacer(modifier = Modifier.width(6.dp))
+                            Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
                             pill()
                         }
                     }
@@ -3217,8 +3251,8 @@ fun MapScreen(
         }
 
 
-        Column(modifier = Modifier.fillMaxWidth().padding(top = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(48.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp))) {
                 SmallFloatingButton(
                     icon = Icons.AutoMirrored.Filled.ArrowBack,
                     desc = stringResource(R.string.appstrings_back),
@@ -3232,18 +3266,18 @@ fun MapScreen(
                     }
                 }
                 Surface(modifier = Modifier.align(Alignment.Center), shape = RoundedCornerShape(32.dp), color = MaterialTheme.colorScheme.surface, shadowElevation = 4.dp, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)) {
-                    Text(txtMapTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = 24.dp, vertical = 12.dp))
+                    Text(txtMapTitle, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(horizontal = sizing.spacing(24.dp), vertical = sizing.spacing(12.dp)))
                 }
 
                 Row(
                     modifier = Modifier.align(Alignment.CenterEnd),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp)),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     if (showCompassInMapHeader) {
                         MapCompassButton(
                             azimuth = azimuth,
-                            modifier = Modifier.size(MapControlButtonDiameter)
+                            modifier = Modifier.size(mapControlButtonDiameter)
                         ) {
                             safeClick {
                                 mapViewRef?.mapOrientation = 0f
@@ -3267,13 +3301,13 @@ fun MapScreen(
                 ActiveMapFiltersBanner(
                     summary = activeMapFilterSummary.orEmpty(),
                     modifier = Modifier
-                        .padding(start = 88.dp, top = 10.dp, end = 88.dp)
+                        .padding(start = sizing.spacing(88.dp), top = sizing.spacing(10.dp), end = sizing.spacing(88.dp))
                         .fillMaxWidth()
                 )
             }
 
             val deleteButtonSpacer by animateDpAsState(
-                targetValue = if (isSearchActive) 93.dp else 19.dp,
+                targetValue = sizing.spacing(if (isSearchActive) 93.dp else 19.dp),
                 label = "deleteButtonAnim"
             )
             Spacer(modifier = Modifier.height(deleteButtonSpacer))
@@ -3293,11 +3327,11 @@ fun MapScreen(
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
                     shape = RoundedCornerShape(32.dp),
-                    modifier = Modifier.height(44.dp)
+                    modifier = Modifier.height(sizing.component(44.dp))
                 ) {
-                    Icon(Icons.Default.DeleteSweep, null, modifier = Modifier.size(18.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(txtDeleteTraces, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    Icon(Icons.Default.DeleteSweep, null, modifier = Modifier.size(sizing.component(18.dp)))
+                    Spacer(Modifier.width(sizing.spacing(8.dp)))
+                    Text(txtDeleteTraces, fontSize = sizing.text(13.sp), fontWeight = FontWeight.Bold)
                 }
             }
         }
@@ -3306,7 +3340,7 @@ fun MapScreen(
             Surface(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(start = 16.dp, end = 16.dp, top = 112.dp)
+                    .padding(start = sizing.spacing(16.dp), end = sizing.spacing(16.dp), top = sizing.spacing(112.dp))
                     .fillMaxWidth(),
                 shape = RoundedCornerShape(20.dp),
                 color = MaterialTheme.colorScheme.primaryContainer,
@@ -3314,7 +3348,7 @@ fun MapScreen(
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.primary.copy(alpha = 0.24f))
             ) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                    modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(12.dp)),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
@@ -3322,7 +3356,7 @@ fun MapScreen(
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onPrimaryContainer
                     )
-                    Spacer(modifier = Modifier.width(12.dp))
+                    Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             text = stringResource(R.string.shared_photo_map_title),
@@ -3331,7 +3365,7 @@ fun MapScreen(
                         )
                         Text(
                             text = pluralStringResource(R.plurals.shared_photo_map_ready, pendingSharedPhotoCount, pendingSharedPhotoCount),
-                            fontSize = 13.sp,
+                            fontSize = sizing.text(13.sp),
                             color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.78f)
                         )
                     }
@@ -3349,15 +3383,15 @@ fun MapScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(bottom = 32.dp, end = 16.dp)
+                .padding(bottom = sizing.spacing(32.dp), end = sizing.spacing(16.dp))
                 .navigationBarsPadding(),
             horizontalAlignment = Alignment.End,
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
         ) {
             if (showCompactCompass) {
                 MapCompassButton(
                     azimuth = azimuth,
-                    modifier = Modifier.size(MapControlButtonDiameter)
+                    modifier = Modifier.size(mapControlButtonDiameter)
                 ) {
                     safeClick {
                         mapViewRef?.mapOrientation = 0f
@@ -3433,7 +3467,7 @@ fun MapScreen(
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(start = 16.dp),
+                            .padding(start = sizing.spacing(16.dp)),
                         horizontalArrangement = Arrangement.End,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -3447,7 +3481,7 @@ fun MapScreen(
                             },
                             modifier = Modifier.weight(1f)
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(sizing.spacing(10.dp)))
                         toolboxContent()
                     }
                 } else {
@@ -3456,10 +3490,10 @@ fun MapScreen(
             }
 
             if (showZoomBtns) {
-                val zoomControlShape = RoundedCornerShape(MapControlButtonDiameter / 2f)
+                val zoomControlShape = RoundedCornerShape(mapControlButtonDiameter / 2f)
                 Surface(
                     modifier = Modifier
-                        .width(MapControlButtonDiameter)
+                        .width(mapControlButtonDiameter)
                         .clip(zoomControlShape),
                     shape = zoomControlShape,
                     color = MaterialTheme.colorScheme.surface,
@@ -3478,15 +3512,15 @@ fun MapScreen(
                         ZoomControlSegmentButton(
                             icon = Icons.Default.Add,
                             shape = RoundedCornerShape(
-                                topStart = MapControlButtonDiameter / 2f,
-                                topEnd = MapControlButtonDiameter / 2f,
+                                topStart = mapControlButtonDiameter / 2f,
+                                topEnd = mapControlButtonDiameter / 2f,
                                 bottomStart = 10.dp,
                                 bottomEnd = 10.dp
                             ),
                             onClick = { mapViewRef?.controller?.zoomIn() }
                         )
                         HorizontalDivider(
-                            modifier = Modifier.width(32.dp),
+                            modifier = Modifier.width(sizing.component(32.dp)),
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
                         )
                         ZoomControlSegmentButton(
@@ -3494,8 +3528,8 @@ fun MapScreen(
                             shape = RoundedCornerShape(
                                 topStart = 10.dp,
                                 topEnd = 10.dp,
-                                bottomStart = MapControlButtonDiameter / 2f,
-                                bottomEnd = MapControlButtonDiameter / 2f
+                                bottomStart = mapControlButtonDiameter / 2f,
+                                bottomEnd = mapControlButtonDiameter / 2f
                             ),
                             onClick = { mapViewRef?.controller?.zoomOut() }
                         )
@@ -3562,7 +3596,7 @@ fun MapScreen(
                     },
                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                     shape = CircleShape,
-                    modifier = Modifier.size(MapControlButtonDiameter)
+                    modifier = Modifier.size(mapControlButtonDiameter)
                 ) {
                     // ✅ On ajoute le cercle très fin autour de l'icône si actif
                     Box(
@@ -3574,7 +3608,7 @@ fun MapScreen(
                                         width = 1.5.dp, // Cercle très fin
                                         color = MaterialTheme.colorScheme.primary, // Couleur principale
                                         shape = CircleShape
-                                    ).padding(2.dp) // Petit espacement pour ne pas coller au bord
+                                    ).padding(sizing.spacing(2.dp)) // Petit espacement pour ne pas coller au bord
                                 } else {
                                     Modifier
                                 }
@@ -3588,7 +3622,8 @@ fun MapScreen(
                                 else -> Icons.Outlined.MyLocation
                             },
                             contentDescription = stringResource(R.string.appstrings_locate),
-                            tint = if (isTrackingActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer
+                            tint = if (isTrackingActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onPrimaryContainer,
+                            modifier = Modifier.size(sizing.component(24.dp))
                         )
                     }
                 }
@@ -3605,7 +3640,7 @@ fun MapScreen(
                 onThresholdChange = { timeSliderThreshold = it },
                 modifier = Modifier
                     .align(Alignment.BottomStart)
-                    .padding(start = 12.dp, end = MapControlButtonDiameter + 24.dp)
+                    .padding(start = sizing.spacing(12.dp), end = mapControlButtonDiameter + sizing.spacing(24.dp))
                     .navigationBarsPadding()
             )
         }
@@ -3623,12 +3658,12 @@ fun MapScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
-                .padding(start = 16.dp, bottom = 32.dp + timeSliderLift)
+                .padding(start = sizing.spacing(16.dp), bottom = sizing.spacing(32.dp) + timeSliderLift)
                 .navigationBarsPadding()
                 .onGloballyPositioned { infoColumnTopPx = it.positionInRoot().y }
                 .alpha(if (infoColumnMasksShare) 0f else 1f),
             horizontalAlignment = Alignment.Start,
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))
         ) {
             if (AppConfig.showSpeedometer.value) {
                 fr.geotower.ui.components.MapSpeedometer(speedKmH = currentSpeedKmH)
@@ -3639,16 +3674,19 @@ fun MapScreen(
             }
 
             if (showAttribution) {
-                val attributionText = when (mapProvider) {
-                    0 -> "Leaflet | © IGN"
-                    2 -> "Leaflet | © CartoDB, OSM"
-                    3 -> "Leaflet | © OpenTopoMap"
+                val isEsriSatellite = mapProvider == 1 && ignStyle == 2
+                val attributionText = when {
+                    mapProvider == 0 -> "Leaflet | © IGN"
+                    isEsriSatellite -> "Leaflet | © Esri, Maxar"
+                    mapProvider == 2 -> "Leaflet | © CartoDB, OSM"
+                    mapProvider == 3 -> "Leaflet | © OpenTopoMap"
                     else -> "Leaflet | © OSM"
                 }
-                val attributionUrl = when (mapProvider) {
-                    0 -> "https://geoservices.ign.fr/"
-                    2 -> "https://carto.com/attributions"
-                    3 -> "https://opentopomap.org/about"
+                val attributionUrl = when {
+                    mapProvider == 0 -> "https://geoservices.ign.fr/"
+                    isEsriSatellite -> "https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9"
+                    mapProvider == 2 -> "https://carto.com/attributions"
+                    mapProvider == 3 -> "https://opentopomap.org/about"
                     else -> "https://www.openstreetmap.org/copyright"
                 }
 
@@ -3662,11 +3700,11 @@ fun MapScreen(
                                 if (infoColumnMasksShare) Modifier
                                 else Modifier.clickable { uriHandler.openUri(attributionUrl) }
                             )
-                            .padding(horizontal = 6.dp, vertical = 4.dp),
+                            .padding(horizontal = sizing.spacing(6.dp), vertical = sizing.spacing(4.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         if (mapProvider == 0) {
-                            Row(modifier = Modifier.size(width = 14.dp, height = 10.dp)) {
+                            Row(modifier = Modifier.size(width = sizing.component(14.dp), height = sizing.component(10.dp))) {
                                 Box(
                                     modifier = Modifier.weight(1f).fillMaxHeight()
                                         .background(Color(0xFF002395))
@@ -3681,7 +3719,7 @@ fun MapScreen(
                                 )
                             }
                         } else {
-                            Column(modifier = Modifier.size(width = 14.dp, height = 10.dp)) {
+                            Column(modifier = Modifier.size(width = sizing.component(14.dp), height = sizing.component(10.dp))) {
                                 Box(
                                     modifier = Modifier.weight(1f).fillMaxWidth()
                                         .background(Color(0xFF005BBC))
@@ -3693,11 +3731,11 @@ fun MapScreen(
                             }
                         }
 
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
 
                         Text(
                             text = attributionText,
-                            fontSize = 11.sp,
+                            fontSize = sizing.text(11.sp),
                             color = Color(0xFF0078A8)
                         )
                     }
@@ -3736,11 +3774,10 @@ fun MapScreen(
                     ) {
                         // 🌐 ON N'AFFICHE LES CARTES EN LIGNE QUE SI ON A INTERNET
                         if (isOnline) {
-                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
                                 if (isMapProviderEnabled(1)) {
                                     MapLayerButton(txtMapOsmLayer, mapProvider == 1, Modifier.weight(1f)) {
                                         AppConfig.mapProvider.value = 1; prefs.edit().putInt("map_provider", 1).apply()
-                                        if (ignStyle == 2) { AppConfig.ignStyle.value = 0; prefs.edit().putInt("ign_style", 0).apply() }
                                     }
                                 }
                                 if (isMapProviderEnabled(0)) {
@@ -3753,6 +3790,7 @@ fun MapScreen(
                                 if (isMapProviderEnabled(2)) {
                                     MapLayerButton(txtMapMapLibre, mapProvider == 2, Modifier.weight(1f)) {
                                         AppConfig.mapProvider.value = 2; prefs.edit().putInt("map_provider", 2).apply()
+                                        if (ignStyle == 2) { AppConfig.ignStyle.value = 0; prefs.edit().putInt("ign_style", 0).apply() }
                                     }
                                 }
                                 if (isMapProviderEnabled(3)) {
@@ -3804,7 +3842,7 @@ fun MapScreen(
                                 MapLayerButton(txtMapDark, ignStyle == 1, Modifier.weight(1f)) {
                                     AppConfig.ignStyle.value = 1; prefs.edit().putInt("ign_style", 1).apply()
                                 }
-                                if (mapProvider == 0) {
+                                if (mapProvider == 0 || mapProvider == 1) {
                                     MapLayerButton(txtMapSatellite, ignStyle == 2, Modifier.weight(1f)) {
                                         AppConfig.ignStyle.value = 2; prefs.edit().putInt("ign_style", 2).apply()
                                     }
@@ -3889,11 +3927,11 @@ fun MapScreen(
                 Text(
                     text = txtWarningTitle,
                     fontWeight = FontWeight.Bold,
-                    style = MaterialTheme.typography.titleLarge
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge)
                 )
             },
             text = {
-                Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
                     Text(text = txtLightColorWarning)
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -3901,15 +3939,15 @@ fun MapScreen(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { dontShowAgainChecked = !dontShowAgainChecked }
-                            .padding(vertical = 4.dp)
+                            .padding(vertical = sizing.spacing(4.dp))
                     ) {
                         Checkbox(
                             checked = dontShowAgainChecked,
                             onCheckedChange = { dontShowAgainChecked = it },
                             colors = CheckboxDefaults.colors(checkedColor = MaterialTheme.colorScheme.primary)
                         )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Text(text = txtDoNotShowAgain, style = MaterialTheme.typography.bodyMedium)
+                        Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                        Text(text = txtDoNotShowAgain, style = sizing.textStyle(MaterialTheme.typography.bodyMedium))
                     }
                 }
             },
@@ -3945,21 +3983,21 @@ fun MapScreen(
             onDismissRequest = { showCityStatsPopup = false }
         ) {
             Surface(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(8.dp)),
                 shape = RoundedCornerShape(24.dp),
                 color = MaterialTheme.colorScheme.surface,
                 shadowElevation = 8.dp
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp),
+                    modifier = Modifier.padding(sizing.spacing(24.dp)),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                    verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
                 ) {
                     val cityStats = if (isLoading) null else declaredSiteStats(filteredAntennas)
 
                     Text(
                         text = stringResource(R.string.appstrings_city_stats_title),
-                        style = MaterialTheme.typography.titleMedium,
+                        style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center
@@ -3973,7 +4011,7 @@ fun MapScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(
-                            modifier = Modifier.padding(20.dp).fillMaxWidth(),
+                            modifier = Modifier.padding(sizing.spacing(20.dp)).fillMaxWidth(),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -3982,20 +4020,20 @@ fun MapScreen(
                                     contentDescription = null,
                                     tint = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
-                                Spacer(modifier = Modifier.width(8.dp))
+                                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                                 Text(
                                     text = stringResource(R.string.appstrings_mobile_telephony),
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                                     fontWeight = FontWeight.SemiBold,
                                     color = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                             }
 
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
                             if (isLoading) {
                                 LoadingIndicator(
-                                    modifier = Modifier.size(48.dp),
+                                    modifier = Modifier.size(sizing.component(48.dp)),
                                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                                 )
                             } else {
@@ -4022,7 +4060,7 @@ fun MapScreen(
                                 if (stats.totalCount > 0) {
                                     Text(
                                         text = stringResource(R.string.appstrings_active_declared_sites_label),
-                                        style = MaterialTheme.typography.labelLarge,
+                                        style = sizing.textStyle(MaterialTheme.typography.labelLarge),
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.82f)
                                     )
@@ -4030,7 +4068,7 @@ fun MapScreen(
                             }
 
                             if ((cityStats?.totalCount ?: 0) > 0) {
-                                Spacer(modifier = Modifier.height(16.dp))
+                                Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
                                 Button(
                                     onClick = { showCityStatsDetail = true },
@@ -4072,8 +4110,9 @@ fun MapScreen(
 
 @Composable
 private fun MapScaleBar(zoom: Double, latitude: Double) {
+    val sizing = LocalGeoTowerUiSizing.current
     val density = LocalDensity.current
-    val maxBarWidthDp = 100.dp
+    val maxBarWidthDp = sizing.component(100.dp)
     val maxBarWidthPx = with(density) { maxBarWidthDp.toPx() }
     val metersPerPx = 156543.03392 * Math.cos(latitude * Math.PI / 180.0) / Math.pow(2.0, zoom)
 
@@ -4083,9 +4122,9 @@ private fun MapScaleBar(zoom: Double, latitude: Double) {
     val label = if (chosenDistance >= 1000) "${chosenDistance / 1000} km" else "$chosenDistance m"
 
     Surface(color = Color.White.copy(alpha = 0.8f), shape = RoundedCornerShape(2.dp)) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)) {
-            Text(label, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.Black)
-            ComposeCanvas(modifier = Modifier.width(actualBarWidthDp).height(6.dp)) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(horizontal = sizing.spacing(6.dp), vertical = sizing.spacing(2.dp))) {
+            Text(label, fontSize = sizing.text(10.sp), fontWeight = FontWeight.Bold, color = Color.Black)
+            ComposeCanvas(modifier = Modifier.width(actualBarWidthDp).height(sizing.component(6.dp))) {
                 drawLine(Color.Black, Offset(0f, size.height), Offset(size.width, size.height), strokeWidth = 2.dp.toPx())
                 drawLine(Color.Black, Offset(0f, size.height), Offset(0f, 0f), strokeWidth = 2.dp.toPx())
                 drawLine(Color.Black, Offset(size.width, size.height), Offset(size.width, 0f), strokeWidth = 2.dp.toPx())
@@ -4112,9 +4151,10 @@ private fun MapSearchBar(
     onSearch: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     Surface(
-        modifier = modifier.height(MapSearchBarHeight),
-        shape = RoundedCornerShape(MapSearchBarHeight / 2f),
+        modifier = modifier.height(mapSearchBarHeight),
+        shape = RoundedCornerShape(mapSearchBarHeight / 2f),
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 8.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -4127,7 +4167,7 @@ private fun MapSearchBar(
                 imageVector = Icons.Default.Search,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 16.dp, end = 12.dp)
+                modifier = Modifier.padding(start = sizing.spacing(16.dp), end = sizing.spacing(12.dp))
             )
 
             Box(modifier = Modifier.weight(1f)) {
@@ -4135,7 +4175,7 @@ private fun MapSearchBar(
                     Text(
                         text = placeholder,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 16.sp,
+                        fontSize = sizing.text(16.sp),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -4146,7 +4186,7 @@ private fun MapSearchBar(
                     singleLine = true,
                     textStyle = TextStyle(
                         color = MaterialTheme.colorScheme.onSurface,
-                        fontSize = 16.sp
+                        fontSize = sizing.text(16.sp)
                     ),
                     cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                     keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
@@ -4162,14 +4202,14 @@ private fun MapSearchBar(
             IconButton(
                 onClick = onSearch,
                 modifier = Modifier
-                    .size(MapControlButtonDiameter)
+                    .size(mapControlButtonDiameter)
                     .background(MaterialTheme.colorScheme.primary, CircleShape)
             ) {
                 Icon(
                     imageVector = Icons.Default.Search,
                     contentDescription = stringResource(R.string.appstrings_search),
                     tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(26.dp)
+                    modifier = Modifier.size(sizing.component(26.dp))
                 )
             }
         }
@@ -4178,8 +4218,11 @@ private fun MapSearchBar(
 
 @Composable
 private fun SmallFloatingButton(icon: ImageVector, desc: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Surface(onClick = onClick, shape = CircleShape, color = MaterialTheme.colorScheme.surface, shadowElevation = 4.dp, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), modifier = modifier.size(MapControlButtonDiameter)) {
-        Box(contentAlignment = Alignment.Center) { Icon(icon, desc) }
+    val sizing = LocalGeoTowerUiSizing.current
+    Surface(onClick = onClick, shape = CircleShape, color = MaterialTheme.colorScheme.surface, shadowElevation = 4.dp, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), modifier = modifier.size(mapControlButtonDiameter)) {
+        // Taille explicite : sans ca l'icone garde le 24.dp par defaut de Material et ne suit
+        // pas le bouton quand le slider grossit.
+        Box(contentAlignment = Alignment.Center) { Icon(icon, desc, modifier = Modifier.size(sizing.component(24.dp))) }
     }
 }
 
@@ -4189,18 +4232,19 @@ private fun ZoomControlSegmentButton(
     shape: androidx.compose.ui.graphics.Shape,
     onClick: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     Surface(
         onClick = onClick,
         modifier = Modifier
             .fillMaxWidth()
-            .height(MapControlButtonDiameter)
+            .height(mapControlButtonDiameter)
             .clip(shape),
         shape = shape,
         color = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onSurface
     ) {
         Box(contentAlignment = Alignment.Center) {
-            Icon(icon, contentDescription = null, modifier = Modifier.size(26.dp))
+            Icon(icon, contentDescription = null, modifier = Modifier.size(sizing.component(26.dp)))
         }
     }
 }
@@ -4272,6 +4316,7 @@ private fun ActiveMapFiltersBanner(
     summary: String,
     modifier: Modifier = Modifier
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(18.dp),
@@ -4285,8 +4330,8 @@ private fun ActiveMapFiltersBanner(
     ) {
         Text(
             text = stringResource(R.string.appstrings_map_active_filters_message, summary),
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            fontSize = 12.sp,
+            modifier = Modifier.padding(horizontal = sizing.spacing(14.dp), vertical = sizing.spacing(8.dp)),
+            fontSize = sizing.text(12.sp),
             fontWeight = FontWeight.SemiBold,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
@@ -4300,6 +4345,7 @@ private fun MapCompassButton(
     modifier: Modifier = Modifier,
     onReset: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     Surface(
         modifier = modifier.clickable(onClick = onReset),
         shape = CircleShape,
@@ -4313,7 +4359,7 @@ private fun MapCompassButton(
         ) {
             Text(
                 text = "N",
-                fontSize = 10.sp,
+                fontSize = sizing.text(10.sp),
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFFD32F2F),
                 modifier = Modifier.align(Alignment.TopCenter),
@@ -4321,7 +4367,7 @@ private fun MapCompassButton(
             )
             Text(
                 text = "S",
-                fontSize = 10.sp,
+                fontSize = sizing.text(10.sp),
                 fontWeight = FontWeight.Bold,
                 color = Color.Gray,
                 modifier = Modifier.align(Alignment.BottomCenter),
@@ -4329,22 +4375,22 @@ private fun MapCompassButton(
             )
             Text(
                 text = "E",
-                fontSize = 10.sp,
+                fontSize = sizing.text(10.sp),
                 fontWeight = FontWeight.Bold,
                 color = Color.Gray,
-                modifier = Modifier.align(Alignment.CenterEnd).padding(end = 5.dp)
+                modifier = Modifier.align(Alignment.CenterEnd).padding(end = sizing.spacing(5.dp))
             )
             Text(
                 text = "O",
-                fontSize = 10.sp,
+                fontSize = sizing.text(10.sp),
                 fontWeight = FontWeight.Bold,
                 color = Color.Gray,
-                modifier = Modifier.align(Alignment.CenterStart).padding(start = 5.dp)
+                modifier = Modifier.align(Alignment.CenterStart).padding(start = sizing.spacing(5.dp))
             )
 
             ComposeCanvas(
                 modifier = Modifier
-                    .size(30.dp)
+                    .size(sizing.component(30.dp))
                     .rotate(-azimuth)
             ) {
                 val w = size.width
@@ -4919,20 +4965,21 @@ private fun formatCoverageTimestamp(raw: String?): String? {
 
 @Composable
 private fun CoverageDetailRow(label: String, value: String, valueColor: Color = Color.Unspecified) {
+    val sizing = LocalGeoTowerUiSizing.current
     Row(
         modifier = Modifier.fillMaxWidth(),
         verticalAlignment = Alignment.Top
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
+            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )
-        Spacer(modifier = Modifier.width(12.dp))
+        Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium,
+            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
             fontWeight = FontWeight.SemiBold,
             color = if (valueColor == Color.Unspecified) MaterialTheme.colorScheme.onSurface else valueColor,
             textAlign = TextAlign.End,
@@ -4947,6 +4994,7 @@ private fun SupportChoiceDialog(
     onSelect: (SupportChoice) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface,
@@ -4954,17 +5002,17 @@ private fun SupportChoiceDialog(
             Text(
                 text = stringResource(R.string.appstrings_support_picker_title, choices.size),
                 fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleLarge
+                style = sizing.textStyle(MaterialTheme.typography.titleLarge)
             )
         },
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp)),
                 modifier = Modifier.verticalScroll(rememberScrollState())
             ) {
                 Text(
                     text = stringResource(R.string.appstrings_support_picker_message),
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 choices.forEach { choice ->
@@ -4983,6 +5031,7 @@ private fun SupportChoiceDialog(
 
 @Composable
 private fun SupportChoiceRow(choice: SupportChoice, onClick: () -> Unit) {
+    val sizing = LocalGeoTowerUiSizing.current
     val subtitle = buildString {
         append(stringResource(R.string.appstrings_support_prefix))
         append(' ')
@@ -5006,23 +5055,23 @@ private fun SupportChoiceRow(choice: SupportChoice, onClick: () -> Unit) {
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+            modifier = Modifier.padding(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(10.dp))
         ) {
             OperatorGrid(operators = choice.operatorKeys)
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
             Column(modifier = Modifier.weight(1f)) {
                 if (operatorLabel.isNotBlank()) {
                     Text(
                         text = operatorLabel,
-                        style = MaterialTheme.typography.titleSmall,
+                        style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface
                     )
-                    Spacer(modifier = Modifier.height(3.dp))
+                    Spacer(modifier = Modifier.height(sizing.spacing(3.dp)))
                 }
                 Text(
                     text = subtitle,
-                    style = MaterialTheme.typography.bodySmall,
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -5037,6 +5086,7 @@ private fun SupportChoiceRow(choice: SupportChoice, onClick: () -> Unit) {
 
 @Composable
 private fun CoveragePointDetailDialog(point: SignalQuestCoveragePoint, onDismiss: () -> Unit) {
+    val sizing = LocalGeoTowerUiSizing.current
     AlertDialog(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surface,
@@ -5044,12 +5094,12 @@ private fun CoveragePointDetailDialog(point: SignalQuestCoveragePoint, onDismiss
             Text(
                 text = stringResource(R.string.appstrings_signalquest_coverage_detail_title),
                 fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.titleLarge
+                style = sizing.textStyle(MaterialTheme.typography.titleLarge)
             )
         },
         text = {
             Column(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
+                verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp)),
                 modifier = Modifier.verticalScroll(rememberScrollState())
             ) {
                 CoverageDetailRow(

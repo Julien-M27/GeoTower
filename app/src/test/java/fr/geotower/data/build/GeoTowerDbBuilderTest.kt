@@ -6,6 +6,7 @@ import java.io.File
 import java.sql.Connection
 import java.sql.DriverManager
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -44,8 +45,9 @@ class GeoTowerDbBuilderTest {
         antennes = listOf(
             row(
                 "sta_nm_anfr" to "1", "aer_id" to "AE1", "sup_id" to "S1", "tae_id" to "16",
-                "aer_nb_azimut" to "120", "aer_nb_alt_bas" to "28",
+                "aer_nb_azimut" to "120", "aer_nb_alt_bas" to "28", "aer_nb_dimension" to "1,5",
             ),
+            // Sans aer_nb_dimension : la station 2 couvre l'absence de tag [DIM: ...].
             row(
                 "sta_nm_anfr" to "2", "aer_id" to "AE2", "sup_id" to "S2", "tae_id" to "32",
                 "aer_nb_azimut" to "240", "aer_nb_alt_bas" to "30",
@@ -128,13 +130,16 @@ class GeoTowerDbBuilderTest {
             assertEquals(1, (techA["has_active"] as Number).toInt())
             assertEquals("Rue X, 75001 PARIS", techA["adresse"])
             assertEquals(
-                "LTE 800 : 791-801 MHz | En service | 2026-01-01 | Panneau : 120° (28m) [AER_ID: AE1]",
+                "LTE 800 : 791-801 MHz | En service | 2026-01-01 | Panneau : 120° (28m) [AER_ID: AE1] [DIM: 1,5m]",
                 FrequencyDetailsCodec.decode(techA["details_frequences"] as String?),
             )
 
-            // Technique station 2 : non actif (En projet).
+            // Technique station 2 : non actif (En projet), sans dimension declaree -> pas de tag [DIM].
             val techB = conn.one("SELECT * FROM technique WHERE id_anfr = '0000000002'")!!
             assertEquals(0, (techB["has_active"] as Number).toInt())
+            val detailsB = FrequencyDetailsCodec.decode(techB["details_frequences"] as String?)!!
+            assertTrue(detailsB.contains("Panneau 5G : 240° (30m) [AER_ID: AE2]"))
+            assertFalse("aucun tag [DIM] sans aer_nb_dimension", detailsB.contains("[DIM"))
 
             // Referentiels.
             val operators = conn.column("SELECT libelle FROM ref_operateur")
@@ -278,6 +283,71 @@ class GeoTowerDbBuilderTest {
                 "LTE 800 : 791-801 MHz | En service | 2026-03-01 | Panneau : 90° (20m) [AER_ID: AE5]",
                 FrequencyDetailsCodec.decode(tech["details_frequences"] as String?),
             )
+        }
+    }
+
+    @Test
+    fun keepsAzimutsOfBothStationsSharingAMutualizedAntenna() {
+        // Site mutualise reel (support 497932, Crozon) : l'ANFR declare le MEME AER_ID sur la station
+        // SFR et sur la station Bouygues. La table `antenne` ayant aer_id pour cle primaire, une seule
+        // des deux y survit -> `localisation.azimuts` de l'autre ne doit PAS pour autant tomber a NULL.
+        val file = File.createTempFile("geotower_mutualise_test", ".db").apply { deleteOnExit() }
+        val sources = AnfrSources(
+            weekly = listOf(
+                row(
+                    "sta_nm_anfr" to "0292700369", "coordonnees" to "48.245 -4.480", "adm_lb_nom" to "SFR",
+                    "statut" to "En service", "generation" to "4G", "emr_lb_systeme" to "LTE 2100",
+                    "emr_dt" to "2022-02-09", "date_maj" to "2026-06-01",
+                ),
+                row(
+                    "sta_nm_anfr" to "0292750303", "coordonnees" to "48.245 -4.480", "adm_lb_nom" to "Bouygues",
+                    "statut" to "En service", "generation" to "4G", "emr_lb_systeme" to "LTE 2100",
+                    "emr_dt" to "2022-02-16", "date_maj" to "2026-06-01",
+                ),
+            ),
+            stations = listOf(
+                row("sta_nm_anfr" to "0292700369", "adm_id" to "6"),
+                row("sta_nm_anfr" to "0292750303", "adm_id" to "7"),
+            ),
+            bandes = listOf(row("emr_id" to "E1", "ban_nb_f_deb" to "1920", "ban_nb_f_fin" to "2170", "ban_fg_unite" to "M")),
+            emetteurs = listOf(
+                row("sta_nm_anfr" to "0292700369", "emr_id" to "E1", "aer_id" to "1204115", "emr_lb_systeme" to "LTE 2100"),
+                row("sta_nm_anfr" to "0292750303", "emr_id" to "E1", "aer_id" to "1204115", "emr_lb_systeme" to "LTE 2100"),
+            ),
+            // Trois panneaux partages : chaque ligne est declaree DEUX fois, une par station (ordre du
+            // fichier ANFR : aer_id croissant, puis numero de station croissant -> Bouygues en dernier).
+            antennes = listOf(
+                row("sta_nm_anfr" to "0292700369", "aer_id" to "1204115", "sup_id" to "497932", "tae_id" to "16", "aer_nb_azimut" to "330", "aer_nb_alt_bas" to "30,8"),
+                row("sta_nm_anfr" to "0292750303", "aer_id" to "1204115", "sup_id" to "497932", "tae_id" to "16", "aer_nb_azimut" to "330", "aer_nb_alt_bas" to "30,8"),
+                row("sta_nm_anfr" to "0292700369", "aer_id" to "1204117", "sup_id" to "497932", "tae_id" to "16", "aer_nb_azimut" to "90", "aer_nb_alt_bas" to "30,8"),
+                row("sta_nm_anfr" to "0292750303", "aer_id" to "1204117", "sup_id" to "497932", "tae_id" to "16", "aer_nb_azimut" to "90", "aer_nb_alt_bas" to "30,8"),
+                row("sta_nm_anfr" to "0292700369", "aer_id" to "1204119", "sup_id" to "497932", "tae_id" to "16", "aer_nb_azimut" to "220", "aer_nb_alt_bas" to "30,8"),
+                row("sta_nm_anfr" to "0292750303", "aer_id" to "1204119", "sup_id" to "497932", "tae_id" to "16", "aer_nb_azimut" to "220", "aer_nb_alt_bas" to "30,8"),
+                // Panneau propre a Bouygues (non mutualise) : ne doit PAS remonter chez SFR.
+                row("sta_nm_anfr" to "0292750303", "aer_id" to "9588616", "sup_id" to "497932", "tae_id" to "17", "aer_nb_azimut" to "235", "aer_nb_alt_bas" to "29,4"),
+            ),
+            supports = listOf(
+                row("sta_nm_anfr" to "0292700369", "sup_id" to "497932", "nat_id" to "23", "tpo_id" to "1", "sup_nm_haut" to "31", "com_cd_insee" to "29042"),
+                row("sta_nm_anfr" to "0292750303", "sup_id" to "497932", "nat_id" to "23", "tpo_id" to "1", "sup_nm_haut" to "31", "com_cd_insee" to "29042"),
+            ),
+        )
+        val references = AnfrReferences(
+            nature = mapOf("23" to "Pylone"),
+            typeAntenne = mapOf("16" to "Panneau", "17" to "Parabole"),
+            communes = mapOf("29042" to "CROZON"),
+        )
+
+        JdbcSqlDatabase(file.absolutePath).use { db ->
+            GeoTowerDbBuilder.build(db, sources, references, emptyMap(), BuildConfig(version = "20260601_1200"))
+        }
+
+        DriverManager.getConnection("jdbc:sqlite:${file.absolutePath}").use { conn ->
+            // Les DEUX operateurs gardent les azimuts des panneaux mutualises.
+            assertEquals("90,220,330", conn.one("SELECT * FROM localisation WHERE id_anfr = '0292700369'")!!["azimuts"])
+            assertEquals("90,220,235,330", conn.one("SELECT * FROM localisation WHERE id_anfr = '0292750303'")!!["azimuts"])
+
+            // La table `antenne` reste dedupliquee par aer_id (schema Room fige) : 4 lignes, pas 7.
+            assertEquals(4L, conn.count("antenne"))
         }
     }
 

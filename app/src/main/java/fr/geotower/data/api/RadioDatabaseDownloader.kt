@@ -3,6 +3,7 @@ package fr.geotower.data.api
 import android.content.Context
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.RadioDatabaseValidator
+import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -190,6 +191,8 @@ object RadioDatabaseDownloader {
         }
 
     private fun readVerifiedRadioDatabaseInfo(): DownloadManifestDatabase? {
+        // Mode « traitement local » (niveau ≥ 2, appareil éligible) : aucun accès au manifeste serveur.
+        if (AppConfig.dbForcedLocal()) return null
         return readVerifiedDownloadManifest()
             ?.radioDatabase
             ?.takeIf { database ->

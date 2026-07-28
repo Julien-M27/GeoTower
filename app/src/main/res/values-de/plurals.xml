@@ -67,4 +67,20 @@
         <item quantity="one">Upload abgebrochen (%1$d/%2$d Foto gesendet).</item>
         <item quantity="other">Upload abgebrochen (%1$d/%2$d Fotos gesendet).</item>
     </plurals>
+    <plurals name="share_history_recorded">
+        <item quantity="one">%1$d Freigabe gespeichert</item>
+        <item quantity="other">%1$d Freigaben gespeichert</item>
+    </plurals>
+    <plurals name="share_history_stations">
+        <item quantity="one">%1$d Station</item>
+        <item quantity="other">%1$d Stationen</item>
+    </plurals>
+    <plurals name="site_network_ids_4g">
+        <item quantity="one">4G-Kennung</item>
+        <item quantity="other">4G-Kennungen</item>
+    </plurals>
+    <plurals name="site_network_ids_5g">
+        <item quantity="one">5G-Kennung</item>
+        <item quantity="other">5G-Kennungen</item>
+    </plurals>
 </resources>

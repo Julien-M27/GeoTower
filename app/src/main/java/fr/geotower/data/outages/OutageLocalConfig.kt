@@ -2,6 +2,7 @@ package fr.geotower.data.outages
 
 import android.content.Context
 import android.content.SharedPreferences
+import fr.geotower.data.models.SiteHsEntity
 
 /**
  * Réglages de la génération LOCALE des pannes (vs source serveur). Persistés dans les prefs
@@ -31,14 +32,61 @@ class OutageLocalConfig(private val prefs: SharedPreferences) {
         get() = prefs.getLong(KEY_LAST_GENERATED, 0L)
         set(value) = prefs.edit().putLong(KEY_LAST_GENERATED, value).apply()
 
+    /** Nombre de pannes produites par la dernière génération réussie. -1 si inconnu. */
+    var lastGeneratedCount: Int
+        get() = prefs.getInt(KEY_LAST_COUNT, -1)
+        set(value) = prefs.edit().putInt(KEY_LAST_COUNT, value).apply()
+
+    /**
+     * Répartition par opérateur de la dernière génération réussie (ordre décroissant), vide si
+     * inconnue. Encodée « opérateur<TAB>nombre » par ligne : pas de dépendance JSON pour 4 lignes,
+     * et les tabulations/retours ligne sont neutralisés à l'écriture.
+     */
+    var lastBreakdown: List<Pair<String, Int>>
+        get() = prefs.getString(KEY_LAST_BREAKDOWN, null)
+            ?.lineSequence()
+            ?.mapNotNull { line ->
+                val parts = line.split('\t')
+                val count = parts.getOrNull(1)?.trim()?.toIntOrNull()
+                if (parts.size == 2 && count != null && parts[0].isNotBlank()) parts[0] to count else null
+            }
+            ?.toList()
+            .orEmpty()
+        set(value) {
+            val encoded = value.joinToString("\n") { (operateur, nombre) ->
+                "${operateur.replace('\t', ' ').replace('\n', ' ')}\t$nombre"
+            }
+            prefs.edit().putString(KEY_LAST_BREAKDOWN, encoded).apply()
+        }
+
+    /**
+     * Mémorise le résultat d'une génération réussie (horodatage, total, répartition par opérateur),
+     * quelle que soit son origine : bouton « Générer maintenant », planification en arrière-plan ou
+     * régénération paresseuse à l'expiration du cache. C'est ce que relit la page « Source des pannes ».
+     */
+    fun recordGeneration(atMillis: Long, sites: List<SiteHsEntity>) {
+        lastGeneratedAtMillis = atMillis
+        lastGeneratedCount = sites.size
+        lastBreakdown = breakdownOf(sites)
+    }
+
     val frequencyMillis: Long get() = frequencyHours.toLong() * 3_600_000L
 
     companion object {
+
+        /** Répartition par opérateur, du plus touché au moins touché. */
+        fun breakdownOf(sites: List<SiteHsEntity>): List<Pair<String, Int>> =
+            sites.groupingBy { it.operateur }.eachCount()
+                .entries.sortedByDescending { it.value }
+                .map { it.key to it.value }
+
         const val PREFS_NAME = "settings"
         const val KEY_SOURCE = "outages_source"
         const val KEY_FREQUENCY_HOURS = "outages_local_frequency_hours"
         const val KEY_BACKGROUND = "outages_local_background_enabled"
         const val KEY_LAST_GENERATED = "outages_local_last_generated_at"
+        const val KEY_LAST_COUNT = "outages_local_last_count"
+        const val KEY_LAST_BREAKDOWN = "outages_local_last_breakdown"
         const val SOURCE_SERVER = "server"
         const val SOURCE_LOCAL = "local"
         const val DEFAULT_FREQUENCY_HOURS = 6

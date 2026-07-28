@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import androidx.compose.ui.unit.sp
 import fr.geotower.data.models.LocalisationEntity // ✅ NOUVEL IMPORT
 import fr.geotower.utils.AppConfig
@@ -32,6 +33,7 @@ fun SiteAddressBlock(
     cardBgColor: Color,
     blockShape: Shape
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
 
     val txtAddressLabel = stringResource(R.string.appstrings_address_label)
@@ -49,13 +51,13 @@ fun SiteAddressBlock(
         elevation = CardDefaults.cardElevation(0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Place, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                 Text(text = txtAddressLabel.replace(" : ", ""), fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             }
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
+            HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
 
             val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: stringResource(R.string.appstrings_not_specified)
             val gpsCoords = String.format(Locale.US, "%.5f, %.5f", info.latitude, info.longitude)
@@ -70,7 +72,7 @@ fun SiteAddressBlock(
                 }
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
 
             InfoLine(
                 label = txtGpsLabel,
@@ -82,7 +84,7 @@ fun SiteAddressBlock(
                 }
             )
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
 
             InfoLine(
                 label = txtDistanceLabel,

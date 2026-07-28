@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.unit.sp
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
@@ -61,6 +62,7 @@ fun ShareThroughputCalculatorBlock(
     maxIncludedBands: Int = Int.MAX_VALUE,
     modifier: Modifier = Modifier
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     val txtUnknown = stringResource(R.string.appstrings_unknown)
     val txtAzimuthNotSpecified = stringResource(R.string.appstrings_azimuth_not_specified)
     val rawFrequencies = technique?.detailsFrequences?.takeIf { it.isNotBlank() } ?: info.frequences
@@ -109,17 +111,17 @@ fun ShareThroughputCalculatorBlock(
         modifier = modifier.fillMaxWidth()
     ) {
         Column(
-            modifier = Modifier.padding(if (compact) 9.dp else 16.dp).fillMaxWidth(),
+            modifier = Modifier.padding(sizing.spacing(if (compact) 9.dp else 16.dp)).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 12.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(if (compact) 13.dp else 24.dp))
-                Spacer(Modifier.width(if (compact) 5.dp else 8.dp))
+                Icon(Icons.Default.Speed, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(sizing.component(if (compact) 13.dp else 24.dp)))
+                Spacer(Modifier.width(sizing.spacing(if (compact) 5.dp else 8.dp)))
                 Text(
                     text = stringResource(R.string.appstrings_share_throughput_title),
                     fontWeight = FontWeight.Bold,
-                    fontSize = if (compact) 11.sp else 16.sp,
-                    lineHeight = if (compact) 12.sp else 18.sp,
+                    fontSize = sizing.text(if (compact) 11.sp else 16.sp),
+                    lineHeight = sizing.text(if (compact) 12.sp else 18.sp),
                     color = MaterialTheme.colorScheme.onSurface,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
@@ -149,8 +151,8 @@ fun ShareThroughputCalculatorBlock(
             if (coneDistance != null && !compact) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(Icons.Default.Timeline, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                    Spacer(Modifier.width(8.dp))
+                    Icon(Icons.Default.Timeline, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(sizing.component(20.dp)))
+                    Spacer(Modifier.width(sizing.spacing(8.dp)))
                     Column {
                         Text(
                             text = ThroughputDisplayText.shareOptimalDistance(formatThroughputDistanceMeters(coneDistance.centerMeters)),
@@ -162,7 +164,7 @@ fun ShareThroughputCalculatorBlock(
                                 formatThroughputDistanceMeters(coneDistance.nearMeters),
                                 formatThroughputDistanceMeters(coneDistance.farMeters)
                             ),
-                            fontSize = 12.sp,
+                            fontSize = sizing.text(12.sp),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -172,8 +174,8 @@ fun ShareThroughputCalculatorBlock(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
             Text(
                 text = ThroughputDisplayText.includedBandsCount(result.includedBands.size, result.bands.size),
-                fontSize = if (compact) 8.sp else 12.sp,
-                lineHeight = if (compact) 9.sp else 14.sp,
+                fontSize = sizing.text(if (compact) 8.sp else 12.sp),
+                lineHeight = sizing.text(if (compact) 9.sp else 14.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -183,8 +185,8 @@ fun ShareThroughputCalculatorBlock(
                 Text(
                     text = stringResource(R.string.appstrings_throughput_no_bands),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = if (compact) 9.sp else 13.sp,
-                    lineHeight = if (compact) 10.sp else 15.sp
+                    fontSize = sizing.text(if (compact) 9.sp else 13.sp),
+                    lineHeight = sizing.text(if (compact) 10.sp else 15.sp)
                 )
             } else {
                 val visibleBands = if (compact) result.includedBands.take(maxIncludedBands) else result.includedBands
@@ -197,7 +199,7 @@ fun ShareThroughputCalculatorBlock(
                 if (compact && result.includedBands.size > visibleBands.size) {
                     Text(
                         text = "+ ${result.includedBands.size - visibleBands.size}",
-                        fontSize = 8.sp,
+                        fontSize = sizing.text(8.sp),
                         lineHeight = 9.sp,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         fontWeight = FontWeight.SemiBold,
@@ -209,7 +211,7 @@ fun ShareThroughputCalculatorBlock(
             if (!compact) {
                 Text(
                     text = stringResource(R.string.appstrings_share_throughput_disclaimer),
-                    fontSize = 11.sp,
+                    fontSize = sizing.text(11.sp),
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
@@ -226,19 +228,20 @@ private fun ShareThroughputMetric(
     compact: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     Column(modifier = modifier) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 if (isDownload) Icons.Default.ArrowDownward else Icons.Default.ArrowUpward,
                 null,
                 tint = iconColor,
-                modifier = Modifier.size(if (compact) 11.dp else 18.dp)
+                modifier = Modifier.size(sizing.component(if (compact) 11.dp else 18.dp))
             )
-            Spacer(Modifier.width(if (compact) 2.dp else 4.dp))
+            Spacer(Modifier.width(sizing.spacing(if (compact) 2.dp else 4.dp)))
             Text(
                 label,
-                fontSize = if (compact) 7.sp else 11.sp,
-                lineHeight = if (compact) 8.sp else 13.sp,
+                fontSize = sizing.text(if (compact) 7.sp else 11.sp),
+                lineHeight = sizing.text(if (compact) 8.sp else 13.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -247,8 +250,8 @@ private fun ShareThroughputMetric(
         Text(
             value,
             fontWeight = FontWeight.Bold,
-            fontSize = if (compact) 13.sp else 20.sp,
-            lineHeight = if (compact) 14.sp else 22.sp,
+            fontSize = sizing.text(if (compact) 13.sp else 20.sp),
+            lineHeight = sizing.text(if (compact) 14.sp else 22.sp),
             color = MaterialTheme.colorScheme.primary,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
@@ -258,20 +261,21 @@ private fun ShareThroughputMetric(
 
 @Composable
 private fun ShareThroughputBandLine(band: ShareThroughputBandResult, compact: Boolean = false) {
+    val sizing = LocalGeoTowerUiSizing.current
     Column(verticalArrangement = Arrangement.spacedBy(if (compact) 1.dp else 3.dp)) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Icon(
                 Icons.Default.Circle,
                 null,
                 tint = if (band.generation == 5) Color(0xFF7E57C2) else Color(0xFF009688),
-                modifier = Modifier.size(if (compact) 6.dp else 9.dp)
+                modifier = Modifier.size(sizing.component(if (compact) 6.dp else 9.dp))
             )
-            Spacer(Modifier.width(if (compact) 4.dp else 7.dp))
+            Spacer(Modifier.width(sizing.spacing(if (compact) 4.dp else 7.dp)))
             Text(
                 text = band.label,
                 fontWeight = FontWeight.SemiBold,
-                fontSize = if (compact) 8.sp else 13.sp,
-                lineHeight = if (compact) 9.sp else 15.sp,
+                fontSize = sizing.text(if (compact) 8.sp else 13.sp),
+                lineHeight = sizing.text(if (compact) 9.sp else 15.sp),
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f),
                 maxLines = 1,
@@ -279,8 +283,8 @@ private fun ShareThroughputBandLine(band: ShareThroughputBandResult, compact: Bo
             )
             Text(
                 text = "${formatThroughputMbps(band.downMbps)} / ${formatThroughputMbps(band.upMbps)}",
-                fontSize = if (compact) 7.sp else 12.sp,
-                lineHeight = if (compact) 8.sp else 14.sp,
+                fontSize = sizing.text(if (compact) 7.sp else 12.sp),
+                lineHeight = sizing.text(if (compact) 8.sp else 14.sp),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
                 maxLines = 1,
@@ -290,9 +294,9 @@ private fun ShareThroughputBandLine(band: ShareThroughputBandResult, compact: Bo
         if (!compact) {
             Text(
                 text = band.modulationLabel,
-                fontSize = 11.sp,
+                fontSize = sizing.text(11.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = 16.dp)
+                modifier = Modifier.padding(start = sizing.spacing(16.dp))
             )
         }
     }

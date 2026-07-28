@@ -49,6 +49,20 @@ object MapUtils {
         }
     }
 
+    // Vue satellite associée au fond OSM (Esri World Imagery, couverture mondiale).
+    object EsriSource {
+        val SATELLITE = object : OnlineTileSourceBase(
+            "Esri Satellite", 0, 19, 256, "",
+            arrayOf("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}")
+        ) {
+            override fun getTileURLString(pMapTileIndex: Long): String {
+                return baseUrl.replace("{z}", MapTileIndex.getZoom(pMapTileIndex).toString())
+                    .replace("{x}", MapTileIndex.getX(pMapTileIndex).toString())
+                    .replace("{y}", MapTileIndex.getY(pMapTileIndex).toString())
+            }
+        }
+    }
+
     val markerIconCache = android.util.LruCache<String, BitmapDrawable>(500)
     val clusterIconCache = android.util.LruCache<String, BitmapDrawable>(200)
     val radioIconCache = android.util.LruCache<String, BitmapDrawable>(300)

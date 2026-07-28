@@ -258,7 +258,12 @@ object RemoteFeatureFlags {
     object Features {
         const val DATABASE_DOWNLOAD = "database.download"
         const val DATABASE_UPDATE_CHECK = "database.updateCheck"
+        // Kill-switch de la base des identifiants eNB/gNB : la donnée vient d'un partenaire
+        // (eNB-Analytics), elle doit pouvoir être coupée sans toucher aux bases ANFR.
+        const val ENB_DATABASE = "enbDatabase.enabled"
         const val APP_UPDATE_CHECK = "appUpdate.check"
+        // Kill-switch distant du mode « traitement local » (défaut activé) : false ⇒ niveau effectif = 0.
+        const val LOCAL_MODE_ENABLED = "localMode.enabled"
         const val OUTAGES_DATA = "outages.data"
         const val OUTAGES_MAP_LAYER = "outages.mapLayer"
         const val OUTAGES_SITE_STATUS = "outages.siteStatus"
@@ -418,6 +423,7 @@ object RemoteFeatureFlags {
             Features.DATABASE_DOWNLOAD to true,
             Features.DATABASE_UPDATE_CHECK to true,
             Features.APP_UPDATE_CHECK to true,
+            Features.LOCAL_MODE_ENABLED to true,
             Features.OUTAGES_DATA to true,
             Features.OUTAGES_MAP_LAYER to true,
             Features.OUTAGES_SITE_STATUS to true,

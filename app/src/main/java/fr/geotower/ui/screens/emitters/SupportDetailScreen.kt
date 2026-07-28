@@ -94,7 +94,9 @@ import fr.geotower.ui.components.InfoLine
 import fr.geotower.ui.components.MiniMapViewMode
 import fr.geotower.ui.components.RadioShareMenu
 import fr.geotower.ui.components.SupportShareMenu
+import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.geoTowerFadingEdge
+import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
@@ -109,6 +111,7 @@ import fr.geotower.utils.FrequencyFilterSelection
 import fr.geotower.utils.activeOperatorKeysForSiteStatusFilter
 import fr.geotower.utils.combineOperatorKeyFilters
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.SupportPagePrefs
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
@@ -138,6 +141,7 @@ fun SupportDetailScreen(
     val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
     val uiStyle = LocalGeoTowerUiStyle.current
+    val sizing = uiStyle.sizing
 
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
@@ -196,6 +200,11 @@ fun SupportDetailScreen(
     val scrollState = rememberScrollState()
 
     LaunchedEffect(siteId, effectiveHighlightedOperatorKey, featureFlags, refreshTrigger) {
+        // Retenu hors du bloc IO pour alimenter les chargements réseau qui suivent, sans les
+        // faire attendre l'affichage.
+        var loadedAntennas: List<LocalisationEntity> = emptyList()
+        val forceOutageRefresh = isRefreshing
+
         // 1️⃣ CHARGEMENT RAPIDE (Base de données) -> Bloque l'écran une fraction de seconde
         try {
             if (!isRefreshing) {
@@ -235,8 +244,14 @@ fun SupportDetailScreen(
                 val canonicalSupportId = selectedPhysique?.idSupport?.takeIf { it.isNotBlank() }
                 val supportAntennas = canonicalSupportId
                     ?.let { supportId ->
-                        repository.getAntennasByExactId(supportId)
-                            .filterBySupportId(repository, supportId)
+                        // `initialSearch` est déjà le résultat de cette requête quand l'id de route
+                        // est l'id de support canonique (cas de l'ouverture depuis la carte).
+                        val bySupport = if (supportId == siteId.trim()) {
+                            initialSearch
+                        } else {
+                            repository.getAntennasByExactId(supportId)
+                        }
+                        bySupport.filterBySupportId(repository, supportId)
                     }
                     .orEmpty()
 
@@ -274,6 +289,7 @@ fun SupportDetailScreen(
                     if (matchedOp != null) priorityList.indexOf(matchedOp) else 99
                 }
                 antennas = sortedAntennas
+                loadedAntennas = sortedAntennas
 
                 val techMap = mutableMapOf<String, TechniqueEntity>()
                 if (sortedAntennas.isNotEmpty()) {
@@ -289,37 +305,12 @@ fun SupportDetailScreen(
                     val supportRadioId = fetchedPhysique?.idSupport ?: canonicalSupportId ?: siteId
                     radioSupportMarkers = radioRepository.getMarkersForSupport(supportRadioId)
 
-                    sortedAntennas.forEach { ant ->
-                        val tech = repository.getTechniqueByAnfr(ant.idAnfr).firstOrNull()
-                        if (tech != null) techMap[ant.idAnfr] = tech
-                    }
+                    // Une seule requête `IN (…)` au lieu d'une par antenne du support.
+                    techMap.putAll(repository.getTechniqueDetailsByIds(sortedAntennas.map { it.idAnfr }))
                 } else {
                     radioSupportMarkers = radioRepository.getMarkersForSupport(siteId)
                 }
                 techniquesMap = techMap
-
-                // TÉLÉCHARGEMENT DES PANNES
-                try {
-                    val allHs = repository.getSitesHs()
-                    val tempOutageMap = mutableMapOf<String, fr.geotower.data.models.SiteHsEntity>()
-                    sortedAntennas.forEach { ant ->
-                        val hsData = allHs.firstOrNull { hs ->
-                            val hsId = hs.idAnfr.toLongOrNull()
-                            val antId = ant.idAnfr.toLongOrNull()
-                            hsId != null && hsId == antId
-                        }
-                        if (hsData != null) {
-                            tempOutageMap[ant.idAnfr] = hsData
-                        }
-                    }
-                    // Propagation « zone blanche » : si un opérateur du support ZB est déclaré HS,
-                    // les autres opérateurs ZB sans déclaration passent en « potentiellement en panne ».
-                    fr.geotower.utils.zbPotentialOutagesForSite(sortedAntennas, tempOutageMap.values.toList())
-                        .forEach { potential -> tempOutageMap.putIfAbsent(potential.idAnfr, potential) }
-                    hsDataMap = tempOutageMap
-                } catch (e: Exception) {
-                    AppLogger.w(TAG_SUPPORT_DETAIL, "Outage data request failed", e)
-                }
             } // Fin du bloc IO Base de données
         } catch (e: Exception) {
             AppLogger.w(TAG_SUPPORT_DETAIL, "Support details request failed", e)
@@ -327,7 +318,36 @@ fun SupportDetailScreen(
             isLoading = false // 🚨 L'ÉCRAN S'AFFICHE IMMÉDIATEMENT ICI !
         }
 
-        // 2️⃣ CHARGEMENT RÉSEAU DES PHOTOS (En arrière-plan, ne bloque pas l'écran)
+        // 2️⃣ PANNES (En arrière-plan : la source est un fichier national, potentiellement réseau)
+        launch(Dispatchers.IO) {
+            if (loadedAntennas.isEmpty()) {
+                hsDataMap = emptyMap()
+                return@launch
+            }
+            try {
+                val allHs = repository.getSitesHs(forceRefresh = forceOutageRefresh)
+                val tempOutageMap = mutableMapOf<String, fr.geotower.data.models.SiteHsEntity>()
+                loadedAntennas.forEach { ant ->
+                    val hsData = allHs.firstOrNull { hs ->
+                        val hsId = hs.idAnfr.toLongOrNull()
+                        val antId = ant.idAnfr.toLongOrNull()
+                        hsId != null && hsId == antId
+                    }
+                    if (hsData != null) {
+                        tempOutageMap[ant.idAnfr] = hsData
+                    }
+                }
+                // Propagation « zone blanche » : si un opérateur du support ZB est déclaré HS,
+                // les autres opérateurs ZB sans déclaration passent en « potentiellement en panne ».
+                fr.geotower.utils.zbPotentialOutagesForSite(loadedAntennas, tempOutageMap.values.toList())
+                    .forEach { potential -> tempOutageMap.putIfAbsent(potential.idAnfr, potential) }
+                hsDataMap = tempOutageMap
+            } catch (e: Exception) {
+                AppLogger.w(TAG_SUPPORT_DETAIL, "Outage data request failed", e)
+            }
+        }
+
+        // 3️⃣ CHARGEMENT RÉSEAU DES PHOTOS (En arrière-plan, ne bloque pas l'écran)
         launch(Dispatchers.IO) {
             if (!canUseSupportPhotos) {
                 communityPhotos = emptyList()
@@ -542,7 +562,8 @@ fun SupportDetailScreen(
             antennas = antennas,
             sitesHs = hsDataMap.values,
             showSitesInService = AppConfig.showSitesInService.value,
-            showSitesOutOfService = AppConfig.showSitesOutOfService.value
+            showSitesOutOfService = AppConfig.showSitesOutOfService.value,
+            showProjectSites = AppConfig.showProjectSites.value
         )
     } else {
         null
@@ -745,18 +766,19 @@ fun SupportDetailScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .geoTowerFadingEdge(scrollState)
+                        .pageScrollbar(PageScrollPrefs.SUPPORT, scrollState)
                         .verticalScroll(scrollState)
                         .navigationBarsPadding()
-                        .padding(bottom = 32.dp)
+                        .padding(bottom = sizing.spacing(32.dp))
                 ) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
 
                     pageSupportOrder.forEach { block ->
                         when (block) {
                             "map" -> {
                                 if (showMap) {
                                     fr.geotower.ui.components.SharedMiniMapCard(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp)),
                                         centerLat = mainRadio.latitude,
                                         centerLon = mainRadio.longitude,
                                         mappedAntennas = listOf(radioMiniMapAntenna),
@@ -786,10 +808,10 @@ fun SupportDetailScreen(
                             }
                             "open_map" -> {
                                 if (showOpenMap) {
-                                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
                                         Button(
                                             onClick = { safeClick { openMapAt(mainRadio.latitude, mainRadio.longitude) } },
-                                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                                            modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
                                             shape = buttonShape,
                                             colors = ButtonDefaults.buttonColors(
                                                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -797,9 +819,9 @@ fun SupportDetailScreen(
                                             )
                                         ) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(24.dp))
-                                                Spacer(modifier = Modifier.width(12.dp))
-                                                Text(stringResource(R.string.appstrings_open_map), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
+                                                Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+                                                Text(stringResource(R.string.appstrings_open_map), fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp))
                                             }
                                         }
                                     }
@@ -807,10 +829,10 @@ fun SupportDetailScreen(
                             }
                             "nav" -> {
                                 if (showNav && canUseSupportNavigation) {
-                                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
                                         Button(
                                             onClick = { safeClick { showNavigationSheet = true } },
-                                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                                            modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
                                             shape = buttonShape,
                                             colors = ButtonDefaults.buttonColors(
                                                 containerColor = MaterialTheme.colorScheme.primary,
@@ -818,9 +840,9 @@ fun SupportDetailScreen(
                                             )
                                         ) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(24.dp))
-                                                Spacer(modifier = Modifier.width(12.dp))
-                                                Text(stringResource(R.string.appstrings_nav_to_site), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                                Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
+                                                Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+                                                Text(stringResource(R.string.appstrings_nav_to_site), fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp))
                                             }
                                         }
                                     }
@@ -837,14 +859,14 @@ fun SupportDetailScreen(
                                         useOneUi = useOneUi,
                                         buttonShape = buttonShape,
                                         globalMapRef = globalMapRef,
-                                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                        modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))
                                     )
                                 }
                             }
                         }
                     }
 
-                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
                         fr.geotower.ui.components.SupportRadioPresenceCard(
                             radioMarkers = radioSupportMarkers,
                             cardBgColor = cardBgColor,
@@ -867,12 +889,13 @@ fun SupportDetailScreen(
                     modifier = Modifier
                         .fillMaxSize()
                         .geoTowerFadingEdge(scrollState)
+                        .pageScrollbar(PageScrollPrefs.SUPPORT, scrollState)
                         .verticalScroll(scrollState)
                         // 🚨 AJOUT : Ajoute un espace à la fin du défilement pour ne pas cacher le dernier élément sous les boutons
                         .navigationBarsPadding()
-                        .padding(bottom = 32.dp)
+                        .padding(bottom = sizing.spacing(32.dp))
                 ) {
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
 
                     if (pendingPhotoDraftId != null && pendingSharedPhotoUris.isNotEmpty() && canUseSharedPhotoUpload) {
                         SupportSharedPhotoUploadCard(
@@ -899,7 +922,7 @@ fun SupportDetailScreen(
                             "map" -> {
                                 if (showMap) {
                                     fr.geotower.ui.components.SharedMiniMapCard(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp)),
                                         centerLat = mainInfo.latitude,
                                         centerLon = mainInfo.longitude,
                                         mappedAntennas = antennas,
@@ -932,7 +955,7 @@ fun SupportDetailScreen(
                             "photos" -> {
                                 // 🚨 CORRECTION : On retire "&& communityPhotos.isNotEmpty()"
                                 if (showPhotos && canUseSupportPhotos) {
-                                    Box(modifier = Modifier.padding(horizontal = 16.dp).padding(bottom = 8.dp)) {
+                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp)).padding(bottom = sizing.spacing(8.dp))) {
                                         CommunityPhotosSectionShared(
                                             photos = communityPhotos,
                                             operatorName = null,
@@ -950,10 +973,10 @@ fun SupportDetailScreen(
                             }
                             "open_map" -> {
                                 if (showOpenMap) {
-                                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
                                         Button(
                                             onClick = { safeClick { openMapAt(mainInfo.latitude, mainInfo.longitude) } },
-                                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                                            modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
                                             shape = buttonShape,
                                             colors = ButtonDefaults.buttonColors(
                                                 containerColor = MaterialTheme.colorScheme.secondaryContainer,
@@ -961,9 +984,9 @@ fun SupportDetailScreen(
                                             )
                                         ) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(24.dp))
-                                                Spacer(modifier = Modifier.width(12.dp))
-                                                Text(stringResource(R.string.appstrings_open_map), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                                Icon(Icons.Default.Map, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
+                                                Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+                                                Text(stringResource(R.string.appstrings_open_map), fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp))
                                             }
                                         }
                                     }
@@ -971,10 +994,10 @@ fun SupportDetailScreen(
                             }
                             "nav" -> {
                                 if (showNav && canUseSupportNavigation) {
-                                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
                                         Button(
                                             onClick = { safeClick { showNavigationSheet = true } },
-                                            modifier = Modifier.fillMaxWidth().height(56.dp),
+                                            modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
                                             shape = buttonShape,
                                             colors = ButtonDefaults.buttonColors(
                                                 containerColor = MaterialTheme.colorScheme.primary,
@@ -982,9 +1005,9 @@ fun SupportDetailScreen(
                                             )
                                         ) {
                                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(24.dp))
-                                                Spacer(modifier = Modifier.width(12.dp))
-                                                Text(stringResource(R.string.appstrings_nav_to_site), fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                                                Icon(Icons.Default.Navigation, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp)))
+                                                Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+                                                Text(stringResource(R.string.appstrings_nav_to_site), fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp))
                                             }
                                         }
                                     }
@@ -992,7 +1015,7 @@ fun SupportDetailScreen(
                             }
                             "share" -> {
                                 if (showShare && canUseSupportShare) {
-                                    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
                                         SupportShareMenu(
                                             siteId = siteId,
                                             antennas = antennas,
@@ -1033,7 +1056,7 @@ fun SupportDetailScreen(
                     }
 
                     if (radioSupportMarkers.isNotEmpty()) {
-                        Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                        Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
                             fr.geotower.ui.components.SupportRadioPresenceCard(
                                 radioMarkers = radioSupportMarkers,
                                 cardBgColor = cardBgColor,
@@ -1052,6 +1075,7 @@ fun SupportDetailScreen(
                     }
                 }
             }
+            PageScrollEdgeButtons(PageScrollPrefs.SUPPORT, scrollState)
         }
 
         if (showNavigationSheet && navigationTarget != null && canUseSupportNavigation) {
@@ -1256,21 +1280,22 @@ private fun SupportSharedPhotoUploadCard(
     blockShape: RoundedCornerShape,
     buttonShape: androidx.compose.ui.graphics.Shape
 ) {
-    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(cardBgColor, blockShape)
-                .padding(16.dp)
+                .padding(sizing.spacing(16.dp))
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     Icons.Default.PhotoLibrary,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.primary,
-                    modifier = Modifier.size(28.dp)
+                    modifier = Modifier.size(sizing.component(28.dp))
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.shared_photo_support_title),
@@ -1279,19 +1304,19 @@ private fun SupportSharedPhotoUploadCard(
                     )
                     Text(
                         text = pluralStringResource(R.plurals.shared_photo_support_ready, photoCount, photoCount),
-                        fontSize = 13.sp,
+                        fontSize = sizing.text(13.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
             if (operators.isEmpty()) {
                 Text(
                     text = stringResource(R.string.shared_photo_support_no_operator),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontSize = 14.sp
+                    fontSize = sizing.text(14.sp)
                 )
             } else {
                 operators.forEach { operator ->
@@ -1304,7 +1329,7 @@ private fun SupportSharedPhotoUploadCard(
                                 else Modifier.clickable { onToggleOperator(operator.key) }
                             )
                             .alpha(if (isUploading) 0.45f else 1f)
-                            .padding(vertical = 6.dp),
+                            .padding(vertical = sizing.spacing(6.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Checkbox(
@@ -1314,21 +1339,21 @@ private fun SupportSharedPhotoUploadCard(
                         )
                         Box(
                             modifier = Modifier
-                                .size(10.dp)
+                                .size(sizing.component(10.dp))
                                 .background(Color(OperatorColors.colorArgbForKey(operator.key)), RoundedCornerShape(999.dp))
                         )
-                        Spacer(modifier = Modifier.width(10.dp))
+                        Spacer(modifier = Modifier.width(sizing.spacing(10.dp)))
                         Text(
                             text = operator.label,
                             color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold
                         )
                         if (isUploading) {
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                             Text(
                                 text = stringResource(R.string.shared_photo_operator_uploading),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                fontSize = 12.sp
+                                fontSize = sizing.text(12.sp)
                             )
                         }
                     }
@@ -1338,23 +1363,23 @@ private fun SupportSharedPhotoUploadCard(
                     Text(
                         text = stringResource(R.string.shared_photo_support_select_one),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontSize = 13.sp,
-                        modifier = Modifier.padding(top = 2.dp)
+                        fontSize = sizing.text(13.sp),
+                        modifier = Modifier.padding(top = sizing.spacing(2.dp))
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(14.dp)))
 
             Button(
                 onClick = onUpload,
                 enabled = operators.isNotEmpty() && selectedOperatorKeys.isNotEmpty(),
-                modifier = Modifier.fillMaxWidth().height(54.dp),
+                modifier = Modifier.fillMaxWidth().height(sizing.component(54.dp)),
                 shape = buttonShape,
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary)
             ) {
                 Icon(Icons.Default.CloudUpload, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                 Text(stringResource(R.string.appstrings_upload_photos_prompt), fontWeight = FontWeight.Bold)
             }
         }
@@ -1369,6 +1394,7 @@ private fun RadioOnlySupportDetailsSection(
     cardBgColor: Color,
     blockShape: RoundedCornerShape
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
     val txtNotSpecified = stringResource(R.string.appstrings_not_specified)
     val txtIdNumber = stringResource(R.string.appstrings_id_number)
@@ -1419,12 +1445,12 @@ private fun RadioOnlySupportDetailsSection(
         "--"
     }
 
-    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(cardBgColor, blockShape)
-                .padding(16.dp)
+                .padding(sizing.spacing(16.dp))
         ) {
             InfoLine(
                 label = txtIdNumber,
@@ -1439,7 +1465,7 @@ private fun RadioOnlySupportDetailsSection(
                     }
                 }
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
             InfoLine(
                 label = txtAddressLabel,
                 value = fullAddress,

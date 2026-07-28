@@ -288,6 +288,15 @@ fun RadioDatabaseDownloadCard(
                     else -> "Télécharger les radios"
                 }
 
+                if (fr.geotower.utils.AppConfig.dbForcedLocal()) {
+                    Text(
+                        text = stringResource(R.string.local_mode_download_disabled),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(8.dp)),
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
                 Button(
                     onClick = {
                         safeClick("radio_database_start_download") {

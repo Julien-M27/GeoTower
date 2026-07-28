@@ -22,6 +22,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import androidx.compose.ui.unit.sp
 import fr.geotower.data.models.LocalisationEntity
 import fr.geotower.data.models.PhysiqueEntity
@@ -59,6 +60,7 @@ fun SupportDetailsSection(
     cardBgColor: Color,
     blockShape: Shape
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
     val isMi = AppConfig.distanceUnit.intValue == 1
 
@@ -83,13 +85,13 @@ fun SupportDetailsSection(
     val txtFromMyPosition = stringResource(R.string.appstrings_from_my_position)
     val txtBearingLabel = stringResource(R.string.appstrings_bearing_label)
 
-    Box(modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(blockShape)
                 .background(cardBgColor)
-                .padding(16.dp)
+                .padding(sizing.spacing(16.dp))
         ) {
             val fullAddress = technique?.adresse?.takeIf { it.isNotBlank() } ?: stringResource(R.string.appstrings_not_specified)
             val gpsCoords = String.format(Locale.US, "%.5f°, %.5f°", mainInfo.latitude, mainInfo.longitude)
@@ -110,7 +112,7 @@ fun SupportDetailsSection(
                     }
                 }
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
 
             InfoLine(
                 label = txtAddressLabel,
@@ -171,14 +173,15 @@ fun SupportDetailsSection(
 
 @Composable
 fun InfoLine(label: String, value: String, onCopy: (() -> Unit)? = null) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(2.dp)), verticalAlignment = Alignment.CenterVertically) {
         Text(text = buildAnnotatedString {
             withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) { append(label) }
             withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(value) }
-        }, fontSize = 14.sp, modifier = Modifier.weight(1f))
+        }, fontSize = sizing.text(14.sp), modifier = Modifier.weight(1f))
         if (onCopy != null) {
-            IconButton(onClick = onCopy, modifier = Modifier.size(24.dp)) {
-                Icon(imageVector = Icons.Default.ContentCopy, contentDescription = stringResource(R.string.appstrings_copy), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(16.dp))
+            IconButton(onClick = onCopy, modifier = Modifier.size(sizing.component(24.dp))) {
+                Icon(imageVector = Icons.Default.ContentCopy, contentDescription = stringResource(R.string.appstrings_copy), tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(sizing.component(16.dp)))
             }
         }
     }
@@ -193,6 +196,7 @@ fun SiteSupportDetailsBlock(
     cardBgColor: Color,
     blockShape: Shape
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val txtSupportDetailsTitle = stringResource(R.string.appstrings_support_details_title)
     val txtSupportNature = stringResource(R.string.appstrings_support_nature)
     val txtOwner = stringResource(R.string.appstrings_owner)
@@ -224,14 +228,14 @@ fun SiteSupportDetailsBlock(
         elevation = CardDefaults.cardElevation(0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxWidth()) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                 Text(text = txtSupportDetailsTitle, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)
             }
             HorizontalDivider(
-                modifier = Modifier.padding(vertical = 12.dp),
+                modifier = Modifier.padding(vertical = sizing.spacing(12.dp)),
                 color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
             )
 
@@ -241,18 +245,18 @@ fun SiteSupportDetailsBlock(
             val likelyOrangeVendor = resolveLikelyOrangeVendor(info)
 
             InfoLine(label = "$txtSupportNature : ", value = nature)
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
             InfoLine(label = "$txtOwner : ", value = proprietaire)
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
             InfoLine(label = "$txtExploitant : ", value = exploitant)
             if (likelyOrangeVendor != null) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
                 InfoLine(label = "$txtLikelyNetworkVendor : ", value = likelyOrangeVendor)
             }
 
             // ✅ AFFICHAGE DES NOUVELLES INFOS DE DISTANCE
             if (distanceMeters != null) {
-                Spacer(modifier = Modifier.height(4.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
                 InfoLine(txtDistanceLabel, "$finalDistanceStr $txtFromMyPosition")
                 if (bearingStr.isNotBlank()) {
                     InfoLine(txtBearingLabel, bearingStr)

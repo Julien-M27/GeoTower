@@ -24,6 +24,7 @@ import fr.geotower.data.models.PhysiqueEntity
 import fr.geotower.data.models.RadioFilterMasks
 import fr.geotower.data.models.RefTypeAntenneDbEntity
 import fr.geotower.data.models.TechniqueEntity
+import fr.geotower.data.models.isDeclaredActive
 import fr.geotower.data.api.SignalQuestClient
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.models.SiteHsEntity
@@ -45,7 +46,9 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -356,7 +359,7 @@ class AnfrRepository(
         LocalOutageProvider(
             cache = OutageLocalCache(context),
             frequencyMillis = { outageLocalConfig.frequencyMillis },
-            markGenerated = { outageLocalConfig.lastGeneratedAtMillis = it },
+            markGenerated = { at, sites -> outageLocalConfig.recordGeneration(at, sites) },
             generate = { lastUpdate, progress -> LocalOutageGenerator.create(dao).generate(lastUpdate, progress) },
         )
     }
@@ -381,6 +384,7 @@ class AnfrRepository(
 
     private fun shouldUseLiveApiFallback(featureId: String): Boolean {
         if (
+            AppConfig.blockCommunityAndUpdates() ||
             !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.LIVE_API_FR) ||
             !RemoteFeatureFlags.isFeatureEnabled(featureId)
         ) {
@@ -802,6 +806,40 @@ class AnfrRepository(
             bounds.longitudeRanges
                 .flatMap { range ->
                     getLocalisationsInBox(
+                        minLat = bounds.minLat,
+                        maxLat = bounds.maxLat,
+                        minLon = range.min,
+                        maxLon = range.max
+                    )
+                }
+                .distinctBy { it.idAnfr }
+        }
+        return enrichRadioBandMasksFromDetails(localisations, detailBackedBandMask)
+    }
+
+    /**
+     * Variante de [getAntennasInBox] restreinte aux sites « totalement en projet » (aucune
+     * émission en service). Le filtre est poussé en SQL : le filtre carte désactive le
+     * clustering, on ne veut donc pas charger toute la zone pour n'en garder que quelques
+     * pourcents côté client.
+     */
+    suspend fun getProjectAntennasInBox(
+        latNorth: Double,
+        lonEast: Double,
+        latSouth: Double,
+        lonWest: Double,
+        detailBackedBandMask: Int = DETAIL_BACKED_5G_BANDS
+    ): List<LocalisationEntity> {
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_BBOX)) {
+            return getLiveSitesInBox(latNorth, lonEast, latSouth, lonWest)
+                .filterNot { it.isDeclaredActive() }
+        }
+
+        val bounds = mapQueryBounds(latNorth, lonEast, latSouth, lonWest)
+        val localisations = queryLocalDatabase(emptyList()) {
+            bounds.longitudeRanges
+                .flatMap { range ->
+                    getProjectLocalisationsInBox(
                         minLat = bounds.minLat,
                         maxLat = bounds.maxLat,
                         minLon = range.min,
@@ -1329,12 +1367,56 @@ class AnfrRepository(
     // =================================================================
     // 3. PANNES RÉSEAU (Nouveau système GeoJSON GeoTower)
     // =================================================================
-    suspend fun getSitesHs(): List<SiteHsEntity> {
+    /**
+     * Pannes réseau, servies depuis un **cache mémoire partagé par tout le process**.
+     *
+     * Le fichier de pannes est national : le retélécharger (ou re-parser le cache disque local) à
+     * chaque ouverture de site coûtait un aller-retour réseau complet + un parse JSON intégral, en
+     * plein chemin bloquant des fiches support/site. On mémorise donc le résultat pendant
+     * [SITES_HS_CACHE_TTL_MS], et les appels concurrents se partagent le même chargement (mutex).
+     *
+     * @param forceRefresh ignore le cache (pull-to-refresh explicite de l'utilisateur).
+     */
+    suspend fun getSitesHs(forceRefresh: Boolean = false): List<SiteHsEntity> {
         if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.OUTAGES_DATA)) {
             return emptyList()
         }
-        // Source « générée localement » : télécharge les CSV opérateurs + géocode via la base ANFR.
-        if (outageLocalConfig.useLocalSource) {
+
+        val sourceKey = currentSitesHsSourceKey()
+        if (!forceRefresh) readSitesHsCache(sourceKey)?.let { return it }
+
+        return sitesHsCacheMutex.withLock {
+            // Un appel concurrent a pu remplir le cache pendant l'attente du verrou.
+            if (!forceRefresh) readSitesHsCache(sourceKey)?.let { return@withLock it }
+
+            val sites = loadSitesHs()
+            // Une liste vide vient presque toujours d'un échec (réseau coupé, provider off) :
+            // on ne la mémorise pas, sinon l'app resterait « sans pannes » pendant tout le TTL.
+            if (sites.isNotEmpty()) storeSitesHsCache(sourceKey, sites)
+            sites
+        }
+    }
+
+    /** Distingue les deux sources possibles : un changement de réglage doit invalider le cache. */
+    private fun currentSitesHsSourceKey(): String {
+        return if (outageLocalConfig.useLocalSource || AppConfig.outagesLocal()) "local" else "remote"
+    }
+
+    private fun readSitesHsCache(sourceKey: String): List<SiteHsEntity>? {
+        val cached = sitesHsCache ?: return null
+        if (cached.sourceKey != sourceKey) return null
+        if (System.currentTimeMillis() - cached.loadedAtMillis >= SITES_HS_CACHE_TTL_MS) return null
+        return cached.sites
+    }
+
+    private fun storeSitesHsCache(sourceKey: String, sites: List<SiteHsEntity>) {
+        sitesHsCache = CachedSitesHs(sourceKey, System.currentTimeMillis(), sites)
+    }
+
+    private suspend fun loadSitesHs(): List<SiteHsEntity> {
+        // Source « traitée localement » : télécharge les CSV opérateurs + géocode via la base ANFR.
+        // Activée par le réglage outage OU par le mode « traitement local » (niveau ≥ 1).
+        if (outageLocalConfig.useLocalSource || AppConfig.outagesLocal()) {
             return localOutageProvider.getSites()
         }
         if (!RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.OUTAGES_GEOTOWER)) {
@@ -1458,15 +1540,42 @@ class AnfrRepository(
      */
     suspend fun regenerateLocalSitesHs(
         onProgress: OutageProgressCallback = NoOutageProgress,
-    ): List<SiteHsEntity> = localOutageProvider.regenerate(force = true, onProgress = onProgress)
+    ): List<SiteHsEntity> {
+        val sites = localOutageProvider.regenerate(force = true, onProgress = onProgress)
+        // Le cache mémoire deviendrait obsolète juste après une génération manuelle.
+        sitesHsCache = null
+        if (sites.isNotEmpty()) storeSitesHsCache(currentSitesHsSourceKey(), sites)
+        return sites
+    }
 
     private fun org.json.JSONObject.optNullableString(name: String): String? {
         return if (isNull(name)) null else optString(name)
     }
 
+    /** Entrée du cache mémoire des pannes : la source + l'instant de chargement bornent sa validité. */
+    private data class CachedSitesHs(
+        val sourceKey: String,
+        val loadedAtMillis: Long,
+        val sites: List<SiteHsEntity>,
+    )
+
     private companion object {
         const val TAG_DB = "GeoTowerDb"
         const val TAG_MAP = "GeoTowerMap"
+
+        /**
+         * Durée de vie du cache mémoire des pannes. Volontairement court : les pannes bougent, mais
+         * plusieurs écrans ouverts à la suite (carte → support → site) doivent partager un seul
+         * chargement. Le cache est au niveau process (plusieurs `AnfrRepository` coexistent :
+         * application, activité, service live, worker).
+         */
+        const val SITES_HS_CACHE_TTL_MS = 5 * 60 * 1000L
+
+        val sitesHsCacheMutex = Mutex()
+
+        @Volatile
+        var sitesHsCache: CachedSitesHs? = null
+
         const val SQLITE_IN_CLAUSE_BATCH_SIZE = 900
         const val LIVE_DETAIL_LOOKUP_LIMIT = 120
         const val LIVE_BBOX_TILE_REQUEST_LIMIT = 96

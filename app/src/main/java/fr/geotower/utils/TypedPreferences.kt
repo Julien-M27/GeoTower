@@ -66,6 +66,7 @@ object MapDisplayPrefs {
     val showSitesOutOfService = BooleanPreference("show_sites_out_of_service", true)
     val hideUndergroundSites = BooleanPreference(AppConfig.PREF_HIDE_UNDERGROUND_SITES, false)
     val showOnlyZbSites = BooleanPreference(AppConfig.PREF_SHOW_ONLY_ZB_SITES, false)
+    val showProjectSites = BooleanPreference(AppConfig.PREF_SHOW_PROJECT_SITES, true)
     val showTechno2G = BooleanPreference("show_techno_2g", true)
     val showTechno3G = BooleanPreference("show_techno_3g", true)
     val showTechno4G = BooleanPreference("show_techno_4g", true)
@@ -93,7 +94,7 @@ object SitePagePrefs {
     const val ORDER = "page_site_order"
     const val MINI_MAP_MODE = "page_site_mini_map_mode"
     const val DEFAULT_ORDER =
-        "operator,bearing_height,map,support_details,elevation_profile,theoretical_coverage,throughput_calculator,open_map,photos,speedtest,nav,share,panel_heights,ids,dates,address,status,freqs,links"
+        "operator,bearing_height,map,support_details,elevation_profile,theoretical_coverage,throughput_calculator,open_map,photos,speedtest,nav,share,panel_heights,ids,network_ids,dates,address,status,freqs,links"
 
     val defaultOrder = DEFAULT_ORDER.split(",")
     val operator = BooleanPreference("page_site_operator", true)
@@ -103,6 +104,7 @@ object SitePagePrefs {
     val photos = BooleanPreference("page_site_photos", true)
     val panelHeights = BooleanPreference("page_site_panel_heights", true)
     val ids = BooleanPreference("page_site_ids", true)
+    val networkIds = BooleanPreference("page_site_network_ids", true)
     val openMap = BooleanPreference("page_site_open_map", true)
     val elevationProfile = BooleanPreference("page_site_elevation_profile", true)
     val theoreticalCoverage = BooleanPreference("page_site_theoretical_coverage", true)
@@ -165,6 +167,18 @@ object SitePagePrefs {
             mutableOrder.remove("open_map")
             mutableOrder.add(openMapIndex, "elevation_profile")
             mutableOrder.add(openMapIndex + 1, "open_map")
+        }
+        // Sans cette reprise, un ordre enregistre avant l'arrivee du bloc ne le contiendrait pas et
+        // l'utilisateur ne le verrait jamais. Calcule en dernier pour se placer dans la liste finale :
+        // a cote des identifiants ANFR, sinon a cote des details du support, sinon en fin de page.
+        if (!mutableOrder.contains("network_ids")) {
+            val idsIndex = mutableOrder.indexOf("ids")
+            val supportDetailsIndex = mutableOrder.indexOf("support_details")
+            when {
+                idsIndex >= 0 -> mutableOrder.add(idsIndex + 1, "network_ids")
+                supportDetailsIndex >= 0 -> mutableOrder.add(supportDetailsIndex + 1, "network_ids")
+                else -> mutableOrder.add("network_ids")
+            }
         }
         return mutableOrder
     }

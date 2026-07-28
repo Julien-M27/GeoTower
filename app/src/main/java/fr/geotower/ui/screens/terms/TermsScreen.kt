@@ -34,11 +34,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import fr.geotower.R
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.geoTowerFadingEdge
+import fr.geotower.ui.components.pageScrollbar
+import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 
@@ -83,21 +87,28 @@ fun TermsScreen(navController: NavController) {
             )
         }
     ) { innerPadding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(uiStyle.backgroundColor)
                 .padding(innerPadding)
-                .geoTowerFadingEdge(scrollState, fadeHeight = uiStyle.sizing.component(72.dp))
-                .verticalScroll(scrollState)
-                .navigationBarsPadding()
-                .padding(
-                    horizontal = uiStyle.sizing.spacing(20.dp),
-                    vertical = uiStyle.sizing.spacing(8.dp)
-                )
         ) {
-            blocks.forEach { block -> TermsBlockView(block) }
-            Spacer(modifier = Modifier.height(uiStyle.sizing.spacing(48.dp)))
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .geoTowerFadingEdge(scrollState, fadeHeight = uiStyle.sizing.component(72.dp))
+                    .pageScrollbar(PageScrollPrefs.TERMS, scrollState)
+                    .verticalScroll(scrollState)
+                    .navigationBarsPadding()
+                    .padding(
+                        horizontal = uiStyle.sizing.spacing(20.dp),
+                        vertical = uiStyle.sizing.spacing(8.dp)
+                    )
+            ) {
+                blocks.forEach { block -> TermsBlockView(block) }
+                Spacer(modifier = Modifier.height(uiStyle.sizing.spacing(48.dp)))
+            }
+            PageScrollEdgeButtons(PageScrollPrefs.TERMS, scrollState)
         }
     }
 }
@@ -108,50 +119,51 @@ fun TermsScreen(navController: NavController) {
 
 @Composable
 private fun TermsBlockView(block: TermsBlock) {
+    val sizing = LocalGeoTowerUiSizing.current
     when (block) {
         is TermsBlock.Heading1 -> Text(
             text = block.text,
-            style = MaterialTheme.typography.titleMedium,
+            style = sizing.textStyle(MaterialTheme.typography.titleMedium),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 24.dp, bottom = 6.dp)
+                .padding(top = sizing.spacing(24.dp), bottom = sizing.spacing(6.dp))
         )
 
         is TermsBlock.Heading2 -> Text(
             text = block.text,
-            style = MaterialTheme.typography.titleSmall,
+            style = sizing.textStyle(MaterialTheme.typography.titleSmall),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 14.dp, bottom = 2.dp)
+                .padding(top = sizing.spacing(14.dp), bottom = sizing.spacing(2.dp))
         )
 
         is TermsBlock.Paragraph -> Text(
             text = annotatedTerms(block.text),
-            style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
+            style = sizing.textStyle(MaterialTheme.typography.bodyMedium).copy(lineHeight = 21.sp),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 5.dp)
+                .padding(vertical = sizing.spacing(5.dp))
         )
 
         is TermsBlock.Bullet -> Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 4.dp, top = 3.dp, bottom = 3.dp)
+                .padding(start = sizing.spacing(4.dp), top = sizing.spacing(3.dp), bottom = sizing.spacing(3.dp))
         ) {
             Text(
                 text = "•",
-                style = MaterialTheme.typography.bodyMedium,
+                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.width(18.dp)
+                modifier = Modifier.width(sizing.component(18.dp))
             )
             Text(
                 text = annotatedTerms(block.text),
-                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
+                style = sizing.textStyle(MaterialTheme.typography.bodyMedium).copy(lineHeight = 21.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f)
             )
@@ -160,18 +172,18 @@ private fun TermsBlockView(block: TermsBlock) {
         is TermsBlock.Step -> Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(start = 4.dp, top = 3.dp, bottom = 3.dp)
+                .padding(start = sizing.spacing(4.dp), top = sizing.spacing(3.dp), bottom = sizing.spacing(3.dp))
         ) {
             Text(
                 text = "${block.number}.",
-                style = MaterialTheme.typography.bodyMedium,
+                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.width(22.dp)
+                modifier = Modifier.width(sizing.component(22.dp))
             )
             Text(
                 text = annotatedTerms(block.text),
-                style = MaterialTheme.typography.bodyMedium.copy(lineHeight = 21.sp),
+                style = sizing.textStyle(MaterialTheme.typography.bodyMedium).copy(lineHeight = 21.sp),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f)
             )
@@ -180,25 +192,25 @@ private fun TermsBlockView(block: TermsBlock) {
         is TermsBlock.Callout -> Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(vertical = 8.dp)
+                .padding(vertical = sizing.spacing(8.dp))
                 .background(
                     color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f),
                     shape = LocalGeoTowerUiStyle.current.smallItemShape
                 )
-                .padding(14.dp)
+                .padding(sizing.spacing(14.dp))
         ) {
             Icon(
                 imageVector = Icons.Filled.Info,
                 contentDescription = null,
                 tint = MaterialTheme.colorScheme.primary,
                 modifier = Modifier
-                    .size(20.dp)
-                    .padding(end = 0.dp)
+                    .size(sizing.component(20.dp))
+                    .padding(end = sizing.spacing(0.dp))
             )
-            Spacer(modifier = Modifier.width(10.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(10.dp)))
             Text(
                 text = annotatedTerms(block.text),
-                style = MaterialTheme.typography.bodySmall.copy(lineHeight = 19.sp),
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall).copy(lineHeight = 19.sp),
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier.weight(1f)
             )
@@ -206,11 +218,11 @@ private fun TermsBlockView(block: TermsBlock) {
 
         is TermsBlock.Muted -> Text(
             text = block.text,
-            style = MaterialTheme.typography.labelMedium,
+            style = sizing.textStyle(MaterialTheme.typography.labelMedium),
             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 8.dp, bottom = 4.dp)
+                .padding(top = sizing.spacing(8.dp), bottom = sizing.spacing(4.dp))
         )
     }
 }

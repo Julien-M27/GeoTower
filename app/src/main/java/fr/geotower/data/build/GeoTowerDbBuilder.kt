@@ -222,6 +222,11 @@ object GeoTowerDbBuilder {
         onProgress(BuildPhase.READING_SUPPORTS, 0L)
         // 6/ SUP_ANTENNE -> staging (physique pre-formatee), puis marquage FH.
         val antenneInserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_antenne VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        // Lien station <-> azimut : sur un site MUTUALISE, l'ANFR declare le MEME aer_id sur les deux
+        // stations (SFR 02927 00xxx / Bouygues 02927 50xxx par ex.). `stg_antenne` ayant aer_id pour cle,
+        // une seule station y survit et l'autre perdrait tous ses azimuts. Ce staging garde TOUTES les
+        // paires, comme la boucle du script serveur (anfr_azimuts[id_anfr] alimente par ligne lue).
+        val azimutStaInserter = BatchInserter(db, "INSERT INTO stg_antenne_sta VALUES (?, ?, ?, ?)")
         var antenneRows = 0L
         for (row in sources.antennes) {
             supSink.antenne(row)
@@ -240,19 +245,29 @@ object GeoTowerDbBuilder {
             }
             val azimutText = AnfrParsing.cleanText(row.get("aer_nb_azimut")).ifEmpty { "N/A" }
             val hauteurText = AnfrParsing.cleanText(row.get("aer_nb_alt_bas")).ifEmpty { "N/A" }
-            val physique = "$typeTexte : $azimutText° (${hauteurText}m) [AER_ID: $aerId]"
+            // Tag [DIM: ...] optionnel, meme convention que [AER_ID: ...] : les ecrans le retirent
+            // de la chaine et l'affichent a cote du type de panneau.
+            val dimensionText = AnfrParsing.antennaDimensionText(row.get("aer_nb_dimension"))
+            val physique = "$typeTexte : $azimutText° (${hauteurText}m) [AER_ID: $aerId]" +
+                if (dimensionText != null) " [DIM: $dimensionText]" else ""
             if (taeId != null) usedTae.add(taeId)
             antenneInserter.add(listOf(aerId, idAnfr, supId, taeId, azimut, hauteurBas, 0, physique))
+            if (azimut != null) azimutStaInserter.add(listOf(idAnfr, aerId, azimut, 0))
             if (++antenneRows % EMIT_EVERY == 0L) onProgress(BuildPhase.READING_SUPPORTS, antenneRows)
         }
         antenneInserter.flush()
-        // Index cree APRES le chargement (perf) : requis par applyAzimuts (ORDER BY id_anfr).
-        db.execSql("CREATE INDEX ix_stg_antenne_id ON stg_antenne(id_anfr)")
+        azimutStaInserter.flush()
         db.execSql("UPDATE stg_antenne SET is_fh = 1 WHERE aer_id IN (SELECT aer_id FROM stg_fh_aer)")
+        db.execSql("UPDATE stg_antenne_sta SET is_fh = 1 WHERE aer_id IN (SELECT aer_id FROM stg_fh_aer)")
+        // Index COUVRANT cree APRES le chargement (perf) : applyAzimuts scanne (id_anfr, azimut, is_fh)
+        // en flux, sans tri temporaire malgre le ORDER BY id_anfr.
+        db.execSql("CREATE INDEX ix_stg_antenne_sta ON stg_antenne_sta(id_anfr, azimut, is_fh)")
 
         onProgress(BuildPhase.COMPUTING_ANTENNAS, 0L)
         // 7/ Azimuts (mobile / FH) par station : scan ordonne -> accumulateur RAM.
         applyAzimuts(db, stations)
+        // Le lien station <-> azimut ne sert plus : on libere le disque avant la suite du build.
+        db.execSql("DROP TABLE IF EXISTS stg_antenne_sta")
 
         onProgress(BuildPhase.READING_SUPPORTS, 0L)
         // 8/ SUP_SUPPORT -> staging + adresses/communes sur l'accumulateur station.
@@ -445,7 +460,7 @@ object GeoTowerDbBuilder {
             mobile.clear()
             fh.clear()
         }
-        db.query("SELECT id_anfr, azimut, is_fh FROM stg_antenne WHERE azimut IS NOT NULL ORDER BY id_anfr") { row ->
+        db.query("SELECT id_anfr, azimut, is_fh FROM stg_antenne_sta WHERE azimut IS NOT NULL ORDER BY id_anfr") { row ->
             val id = row.getString("id_anfr") ?: ""
             if (id != currentId) {
                 flush()
@@ -518,7 +533,7 @@ object GeoTowerDbBuilder {
     private const val EMIT_EVERY = 50_000L
 
     private val STAGING_TABLES = listOf(
-        "stg_bande", "stg_emr_freqs", "stg_emetteur", "stg_fh_aer", "stg_antenne",
+        "stg_bande", "stg_emr_freqs", "stg_emetteur", "stg_fh_aer", "stg_antenne", "stg_antenne_sta",
         "stg_support", "stg_sysstatus", "stg_station_final", "stg_arcep", "stg_details",
     )
 
@@ -532,6 +547,8 @@ object GeoTowerDbBuilder {
         "CREATE TABLE stg_emetteur (id_anfr TEXT, emr_id TEXT, aer_id TEXT, systeme TEXT)",
         "CREATE TABLE stg_fh_aer (aer_id TEXT PRIMARY KEY)",
         "CREATE TABLE stg_antenne (aer_id TEXT PRIMARY KEY, id_anfr TEXT, sup_id TEXT, tae_id INTEGER, azimut INTEGER, hauteur_bas REAL, is_fh INTEGER, physique TEXT)",
+        // Sans cle primaire : un aer_id mutualise DOIT y apparaitre une fois par station (cf. build()).
+        "CREATE TABLE stg_antenne_sta (id_anfr TEXT, aer_id TEXT, azimut INTEGER, is_fh INTEGER)",
         "CREATE TABLE stg_support (id_anfr TEXT, sup_id TEXT, nat_id INTEGER, tpo_id INTEGER, hauteur REAL, PRIMARY KEY(id_anfr, sup_id))",
         "CREATE TABLE stg_sysstatus (id_anfr TEXT, systeme_upper TEXT, statut TEXT, emr_dt TEXT, PRIMARY KEY(id_anfr, systeme_upper))",
         "CREATE TABLE stg_station_final (id_anfr TEXT PRIMARY KEY, operateur_id INTEGER, operator_label TEXT, latitude REAL, longitude REAL, statut_id INTEGER, statut_label TEXT, adm_id INTEGER, date_imp TEXT, date_ser TEXT, date_mod TEXT, adresse TEXT, code_insee TEXT, tech_mask INTEGER, band_mask INTEGER, has_active INTEGER, azimuts TEXT, azimuts_fh TEXT)",

@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
 import fr.geotower.data.models.LocalisationEntity
@@ -58,6 +59,7 @@ fun SiteFrequenciesBlock(
     forceGridDisplay: Boolean = false,
     showAntennaTypeTable: Boolean = false
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     val context = LocalContext.current
     val txtFrequenciesTitle = stringResource(R.string.appstrings_frequencies_title)
     val txtBandsNotSpecified = stringResource(R.string.appstrings_bands_not_specified)
@@ -117,18 +119,18 @@ fun SiteFrequenciesBlock(
         elevation = CardDefaults.cardElevation(0.dp),
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxWidth()) {
 
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.WifiTethering, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(text = txtFrequenciesTitle, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, fontSize = 18.sp)
+                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                Text(text = txtFrequenciesTitle, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface, fontSize = sizing.text(18.sp))
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
             if (parsedBands.isEmpty()) {
-                Text(text = txtBandsNotSpecified, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(text = txtBandsNotSpecified, style = sizing.textStyle(MaterialTheme.typography.bodyLarge), color = MaterialTheme.colorScheme.onSurfaceVariant)
             } else {
                 // ✅ NOUVEAU : On vérifie l'option d'affichage
                 if (forceGridDisplay || AppConfig.siteFreqGridDisplay.value) {
@@ -150,14 +152,14 @@ fun SiteFrequenciesBlock(
                     sectionedBands.forEachIndexed { index, band ->
                         if (index == mobileBands.size && fhBands.isNotEmpty()) {
                             if (mobileBands.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(4.dp))
+                                Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
                             }
                             Text(
                                 text = txtMicrowaveLinks,
                                 fontWeight = FontWeight.Bold,
                                 color = MaterialTheme.colorScheme.primary,
-                                fontSize = 14.sp,
-                                modifier = Modifier.padding(bottom = 10.dp)
+                                fontSize = sizing.text(14.sp),
+                                modifier = Modifier.padding(bottom = sizing.spacing(10.dp))
                             )
                         }
                         val (statusColor, statusText) = when (classifyFrequencyStatus(band.status)) {
@@ -188,7 +190,7 @@ fun SiteFrequenciesBlock(
                             .padding(bottom = if (index == sectionedBands.lastIndex) 0.dp else 12.dp)
                     ) {
                         Column(modifier = Modifier.fillMaxWidth()) {
-                            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Row(modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(14.dp)), verticalAlignment = Alignment.CenterVertically) {
                                 // ✅ NOUVEAU : Formatage propre "4G 700" ici aussi
                                 val bandCode = radioBandCode(band.gen, band.value)
                                 val mainBandLabel = if (band.gen in 2..5 && band.value > 0) {
@@ -206,7 +208,7 @@ fun SiteFrequenciesBlock(
                                         text = "• ",
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface,
-                                        fontSize = 12.sp,
+                                        fontSize = sizing.text(12.sp),
                                         maxLines = 1
                                     )
                                     Column {
@@ -214,7 +216,7 @@ fun SiteFrequenciesBlock(
                                             text = mainBandLabel,
                                             fontWeight = FontWeight.SemiBold,
                                             color = MaterialTheme.colorScheme.onSurface,
-                                            fontSize = 12.sp,
+                                            fontSize = sizing.text(12.sp),
                                             maxLines = 1,
                                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                                         )
@@ -223,7 +225,7 @@ fun SiteFrequenciesBlock(
                                                 text = "($bandCode)",
                                                 fontWeight = FontWeight.SemiBold,
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                fontSize = 12.sp,
+                                                fontSize = sizing.text(12.sp),
                                                 lineHeight = 14.sp,
                                                 maxLines = 1
                                             )
@@ -235,26 +237,26 @@ fun SiteFrequenciesBlock(
                                         text = "• ${band.rawFreq.substringBefore(":").trim().ifBlank { band.rawFreq }}",
                                         fontWeight = FontWeight.SemiBold,
                                         color = MaterialTheme.colorScheme.onSurface,
-                                        fontSize = 12.sp,
+                                        fontSize = sizing.text(12.sp),
                                         maxLines = 1,
                                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                         modifier = Modifier.weight(1f)
                                     )
                                 }
-                                Spacer(modifier = Modifier.width(6.dp))
+                                Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Text(
                                         text = statusText, color = MaterialTheme.colorScheme.onSurfaceVariant, fontWeight = FontWeight.Normal,
-                                        fontSize = 10.sp, // ✅ État plus petit (avant: 12.sp)
+                                        fontSize = sizing.text(10.sp), // ✅ État plus petit (avant: 12.sp)
                                         maxLines = 1
                                     )
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(statusColor))
+                                    Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                                    Box(modifier = Modifier.size(sizing.component(8.dp)).clip(CircleShape).background(statusColor))
                                 }
                             }
                             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
 
-                            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+                            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(10.dp))) {
                                 val preciseFreqs = band.spectrumLines
                                     .ifEmpty { listOf(band.rawFreq.substringAfter(":", "").trim()) }
                                     .filter { it.isNotBlank() }
@@ -269,7 +271,7 @@ fun SiteFrequenciesBlock(
                                         Text(
                                             text = "${stringResource(R.string.appstrings_spectrum_by_band)} :\n\n${spectrumDisplay.detailedFrequencies}",
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            fontSize = 12.sp,
+                                            fontSize = sizing.text(12.sp),
                                             fontWeight = FontWeight.Medium,
                                             lineHeight = 16.sp
                                         )
@@ -279,46 +281,47 @@ fun SiteFrequenciesBlock(
                                     if (AppConfig.siteShowSpectrumTotal.value && spectrumDisplay.hasTotal) {
                                         // On ajoute un petit espace seulement si le texte du dessus est affiché
                                         if (AppConfig.siteShowSpectrumBand.value) {
-                                            Spacer(modifier = Modifier.height(2.dp))
+                                            Spacer(modifier = Modifier.height(sizing.spacing(2.dp)))
                                         }
 
-                                        Text(text = "${stringResource(R.string.appstrings_totalspectrum)} : ${spectrumDisplay.totalBandwidth} ${spectrumDisplay.totalUnit}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Medium)
-                                        Spacer(modifier = Modifier.height(2.dp))
+                                        Text(text = "${stringResource(R.string.appstrings_totalspectrum)} : ${spectrumDisplay.totalBandwidth} ${spectrumDisplay.totalUnit}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = sizing.text(12.sp), fontWeight = FontWeight.Medium)
+                                        Spacer(modifier = Modifier.height(sizing.spacing(2.dp)))
                                         Text(
                                             text = stringResource(R.string.appstrings_total_spectrum_warning),
                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
-                                            fontSize = 11.sp,
+                                            fontSize = sizing.text(11.sp),
                                             lineHeight = 13.sp
                                         )
                                     }
 
                                     // Espacement final uniquement si l'un des deux éléments a été affiché
                                     if (AppConfig.siteShowSpectrumBand.value || (AppConfig.siteShowSpectrumTotal.value && spectrumDisplay.hasTotal)) {
-                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
                                     }
                                 }
 
-                                Text(text = dateDisplay, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 12.sp)
+                                Text(text = dateDisplay, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = sizing.text(12.sp))
 
                                 // Affichage de tous les panneaux associés à cette fréquence
                                 if (band.physDetails.isNotEmpty()) {
-                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Spacer(modifier = Modifier.height(sizing.spacing(6.dp)))
                                     band.physDetails.forEach { physDetail ->
                                         Row(
                                             verticalAlignment = Alignment.Top,
-                                            modifier = Modifier.padding(top = 4.dp)
+                                            modifier = Modifier.padding(top = sizing.spacing(4.dp))
                                         ) {
                                             Icon(
                                                 Icons.Default.Explore,
                                                 contentDescription = null,
                                                 tint = MaterialTheme.colorScheme.primary,
-                                                modifier = Modifier.size(14.dp)
+                                                modifier = Modifier.size(sizing.component(14.dp))
                                             )
-                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
 
                                             // ✅ SÉPARATION ET TRADUCTION DU TYPE D'ANTENNE (Version Ultra-Robuste)
                                             val panelId = extractFrequencyPanelId(physDetail)
-                                            val displayPhysDetail = removeFrequencyPanelIdForDisplay(physDetail)
+                                            val panelDimension = extractFrequencyPanelDimension(physDetail)
+                                            val displayPhysDetail = removeFrequencyPanelTagsForDisplay(physDetail)
                                             val typePart =
                                                 if (displayPhysDetail.contains(":")) displayPhysDetail.substringBefore(
                                                     ":"
@@ -333,27 +336,31 @@ fun SiteFrequenciesBlock(
                                             // ✅ SÉCURITÉ : Si la traduction renvoie du vide, on force l'affichage du mot original (ex: "Panneau")
                                             val safeType =
                                                 if (translatedType.isNotBlank()) translatedType else typePart
+                                            // La dimension du panneau se place juste après le type,
+                                            // avant les deux-points : "Panneaux (1,5m) : 0° (20,8m)".
+                                            val typeWithDimension =
+                                                appendPanelDimensionToType(safeType, panelDimension)
 
                                             val finalPhysText =
-                                                if (restPart.isNotEmpty()) "$safeType : $restPart" else safeType
+                                                if (restPart.isNotEmpty()) "$typeWithDimension : $restPart" else typeWithDimension
 
                                             Column {
                                                 Text(
                                                     text = formatFrequencyPhysicalDetailsForUnit(finalPhysText), // Ex: "Panel : 120° (15.5m)"
                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                     fontWeight = FontWeight.Medium,
-                                                    fontSize = 12.sp
+                                                    fontSize = sizing.text(12.sp)
                                                 )
                                                 panelId?.let { id ->
                                                     Row(
                                                         verticalAlignment = Alignment.CenterVertically,
-                                                        modifier = Modifier.padding(top = 2.dp)
+                                                        modifier = Modifier.padding(top = sizing.spacing(2.dp))
                                                     ) {
                                                         Text(
                                                             text = "$txtPanelIdentifier : $id",
                                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                             fontWeight = FontWeight.Medium,
-                                                            fontSize = 12.sp
+                                                            fontSize = sizing.text(12.sp)
                                                         )
                                                         IconButton(
                                                             onClick = {
@@ -361,13 +368,13 @@ fun SiteFrequenciesBlock(
                                                                 clipboard.setPrimaryClip(ClipData.newPlainText(txtPanelIdentifier, id))
                                                                 Toast.makeText(context, txtPanelIdentifierCopied, Toast.LENGTH_SHORT).show()
                                                             },
-                                                            modifier = Modifier.size(24.dp)
+                                                            modifier = Modifier.size(sizing.component(24.dp))
                                                         ) {
                                                             Icon(
                                                                 imageVector = Icons.Default.ContentCopy,
                                                                 contentDescription = txtCopy,
                                                                 tint = MaterialTheme.colorScheme.primary,
-                                                                modifier = Modifier.size(16.dp)
+                                                                modifier = Modifier.size(sizing.component(16.dp))
                                                             )
                                                         }
                                                     }
@@ -431,7 +438,7 @@ private fun displayFrequencyBandLabel(band: FreqBand): String {
 }
 
 private fun formatFrequencyPhysicalDetailsForUnit(text: String): String {
-    val displayText = removeFrequencyPanelIdForDisplay(text)
+    val displayText = removeFrequencyPanelTagsForDisplay(text)
     if (AppConfig.distanceUnit.intValue != 1) return displayText
     return frequencyHeightMetersRegex.replace(displayText) { match ->
         val meters = match.groupValues[1].replace(',', '.').toDoubleOrNull()
@@ -439,8 +446,11 @@ private fun formatFrequencyPhysicalDetailsForUnit(text: String): String {
     }
 }
 
-private fun removeFrequencyPanelIdForDisplay(text: String): String {
-    return frequencyPanelIdRegex.replace(text, "").trim()
+/** Retire les tags techniques (`[AER_ID: ...]`, `[DIM: ...]`) de la chaîne `physique` de l'ANFR. */
+internal fun removeFrequencyPanelTagsForDisplay(text: String): String {
+    return frequencyPanelIdRegex.replace(text, "")
+        .let { frequencyPanelDimensionRegex.replace(it, "") }
+        .trim()
 }
 
 private fun formatFrequencyHeightForUnit(rawHeight: String): String {
@@ -461,7 +471,36 @@ private fun extractFrequencyPanelId(text: String): String? {
     return frequencyPanelIdRegex.find(text)?.groupValues?.getOrNull(1)?.takeIf { it.isNotBlank() }
 }
 
+/**
+ * Valeur brute du tag `[DIM: 1,5m]` posé par les générateurs de base (`AER_NB_DIMENSION`),
+ * toujours en mètres, ou `null` si l'ANFR ne déclare pas la dimension du panneau.
+ */
+internal fun extractRawPanelDimension(text: String): String? {
+    return frequencyPanelDimensionRegex.find(text)
+        ?.groupValues
+        ?.getOrNull(1)
+        ?.trim()
+        ?.takeIf { it.isNotBlank() }
+}
+
+/** [extractRawPanelDimension] converti dans l'unité de l'utilisateur, prêt à être affiché. */
+internal fun extractFrequencyPanelDimension(text: String): String? {
+    return extractRawPanelDimension(text)?.let { formatFrequencyHeightForUnit(it) }
+}
+
+/** Retire le seul tag `[DIM: ...]` (le tag `[AER_ID: ...]` reste, cf. images de partage). */
+internal fun removePanelDimensionTag(text: String): String {
+    return frequencyPanelDimensionRegex.replace(text, "")
+}
+
+/** `"Panneaux"` + `"1,5m"` -> `"Panneaux (1,5m)"` ; type inchangé si la dimension est absente. */
+internal fun appendPanelDimensionToType(type: String, dimension: String?): String {
+    if (dimension.isNullOrBlank()) return type
+    return "$type ($dimension)"
+}
+
 private val frequencyPanelIdRegex = Regex("""\[AER_ID:\s*([^\]\s]+)\]""")
+private val frequencyPanelDimensionRegex = Regex("""\s*\[DIM:\s*([^\]]+)\]""", RegexOption.IGNORE_CASE)
 private val frequencyHeightMetersRegex = Regex("""\(([0-9]+(?:[.,][0-9]+)?)\s*m\)""", RegexOption.IGNORE_CASE)
 
 // ==========================================
@@ -480,6 +519,7 @@ fun FrequenciesGridView(
     txtPanelIdentifier: String,
     showAntennaTypeTable: Boolean = false
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     val headerBgColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
     val subHeaderBgColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
@@ -489,12 +529,12 @@ fun FrequenciesGridView(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         border = BorderStroke(1.dp, borderColor),
-        modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp)
+        modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(16.dp))
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // Titre du tableau 1
             Box(
-                modifier = Modifier.fillMaxWidth().background(headerBgColor).padding(8.dp),
+                modifier = Modifier.fillMaxWidth().background(headerBgColor).padding(sizing.spacing(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -512,25 +552,25 @@ fun FrequenciesGridView(
             ) {
                 Text(
                     stringResource(R.string.appstrings_col_techno),
-                    modifier = Modifier.weight(1.3f).padding(8.dp),
+                    modifier = Modifier.weight(1.3f).padding(sizing.spacing(8.dp)),
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = sizing.text(12.sp),
                     textAlign = TextAlign.Center
                 )
                 VerticalDivider(color = borderColor)
                 Text(
                     stringResource(R.string.appstrings_col_service),
-                    modifier = Modifier.weight(1f).padding(8.dp),
+                    modifier = Modifier.weight(1f).padding(sizing.spacing(8.dp)),
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = sizing.text(12.sp),
                     textAlign = TextAlign.Center
                 )
                 VerticalDivider(color = borderColor)
                 Text(
                     stringResource(R.string.appstrings_col_state),
-                    modifier = Modifier.weight(1.1f).padding(8.dp),
+                    modifier = Modifier.weight(1.1f).padding(sizing.spacing(8.dp)),
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = sizing.text(12.sp),
                     textAlign = TextAlign.Center
                 )
             }
@@ -568,8 +608,8 @@ fun FrequenciesGridView(
                 ) {
                     Text(
                         technoName,
-                        modifier = Modifier.weight(1.3f).padding(8.dp),
-                        fontSize = 12.sp,
+                        modifier = Modifier.weight(1.3f).padding(sizing.spacing(8.dp)),
+                        fontSize = sizing.text(12.sp),
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary,
                         textAlign = TextAlign.Center
@@ -577,16 +617,16 @@ fun FrequenciesGridView(
                     VerticalDivider(color = borderColor)
                     Text(
                         dateDisplay,
-                        modifier = Modifier.weight(1f).padding(8.dp),
-                        fontSize = 12.sp,
+                        modifier = Modifier.weight(1f).padding(sizing.spacing(8.dp)),
+                        fontSize = sizing.text(12.sp),
                         color = MaterialTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center
                     )
                     VerticalDivider(color = borderColor)
                     Text(
                         statusText,
-                        modifier = Modifier.weight(1.1f).padding(8.dp),
-                        fontSize = 12.sp,
+                        modifier = Modifier.weight(1.1f).padding(sizing.spacing(8.dp)),
+                        fontSize = sizing.text(12.sp),
                         color = statusColor,
                         fontWeight = FontWeight.Medium,
                         textAlign = TextAlign.Center
@@ -681,7 +721,7 @@ fun FrequenciesGridView(
         Column(modifier = Modifier.fillMaxWidth()) {
             // Titre du tableau 2
             Box(
-                modifier = Modifier.fillMaxWidth().background(headerBgColor).padding(8.dp),
+                modifier = Modifier.fillMaxWidth().background(headerBgColor).padding(sizing.spacing(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -699,35 +739,35 @@ fun FrequenciesGridView(
             ) {
                 Text(
                     stringResource(R.string.appstrings_col_azimuth),
-                    modifier = Modifier.weight(0.8f).padding(6.dp),
+                    modifier = Modifier.weight(0.8f).padding(sizing.spacing(6.dp)),
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = sizing.text(12.sp),
                     maxLines = 1,
                     textAlign = TextAlign.Center
                 )
                 VerticalDivider(color = borderColor)
                 Text(
                     stringResource(R.string.appstrings_col_height),
-                    modifier = Modifier.weight(1f).padding(6.dp),
+                    modifier = Modifier.weight(1f).padding(sizing.spacing(6.dp)),
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = sizing.text(12.sp),
                     maxLines = 1,
                     textAlign = TextAlign.Center
                 )
                 VerticalDivider(color = borderColor)
                 Text(
                     stringResource(R.string.appstrings_col_band),
-                    modifier = Modifier.weight(1f).padding(6.dp),
+                    modifier = Modifier.weight(1f).padding(sizing.spacing(6.dp)),
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = sizing.text(12.sp),
                     textAlign = TextAlign.Center
                 )
                 VerticalDivider(color = borderColor)
                 Text(
                     stringResource(R.string.appstrings_col_freqs),
-                    modifier = Modifier.weight(1.6f).padding(6.dp),
+                    modifier = Modifier.weight(1.6f).padding(sizing.spacing(6.dp)),
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = sizing.text(12.sp),
                     textAlign = TextAlign.Center
                 )
             }
@@ -761,28 +801,28 @@ fun FrequenciesGridView(
                     ) {
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
-                            modifier = Modifier.padding(4.dp)
+                            modifier = Modifier.padding(sizing.spacing(4.dp))
                         ) {
                             Text(
                                 azimutDisplay,
-                                fontSize = 13.sp,
+                                fontSize = sizing.text(13.sp),
                                 fontWeight = FontWeight.Medium,
                                 textAlign = TextAlign.Center,
                                 maxLines = 1
                             )
                             // Les identifiants sont déportés dans le tableau « type de panneau » quand il est actif.
                             if (!showAntennaTypeTable && panelIds.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(3.dp))
+                                Spacer(modifier = Modifier.height(sizing.spacing(3.dp)))
                                 Text(
                                     text = txtPanelIdentifier,
-                                    fontSize = 9.sp,
+                                    fontSize = sizing.text(9.sp),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center,
                                     lineHeight = 10.sp
                                 )
                                 Text(
                                     text = panelIds.joinToString("\n"),
-                                    fontSize = 9.sp,
+                                    fontSize = sizing.text(9.sp),
                                     fontWeight = FontWeight.Medium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center,
@@ -807,11 +847,11 @@ fun FrequenciesGridView(
                                 ) {
                                     Text(
                                         hauteur,
-                                        fontSize = 12.sp,
+                                        fontSize = sizing.text(12.sp),
                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                         textAlign = TextAlign.Center,
                                         maxLines = 1,
-                                        modifier = Modifier.padding(4.dp)
+                                        modifier = Modifier.padding(sizing.spacing(4.dp))
                                     )
                                 }
                                 VerticalDivider(color = borderColor)
@@ -827,12 +867,12 @@ fun FrequenciesGridView(
                                         ) {
                                             Column(
                                                 modifier = Modifier.weight(1f)
-                                                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                                                    .padding(vertical = sizing.spacing(8.dp), horizontal = sizing.spacing(4.dp)),
                                                 horizontalAlignment = Alignment.CenterHorizontally
                                             ) {
                                                 Text(
                                                     text = rowItem.techno,
-                                                    fontSize = 12.sp,
+                                                    fontSize = sizing.text(12.sp),
                                                     fontWeight = FontWeight.Bold,
                                                     color = MaterialTheme.colorScheme.primary,
                                                     textAlign = TextAlign.Center
@@ -840,7 +880,7 @@ fun FrequenciesGridView(
                                                 rowItem.bandEquivalent?.let { equivalent ->
                                                     Text(
                                                         text = "($equivalent)",
-                                                        fontSize = 10.sp,
+                                                        fontSize = sizing.text(10.sp),
                                                         fontWeight = FontWeight.Medium,
                                                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                         textAlign = TextAlign.Center,
@@ -852,8 +892,8 @@ fun FrequenciesGridView(
                                             Text(
                                                 text = rowItem.freqs,
                                                 modifier = Modifier.weight(1.6f)
-                                                    .padding(vertical = 8.dp, horizontal = 4.dp),
-                                                fontSize = 11.sp,
+                                                    .padding(vertical = sizing.spacing(8.dp), horizontal = sizing.spacing(4.dp)),
+                                                fontSize = sizing.text(11.sp),
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 textAlign = TextAlign.Center,
                                                 lineHeight = 16.sp
@@ -893,6 +933,8 @@ internal data class AntennaTypeGridRow(
     val azimut: String,
     val hauteur: String,
     val rawType: String,
+    /** Dimension du panneau déjà formatée dans l'unité utilisateur (`"1,5m"`), vide si non déclarée. */
+    val dimension: String,
     val ids: List<String>
 )
 
@@ -904,11 +946,12 @@ private val antennaAzimuthNumberRegex = Regex("""-?\d+(?:[.,]\d+)?""")
  * identifiant AER sont retenus, dédupliqués et regroupés par (azimut, hauteur, type).
  */
 internal fun buildAntennaTypeRows(bands: List<FreqBand>): List<AntennaTypeGridRow> {
-    data class Key(val azimut: String, val hauteur: String, val rawType: String)
+    data class Key(val azimut: String, val hauteur: String, val rawType: String, val dimension: String)
     val grouped = linkedMapOf<Key, LinkedHashSet<String>>()
     bands.asSequence().flatMap { it.physDetails.asSequence() }.forEach { phys ->
         val id = extractFrequencyPanelId(phys) ?: return@forEach
-        val display = removeFrequencyPanelIdForDisplay(phys)
+        val dimension = extractFrequencyPanelDimension(phys).orEmpty()
+        val display = removeFrequencyPanelTagsForDisplay(phys)
         val hasColon = display.contains(":")
         val geometry = if (hasColon) display.substringAfter(":").trim() else display.trim()
         val rawType = if (hasColon) display.substringBefore(":").trim() else ""
@@ -924,7 +967,7 @@ internal fun buildAntennaTypeRows(bands: List<FreqBand>): List<AntennaTypeGridRo
         }
         val hauteur = formatFrequencyHeightForUnit(rawHauteur.ifBlank { "-" })
         grouped
-            .getOrPut(Key("$azimutNumber°", hauteur, rawType)) { linkedSetOf() }
+            .getOrPut(Key("$azimutNumber°", hauteur, rawType, dimension)) { linkedSetOf() }
             .add(id)
     }
     return grouped.entries
@@ -937,6 +980,7 @@ internal fun buildAntennaTypeRows(bands: List<FreqBand>): List<AntennaTypeGridRo
                 azimut = key.azimut,
                 hauteur = key.hauteur,
                 rawType = key.rawType,
+                dimension = key.dimension,
                 ids = ids.toList()
             )
         }
@@ -979,6 +1023,7 @@ private fun AntennaTypeGridTable(
     headerBgColor: Color,
     subHeaderBgColor: Color
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     if (rows.isEmpty()) return
     val groupedByAzimut = rows.groupBy { it.azimut }.entries.toList()
     val context = LocalContext.current
@@ -990,12 +1035,12 @@ private fun AntennaTypeGridTable(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color.Transparent),
         border = BorderStroke(1.dp, borderColor),
-        modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
+        modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(16.dp))
     ) {
         Column(modifier = Modifier.fillMaxWidth()) {
             // Titre du tableau 3
             Box(
-                modifier = Modifier.fillMaxWidth().background(headerBgColor).padding(8.dp),
+                modifier = Modifier.fillMaxWidth().background(headerBgColor).padding(sizing.spacing(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
@@ -1013,35 +1058,35 @@ private fun AntennaTypeGridTable(
             ) {
                 Text(
                     stringResource(R.string.appstrings_col_azimuth),
-                    modifier = Modifier.weight(0.8f).padding(6.dp),
+                    modifier = Modifier.weight(0.8f).padding(sizing.spacing(6.dp)),
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = sizing.text(12.sp),
                     maxLines = 1,
                     textAlign = TextAlign.Center
                 )
                 VerticalDivider(color = borderColor)
                 Text(
                     stringResource(R.string.appstrings_col_height),
-                    modifier = Modifier.weight(0.9f).padding(6.dp),
+                    modifier = Modifier.weight(0.9f).padding(sizing.spacing(6.dp)),
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = sizing.text(12.sp),
                     maxLines = 1,
                     textAlign = TextAlign.Center
                 )
                 VerticalDivider(color = borderColor)
                 Text(
                     stringResource(R.string.appstrings_col_type),
-                    modifier = Modifier.weight(1.2f).padding(6.dp),
+                    modifier = Modifier.weight(1.2f).padding(sizing.spacing(6.dp)),
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = sizing.text(12.sp),
                     textAlign = TextAlign.Center
                 )
                 VerticalDivider(color = borderColor)
                 Text(
                     stringResource(R.string.appstrings_col_id),
-                    modifier = Modifier.weight(1.3f).padding(6.dp),
+                    modifier = Modifier.weight(1.3f).padding(sizing.spacing(6.dp)),
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
+                    fontSize = sizing.text(12.sp),
                     textAlign = TextAlign.Center
                 )
             }
@@ -1059,11 +1104,11 @@ private fun AntennaTypeGridTable(
                     ) {
                         Text(
                             azimut,
-                            fontSize = 13.sp,
+                            fontSize = sizing.text(13.sp),
                             fontWeight = FontWeight.Medium,
                             textAlign = TextAlign.Center,
                             maxLines = 1,
-                            modifier = Modifier.padding(4.dp)
+                            modifier = Modifier.padding(sizing.spacing(4.dp))
                         )
                     }
                     VerticalDivider(color = borderColor)
@@ -1076,30 +1121,31 @@ private fun AntennaTypeGridTable(
                             ) {
                                 Text(
                                     row.hauteur,
-                                    modifier = Modifier.weight(0.9f).padding(vertical = 8.dp, horizontal = 4.dp),
-                                    fontSize = 12.sp,
+                                    modifier = Modifier.weight(0.9f).padding(vertical = sizing.spacing(8.dp), horizontal = sizing.spacing(4.dp)),
+                                    fontSize = sizing.text(12.sp),
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                     textAlign = TextAlign.Center,
                                     maxLines = 1
                                 )
                                 VerticalDivider(color = borderColor)
                                 Text(
-                                    antennaTypeShortLabel(row.rawType),
-                                    modifier = Modifier.weight(1.2f).padding(vertical = 8.dp, horizontal = 4.dp),
-                                    fontSize = 12.sp,
+                                    // La dimension du panneau complète le type, entre parenthèses.
+                                    appendPanelDimensionToType(antennaTypeShortLabel(row.rawType), row.dimension),
+                                    modifier = Modifier.weight(1.2f).padding(vertical = sizing.spacing(8.dp), horizontal = sizing.spacing(4.dp)),
+                                    fontSize = sizing.text(12.sp),
                                     color = MaterialTheme.colorScheme.onSurface,
                                     textAlign = TextAlign.Center
                                 )
                                 VerticalDivider(color = borderColor)
                                 Column(
-                                    modifier = Modifier.weight(1.3f).padding(vertical = 4.dp, horizontal = 2.dp),
+                                    modifier = Modifier.weight(1.3f).padding(vertical = sizing.spacing(4.dp), horizontal = sizing.spacing(2.dp)),
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     row.ids.forEach { id ->
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(
                                                 text = id,
-                                                fontSize = 11.sp,
+                                                fontSize = sizing.text(11.sp),
                                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                 textAlign = TextAlign.Center,
                                                 lineHeight = 14.sp
@@ -1110,13 +1156,13 @@ private fun AntennaTypeGridTable(
                                                     clipboard.setPrimaryClip(ClipData.newPlainText(txtPanelIdentifier, id))
                                                     Toast.makeText(context, txtPanelIdentifierCopied, Toast.LENGTH_SHORT).show()
                                                 },
-                                                modifier = Modifier.size(24.dp)
+                                                modifier = Modifier.size(sizing.component(24.dp))
                                             ) {
                                                 Icon(
                                                     imageVector = Icons.Default.ContentCopy,
                                                     contentDescription = txtCopy,
                                                     tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(16.dp)
+                                                    modifier = Modifier.size(sizing.component(16.dp))
                                                 )
                                             }
                                         }

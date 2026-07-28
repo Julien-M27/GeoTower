@@ -64,11 +64,16 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.geoTowerLazyListFadingEdge
+import fr.geotower.ui.components.pageScrollbar
+import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.HelpDisplayText
 import kotlinx.coroutines.launch
@@ -278,19 +283,22 @@ private fun HelpSummary(
     style: HelpUiStyle,
     modifier: Modifier = Modifier
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val listState = rememberLazyListState()
+    Box(modifier = modifier.fillMaxSize()) {
     LazyColumn(
         state = listState,
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
-            .geoTowerLazyListFadingEdge(listState),
+            .geoTowerLazyListFadingEdge(listState)
+            .pageScrollbar(PageScrollPrefs.HELP, listState),
         contentPadding = PaddingValues(
-            start = 20.dp,
-            top = 20.dp,
-            end = 20.dp,
-            bottom = 20.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            start = sizing.spacing(20.dp),
+            top = sizing.spacing(20.dp),
+            end = sizing.spacing(20.dp),
+            bottom = sizing.spacing(20.dp) + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         ),
-        verticalArrangement = Arrangement.spacedBy(14.dp)
+        verticalArrangement = Arrangement.spacedBy(sizing.spacing(14.dp))
     ) {
         item {
             Surface(
@@ -300,20 +308,20 @@ private fun HelpSummary(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Row(
-                    modifier = Modifier.padding(18.dp),
+                    modifier = Modifier.padding(sizing.spacing(18.dp)),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.AutoMirrored.Filled.Help, contentDescription = null, modifier = Modifier.size(34.dp))
-                    Spacer(Modifier.width(14.dp))
+                    Icon(Icons.AutoMirrored.Filled.Help, contentDescription = null, modifier = Modifier.size(sizing.component(34.dp)))
+                    Spacer(Modifier.width(sizing.spacing(14.dp)))
                     Column {
                         Text(
                             text = stringResource(R.string.appstrings_help_center_title),
-                            style = MaterialTheme.typography.titleLarge,
+                            style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                             fontWeight = FontWeight.Bold
                         )
                         Text(
                             text = stringResource(R.string.appstrings_help_center_intro),
-                            style = MaterialTheme.typography.bodyMedium
+                            style = sizing.textStyle(MaterialTheme.typography.bodyMedium)
                         )
                     }
                 }
@@ -332,7 +340,7 @@ private fun HelpSummary(
         item {
             Text(
                 text = if (query.isBlank()) stringResource(R.string.appstrings_help_contents) else stringResource(R.string.appstrings_help_results),
-                style = MaterialTheme.typography.titleMedium,
+                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
                 fontWeight = FontWeight.Bold
             )
         }
@@ -355,6 +363,8 @@ private fun HelpSummary(
             }
         }
     }
+    PageScrollEdgeButtons(PageScrollPrefs.HELP, listState)
+    }
 }
 
 @Composable
@@ -364,15 +374,16 @@ private fun HelpSearchField(
     onClearQuery: () -> Unit,
     style: HelpUiStyle
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     OutlinedTextField(
         value = query,
         onValueChange = onQueryChange,
         modifier = Modifier
             .fillMaxWidth()
-            .height(62.dp),
+            .height(sizing.component(62.dp)),
         singleLine = true,
         shape = style.softShape,
-        textStyle = MaterialTheme.typography.bodyLarge.copy(lineHeight = 24.sp),
+        textStyle = sizing.textStyle(MaterialTheme.typography.bodyLarge).copy(lineHeight = sizing.text(24.sp)),
         colors = OutlinedTextFieldDefaults.colors(
             focusedContainerColor = if (style.useOneUi) style.cardColor else Color.Transparent,
             unfocusedContainerColor = if (style.useOneUi) style.cardColor else Color.Transparent,
@@ -389,7 +400,7 @@ private fun HelpSearchField(
                 }
             }
         },
-        placeholder = { Text(stringResource(R.string.appstrings_help_search_placeholder), style = MaterialTheme.typography.bodyLarge) }
+        placeholder = { Text(stringResource(R.string.appstrings_help_search_placeholder), style = sizing.textStyle(MaterialTheme.typography.bodyLarge)) }
     )
 }
 
@@ -400,6 +411,7 @@ private fun HelpTopicCard(
     safeClick: (() -> Unit) -> Unit,
     style: HelpUiStyle
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -408,11 +420,11 @@ private fun HelpTopicCard(
         border = style.cardBorder,
         colors = CardDefaults.cardColors(containerColor = style.secondaryCardColor)
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(topic.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
+            Text(topic.title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
             Text(
                 topic.subtitle,
-                style = MaterialTheme.typography.bodyMedium,
+                style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 3,
                 overflow = TextOverflow.Ellipsis
@@ -434,27 +446,30 @@ private fun HelpTopicDetail(
     style: HelpUiStyle,
     modifier: Modifier = Modifier
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val firstSectionIndex = 2
 
+    Box(modifier = modifier.fillMaxSize()) {
     LazyColumn(
         state = listState,
-        modifier = modifier
+        modifier = Modifier
             .fillMaxSize()
-            .geoTowerLazyListFadingEdge(listState),
+            .geoTowerLazyListFadingEdge(listState)
+            .pageScrollbar(PageScrollPrefs.HELP, listState),
         contentPadding = PaddingValues(
-            start = 20.dp,
-            top = 20.dp,
-            end = 20.dp,
-            bottom = 20.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            start = sizing.spacing(20.dp),
+            top = sizing.spacing(20.dp),
+            end = sizing.spacing(20.dp),
+            bottom = sizing.spacing(20.dp) + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
         ),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
     ) {
         item {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(topic.title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                Text(topic.subtitle, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
+                Text(topic.title, style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold)
+                Text(topic.subtitle, style = sizing.textStyle(MaterialTheme.typography.bodyLarge), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
 
@@ -465,7 +480,7 @@ private fun HelpTopicDetail(
                 colors = CardDefaults.cardColors(containerColor = style.secondaryCardColor),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
                     Text(stringResource(R.string.appstrings_help_local_contents), fontWeight = FontWeight.Bold)
                     topic.sections.forEachIndexed { index, section ->
                         TextButton(
@@ -479,7 +494,7 @@ private fun HelpTopicDetail(
                             Text(
                                 text = "${index + 1}. ${section.title}",
                                 modifier = Modifier.fillMaxWidth(),
-                                style = MaterialTheme.typography.bodyMedium
+                                style = sizing.textStyle(MaterialTheme.typography.bodyMedium)
                             )
                         }
                     }
@@ -497,19 +512,22 @@ private fun HelpTopicDetail(
             }
         }
     }
+    PageScrollEdgeButtons(PageScrollPrefs.HELP, listState)
+    }
 }
 
 @Composable
 private fun HelpSectionCard(section: HelpSection, style: HelpUiStyle) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = style.cardShape,
         border = style.cardBorder,
         colors = CardDefaults.cardColors(containerColor = style.cardColor)
     ) {
-        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Text(section.title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(section.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
+            Text(section.title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+            Text(section.body, style = sizing.textStyle(MaterialTheme.typography.bodyMedium), color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             section.visual?.let { visual ->
                 HelpVisualCard(visual = visual, style = style)
@@ -518,9 +536,9 @@ private fun HelpSectionCard(section: HelpSection, style: HelpUiStyle) {
             if (section.actions.isNotEmpty()) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
                 section.actions.forEach { action ->
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(2.dp))) {
                         Text(action.title, fontWeight = FontWeight.SemiBold)
-                        Text(action.description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(action.description, style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                 }
             }
@@ -530,6 +548,7 @@ private fun HelpSectionCard(section: HelpSection, style: HelpUiStyle) {
 
 @Composable
 private fun HelpVisualCard(visual: HelpVisual, style: HelpUiStyle) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val visualBackground = if (style.useOneUi) {
         MaterialTheme.colorScheme.surface.copy(alpha = 0.48f)
     } else {
@@ -543,16 +562,16 @@ private fun HelpVisualCard(visual: HelpVisual, style: HelpUiStyle) {
         border = if (style.useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     ) {
         Column(
-            modifier = Modifier.padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            modifier = Modifier.padding(sizing.spacing(14.dp)),
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))
         ) {
             Text(
                 text = HelpDisplayText.visualTitle(visual.id),
-                style = MaterialTheme.typography.titleSmall,
+                style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                 fontWeight = FontWeight.Bold
             )
             HelpVisualMockup(visual = visual, style = style)
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))) {
                 (1..3).forEach { index ->
                     HelpVisualLegendRow(index, HelpDisplayText.visualLabel(visual.id, index))
                 }
@@ -563,6 +582,7 @@ private fun HelpVisualCard(visual: HelpVisual, style: HelpUiStyle) {
 
 @Composable
 private fun HelpVisualMockup(visual: HelpVisual, style: HelpUiStyle) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val mockupBackground = if (style.useOneUi) {
         MaterialTheme.colorScheme.background.copy(alpha = 0.62f)
     } else {
@@ -573,9 +593,10 @@ private fun HelpVisualMockup(visual: HelpVisual, style: HelpUiStyle) {
         modifier = Modifier.fillMaxWidth()
     ) {
         val isCompact = maxWidth < 420.dp
-        val mockupHeight = helpVisualHeight(visual, isCompact)
-        val contentWidth = maxWidth - 24.dp
-        val contentHeight = mockupHeight - 24.dp
+        val mockupHeight = sizing.component(helpVisualHeight(visual, isCompact))
+        val mockupPadding = sizing.spacing(12.dp)
+        val contentWidth = maxWidth - mockupPadding * 2
+        val contentHeight = mockupHeight - mockupPadding * 2
         val blocks = helpVisualBlocks(visual, compact = isCompact)
 
         Box(
@@ -584,7 +605,7 @@ private fun HelpVisualMockup(visual: HelpVisual, style: HelpUiStyle) {
                 .height(mockupHeight)
                 .clip(style.softShape)
                 .background(mockupBackground)
-                .padding(12.dp)
+                .padding(mockupPadding)
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 blocks.forEach { block ->
@@ -602,14 +623,15 @@ private fun HelpVisualMockup(visual: HelpVisual, style: HelpUiStyle) {
 
 @Composable
 private fun HelpVisualLegendRow(index: Int, label: String) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Row(
         verticalAlignment = Alignment.Top,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
     ) {
-        HelpVisualMarker(index, modifier = Modifier.size(20.dp), fontSize = 11)
+        HelpVisualMarker(index, modifier = Modifier.size(sizing.component(20.dp)), fontSize = 11)
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
+            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.weight(1f)
         )
@@ -623,6 +645,7 @@ private fun HelpVisualBlockView(
     parentHeight: androidx.compose.ui.unit.Dp,
     style: HelpUiStyle
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val blockColor = helpVisualBlockColor(block.type)
     val shape = when (block.type) {
         HelpVisualBlockType.Marker,
@@ -643,14 +666,17 @@ private fun HelpVisualBlockView(
     ) {
         block.marker?.let { marker ->
             Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
-                HelpVisualMarker(marker, modifier = Modifier.size(20.dp), fontSize = 11)
+                HelpVisualMarker(marker, modifier = Modifier.size(sizing.component(20.dp)), fontSize = 11)
             }
         }
     }
 }
 
 @Composable
+// Le defaut reste en dp brut : `sizing` n'est pas en portee dans un parametre par defaut, et les
+// deux appelants passent de toute facon un modifier explicite deja mis a l'echelle.
 private fun HelpVisualMarker(number: Int, modifier: Modifier = Modifier.size(24.dp), fontSize: Int = 12) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Surface(
         modifier = modifier,
         shape = CircleShape,
@@ -662,11 +688,11 @@ private fun HelpVisualMarker(number: Int, modifier: Modifier = Modifier.size(24.
                 text = number.toString(),
                 modifier = Modifier.align(Alignment.Center),
                 color = MaterialTheme.colorScheme.onPrimary,
-                fontSize = fontSize.sp,
-                lineHeight = fontSize.sp,
+                fontSize = sizing.text(fontSize.sp),
+                lineHeight = sizing.text(fontSize.sp),
                 fontWeight = FontWeight.Bold,
                 textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.labelSmall.copy(
+                style = sizing.textStyle(MaterialTheme.typography.labelSmall).copy(
                     platformStyle = PlatformTextStyle(includeFontPadding = false)
                 )
             )

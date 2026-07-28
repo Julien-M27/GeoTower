@@ -89,7 +89,8 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
             notificationManager.createNotificationChannel(channel)
         }
 
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("geotower://settings?section=database")).apply {
+        // La mise à jour annoncée est celle de la base mobile : on ouvre sur SA carte.
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("geotower://settings?section=db_mobile")).apply {
             setPackage(context.packageName)
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }

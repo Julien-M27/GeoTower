@@ -57,6 +57,18 @@ object LocalizedDateLabels {
         }
     }
 
+    /**
+     * Horodatage (ms) d'une donnée produite sur l'appareil -> « date\n<à> heure », même mise en forme
+     * que les versions de bases. On connaît alors la minute exacte, pas seulement le jour.
+     */
+    fun formatVersionDateTime(context: Context, millis: Long, timeAtLabel: String): String {
+        val locale = context.currentLocale()
+        val moment = java.util.Date(millis)
+        val date = DateFormat.getDateInstance(DateFormat.SHORT, locale).format(moment)
+        val time = DateFormat.getTimeInstance(DateFormat.SHORT, locale).format(moment)
+        return "$date\n$timeAtLabel $time"
+    }
+
     fun formatQuarterlyVersion(context: Context, rawValue: String): String {
         val cleanValue = rawValue.trim()
         if (cleanValue.isBlank() || cleanValue == "-") return cleanValue.ifBlank { "-" }

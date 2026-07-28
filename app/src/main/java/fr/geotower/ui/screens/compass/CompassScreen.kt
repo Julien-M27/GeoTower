@@ -98,6 +98,9 @@ import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.LiveDatabaseUsageWarningDialog
 import fr.geotower.ui.components.LocationUnavailableBanner
+import fr.geotower.ui.components.PageScrollEdgeButtons
+import fr.geotower.ui.components.pageScrollbar
+import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.settings.CompassSettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
@@ -129,6 +132,7 @@ fun CompassScreen(
     val screenRotation = currentDisplayRotation(context)
     val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val uiStyle = LocalGeoTowerUiStyle.current
+    val sizing = uiStyle.sizing
 
     // --- DÉTECTION RÉACTIVE DE LA DISPONIBILITÉ DE LA LOCALISATION (permission + GPS) ---
     // La boussole magnétique fonctionne sans position, mais le radar des antennes et les infos GPS
@@ -464,7 +468,15 @@ fun CompassScreen(
             modifier = Modifier
                 .fillMaxSize()
                 // --- 1. AJOUT DU DÉFILEMENT ICI ---
-                .then(if (!isLandscape) Modifier.verticalScroll(contentScrollState) else Modifier),
+                .then(
+                    if (!isLandscape) {
+                        Modifier
+                            .pageScrollbar(PageScrollPrefs.COMPASS, contentScrollState)
+                            .verticalScroll(contentScrollState)
+                    } else {
+                        Modifier
+                    }
+                ),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -472,8 +484,8 @@ fun CompassScreen(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.spacedBy(24.dp),
+                        .padding(horizontal = sizing.spacing(24.dp), vertical = sizing.spacing(12.dp)),
+                    horizontalArrangement = Arrangement.spacedBy(sizing.spacing(24.dp)),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     // Sans localisation : on retire le panneau d'infos, le cadran (seul enfant pondéré)
@@ -482,7 +494,7 @@ fun CompassScreen(
                         CompassInfoPanel(
                             modifier = Modifier
                                 .weight(1f)
-                                .padding(horizontal = 8.dp),
+                                .padding(horizontal = sizing.spacing(8.dp)),
                             compassOrder = compassOrder,
                             showLocation = showLocation,
                             showGps = showGps,
@@ -576,9 +588,9 @@ fun CompassScreen(
             // --- PANNEAU DE DÉTAILS (BULLLE DU BAS) ---
             if (selectedClusterSites.isNotEmpty()) {
                 ModalBottomSheet(onDismissRequest = { selectedClusterSites = emptyList() }, sheetState = sheetState) {
-                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(bottom = 48.dp)) {
-                        Text(text = stringResource(R.string.appstrings_nearby_antennas_azimuth), style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp)).padding(bottom = sizing.spacing(48.dp))) {
+                        Text(text = stringResource(R.string.appstrings_nearby_antennas_azimuth), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold)
+                        HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outlineVariant)
 
                         // Tri mémoïsé (hors composition) + clés stables : évite de re-trier la liste et
                         // de recréer tous les items à chaque recomposition de la feuille.
@@ -596,14 +608,14 @@ fun CompassScreen(
                                             .putFloat("clicked_lon", site.longitude.toFloat())
                                             .apply()
                                         navController.navigate("support_detail/${site.id}")
-                                    }.padding(vertical = 12.dp),
+                                    }.padding(vertical = sizing.spacing(12.dp)),
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(modifier = Modifier.size(24.dp)) {
+                                    Box(modifier = Modifier.size(sizing.component(24.dp))) {
                                         MiniOperatorGrid(operateurs = site.operateurs)
                                     }
-                                    Spacer(modifier = Modifier.width(16.dp))
+                                    Spacer(modifier = Modifier.width(sizing.spacing(16.dp)))
                                     Column(modifier = Modifier.weight(1f)) {
                                         // --- AFFICHAGE DES OPÉRATEURS DU SUPPORT ---
                                         val opsText = site.operateurs.joinToString(", ") { op ->
@@ -614,7 +626,7 @@ fun CompassScreen(
                                             text = "${stringResource(R.string.appstrings_support_prefix)} $opsText",
                                             color = MaterialTheme.colorScheme.onSurface,
                                             fontWeight = FontWeight.SemiBold,
-                                            fontSize = 16.sp
+                                            fontSize = sizing.text(16.sp)
                                         )
 
                                         // --- AFFICHAGE DE LA DISTANCE (En gris standard) ---
@@ -622,11 +634,11 @@ fun CompassScreen(
                                         val distStr = formatCompassDistance(site.distance, isMi)
                                         Text(
                                             text = distStr,
-                                            style = MaterialTheme.typography.bodyMedium,
+                                            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                                             color = MaterialTheme.colorScheme.onSurfaceVariant // <-- Couleur adaptative standard
                                         )
                                     }
-                                    Text(text = "${site.bearing.toInt()}°", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+                                    Text(text = "${site.bearing.toInt()}°", style = sizing.textStyle(MaterialTheme.typography.bodyLarge), color = MaterialTheme.colorScheme.onSurface)
                                 }
                             }
                         }
@@ -635,39 +647,39 @@ fun CompassScreen(
             }
 
             if (!isLandscape && isLocationReady) {
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
             // --- 4. AFFICHAGE DYNAMIQUE (LIEU, GPS, PRÉCISION) ---
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp),
+                    .padding(horizontal = sizing.spacing(16.dp)),
                 horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(24.dp) // Met un bel espace régulier entre chaque bloc
+                verticalArrangement = Arrangement.spacedBy(sizing.spacing(24.dp)) // Met un bel espace régulier entre chaque bloc
             ) {
                 compassOrder.forEach { block ->
                     when (block) {
                         "location" -> {
                             if (showLocation) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Icon(Icons.Outlined.LocationOn, contentDescription = stringResource(R.string.appstrings_position), tint = oncompassBg, modifier = Modifier.size(32.dp))
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(text = city, fontSize = 32.sp, fontWeight = FontWeight.Bold, color = oncompassBg)
-                                    Text(text = country, fontSize = 24.sp, fontWeight = FontWeight.Medium, color = oncompassBgVariant)
+                                    Icon(Icons.Outlined.LocationOn, contentDescription = stringResource(R.string.appstrings_position), tint = oncompassBg, modifier = Modifier.size(sizing.component(32.dp)))
+                                    Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
+                                    Text(text = city, fontSize = sizing.text(32.sp), fontWeight = FontWeight.Bold, color = oncompassBg)
+                                    Text(text = country, fontSize = sizing.text(24.sp), fontWeight = FontWeight.Medium, color = oncompassBgVariant)
                                 }
                             }
                         }
                         "gps" -> {
                             if (showGps) {
                                 // J'ai réorganisé les coordonnées côte à côte pour que ça reste centré et harmonieux peu importe l'ordre !
-                                Row(horizontalArrangement = Arrangement.spacedBy(32.dp)) {
+                                Row(horizontalArrangement = Arrangement.spacedBy(sizing.spacing(32.dp))) {
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(text = stringResource(R.string.appstrings_lat_short), fontSize = 12.sp, color = compassTextGray, fontWeight = FontWeight.Bold)
-                                        Text(text = formatCoordinate(latitude, isLat = true), fontSize = 18.sp, color = oncompassBg)
+                                        Text(text = stringResource(R.string.appstrings_lat_short), fontSize = sizing.text(12.sp), color = compassTextGray, fontWeight = FontWeight.Bold)
+                                        Text(text = formatCoordinate(latitude, isLat = true), fontSize = sizing.text(18.sp), color = oncompassBg)
                                     }
                                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                        Text(text = stringResource(R.string.appstrings_lon_short), fontSize = 12.sp, color = compassTextGray, fontWeight = FontWeight.Bold)
-                                        Text(text = formatCoordinate(longitude, isLat = false), fontSize = 18.sp, color = oncompassBg)
+                                        Text(text = stringResource(R.string.appstrings_lon_short), fontSize = sizing.text(12.sp), color = compassTextGray, fontWeight = FontWeight.Bold)
+                                        Text(text = formatCoordinate(longitude, isLat = false), fontSize = sizing.text(18.sp), color = oncompassBg)
                                     }
                                 }
                             }
@@ -675,17 +687,17 @@ fun CompassScreen(
                         "accuracy" -> {
                             if (showAccuracy) {
                                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                    Text(text = stringResource(R.string.appstrings_accuracy), fontSize = 12.sp, color = compassTextGray, fontWeight = FontWeight.Bold)
+                                    Text(text = stringResource(R.string.appstrings_accuracy), fontSize = sizing.text(12.sp), color = compassTextGray, fontWeight = FontWeight.Bold)
                                     // ✅ On utilise la même logique d'unité pour la précision
                                     val isMi = AppConfig.distanceUnit.intValue == 1
-                                    Text(text = "+/- ${formatCompassDistance(accuracy, isMi)}", fontSize = 18.sp, color = oncompassBg)
+                                    Text(text = "+/- ${formatCompassDistance(accuracy, isMi)}", fontSize = sizing.text(18.sp), color = oncompassBg)
                                 }
                             }
                         }
                     }
                 }
             }
-                Spacer(modifier = Modifier.height(32.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
             }
         }
 
@@ -695,6 +707,11 @@ fun CompassScreen(
                 onFixClick = onFixLocation,
                 modifier = Modifier.align(Alignment.TopCenter)
             )
+
+            // En paysage la colonne ne défile pas : pas de pastille dans ce cas.
+            if (!isLandscape) {
+                PageScrollEdgeButtons(PageScrollPrefs.COMPASS, contentScrollState)
+            }
         }
     }
 
@@ -799,30 +816,39 @@ private fun CompassInfoPanel(
     alignStart: Boolean,
     compact: Boolean = false
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val horizontalAlignment = if (alignStart) Alignment.Start else Alignment.CenterHorizontally
-    val blockSpacing = when {
-        compact -> 10.dp
-        alignStart -> 18.dp
-        else -> 24.dp
-    }
-    val iconSize = when {
-        compact -> 24.dp
-        alignStart -> 28.dp
-        else -> 32.dp
-    }
-    val cityTextSize = when {
-        compact -> 24.sp
-        alignStart -> 28.sp
-        else -> 32.sp
-    }
-    val countryTextSize = when {
-        compact -> 17.sp
-        alignStart -> 20.sp
-        else -> 24.sp
-    }
-    val coordinateSpacing = if (compact) 18.dp else if (alignStart) 24.dp else 32.dp
-    val labelTextSize = if (compact) 11.sp else 12.sp
-    val valueTextSize = if (compact) 16.sp else 18.sp
+    val blockSpacing = sizing.spacing(
+        when {
+            compact -> 10.dp
+            alignStart -> 18.dp
+            else -> 24.dp
+        }
+    )
+    val iconSize = sizing.component(
+        when {
+            compact -> 24.dp
+            alignStart -> 28.dp
+            else -> 32.dp
+        }
+    )
+    val cityTextSize = sizing.text(
+        when {
+            compact -> 24.sp
+            alignStart -> 28.sp
+            else -> 32.sp
+        }
+    )
+    val countryTextSize = sizing.text(
+        when {
+            compact -> 17.sp
+            alignStart -> 20.sp
+            else -> 24.sp
+        }
+    )
+    val coordinateSpacing = sizing.spacing(if (compact) 18.dp else if (alignStart) 24.dp else 32.dp)
+    val labelTextSize = sizing.text(if (compact) 11.sp else 12.sp)
+    val valueTextSize = sizing.text(if (compact) 16.sp else 18.sp)
 
     Column(
         modifier = modifier,
@@ -840,7 +866,7 @@ private fun CompassInfoPanel(
                                 tint = oncompassBg,
                                 modifier = Modifier.size(iconSize)
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
                             Text(
                                 text = city,
                                 fontSize = cityTextSize,
@@ -1073,13 +1099,14 @@ fun CenterCompassContent(
         else -> ""
     }
 
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
         if (showLogo) {
         val logoColor = accentColor.copy(alpha = 0.7f)
-        Canvas(modifier = Modifier.size(80.dp)) {
+        Canvas(modifier = Modifier.size(sizing.component(80.dp))) {
             val u = size.width / 100f
             val cx = size.width / 2
             val cy = size.height / 2 + (10f * u)
@@ -1108,20 +1135,20 @@ fun CenterCompassContent(
             drawArc(logoColor, 140f, 80f, false, topLeft = rectOuter.topLeft, size = rectOuter.size, style = iconPaint)
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
         }
 
         Row(verticalAlignment = Alignment.Bottom) {
             Text(
                 text = cardinal,
-                fontSize = if (compact) 16.sp else 18.sp,
+                fontSize = sizing.text(if (compact) 16.sp else 18.sp),
                 fontWeight = FontWeight.Bold,
                 color = accentColor, // Applique la couleur dynamique au NW, S, etc.
-                modifier = Modifier.padding(bottom = if (compact) 5.dp else 6.dp, end = 4.dp)
+                modifier = Modifier.padding(bottom = sizing.spacing(if (compact) 5.dp else 6.dp), end = sizing.spacing(4.dp))
             )
             Text(
                 text = "$azimuthInt°",
-                fontSize = if (compact) 34.sp else 40.sp,
+                fontSize = sizing.text(if (compact) 34.sp else 40.sp),
                 fontWeight = FontWeight.Light,
                 color = oncompassBg
             )
@@ -1317,7 +1344,7 @@ fun MiniOperatorGrid(operateurs: List<String>) {
 
     val emptyColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
 
-    Canvas(modifier = Modifier.size(24.dp)) {
+    Canvas(modifier = Modifier.size(LocalGeoTowerUiStyle.current.sizing.component(24.dp))) {
         val spacing = 2.dp.toPx()
         val cellSize = (size.width - spacing) / 2f
         val cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx(), 4.dp.toPx())

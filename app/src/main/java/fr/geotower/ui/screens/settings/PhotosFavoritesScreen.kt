@@ -71,10 +71,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.navigation.NavController
-import coil.compose.AsyncImage
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.SignalQuestClient
@@ -82,7 +82,10 @@ import fr.geotower.data.api.SqPhotoData
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.GeoTowerLoadingMessage
+import fr.geotower.ui.components.PhotoAsyncImage
+import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.geoTowerFadingEdge
+import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.emitters.CommunityPhoto
 import fr.geotower.ui.screens.emitters.PhotoExifDialog
@@ -93,6 +96,7 @@ import fr.geotower.ui.screens.emitters.saveCommunityPhotoToGallery
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.PreferenceStores
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -207,12 +211,17 @@ fun PhotosFavoritesScreen(
             }
 
             else -> {
-                Column(
+                Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(uiStyle.backgroundColor)
                         .padding(innerPadding)
+                ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
                         .geoTowerFadingEdge(scrollState, fadeHeight = sizing.component(72.dp))
+                        .pageScrollbar(PageScrollPrefs.PHOTOS_FAVORITES, scrollState)
                         .verticalScroll(scrollState)
                         .navigationBarsPadding()
                         .padding(
@@ -234,6 +243,8 @@ fun PhotosFavoritesScreen(
                         )
                     }
                     Spacer(Modifier.height(sizing.spacing(24.dp)))
+                }
+                PageScrollEdgeButtons(PageScrollPrefs.PHOTOS_FAVORITES, scrollState)
                 }
             }
         }
@@ -396,13 +407,11 @@ private fun FavoritePhotoThumbnail(
             .then(if (photo != null) Modifier.clickable { onOpen() } else Modifier)
     ) {
         if (photo != null) {
-            AsyncImage(
+            PhotoAsyncImage(
                 model = photo.url,
                 contentDescription = stringResource(R.string.appstrings_site_photo_desc),
                 contentScale = ContentScale.Crop,
-                error = painterResource(id = R.drawable.chateau_deau),
                 fallback = painterResource(id = R.drawable.chateau_deau),
-                placeholder = painterResource(id = R.drawable.chateau_deau),
                 modifier = Modifier.fillMaxSize()
             )
         } else {
@@ -459,6 +468,7 @@ private fun FavoritePhotoViewer(
     initialIndex: Int,
     onDismiss: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     if (photos.isEmpty()) return
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -520,10 +530,12 @@ private fun FavoritePhotoViewer(
                             lockRotationOnZoomPan = true
                         )
                 ) {
-                    AsyncImage(
+                    PhotoAsyncImage(
                         model = photos[page].url,
                         contentDescription = stringResource(R.string.appstrings_full_screen_photo_desc),
                         contentScale = ContentScale.Fit,
+                        containerColor = Color.Transparent,
+                        indicatorColor = overlayContent,
                         modifier = Modifier
                             .fillMaxSize()
                             .graphicsLayer {
@@ -544,15 +556,15 @@ private fun FavoritePhotoViewer(
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .statusBarsPadding()
-                    .padding(12.dp)
-                    .size(32.dp)
+                    .padding(sizing.spacing(12.dp))
+                    .size(sizing.component(32.dp))
                     .background(overlayButtonBg, CircleShape)
             ) {
                 Icon(
                     imageVector = Icons.Default.Close,
                     contentDescription = stringResource(R.string.appstrings_close),
                     tint = overlayContent,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(sizing.component(18.dp))
                 )
             }
 
@@ -561,8 +573,8 @@ private fun FavoritePhotoViewer(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .statusBarsPadding()
-                    .padding(12.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    .padding(sizing.spacing(12.dp)),
+                horizontalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (AppConfig.siteShowPhotoExif.value && !currentPhoto.exifMetadata.isNullOrEmpty()) {
@@ -617,8 +629,8 @@ private fun FavoritePhotoViewer(
                     onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) } },
                     modifier = Modifier
                         .align(Alignment.CenterStart)
-                        .padding(start = 8.dp)
-                        .size(36.dp)
+                        .padding(start = sizing.spacing(8.dp))
+                        .size(sizing.component(36.dp))
                         .background(overlayButtonBg, CircleShape)
                 ) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, contentDescription = null, tint = overlayContent)
@@ -630,8 +642,8 @@ private fun FavoritePhotoViewer(
                     onClick = { scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) } },
                     modifier = Modifier
                         .align(Alignment.CenterEnd)
-                        .padding(end = 8.dp)
-                        .size(36.dp)
+                        .padding(end = sizing.spacing(8.dp))
+                        .size(sizing.component(36.dp))
                         .background(overlayButtonBg, CircleShape)
                 ) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = overlayContent)
@@ -644,7 +656,7 @@ private fun FavoritePhotoViewer(
                     .align(Alignment.BottomCenter)
                     .fillMaxWidth()
                     .navigationBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                    .padding(horizontal = sizing.spacing(24.dp), vertical = sizing.spacing(20.dp)),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 val sourceLabel = currentPhoto.operatorLabel?.let { "${currentPhoto.communityName} · $it" }
@@ -652,14 +664,14 @@ private fun FavoritePhotoViewer(
                 Text(
                     text = sourceLabel,
                     color = overlayContent,
-                    style = MaterialTheme.typography.labelMedium,
+                    style = sizing.textStyle(MaterialTheme.typography.labelMedium),
                     textAlign = TextAlign.Center
                 )
                 currentPhoto.author?.takeIf { it.isNotBlank() }?.let {
                     Text(
                         text = stringResource(R.string.photo_by_author, it),
                         color = overlayContent.copy(alpha = 0.85f),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                         textAlign = TextAlign.Center
                     )
                 }
@@ -667,16 +679,16 @@ private fun FavoritePhotoViewer(
                     Text(
                         text = stringResource(R.string.photo_on_date, it),
                         color = overlayContent.copy(alpha = 0.85f),
-                        style = MaterialTheme.typography.bodySmall,
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                         textAlign = TextAlign.Center
                     )
                 }
                 if (photos.size > 1) {
-                    Spacer(Modifier.height(6.dp))
+                    Spacer(Modifier.height(sizing.spacing(6.dp)))
                     Text(
                         text = "${pagerState.currentPage + 1} / ${photos.size}",
                         color = overlayContent.copy(alpha = 0.7f),
-                        style = MaterialTheme.typography.labelSmall
+                        style = sizing.textStyle(MaterialTheme.typography.labelSmall)
                     )
                 }
             }

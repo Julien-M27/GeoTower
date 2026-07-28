@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 
 private val ToolboxButtonDiameter = 54.dp
 private val ToolboxIconDiameter = 24.dp
@@ -43,6 +44,11 @@ fun AntennaMapToolBox(
     showSettings: Boolean = true,
     expandLeft: Boolean = false
 ) {
+    // Les diametres suivent le reglage de taille d'interface (slider des parametres).
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val buttonDiameter = sizing.component(ToolboxButtonDiameter)
+    val iconDiameter = sizing.component(ToolboxIconDiameter)
+
     // L'animation est gérée en interne par le composant !
     val toolboxRotation by animateFloatAsState(
         targetValue = if (isToolboxExpanded) 180f else 0f,
@@ -57,8 +63,8 @@ fun AntennaMapToolBox(
 
     if (expandLeft) {
         Surface(
-            modifier = Modifier.height(ToolboxButtonDiameter),
-            shape = RoundedCornerShape(ToolboxButtonDiameter / 2f),
+            modifier = Modifier.height(buttonDiameter),
+            shape = RoundedCornerShape(buttonDiameter / 2f),
             color = MaterialTheme.colorScheme.surface,
             shadowElevation = 6.dp,
             border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
@@ -77,7 +83,7 @@ fun AntennaMapToolBox(
                             IconButton(
                                 onClick = onToggleSearch,
                                 modifier = Modifier
-                                    .size(ToolboxButtonDiameter)
+                                    .size(buttonDiameter)
                                     .background(
                                         if (isSearchActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                                         CircleShape
@@ -87,7 +93,7 @@ fun AntennaMapToolBox(
                                     Icons.Default.Search,
                                     contentDescription = stringResource(R.string.appstrings_search),
                                     tint = if (isSearchActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(ToolboxIconDiameter)
+                                    modifier = Modifier.size(iconDiameter)
                                 )
                             }
                         }
@@ -95,14 +101,14 @@ fun AntennaMapToolBox(
                             IconButton(
                                 onClick = onToggleMeasure,
                                 modifier = Modifier
-                                    .size(ToolboxButtonDiameter)
+                                    .size(buttonDiameter)
                                     .background(if (isMeasuringMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, CircleShape)
                             ) {
                                 Icon(
                                     Icons.Default.Straighten,
                                     contentDescription = stringResource(R.string.appstrings_ruler),
                                     tint = if (isMeasuringMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(ToolboxIconDiameter)
+                                    modifier = Modifier.size(iconDiameter)
                                 )
                             }
                         }
@@ -110,38 +116,38 @@ fun AntennaMapToolBox(
                             IconButton(
                                 onClick = onToggleTimeSlider,
                                 modifier = Modifier
-                                    .size(ToolboxButtonDiameter)
+                                    .size(buttonDiameter)
                                     .background(if (isTimeSliderActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, CircleShape)
                             ) {
                                 Icon(
                                     Icons.Default.History,
                                     contentDescription = stringResource(R.string.appstrings_time_slider),
                                     tint = if (isTimeSliderActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(ToolboxIconDiameter)
+                                    modifier = Modifier.size(iconDiameter)
                                 )
                             }
                         }
                         if (showLayers) {
-                            IconButton(onClick = onOpenLayers, modifier = Modifier.size(ToolboxButtonDiameter)) {
-                                Icon(Icons.Default.Layers, contentDescription = stringResource(R.string.appstrings_layers), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(ToolboxIconDiameter))
+                            IconButton(onClick = onOpenLayers, modifier = Modifier.size(buttonDiameter)) {
+                                Icon(Icons.Default.Layers, contentDescription = stringResource(R.string.appstrings_layers), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(iconDiameter))
                             }
                         }
                         if (showSettings) {
-                            IconButton(onClick = onOpenSettings, modifier = Modifier.size(ToolboxButtonDiameter)) {
-                                Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.appstrings_settings_title), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(ToolboxIconDiameter))
+                            IconButton(onClick = onOpenSettings, modifier = Modifier.size(buttonDiameter)) {
+                                Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.appstrings_settings_title), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(iconDiameter))
                             }
                         }
                         VerticalDivider(
                             modifier = Modifier
-                                .height(32.dp)
-                                .padding(horizontal = 4.dp),
+                                .height(sizing.component(32.dp))
+                                .padding(horizontal = sizing.spacing(4.dp)),
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f)
                         )
                     }
                 }
                 Box(
                     modifier = Modifier
-                        .size(ToolboxButtonDiameter)
+                        .size(buttonDiameter)
                         .background(
                             if (highlightCollapsed) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                             CircleShape
@@ -153,15 +159,15 @@ fun AntennaMapToolBox(
                         if (isToolboxExpanded) Icons.Default.Close else Icons.Default.Build,
                         contentDescription = stringResource(R.string.appstrings_tools),
                         tint = if (highlightCollapsed) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                        modifier = Modifier.size(ToolboxIconDiameter).rotate(toolboxRotation)
+                        modifier = Modifier.size(iconDiameter).rotate(toolboxRotation)
                     )
                 }
             }
         }
     } else {
     Surface(
-        modifier = Modifier.width(ToolboxButtonDiameter),
-        shape = RoundedCornerShape(ToolboxButtonDiameter / 2f),
+        modifier = Modifier.width(buttonDiameter),
+        shape = RoundedCornerShape(buttonDiameter / 2f),
         color = MaterialTheme.colorScheme.surface,
         shadowElevation = 6.dp,
         border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
@@ -170,13 +176,13 @@ fun AntennaMapToolBox(
             AnimatedVisibility(visible = isToolboxExpanded, enter = expandVertically(), exit = shrinkVertically()) {
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
                 ) {
                     if (showSearch) {
                         IconButton(
                             onClick = onToggleSearch,
                             modifier = Modifier
-                                .size(ToolboxButtonDiameter)
+                                .size(buttonDiameter)
                                 .background(
                                     if (isSearchActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                                     CircleShape
@@ -186,7 +192,7 @@ fun AntennaMapToolBox(
                                 Icons.Default.Search,
                                 contentDescription = stringResource(R.string.appstrings_search),
                                 tint = if (isSearchActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(ToolboxIconDiameter)
+                                modifier = Modifier.size(iconDiameter)
                             )
                         }
                     }
@@ -194,14 +200,14 @@ fun AntennaMapToolBox(
                         IconButton(
                             onClick = onToggleMeasure,
                             modifier = Modifier
-                                .size(ToolboxButtonDiameter)
+                                .size(buttonDiameter)
                                 .background(if (isMeasuringMode) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, CircleShape)
                         ) {
                             Icon(
                                 Icons.Default.Straighten,
                                 contentDescription = stringResource(R.string.appstrings_ruler),
                                 tint = if (isMeasuringMode) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(ToolboxIconDiameter)
+                                modifier = Modifier.size(iconDiameter)
                             )
                         }
                     }
@@ -209,33 +215,33 @@ fun AntennaMapToolBox(
                         IconButton(
                             onClick = onToggleTimeSlider,
                             modifier = Modifier
-                                .size(ToolboxButtonDiameter)
+                                .size(buttonDiameter)
                                 .background(if (isTimeSliderActive) MaterialTheme.colorScheme.primaryContainer else Color.Transparent, CircleShape)
                         ) {
                             Icon(
                                 Icons.Default.History,
                                 contentDescription = stringResource(R.string.appstrings_time_slider),
                                 tint = if (isTimeSliderActive) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.size(ToolboxIconDiameter)
+                                modifier = Modifier.size(iconDiameter)
                             )
                         }
                     }
                     if (showLayers) {
-                        IconButton(onClick = onOpenLayers, modifier = Modifier.size(ToolboxButtonDiameter)) {
-                            Icon(Icons.Default.Layers, contentDescription = stringResource(R.string.appstrings_layers), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(ToolboxIconDiameter))
+                        IconButton(onClick = onOpenLayers, modifier = Modifier.size(buttonDiameter)) {
+                            Icon(Icons.Default.Layers, contentDescription = stringResource(R.string.appstrings_layers), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(iconDiameter))
                         }
                     }
                     if (showSettings) {
-                        IconButton(onClick = onOpenSettings, modifier = Modifier.size(ToolboxButtonDiameter)) {
-                            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.appstrings_settings_title), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(ToolboxIconDiameter))
+                        IconButton(onClick = onOpenSettings, modifier = Modifier.size(buttonDiameter)) {
+                            Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.appstrings_settings_title), tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(iconDiameter))
                         }
                     }
-                    HorizontalDivider(modifier = Modifier.width(32.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+                    HorizontalDivider(modifier = Modifier.width(sizing.component(32.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
                 }
             }
             Box(
                 modifier = Modifier
-                    .size(ToolboxButtonDiameter)
+                    .size(buttonDiameter)
                     .background(
                         if (highlightCollapsed) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
                         CircleShape
@@ -247,7 +253,7 @@ fun AntennaMapToolBox(
                     if (isToolboxExpanded) Icons.Default.Close else Icons.Default.Build,
                     contentDescription = stringResource(R.string.appstrings_tools),
                     tint = if (highlightCollapsed) MaterialTheme.colorScheme.primary else LocalContentColor.current,
-                    modifier = Modifier.size(ToolboxIconDiameter).rotate(toolboxRotation)
+                    modifier = Modifier.size(iconDiameter).rotate(toolboxRotation)
                 )
             }
         }

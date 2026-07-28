@@ -13,13 +13,53 @@ class StationMasks(var techMask: Int = 0, var bandMask: Int = 0)
  */
 object RadioMaskComputer {
 
+    // Familles deduites d'un libelle de systeme ou de generation. Bits internes au cache
+    // ci-dessous, sans rapport avec ceux de RadioFilterMasks.
+    private const val FAMILY_FH = 1 shl 0
+    private const val FAMILY_2G = 1 shl 1
+    private const val FAMILY_3G = 1 shl 2
+    private const val FAMILY_4G = 1 shl 3
+    private const val FAMILY_5G = 1 shl 4
+
+    /**
+     * Plafond des caches de libelles : les sources ANFR n'exposent qu'une poignee de valeurs
+     * distinctes, ce garde-fou evite toute croissance non bornee sur une source inattendue.
+     */
+    private const val MAX_CACHE_ENTRIES = 8192
+
+    private val systemFamilies = HashMap<String, Int>()
+    private val generationFamilies = HashMap<String, Int>()
+
+    /**
+     * Memoise la reconnaissance de famille d'un libelle. Le scan des masques traverse plusieurs
+     * millions de lignes (emetteur x bande) mais ne rencontre qu'une poignee de libelles distincts
+     * ("GSM 900", "LTE 1800", "FH"...) : sans cache, chaque ligne payait un `uppercase()` — donc
+     * une allocation — suivi de six `contains`. Le calcul est inchange, il n'est plus fait qu'une
+     * fois par libelle. Non thread-safe, comme le reste du builder (un build = un thread).
+     */
+    private inline fun families(cache: HashMap<String, Int>, label: String?, compute: (String) -> Int): Int {
+        val key = label ?: ""
+        cache[key]?.let { return it }
+        val value = compute(AnfrParsing.cleanText(label).uppercase())
+        if (cache.size >= MAX_CACHE_ENTRIES) cache.clear()
+        cache[key] = value
+        return value
+    }
+
     /** Python `update_masks_from_generation`. */
     fun updateMasksFromGeneration(masks: StationMasks, generation: String?) {
-        val g = AnfrParsing.cleanText(generation).uppercase()
-        if (g.contains("2G")) masks.techMask = masks.techMask or RadioFilterMasks.TECH_2G
-        if (g.contains("3G")) masks.techMask = masks.techMask or RadioFilterMasks.TECH_3G
-        if (g.contains("4G")) masks.techMask = masks.techMask or RadioFilterMasks.TECH_4G
-        if (g.contains("5G")) masks.techMask = masks.techMask or RadioFilterMasks.TECH_5G
+        val families = families(generationFamilies, generation) { g ->
+            var flags = 0
+            if (g.contains("2G")) flags = flags or FAMILY_2G
+            if (g.contains("3G")) flags = flags or FAMILY_3G
+            if (g.contains("4G")) flags = flags or FAMILY_4G
+            if (g.contains("5G")) flags = flags or FAMILY_5G
+            flags
+        }
+        if (families and FAMILY_2G != 0) masks.techMask = masks.techMask or RadioFilterMasks.TECH_2G
+        if (families and FAMILY_3G != 0) masks.techMask = masks.techMask or RadioFilterMasks.TECH_3G
+        if (families and FAMILY_4G != 0) masks.techMask = masks.techMask or RadioFilterMasks.TECH_4G
+        if (families and FAMILY_5G != 0) masks.techMask = masks.techMask or RadioFilterMasks.TECH_5G
     }
 
     /** Python `update_masks_from_system_and_band`. */
@@ -29,18 +69,29 @@ object RadioMaskComputer {
         fStartMhz: Double?,
         fEndMhz: Double?
     ) {
-        val s = AnfrParsing.cleanText(system).uppercase()
+        val families = families(systemFamilies, system) { s ->
+            if (s.contains("FH")) {
+                FAMILY_FH
+            } else {
+                var flags = 0
+                if (s.contains("GSM") || s.contains("2G")) flags = flags or FAMILY_2G
+                if (s.contains("UMTS") || s.contains("3G")) flags = flags or FAMILY_3G
+                if (s.contains("LTE") || s.contains("4G")) flags = flags or FAMILY_4G
+                if (s.contains("NR") || s.contains("5G")) flags = flags or FAMILY_5G
+                flags
+            }
+        }
 
-        if (s.contains("FH")) {
+        if (families and FAMILY_FH != 0) {
             masks.techMask = masks.techMask or RadioFilterMasks.TECH_FH
             masks.bandMask = masks.bandMask or RadioFilterMasks.BAND_FH
             return
         }
 
-        val is2g = s.contains("GSM") || s.contains("2G")
-        val is3g = s.contains("UMTS") || s.contains("3G")
-        val is4g = s.contains("LTE") || s.contains("4G")
-        val is5g = s.contains("NR") || s.contains("5G")
+        val is2g = families and FAMILY_2G != 0
+        val is3g = families and FAMILY_3G != 0
+        val is4g = families and FAMILY_4G != 0
+        val is5g = families and FAMILY_5G != 0
 
         if (is2g) {
             masks.techMask = masks.techMask or RadioFilterMasks.TECH_2G

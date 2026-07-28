@@ -65,7 +65,8 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
 
         if (
             !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_UPLOAD) ||
-            !RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.SIGNALQUEST_UPLOAD)
+            !RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.SIGNALQUEST_UPLOAD) ||
+            fr.geotower.utils.AppConfig.blockCommunityAndUpdates()
         ) {
             SignalQuestUploadQueue.cleanupUpload(applicationContext, uploadId)
             return Result.failure()

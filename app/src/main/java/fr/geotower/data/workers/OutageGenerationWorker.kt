@@ -18,7 +18,6 @@ import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.RetrofitClient
-import fr.geotower.data.models.SiteHsEntity
 import fr.geotower.data.outages.OutageGenerationStep
 import fr.geotower.data.outages.OutageLocalConfig
 import fr.geotower.data.outages.labelRes
@@ -89,7 +88,9 @@ class OutageGenerationWorker(
             }
             ticker.cancel()
             cancelSafely(PROGRESS_NOTIFICATION_ID)
-            val breakdown = operatorBreakdown(sites)
+            // Le détail par opérateur affiché dans les réglages est persisté par la génération
+            // elle-même (OutageLocalConfig.recordGeneration) : ici il ne sert qu'à la notification.
+            val breakdown = OutageLocalConfig.breakdownOf(sites)
             setProgress(
                 workDataOf(
                     KEY_PERCENT to 100,
@@ -97,8 +98,8 @@ class OutageGenerationWorker(
                     KEY_COUNT to sites.size,
                 ),
             )
-            showResult(sites.size, breakdown)
-            Result.success(workDataOf(KEY_COUNT to sites.size, KEY_BREAKDOWN to breakdown))
+            showResult(sites.size, breakdown.joinToString("\n") { (operateur, nombre) -> "$operateur : $nombre" })
+            Result.success(workDataOf(KEY_COUNT to sites.size))
         } catch (e: CancellationException) {
             ticker.cancel()
             cancelSafely(PROGRESS_NOTIFICATION_ID)
@@ -164,16 +165,12 @@ class OutageGenerationWorker(
         notifySafely(RESULT_NOTIFICATION_ID, builder.build())
     }
 
-    /** Répartition « Opérateur : N » (le plus gros en premier), pour la notif et la page. */
-    private fun operatorBreakdown(sites: List<SiteHsEntity>): String =
-        sites.groupingBy { it.operateur }.eachCount()
-            .entries.sortedByDescending { it.value }
-            .joinToString(" · ") { "${it.key} : ${it.value}" }
-
     private fun settingsPendingIntent(): PendingIntent {
+        // La génération des pannes se pilote depuis « Source des pannes » : on ouvre cette page,
+        // pas la racine des réglages.
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            data = Uri.parse("geotower://settings")
+            data = Uri.parse("geotower://outage_source")
         }
         return PendingIntent.getActivity(
             context, 0, intent,
@@ -196,7 +193,6 @@ class OutageGenerationWorker(
         const val KEY_PERCENT = "percent"
         const val KEY_DETAIL = "detail"
         const val KEY_COUNT = "count"
-        const val KEY_BREAKDOWN = "breakdown"
 
         private const val TAG = "OutageGeneration"
         private const val PROGRESS_NOTIFICATION_ID = 472_001

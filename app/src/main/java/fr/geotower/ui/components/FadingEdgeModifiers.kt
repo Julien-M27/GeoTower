@@ -2,6 +2,7 @@ package fr.geotower.ui.components
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.BlendMode
@@ -14,9 +15,21 @@ import androidx.compose.ui.unit.dp
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.PowerProfile
 
+/**
+ * Hauteur estompée en haut et en bas d'une zone défilante quand le « flou au défilement » est
+ * actif. Tout ce qui tombe dans cette bande est délavé : un défilement qui vise un élément précis
+ * doit donc le poser SOUS cette bande, sinon son titre est illisible.
+ */
+val GeoTowerFadingEdgeHeight: Dp = 80.dp
+
+/** Le fondu de bord est-il réellement dessiné ? (réglage « flou » + profil d'énergie). */
+@Composable
+fun isGeoTowerFadingEdgeActive(): Boolean =
+    AppConfig.isBlurEnabled.value && PowerProfile.richAnimations
+
 fun Modifier.geoTowerFadingEdge(
     scrollState: ScrollState,
-    fadeHeight: Dp = 80.dp,
+    fadeHeight: Dp = GeoTowerFadingEdgeHeight,
     requireScrollableContent: Boolean = false
 ): Modifier {
     if (!AppConfig.isBlurEnabled.value || !PowerProfile.richAnimations) return this
@@ -63,7 +76,7 @@ fun Modifier.geoTowerFadingEdge(
 
 fun Modifier.geoTowerLazyListFadingEdge(
     lazyListState: LazyListState,
-    fadeHeight: Dp = 80.dp
+    fadeHeight: Dp = GeoTowerFadingEdgeHeight
 ): Modifier {
     if (!AppConfig.isBlurEnabled.value || !PowerProfile.richAnimations) return this
 

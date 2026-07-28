@@ -207,9 +207,10 @@ class RadioDatabaseDownloadWorker(
     }
 
     private fun settingsPendingIntent(requestCode: Int, showSuccessPopup: Boolean): PendingIntent {
+        // Cible la carte « base radio » précisément, pas le haut de la section « Base de données ».
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            data = android.net.Uri.parse("geotower://settings?section=database")
+            data = android.net.Uri.parse("geotower://settings?section=db_radio")
             if (showSuccessPopup) putExtra("SHOW_DB_SUCCESS_POPUP", true)
         }
         return PendingIntent.getActivity(

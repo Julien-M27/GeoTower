@@ -20,6 +20,28 @@ class TypedPreferencesTest {
     }
 
     @Test
+    fun sitePageOrderInsertsNetworkIdsNextToAnfrIdentifiers() {
+        // Un ordre déjà personnalisé ne contient pas le bloc arrivé après : sans reprise dans
+        // normalizeOrder, l'utilisateur ne verrait jamais les identifiants réseau.
+        val normalized = SitePagePrefs.normalizeOrder(
+            listOf("operator", "map", "support_details", "elevation_profile", "open_map", "ids", "links")
+        )
+
+        assertEquals(normalized.indexOf("ids") + 1, normalized.indexOf("network_ids"))
+        assertEquals(1, normalized.count { it == "network_ids" })
+    }
+
+    @Test
+    fun sitePageOrderKeepsNetworkIdsWhereTheUserPutIt() {
+        val normalized = SitePagePrefs.normalizeOrder(
+            listOf("operator", "network_ids", "map", "support_details", "elevation_profile", "open_map", "ids")
+        )
+
+        assertEquals(1, normalized.indexOf("network_ids"))
+        assertEquals(1, normalized.count { it == "network_ids" })
+    }
+
+    @Test
     fun sitePageOrderNormalizesLegacyOrderWithoutRenamingKey() {
         val prefs = FakeSharedPreferences(
             SitePagePrefs.ORDER to "operator,map,support_details,photos,nav"
@@ -31,6 +53,9 @@ class TypedPreferencesTest {
                 "operator",
                 "map",
                 "support_details",
+                // Ordre hérité sans bloc « ids » : les identifiants réseau se rangent juste après
+                // les détails du support plutôt que d'atterrir en fin de page.
+                "network_ids",
                 "elevation_profile",
                 "theoretical_coverage",
                 "throughput_calculator",

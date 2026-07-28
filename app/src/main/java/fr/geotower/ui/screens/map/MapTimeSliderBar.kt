@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.unit.sp
 import fr.geotower.R
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
@@ -187,7 +188,7 @@ fun MapTimeSliderBar(
                 if (undatedCount > 0) {
                     Text(
                         text = stringResource(R.string.appstrings_time_slider_undated, undatedCount),
-                        fontSize = 12.sp,
+                        fontSize = sizing.text(12.sp),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -198,19 +199,20 @@ fun MapTimeSliderBar(
 
 @Composable
 private fun OperatorCountChip(operatorKey: String, count: Int) {
+    val sizing = LocalGeoTowerUiSizing.current
     val label = OperatorColors.specForKey(operatorKey)?.label ?: operatorKey
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
+        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))
     ) {
         Box(
             modifier = Modifier
-                .size(10.dp)
+                .size(sizing.component(10.dp))
                 .background(Color(OperatorColors.colorIntForKey(operatorKey)), CircleShape)
         )
         Text(
             text = "$label $count",
-            fontSize = 12.sp,
+            fontSize = sizing.text(12.sp),
             color = MaterialTheme.colorScheme.onSurface
         )
     }

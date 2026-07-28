@@ -30,6 +30,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiSizing
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import androidx.compose.ui.unit.sp
 import fr.geotower.R
 import fr.geotower.utils.LocationReadiness
@@ -48,11 +50,12 @@ fun LocationUnavailableBanner(
     onFixClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     AnimatedVisibility(
         visible = readiness != LocationReadiness.Ready,
         enter = expandVertically() + fadeIn(),
         exit = shrinkVertically() + fadeOut(),
-        modifier = modifier.fillMaxWidth().padding(top = 16.dp, start = 16.dp, end = 16.dp)
+        modifier = modifier.fillMaxWidth().padding(top = sizing.spacing(16.dp), start = sizing.spacing(16.dp), end = sizing.spacing(16.dp))
     ) {
         val descRes = if (readiness == LocationReadiness.ServicesOff) {
             R.string.appstrings_location_services_off_banner_desc
@@ -68,46 +71,46 @@ fun LocationUnavailableBanner(
             color = MaterialTheme.colorScheme.tertiaryContainer,
             shape = RoundedCornerShape(16.dp),
             shadowElevation = 2.dp,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(8.dp))
         ) {
             Row(
-                modifier = Modifier.padding(16.dp),
+                modifier = Modifier.padding(sizing.spacing(16.dp)),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Icon(
                     imageVector = Icons.Default.LocationOff,
                     contentDescription = null,
                     tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                    modifier = Modifier.size(24.dp)
+                    modifier = Modifier.size(sizing.component(24.dp))
                 )
-                Spacer(modifier = Modifier.width(12.dp))
+                Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = stringResource(R.string.appstrings_location_disabled_title),
                         color = MaterialTheme.colorScheme.onTertiaryContainer,
                         fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleSmall
+                        style = sizing.textStyle(MaterialTheme.typography.titleSmall)
                     )
                     Text(
                         text = stringResource(descRes),
                         color = MaterialTheme.colorScheme.onTertiaryContainer,
-                        style = MaterialTheme.typography.bodySmall
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall)
                     )
                 }
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                 Button(
                     onClick = onFixClick,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.onTertiaryContainer,
                         contentColor = MaterialTheme.colorScheme.tertiaryContainer
                     ),
-                    contentPadding = PaddingValues(horizontal = 12.dp, vertical = 4.dp),
-                    modifier = Modifier.height(36.dp)
+                    contentPadding = PaddingValues(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(4.dp)),
+                    modifier = Modifier.height(sizing.component(36.dp))
                 ) {
                     Text(
                         text = stringResource(actionRes),
                         fontWeight = FontWeight.Bold,
-                        fontSize = 12.sp
+                        fontSize = sizing.text(12.sp)
                     )
                 }
             }
@@ -127,6 +130,7 @@ fun LocationUnavailableMessage(
     onFixClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val descRes = if (readiness == LocationReadiness.ServicesOff) {
         R.string.appstrings_location_services_off_nearby_desc
     } else {
@@ -138,38 +142,38 @@ fun LocationUnavailableMessage(
         R.string.common_authorize
     }
     Column(
-        modifier = modifier.padding(horizontal = 32.dp),
+        modifier = modifier.padding(horizontal = sizing.spacing(32.dp)),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Icon(
             imageVector = Icons.Default.LocationOff,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.primary,
-            modifier = Modifier.size(48.dp)
+            modifier = Modifier.size(sizing.component(48.dp))
         )
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
         Text(
             text = stringResource(R.string.appstrings_location_disabled_title),
-            style = MaterialTheme.typography.titleMedium,
+            style = sizing.textStyle(MaterialTheme.typography.titleMedium),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(8.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
         Text(
             text = stringResource(descRes),
-            style = MaterialTheme.typography.bodyMedium,
+            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center
         )
-        Spacer(modifier = Modifier.height(20.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(20.dp)))
         Button(onClick = onFixClick) {
             Icon(
                 imageVector = Icons.Default.LocationOn,
                 contentDescription = null,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(sizing.component(18.dp))
             )
-            Spacer(modifier = Modifier.width(8.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
             Text(stringResource(actionRes), fontWeight = FontWeight.Bold)
         }
     }

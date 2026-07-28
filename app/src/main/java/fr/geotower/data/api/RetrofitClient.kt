@@ -6,6 +6,9 @@ import okhttp3.Cache
 import okhttp3.CacheControl
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
+import okhttp3.Response
+import okhttp3.ResponseBody.Companion.toResponseBody
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 import java.io.File
@@ -71,9 +74,38 @@ object RetrofitClient {
         }
     }
 
+    /**
+     * Prédicat injecté par l'app : true ⇒ le mode « traitement local » (niveau 3) bloque les
+     * endpoints communautaires / mise à jour / live du client partagé. Laisse passer DB, flags et
+     * pannes. Injecté (pas d'import AppConfig) pour garder la couche réseau découplée.
+     */
+    @Volatile
+    var communityEndpointBlocker: () -> Boolean = { false }
+
+    private fun isLocallyBlockedPath(path: String): Boolean =
+        path.startsWith("/api/v2/signalquest/") ||
+            path == "/api/v2/app/latest" ||
+            path.startsWith("/api/v2/live/")
+
+    private val localModeBlockInterceptor = Interceptor { chain ->
+        val request = chain.request()
+        if (communityEndpointBlocker() && isLocallyBlockedPath(request.url.encodedPath)) {
+            Response.Builder()
+                .request(request)
+                .protocol(Protocol.HTTP_1_1)
+                .code(503)
+                .message("Traitement local actif : endpoint desactive")
+                .body(ByteArray(0).toResponseBody(null))
+                .build()
+        } else {
+            chain.proceed(request)
+        }
+    }
+
     val currentClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
             .apply { httpCache?.let { cache(it) } }
+            .addInterceptor(localModeBlockInterceptor)
             .addInterceptor(offlineFallbackInterceptor)
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)

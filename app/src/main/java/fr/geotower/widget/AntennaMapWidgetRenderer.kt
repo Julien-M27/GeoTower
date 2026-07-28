@@ -699,13 +699,7 @@ object AntennaMapWidgetRenderer {
                 urlFor = { z, x, y -> "https://a.tile.opentopomap.org/$z/$x/$y.png" }
             )
             4 -> offlineTileSource(context) ?: osmTileSource(ignStyle)
-            1 -> osmTileSource(ignStyle)
-            else -> WidgetTileSource(
-                cacheKey = "osm_${ignStyle}",
-                invertColors = ignStyle == 1,
-                maxRenderZoom = 19,
-                urlFor = { z, x, y -> "https://tile.openstreetmap.org/$z/$x/$y.png" }
-            )
+            else -> osmTileSource(ignStyle)
         }
     }
 
@@ -743,6 +737,16 @@ object AntennaMapWidgetRenderer {
     }
 
     private fun osmTileSource(ignStyle: Int): WidgetTileSource {
+        if (ignStyle == 2) {
+            return WidgetTileSource(
+                cacheKey = "esri_satellite",
+                invertColors = false,
+                maxRenderZoom = 19,
+                urlFor = { z, x, y ->
+                    "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/$z/$y/$x"
+                }
+            )
+        }
         return WidgetTileSource(
             cacheKey = "osm_${ignStyle}",
             invertColors = ignStyle == 1,

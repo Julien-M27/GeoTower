@@ -26,7 +26,9 @@ object OutageBackgroundScheduler {
     /** Réconcilie la planif périodique avec l'état des réglages (source locale ET fond activé). */
     fun reconcile(context: Context) {
         val config = OutageLocalConfig(context)
-        if (config.useLocalSource && config.backgroundEnabled) {
+        // Source locale activée par le réglage outage OU par le mode « traitement local » (niveau ≥ 1).
+        val localSource = config.useLocalSource || fr.geotower.utils.AppConfig.outagesLocal()
+        if (localSource && config.backgroundEnabled) {
             schedule(context, config.frequencyHours)
         } else {
             cancel(context)

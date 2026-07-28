@@ -67,4 +67,20 @@
         <item quantity="one">Invio annullato (%1$d/%2$d foto inviata).</item>
         <item quantity="other">Invio annullato (%1$d/%2$d foto inviate).</item>
     </plurals>
+    <plurals name="share_history_recorded">
+        <item quantity="one">%1$d condivisione registrata</item>
+        <item quantity="other">%1$d condivisioni registrate</item>
+    </plurals>
+    <plurals name="share_history_stations">
+        <item quantity="one">%1$d stazione</item>
+        <item quantity="other">%1$d stazioni</item>
+    </plurals>
+    <plurals name="site_network_ids_4g">
+        <item quantity="one">Identificativo 4G</item>
+        <item quantity="other">Identificativi 4G</item>
+    </plurals>
+    <plurals name="site_network_ids_5g">
+        <item quantity="one">Identificativo 5G</item>
+        <item quantity="other">Identificativi 5G</item>
+    </plurals>
 </resources>

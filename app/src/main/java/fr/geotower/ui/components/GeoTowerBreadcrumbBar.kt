@@ -41,6 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavController
@@ -59,6 +60,7 @@ fun GeoTowerBreadcrumbBar(
     modifier: Modifier = Modifier,
     backgroundColor: Color = MaterialTheme.colorScheme.surfaceContainer
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     if (items.isEmpty()) return
 
     val scrollState = rememberScrollState()
@@ -73,7 +75,7 @@ fun GeoTowerBreadcrumbBar(
     Surface(
         modifier = modifier
             .fillMaxWidth()
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .padding(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(6.dp)),
         shape = MaterialTheme.shapes.extraLarge,
         color = backgroundColor,
         contentColor = MaterialTheme.colorScheme.onSurface,
@@ -82,9 +84,9 @@ fun GeoTowerBreadcrumbBar(
         Row(
             modifier = Modifier
                 .horizontalScroll(scrollState)
-                .padding(horizontal = 8.dp, vertical = 7.dp),
+                .padding(horizontal = sizing.spacing(8.dp), vertical = sizing.spacing(7.dp)),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
+            horizontalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))
         ) {
             items.forEachIndexed { index, item ->
                 if (index > 0) {
@@ -92,7 +94,7 @@ fun GeoTowerBreadcrumbBar(
                         imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        modifier = Modifier.size(16.dp)
+                        modifier = Modifier.size(sizing.component(16.dp))
                     )
                 }
 
@@ -120,7 +122,7 @@ fun GeoTowerBreadcrumbBar(
                         BreadcrumbContent(
                             item = item,
                             fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp)
+                            modifier = Modifier.padding(horizontal = sizing.spacing(11.dp), vertical = sizing.spacing(8.dp))
                         )
                     }
                 } else {
@@ -133,7 +135,7 @@ fun GeoTowerBreadcrumbBar(
                         BreadcrumbContent(
                             item = item,
                             fontWeight = if (isCurrent) FontWeight.Bold else FontWeight.SemiBold,
-                            modifier = Modifier.padding(horizontal = 11.dp, vertical = 8.dp)
+                            modifier = Modifier.padding(horizontal = sizing.spacing(11.dp), vertical = sizing.spacing(8.dp))
                         )
                     }
                 }
@@ -191,6 +193,7 @@ private fun BreadcrumbContent(
     modifier: Modifier = Modifier,
     fontWeight: FontWeight = FontWeight.SemiBold
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically
@@ -199,15 +202,15 @@ private fun BreadcrumbContent(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                modifier = Modifier.size(16.dp)
+                modifier = Modifier.size(sizing.component(16.dp))
             )
-            Spacer(modifier = Modifier.width(5.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(5.dp)))
         }
         Text(
             text = item.label,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
-            fontSize = 13.sp,
+            fontSize = sizing.text(13.sp),
             fontWeight = fontWeight
         )
     }
@@ -230,6 +233,8 @@ private fun rememberGeoTowerBreadcrumbLabels(): GeoTowerBreadcrumbLabels {
         throughputCalculator = stringResource(R.string.appstrings_throughput_calculator_title),
         speedtests = stringResource(R.string.appstrings_speedtests_all_title),
         uploadHistory = stringResource(R.string.appstrings_upload_history_title),
+        shareHistory = stringResource(R.string.share_history_title),
+        histories = stringResource(R.string.histories_title),
         radio = stringResource(R.string.appstrings_radio_share_radio_title)
     )
 }
@@ -249,6 +254,8 @@ private data class GeoTowerBreadcrumbLabels(
     val throughputCalculator: String,
     val speedtests: String,
     val uploadHistory: String,
+    val shareHistory: String,
+    val histories: String,
     val radio: String
 )
 
@@ -269,6 +276,8 @@ private fun NavBackStackEntry.toGeoTowerBreadcrumbItem(
         "about" -> GeoTowerBreadcrumbItem(labels.about, Icons.Default.Home, onClick, "about")
         "diagnostic" -> GeoTowerBreadcrumbItem(labels.diagnostic, Icons.Default.Info, onClick, "diagnostic")
         "photo_upload_history" -> GeoTowerBreadcrumbItem(labels.uploadHistory, Icons.Default.History, onClick, "photo_upload_history")
+        "share_history" -> GeoTowerBreadcrumbItem(labels.shareHistory, Icons.Default.History, onClick, "share_history")
+        "histories" -> GeoTowerBreadcrumbItem(labels.histories, Icons.Default.History, onClick, "histories")
         "support_detail/{id}?operator={operator}&fromMap={fromMap}&photoDraftId={photoDraftId}" -> GeoTowerBreadcrumbItem(labels.support, Icons.Default.VerticalAlignTop, onClick, "support_detail")
         "site_detail/{id}" -> GeoTowerBreadcrumbItem(labels.site, Icons.Default.Tag, onClick, "site_detail")
         "site_detail_from_map/{id}" -> GeoTowerBreadcrumbItem(labels.site, Icons.Default.Tag, onClick, "site_detail_from_map")

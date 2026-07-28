@@ -67,4 +67,20 @@
         <item quantity="one">Upload cancelled (%1$d/%2$d photo sent).</item>
         <item quantity="other">Upload cancelled (%1$d/%2$d photos sent).</item>
     </plurals>
+    <plurals name="share_history_recorded">
+        <item quantity="one">%1$d share recorded</item>
+        <item quantity="other">%1$d shares recorded</item>
+    </plurals>
+    <plurals name="share_history_stations">
+        <item quantity="one">%1$d station</item>
+        <item quantity="other">%1$d stations</item>
+    </plurals>
+    <plurals name="site_network_ids_4g">
+        <item quantity="one">4G identifier</item>
+        <item quantity="other">4G identifiers</item>
+    </plurals>
+    <plurals name="site_network_ids_5g">
+        <item quantity="one">5G identifier</item>
+        <item quantity="other">5G identifiers</item>
+    </plurals>
 </resources>

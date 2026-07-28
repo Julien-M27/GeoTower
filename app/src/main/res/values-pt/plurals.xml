@@ -67,4 +67,20 @@
         <item quantity="one">Envio cancelado (%1$d/%2$d foto enviada).</item>
         <item quantity="other">Envio cancelado (%1$d/%2$d fotos enviadas).</item>
     </plurals>
+    <plurals name="share_history_recorded">
+        <item quantity="one">%1$d partilha registada</item>
+        <item quantity="other">%1$d partilhas registadas</item>
+    </plurals>
+    <plurals name="share_history_stations">
+        <item quantity="one">%1$d estação</item>
+        <item quantity="other">%1$d estações</item>
+    </plurals>
+    <plurals name="site_network_ids_4g">
+        <item quantity="one">Identificador 4G</item>
+        <item quantity="other">Identificadores 4G</item>
+    </plurals>
+    <plurals name="site_network_ids_5g">
+        <item quantity="one">Identificador 5G</item>
+        <item quantity="other">Identificadores 5G</item>
+    </plurals>
 </resources>

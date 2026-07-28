@@ -144,27 +144,28 @@ class MapViewModel(
                 // ✅ 2. ON EMPÊCHE LE CLUSTERING GLOBAL SI UNE VILLE EST RECHERCHÉE
                 val showSitesInService = AppConfig.showSitesInService.value
                 val showSitesOutOfService = AppConfig.showSitesOutOfService.value
-                val showOnlySitesOutOfService = !showSitesInService && showSitesOutOfService
-                val hsOnlyIds = if (showOnlySitesOutOfService) {
+                val showProjectSites = AppConfig.showProjectSites.value
+
+                if (!showSitesInService && !showSitesOutOfService && !showProjectSites) {
+                    _antennas.value = emptyList()
+                    _radioMarkers.value = loadRadioMarkers(zoom, latNorth, lonEast, latSouth, lonWest)
+                    return@launch
+                }
+
+                // « En service » décoché : ce qui reste (pannes déclarées, sites en projet) tient
+                // dans des sous-ensembles bornés → on les charge directement au lieu de ramener
+                // toute la zone pour la filtrer ensuite.
+                val loadsStatusSubsetsOnly = !showSitesInService
+                val hsOnlyIds = if (loadsStatusSubsetsOnly && showSitesOutOfService) {
                     sitesHsAnfrIds(_sitesHs.value)
                 } else {
                     emptyList()
                 }
 
-                if (!showSitesInService && !showSitesOutOfService) {
-                    _antennas.value = emptyList()
-                    _radioMarkers.value = loadRadioMarkers(zoom, latNorth, lonEast, latSouth, lonWest)
-                    return@launch
-                }
-
-                if (showOnlySitesOutOfService && hsOnlyIds.isEmpty()) {
-                    _antennas.value = emptyList()
-                    _radioMarkers.value = loadRadioMarkers(zoom, latNorth, lonEast, latSouth, lonWest)
-                    return@launch
-                }
-
                 val frequencyFilter = FrequencyFilterSelection.fromMapConfig()
-                val hasSiteDisplayFilter = !showSitesInService || !showSitesOutOfService
+                // Le clustering est pré-agrégé en base : il ne sait pas distinguer les statuts,
+                // donc tout décochage force le chargement détaillé.
+                val hasSiteDisplayFilter = !showSitesInService || !showSitesOutOfService || !showProjectSites
                 val hasFrequencyFilter = !frequencyFilter.isFullyEnabled
 
                 if (zoom < 13.0 && cityPolygons == null && !hasSiteDisplayFilter && !hasFrequencyFilter && !AppConfig.timeSliderActive.value) {
@@ -184,22 +185,44 @@ class MapViewModel(
                             azimuts = null, codeInsee = null, azimutsFh = null,
                             techMask = 0,
                             bandMask = 0,
-                            isZb = clusterIsZb
+                            isZb = clusterIsZb,
+                            // Un cluster agrège des sites de statuts mélangés : on le déclare
+                            // actif pour qu'il ne tombe pas dans le statut « En projet ».
+                            // Sans effet réel : dès qu'un statut est décoché, plus de clustering.
+                            hasActive = 1
                         )
                     }
                     _antennas.value = fakeAntennas
                 } else {
                     // Si on a zoomé, on charge les vraies antennes détaillées de la zone
                     val detailBackedBandMask = frequencyFilter.detailBackedBandMaskForEnrichment()
-                    val rawAntennas = if (showOnlySitesOutOfService) {
-                        repository.getAntennasByIdsInBox(
-                            hsOnlyIds,
-                            latNorth,
-                            lonEast,
-                            latSouth,
-                            lonWest,
-                            detailBackedBandMask = detailBackedBandMask
-                        )
+                    val rawAntennas = if (loadsStatusSubsetsOnly) {
+                        // Union des sous-ensembles cochés. Le filtre fréquences reste appliqué
+                        // côté carte : inutile de passer par la variante SQL par bandes ici.
+                        val hsAntennas = if (hsOnlyIds.isNotEmpty()) {
+                            repository.getAntennasByIdsInBox(
+                                hsOnlyIds,
+                                latNorth,
+                                lonEast,
+                                latSouth,
+                                lonWest,
+                                detailBackedBandMask = detailBackedBandMask
+                            )
+                        } else {
+                            emptyList()
+                        }
+                        val projectAntennas = if (showProjectSites) {
+                            repository.getProjectAntennasInBox(
+                                latNorth,
+                                lonEast,
+                                latSouth,
+                                lonWest,
+                                detailBackedBandMask = detailBackedBandMask
+                            )
+                        } else {
+                            emptyList()
+                        }
+                        (hsAntennas + projectAntennas).distinctBy { it.idAnfr }
                     } else if (hasFrequencyFilter) {
                         repository.getAntennasInBoxForFrequencyFilter(
                             latNorth = latNorth,

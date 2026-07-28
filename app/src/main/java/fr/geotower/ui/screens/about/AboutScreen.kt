@@ -1,6 +1,7 @@
 @file:OptIn(ExperimentalMaterial3Api::class)
 package fr.geotower.ui.screens.about
 
+import android.content.Context
 import android.widget.ImageView
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -36,6 +37,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Download
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.ui.platform.LocalUriHandler
@@ -75,8 +77,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.navigation.NavController
+import fr.geotower.data.outages.OutageLocalConfig
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.AppLogoDrawingResources
@@ -90,8 +95,11 @@ import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.compose.foundation.layout.navigationBarsPadding
+import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.geoTowerFadingEdge
+import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.ui.components.rememberSafeClick
+import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import kotlin.math.roundToInt
 import androidx.compose.ui.res.stringResource
@@ -142,6 +150,7 @@ fun AboutScreen(navController: NavController) {
 
     // --- LECTURE DU MODE DE NAVIGATION DEPUIS AppConfig ---
     val navMode = AppConfig.navMode.intValue
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     val txtVersion = stringResource(R.string.appstrings_version)
     val txtUnknown = stringResource(R.string.appstrings_unknown)
@@ -285,7 +294,7 @@ fun AboutScreen(navController: NavController) {
                             .weight(1f)
                             .fillMaxHeight()
                             .navigationBarsPadding()
-                            .padding(top = 16.dp, bottom = 24.dp)
+                            .padding(top = sizing.spacing(16.dp), bottom = sizing.spacing(24.dp))
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -295,17 +304,17 @@ fun AboutScreen(navController: NavController) {
                             IconButton(
                                 onClick = { safeBackNavigation.navigateBack() },
                                 enabled = !safeBackNavigation.isLocked,
-                                modifier = Modifier.padding(start = 8.dp)
+                                modifier = Modifier.padding(start = sizing.spacing(8.dp))
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.appstrings_back), tint = MaterialTheme.colorScheme.onSurface)
                             }
                             // ✅ RETOUR DU BOUTON MENU
-                            IconButton(onClick = onCloseSidebar, modifier = Modifier.padding(end = 8.dp)) {
+                            IconButton(onClick = onCloseSidebar, modifier = Modifier.padding(end = sizing.spacing(8.dp))) {
                                 Icon(Icons.Default.Menu, contentDescription = stringResource(R.string.appstrings_close_menu), tint = MaterialTheme.colorScheme.onSurface)
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
                         menuItems.forEach { (title, icon, index) ->
                             AboutNavigationMenuItem(
@@ -327,9 +336,9 @@ fun AboutScreen(navController: NavController) {
                             )
                         }
 
-                        Spacer(modifier = Modifier.height(8.dp))
+                        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                         HorizontalDivider(
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                            modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp)),
                             color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
                         )
                         AboutNavigationMenuItem(
@@ -362,9 +371,9 @@ fun AboutScreen(navController: NavController) {
 
                         Text(
                             text = appVersion,
-                            style = MaterialTheme.typography.labelSmall,
+                            style = sizing.textStyle(MaterialTheme.typography.labelSmall),
                             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
-                            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp)),
                             textAlign = TextAlign.Center
                         )
                     }
@@ -377,7 +386,7 @@ fun AboutScreen(navController: NavController) {
                     // --- EN-TÊTE TABLETTE ---
                     if (isExpanded) {
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = 16.dp, bottom = 16.dp),
+                            modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(16.dp), bottom = sizing.spacing(16.dp)),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             AnimatedVisibility(
@@ -387,7 +396,7 @@ fun AboutScreen(navController: NavController) {
                             ) {
                                 IconButton(
                                     onClick = onToggleSidebar,
-                                    modifier = Modifier.padding(start = 8.dp)
+                                    modifier = Modifier.padding(start = sizing.spacing(8.dp))
                                 ) {
                                     Icon(Icons.Default.Menu, contentDescription = stringResource(R.string.appstrings_open_menu), tint = MaterialTheme.colorScheme.onSurface)
                                 }
@@ -395,7 +404,7 @@ fun AboutScreen(navController: NavController) {
 
                             Text(
                                 text = stringResource(R.string.appstrings_about),
-                                style = MaterialTheme.typography.headlineMedium,
+                                style = sizing.textStyle(MaterialTheme.typography.headlineMedium),
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.weight(1f),
                                 textAlign = TextAlign.Center
@@ -406,12 +415,13 @@ fun AboutScreen(navController: NavController) {
                                 enter = fadeIn(animationSpec = tween(300)) + expandHorizontally(),
                                 exit = fadeOut(animationSpec = tween(200)) + shrinkHorizontally()
                             ) {
-                                Spacer(modifier = Modifier.width(56.dp))
+                                Spacer(modifier = Modifier.width(sizing.spacing(56.dp)))
                             }
                         }
                     }
 
                     // --- CONTENU DE LA PAGE ---
+                    Box(modifier = Modifier.fillMaxSize()) {
                     Box(
                         modifier = Modifier
                             .fillMaxSize()
@@ -420,8 +430,9 @@ fun AboutScreen(navController: NavController) {
                                 scrollViewportHeight = coordinates.size.height.toFloat()
                             }
                             .then(if (navMode == 0 || !isExpanded) Modifier.geoTowerFadingEdge(scrollState) else Modifier)
+                            .then(if (navMode == 0 || !isExpanded) Modifier.pageScrollbar(PageScrollPrefs.ABOUT, scrollState) else Modifier)
                             .then(if (navMode == 0 || !isExpanded) Modifier.verticalScroll(scrollState) else Modifier)
-                            .padding(horizontal = if (isExpanded) 48.dp else 24.dp)
+                            .padding(horizontal = sizing.spacing(if (isExpanded) 48.dp else 24.dp))
                             // 🚨 CORRECTION 3 : Ajout de la marge de sécurité
                             .navigationBarsPadding()
                     ) {
@@ -439,8 +450,8 @@ fun AboutScreen(navController: NavController) {
                                     sectionAnchorModifiers[3],
                                     sectionAnchorModifiers[4],
                                     sectionAnchorModifiers[5],
-                                    onOpenPhotoUploadHistory = {
-                                        navController.navigate("photo_upload_history")
+                                    onOpenHistories = {
+                                        navController.navigate("histories")
                                     },
                                     onOpenDiagnostic = {
                                         navController.navigate("diagnostic")
@@ -449,7 +460,7 @@ fun AboutScreen(navController: NavController) {
                                         navController.navigate("terms")
                                     }
                                 )
-                                Spacer(modifier = Modifier.height(60.dp))
+                                Spacer(modifier = Modifier.height(sizing.spacing(60.dp)))
                             }
                         } else {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -459,8 +470,8 @@ fun AboutScreen(navController: NavController) {
                                     2 -> SectionConfidentialite(
                                         cardShape,
                                         bubbleBaseColor,
-                                        onOpenPhotoUploadHistory = {
-                                            navController.navigate("photo_upload_history")
+                                        onOpenHistories = {
+                                            navController.navigate("histories")
                                         },
                                         onOpenTerms = {
                                             navController.navigate("terms")
@@ -476,6 +487,10 @@ fun AboutScreen(navController: NavController) {
                                 }
                             }
                         }
+                    }
+                    if (navMode == 0 || !isExpanded) {
+                        PageScrollEdgeButtons(PageScrollPrefs.ABOUT, scrollState)
+                    }
                     }
                 }
             }
@@ -503,17 +518,18 @@ fun AboutNavigationMenuItem(title: String, icon: ImageVector, isSelected: Boolea
     }
 
     val shape = if (useOneUi) RoundedCornerShape(16.dp) else RoundedCornerShape(12.dp)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     Surface(
         onClick = onClick,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 4.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(4.dp)),
         shape = shape,
         color = bgColor
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(icon, null, tint = contentColor, modifier = Modifier.size(24.dp))
-            Spacer(modifier = Modifier.width(16.dp))
-            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, color = contentColor)
+        Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
+            Icon(icon, null, tint = contentColor, modifier = Modifier.size(sizing.component(24.dp)))
+            Spacer(modifier = Modifier.width(sizing.spacing(16.dp)))
+            Text(title, style = sizing.textStyle(MaterialTheme.typography.bodyLarge), fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium, color = contentColor)
         }
     }
 }
@@ -540,33 +556,34 @@ fun AllAboutContent(
     sourcesModifier: Modifier = Modifier,
     versionsModifier: Modifier = Modifier,
     developmentModifier: Modifier = Modifier,
-    onOpenPhotoUploadHistory: () -> Unit = {},
+    onOpenHistories: () -> Unit = {},
     onOpenDiagnostic: () -> Unit = {},
     onOpenTerms: () -> Unit = {}
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(
         modifier = presentationModifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         SectionPresentation(appTitle, appVersion, logoResId)
     }
-    Spacer(modifier = Modifier.height(48.dp))
+    Spacer(modifier = Modifier.height(sizing.spacing(48.dp)))
     Column(
         modifier = newsModifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         SectionNouveautes(appVersion, cardShape, bubbleColor)
     }
-    Spacer(modifier = Modifier.height(48.dp))
+    Spacer(modifier = Modifier.height(sizing.spacing(48.dp)))
 
     // --- NOUVEAU ---
     Column(
         modifier = privacyModifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        SectionConfidentialite(cardShape, bubbleColor, onOpenPhotoUploadHistory, onOpenTerms)
+        SectionConfidentialite(cardShape, bubbleColor, onOpenHistories, onOpenTerms)
     }
-    Spacer(modifier = Modifier.height(48.dp))
+    Spacer(modifier = Modifier.height(sizing.spacing(48.dp)))
     // ---------------
 
     Column(
@@ -575,14 +592,14 @@ fun AllAboutContent(
     ) {
         SectionSources(cardShape, bubbleColor)
     }
-    Spacer(modifier = Modifier.height(48.dp))
+    Spacer(modifier = Modifier.height(sizing.spacing(48.dp)))
     Column(
         modifier = versionsModifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         SectionVersions(cardShape, bubbleColor, onOpenDiagnostic)
     }
-    Spacer(modifier = Modifier.height(16.dp))
+    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
     Column(
         modifier = developmentModifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally
@@ -593,21 +610,23 @@ fun AllAboutContent(
 
 @Composable
 fun SectionPresentation(appTitle: String, appVersion: String, logoResId: Int) {
-    AboutDrawableImage(resId = logoResId, modifier = Modifier.size(150.dp).padding(top = 16.dp))
-    Spacer(modifier = Modifier.height(16.dp))
-    Text(appTitle, style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-    Text(appVersion, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-    Spacer(modifier = Modifier.height(32.dp))
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    AboutDrawableImage(resId = logoResId, modifier = Modifier.size(sizing.component(150.dp)).padding(top = sizing.spacing(16.dp)))
+    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+    Text(appTitle, style = sizing.textStyle(MaterialTheme.typography.headlineLarge), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+    Text(appVersion, style = sizing.textStyle(MaterialTheme.typography.bodyMedium), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
     Text(
         text = stringResource(R.string.appstrings_about_intro),
         textAlign = TextAlign.Center,
-        style = MaterialTheme.typography.bodyLarge
+        style = sizing.textStyle(MaterialTheme.typography.bodyLarge)
     )
 }
 
 @Composable
 fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) {
     val releaseNotes = currentReleaseNotes()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     SectionTitle(stringResource(R.string.about_new_for_version, appVersion))
     Card(
@@ -615,28 +634,28 @@ fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) 
         shape = cardShape,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Default.FilledNewReleases, null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.appstrings_latest_changes), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                Text(stringResource(R.string.appstrings_latest_changes), style = sizing.textStyle(MaterialTheme.typography.titleSmall), fontWeight = FontWeight.Bold)
             }
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
             releaseNotes.sections.forEach { section ->
-                Text(section.title, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = 8.dp, bottom = 4.dp))
+                Text(section.title, style = sizing.textStyle(MaterialTheme.typography.labelLarge), fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = sizing.spacing(8.dp), bottom = sizing.spacing(4.dp)))
                 section.entries.forEach { entry ->
                     when (entry) {
                         is ReleaseNoteGroup -> {
-                            Text(entry.title, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = 8.dp, top = 4.dp, bottom = 2.dp))
+                            Text(entry.title, style = sizing.textStyle(MaterialTheme.typography.bodyMedium), fontWeight = FontWeight.Bold, modifier = Modifier.padding(start = sizing.spacing(8.dp), top = sizing.spacing(4.dp), bottom = sizing.spacing(2.dp)))
                             entry.items.forEach { item ->
-                                Text("• $item", style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(start = 20.dp, top = 1.dp, bottom = 1.dp))
+                                Text("• $item", style = sizing.textStyle(MaterialTheme.typography.bodySmall), modifier = Modifier.padding(start = sizing.spacing(20.dp), top = sizing.spacing(1.dp), bottom = sizing.spacing(1.dp)))
                             }
                         }
-                        is ReleaseNoteItem -> Text("• ${entry.text}", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(start = 8.dp, top = 2.dp, bottom = 2.dp))
+                        is ReleaseNoteItem -> Text("• ${entry.text}", style = sizing.textStyle(MaterialTheme.typography.bodyMedium), modifier = Modifier.padding(start = sizing.spacing(8.dp), top = sizing.spacing(2.dp), bottom = sizing.spacing(2.dp)))
                     }
                 }
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
 
             }
         }
@@ -645,6 +664,7 @@ fun SectionNouveautes(appVersion: String, cardShape: Shape, bubbleColor: Color) 
 
 @Composable
 fun SectionSources(cardShape: Shape, bubbleColor: Color) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     SectionTitle(stringResource(R.string.appstrings_about_sources))
     val cardColor = if (bubbleColor == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else bubbleColor
 
@@ -656,10 +676,10 @@ fun SectionSources(cardShape: Shape, bubbleColor: Color) {
         shape = cardShape,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
             // 1. ANFR (Données)
             CreditItem(stringResource(R.string.appstrings_src_antennas), stringResource(R.string.appstrings_src_antennas_desc))
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
             SourceDataLink(
                 label = stringResource(R.string.appstrings_version_weekly_label).replace('\n', ' '),
                 host = "data.anfr.fr",
@@ -681,7 +701,7 @@ fun SectionSources(cardShape: Shape, bubbleColor: Color) {
                 onClick = { uriHandler.openUri(ARCEP_HS_DATA_URL) }
             )
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outlineVariant)
 
             // 2. IGN (Cliquable)
             Column(
@@ -690,10 +710,10 @@ fun SectionSources(cardShape: Shape, bubbleColor: Color) {
                     .clickable { uriHandler.openUri("https://geoservices.ign.fr/") }
             ) {
                 CreditItem(stringResource(R.string.appstrings_src_ign), stringResource(R.string.appstrings_src_ign_desc))
-                Text("geoservices.ign.fr", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Text("geoservices.ign.fr", style = sizing.textStyle(MaterialTheme.typography.labelSmall), color = MaterialTheme.colorScheme.primary)
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outlineVariant)
 
             // 3. OpenStreetMap (Cliquable)
             Column(
@@ -702,10 +722,10 @@ fun SectionSources(cardShape: Shape, bubbleColor: Color) {
                     .clickable { uriHandler.openUri("https://www.openstreetmap.org/copyright") }
             ) {
                 CreditItem(stringResource(R.string.appstrings_src_osm), stringResource(R.string.appstrings_src_osm_desc))
-                Text("www.openstreetmap.org", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Text("www.openstreetmap.org", style = sizing.textStyle(MaterialTheme.typography.labelSmall), color = MaterialTheme.colorScheme.primary)
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outlineVariant)
 
             // 4. MapsForge (Cliquable)
             Column(
@@ -714,10 +734,10 @@ fun SectionSources(cardShape: Shape, bubbleColor: Color) {
                     .clickable { uriHandler.openUri("https://mapsforge.org") }
             ) {
                 CreditItem(stringResource(R.string.appstrings_maps_forges_title), stringResource(R.string.appstrings_maps_forges_desc))
-                Text("www.mapsforge.org", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.primary)
+                Text("www.mapsforge.org", style = sizing.textStyle(MaterialTheme.typography.labelSmall), color = MaterialTheme.colorScheme.primary)
             }
 
-            HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outlineVariant)
+            HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(12.dp)), color = MaterialTheme.colorScheme.outlineVariant)
 
             // 5. Inspiration
             CreditItem(stringResource(R.string.appstrings_src_inspo), stringResource(R.string.appstrings_src_inspo_desc))
@@ -741,34 +761,37 @@ fun SectionDeveloppement() {
 
 @Composable
 private fun SectionTitle(title: String) {
-    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp))
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Text(title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary, modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp)))
 }
 
 @Composable
 private fun CreditItem(title: String, description: String) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Column {
-        Text(title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
-        Text(description, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(title, style = sizing.textStyle(MaterialTheme.typography.titleSmall), fontWeight = FontWeight.Bold)
+        Text(description, style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
 private fun SourceDataLink(label: String, host: String, onClick: () -> Unit) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 4.dp)
+            .padding(vertical = sizing.spacing(4.dp))
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodySmall,
+            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
             fontWeight = FontWeight.SemiBold,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
             text = host,
-            style = MaterialTheme.typography.labelSmall,
+            style = sizing.textStyle(MaterialTheme.typography.labelSmall),
             color = MaterialTheme.colorScheme.primary
         )
     }
@@ -798,6 +821,7 @@ fun SectionVersions(
     onOpenDiagnostic: () -> Unit = {}
 ) {
     val context = LocalContext.current
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     var appVersion by remember { mutableStateOf("-") }
     var dbVersion by remember { mutableStateOf("-") }
     var radioDbVersion by remember { mutableStateOf("-") }
@@ -805,6 +829,9 @@ fun SectionVersions(
     var quarterlyVersion by remember { mutableStateOf("-") }
     var rawMonthlyVersion by remember { mutableStateOf("-") } // ✅ Changé en "rawMonthlyVersion"
     var hsDate by remember { mutableStateOf("-") }
+    // > 0 uniquement si les sites HS sont produits sur l'appareil : on affiche alors l'heure de génération.
+    var hsLocalGeneratedAt by remember { mutableLongStateOf(0L) }
+    var hsRefreshTick by remember { mutableIntStateOf(0) }
     val txtDownloadNewBase = stringResource(R.string.appstrings_about_download_new_database)
     val txtInvalidLocalDatabase = stringResource(R.string.appstrings_invalid_local_database)
     val txtNotInstalled = stringResource(R.string.appstrings_about_database_not_installed)
@@ -907,9 +934,21 @@ fun SectionVersions(
                 radioDbVersion = "-"
                 AppLogger.w(TAG_ABOUT, "Radio database version info could not be read", e)
             }
+        }
+    }
 
-            val prefs = context.getSharedPreferences("settings", android.content.Context.MODE_PRIVATE)
-            hsDate = prefs.getString("last_hs_update", "-") ?: "-"
+    // Les sites HS, eux, bougent pendant que la page est ouverte : une génération locale peut se
+    // terminer (bouton « Générer maintenant », planification en fond, cache expiré côté carte). On
+    // relit donc leurs prefs à chaque retour au premier plan, sans refaire les lectures SQLite.
+    LifecycleResumeEffect(Unit) {
+        hsRefreshTick++
+        onPauseOrDispose { }
+    }
+    LaunchedEffect(hsRefreshTick) {
+        withContext(Dispatchers.IO) {
+            val state = readSitesHsState(context)
+            hsDate = state.serverDate
+            hsLocalGeneratedAt = state.localGeneratedAtMillis
         }
     }
 
@@ -922,7 +961,20 @@ fun SectionVersions(
         shape = cardShape,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+        Column(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(10.dp))) {
+            // Sites HS produits sur l'appareil : le libellé l'annonce et la valeur porte l'heure de
+            // génération (à la minute), là où la source serveur ne connaît que le jour.
+            val hsGeneratedLocally = hsLocalGeneratedAt > 0L
+            val hsLabel = stringResource(
+                if (hsGeneratedLocally) R.string.appstrings_version_hs_local_label
+                else R.string.appstrings_version_hs_label
+            )
+            val hsValue = if (hsGeneratedLocally) {
+                LocalizedDateLabels.formatVersionDateTime(context, hsLocalGeneratedAt, txtVersionTimeAt)
+            } else {
+                LocalizedDateLabels.formatVersionDate(context, hsDate)
+            }
+
             val versionRows = listOf(
                 stringResource(R.string.appstrings_version_app_label) to appVersion,
                 stringResource(R.string.appstrings_version_db_label) to dbVersion,
@@ -930,14 +982,14 @@ fun SectionVersions(
                 stringResource(R.string.appstrings_version_weekly_label) to LocalizedDateLabels.formatWeeklyVersionWithWeekNumber(context, anfrDate),
                 stringResource(R.string.appstrings_version_monthly_label) to LocalizedDateLabels.formatMonthlyVersion(context, rawMonthlyVersion),
                 stringResource(R.string.appstrings_version_quarterly_label) to LocalizedDateLabels.formatQuarterlyVersion(context, quarterlyVersion),
-                stringResource(R.string.appstrings_version_hs_label) to LocalizedDateLabels.formatVersionDate(context, hsDate)
+                hsLabel to hsValue
             )
 
             versionRows.forEachIndexed { index, row ->
                 VersionLine(row.first, row.second)
                 if (index < versionRows.lastIndex) {
                     HorizontalDivider(
-                        modifier = Modifier.padding(vertical = 2.dp),
+                        modifier = Modifier.padding(vertical = sizing.spacing(2.dp)),
                         color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f)
                     )
                 }
@@ -945,7 +997,7 @@ fun SectionVersions(
         }
     }
 
-    Spacer(modifier = Modifier.height(12.dp))
+    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
     Surface(
         onClick = { uriHandler.openUri(GEOTOWER_APP_DOWNLOAD_URL) },
@@ -953,17 +1005,17 @@ fun SectionVersions(
         color = cardColor,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Download, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
             Column {
-                Text(stringResource(R.string.appstrings_about_download_app_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(stringResource(R.string.appstrings_about_download_app_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.appstrings_about_download_app_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.appstrings_about_download_app_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
 
-    Spacer(modifier = Modifier.height(12.dp))
+    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
     Surface(
         onClick = onOpenDiagnostic,
@@ -971,12 +1023,12 @@ fun SectionVersions(
         color = cardColor,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
             Column {
-                Text(stringResource(R.string.appstrings_diagnostic_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(stringResource(R.string.appstrings_diagnostic_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.appstrings_diagnostic_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.appstrings_diagnostic_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }
@@ -1005,6 +1057,28 @@ private fun readQuarterlyDataVersion(db: SQLiteDatabase): String {
     } catch (e: Exception) {
         "-"
     }
+}
+
+/** Ligne « sites HS » : date de la donnée serveur + horodatage de génération locale (0 si aucune). */
+private data class SitesHsState(val serverDate: String, val localGeneratedAtMillis: Long)
+
+/**
+ * Lit l'état des sites HS (prefs uniquement, donc rejouable à volonté). L'horodatage de génération
+ * n'est renvoyé que si les pannes sont réellement produites sur l'appareil — réglage « source
+ * locale » ou mode traitement local (niveau ≥ 1) : sinon c'est la donnée serveur qui est affichée,
+ * et un ancien horodatage local n'a plus de sens.
+ */
+private fun readSitesHsState(context: Context): SitesHsState {
+    val prefs = context.getSharedPreferences(OutageLocalConfig.PREFS_NAME, Context.MODE_PRIVATE)
+    val config = OutageLocalConfig(prefs)
+    return SitesHsState(
+        serverDate = prefs.getString("last_hs_update", "-") ?: "-",
+        localGeneratedAtMillis = if (config.useLocalSource || AppConfig.outagesLocal()) {
+            config.lastGeneratedAtMillis
+        } else {
+            0L
+        }
+    )
 }
 
 private fun normalizeQuarterlyVersion(rawValue: String?): String {
@@ -1044,23 +1118,24 @@ private fun formatAboutDatabaseVersion(rawValue: String?, timeAtLabel: String): 
 
 @Composable
 private fun VersionLine(label: String, value: String) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 7.dp),
+            .padding(vertical = sizing.spacing(7.dp)),
         verticalAlignment = Alignment.Top
     ) {
         Text(
             text = label,
-            style = MaterialTheme.typography.bodyMedium,
+            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier
                 .weight(0.52f)
-                .padding(end = 12.dp)
+                .padding(end = sizing.spacing(12.dp))
         )
         Text(
             text = value,
-            style = MaterialTheme.typography.bodyMedium,
+            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.primary,
             textAlign = TextAlign.End,
@@ -1073,9 +1148,10 @@ private fun VersionLine(label: String, value: String) {
 fun SectionConfidentialite(
     cardShape: Shape,
     bubbleColor: Color,
-    onOpenPhotoUploadHistory: () -> Unit = {},
+    onOpenHistories: () -> Unit = {},
     onOpenTerms: () -> Unit = {}
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     SectionTitle(stringResource(R.string.appstrings_privacy_category))
     val cardColor = if (bubbleColor == Color.Transparent) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f) else bubbleColor
 
@@ -1084,37 +1160,47 @@ fun SectionConfidentialite(
         shape = cardShape,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(Icons.Outlined.Storage, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(stringResource(R.string.appstrings_your_data_title), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold)
+                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                Text(stringResource(R.string.appstrings_your_data_title), style = sizing.textStyle(MaterialTheme.typography.titleSmall), fontWeight = FontWeight.Bold)
             }
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(stringResource(R.string.appstrings_your_data_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+            Text(stringResource(R.string.appstrings_your_data_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 
-    Spacer(modifier = Modifier.height(12.dp))
-    PhotoUploadHistoryShortcut(
-        cardShape = cardShape,
-        cardColor = cardColor,
-        onOpenHistory = onOpenPhotoUploadHistory
-    )
+    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+    Surface(
+        onClick = onOpenHistories,
+        shape = cardShape,
+        color = cardColor,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.History, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
+            Column {
+                Text(stringResource(R.string.histories_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.histories_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+        }
+    }
 
-    Spacer(modifier = Modifier.height(12.dp))
+    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
     Surface(
         onClick = onOpenTerms,
         shape = cardShape,
         color = cardColor,
         modifier = Modifier.fillMaxWidth()
     ) {
-        Row(modifier = Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Description, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-            Spacer(modifier = Modifier.width(12.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
             Column {
-                Text(stringResource(R.string.appstrings_terms_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                Text(stringResource(R.string.appstrings_terms_button_desc), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.appstrings_terms_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.appstrings_terms_button_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
     }

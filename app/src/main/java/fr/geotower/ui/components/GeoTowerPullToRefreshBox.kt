@@ -14,6 +14,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable
@@ -42,6 +43,8 @@ fun GeoTowerPullToRefreshBox(
                 state = cappedIndicatorState,
                 isRefreshing = isRefreshing,
                 modifier = Modifier.align(Alignment.TopCenter),
+                // Pas de pastille colorée derrière l'indicateur : seule la forme animée reste visible.
+                containerColor = Color.Transparent,
                 color = MaterialTheme.colorScheme.primary
             )
         },

@@ -36,7 +36,11 @@ import fr.geotower.data.db.RadioStatRow
 import fr.geotower.data.db.WeeklyRadioStatRow
 import fr.geotower.data.models.RadioFilterMasks
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import androidx.compose.foundation.layout.Box
+import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.geoTowerFadingEdge
+import fr.geotower.ui.components.pageScrollbar
+import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.settings.StatsSettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
@@ -444,6 +448,7 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE) }
     val uiStyle = LocalGeoTowerUiStyle.current
+    val sizing = uiStyle.sizing
 
     val mainBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.background
     val cardBgColor = MaterialTheme.colorScheme.surfaceVariant
@@ -504,15 +509,15 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
             )
         }
     ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding).background(mainBgColor)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .background(mainBgColor)
                 .geoTowerFadingEdge(scrollState)
+                .pageScrollbar(PageScrollPrefs.STATS, scrollState)
                 .verticalScroll(scrollState)
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
             StatsDisplayModeSelector(
                 displayMode = displayMode,
@@ -570,7 +575,7 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
                 .filter { card -> StatsPreferences.isStatsBlockVisible(prefs, card.blockId) }
 
             visibleCards.forEach { card ->
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                 StatCard(
                     title = card.title,
                     desc = card.description,
@@ -583,7 +588,9 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
                 )
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
+        }
+        PageScrollEdgeButtons(PageScrollPrefs.STATS, scrollState)
         }
     }
 
@@ -601,6 +608,7 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRepository, tech: String) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
     val isSystemDark = isSystemInDarkTheme()
@@ -653,22 +661,22 @@ fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRep
             )
         }
     ) { padding ->
+        Box(modifier = Modifier.fillMaxSize().padding(padding).background(mainBgColor)) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .background(mainBgColor)
                 .geoTowerFadingEdge(scrollState)
+                .pageScrollbar(PageScrollPrefs.STATS, scrollState)
                 .verticalScroll(scrollState)
         ) {
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
             StatsDisplayModeSelector(
                 displayMode = displayMode,
                 onDisplayModeChange = ::updateDisplayMode,
                 bgColor = cardBgColor
             )
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
             val orderedFrequencyStats = visibleFrequencyStats(prefs, normalizedTech, frequencyStats)
 
@@ -689,12 +697,12 @@ fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRep
                         colors = CardDefaults.cardColors(containerColor = cardBgColor.copy(alpha = 0.58f)),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 16.dp)
+                            .padding(horizontal = sizing.spacing(16.dp))
                     ) {
                         Text(
                             text = stringResource(R.string.appstrings_stats_no_frequency_available_for, normalizedTech),
-                            style = MaterialTheme.typography.bodyMedium,
-                            modifier = Modifier.padding(16.dp),
+                            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                            modifier = Modifier.padding(sizing.spacing(16.dp)),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -702,7 +710,7 @@ fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRep
                 else -> {
                     orderedFrequencyStats.forEachIndexed { index, band ->
                         if (index > 0) {
-                            Spacer(modifier = Modifier.height(16.dp))
+                            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                         }
                         StatCard(
                             title = band.title,
@@ -717,7 +725,9 @@ fun FrequencyStatsDetailScreen(navController: NavController, repository: AnfrRep
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
+        }
+        PageScrollEdgeButtons(PageScrollPrefs.STATS, scrollState)
         }
     }
 }
@@ -738,18 +748,19 @@ private fun StatsDisplayModeSelector(
     bgColor: Color
 ) {
     val chipScrollState = rememberScrollState()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     Surface(
         shape = RoundedCornerShape(20.dp),
         color = bgColor.copy(alpha = 0.58f),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = sizing.spacing(16.dp))
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
             Text(
                 text = stringResource(R.string.appstrings_stats_display_mode_title),
-                style = MaterialTheme.typography.titleSmall,
+                style = sizing.textStyle(MaterialTheme.typography.titleSmall),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -757,8 +768,8 @@ private fun StatsDisplayModeSelector(
                 modifier = Modifier
                     .fillMaxWidth()
                     .horizontalScroll(chipScrollState)
-                    .padding(top = 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    .padding(top = sizing.spacing(10.dp)),
+                horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp))
             ) {
                 StatsDisplayMode.values().forEach { mode ->
                     StatsDisplayModeChip(
@@ -779,6 +790,7 @@ private fun StatsDisplayModeChip(
     onClick: () -> Unit
 ) {
     val shape = RoundedCornerShape(10.dp)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val borderColor = if (selected) {
         MaterialTheme.colorScheme.primary.copy(alpha = 0.65f)
     } else {
@@ -801,8 +813,8 @@ private fun StatsDisplayModeChip(
     ) {
         Text(
             text = label,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.padding(horizontal = sizing.spacing(14.dp), vertical = sizing.spacing(8.dp)),
+            style = sizing.textStyle(MaterialTheme.typography.labelLarge),
             fontWeight = FontWeight.Bold,
             softWrap = false
         )
@@ -822,26 +834,27 @@ private fun StatCard(
     onClick: (() -> Unit)? = null
 ) {
     val cardShape = RoundedCornerShape(20.dp)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val cardModifier = Modifier
         .fillMaxWidth()
-        .padding(horizontal = 16.dp)
+        .padding(horizontal = sizing.spacing(16.dp))
     val cardColors = CardDefaults.cardColors(containerColor = bgColor.copy(alpha = 0.58f))
     val content: @Composable () -> Unit = {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(text = title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(text = desc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Spacer(modifier = Modifier.height(18.dp))
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
+            Text(text = title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+            Text(text = desc, style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(modifier = Modifier.height(sizing.spacing(18.dp)))
             if (isLoading) {
-                Box(modifier = Modifier.fillMaxWidth().height(220.dp), contentAlignment = Alignment.Center) {
+                Box(modifier = Modifier.fillMaxWidth().height(sizing.component(220.dp)), contentAlignment = Alignment.Center) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally) {
                         LoadingIndicator(
-                            modifier = Modifier.size(48.dp),
+                            modifier = Modifier.size(sizing.component(48.dp)),
                             color = MaterialTheme.colorScheme.primary
                         )
-                        Spacer(modifier = Modifier.height(12.dp))
+                        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                         Text(
                             text = stringResource(R.string.appstrings_stats_loading_title),
-                            style = MaterialTheme.typography.bodyMedium,
+                            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
@@ -887,13 +900,14 @@ private fun SupportBarChart(data: List<OperatorStatValue>, displayMode: StatsDis
     val maxCount = (data.maxOfOrNull(::displayCount) ?: 0).coerceAtLeast(1)
     val rows = data.sortedWith(compareByDescending<OperatorStatValue> { displayCount(it) }.thenBy { it.name }.thenBy { it.regionSuffixRes ?: 0 })
     val chartScrollState = rememberScrollState()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .horizontalScroll(chartScrollState)
-            .padding(top = 4.dp, bottom = 2.dp),
-        horizontalArrangement = Arrangement.spacedBy(14.dp),
+            .padding(top = sizing.spacing(4.dp), bottom = sizing.spacing(2.dp)),
+        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(14.dp)),
         verticalAlignment = Alignment.Bottom
     ) {
         rows.forEach { stat ->
@@ -936,19 +950,20 @@ private fun WeeklyTrendChart(data: List<WeeklyStatValue>, displayMode: StatsDisp
     val maxCount = points.maxOf(::displayCount).coerceAtLeast(1)
     val activeColor = MaterialTheme.colorScheme.primary
     val totalColor = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+    val sizing = LocalGeoTowerUiStyle.current.sizing
 
-    Spacer(modifier = Modifier.height(18.dp))
+    Spacer(modifier = Modifier.height(sizing.spacing(18.dp)))
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(14.dp))
             .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.42f))
-            .padding(12.dp)
+            .padding(sizing.spacing(12.dp))
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = stringResource(R.string.appstrings_stats_weekly_trend_title),
-                style = MaterialTheme.typography.labelLarge,
+                style = sizing.textStyle(MaterialTheme.typography.labelLarge),
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
@@ -958,18 +973,18 @@ private fun WeeklyTrendChart(data: List<WeeklyStatValue>, displayMode: StatsDisp
                 StatsDisplayMode.Active -> TrendLegend(color = activeColor, label = stringResource(R.string.appstrings_active_sites_label))
                 StatsDisplayMode.Both -> {
                     TrendLegend(color = activeColor, label = stringResource(R.string.appstrings_active_sites_label))
-                    Spacer(modifier = Modifier.width(10.dp))
+                    Spacer(modifier = Modifier.width(sizing.spacing(10.dp)))
                     TrendLegend(color = totalColor, label = stringResource(R.string.appstrings_sites_label))
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
 
         Canvas(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(94.dp)
+                .height(sizing.component(94.dp))
         ) {
             val left = 6f
             val right = size.width - 6f
@@ -1018,14 +1033,14 @@ private fun WeeklyTrendChart(data: List<WeeklyStatValue>, displayMode: StatsDisp
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(
                 text = points.first().shortWeekLabel(),
-                style = MaterialTheme.typography.labelSmall,
+                style = sizing.textStyle(MaterialTheme.typography.labelSmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
                 text = points.last().shortWeekLabel(),
-                style = MaterialTheme.typography.labelSmall,
+                style = sizing.textStyle(MaterialTheme.typography.labelSmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -1036,17 +1051,18 @@ private fun WeeklyTrendChart(data: List<WeeklyStatValue>, displayMode: StatsDisp
 
 @Composable
 private fun TrendLegend(color: Color, label: String) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Row(verticalAlignment = Alignment.CenterVertically) {
         Box(
             modifier = Modifier
-                .size(8.dp)
+                .size(sizing.component(8.dp))
                 .clip(RoundedCornerShape(3.dp))
                 .background(color)
         )
-        Spacer(modifier = Modifier.width(4.dp))
+        Spacer(modifier = Modifier.width(sizing.spacing(4.dp)))
         Text(
             text = label,
-            style = MaterialTheme.typography.labelSmall,
+            style = sizing.textStyle(MaterialTheme.typography.labelSmall),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             maxLines = 1
         )
@@ -1068,7 +1084,8 @@ private fun OperatorStatBar(
     color: Color,
     displayMode: StatsDisplayMode
 ) {
-    val chartHeight = 174.dp
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val chartHeight = sizing.component(174.dp)
     val primaryCount = when (displayMode) {
         StatsDisplayMode.Sites -> totalCount
         StatsDisplayMode.Active -> activeCount
@@ -1076,7 +1093,7 @@ private fun OperatorStatBar(
     }
     val primaryBarHeight = when {
         primaryCount <= 0 -> 0.dp
-        else -> (chartHeight * fraction).coerceAtLeast(8.dp)
+        else -> (chartHeight * fraction).coerceAtLeast(sizing.component(8.dp))
     }
     val activeFraction = if (totalCount > 0) {
         activeCount.toFloat().coerceAtLeast(0f) / totalCount.toFloat()
@@ -1091,7 +1108,7 @@ private fun OperatorStatBar(
     }
 
     Column(
-        modifier = Modifier.width(176.dp),
+        modifier = Modifier.width(sizing.component(176.dp)),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
@@ -1102,14 +1119,14 @@ private fun OperatorStatBar(
         ) {
             Box(
                 modifier = Modifier
-                    .width(46.dp)
+                    .width(sizing.component(46.dp))
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(50))
                     .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.24f))
             )
             Box(
                 modifier = Modifier
-                    .width(46.dp)
+                    .width(sizing.component(46.dp))
                     .height(primaryBarHeight)
                     .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 6.dp, bottomEnd = 6.dp))
                     .background(if (displayMode == StatsDisplayMode.Active) color else color.copy(alpha = 0.36f))
@@ -1117,7 +1134,7 @@ private fun OperatorStatBar(
             if (displayMode == StatsDisplayMode.Both) {
                 Box(
                     modifier = Modifier
-                        .width(46.dp)
+                        .width(sizing.component(46.dp))
                         .height(activeBarHeight)
                         .clip(RoundedCornerShape(topStart = 18.dp, topEnd = 18.dp, bottomStart = 6.dp, bottomEnd = 6.dp))
                         .background(color)
@@ -1125,47 +1142,47 @@ private fun OperatorStatBar(
             }
         }
 
-        Spacer(modifier = Modifier.height(10.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(10.dp)))
 
         Surface(
             shape = RoundedCornerShape(14.dp),
             color = MaterialTheme.colorScheme.surface.copy(alpha = 0.64f),
             tonalElevation = 1.dp,
-            modifier = Modifier.fillMaxWidth().heightIn(min = if (displayMode == StatsDisplayMode.Both) 70.dp else 52.dp)
+            modifier = Modifier.fillMaxWidth().heightIn(min = sizing.component(if (displayMode == StatsDisplayMode.Both) 70.dp else 52.dp))
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                modifier = Modifier.padding(horizontal = sizing.spacing(10.dp), vertical = sizing.spacing(8.dp)),
                 horizontalAlignment = Alignment.Start
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(10.dp)
+                            .size(sizing.component(10.dp))
                             .clip(RoundedCornerShape(3.dp))
                             .background(color)
                     )
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                     Text(
                         text = operatorName,
                         modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.labelMedium,
+                        style = sizing.textStyle(MaterialTheme.typography.labelMedium),
                         fontWeight = FontWeight.SemiBold,
                         color = MaterialTheme.colorScheme.onSurface,
                         maxLines = if (displayMode == StatsDisplayMode.Both) 1 else 2,
                         overflow = TextOverflow.Ellipsis
                     )
                     if (displayMode != StatsDisplayMode.Both) {
-                        Spacer(modifier = Modifier.width(6.dp))
+                        Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
                         StatCountBadge(countText = countText, color = color)
                     }
                 }
 
                 if (displayMode == StatsDisplayMode.Both) {
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(sizing.spacing(6.dp)))
                     StatCountBadge(
                         countText = countText,
                         color = color,
-                        modifier = Modifier.padding(start = 18.dp)
+                        modifier = Modifier.padding(start = sizing.spacing(18.dp))
                     )
                 }
             }
@@ -1179,6 +1196,7 @@ private fun StatCountBadge(
     color: Color,
     modifier: Modifier = Modifier
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Surface(
         shape = RoundedCornerShape(50),
         color = color.copy(alpha = 0.14f),
@@ -1187,8 +1205,8 @@ private fun StatCountBadge(
     ) {
         Text(
             text = countText,
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-            style = MaterialTheme.typography.labelMedium,
+            modifier = Modifier.padding(horizontal = sizing.spacing(8.dp), vertical = sizing.spacing(3.dp)),
+            style = sizing.textStyle(MaterialTheme.typography.labelMedium),
             fontWeight = FontWeight.Black,
             softWrap = false
         )

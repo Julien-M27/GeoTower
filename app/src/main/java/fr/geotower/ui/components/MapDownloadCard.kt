@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -62,20 +63,28 @@ private fun isMapRowAtBestViewportPosition(
     viewportTop: Float,
     viewportBottom: Float,
     scrollValue: Int,
-    scrollMaxValue: Int
+    scrollMaxValue: Int,
+    fadeInsetPx: Float
 ): Boolean {
     if (bounds.top.isNaN() || bounds.height <= 0 || viewportTop.isNaN() || viewportBottom.isNaN()) return false
 
-    val viewportHeight = viewportBottom - viewportTop
+    // Flou au défilement actif : les bandes du haut et du bas sont délavées, la ligne n'y est pas
+    // vraiment lisible et le défilement ciblé s'arrête volontairement sous la bande du haut.
+    val topInset = if (scrollValue > 0) fadeInsetPx else 0f
+    val bottomInset = if (scrollValue < scrollMaxValue) fadeInsetPx else 0f
+    val readableTop = viewportTop + topInset
+    val readableBottom = viewportBottom - bottomInset
+
+    val viewportHeight = readableBottom - readableTop
     if (viewportHeight <= 0f) return false
 
-    val visibleTop = maxOf(bounds.top, viewportTop)
-    val visibleBottom = minOf(bounds.bottom, viewportBottom)
+    val visibleTop = maxOf(bounds.top, readableTop)
+    val visibleBottom = minOf(bounds.bottom, readableBottom)
     val visibleHeight = (visibleBottom - visibleTop).coerceAtLeast(0f)
     val maxVisibleHeight = minOf(bounds.height.toFloat(), viewportHeight)
     if (visibleHeight < maxVisibleHeight - 2f) return false
 
-    val idealScroll = (scrollValue + bounds.top - viewportTop)
+    val idealScroll = (scrollValue + bounds.top - viewportTop - fadeInsetPx)
         .coerceIn(0f, scrollMaxValue.toFloat())
     val topTolerance = maxOf(12f, bounds.height * 0.1f)
 
@@ -104,6 +113,12 @@ fun MapDownloadCard(
 ) {
     val context = LocalContext.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
+    // Même bande estompée que celle visée par le défilement des réglages (voir SettingsScreen).
+    val fadeInsetPx = if (isGeoTowerFadingEdgeActive()) {
+        with(LocalDensity.current) { GeoTowerFadingEdgeHeight.toPx() }
+    } else {
+        0f
+    }
     val workManager = remember { androidx.work.WorkManager.getInstance(context) }
     val safeClick = onSafeClick ?: rememberSafeClick()
     val featureFlags by RemoteFeatureFlags.config
@@ -258,8 +273,8 @@ fun MapDownloadCard(
                         OfflineMapDownloadValidator.safeMapFile(mapsDir, map.mapFilename)?.exists() == true
                     }
 
-                    LaunchedEffect(map.mapFilename, rowBounds, viewportTop, viewportBottom, scrollValue, scrollMaxValue) {
-                        if (isMapRowAtBestViewportPosition(rowBounds, viewportTop, viewportBottom, scrollValue, scrollMaxValue)) {
+                    LaunchedEffect(map.mapFilename, rowBounds, viewportTop, viewportBottom, scrollValue, scrollMaxValue, fadeInsetPx) {
+                        if (isMapRowAtBestViewportPosition(rowBounds, viewportTop, viewportBottom, scrollValue, scrollMaxValue, fadeInsetPx)) {
                             DownloadNotificationCenter.clearOfflineMapResultNotification(context, map.mapFilename)
                         }
                     }

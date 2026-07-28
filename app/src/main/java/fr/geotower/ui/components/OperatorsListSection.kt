@@ -22,6 +22,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import androidx.compose.ui.unit.sp
 import fr.geotower.R
 import fr.geotower.data.models.LocalisationEntity
@@ -44,6 +45,7 @@ fun OperatorsListSection(
     activeOperatorKeys: Set<String>? = null,
     onAntennaClick: (String) -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     // ✅ 1. LECTURE DES PARAMÈTRES SPÉCIFIQUES AU DÉTAIL DU SITE
     val s2G = AppConfig.siteShowTechno2G.value && (AppConfig.siteF2G_900.value || AppConfig.siteF2G_1800.value)
     val s3G = AppConfig.siteShowTechno3G.value && (AppConfig.siteF3G_900.value || AppConfig.siteF3G_2100.value)
@@ -89,12 +91,12 @@ fun OperatorsListSection(
         }
     }
 
-    Column(modifier = Modifier.padding(top = 8.dp)) {
+    Column(modifier = Modifier.padding(top = sizing.spacing(8.dp))) {
         Text(
             text = stringResource(R.string.operator_count, filteredAntennas.size), // ✅ Utilise la taille filtrée
             color = MaterialTheme.colorScheme.primary,
-            fontSize = 13.sp,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+            fontSize = sizing.text(13.sp),
+            modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))
         )
         if (!useOneUi) {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
@@ -130,10 +132,11 @@ fun OperatorDetailItem(
     isMuted: Boolean = false,
     onClick: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val modifier = if (useOneUi) {
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 6.dp).clip(blockShape).background(cardBgColor).clickable(onClick = onClick).padding(16.dp)
+        Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(6.dp)).clip(blockShape).background(cardBgColor).clickable(onClick = onClick).padding(sizing.spacing(16.dp))
     } else {
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp)
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(sizing.spacing(16.dp))
     }
 
     Column(modifier = modifier.alpha(if (isMuted) 0.42f else 1f)) {
@@ -142,13 +145,13 @@ fun OperatorDetailItem(
             val logoRes = getLocalLogoRes(opName)
 
             if (logoRes != null) {
-                Image(painter = painterResource(id = logoRes), contentDescription = null, modifier = Modifier.size(60.dp).clip(RoundedCornerShape(8.dp)))
+                Image(painter = painterResource(id = logoRes), contentDescription = null, modifier = Modifier.size(sizing.component(60.dp)).clip(RoundedCornerShape(8.dp)))
             } else {
-                Box(modifier = Modifier.size(60.dp).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)))
+                Box(modifier = Modifier.size(sizing.component(60.dp)).background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(8.dp)))
             }
-            Spacer(modifier = Modifier.width(16.dp))
+            Spacer(modifier = Modifier.width(sizing.spacing(16.dp)))
             Column(modifier = Modifier.weight(1f)) {
-                Text(text = opName, fontWeight = FontWeight.Bold, fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurface)
+                Text(text = opName, fontWeight = FontWeight.Bold, fontSize = sizing.text(18.sp), color = MaterialTheme.colorScheme.onSurface)
 
                 // ✅ LECTURE DES FILTRES SPÉCIFIQUES AU DÉTAIL DU SITE
                 val s2G = AppConfig.siteShowTechno2G.value && (AppConfig.siteF2G_900.value || AppConfig.siteF2G_1800.value)
@@ -161,29 +164,29 @@ fun OperatorDetailItem(
                 val rawTechs = technique?.technologies?.takeIf { it.isNotBlank() } ?: antenna.frequences
                 // ✅ On envoie les filtres au formateur
                 val realTechs = formatSiteTechnologies(rawTechs, stringResource(R.string.appstrings_unknown), s2G, s3G, s4G, s5G, sFh)
-                Text(text = realTechs, fontSize = 16.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(text = realTechs, fontSize = sizing.text(16.sp), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
             } // <-- Fin de la Column(weight = 1f)
 
             // La flèche reste toute seule à droite
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, modifier = Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, modifier = Modifier.size(sizing.component(28.dp)), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         } // <-- Fin de la Row contenant le logo, le titre et la flèche
 
         // 🚨 NOUVEAU PLACEMENT : Sous le logo complet, et au-dessus des dates (Implémentation)
         if (hsEntity != null) {
             Row(
                 verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.padding(top = 12.dp) // Espace avec le logo au-dessus
+                modifier = Modifier.padding(top = sizing.spacing(12.dp)) // Espace avec le logo au-dessus
             ) {
                 Icon(
                     imageVector = androidx.compose.material.icons.Icons.Default.Warning,
                     contentDescription = stringResource(R.string.appstrings_outage_attention_desc),
                     tint = Color(0xFFE53935),
-                    modifier = Modifier.size(16.dp).padding(end = 6.dp)
+                    modifier = Modifier.size(sizing.component(16.dp)).padding(end = sizing.spacing(6.dp))
                 )
                 Text(
                     text = formatOutageDetails(hsEntity),
-                    fontSize = 12.sp,
+                    fontSize = sizing.text(12.sp),
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFFE53935),
                     lineHeight = 16.sp
@@ -191,7 +194,7 @@ fun OperatorDetailItem(
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
         // ✅ AFFICHAGE DES DATES AVEC FORMATAGE FRANÇAIS
         val dateImp = technique?.dateImplantation?.let { formatDateToFrench(it) } ?: "-"
@@ -213,12 +216,13 @@ fun OperatorDetailItem(
 
 @Composable
 fun DateLine(label: String, value: String) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     Text(
         text = buildAnnotatedString {
             withStyle(style = SpanStyle(fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface)) { append(label) }
             withStyle(style = SpanStyle(color = MaterialTheme.colorScheme.onSurfaceVariant)) { append(value) }
         },
-        fontSize = 14.sp, modifier = Modifier.padding(vertical = 2.dp)
+        fontSize = sizing.text(14.sp), modifier = Modifier.padding(vertical = sizing.spacing(2.dp))
     )
 }
 

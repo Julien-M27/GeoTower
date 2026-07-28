@@ -378,6 +378,16 @@ fun DatabaseDownloadCard(
                     else -> stringResource(R.string.database_download_antennas)
                 }
 
+                if (AppConfig.dbForcedLocal()) {
+                    Text(
+                        text = stringResource(R.string.local_mode_download_disabled),
+                        modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(8.dp)),
+                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = TextAlign.Center
+                    )
+                }
                 Button(
                     onClick = {
                         safeClick("database_start_download") {

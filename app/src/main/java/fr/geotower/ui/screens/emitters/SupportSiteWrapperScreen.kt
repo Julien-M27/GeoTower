@@ -1,6 +1,5 @@
 package fr.geotower.ui.screens.emitters
 
-import android.content.Context
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -17,10 +16,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -54,79 +51,13 @@ fun SupportSiteWrapperScreen(
     onCloseSplitScreen: () -> Unit = {},
     onOpenAntennaInHost: ((String) -> Unit)? = null
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    var isReady by remember { mutableStateOf(false) }
+    // Pas de pré-chargement ici : [SupportDetailScreen] résout déjà l'antenne d'ancrage
+    // (`selectSupportAnchor`, mêmes règles : coordonnées cliquées → position GPS → première) et
+    // réécrit `clicked_lat`/`clicked_lon`. Le refaire ici doublait la requête la plus lourde de
+    // l'ouverture d'une fiche et ajoutait un second écran de chargement.
     var selectedSiteId by remember { mutableStateOf<String?>(null) }
     var selectedSidePane by remember { mutableStateOf<SiteDetailSidePane?>(null) }
     val displayStyle by AppConfig.displayStyle
-
-    LaunchedEffect(supportId) {
-        isReady = false
-        kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-            try {
-                val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-                val savedLat = prefs.getFloat("clicked_lat", 0f).toDouble()
-                val savedLon = prefs.getFloat("clicked_lon", 0f).toDouble()
-
-                val antennas = repository.getAntennasByExactId(supportId)
-                if (antennas.isNotEmpty()) {
-                    var site = antennas.find {
-                        Math.abs(it.latitude - savedLat) < 0.005 && Math.abs(it.longitude - savedLon) < 0.005
-                    }
-
-                    if (site == null) {
-                        val locManager = context.getSystemService(Context.LOCATION_SERVICE) as android.location.LocationManager
-                        val hasPermission = androidx.core.content.ContextCompat.checkSelfPermission(
-                            context,
-                            android.Manifest.permission.ACCESS_FINE_LOCATION
-                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-
-                        val userLoc = if (hasPermission) {
-                            try {
-                                locManager.getProviders(true)
-                                    .mapNotNull { locManager.getLastKnownLocation(it) }
-                                    .maxByOrNull { it.time }
-                            } catch (e: Exception) {
-                                null
-                            }
-                        } else {
-                            null
-                        }
-
-                        site = if (userLoc != null) {
-                            antennas.minByOrNull {
-                                val dLat = it.latitude - userLoc.latitude
-                                val dLon = it.longitude - userLoc.longitude
-                                (dLat * dLat) + (dLon * dLon)
-                            }
-                        } else {
-                            antennas.first()
-                        }
-                    }
-
-                    prefs.edit()
-                        .putFloat("clicked_lat", site!!.latitude.toFloat())
-                        .putFloat("clicked_lon", site!!.longitude.toFloat())
-                        .apply()
-                }
-            } catch (e: Exception) {
-                AppLogger.w(TAG_SUPPORT_WRAPPER, "Support selection restore failed", e)
-            }
-        }
-        isReady = true
-    }
-
-    if (!isReady) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background),
-            contentAlignment = Alignment.Center
-        ) {
-            LoadingIndicator(color = MaterialTheme.colorScheme.primary)
-        }
-        return
-    }
 
     val canOpenSiteSplit = displayStyle == 1 && !isSplitScreen
     val isSplitActive = canOpenSiteSplit && selectedSiteId != null
@@ -215,8 +146,6 @@ fun SupportSiteWrapperScreen(
         }
     }
 }
-
-private const val TAG_SUPPORT_WRAPPER = "GeoTower"
 
 @Composable
 fun NearEmittersSupportWrapperScreen(

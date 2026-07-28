@@ -199,8 +199,7 @@ class LocalDbBuildPipeline(
                             if (builtRadioFile.exists()) builtRadioFile.delete()
                             builtRadioFile.parentFile?.mkdirs()
                             radioDb = AndroidSqlDatabase(SQLiteDatabase.openOrCreateDatabase(builtRadioFile, null)).also {
-                                it.execSql("PRAGMA cache_size = -40000")
-                                it.execSql("PRAGMA mmap_size = 268435456")
+                                it.applyBuildPragmas(eligibility.totalRamBytes)
                                 RadioDbBuilder.prepareSchema(it)
                             }
                         }
@@ -210,8 +209,7 @@ class LocalDbBuildPipeline(
                         // Metadonnees ARCEP (arcep_nidt/is_zb) fusionnees depuis les CSV telecharges.
                         val arcep = parseArcepFiles(arcepFiles)
                         val db = AndroidSqlDatabase(SQLiteDatabase.openOrCreateDatabase(builtFile, null))
-                        db.execSql("PRAGMA cache_size = -40000")
-                        db.execSql("PRAGMA mmap_size = 268435456")
+                        db.applyBuildPragmas(eligibility.totalRamBytes)
                         try {
                             GeoTowerDbBuilder.build(
                                 db, sources, references, arcep,
@@ -265,8 +263,7 @@ class LocalDbBuildPipeline(
                         if (builtRadioFile.exists()) builtRadioFile.delete()
                         builtRadioFile.parentFile?.mkdirs()
                         val rdb = AndroidSqlDatabase(SQLiteDatabase.openOrCreateDatabase(builtRadioFile, null)).also {
-                            it.execSql("PRAGMA cache_size = -40000")
-                            it.execSql("PRAGMA mmap_size = 268435456")
+                            it.applyBuildPragmas(eligibility.totalRamBytes)
                         }
                         radioDb = rdb
                         val radioVersion = buildVersion()
@@ -322,6 +319,22 @@ class LocalDbBuildPipeline(
         }
         return RawSourceDownloader.parseArcepSites(rows)
     }
+
+    /**
+     * Reglages SQLite communs aux bases construites. Le cache est de la memoire **native** (pas le
+     * heap Java, qui n'est donc pas menace) : sur un appareil eligible — au moins 6 Go par
+     * construction, cf. [LocalBuildCapability] — lui donner bien plus que les 40 Mo d'origine
+     * change beaucoup pour la creation des index et les jointures sur des tables de staging de
+     * plusieurs centaines de Mo.
+     */
+    private fun AndroidSqlDatabase.applyBuildPragmas(totalRamBytes: Long) {
+        execSql("PRAGMA cache_size = -${cacheSizeKib(totalRamBytes)}")
+        execSql("PRAGMA mmap_size = 268435456")
+    }
+
+    /** Taille du cache SQLite en Kio : 1/48e de la RAM, borne a [64 Mo, 160 Mo]. */
+    private fun cacheSizeKib(totalRamBytes: Long): Long =
+        (totalRamBytes / 48 / 1024).coerceIn(64L * 1024L, 160L * 1024L)
 
     /** Verifie que `zip` est une archive ZIP valide contenant SUP_STATION. Retourne la cause si KO, sinon null. */
     private fun verifyMonthlyZip(zip: File): String? {

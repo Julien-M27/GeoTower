@@ -210,6 +210,8 @@ object DatabaseDownloader {
         }
 
     private fun readVerifiedDatabaseInfo(): DownloadManifestDatabase? {
+        // Mode « traitement local » (niveau ≥ 2, appareil éligible) : aucun accès au manifeste serveur.
+        if (AppConfig.dbForcedLocal()) return null
         return readVerifiedDownloadManifest()
             ?.database
             ?.takeIf { database ->

@@ -74,6 +74,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.zIndex
 import fr.geotower.R
 import fr.geotower.utils.AppConfig
@@ -106,6 +107,7 @@ import kotlin.math.roundToInt
 import androidx.compose.runtime.mutableIntStateOf
 import fr.geotower.ui.screens.emitters.loadElevationProfileIncludeObstacles
 import fr.geotower.ui.screens.emitters.saveElevationProfileIncludeObstacles
+import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.PreferenceStores
 import fr.geotower.utils.StatsDisplayMode
 import fr.geotower.utils.StatsPreferences
@@ -162,6 +164,130 @@ object SiteSpeedtestsPagePreferences {
             SORT_MAX -> SORT_MAX
             SORT_DOWNLOAD -> SORT_DOWNLOAD
             else -> SORT_AVERAGE
+        }
+    }
+}
+
+/**
+ * Options d'affichage propres aux pages d'historiques, réglées depuis la roue dentée de leur barre
+ * du haut. Les aides au défilement de ces pages restent gérées par [PageScrollPrefs].
+ *
+ * Tout est affiché par défaut : la roue dentée sert à retirer ce dont on ne veut pas, jamais à
+ * découvrir une fonctionnalité cachée. Une remise à zéro globale (`prefs.clear()`) rend donc
+ * naturellement l'affichage complet, sans avoir à réécrire ces clés.
+ */
+object HistoryPagePreferences {
+    const val UPLOAD_THUMBNAILS = "page_upload_history_thumbnails"
+    const val UPLOAD_DATE_BAR = "page_upload_history_date_bar"
+    const val SHARE_COUNTER = "page_share_history_counter"
+    const val SHARE_ADDRESS = "page_share_history_address"
+    const val SHARE_DATE_BAR = "page_share_history_date_bar"
+
+    const val DEFAULT_ENABLED = true
+
+    fun read(prefs: SharedPreferences, key: String): Boolean = prefs.getBoolean(key, DEFAULT_ENABLED)
+
+    fun write(prefs: SharedPreferences, key: String, enabled: Boolean) {
+        prefs.edit().putBoolean(key, enabled).apply()
+    }
+}
+
+/** Une option d'affichage telle que la roue dentée d'une page d'historique la présente. */
+data class HistoryPageOption(
+    val title: String,
+    val checked: Boolean,
+    val onCheckedChange: (Boolean) -> Unit
+)
+
+/**
+ * Feuille de réglages des pages d'historiques : les options d'affichage propres à la page, puis
+ * les trois aides au défilement communes (barre latérale, bouton haut, bouton bas). Le bouton de
+ * remise à zéro remet les deux d'un coup.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HistoryPageSettingsSheet(
+    title: String,
+    page: String,
+    options: List<HistoryPageOption>,
+    onReset: () -> Unit,
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    bubbleColor: Color
+) {
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val scrollState = rememberScrollState()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val context = LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE) }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        BackHandler(onBack = onBack)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(16.dp)),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                Text(
+                    text = title,
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
+            }
+
+            val shape = oneUiActionButtonShape(useOneUi)
+            val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+
+            options.forEachIndexed { index, option ->
+                if (index > 0) Spacer(Modifier.height(sizing.spacing(12.dp)))
+                SimpleSwitchCard(
+                    title = option.title,
+                    showMapLocation = option.checked,
+                    onLocationChange = option.onCheckedChange,
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    useOneUi = useOneUi
+                )
+            }
+
+            if (options.isNotEmpty()) Spacer(Modifier.height(sizing.spacing(12.dp)))
+            PageScrollAidsCards(page, shape, border, bubbleColor, useOneUi)
+
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+            TextButton(
+                onClick = {
+                    PageScrollPrefs.Aid.entries.forEach { aid ->
+                        PageScrollPrefs.set(prefs, aid, page, PageScrollPrefs.defaultEnabled(aid, page))
+                    }
+                    onReset()
+                }
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
+                Text(
+                    text = stringResource(R.string.appstrings_reset_to_default),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
         }
     }
 }
@@ -260,6 +386,18 @@ fun PagesCustomizationSheet(
             if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THROUGHPUT_CALCULATOR)) {
                 NavigationMenuItem(title = stringResource(R.string.appstrings_throughput_calculator_title), icon = Icons.Default.Speed, isSelected = false, isDark = isDark) { onThroughputCalculatorClick() }
             }
+
+            // 3. Réglage transverse : la barre de défilement latérale sur toutes les pages
+            Spacer(Modifier.height(sizing.spacing(16.dp)))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            Spacer(Modifier.height(sizing.spacing(16.dp)))
+            AllPagesScrollAidsCard(
+                shape = oneUiActionButtonShape(useOneUi),
+                border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null,
+                bubbleColor = LocalGeoTowerUiStyle.current.bubbleColor,
+                useOneUi = useOneUi
+            )
+            Spacer(Modifier.height(sizing.spacing(16.dp)).navigationBarsPadding())
         }
     }
 }
@@ -492,7 +630,7 @@ fun HomeSettingsSheet(
 
                 Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
             } else {
-                Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(4.dp)), verticalAlignment = Alignment.CenterVertically) {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                     Text(stringResource(R.string.appstrings_page_home_settings), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                     Spacer(Modifier.width(sizing.spacing(48.dp)))
@@ -539,7 +677,7 @@ fun HomeSettingsSheet(
                         }
                     }
                 }
-                    HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(8.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                     ConfigurableSwitchCard(
                         title = stringResource(R.string.appstrings_home_help_settings),
                         checked = showHelpButton,
@@ -553,9 +691,10 @@ fun HomeSettingsSheet(
                         bubbleColor = bubbleColor,
                         useOneUi = useOneUi
                     )
+                    PageScrollAidsCards(PageScrollPrefs.HOME, shape, border, bubbleColor, useOneUi, spacing = 0.dp)
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
             TextButton(onClick = {
                 val defaultHomeOrder = if (AppConfig.hasCompass.value) {
                     listOf("nearby", "map", "compass", "stats", "settings", "logo") // Logo à la fin
@@ -752,7 +891,7 @@ fun NearbySettingsSheet(
                 .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(4.dp)), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(stringResource(R.string.appstrings_page_nearby_settings), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Spacer(Modifier.width(sizing.spacing(48.dp)))
@@ -788,6 +927,8 @@ fun NearbySettingsSheet(
                 bubbleColor = bubbleColor,
                 useOneUi = useOneUi
             )
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+            PageScrollAidsCards(PageScrollPrefs.NEARBY, shape, border, bubbleColor, useOneUi)
             Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
             // --- NOUVEAU : BOUTON RÉINITIALISER L'ORDRE ---
             TextButton(
@@ -836,6 +977,7 @@ fun SearchRadiusCard(
     bubbleColor: Color,
     useOneUi: Boolean
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     // 🚨 ON GARDE TOUTE LA LOGIQUE CI-DESSOUS INTACTE
     val steps = listOf(1, 2, 5, 10, 20, 30, 50)
     val labels = listOf("1 km", "2 km", "5 km", "10 km", "20 km", "30 km", "50 km")
@@ -846,13 +988,13 @@ fun SearchRadiusCard(
     // 🚨 ON ENVELOPPE LE DESSIN DANS UN "if (false)"
     if (false) {
         Surface(shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
-            Column(modifier = Modifier.padding(16.dp)) {
+            Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text(stringResource(R.string.appstrings_search_radius_title), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-                    Text(labels[currentIndex.toInt()], style = MaterialTheme.typography.titleMedium, color = accentColor, fontWeight = FontWeight.Bold)
+                    Text(stringResource(R.string.appstrings_search_radius_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                    Text(labels[currentIndex.toInt()], style = sizing.textStyle(MaterialTheme.typography.titleMedium), color = accentColor, fontWeight = FontWeight.Bold)
                 }
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
 
                 if (useOneUi) {
                     Slider(
@@ -864,13 +1006,13 @@ fun SearchRadiusCard(
                         thumb = {
                             Box(
                                 modifier = Modifier
-                                    .size(24.dp)
+                                    .size(sizing.component(24.dp))
                                     .background(MaterialTheme.colorScheme.surface, CircleShape)
                                     .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
                             )
                         },
                         track = { _ ->
-                            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxWidth().height(14.dp)) {
+                            androidx.compose.foundation.Canvas(modifier = Modifier.fillMaxWidth().height(sizing.component(14.dp))) {
                                 val trackColor = Color.Gray.copy(alpha = 0.3f)
                                 val dotColor = Color.Gray.copy(alpha = 0.6f)
                                 drawLine(color = trackColor, start = androidx.compose.ui.geometry.Offset(0f, size.height / 2), end = androidx.compose.ui.geometry.Offset(size.width, size.height / 2), strokeWidth = 14.dp.toPx(), cap = androidx.compose.ui.graphics.StrokeCap.Round)
@@ -923,7 +1065,7 @@ fun CompassSettingsSheet(
                 .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(4.dp)), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(stringResource(R.string.appstrings_page_compass_settings), style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Spacer(Modifier.width(sizing.spacing(48.dp)))
@@ -946,6 +1088,9 @@ fun CompassSettingsSheet(
                 bubbleColor = bubbleColor,
                 useOneUi = useOneUi
             )
+
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+            PageScrollAidsCards(PageScrollPrefs.COMPASS, shape, border, bubbleColor, useOneUi)
 
             Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
             TextButton(onClick = {
@@ -1150,6 +1295,121 @@ fun SimpleSwitchCard(title: String, showMapLocation: Boolean, onLocationChange: 
     }
 }
 
+/** Libellé d'une aide au défilement dans les réglages d'une page. */
+@Composable
+fun scrollAidOptionLabel(aid: PageScrollPrefs.Aid): String = stringResource(
+    when (aid) {
+        PageScrollPrefs.Aid.BAR -> R.string.appstrings_page_scrollbar_option
+        PageScrollPrefs.Aid.TOP -> R.string.appstrings_page_scroll_top_option
+        PageScrollPrefs.Aid.BOTTOM -> R.string.appstrings_page_scroll_bottom_option
+    }
+)
+
+/** Libellé de l'interrupteur global d'une aide au défilement. */
+@Composable
+private fun scrollAidAllPagesLabel(aid: PageScrollPrefs.Aid): String = stringResource(
+    when (aid) {
+        PageScrollPrefs.Aid.BAR -> R.string.appstrings_pages_scrollbar_all_option
+        PageScrollPrefs.Aid.TOP -> R.string.appstrings_pages_scroll_top_all_option
+        PageScrollPrefs.Aid.BOTTOM -> R.string.appstrings_pages_scroll_bottom_all_option
+    }
+)
+
+/**
+ * Les trois interrupteurs « aides au défilement » d'une page : barre latérale, bouton haut de
+ * page, bouton bas de page (voir [PageScrollPrefs]). Les boutons sont indépendants : on peut
+ * n'en garder qu'un des deux.
+ * À poser dans le menu de réglages de chaque page défilante.
+ */
+@Composable
+fun PageScrollAidsCards(
+    page: String,
+    shape: androidx.compose.ui.graphics.Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
+    useOneUi: Boolean,
+    // 0.dp quand la colonne parente applique déjà un `Arrangement.spacedBy`.
+    spacing: Dp = 12.dp
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val context = LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE) }
+    PageScrollPrefs.Aid.entries.forEachIndexed { index, aid ->
+        if (index > 0 && spacing.value > 0f) Spacer(Modifier.height(sizing.spacing(spacing)))
+        SimpleSwitchCard(
+            title = scrollAidOptionLabel(aid),
+            showMapLocation = PageScrollPrefs.isEnabled(aid, page),
+            onLocationChange = { PageScrollPrefs.set(prefs, aid, page, it) },
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi
+        )
+    }
+}
+
+/**
+ * Même chose que [PageScrollAidsCards], mais au format « interrupteur + libellé » des feuilles
+ * qui n'utilisent pas de cartes (couverture théorique, profil altimétrique).
+ */
+@Composable
+fun ScrollAidSwitchRows(
+    page: String,
+    prefs: SharedPreferences,
+    useOneUi: Boolean
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    PageScrollPrefs.Aid.entries.forEach { aid ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            fr.geotower.ui.components.GeoTowerSwitch(
+                checked = PageScrollPrefs.isEnabled(aid, page),
+                onCheckedChange = { PageScrollPrefs.set(prefs, aid, page, it) },
+                useOneUi = useOneUi
+            )
+            Spacer(Modifier.width(sizing.spacing(8.dp)))
+            Text(scrollAidOptionLabel(aid))
+        }
+    }
+}
+
+/**
+ * Interrupteurs globaux : chacun est coché quand TOUTES les pages ont l'aide correspondante.
+ * Les basculer écrit toutes les pages d'un coup, y compris celles qui n'ont pas de réglage
+ * dédié ici (Réglages, À propos, Aide, Diagnostic, CGU, Photos favorites).
+ */
+@Composable
+fun AllPagesScrollAidsCard(
+    shape: androidx.compose.ui.graphics.Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
+    useOneUi: Boolean
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val context = LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE) }
+    PageScrollPrefs.Aid.entries.forEachIndexed { index, aid ->
+        if (index > 0) Spacer(Modifier.height(sizing.spacing(12.dp)))
+        SimpleSwitchCard(
+            title = scrollAidAllPagesLabel(aid),
+            showMapLocation = PageScrollPrefs.allEnabled(aid),
+            onLocationChange = { PageScrollPrefs.setAll(prefs, aid, it) },
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi
+        )
+    }
+    Text(
+        text = stringResource(R.string.appstrings_pages_scroll_aids_all_desc),
+        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = sizing.spacing(6.dp), start = sizing.spacing(4.dp), end = sizing.spacing(4.dp)),
+        textAlign = TextAlign.Center
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SiteSpeedtestsSettingsSheet(
@@ -1274,6 +1534,7 @@ fun SiteSpeedtestsSettingsSheet(
                 SimpleSwitchCard(stringResource(R.string.appstrings_speedtests_show_radio_details), showRadioDetails, onShowRadioDetailsChange, shape, border, bubbleColor, useOneUi)
                 SimpleSwitchCard(stringResource(R.string.appstrings_speedtests_show_network_details), showNetworkDetails, onShowNetworkDetailsChange, shape, border, bubbleColor, useOneUi)
                 SimpleSwitchCard(stringResource(R.string.appstrings_speedtests_show_coordinates), showCoordinates, onShowCoordinatesChange, shape, border, bubbleColor, useOneUi)
+                PageScrollAidsCards(PageScrollPrefs.SPEEDTESTS, shape, border, bubbleColor, useOneUi, spacing = 0.dp)
             }
 
             Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
@@ -1363,6 +1624,9 @@ fun ThroughputCalculatorSettingsSheet(
             Spacer(modifier = Modifier.height(sizing.spacing(20.dp)))
             HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
             Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+        },
+        contentAfterReset = { shape, border ->
+            PageScrollAidsCards(PageScrollPrefs.THROUGHPUT_CALCULATOR, shape, border, bubbleColor, useOneUi)
         }
     )
 }
@@ -1632,7 +1896,7 @@ fun ReorderableBlockSettingsSheet(
                 .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Row(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(4.dp)), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 Text(title, style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                 Spacer(Modifier.width(sizing.spacing(48.dp)))
@@ -1708,7 +1972,10 @@ fun SupportSettingsSheet(
         onBack = onBack,
         sheetState = sheetState,
         useOneUi = useOneUi,
-        bubbleColor = bubbleColor
+        bubbleColor = bubbleColor,
+        contentAfterReset = { shape, border ->
+            PageScrollAidsCards(PageScrollPrefs.SUPPORT, shape, border, bubbleColor, useOneUi)
+        }
     )
 }
 
@@ -1723,6 +1990,7 @@ fun SiteSettingsSheet(
     showPhotos: Boolean, onPhotosChange: (Boolean) -> Unit,
     showPanelHeights: Boolean, onPanelHeightsChange: (Boolean) -> Unit,
     showIds: Boolean, onIdsChange: (Boolean) -> Unit,
+    showNetworkIds: Boolean, onNetworkIdsChange: (Boolean) -> Unit,
     showOpenMap: Boolean, onOpenMapChange: (Boolean) -> Unit,
     showElevationProfile: Boolean, onElevationProfileChange: (Boolean) -> Unit,
     showThroughputCalculator: Boolean, onThroughputCalculatorChange: (Boolean) -> Unit,
@@ -1757,6 +2025,7 @@ fun SiteSettingsSheet(
                 onOpenPhotosSettings()
             }),
             ConfigurableBlock("ids", { stringResource(R.string.appstrings_site_ids_option) }, showIds, onIdsChange),
+            ConfigurableBlock("network_ids", { stringResource(R.string.appstrings_site_network_ids_option) }, showNetworkIds, onNetworkIdsChange),
             ConfigurableBlock("open_map", { stringResource(R.string.appstrings_site_open_map_option) }, showOpenMap, onOpenMapChange),
             ConfigurableBlock("elevation_profile", { stringResource(R.string.appstrings_site_elevation_profile_option) }, showElevationProfile, onElevationProfileChange),
             ConfigurableBlock("throughput_calculator", { stringResource(R.string.appstrings_site_throughput_calculator_option) }, showThroughputCalculator, onThroughputCalculatorChange),
@@ -1801,7 +2070,10 @@ fun SiteSettingsSheet(
         onBack = onBack,
         sheetState = sheetState,
         useOneUi = useOneUi,
-        bubbleColor = bubbleColor
+        bubbleColor = bubbleColor,
+        contentAfterReset = { shape, border ->
+            PageScrollAidsCards(PageScrollPrefs.SITE, shape, border, bubbleColor, useOneUi)
+        }
     )
 }
 
@@ -1820,6 +2092,7 @@ fun CoverageSettingsSheet(
     useOneUi: Boolean,
     onBack: (() -> Unit)? = null
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     val context = LocalContext.current
     val prefs = context.getSharedPreferences(COVERAGE_DEFAULTS_PREFS, Context.MODE_PRIVATE)
     var quality by remember { mutableIntStateOf(prefs.getInt(COVERAGE_PREF_QUALITY, 1)) }
@@ -1834,23 +2107,23 @@ fun CoverageSettingsSheet(
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = bg) {
         if (onBack != null) BackHandler(onBack = onBack)
         Column(
-            modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 48.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.fillMaxWidth().padding(start = sizing.spacing(24.dp), end = sizing.spacing(24.dp), bottom = sizing.spacing(48.dp)),
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
         ) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 if (onBack != null) {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 } else {
-                    Spacer(Modifier.width(48.dp))
+                    Spacer(Modifier.width(sizing.spacing(48.dp)))
                 }
                 Text(
                     stringResource(R.string.appstrings_coverage_settings_title),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.width(48.dp))
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
             }
             Text("${stringResource(R.string.appstrings_coverage_quality)} (${quality + 1}/4)", fontWeight = FontWeight.Bold)
             OneUiDefaultSlider(
@@ -1867,7 +2140,7 @@ fun CoverageSettingsSheet(
                     onCheckedChange = { obstacles = it; prefs.edit().putBoolean(COVERAGE_PREF_OBSTACLES, it).apply() },
                     useOneUi = useOneUi
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
                 Text(stringResource(R.string.appstrings_coverage_obstacles))
             }
             Text("${stringResource(R.string.appstrings_coverage_tilt)} : $tilt°", fontWeight = FontWeight.Bold)
@@ -1879,6 +2152,7 @@ fun CoverageSettingsSheet(
                 onValueChange = { tilt = it.roundToInt() },
                 onValueChangeFinished = { prefs.edit().putInt(COVERAGE_PREF_TILT, tilt).apply() }
             )
+            ScrollAidSwitchRows(PageScrollPrefs.COVERAGE, prefs, useOneUi)
         }
     }
 }
@@ -1892,6 +2166,7 @@ fun ElevationProfileSettingsSheet(
     useOneUi: Boolean,
     onBack: (() -> Unit)? = null
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     val context = LocalContext.current
     var obstacles by remember { mutableStateOf(loadElevationProfileIncludeObstacles(context)) }
 
@@ -1903,23 +2178,23 @@ fun ElevationProfileSettingsSheet(
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = bg) {
         if (onBack != null) BackHandler(onBack = onBack)
         Column(
-            modifier = Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, bottom = 48.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+            modifier = Modifier.fillMaxWidth().padding(start = sizing.spacing(24.dp), end = sizing.spacing(24.dp), bottom = sizing.spacing(48.dp)),
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
         ) {
             Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 if (onBack != null) {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
                 } else {
-                    Spacer(Modifier.width(48.dp))
+                    Spacer(Modifier.width(sizing.spacing(48.dp)))
                 }
                 Text(
                     stringResource(R.string.appstrings_coverage_settings_title),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.weight(1f),
                     textAlign = TextAlign.Center
                 )
-                Spacer(Modifier.width(48.dp))
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
             }
             Row(verticalAlignment = Alignment.CenterVertically) {
                 fr.geotower.ui.components.GeoTowerSwitch(
@@ -1927,9 +2202,13 @@ fun ElevationProfileSettingsSheet(
                     onCheckedChange = { obstacles = it; saveElevationProfileIncludeObstacles(context, it) },
                     useOneUi = useOneUi
                 )
-                Spacer(Modifier.width(8.dp))
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
                 Text(stringResource(R.string.appstrings_coverage_obstacles))
             }
+            val scrollAidPrefs = remember(context) {
+                context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+            }
+            ScrollAidSwitchRows(PageScrollPrefs.ELEVATION_PROFILE, scrollAidPrefs, useOneUi)
         }
     }
 }
@@ -1944,6 +2223,7 @@ private fun OneUiDefaultSlider(
     onValueChange: (Float) -> Unit,
     onValueChangeFinished: () -> Unit
 ) {
+    val sizing = LocalGeoTowerUiSizing.current
     if (!useOneUi) {
         Slider(
             value = value,
@@ -1969,13 +2249,13 @@ private fun OneUiDefaultSlider(
         thumb = {
             Box(
                 modifier = Modifier
-                    .size(22.dp)
+                    .size(sizing.component(22.dp))
                     .background(MaterialTheme.colorScheme.surface, CircleShape)
                     .border(3.dp, MaterialTheme.colorScheme.primary, CircleShape)
             )
         },
         track = {
-            Canvas(modifier = Modifier.fillMaxWidth().height(12.dp)) {
+            Canvas(modifier = Modifier.fillMaxWidth().height(sizing.component(12.dp))) {
                 val centerY = size.height / 2
                 drawLine(inactiveTrack, Offset(0f, centerY), Offset(size.width, centerY), 10.dp.toPx(), StrokeCap.Round)
                 drawLine(activeTrack, Offset(0f, centerY), Offset(size.width * fraction, centerY), 10.dp.toPx(), StrokeCap.Round)
@@ -2333,6 +2613,9 @@ fun StatsSettingsSheet(
                     useOneUi = useOneUi
                 )
 
+                Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+                PageScrollAidsCards(PageScrollPrefs.STATS, shape, border, bubbleColor, useOneUi)
+
                 Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
                 TextButton(onClick = ::resetStatsSettings) {
                     Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
@@ -2487,6 +2770,7 @@ fun SiteFreqFiltersSheet(
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss, containerColor = MaterialTheme.colorScheme.surface) {
+    val sizing = LocalGeoTowerUiSizing.current
         BackHandler(onBack = onBack)
         Column(
             modifier = Modifier

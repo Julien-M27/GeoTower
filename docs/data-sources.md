@@ -18,6 +18,21 @@ Le fichier `SpectrumAllocationsFrMetro.kt` contient les blocs FR metropole utili
 
 La largeur de bande par operateur vient de ces allocations. Si une bande n'existe pas pour l'operateur, le moteur l'exclut au lieu d'inventer une largeur.
 
+## Identifiants reseau eNB / gNB
+
+Source : **eNB-Analytics** (partenaire), fichiers `NmEa_<PLMN>.ntm.zip` publies par operateur
+metropolitain (20801 Orange, 20810 SFR, 20815 Free, 20820 Bouygues).
+
+Redistribution autorisee par le partenaire : le serveur GeoTower telecharge ces fichiers une fois
+par semaine (`docs/server/build_fr_enb_db.py`), en derive `geotower_fr_enb.db` et la sert lui-meme.
+Les telephones ne contactent jamais eNB-Analytics ; l'integrite est portee par le SHA-256 du
+manifeste signe. L'attribution « Source : eNB-Analytics » est affichee sur la carte de
+telechargement des reglages.
+
+Cette base n'est **pas** de l'ANFR : elle rattache un eNB/gNB a un `id_support` ANFR (et a un
+operateur via le MNC). Les eNB non rattaches a un pylone (indoor, DAS) y figurent avec leur seule
+position et adresse.
+
 ## Donnees site
 
 Les frequences, statuts, azimuts et hauteurs viennent des donnees locales ANFR deja importees par GeoTower. Le calculateur ne suppose pas qu'une frequence declaree est automatiquement active commercialement : les bandes en projet restent exclues par defaut dans l'interface.

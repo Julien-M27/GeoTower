@@ -194,6 +194,51 @@ class SiteFrequenciesBlockParsingTest {
     }
 
     @Test
+    fun antennaTypeRowsCarryPanelDimensionAndSplitRowsWhenItDiffers() {
+        val details = """
+            LTE 1800 (4G) : 1835-1850 MHz | En service | 2024-06-11 | Panneau : 120 deg (24,6m) [AER_ID: 7001] [DIM: 1,5m]
+            LTE 1800 (4G) : 1835-1850 MHz | En service | 2024-06-11 | Panneau : 120 deg (24,6m) [AER_ID: 7002] [DIM: 1,5m]
+            LTE 800 (4G) : 806-821 MHz | En service | 2024-06-11 | Panneau : 120 deg (24,6m) [AER_ID: 7003] [DIM: 2,6m]
+            5G NR 3500 (5G) : 3490-3560 MHz | En service | 2024-06-27 | Panneau : 220 deg (24,6m) [AER_ID: 8002]
+        """.trimIndent()
+
+        val parsed = parseAndSortFrequencies(
+            freqStr = details,
+            txtUnknown = "Inconnu",
+            txtAzimuthNotSpecified = "Azimut non specifie"
+        )
+
+        val rows = buildAntennaTypeRows(parsed)
+
+        // Meme azimut / hauteur / type mais dimension differente -> lignes distinctes.
+        assertEquals(3, rows.size)
+        assertTrue(rows.all { it.rawType == "Panneau" }) // le type reste pur, donc traduisible
+        val byDimension = rows.associateBy { it.dimension }
+        assertEquals(setOf("7001", "7002"), byDimension.getValue("1,5m").ids.toSet())
+        assertEquals(listOf("7003"), byDimension.getValue("2,6m").ids)
+        // Dimension non declaree : cellule vide, aucun "()" parasite dans la case « Type ».
+        val undeclared = byDimension.getValue("")
+        assertEquals("220°", undeclared.azimut)
+        assertEquals("Panneau", appendPanelDimensionToType("Panneau", undeclared.dimension))
+        assertEquals("Panneau (1,5m)", appendPanelDimensionToType("Panneau", "1,5m"))
+    }
+
+    @Test
+    fun panelTagsAreStrippedFromTheDisplayedPhysicalLine() {
+        assertEquals(
+            "Panneau : 120° (24,6m)",
+            removeFrequencyPanelTagsForDisplay("Panneau : 120° (24,6m) [AER_ID: 7001] [DIM: 1,5m]")
+        )
+        // Les partages gardent l'identifiant de panneau mais pas le tag de dimension.
+        assertEquals(
+            "Panneau : 120° (24,6m) [AER_ID: 7001]",
+            removePanelDimensionTag("Panneau : 120° (24,6m) [AER_ID: 7001] [DIM: 1,5m]")
+        )
+        assertEquals("1,5m", extractRawPanelDimension("Panneau : 120° (24,6m) [DIM: 1,5m]"))
+        assertEquals(null, extractRawPanelDimension("Panneau : 120° (24,6m) [AER_ID: 7001]"))
+    }
+
+    @Test
     fun antennaTypeRowsIgnorePanelsWithoutAerId() {
         val details = """
             LTE 800 (4G) : 806-821 MHz | En service | 2024-06-11 | Panneau : 90 deg (30m)

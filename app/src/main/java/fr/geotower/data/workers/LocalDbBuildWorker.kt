@@ -8,6 +8,7 @@ import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.drawable.Icon
 import android.os.Build
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -78,6 +79,16 @@ class LocalDbBuildWorker(
             }
         }
 
+        // Un service au premier plan empeche la mort du process, mais PAS la suspension du CPU
+        // ecran eteint : sans ce wake lock, un build lance puis range dans une poche est
+        // interrompu en boucle et s'etire bien au-dela du necessaire. Plafond de securite pour ne
+        // jamais laisser le verrou pris si le worker meurt sans passer par le `finally`.
+        val wakeLock = (context.getSystemService(Context.POWER_SERVICE) as PowerManager)
+            .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG)
+            .apply { setReferenceCounted(false) }
+        runCatching { wakeLock.acquire(WAKE_LOCK_TIMEOUT_MS) }
+            .onFailure { AppLogger.w(TAG, "Local build wake lock unavailable", it) }
+
         try {
             val packs = LocalDbBuildPipeline.Packs(
                 mobile = inputData.getBoolean(KEY_PACK_MOBILE, true),
@@ -116,6 +127,8 @@ class LocalDbBuildWorker(
             cancelSafely(PROGRESS_NOTIFICATION_ID)
             showResult(success = false, reason = e.message)
             Result.failure()
+        } finally {
+            runCatching { if (wakeLock.isHeld) wakeLock.release() }
         }
     }
 
@@ -250,6 +263,10 @@ class LocalDbBuildWorker(
         private const val TAG = "GeoTowerDb"
         private const val PROGRESS_NOTIFICATION_ID = 471_001
         private const val RESULT_NOTIFICATION_ID = 471_002
+        private const val WAKE_LOCK_TAG = "GeoTower:localDbBuild"
+
+        /** Plafond de securite du wake lock : tres au-dela d'un build normal, mais borne. */
+        private const val WAKE_LOCK_TIMEOUT_MS = 4L * 60L * 60L * 1000L
 
         fun buildRequest(mobile: Boolean, radioBroadcast: Boolean, nonMobileTech: Boolean) =
             OneTimeWorkRequestBuilder<LocalDbBuildWorker>()

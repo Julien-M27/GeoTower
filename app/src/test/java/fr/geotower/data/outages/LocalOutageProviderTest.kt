@@ -31,7 +31,7 @@ class LocalOutageProviderTest {
             cache.save(CachedOutages(now, "d", listOf(site("A"))))
             var generateCalls = 0
             val provider = LocalOutageProvider(
-                cache, { oneHourMs }, {}, { _, _ -> generateCalls++; result("B") }, { now },
+                cache, { oneHourMs }, { _, _ -> }, { _, _ -> generateCalls++; result("B") }, { now },
             )
             assertEquals(listOf("A"), provider.getSites().map { it.idAnfr })
             assertEquals(0, generateCalls)
@@ -47,13 +47,20 @@ class LocalOutageProviderTest {
             val now = 10_000_000L
             cache.save(CachedOutages(now - 2 * oneHourMs, "old", listOf(site("A")))) // 2 h > TTL 1 h
             var marked = 0L
+            var markedSites = emptyList<String>()
             var generateCalls = 0
             val provider = LocalOutageProvider(
-                cache, { oneHourMs }, { marked = it }, { _, _ -> generateCalls++; result("B", "C") }, { now },
+                cache,
+                { oneHourMs },
+                { at, sites -> marked = at; markedSites = sites.map { it.idAnfr } },
+                { _, _ -> generateCalls++; result("B", "C") },
+                { now },
             )
             assertEquals(listOf("B", "C"), provider.getSites().map { it.idAnfr })
             assertEquals(1, generateCalls)
             assertEquals(now, marked)
+            // Le résumé persisté doit porter sur les sites fraîchement générés (pas l'ancien cache).
+            assertEquals(listOf("B", "C"), markedSites)
             assertEquals(listOf("B", "C"), cache.load()!!.sites.map { it.idAnfr }) // cache réécrit
         } finally {
             file.delete()
@@ -67,7 +74,9 @@ class LocalOutageProviderTest {
             val now = 5_000_000L
             cache.save(CachedOutages(now, "d", listOf(site("A"))))
             var generateCalls = 0
-            val provider = LocalOutageProvider(cache, { oneHourMs }, {}, { _, _ -> generateCalls++; result("B") }, { now })
+            val provider = LocalOutageProvider(
+                cache, { oneHourMs }, { _, _ -> }, { _, _ -> generateCalls++; result("B") }, { now },
+            )
             assertEquals(listOf("B"), provider.regenerate(force = true).map { it.idAnfr })
             assertEquals(1, generateCalls)
         } finally {
@@ -82,7 +91,7 @@ class LocalOutageProviderTest {
             val now = 20_000_000L
             cache.save(CachedOutages(now - 2 * oneHourMs, "old", listOf(site("A"))))
             val provider = LocalOutageProvider(
-                cache, { oneHourMs }, {}, { _, _ -> throw IOException("down") }, { now },
+                cache, { oneHourMs }, { _, _ -> }, { _, _ -> throw IOException("down") }, { now },
             )
             // Génération en échec → on conserve l'ancien cache plutôt que rien.
             assertEquals(listOf("A"), provider.getSites().map { it.idAnfr })
