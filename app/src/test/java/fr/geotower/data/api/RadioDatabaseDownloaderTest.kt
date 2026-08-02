@@ -23,11 +23,11 @@ class RadioDatabaseDownloaderTest {
 
     @Test
     fun isOfficialRadioDatabaseDownloadUrl_rejectsNonOfficialUrls() {
-        assertTrue(RadioDatabaseDownloader.isOfficialRadioDatabaseDownloadUrl("https://api.cajejuma.fr/api/v2/download/radio_db"))
-        assertFalse(RadioDatabaseDownloader.isOfficialRadioDatabaseDownloadUrl("http://api.cajejuma.fr/api/v2/download/radio_db"))
+        assertTrue(RadioDatabaseDownloader.isOfficialRadioDatabaseDownloadUrl("https://api.geotower.fr/api/v2/download/radio_db"))
+        assertFalse(RadioDatabaseDownloader.isOfficialRadioDatabaseDownloadUrl("http://api.geotower.fr/api/v2/download/radio_db"))
         assertFalse(RadioDatabaseDownloader.isOfficialRadioDatabaseDownloadUrl("https://evil.example/api/v2/download/radio_db"))
-        assertFalse(RadioDatabaseDownloader.isOfficialRadioDatabaseDownloadUrl("https://api.cajejuma.fr/api/v2/download/db"))
-        assertFalse(RadioDatabaseDownloader.isOfficialRadioDatabaseDownloadUrl("https://user:pass@api.cajejuma.fr/api/v2/download/radio_db"))
+        assertFalse(RadioDatabaseDownloader.isOfficialRadioDatabaseDownloadUrl("https://api.geotower.fr/api/v2/download/db"))
+        assertFalse(RadioDatabaseDownloader.isOfficialRadioDatabaseDownloadUrl("https://user:pass@api.geotower.fr/api/v2/download/radio_db"))
     }
 
     private fun validInfo(

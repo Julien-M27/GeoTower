@@ -341,12 +341,17 @@ fun SiteSpeedtestsScreen(
                 contentColor = MaterialTheme.colorScheme.onSurface,
                 backEnabled = !safeBackNavigation.isLocked,
                 actions = {
-                    IconButton(onClick = { showSettingsSheet = true }) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.appstrings_settings_title),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
+                    fr.geotower.ui.components.PageCustomizationHint(
+                        page = fr.geotower.utils.PageScrollPrefs.SPEEDTESTS,
+                        onOpenSettings = { showSettingsSheet = true }
+                    ) {
+                        IconButton(onClick = { showSettingsSheet = true }) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.appstrings_settings_title),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             )
@@ -483,6 +488,10 @@ fun SiteSpeedtestsScreen(
                         }
                     }
                 }
+            }
+
+            item {
+                fr.geotower.ui.components.PageCustomizationFooter(onClick = { showSettingsSheet = true })
             }
         }
             PageScrollEdgeButtons(PageScrollPrefs.SPEEDTESTS, listState)

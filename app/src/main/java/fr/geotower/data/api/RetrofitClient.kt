@@ -16,7 +16,7 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 object RetrofitClient {
-    const val BASE_URL = "https://api.cajejuma.fr/"
+    const val BASE_URL = "https://api.geotower.fr/"
 
     private const val HTTP_CACHE_SIZE_BYTES = 20L * 1024 * 1024 // 20 Mo de cache HTTP disque
 

@@ -12,8 +12,10 @@ import fr.geotower.BuildConfig
 import fr.geotower.R
 import fr.geotower.data.api.AppReleaseInfo
 import fr.geotower.data.api.AppUpdateChecker
+import fr.geotower.data.api.AppUpdateState
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.utils.AppLocale
+import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 import kotlinx.coroutines.sync.Mutex
 
@@ -26,11 +28,9 @@ object AppUpdateNotifier {
 
     suspend fun checkAndNotify(context: Context) {
         val appContext = context.applicationContext
-        if (!UpdateCheckScheduler.areUpdateNotificationsEnabled(appContext)) return
         if (
             !RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.APP_UPDATE_CHECK) ||
-            !RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.APP_UPDATE_CHECK) ||
-            !RemoteFeatureFlags.isPlatformEnabled(RemoteFeatureFlags.Platform.NOTIFICATIONS)
+            !RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.APP_UPDATE_CHECK)
         ) {
             return
         }
@@ -39,6 +39,16 @@ object AppUpdateNotifier {
         try {
             val prefs = appContext.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
             val latestRelease = AppUpdateChecker.getLatestRelease() ?: return
+
+            // Toujours mémorisé, avant les garde-fous propres à la NOTIFICATION : l'interface doit
+            // pouvoir signaler une mise à jour même quand l'utilisateur a coupé les notifications.
+            AppUpdateState.record(appContext, latestRelease)
+
+            if (!UpdateCheckScheduler.areUpdateNotificationsEnabled(appContext)) return
+            // canPost() couvre le kill-switch Platform.NOTIFICATIONS, l'interrupteur maître et la
+            // permission système.
+            if (!AppNotifications.canPost(appContext)) return
+
             val lastNotifiedReleaseId = prefs.getString(LAST_NOTIFIED_APP_RELEASE_KEY, "")
 
             if (latestRelease.releaseId == lastNotifiedReleaseId) return

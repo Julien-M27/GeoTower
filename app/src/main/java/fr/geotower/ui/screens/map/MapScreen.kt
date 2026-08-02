@@ -61,6 +61,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.LocationDisabled
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.NearMe
@@ -151,6 +152,7 @@ import fr.geotower.data.models.isDeclaredActive
 import fr.geotower.data.models.physicalSiteKey
 import fr.geotower.ui.components.LiveDatabaseUsageWarningDialog
 import fr.geotower.ui.components.rememberSafeClick
+import fr.geotower.ui.navigation.ROOT_FALLBACK_ROUTE
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
@@ -907,7 +909,10 @@ private fun buildActiveMapFilterSummary(
 fun MapScreen(
     navController: NavController,
     viewModel: MapViewModel,
-    photoDraftId: String? = null
+    photoDraftId: String? = null,
+    // Mode simplifié : fourni par l'hôte qui porte le tiroir. Non nul ⇒ le bouton en haut à
+    // gauche ouvre le menu au lieu de revenir en arrière (la carte est la racine du backstack).
+    onOpenSimpleModeMenu: (() -> Unit)? = null
 ) {
     SecureScreenEffect(RemoteFeatureFlags.SecureScreens.MAP)
     val context = LocalContext.current
@@ -1290,7 +1295,7 @@ fun MapScreen(
     // L'API live (fallback sans base) ne fournit pas les dates -> on masque le bouton.
     val timeSliderAvailable = AppConfig.localDatabaseState.value ==
         fr.geotower.data.db.GeoTowerDatabaseValidator.LocalDatabaseState.VALID
-    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = ROOT_FALLBACK_ROUTE)
     var operatorSearchPreviousOperatorKeys by rememberSaveable { mutableStateOf<List<String>?>(null) }
 
     fun applyOperatorSearchSelection(operatorKeys: Set<String>) {
@@ -3253,13 +3258,22 @@ fun MapScreen(
 
         Column(modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(48.dp)), horizontalAlignment = Alignment.CenterHorizontally) {
             Box(modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp))) {
+                // En mode simplifié la carte est la racine : le retour n'a plus de sens, le bouton
+                // ouvre le tiroir. La sélection de photo partagée garde en revanche son « annuler ».
+                val showSimpleModeMenuButton = onOpenSimpleModeMenu != null && !isSharedPhotoSelectionMode
                 SmallFloatingButton(
-                    icon = Icons.AutoMirrored.Filled.ArrowBack,
-                    desc = stringResource(R.string.appstrings_back),
+                    icon = if (showSimpleModeMenuButton) Icons.Default.Menu else Icons.AutoMirrored.Filled.ArrowBack,
+                    desc = if (showSimpleModeMenuButton) {
+                        stringResource(R.string.simple_mode_open_menu)
+                    } else {
+                        stringResource(R.string.appstrings_back)
+                    },
                     modifier = Modifier.align(Alignment.CenterStart)
                 ) {
                     if (isSharedPhotoSelectionMode) {
                         cancelSharedPhotoSelection()
+                    } else if (showSimpleModeMenuButton) {
+                        safeClick { onOpenSimpleModeMenu.invoke() }
                     } else {
                         restoreOperatorSearchSelection()
                         safeBackNavigation.navigateBack()
@@ -3286,8 +3300,10 @@ fun MapScreen(
                         }
                     }
 
+                    // « Réglages/filtres » : icône Tune et non Menu, sinon deux hamburgers
+                    // identiques encadrent la barre en mode simplifié.
                     SmallFloatingButton(
-                        icon = Icons.Default.Menu,
+                        icon = Icons.Default.Tune,
                         desc = txtFilter
                     ) { safeClick { showSettingsSheet = true } }
                 }

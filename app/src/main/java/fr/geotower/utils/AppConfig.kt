@@ -8,6 +8,7 @@ import fr.geotower.data.build.LocalBuildCapability
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.models.RadioMapCategoryMasks
+import fr.geotower.data.outages.OutageLocalConfig
 import fr.geotower.data.workers.OutageBackgroundScheduler
 
 object AppConfig {
@@ -36,8 +37,16 @@ object AppConfig {
     const val PREF_LOW_POWER_LEVEL = "low_power_level"
     const val PREF_LOW_POWER_FOLLOW_SYSTEM = "low_power_follow_system"
 
+    // Suivi live : clé historique (« notifications live ») gardée pour ne pas réinitialiser le
+    // réglage des utilisateurs. Elle ne pilote que le service de suivi, pas le droit de notifier.
+    const val PREF_ENABLE_LIVE_TRACKING = "enable_live_notifications"
+
     // Mode « traitement local » : 0 Serveur / 1 Sites HS / 2 Base+sites / 3 Autonomie max.
     const val PREF_LOCAL_MODE_LEVEL = "local_mode_level"
+
+    // Mode simplifié : carte au lancement, tiroir latéral à la place de l'accueil, fiche
+    // support et fiches opérateurs fusionnées. Un seul interrupteur pilote l'ensemble.
+    const val PREF_SIMPLE_MODE = "simple_mode"
 
     // --- Apparence ---
     var themeMode = mutableIntStateOf(0)
@@ -55,6 +64,10 @@ object AppConfig {
     // État validé une fois au démarrage/onboarding, réutilisé par l'accueil pour éviter les faux bandeaux.
     var localDatabaseState = mutableStateOf<GeoTowerDatabaseValidator.LocalDatabaseState?>(null)
 
+    // Interrupteur maître des notifications de l'app (voir AppNotifications) : séparé du suivi live,
+    // il permet d'avoir les notifications sans le tracking.
+    var enableAppNotifications = mutableStateOf(AppNotifications.DEFAULT_ENABLED)
+
     //Notification de téléchargement
     var enableUpdateNotifications = mutableStateOf(true) // Désactivé par défaut
 
@@ -67,8 +80,10 @@ object AppConfig {
     // Langue globale de l'application (Système par défaut au 1er lancement)
     val appLanguage = mutableStateOf("Système")
 
-    //Notifications live
-    var enableLiveNotifications = mutableStateOf(false)
+    // Suivi live (service GPS de premier plan). Le nom de la clé reste « enable_live_notifications »
+    // pour ne pas perdre le réglage des utilisateurs, mais ce n'est PAS un droit de notifier :
+    // celui-là appartient à AppNotifications.PREF_ENABLED, indépendant.
+    var enableLiveTracking = mutableStateOf(false)
 
     // --- Mode faible consommation ---
     // 0 = Normal, 1 = Éco (équilibré), 2 = Éco+ (agressif). Le niveau effectif est calculé par PowerProfile.
@@ -81,6 +96,11 @@ object AppConfig {
     var localModeLevel = mutableIntStateOf(0)
     // Éligibilité de l'appareil à la génération locale de la base (RAM/stockage), évaluée au runtime.
     var localBuildEligible = mutableStateOf(false)
+
+    // --- Mode simplifié ---
+    // Choix de l'utilisateur. Passer par [simpleModeActive] pour l'appliquer : le kill-switch
+    // distant peut le neutraliser sans effacer la préférence.
+    var simpleMode = mutableStateOf(false)
 
     // --- UNITÉS DE MESURE ---
     // 0 = Kilomètres (km), 1 = Miles (mi)
@@ -326,7 +346,14 @@ object AppConfig {
             0
         }
 
-    /** Niveau ≥ 1 : les sites en panne sont récupérés/localisés sur l'appareil. */
+    /**
+     * Niveau ≥ 1 : les sites en panne sont récupérés/localisés sur l'appareil.
+     *
+     * SEULE vérité sur la source des pannes : il n'existe plus de réglage concurrent. Tout ce qui
+     * décide « local ou serveur » (repository, planification en fond, worker, écrans) doit passer
+     * par ici, sinon on retombe sur l'incohérence d'avant (un planificateur qui lance un worker
+     * qui refuse de travailler).
+     */
     fun outagesLocal(): Boolean = effectiveLocalModeLevel() >= 1
 
     /** Niveau ≥ 2 ET appareil éligible : la base est générée localement (bloque le téléchargement serveur). */
@@ -348,8 +375,69 @@ object AppConfig {
         OutageBackgroundScheduler.reconcile(context)
     }
 
+    /**
+     * Migration ponctuelle : l'ancien interrupteur « Récupérer les pannes sur l'appareil »
+     * (clé `outages_source` du store "settings") a été absorbé par le niveau de traitement local.
+     * Un ancien « local » devient le niveau 1, puis la clé est supprimée pour ne plus jamais être
+     * relue. Idempotent, et à appeler AVANT la lecture de [PREF_LOCAL_MODE_LEVEL].
+     */
+    fun migrateLegacyOutageSourcePref(context: Context) {
+        val appContext = context.applicationContext
+        val outagePrefs = appContext
+            .getSharedPreferences(OutageLocalConfig.PREFS_NAME, Context.MODE_PRIVATE)
+        val legacy = outagePrefs.getString(OutageLocalConfig.LEGACY_KEY_SOURCE, null) ?: return
+        outagePrefs.edit().remove(OutageLocalConfig.LEGACY_KEY_SOURCE).apply()
+        if (legacy != OutageLocalConfig.LEGACY_SOURCE_LOCAL) return
+
+        // On ne rétrograde jamais un utilisateur déjà en niveau 2 ou 3.
+        val appPrefs = appContext.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+        if (appPrefs.getInt(PREF_LOCAL_MODE_LEVEL, 0) < 1) {
+            appPrefs.edit().putInt(PREF_LOCAL_MODE_LEVEL, 1).apply()
+        }
+    }
+
+    // --- Mode simplifié : état effectif + application ---
+    /**
+     * SEULE vérité pour appliquer le mode simplifié : le choix de l'utilisateur ET le kill-switch
+     * distant. Tout ce qui change de comportement (démarrage, tiroir, fusion des fiches) doit
+     * passer par ici, sinon un kill-switch ne coupe qu'une partie du mode et l'app devient bancale.
+     */
+    fun simpleModeActive(): Boolean =
+        simpleMode.value &&
+            RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIMPLE_MODE_ENABLED)
+
+    /**
+     * Même réponse que [simpleModeActive], mais lisible avant que [loadSavedFilters] ait tourné :
+     * MainActivity choisit sa destination de démarrage avant de charger les préférences.
+     */
+    fun isSimpleModeActive(prefs: SharedPreferences): Boolean =
+        prefs.getBoolean(PREF_SIMPLE_MODE, false) &&
+            RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIMPLE_MODE_ENABLED)
+
+    /**
+     * Style d'affichage effectif. Le mode simplifié impose le plein écran : les fiches y sont déjà
+     * fusionnées, garder en plus le volet fractionné ferait un troisième comportement à maintenir.
+     */
+    fun effectiveDisplayStyle(): Int = if (simpleModeActive()) 0 else displayStyle.intValue
+
+    /** Applique un choix de mode simplifié : état en mémoire + persistance. */
+    fun setSimpleMode(context: Context, enabled: Boolean) {
+        simpleMode.value = enabled
+        context.applicationContext
+            .getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(PREF_SIMPLE_MODE, enabled)
+            .apply()
+    }
+
+    /** Route d'accueil : le mode simplifié n'a pas de page d'accueil, la carte en tient lieu. */
+    fun homeRoute(): String = if (simpleModeActive()) "map" else "home"
+
     // --- FONCTION POUR CHARGER LA MÉMOIRE AU DÉMARRAGE ---
     fun loadSavedFilters(prefs: android.content.SharedPreferences) {
+
+        // Interrupteur maître des notifications (indépendant du suivi live).
+        enableAppNotifications.value = AppNotifications.enabled(prefs)
 
         //Notification de téléchargement
         enableUpdateNotifications.value = prefs.getBoolean("enable_update_notifications", true)
@@ -369,8 +457,8 @@ object AppConfig {
         // Si c'est un Z Fold OU un Pixel Fold, la valeur par défaut est 1 (Fractionné), sinon 0 (Plein écran)
         val defaultDisplayStyle = if (DeviceProfile.prefersSplitDisplay) 1 else 0
 
-        //Notifications live
-        enableLiveNotifications.value = prefs.getBoolean("enable_live_notifications", false)
+        // Suivi live (clé historique conservée)
+        enableLiveTracking.value = prefs.getBoolean(PREF_ENABLE_LIVE_TRACKING, false)
 
         // Mode faible consommation (0 Normal / 1 Éco / 2 Éco+)
         lowPowerLevel.intValue = prefs.getInt(PREF_LOW_POWER_LEVEL, 0)
@@ -378,6 +466,9 @@ object AppConfig {
 
         // Mode « traitement local » (niveau 0..3).
         localModeLevel.intValue = prefs.getInt(PREF_LOCAL_MODE_LEVEL, 0).coerceIn(0, 3)
+
+        // Mode simplifié (carte au lancement, tiroir latéral, fiches fusionnées).
+        simpleMode.value = prefs.getBoolean(PREF_SIMPLE_MODE, false)
 
         // ✅ CHARGEMENT DU STYLE D'AFFICHAGE (avec la nouvelle valeur par défaut)
         displayStyle.intValue = prefs.getInt("display_style", defaultDisplayStyle)
@@ -391,6 +482,9 @@ object AppConfig {
 
         // Barre latérale de défilement, activable page par page.
         PageScrollPrefs.load(prefs)
+
+        // Relais de découverte de « Personnalisation des pages » (bulles + rappel de bas de page).
+        PageCustomizationPrefs.load(prefs)
 
         siteShowTechno2G.value = prefs.getBoolean("site_show_techno_2g", true)
         siteShowTechno3G.value = prefs.getBoolean("site_show_techno_3g", true)

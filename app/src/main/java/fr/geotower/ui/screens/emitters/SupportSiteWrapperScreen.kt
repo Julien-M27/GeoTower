@@ -49,6 +49,8 @@ fun SupportSiteWrapperScreen(
     photoDraftId: String? = null,
     isSplitScreen: Boolean = false,
     onCloseSplitScreen: () -> Unit = {},
+    // Mode simplifié : opérateur à déplier d'emblée sur la fiche support.
+    expandAntennaId: String? = null,
     onOpenAntennaInHost: ((String) -> Unit)? = null
 ) {
     // Pas de pré-chargement ici : [SupportDetailScreen] résout déjà l'antenne d'ancrage
@@ -57,7 +59,8 @@ fun SupportSiteWrapperScreen(
     // l'ouverture d'une fiche et ajoutait un second écran de chargement.
     var selectedSiteId by remember { mutableStateOf<String?>(null) }
     var selectedSidePane by remember { mutableStateOf<SiteDetailSidePane?>(null) }
-    val displayStyle by AppConfig.displayStyle
+    // Lit les deux états observables (style choisi + mode simplifié) : le mode simplifié impose 0.
+    val displayStyle = AppConfig.effectiveDisplayStyle()
 
     val canOpenSiteSplit = displayStyle == 1 && !isSplitScreen
     val isSplitActive = canOpenSiteSplit && selectedSiteId != null
@@ -91,6 +94,7 @@ fun SupportSiteWrapperScreen(
                     photoDraftId = photoDraftId,
                     isSplitScreen = isSplitScreen,
                     onCloseSplitScreen = onCloseSplitScreen,
+                    expandAntennaId = expandAntennaId,
                     onAntennaClick = { id ->
                         if (onOpenAntennaInHost != null) {
                             onOpenAntennaInHost(id)
@@ -153,7 +157,8 @@ fun NearEmittersSupportWrapperScreen(
     repository: AnfrRepository,
     radioRepository: RadioRepository
 ) {
-    val displayStyle by AppConfig.displayStyle
+    // Lit les deux états observables (style choisi + mode simplifié) : le mode simplifié impose 0.
+    val displayStyle = AppConfig.effectiveDisplayStyle()
     var selectedSupportId by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSupportOperatorKey by rememberSaveable { mutableStateOf<String?>(null) }
     var selectedSiteId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -271,7 +276,8 @@ fun SiteDetailToolWrapperScreen(
     antennaId: String,
     applyMapFilters: Boolean = false
 ) {
-    val displayStyle by AppConfig.displayStyle
+    // Lit les deux états observables (style choisi + mode simplifié) : le mode simplifié impose 0.
+    val displayStyle = AppConfig.effectiveDisplayStyle()
     var selectedSidePane by remember(antennaId) { mutableStateOf<SiteDetailSidePane?>(null) }
     val isSplitActive = displayStyle == 1 && selectedSidePane != null
     val siteWidthFraction by animateFloatAsState(

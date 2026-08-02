@@ -22,6 +22,7 @@ import fr.geotower.data.outages.OutageGenerationStep
 import fr.geotower.data.outages.OutageLocalConfig
 import fr.geotower.data.outages.labelRes
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -49,9 +50,12 @@ class OutageGenerationWorker(
 
     override suspend fun doWork(): Result = coroutineScope {
         // Exécution périodique : ne rien faire si l'utilisateur a désactivé le mode local ou le fond.
+        // La source locale se lit sur le niveau de traitement local, comme dans le planificateur.
         if (inputData.getBoolean(KEY_CHECK_ENABLED, false)) {
             val config = OutageLocalConfig(context)
-            if (!config.useLocalSource || !config.backgroundEnabled) return@coroutineScope Result.success()
+            if (!fr.geotower.utils.AppConfig.outagesLocal() || !config.backgroundEnabled) {
+                return@coroutineScope Result.success()
+            }
         }
 
         createChannel()
@@ -166,11 +170,11 @@ class OutageGenerationWorker(
     }
 
     private fun settingsPendingIntent(): PendingIntent {
-        // La génération des pannes se pilote depuis « Source des pannes » : on ouvre cette page,
-        // pas la racine des réglages.
+        // La récupération des pannes se pilote depuis « Traitement local » (niveau ≥ 1) : on ouvre
+        // cette page, pas la racine des réglages.
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            data = Uri.parse("geotower://outage_source")
+            data = Uri.parse("geotower://local_mode")
         }
         return PendingIntent.getActivity(
             context, 0, intent,
@@ -179,6 +183,9 @@ class OutageGenerationWorker(
     }
 
     private fun notifySafely(id: Int, notification: android.app.Notification) {
+        // La notification de fin suit l'interrupteur maître des notifications ; celle de progression
+        // est celle du service de premier plan, imposée par Android pendant la récupération.
+        if (id != PROGRESS_NOTIFICATION_ID && !AppNotifications.canPost(context)) return
         runCatching { notificationManager.notify(id, notification) }
             .onFailure { AppLogger.w(TAG, "Outage generation notification failed", it) }
     }

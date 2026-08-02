@@ -995,14 +995,16 @@ private fun buildPermissionsItem(context: Context, liveNotificationsEnabled: Boo
 
 private fun buildNotificationsItem(context: Context, prefs: android.content.SharedPreferences): DiagnosticItem {
     val notificationsEnabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+    // Interrupteur maître de l'app (indépendant du suivi live) puis ses sous-réglages.
+    val appNotificationsEnabled = fr.geotower.utils.AppNotifications.enabled(prefs)
     val updateNotificationsEnabled = prefs.getBoolean("enable_update_notifications", true)
     val liveNotificationsEnabled = prefs.getBoolean("enable_live_notifications", false)
     val liveInterval = LiveTrackingPrefs.locationUpdateIntervalSeconds(prefs)
     val blockedChannels = blockedNotificationChannelNames(context)
     val severity = when {
-        !notificationsEnabled && (updateNotificationsEnabled || liveNotificationsEnabled) -> DiagnosticSeverity.Warning
+        !notificationsEnabled && (appNotificationsEnabled || liveNotificationsEnabled) -> DiagnosticSeverity.Warning
         blockedChannels.isNotEmpty() -> DiagnosticSeverity.Warning
-        !updateNotificationsEnabled && !liveNotificationsEnabled -> DiagnosticSeverity.Info
+        !appNotificationsEnabled && !liveNotificationsEnabled -> DiagnosticSeverity.Info
         else -> DiagnosticSeverity.Ok
     }
     val summary = when {
@@ -1012,6 +1014,7 @@ private fun buildNotificationsItem(context: Context, prefs: android.content.Shar
     }
     val details = buildList {
         add(context.getString(R.string.appstrings_diagnostic_detail_notifications_android, yesNo(context, notificationsEnabled)))
+        add(context.getString(R.string.appstrings_diagnostic_detail_notifications_app, enabledDisabled(context, appNotificationsEnabled)))
         add(context.getString(R.string.appstrings_diagnostic_detail_notifications_update, enabledDisabled(context, updateNotificationsEnabled)))
         add(context.getString(R.string.appstrings_diagnostic_detail_notifications_live, enabledDisabled(context, liveNotificationsEnabled)))
         add(context.getString(R.string.appstrings_diagnostic_detail_notifications_live_interval, liveInterval))

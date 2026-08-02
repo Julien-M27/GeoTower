@@ -337,11 +337,16 @@ fun ElevationProfileScreen(
                     backgroundColor = mainBgColor,
                     backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
                     actions = {
-                        IconButton(onClick = { showElevationSettings = true }) {
-                            Icon(
-                                Icons.Default.Settings,
-                                contentDescription = stringResource(R.string.appstrings_coverage_settings_title)
-                            )
+                        fr.geotower.ui.components.PageCustomizationHint(
+                            page = fr.geotower.utils.PageScrollPrefs.ELEVATION_PROFILE,
+                            onOpenSettings = { showElevationSettings = true }
+                        ) {
+                            IconButton(onClick = { showElevationSettings = true }) {
+                                Icon(
+                                    Icons.Default.Settings,
+                                    contentDescription = stringResource(R.string.appstrings_coverage_settings_title)
+                                )
+                            }
                         }
                     }
                 )
@@ -551,6 +556,8 @@ fun ElevationProfileScreen(
                         cardBgColor = cardBgColor,
                         blockShape = blockShape
                     )
+
+                    fr.geotower.ui.components.PageCustomizationFooter(onClick = { showElevationSettings = true })
                 }
                 PageScrollEdgeButtons(PageScrollPrefs.ELEVATION_PROFILE, scrollState)
                 }

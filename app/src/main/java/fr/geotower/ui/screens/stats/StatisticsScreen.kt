@@ -41,6 +41,7 @@ import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.utils.PageScrollPrefs
+import fr.geotower.ui.navigation.ROOT_FALLBACK_ROUTE
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.settings.StatsSettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
@@ -455,6 +456,12 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
     val cachedStats = StatisticsScreenCache.data
     var displayMode by AppConfig.statsDisplayMode
     var showStatsSettingsSheet by remember { mutableStateOf(false) }
+    // Bloc visé par un appui long : le panneau défile jusqu'à sa ligne et la met en surbrillance.
+    var settingsHighlightBlock by remember { mutableStateOf<String?>(null) }
+    val onCustomizeBlock: (String) -> Unit = { blockId ->
+        settingsHighlightBlock = blockId
+        showStatsSettingsSheet = true
+    }
     val statsSettingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     // --- ÉTAT DES DONNÉES ---
@@ -465,7 +472,7 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
     var support5GCounts by remember { mutableStateOf(cachedStats?.supports5G ?: emptyList()) }
     var weeklyByItem by remember { mutableStateOf(cachedStats?.weeklyByItem ?: emptyMap()) }
     var isLoading by remember { mutableStateOf(cachedStats == null) }
-    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = ROOT_FALLBACK_ROUTE)
     val scrollState = rememberScrollState()
 
     BackHandler(enabled = !safeBackNavigation.isLocked) {
@@ -499,11 +506,16 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
                 backgroundColor = mainBgColor,
                 backEnabled = !safeBackNavigation.isLocked,
                 actions = {
-                    IconButton(onClick = { showStatsSettingsSheet = true }) {
-                        Icon(
-                            imageVector = Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.appstrings_settings_title)
-                        )
+                    fr.geotower.ui.components.PageCustomizationHint(
+                        page = fr.geotower.utils.PageScrollPrefs.STATS,
+                        onOpenSettings = { settingsHighlightBlock = null; showStatsSettingsSheet = true }
+                    ) {
+                        IconButton(onClick = { settingsHighlightBlock = null; showStatsSettingsSheet = true }) {
+                            Icon(
+                                imageVector = Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.appstrings_settings_title)
+                            )
+                        }
                     }
                 }
             )
@@ -575,18 +587,30 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
                 .filter { card -> StatsPreferences.isStatsBlockVisible(prefs, card.blockId) }
 
             visibleCards.forEach { card ->
-                Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
-                StatCard(
-                    title = card.title,
-                    desc = card.description,
-                    data = card.data,
-                    isLoading = isLoading,
-                    bgColor = cardBgColor,
-                    displayMode = displayMode,
-                    weeklyData = card.weeklyData,
-                    onClick = card.onClick
-                )
+                // spacing = 0 : l'espacement est déjà porté par le Spacer de chaque carte.
+                fr.geotower.ui.components.CustomizableBlock(card.blockId, onCustomizeBlock, spacing = 0.dp) {
+                    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                    StatCard(
+                        title = card.title,
+                        desc = card.description,
+                        data = card.data,
+                        isLoading = isLoading,
+                        bgColor = cardBgColor,
+                        displayMode = displayMode,
+                        weeklyData = card.weeklyData,
+                        onClick = card.onClick
+                    )
+                }
             }
+
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+            fr.geotower.ui.components.PageCustomizationFooter(
+                onClick = {
+                    settingsHighlightBlock = null
+                    showStatsSettingsSheet = true
+                },
+                modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))
+            )
 
             Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
         }
@@ -596,11 +620,12 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
 
     if (showStatsSettingsSheet) {
         StatsSettingsSheet(
-            onDismiss = { showStatsSettingsSheet = false },
-            onBack = { showStatsSettingsSheet = false },
+            onDismiss = { showStatsSettingsSheet = false; settingsHighlightBlock = null },
+            onBack = { showStatsSettingsSheet = false; settingsHighlightBlock = null },
             sheetState = statsSettingsSheetState,
             useOneUi = uiStyle.useOneUi,
-            bubbleColor = uiStyle.bubbleColor
+            bubbleColor = uiStyle.bubbleColor,
+            highlightBlockId = settingsHighlightBlock
         )
     }
 }

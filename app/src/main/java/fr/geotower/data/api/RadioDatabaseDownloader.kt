@@ -19,7 +19,7 @@ import java.util.concurrent.TimeUnit
 
 object RadioDatabaseDownloader {
 
-    private const val DOWNLOAD_MANIFEST_URL = "https://api.cajejuma.fr/api/v2/download/manifest"
+    private const val DOWNLOAD_MANIFEST_URL = "https://api.geotower.fr/api/v2/download/manifest"
     private const val DB_NAME = RadioDatabaseValidator.DB_NAME
     private val sha256Regex = Regex("^[A-Fa-f0-9]{64}$")
     private val downloadClient: OkHttpClient by lazy {
@@ -228,7 +228,7 @@ object RadioDatabaseDownloader {
         val uri = runCatching { URI(url) }.getOrNull() ?: return false
         return uri.scheme.equals("https", ignoreCase = true) &&
             uri.userInfo == null &&
-            uri.host.equals("api.cajejuma.fr", ignoreCase = true) &&
+            uri.host.equals("api.geotower.fr", ignoreCase = true) &&
             uri.path == "/api/v2/download/radio_db"
     }
 

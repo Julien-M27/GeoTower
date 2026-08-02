@@ -74,6 +74,7 @@ fun LocalDbBuildCard(
     border: BorderStroke?,
     bubbleColor: Color,
     onSafeClick: SafeClick? = null,
+    refreshState: DatabaseRefreshState? = null,
 ) {
     val context = LocalContext.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -104,11 +105,16 @@ fun LocalDbBuildCard(
     // fournit l'horodatage (metadata.version) du dernier build local. Re-lue a la fin de chaque build.
     var mobileInfo by remember { mutableStateOf(LocalDbProvenance.Info.NONE) }
     var radioInfo by remember { mutableStateOf(LocalDbProvenance.Info.NONE) }
-    LaunchedEffect(isBuilding) {
+    // Actualisation de toute la section « Base de données » : clé partagée par les quatre cartes.
+    val sectionRefreshKey = refreshState?.refreshKey ?: 0
+    DatabaseRefreshMembership(refreshState, DatabaseRefreshIds.LOCAL_BUILD)
+
+    LaunchedEffect(isBuilding, sectionRefreshKey) {
         withContext(Dispatchers.IO) {
             mobileInfo = LocalDbProvenance.readMobile(context)
             radioInfo = LocalDbProvenance.readRadio(context)
         }
+        refreshState?.reportRefreshed(DatabaseRefreshIds.LOCAL_BUILD, sectionRefreshKey)
     }
 
     Surface(

@@ -6382,7 +6382,10 @@ fun SupportShareMenu(
     buttonShape: Shape,
     globalMapRef: org.osmdroid.views.MapView?,
     communityPhotos: List<CommunityPhoto> = emptyList(),
-    radioMarkers: List<RadioMapMarker> = emptyList()
+    radioMarkers: List<RadioMapMarker> = emptyList(),
+    // Compteur incrémenté par l'hôte pour lancer directement l'export PDF multi-opérateurs, sans
+    // ouvrir les feuilles de partage (bouton « Partager tous les opérateurs » du mode simplifié).
+    pdfExportRequest: Int = 0
 ) {
     val context = LocalContext.current
     val currentView = LocalView.current
@@ -6514,6 +6517,103 @@ fun SupportShareMenu(
         }
     }
 
+    // Hors de la feuille de sélection : l'export PDF multi-opérateurs est aussi déclenché depuis la
+    // liste des opérateurs (mode simplifié), sans passer par le choix du thème — le PDF n'en a pas.
+    fun recordSupportShare(destination: ShareImageDestination) {
+        val anchor = antennas.firstOrNull() ?: return
+        ShareHistoryStore.record(
+            context = context,
+            kind = ShareHistoryStore.KIND_MOBILE_SUPPORT,
+            destination = destination.historyKey(),
+            supportId = siteId,
+            label = antennas.mapNotNull { it.operateur?.takeIf { name -> name.isNotBlank() } }
+                .distinct()
+                .joinToString(", "),
+            address = techniquesMap[anchor.idAnfr]?.adresse,
+            latitude = anchor.latitude,
+            longitude = anchor.longitude,
+            itemCount = antennas.size
+        )
+    }
+
+    fun startSupportPdfExport(destination: ShareImageDestination) {
+        val anchor = antennas.firstOrNull() ?: return
+        if (isGeneratingShare) return
+        isGeneratingShare = true
+        generationMessage = txtShareImagePreparingInProgress
+        showSelectionSheet = false
+        recordSupportShare(destination)
+        // La collecte des speedtests précède le rendu : on signale la génération dès maintenant.
+        PdfReportNotifier.showPreparing(context, supportReportLabel)
+        globalMapRef?.let { map -> map.controller.setZoom(17.5); map.controller.setCenter(org.osmdroid.util.GeoPoint(anchor.latitude, anchor.longitude)) }
+        scope.launch {
+            val sharePhotoBitmaps = if (incPhotos && hasSharePhotos && shareOrder.contains("photos")) {
+                loadSharePhotoBitmaps(visibleSharePhotos)
+            } else {
+                emptyList()
+            }
+            // Une page de rapport = une station : on va chercher le meilleur speedtest de
+            // chacune. Sur réseau lent, le PDF part sans les speedtests plutôt que d'attendre.
+            val speedtestByStation = if (incReportSpeedtest) {
+                withTimeoutOrNull(REPORT_SPEEDTEST_TIMEOUT_MS) {
+                    loadBestSpeedtestsForReport(
+                        antennas = antennas,
+                        prefs = prefs,
+                        supportId = physique?.idSupport
+                    )
+                } ?: emptyMap()
+            } else {
+                emptyMap()
+            }
+            currentView.postDelayed({
+                try {
+                    val mapBmp = if (incMap) { try { globalMapRef?.let { map -> val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888); map.draw(Canvas(bmp)); bmp } } catch (e: Exception) { null } } else null
+                    shareSupportMultiOperatorPdf(
+                        context = context,
+                        currentView = currentView,
+                        siteId = siteId,
+                        antennas = antennas,
+                        physique = physique,
+                        techniquesMap = techniquesMap,
+                        hsDataMap = hsDataMap,
+                        distanceStr = distanceStr,
+                        mapBitmap = mapBmp,
+                        incMap = incMap,
+                        incConfidential = incConfidential,
+                        incQrCode = incQrCode,
+                        chooserTitle = txtShareSiteVia,
+                        txtInitError = txtInitError,
+                        bearingStr = bearingStr,
+                        photoBitmaps = sharePhotoBitmaps,
+                        txtCommunityPhotosTitle = txtCommunityPhotosTitle,
+                        incSupport = incSupport,
+                        incPhotos = incPhotos,
+                        speedtestByStation = speedtestByStation,
+                        incSpeedtest = incReportSpeedtest,
+                        incThroughput = incReportThroughput,
+                        destination = destination,
+                        onComplete = { isGeneratingShare = false }
+                    )
+                } catch (e: Exception) {
+                    AppLogger.w(TAG_SHARE_IMAGE, "Support PDF generation failed", e)
+                    PdfReportNotifier.cancelProgress(context)
+                    isGeneratingShare = false
+                }
+            }, 300)
+        }
+    }
+
+    // Demande venue de la liste des opérateurs : le compteur change, on lance l'export.
+    // La valeur déjà traitée est mémorisée — sinon un simple retour en composition de ce menu
+    // (réordonnancement des blocs, par exemple) relancerait un export que personne n'a demandé.
+    var lastHandledPdfRequest by remember { mutableIntStateOf(pdfExportRequest) }
+    LaunchedEffect(pdfExportRequest) {
+        if (pdfExportRequest > 0 && pdfExportRequest != lastHandledPdfRequest) {
+            lastHandledPdfRequest = pdfExportRequest
+            startSupportPdfExport(ShareImageDestination.Pdf)
+        }
+    }
+
     if (showSelectionSheet && antennas.isNotEmpty()) {
         val mainInfo = antennas.first()
         ModalBottomSheet(onDismissRequest = { showSelectionSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
@@ -6634,22 +6734,6 @@ fun SupportShareMenu(
 
             // L'historique retient l'identifiant de route du support (celui qui a ouvert la page),
             // pas `physique.idSupport` : c'est lui qui permet de rouvrir la fiche à l'identique.
-            fun recordSupportShare(destination: ShareImageDestination) {
-                ShareHistoryStore.record(
-                    context = context,
-                    kind = ShareHistoryStore.KIND_MOBILE_SUPPORT,
-                    destination = destination.historyKey(),
-                    supportId = siteId,
-                    label = antennas.mapNotNull { it.operateur?.takeIf { name -> name.isNotBlank() } }
-                        .distinct()
-                        .joinToString(", "),
-                    address = techniquesMap[mainInfo.idAnfr]?.adresse,
-                    latitude = mainInfo.latitude,
-                    longitude = mainInfo.longitude,
-                    itemCount = antennas.size
-                )
-            }
-
             fun startSupportImageExport(destination: ShareImageDestination) {
                 if (isGeneratingShare) return
                 isGeneratingShare = true
@@ -6683,72 +6767,6 @@ fun SupportShareMenu(
                             )
                         } catch (e: Exception) {
                             AppLogger.w(TAG_SHARE_IMAGE, "Support share generation failed", e)
-                            isGeneratingShare = false
-                        }
-                    }, 300)
-                }
-            }
-
-            fun startSupportPdfExport(destination: ShareImageDestination) {
-                if (isGeneratingShare) return
-                isGeneratingShare = true
-                generationMessage = txtShareImagePreparingInProgress
-                showSelectionSheet = false
-                recordSupportShare(destination)
-                // La collecte des speedtests précède le rendu : on signale la génération dès maintenant.
-                PdfReportNotifier.showPreparing(context, supportReportLabel)
-                globalMapRef?.let { map -> map.controller.setZoom(17.5); map.controller.setCenter(org.osmdroid.util.GeoPoint(mainInfo.latitude, mainInfo.longitude)) }
-                scope.launch {
-                    val sharePhotoBitmaps = if (incPhotos && hasSharePhotos && shareOrder.contains("photos")) {
-                        loadSharePhotoBitmaps(visibleSharePhotos)
-                    } else {
-                        emptyList()
-                    }
-                    // Une page de rapport = une station : on va chercher le meilleur speedtest de
-                    // chacune. Sur réseau lent, le PDF part sans les speedtests plutôt que d'attendre.
-                    val speedtestByStation = if (incReportSpeedtest) {
-                        withTimeoutOrNull(REPORT_SPEEDTEST_TIMEOUT_MS) {
-                            loadBestSpeedtestsForReport(
-                                antennas = antennas,
-                                prefs = prefs,
-                                supportId = physique?.idSupport
-                            )
-                        } ?: emptyMap()
-                    } else {
-                        emptyMap()
-                    }
-                    currentView.postDelayed({
-                        try {
-                            val mapBmp = if (incMap) { try { globalMapRef?.let { map -> val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888); map.draw(Canvas(bmp)); bmp } } catch (e: Exception) { null } } else null
-                            shareSupportMultiOperatorPdf(
-                                context = context,
-                                currentView = currentView,
-                                siteId = siteId,
-                                antennas = antennas,
-                                physique = physique,
-                                techniquesMap = techniquesMap,
-                                hsDataMap = hsDataMap,
-                                distanceStr = distanceStr,
-                                mapBitmap = mapBmp,
-                                incMap = incMap,
-                                incConfidential = incConfidential,
-                                incQrCode = incQrCode,
-                                chooserTitle = txtShareSiteVia,
-                                txtInitError = txtInitError,
-                                bearingStr = bearingStr,
-                                photoBitmaps = sharePhotoBitmaps,
-                                txtCommunityPhotosTitle = txtCommunityPhotosTitle,
-                                incSupport = incSupport,
-                                incPhotos = incPhotos,
-                                speedtestByStation = speedtestByStation,
-                                incSpeedtest = incReportSpeedtest,
-                                incThroughput = incReportThroughput,
-                                destination = destination,
-                                onComplete = { isGeneratingShare = false }
-                            )
-                        } catch (e: Exception) {
-                            AppLogger.w(TAG_SHARE_IMAGE, "Support PDF generation failed", e)
-                            PdfReportNotifier.cancelProgress(context)
                             isGeneratingShare = false
                         }
                     }, 300)

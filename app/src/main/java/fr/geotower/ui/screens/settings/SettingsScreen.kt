@@ -93,6 +93,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -146,8 +147,15 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.community.CommunityDataPreferences
+import fr.geotower.ui.navigation.ROOT_FALLBACK_ROUTE
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.components.GeoTowerBackTopBar
+import fr.geotower.ui.components.GeoTowerPullToRefreshBox
+import fr.geotower.ui.components.DatabaseRefreshState
+import fr.geotower.ui.components.DatabaseRefreshTimeout
+import fr.geotower.ui.components.DatabaseSectionRefreshButton
+import fr.geotower.ui.components.rememberDatabaseRefreshIndicator
+import fr.geotower.ui.components.rememberDatabaseRefreshState
 import fr.geotower.ui.components.SafeClick
 import fr.geotower.ui.components.colorPaletteFadingEdge
 import fr.geotower.ui.components.DialogDestructiveButton
@@ -263,15 +271,21 @@ fun SettingsScreen(
     var hasPrimedOfflineMapsTargetScroll by remember(initialSection, offlineMapsTargetFilename) { mutableStateOf(false) }
     val databaseBringIntoViewRequester = sectionBringIntoViewRequesters[SECTION_DATABASE]
     val offlineMapsBringIntoViewRequester = remember { BringIntoViewRequester() }
-    var shouldBringDatabaseIntoView by remember(initialSection) { mutableStateOf(initialSection == "database") }
-    var shouldBringOfflineMapsIntoView by remember(initialSection) { mutableStateOf(initialSection == "offline_maps") }
+    // Les cibles de défilement d'un lien profond sont à usage unique et SURVIVENT à un aller-retour
+    // vers un sous-écran (rememberSaveable) : sinon, revenir de « Traitement local » relançait le
+    // défilement vers la section base de données comme si on rouvrait la notification.
+    var shouldBringDatabaseIntoView by rememberSaveable(initialSection) { mutableStateOf(initialSection == "database") }
+    var shouldBringOfflineMapsIntoView by rememberSaveable(initialSection) { mutableStateOf(initialSection == "offline_maps") }
     // Cibles fines des cartes de la section base de donnees (base mobile, base radio, base eNB,
     // generation locale) : la notif d'un telechargement doit arriver precisement sur SA carte, pas
     // au titre de la section.
     val initialDatabaseCardAnchor = initialSection?.takeIf { it in DATABASE_CARD_ANCHORS }
     val databaseCardRequesters = remember { DATABASE_CARD_ANCHORS.associateWith { BringIntoViewRequester() } }
     val databaseCardBounds = remember { mutableStateMapOf<String, SettingsSectionBounds>() }
-    var pendingDatabaseCardAnchor by remember(initialSection) { mutableStateOf(initialDatabaseCardAnchor) }
+    var pendingDatabaseCardAnchor by rememberSaveable(initialSection) { mutableStateOf(initialDatabaseCardAnchor) }
+    // Le lien profond n'ouvre sa section qu'une fois : au retour d'un sous-écran, on garde la
+    // section réellement consultée par l'utilisateur.
+    var hasAppliedInitialSection by rememberSaveable(initialSection) { mutableStateOf(false) }
 
     var themeMode by AppConfig.themeMode
     var isOledMode by AppConfig.isOledMode
@@ -279,8 +293,14 @@ fun SettingsScreen(
     val featureFlags by RemoteFeatureFlags.config
     val uiStyle = LocalGeoTowerUiStyle.current
     var showUnitSheet by remember { mutableStateOf(false) }
-    var showColorPalettePage by remember { mutableStateOf(false) }
-    var settingsSearchQuery by remember { mutableStateOf("") }
+    var showColorPalettePage by rememberSaveable { mutableStateOf(false) }
+    // Actualisation de la section « Base de données » : les quatre cartes relisent la base installée
+    // et réinterrogent le manifeste. Deux déclencheurs selon le mode d'affichage — bouton sur le
+    // titre en page unique, tirage vers le bas quand la section occupe la page à elle seule.
+    val databaseRefreshState = rememberDatabaseRefreshState()
+    val databaseRefreshVisible = rememberDatabaseRefreshIndicator(databaseRefreshState)
+    DatabaseRefreshTimeout(databaseRefreshState)
+    var settingsSearchQuery by rememberSaveable { mutableStateOf("") }
     var pendingSearchScrollSection by remember { mutableStateOf<Int?>(null) }
 
     fun updateOneUi(enabled: Boolean) {
@@ -302,14 +322,17 @@ fun SettingsScreen(
     val isWideScreen = minOf(configuration.screenWidthDp, configuration.screenHeightDp) >= 600
 
     val safeClick = rememberSafeClick()
-    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = ROOT_FALLBACK_ROUTE)
 
     // TÉLÉPHONE : accueil des réglages par sections (un bouton par section) au lieu de la longue
     // page unique. `phoneSectionIndex` = null → on est sur l'accueil, sinon section ouverte.
     // Les grands écrans gardent leur barre latérale (navMode), ce réglage ne les concerne pas.
     val settingsSectionsMode by AppConfig.settingsSectionsMode
     val usePhoneSections = !isWideScreen && settingsSectionsMode
-    var phoneSectionIndex by remember { mutableStateOf<Int?>(null) }
+    // rememberSaveable : partir sur un sous-écran (Traitement local, Diagnostic, Historiques…) ou
+    // tourner l'appareil détruit la composition. Avec un simple `remember`, le retour retombait sur
+    // l'accueil des sections au lieu de la section d'où l'on venait.
+    var phoneSectionIndex by rememberSaveable { mutableStateOf<Int?>(null) }
 
     fun openPhoneSection(section: Int?) {
         phoneSectionIndex = section
@@ -322,25 +345,32 @@ fun SettingsScreen(
         openPhoneSection(null)
     }
 
+    // Un seul cran par appui sur « retour », dans cet ordre :
+    //   palette de couleurs → recherche → section ouverte → sortie de l'écran.
+    // Les conditions sont mutuellement exclusives : on ne dépend pas de l'ordre d'enregistrement
+    // des BackHandler dans le dispatcher (LIFO), qui est un détail d'implémentation.
+    val isPhoneSectionOpen = usePhoneSections && phoneSectionIndex != null
+    val isSearchActive = settingsSearchQuery.isNotBlank()
+
     BackHandler(enabled = showColorPalettePage) {
         showColorPalettePage = false
     }
 
-    BackHandler(enabled = !showColorPalettePage && !safeBackNavigation.isLocked) {
-        safeBackNavigation.navigateBack()
+    // Recherche active : le retour efface d'abord la recherche au lieu de quitter l'écran.
+    BackHandler(enabled = !showColorPalettePage && isSearchActive) {
+        settingsSearchQuery = ""
     }
 
     // Accueil par sections : le retour remonte d'abord à la liste des sections.
-    BackHandler(
-        enabled = usePhoneSections && phoneSectionIndex != null &&
-            !showColorPalettePage && settingsSearchQuery.isBlank()
-    ) {
+    BackHandler(enabled = !showColorPalettePage && !isSearchActive && isPhoneSectionOpen) {
         openPhoneSection(null)
     }
 
-    // Recherche active : le retour efface d'abord la recherche au lieu de quitter l'écran.
-    BackHandler(enabled = settingsSearchQuery.isNotBlank() && !showColorPalettePage) {
-        settingsSearchQuery = ""
+    BackHandler(
+        enabled = !showColorPalettePage && !isSearchActive && !isPhoneSectionOpen &&
+            !safeBackNavigation.isLocked
+    ) {
+        safeBackNavigation.navigateBack()
     }
 
     var isBlurEnabled by AppConfig.isBlurEnabled
@@ -348,7 +378,9 @@ fun SettingsScreen(
     var ignStyle by AppConfig.ignStyle
     var defaultOperator by AppConfig.defaultOperator
     val navMode = AppConfig.navMode.intValue
-    var activeSectionIndex by remember { mutableIntStateOf(0) }
+    // Même raison que phoneSectionIndex : le mode « pages » des grands écrans doit retrouver sa
+    // section au retour d'un sous-écran, pas repartir sur « Apparence ».
+    var activeSectionIndex by rememberSaveable { mutableIntStateOf(0) }
 
     // Une seule section à l'écran : mode « pages » des grands écrans (Fold déplié) ou section
     // ouverte depuis l'accueil par sections d'un téléphone. Sinon tout est empilé sur une page.
@@ -361,8 +393,14 @@ fun SettingsScreen(
         // Accueil par sections : on ouvre directement la section, il n'y a rien à faire défiler.
         if (usePhoneSections) openPhoneSection(section) else pendingSearchScrollSection = section
     }
-    fun searchOpen(action: () -> Unit) {
+    // Ouvrir un réglage depuis la recherche positionne aussi la section : en refermant la fenêtre
+    // (ou en revenant du sous-écran), on retombe sur la section du réglage, pas sur l'accueil.
+    fun searchOpen(section: Int?, action: () -> Unit) {
         settingsSearchQuery = ""
+        if (section != null) {
+            activeSectionIndex = section
+            if (usePhoneSections) openPhoneSection(section)
+        }
         action()
     }
 
@@ -401,6 +439,8 @@ fun SettingsScreen(
     }
 
     LaunchedEffect(initialSection) {
+        if (hasAppliedInitialSection) return@LaunchedEffect
+        hasAppliedInitialSection = true
         if (initialSection == "database" || initialSection == "offline_maps" || initialDatabaseCardAnchor != null) {
             // Les cartes hors ligne vivent maintenant dans la section Cartographie.
             val target = if (initialSection == "offline_maps") SECTION_MAPPING else SECTION_DATABASE
@@ -609,6 +649,7 @@ fun SettingsScreen(
     var pageSiteOpenMap by remember { mutableStateOf(SitePagePrefs.openMap.read(prefs)) }
     var pageSiteElevationProfile by remember { mutableStateOf(SitePagePrefs.elevationProfile.read(prefs)) }
     var pageSiteThroughputCalculator by remember { mutableStateOf(SitePagePrefs.throughputCalculator.read(prefs)) }
+    var pageSiteTheoreticalCoverage by remember { mutableStateOf(SitePagePrefs.theoreticalCoverage.read(prefs)) }
     var pageSiteNav by remember { mutableStateOf(SitePagePrefs.nav.read(prefs)) }
     var pageSiteShare by remember { mutableStateOf(SitePagePrefs.share.read(prefs)) }
     var pageSiteDates by remember { mutableStateOf(SitePagePrefs.dates.read(prefs)) }
@@ -790,7 +831,7 @@ fun SettingsScreen(
                         keywords = keywords,
                         sectionLabel = meta.first,
                         icon = meta.second,
-                        onClick = { if (openAction != null) searchOpen(openAction) else searchScrollTo(section) }
+                        onClick = { if (openAction != null) searchOpen(section, openAction) else searchScrollTo(section) }
                     )
                 )
             }
@@ -804,7 +845,7 @@ fun SettingsScreen(
                         keywords = keywords,
                         sectionLabel = context.getString(R.string.nav_settings),
                         icon = icon,
-                        onClick = { searchOpen(action) }
+                        onClick = { searchOpen(null, action) }
                     )
                 )
             }
@@ -833,7 +874,7 @@ fun SettingsScreen(
             entry(context.getString(R.string.settings_app_language), "langue language francais anglais traduction locale", SECTION_PREFERENCES) { showLanguageSheet = true }
             entry(context.getString(R.string.settings_units_title), "unites units distance vitesse metre km mesure imperial", SECTION_PREFERENCES) { showUnitSheet = true }
             if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.PAGES_CUSTOMIZATION)) {
-                entry(context.getString(R.string.settings_pages_customization_title), "pages personnalisation accueil carte boussole site support proximite statistiques", SECTION_PREFERENCES) { showPagesCustomizationSheet = true }
+                entry(context.getString(R.string.settings_pages_customization_title), "pages personnalisation accueil carte boussole site support proximite statistiques blocs reorganiser masquer astuces bulle rappel appui long", SECTION_PREFERENCES) { showPagesCustomizationSheet = true }
             }
             if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.EXTERNAL_LINKS_SETTINGS)) {
                 entry(context.getString(R.string.settings_external_links_title), "liens externes links cartoradio sites web", SECTION_PREFERENCES) { showExternalLinksSheet = true }
@@ -843,6 +884,7 @@ fun SettingsScreen(
             }
 
             // --- Notifications et arrière-plan ---
+            entry(context.getString(R.string.appstrings_app_notifications_title), "notifications app autoriser permission activer couper toutes", SECTION_BACKGROUND)
             entry(context.getString(R.string.appstrings_update_notif_setting_title), "notification mise a jour update base donnees alerte", SECTION_BACKGROUND)
             entry(context.getString(R.string.appstrings_low_power_title), "faible consommation economie batterie eco energie basse performance low power mode", SECTION_BACKGROUND)
             entry(context.getString(R.string.appstrings_live_notification_title), "notification live suivi temps reel antenne direct", SECTION_BACKGROUND)
@@ -858,9 +900,20 @@ fun SettingsScreen(
             entry(context.getString(R.string.settings_section_database), "base de donnees database telechargement anfr support antenne", SECTION_DATABASE)
             entry(context.getString(R.string.appstrings_radio_data_title), "radio donnees frequences base anfr", SECTION_DATABASE)
             entry(context.getString(R.string.local_mode_settings_title), "traitement local autonomie serveur hors ligne generation", SECTION_DATABASE) { navController.navigate("local_mode") }
-            entry(context.getString(R.string.outage_source_settings_title), "coupures pannes source sites hs operateurs", SECTION_DATABASE) { navController.navigate("outage_source") }
+            // Les pannes n'ont plus de page dédiée : leurs réglages vivent dans « Traitement local »
+            // (niveau ≥ 1). On garde l'entrée de recherche pour que les mots-clés continuent de mener au bon endroit.
+            entry(context.getString(R.string.outage_source_settings_title), "coupures pannes source sites hs operateurs frequence arriere plan", SECTION_DATABASE) { navController.navigate("local_mode") }
 
             // --- Entrées directes (hors section) ---
+            // Le mode simplifié vit en tête des réglages : le résultat referme la recherche (et la
+            // section ouverte) pour ramener sur la page où sa carte est visible.
+            if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIMPLE_MODE_ENABLED)) {
+                directEntry(
+                    context.getString(R.string.settings_simple_mode_title),
+                    "mode simplifie simple carte demarrage tiroir menu lateral debutant epure",
+                    Icons.Outlined.Tune
+                ) { openPhoneSection(null) }
+            }
             directEntry(
                 context.getString(R.string.photos_favorites_title),
                 "photos favorites galerie images preferees",
@@ -945,11 +998,12 @@ fun SettingsScreen(
                     GeoTowerBackTopBar(
                         title = openSection?.let { menuItems[it].first }
                             ?: stringResource(R.string.nav_settings),
+                        // Même échelle que le retour système : recherche, puis section, puis sortie.
                         onBack = {
-                            if (openSection != null) {
-                                openPhoneSection(null)
-                            } else {
-                                safeBackNavigation.navigateBack()
+                            when {
+                                isSearchActive -> settingsSearchQuery = ""
+                                openSection != null -> openPhoneSection(null)
+                                else -> safeBackNavigation.navigateBack()
                             }
                         },
                         backgroundColor = MaterialTheme.colorScheme.background,
@@ -1010,6 +1064,11 @@ fun SettingsScreen(
             modifier = Modifier.padding(top = innerPadding.calculateTopPadding()),
             // ✅ AJOUT : onCloseSidebar
             sidebar = { width, onCloseSidebar ->
+                // La barre latérale doit défiler : elle porte 6 sections + 6 entrées directes + la
+                // version, ce qui dépasse la hauteur d'un Fold dès l'échelle 100 %. Sans défilement
+                // le `Spacer(weight(1f))` du bas n'a plus rien à distribuer et les dernières entrées
+                // (profils, À propos, réinitialisation) étaient purement et simplement rognées.
+                val sidebarScrollState = rememberScrollState()
                 Row(modifier = Modifier.width(width).fillMaxHeight().background(mainBgColor)) {
                     Column(
                         modifier = Modifier
@@ -1017,6 +1076,11 @@ fun SettingsScreen(
                             .fillMaxHeight()
                             // 🚨 CORRECTION 2 : Marge pour les boutons de navigation
                             .navigationBarsPadding()
+                            // `fillMaxHeight` + `navigationBarsPadding` fixent la hauteur MINIMALE
+                            // transmise au contenu ; le défilement ne relâche que le maximum. Le
+                            // `Spacer(weight(1f))` continue donc de plaquer la version en bas quand
+                            // il reste de la place, et la colonne défile quand il n'y en a plus.
+                            .verticalScroll(sidebarScrollState)
                             .padding(top = sizing.spacing(16.dp), bottom = sizing.spacing(16.dp))
                     ) {
                         // ✅ RETOUR DU ROW AVEC LES DEUX BOUTONS
@@ -1026,8 +1090,11 @@ fun SettingsScreen(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             IconButton(
-                                onClick = { safeBackNavigation.navigateBack() },
-                                enabled = !safeBackNavigation.isLocked,
+                                // Comme sur téléphone : la recherche se referme avant de quitter.
+                                onClick = {
+                                    if (isSearchActive) settingsSearchQuery = "" else safeBackNavigation.navigateBack()
+                                },
+                                enabled = isSearchActive || !safeBackNavigation.isLocked,
                                 modifier = Modifier.padding(start = sizing.spacing(8.dp))
                             ) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
@@ -1119,6 +1186,24 @@ fun SettingsScreen(
 
                     // --- CONTENU DÉFILANT DES PARAMÈTRES ---
                     Box(modifier = Modifier.fillMaxSize()) {
+                    // Modes d'affichage, décidés ici puis réutilisés tels quels par les branches
+                    // plus bas : la condition du tirage vers le bas doit suivre EXACTEMENT ce qui
+                    // est réellement rendu, sinon le geste survit à un changement de mode.
+                    val isSectionsHome = usePhoneSections && phoneSectionIndex == null
+                    val isAllInOnePage = !usePhoneSections && (navMode == 0 || !isExpanded)
+                    val openSectionIndex =
+                        if (usePhoneSections) phoneSectionIndex ?: SECTION_APPEARANCE else activeSectionIndex
+                    // Le tirage n'a de sens que si la section « Base de données » occupe la page à
+                    // elle seule : ailleurs elle n'est pas en haut du défilement, et c'est le bouton
+                    // posé sur son titre qui l'actualise.
+                    val databaseSectionAlone = settingsSearchQuery.isBlank() && !isSectionsHome &&
+                        !isAllInOnePage && openSectionIndex == SECTION_DATABASE
+                    GeoTowerPullToRefreshBox(
+                        isRefreshing = databaseSectionAlone && databaseRefreshVisible,
+                        onRefresh = { databaseRefreshState.refresh() },
+                        enabled = databaseSectionAlone,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
                     Box(
                         modifier = Modifier.fillMaxSize()
                             .onGloballyPositioned { coordinates ->
@@ -1145,6 +1230,42 @@ fun SettingsScreen(
                                 useOneUi = useOneUi
                             )
                             Spacer(Modifier.height(sizing.spacing(20.dp)))
+
+                            // Le mode simplifié change toute la navigation de l'app : il est en
+                            // tête des réglages, au-dessus des sections, et non enterré dans
+                            // « Apparence ». Masqué pendant une recherche (les résultats prennent
+                            // la page) et sur une section ouverte (il n'appartient à aucune).
+                            if (
+                                settingsSearchQuery.isBlank() &&
+                                !isPhoneSectionOpen &&
+                                RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIMPLE_MODE_ENABLED)
+                            ) {
+                                val simpleModeEnabled by AppConfig.simpleMode
+                                PreferenceSwitchCard(
+                                    title = stringResource(R.string.settings_simple_mode_title),
+                                    desc = stringResource(R.string.settings_simple_mode_desc),
+                                    checked = simpleModeEnabled,
+                                    onCheckedChange = { enabled ->
+                                        AppConfig.setSimpleMode(context, enabled)
+                                        // Le mode change la RACINE de la navigation, et celle-ci est
+                                        // figée au lancement de l'app : sans reconstruction, le
+                                        // retour depuis les réglages retombait sur l'accueil, page
+                                        // qui n'existe plus en mode simplifié. On repose donc la
+                                        // bonne racine, puis les réglages par-dessus pour laisser
+                                        // l'utilisateur là où il est.
+                                        navController.navigate(AppConfig.homeRoute()) {
+                                            popUpTo(navController.graph.id) { inclusive = true }
+                                        }
+                                        navController.navigate("settings")
+                                    },
+                                    shape = cardShape,
+                                    border = cardBorder,
+                                    bubbleColor = bubbleBaseColor,
+                                    useOneUi = useOneUi
+                                )
+                                Spacer(Modifier.height(sizing.spacing(20.dp)))
+                            }
+
                             if (settingsSearchQuery.isNotBlank()) {
                                 SettingsSearchResults(
                                     query = settingsSearchQuery,
@@ -1155,7 +1276,7 @@ fun SettingsScreen(
                                     useOneUi = useOneUi
                                 )
                             } else {
-                            if (usePhoneSections && phoneSectionIndex == null) {
+                            if (isSectionsHome) {
                                 // Téléphone : accueil des réglages, un bouton par section.
                                 SettingsSectionsHome(
                                     sections = menuItems,
@@ -1171,7 +1292,7 @@ fun SettingsScreen(
                                     useOneUi = useOneUi,
                                     safeClick = safeClick
                                 )
-                            } else if (!usePhoneSections && (navMode == 0 || !isExpanded)) {
+                            } else if (isAllInOnePage) {
                                 AllSettingsContent(
                                     isWide = isExpanded,
                                     nav = navMode,
@@ -1226,9 +1347,9 @@ fun SettingsScreen(
                                     onPhotosFavorites = { navController.navigate("photos_favorites") },
                                     onPhotoUploadHistory = { navController.navigate("photo_upload_history") },
                                     onShareHistory = { navController.navigate("share_history") },
-                                    onOutageSource = { navController.navigate("outage_source") },
                                     onLocalMode = { navController.navigate("local_mode") },
-                                    databaseCardModifiers = databaseCardAnchorModifiers
+                                    databaseCardModifiers = databaseCardAnchorModifiers,
+                                    databaseRefreshState = databaseRefreshState
                                 )
                                 if (!isExpanded) {
                                     // Retour vers l'accueil par sections (pendant du bouton de la barre du haut).
@@ -1253,7 +1374,7 @@ fun SettingsScreen(
                             } else {
                                 // Une seule section : mode « pages » des grands écrans, ou section
                                 // ouverte depuis l'accueil par sections d'un téléphone.
-                                when (if (usePhoneSections) phoneSectionIndex ?: SECTION_APPEARANCE else activeSectionIndex) {
+                                when (openSectionIndex) {
                                     SECTION_APPEARANCE -> SectionApparence(
                                         themeMode,
                                         { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() },
@@ -1337,15 +1458,18 @@ fun SettingsScreen(
                                         context,
                                         modifier = sectionAnchorModifiers[SECTION_DATABASE],
                                         onLocalMode = { navController.navigate("local_mode") },
-                                        onOutageSource = { navController.navigate("outage_source") },
                                         safeClick = safeClick,
-                                        databaseCardModifiers = databaseCardAnchorModifiers
+                                        databaseCardModifiers = databaseCardAnchorModifiers,
+                                        refreshState = databaseRefreshState
+                                        // Pas de bouton ici : la section est seule sur la page,
+                                        // le tirage vers le bas la couvre.
                                     )
                                 }
                             }
                             }
                             Spacer(Modifier.height(sizing.spacing(48.dp)))
                         }
+                    }
                     }
                     // Le contenu défile dans tous les modes : les aides au défilement suivent.
                     PageScrollEdgeButtons(PageScrollPrefs.SETTINGS, scrollState)
@@ -1391,7 +1515,7 @@ fun SettingsScreen(
                     prefs.edit().putString("default_operator", selectedOperator).apply()
                     // La notif live ne dépend plus d'un opérateur : on la relance pour qu'elle
                     // suive soit l'opérateur choisi, soit l'antenne la plus proche si « Aucun ».
-                    if (AppConfig.enableLiveNotifications.value) {
+                    if (AppConfig.enableLiveTracking.value) {
                         LiveTrackingController.startIfEligible(context)
                     }
                 },
@@ -1839,6 +1963,7 @@ fun SettingsScreen(
                 showOpenMap = pageSiteOpenMap, onOpenMapChange = { pageSiteOpenMap = it; prefs.edit().putBoolean(SitePagePrefs.openMap.key, it).apply() },
                 showElevationProfile = pageSiteElevationProfile, onElevationProfileChange = { pageSiteElevationProfile = it; prefs.edit().putBoolean(SitePagePrefs.elevationProfile.key, it).apply() },
                 showThroughputCalculator = pageSiteThroughputCalculator, onThroughputCalculatorChange = { pageSiteThroughputCalculator = it; prefs.edit().putBoolean(SitePagePrefs.throughputCalculator.key, it).apply() },
+                showTheoreticalCoverage = pageSiteTheoreticalCoverage, onTheoreticalCoverageChange = { pageSiteTheoreticalCoverage = it; prefs.edit().putBoolean(SitePagePrefs.theoreticalCoverage.key, it).apply() },
                 showNav = pageSiteNav, onNavChange = { pageSiteNav = it; prefs.edit().putBoolean(SitePagePrefs.nav.key, it).apply() },
                 showShare = pageSiteShare, onShareChange = { pageSiteShare = it; prefs.edit().putBoolean(SitePagePrefs.share.key, it).apply() },
                 showDates = pageSiteDates, onDatesChange = { pageSiteDates = it; prefs.edit().putBoolean(SitePagePrefs.dates.key, it).apply() },
@@ -2315,9 +2440,9 @@ fun AllSettingsContent(
     onPhotosFavorites: () -> Unit = {},
     onPhotoUploadHistory: () -> Unit = {},
     onShareHistory: () -> Unit = {},
-    onOutageSource: () -> Unit = {},
     onLocalMode: () -> Unit = {},
-    databaseCardModifiers: Map<String, Modifier> = emptyMap()
+    databaseCardModifiers: Map<String, Modifier> = emptyMap(),
+    databaseRefreshState: DatabaseRefreshState? = null
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     Column(modifier = appearanceSectionModifier.fillMaxWidth()) {
@@ -2358,9 +2483,11 @@ fun AllSettingsContent(
         ctx,
         databaseSectionModifier,
         onLocalMode = onLocalMode,
-        onOutageSource = onOutageSource,
         safeClick = safeClick,
-        databaseCardModifiers = databaseCardModifiers
+        databaseCardModifiers = databaseCardModifiers,
+        refreshState = databaseRefreshState,
+        // Page unique : la section est noyée au milieu du défilement, seul un bouton peut l'actualiser.
+        showRefreshButton = true
     )
     Spacer(Modifier.height(sizing.spacing(32.dp)))
     SettingsDirectEntries(
@@ -2427,6 +2554,9 @@ fun SectionApparence(
         onColorPaletteClick = onColorPaletteClick,
         shape = shape, border = border, bubbleColor = bubbleColor, safeClick = safeClick
     )
+
+    // Le mode simplifié n'est plus ici : il change toute la navigation de l'app, il est donc
+    // présenté en tête des réglages (cf. SimpleModeSettingsCard), au-dessus des sections.
 
     // --- MISE EN PAGE DES RÉGLAGES (grands écrans) ---
     if (isWide) {
@@ -2701,28 +2831,36 @@ fun SectionNotifications(
     }
     var showWidgetPickerSheet by remember { mutableStateOf(false) }
 
+    // Demande de POST_NOTIFICATIONS par un launcher et non par un cast de LocalContext en Activity :
+    // GeoTowerLocaleProvider remplace LocalContext par un contexte localisé, le cast serait null et
+    // la boîte de dialogue système ne s'ouvrirait jamais. Le réglage reste tel que choisi : sans la
+    // permission l'app se contente de ne rien afficher.
+    val notificationPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { }
+    val requestNotificationPermission: () -> Unit = {
+        if (!fr.geotower.utils.AppNotifications.hasPermission(context)) {
+            notificationPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
     SectionTitle(stringResource(R.string.settings_section_background))
 
-    // --- NOTIFICATIONS DE MISE À JOUR DE LA BASE ---
-    val updateNotifsEnabled by fr.geotower.utils.AppConfig.enableUpdateNotifications
+    // --- INTERRUPTEUR MAÎTRE DES NOTIFICATIONS ---
+    // Séparé du suivi live : on peut recevoir toutes les notifications de l'app (base, mises à jour,
+    // pannes, rapport PDF, envois de photos, cartes hors ligne) sans lancer le tracking GPS.
+    val appNotifsEnabled by fr.geotower.utils.AppConfig.enableAppNotifications
 
     PreferenceSwitchCard(
-        title = stringResource(R.string.appstrings_update_notif_setting_title),
-        desc = stringResource(R.string.appstrings_update_notif_setting_desc),
-        checked = updateNotifsEnabled,
+        title = stringResource(R.string.appstrings_app_notifications_title),
+        desc = stringResource(R.string.appstrings_app_notifications_desc),
+        checked = appNotifsEnabled,
         onCheckedChange = { isChecked ->
-            fr.geotower.utils.AppConfig.enableUpdateNotifications.value = isChecked
-            prefs.edit().putBoolean("enable_update_notifications", isChecked).apply()
-            UpdateCheckScheduler.onNotificationsPreferenceChanged(context, isChecked)
+            fr.geotower.utils.AppNotifications.setEnabled(context, isChecked)
 
-            // Demande la permission sur Android 13+ si on active
-            if (isChecked && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
-                if (context.checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                    (context as? android.app.Activity)?.requestPermissions(
-                        arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1003
-                    )
-                }
-            }
+            // Demande la permission sur Android 13+ si on active : c'est ce réglage qui porte
+            // désormais l'autorisation de notifier, plus la notification live.
+            if (isChecked) requestNotificationPermission()
         },
         shape = shape,
         border = border,
@@ -2730,6 +2868,31 @@ fun SectionNotifications(
         useOneUi = useOneUi
     )
     Spacer(Modifier.height(sizing.spacing(12.dp)))
+
+    // --- NOTIFICATIONS DE MISE À JOUR DE LA BASE ---
+    // Sous-réglage : sans l'interrupteur maître, il ne pourrait rien afficher.
+    val updateNotifsEnabled by fr.geotower.utils.AppConfig.enableUpdateNotifications
+
+    if (appNotifsEnabled) {
+        PreferenceSwitchCard(
+            title = stringResource(R.string.appstrings_update_notif_setting_title),
+            desc = stringResource(R.string.appstrings_update_notif_setting_desc),
+            checked = updateNotifsEnabled,
+            onCheckedChange = { isChecked ->
+                fr.geotower.utils.AppConfig.enableUpdateNotifications.value = isChecked
+                prefs.edit().putBoolean("enable_update_notifications", isChecked).apply()
+                UpdateCheckScheduler.onNotificationsPreferenceChanged(context, isChecked)
+
+                // Demande la permission sur Android 13+ si on active
+                if (isChecked) requestNotificationPermission()
+            },
+            shape = shape,
+            border = border,
+            bubbleColor = bubbleColor,
+            useOneUi = useOneUi
+        )
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
+    }
 
     // --- MODE FAIBLE CONSOMMATION (Normal / Éco / Éco+) ---
     val lowPowerLevel by AppConfig.lowPowerLevel
@@ -2811,43 +2974,41 @@ fun SectionNotifications(
     )
     Spacer(Modifier.height(sizing.spacing(12.dp)))
 
-    // --- NOTIFICATION LIVE ---
-    val liveNotifsEnabled by AppConfig.enableLiveNotifications
+    // --- SUIVI LIVE (tracking seul) ---
+    // Ce réglage ne pilote que le service de suivi : les autres notifications de l'app dépendent de
+    // l'interrupteur maître ci-dessus, et la permission POST_NOTIFICATIONS ne décide plus que de la
+    // visibilité de la notification live — le suivi tourne sans elle.
+    val liveTrackingEnabled by AppConfig.enableLiveTracking
     val isOperatorSelected = op != "Aucun"
+
+    val startLiveTracking: () -> Unit = {
+        if (LiveTrackingController.setEnabled(context, true) == LiveTrackingController.StartResult.Started &&
+            LiveTrackingController.shouldOpenPromotedNotificationSettings(context)
+        ) {
+            LiveTrackingController.openPromotedNotificationSettings(context)
+        }
+    }
+    // La permission est proposée pour que la notification live soit visible, puis le suivi démarre
+    // dans tous les cas : refuser l'affichage n'est pas refuser le suivi.
+    val liveTrackingPermissionLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        contract = androidx.activity.result.contract.ActivityResultContracts.RequestPermission()
+    ) { startLiveTracking() }
 
     fr.geotower.ui.components.LiveNotificationCard(
         title = stringResource(R.string.appstrings_live_notification_title),
         desc = if (isOperatorSelected) stringResource(R.string.appstrings_live_notification_desc) else stringResource(R.string.appstrings_live_notification_desc_nearest),
-        checked = liveNotifsEnabled,
+        checked = liveTrackingEnabled,
         onCheckedChange = { isChecked ->
-            if (isChecked) {
-                val eligibility = LiveTrackingController.eligibility(context)
-                if (
-                    eligibility == LiveTrackingController.StartResult.MissingNotifications &&
-                    android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
-                ) {
-                    (context as? android.app.Activity)?.requestPermissions(
-                        arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
-                        1004
-                    )
-                }
-
-                if (eligibility == LiveTrackingController.StartResult.Started) {
-                    AppConfig.enableLiveNotifications.value = true
-                    prefs.edit().putBoolean("enable_live_notifications", true).apply()
-                    if (LiveTrackingController.shouldOpenPromotedNotificationSettings(context)) {
-                        LiveTrackingController.openPromotedNotificationSettings(context)
-                    }
-                    LiveTrackingController.startIfEligible(context)
-                } else {
-                    AppConfig.enableLiveNotifications.value = false
-                    prefs.edit().putBoolean("enable_live_notifications", false).apply()
-                    LiveTrackingController.stop(context)
-                }
+            if (!isChecked) {
+                LiveTrackingController.setEnabled(context, false)
+            } else if (
+                android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU &&
+                LiveTrackingController.notificationPermissionMissing(context)
+            ) {
+                // Le suivi démarrera dans le callback du launcher, accord ou pas.
+                liveTrackingPermissionLauncher.launch(android.Manifest.permission.POST_NOTIFICATIONS)
             } else {
-                AppConfig.enableLiveNotifications.value = false
-                prefs.edit().putBoolean("enable_live_notifications", false).apply()
-                LiveTrackingController.stop(context)
+                startLiveTracking()
             }
         },
         enabled = true,
@@ -2857,7 +3018,7 @@ fun SectionNotifications(
         useOneUi = useOneUi
     )
 
-    if (liveNotifsEnabled) {
+    if (liveTrackingEnabled) {
         Spacer(Modifier.height(sizing.spacing(12.dp)))
         // Mode faible conso : le slider suit la valeur imposée par le niveau (grisé tant qu'il pilote).
         val intervalFloor = fr.geotower.utils.PowerProfile.liveIntervalFloorSeconds
@@ -3208,9 +3369,10 @@ fun SectionDatabase(
     context: Context,
     modifier: Modifier = Modifier,
     onLocalMode: () -> Unit = {},
-    onOutageSource: () -> Unit = {},
     safeClick: SafeClick,
-    databaseCardModifiers: Map<String, Modifier> = emptyMap()
+    databaseCardModifiers: Map<String, Modifier> = emptyMap(),
+    refreshState: DatabaseRefreshState? = null,
+    showRefreshButton: Boolean = false
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     fun cardAnchor(anchor: String): Modifier = databaseCardModifiers[anchor] ?: Modifier
@@ -3220,7 +3382,26 @@ fun SectionDatabase(
 
     // 🚀 LA CARTE DE LA BASE DE DONNÉES (Existante)
     Column(modifier = modifier.fillMaxWidth()) {
-        SectionTitle(stringResource(R.string.settings_section_database))
+        // Page unique : la section n'est pas en haut du défilement, le tirage vers le bas ne peut
+        // pas la viser — d'où le bouton posé sur son titre. Quand la section occupe la page à elle
+        // seule, c'est le tirage Material qui prend le relais (voir SettingsScreen).
+        if (showRefreshButton && refreshState != null) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp)),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = stringResource(R.string.settings_section_database),
+                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.weight(1f)
+                )
+                DatabaseSectionRefreshButton(state = refreshState, onSafeClick = safeClick)
+            }
+        } else {
+            SectionTitle(stringResource(R.string.settings_section_database))
+        }
 
         Box(modifier = cardAnchor(ANCHOR_DB_MOBILE).fillMaxWidth()) {
             fr.geotower.ui.components.DatabaseDownloadCard(
@@ -3228,7 +3409,8 @@ fun SectionDatabase(
                 shape = shape,
                 border = border,
                 bubbleColor = bubbleColor,
-                title = stringResource(R.string.settings_database_online_title)
+                title = stringResource(R.string.settings_database_online_title),
+                refreshState = refreshState
             )
         }
 
@@ -3239,7 +3421,8 @@ fun SectionDatabase(
                 useOneUi = useOneUi,
                 shape = shape,
                 border = border,
-                bubbleColor = bubbleColor
+                bubbleColor = bubbleColor,
+                refreshState = refreshState
             )
         }
 
@@ -3252,7 +3435,8 @@ fun SectionDatabase(
                 useOneUi = useOneUi,
                 shape = shape,
                 border = border,
-                bubbleColor = bubbleColor
+                bubbleColor = bubbleColor,
+                refreshState = refreshState
             )
         }
 
@@ -3263,31 +3447,19 @@ fun SectionDatabase(
                 useOneUi = useOneUi,
                 shape = shape,
                 border = border,
-                bubbleColor = bubbleColor
+                bubbleColor = bubbleColor,
+                refreshState = refreshState
             )
         }
 
-        // Provenance des données : ces deux écrans décident d'où viennent la base et les sites HS,
-        // ils appartiennent donc à cette section (et non plus « entre deux sections »).
+        // Provenance des données : un SEUL écran décide d'où viennent la base ET les sites en panne
+        // (le niveau de traitement local), leurs réglages d'exécution y sont rassemblés.
         Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
         PreferenceActionCard(
             title = stringResource(R.string.local_mode_settings_title),
             desc = stringResource(R.string.local_mode_settings_desc),
             onClick = onLocalMode,
-            shape = shape,
-            border = border,
-            bubbleColor = bubbleColor,
-            useOneUi = useOneUi,
-            safeClick = safeClick
-        )
-
-        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
-
-        PreferenceActionCard(
-            title = stringResource(R.string.outage_source_settings_title),
-            desc = stringResource(R.string.outage_source_settings_desc),
-            onClick = onOutageSource,
             shape = shape,
             border = border,
             bubbleColor = bubbleColor,

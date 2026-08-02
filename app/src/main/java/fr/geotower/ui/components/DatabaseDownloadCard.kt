@@ -45,7 +45,8 @@ fun DatabaseDownloadCard(
     border: BorderStroke?,
     bubbleColor: Color,
     title: String? = null,
-    onSafeClick: SafeClick? = null
+    onSafeClick: SafeClick? = null,
+    refreshState: DatabaseRefreshState? = null
 ) {
     val context = LocalContext.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -85,8 +86,13 @@ fun DatabaseDownloadCard(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var dbRefreshTrigger by remember { mutableIntStateOf(0) } // Déclenche le re-scan local
 
+    // Actualisation de toute la section « Base de données » (bouton ou tirage vers le bas) : une
+    // clé de plus, partagée par les quatre cartes.
+    val sectionRefreshKey = refreshState?.refreshKey ?: 0
+    DatabaseRefreshMembership(refreshState, DatabaseRefreshIds.MOBILE)
+
     // ✅ ON AJOUTE dbRefreshTrigger AUX CLÉS DE L'EFFET
-    LaunchedEffect(isSyncing, dbRefreshTrigger, txtSearching, txtUnknown, txtNoDb, txtInvalidDb, txtOldDb, featureFlags) {
+    LaunchedEffect(isSyncing, dbRefreshTrigger, sectionRefreshKey, txtSearching, txtUnknown, txtNoDb, txtInvalidDb, txtOldDb, featureFlags) {
         withContext(Dispatchers.IO) {
             fun formatVersion(raw: String?): String {
                 if (raw != null && raw.length == 13) {
@@ -214,6 +220,9 @@ fun DatabaseDownloadCard(
                 -1.0
             }
         }
+        // La carte a fini de se relire : l'indicateur de section peut s'éteindre dès que les
+        // trois autres en auront fait autant.
+        refreshState?.reportRefreshed(DatabaseRefreshIds.MOBILE, sectionRefreshKey)
     }
 
     Surface(

@@ -5,17 +5,18 @@ import android.content.SharedPreferences
 import fr.geotower.data.models.SiteHsEntity
 
 /**
- * Réglages de la génération LOCALE des pannes (vs source serveur). Persistés dans les prefs
- * partagées "settings" (même store que `last_hs_update`). Défaut : source serveur.
+ * Réglages de la récupération LOCALE des pannes (vs source serveur). Persistés dans les prefs
+ * partagées "settings" (même store que `last_hs_update`).
+ *
+ * Le CHOIX de la source ne vit plus ici : il est porté par le niveau de « Traitement local »
+ * ([fr.geotower.utils.AppConfig.outagesLocal], niveau ≥ 1), seule vérité de l'app. Cette classe ne
+ * garde que les réglages d'exécution (fréquence, arrière-plan) et le résumé de la dernière
+ * récupération. L'ancienne clé `outages_source` est migrée au démarrage puis supprimée
+ * (cf. `AppConfig.migrateLegacyOutageSourcePref`).
  */
 class OutageLocalConfig(private val prefs: SharedPreferences) {
 
     constructor(context: Context) : this(context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE))
-
-    /** true = l'app génère les pannes elle-même ; false = GeoJSON serveur (défaut). */
-    var useLocalSource: Boolean
-        get() = prefs.getString(KEY_SOURCE, SOURCE_SERVER) == SOURCE_LOCAL
-        set(value) = prefs.edit().putString(KEY_SOURCE, if (value) SOURCE_LOCAL else SOURCE_SERVER).apply()
 
     /** Fréquence (heures) : durée de validité du cache ET période de la planification en fond. */
     var frequencyHours: Int
@@ -81,14 +82,16 @@ class OutageLocalConfig(private val prefs: SharedPreferences) {
                 .map { it.key to it.value }
 
         const val PREFS_NAME = "settings"
-        const val KEY_SOURCE = "outages_source"
+
+        /** Ancienne clé du choix de source, conservée uniquement pour la migration ponctuelle. */
+        const val LEGACY_KEY_SOURCE = "outages_source"
+        const val LEGACY_SOURCE_LOCAL = "local"
+
         const val KEY_FREQUENCY_HOURS = "outages_local_frequency_hours"
         const val KEY_BACKGROUND = "outages_local_background_enabled"
         const val KEY_LAST_GENERATED = "outages_local_last_generated_at"
         const val KEY_LAST_COUNT = "outages_local_last_count"
         const val KEY_LAST_BREAKDOWN = "outages_local_last_breakdown"
-        const val SOURCE_SERVER = "server"
-        const val SOURCE_LOCAL = "local"
         const val DEFAULT_FREQUENCY_HOURS = 6
         const val MIN_FREQUENCY_HOURS = 1
         const val MAX_FREQUENCY_HOURS = 24

@@ -11,6 +11,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import fr.geotower.R
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 
 /**
@@ -125,8 +126,12 @@ object PdfReportNotifier {
         }
     }
 
-    /** Sans la permission POST_NOTIFICATIONS le rapport se génère quand même, en silence. */
+    /**
+     * Sans la permission POST_NOTIFICATIONS — ou avec les notifications de l'app coupées — le
+     * rapport se génère quand même, en silence.
+     */
     private fun notifySafely(context: Context, id: Int, notification: android.app.Notification) {
+        if (!AppNotifications.canPost(context)) return
         runCatching { notificationManager(context).notify(id, notification) }
             .onFailure { AppLogger.w(TAG, "Report PDF notification failed", it) }
     }

@@ -25,6 +25,7 @@ import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DbOperationTimings
 import android.content.pm.ServiceInfo
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 import kotlinx.coroutines.CancellationException
 import java.util.concurrent.TimeUnit
@@ -92,6 +93,10 @@ class DatabaseDownloadWorker(
     }
 
     private fun notifySafely(id: Int, notification: android.app.Notification) {
+        // Les notifications de fin obéissent à l'interrupteur maître des notifications ; celle de
+        // progression est celle du service de premier plan, imposée par Android tant que le
+        // téléchargement tourne, et elle disparaît avec lui.
+        if (id != notificationId && !AppNotifications.canPost(context)) return
         runCatching {
             notificationManager.notify(id, notification)
         }.onFailure { error ->

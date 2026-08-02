@@ -259,6 +259,8 @@ fun ThroughputCalculatorScreen(
     var includePlanned by remember { mutableStateOf(ThroughputPrefs.includePlanned.read(prefs)) }
     var pageSiteThroughputCalculator by remember { mutableStateOf(SitePagePrefs.throughputCalculator.read(prefs)) }
     var showThroughputSettingsSheet by remember { mutableStateOf(false) }
+    // Bloc visé par un appui long : le panneau défile jusqu'à sa ligne et la met en surbrillance.
+    var settingsHighlightBlock by remember { mutableStateOf<String?>(null) }
     var showThroughputDefaultsSheet by remember { mutableStateOf(false) }
     var throughputDefaultsVersion by remember { mutableStateOf(0) }
     val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -362,12 +364,17 @@ fun ThroughputCalculatorScreen(
                                 coneMapView = coneMapView
                             )
                         }
-                        IconButton(onClick = { showThroughputSettingsSheet = true }) {
-                            Icon(
-                                Icons.Default.Settings,
-                                contentDescription = stringResource(R.string.settings_pages_customization_title),
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
+                        fr.geotower.ui.components.PageCustomizationHint(
+                            page = fr.geotower.utils.PageScrollPrefs.THROUGHPUT_CALCULATOR,
+                            onOpenSettings = { settingsHighlightBlock = null; showThroughputSettingsSheet = true }
+                        ) {
+                            IconButton(onClick = { settingsHighlightBlock = null; showThroughputSettingsSheet = true }) {
+                                Icon(
+                                    Icons.Default.Settings,
+                                    contentDescription = stringResource(R.string.settings_pages_customization_title),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
                     }
                 )
@@ -430,7 +437,15 @@ fun ThroughputCalculatorScreen(
                 result = result,
                 blockOrder = throughputBlockOrder,
                 visibleBlocks = visibleThroughputBlocks,
-                onConeMapReady = { coneMapView = it }
+                onConeMapReady = { coneMapView = it },
+                onCustomizeBlock = { blockId ->
+                    settingsHighlightBlock = blockId
+                    showThroughputSettingsSheet = true
+                },
+                onOpenPageSettings = {
+                    settingsHighlightBlock = null
+                    showThroughputSettingsSheet = true
+                }
             )
         }
     }
@@ -491,11 +506,12 @@ fun ThroughputCalculatorScreen(
                 showThroughputSettingsSheet = false
                 showThroughputDefaultsSheet = true
             },
-            onDismiss = { showThroughputSettingsSheet = false },
-            onBack = { showThroughputSettingsSheet = false },
+            onDismiss = { showThroughputSettingsSheet = false; settingsHighlightBlock = null },
+            onBack = { showThroughputSettingsSheet = false; settingsHighlightBlock = null },
             sheetState = settingsSheetState,
             useOneUi = uiStyle.useOneUi,
-            bubbleColor = uiStyle.bubbleColor
+            bubbleColor = uiStyle.bubbleColor,
+            highlightBlockId = settingsHighlightBlock
         )
     }
 
@@ -575,7 +591,9 @@ private fun ThroughputContent(
     result: ThroughputResult,
     blockOrder: List<ThroughputBlock>,
     visibleBlocks: Map<ThroughputBlock, Boolean>,
-    onConeMapReady: (org.osmdroid.views.MapView) -> Unit
+    onConeMapReady: (org.osmdroid.views.MapView) -> Unit,
+    onCustomizeBlock: (String) -> Unit,
+    onOpenPageSettings: () -> Unit
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val scrollState = rememberScrollState()
@@ -598,6 +616,7 @@ private fun ThroughputContent(
     ) {
         blockOrder.forEach { block ->
             if (visibleBlocks[block] != true) return@forEach
+            fr.geotower.ui.components.CustomizableBlock(block.id, onCustomizeBlock, spacing = 0.dp) {
             when (block) {
                 ThroughputBlock.Header -> ThroughputHeaderCard(site, physique, cardBgColor, blockShape)
                 ThroughputBlock.Summary -> ThroughputSummaryCard(result, cardBgColor, blockShape)
@@ -638,7 +657,9 @@ private fun ThroughputContent(
                 }
                 ThroughputBlock.Assumptions -> ThroughputAssumptionsCard(result, cardBgColor, blockShape)
             }
+            }
         }
+        fr.geotower.ui.components.PageCustomizationFooter(onClick = onOpenPageSettings)
         Spacer(Modifier.height(sizing.spacing(8.dp)))
     }
     PageScrollEdgeButtons(PageScrollPrefs.THROUGHPUT_CALCULATOR, scrollState)

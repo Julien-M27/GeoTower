@@ -35,7 +35,7 @@ data class AppReleaseInfo(
 }
 
 object AppUpdateChecker {
-    private const val LATEST_APP_RELEASE_URL = "https://api.cajejuma.fr/api/v2/app/latest"
+    private const val LATEST_APP_RELEASE_URL = "https://api.geotower.fr/api/v2/app/latest"
     private val VERSION_NUMBER_REGEX = Regex("\\d+")
     private val OFFICIAL_DOWNLOAD_URLS = listOf(
         OfficialDownloadUrl(
@@ -43,7 +43,7 @@ object AppUpdateChecker {
             pathPrefixes = listOf("/app/share/2149816/6d30423f-ac8b-4509-9857-86684d3a2e03")
         ),
         OfficialDownloadUrl(
-            host = "api.cajejuma.fr",
+            host = "api.geotower.fr",
             pathPrefixes = listOf("/downloads/geotower/")
         ),
         OfficialDownloadUrl(

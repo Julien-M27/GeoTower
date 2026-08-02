@@ -39,6 +39,7 @@ import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VerticalAlignTop
+import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
@@ -135,6 +136,9 @@ fun SupportDetailScreen(
     photoDraftId: String? = null,
     isSplitScreen: Boolean = false,
     onCloseSplitScreen: () -> Unit = {},
+    // Mode simplifié : opérateur à déplier d'emblée (notification, widget, lien profond ou
+    // historique qui visait auparavant la fiche site autonome). Sans lui, on ouvre le premier.
+    expandAntennaId: String? = null,
     onAntennaClick: (String) -> Unit = {}
 ) {
     SecureScreenEffect(RemoteFeatureFlags.SecureScreens.SUPPORT_DETAIL)
@@ -194,6 +198,19 @@ fun SupportDetailScreen(
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val pageSettingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showSupportSettingsSheet by remember { mutableStateOf(false) }
+    // Bloc visé par un appui long : le panneau défile jusqu'à sa ligne et la met en surbrillance.
+    var settingsHighlightBlock by remember { mutableStateOf<String?>(null) }
+    val onCustomizeBlock: (String) -> Unit = { blockId ->
+        settingsHighlightBlock = blockId
+        showSupportSettingsSheet = true
+    }
+    /**
+     * Vrai pour les blocs qui, en mode simplifié, contiennent des fiches dépliées possédant leurs
+     * propres blocs personnalisables. L'appui long y est laissé à l'enfant, sinon deux panneaux
+     * s'ouvrent l'un après l'autre (la détection se fait en passe Initial, du parent vers l'enfant).
+     */
+    fun blockOwnsEmbeddedFiches(blockId: String): Boolean =
+        blockId == "operators" && AppConfig.simpleModeActive()
     var showSupportMiniMapSettingsSheet by remember { mutableStateOf(false) }
     var showSupportPhotosSettingsSheet by remember { mutableStateOf(false) }
     var showCommunityDataSettingsSheet by remember { mutableStateOf(false) }
@@ -539,6 +556,11 @@ fun SupportDetailScreen(
     var showOpenMap by remember { mutableStateOf(SupportPagePrefs.openMap.read(prefs)) }
     var showNav by remember { mutableStateOf(SupportPagePrefs.nav.read(prefs)) }
     var showShare by remember { mutableStateOf(SupportPagePrefs.share.read(prefs)) }
+
+    // « Partager tous les opérateurs » réutilise l'export PDF du bloc « Partager » : ce compteur le
+    // déclenche à distance. Sans ce bloc à l'écran, SupportShareMenu n'est pas composé et le bouton
+    // ne mène nulle part — d'où la garde côté liste des opérateurs.
+    var supportPdfExportRequest by remember { mutableIntStateOf(0) }
     var showOperators by remember { mutableStateOf(SupportPagePrefs.operators.read(prefs)) }
     val mapFrequencyFilter = if (applyMapFilters) FrequencyFilterSelection.fromMapConfig() else null
     val frequencyMatchedOperatorKeys = remember(antennas, mapFrequencyFilter) {
@@ -661,14 +683,27 @@ fun SupportDetailScreen(
                     backgroundColor = mainBgColor,
                     backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
                     actions = {
-                        IconButton(
-                            onClick = { safeClick { showSupportSettingsSheet = true } }
+                        fr.geotower.ui.components.PageCustomizationHint(
+                            page = fr.geotower.utils.PageScrollPrefs.SUPPORT,
+                            onOpenSettings = { safeClick { settingsHighlightBlock = null; showSupportSettingsSheet = true } }
                         ) {
-                            Icon(
-                                Icons.Default.Settings,
-                                contentDescription = stringResource(R.string.appstrings_settings_title),
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
+                            IconButton(
+                                onClick = { safeClick { settingsHighlightBlock = null; showSupportSettingsSheet = true } }
+                            ) {
+                                // En mode simplifié, une roue dentée se lit « réglages de l'app »
+                                // alors qu'elle ne règle que la mise en page de CETTE fiche. Des
+                                // blocs empilés le disent mieux. (Les blocs des opérateurs, eux,
+                                // se personnalisent depuis le pied de leur section dépliée.)
+                                Icon(
+                                    if (AppConfig.simpleModeActive()) {
+                                        Icons.Outlined.ViewAgenda
+                                    } else {
+                                        Icons.Default.Settings
+                                    },
+                                    contentDescription = stringResource(R.string.settings_pages_customization_title),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
                     }
                 )
@@ -680,18 +715,24 @@ fun SupportDetailScreen(
                         key = "support_detail"
                     ),
                     currentRouteKeys = setOf("support_detail", "site_detail", "site_detail_from_map"),
-                    impliedParentItems = listOf(
-                        GeoTowerBreadcrumbItem(
-                            label = txtHomeTitle,
-                            icon = Icons.Default.Home,
-                            onClick = {
-                                if (isSplitScreen) onCloseSplitScreen()
-                                navController.navigate("home") {
-                                    launchSingleTop = true
-                                }
-                            },
-                            key = "home"
-                        ),
+                    impliedParentItems = listOfNotNull(
+                        // Le mode simplifié n'a pas d'accueil : le fil d'Ariane commence à la
+                        // carte (ou à « À proximité »), pas sur une page qui n'existe plus.
+                        if (AppConfig.simpleModeActive()) {
+                            null
+                        } else {
+                            GeoTowerBreadcrumbItem(
+                                label = txtHomeTitle,
+                                icon = Icons.Default.Home,
+                                onClick = {
+                                    if (isSplitScreen) onCloseSplitScreen()
+                                    navController.navigate("home") {
+                                        launchSingleTop = true
+                                    }
+                                },
+                                key = "home"
+                            )
+                        },
                         if (applyMapFilters) {
                             GeoTowerBreadcrumbItem(
                                 label = txtMapTitle,
@@ -774,6 +815,14 @@ fun SupportDetailScreen(
                     Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
 
                     pageSupportOrder.forEach { block ->
+                        // spacing = 0 : sur cette page, chaque bloc porte déjà sa propre marge.
+                        // Bloc « operators » en mode simplifié : son contenu est fait de fiches
+                        // opérateur qui ont déjà leurs propres blocs personnalisables. Comme
+                        // l'appui long est détecté en passe Initial (parent AVANT enfant), garder
+                        // le sien ici ouvrait DEUX panneaux à la suite. Le bloc laisse donc la
+                        // main : le panneau qui s'ouvre est celui du bloc réellement visé.
+                        val blockCustomize = if (blockOwnsEmbeddedFiches(block)) null else onCustomizeBlock
+                        fr.geotower.ui.components.CustomizableBlock(block, blockCustomize, spacing = 0.dp) {
                         when (block) {
                             "map" -> {
                                 if (showMap) {
@@ -864,7 +913,16 @@ fun SupportDetailScreen(
                                 }
                             }
                         }
+                        }
                     }
+
+                    fr.geotower.ui.components.PageCustomizationFooter(
+                        onClick = {
+                            settingsHighlightBlock = null
+                            showSupportSettingsSheet = true
+                        },
+                        modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))
+                    )
 
                     Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
                         fr.geotower.ui.components.SupportRadioPresenceCard(
@@ -918,6 +976,14 @@ fun SupportDetailScreen(
                     }
 
                     pageSupportOrder.forEach { block ->
+                        // spacing = 0 : sur cette page, chaque bloc porte déjà sa propre marge.
+                        // Bloc « operators » en mode simplifié : son contenu est fait de fiches
+                        // opérateur qui ont déjà leurs propres blocs personnalisables. Comme
+                        // l'appui long est détecté en passe Initial (parent AVANT enfant), garder
+                        // le sien ici ouvrait DEUX panneaux à la suite. Le bloc laisse donc la
+                        // main : le panneau qui s'ouvre est celui du bloc réellement visé.
+                        val blockCustomize = if (blockOwnsEmbeddedFiches(block)) null else onCustomizeBlock
+                        fr.geotower.ui.components.CustomizableBlock(block, blockCustomize, spacing = 0.dp) {
                         when (block) {
                             "map" -> {
                                 if (showMap) {
@@ -1028,13 +1094,17 @@ fun SupportDetailScreen(
                                             buttonShape = buttonShape,
                                             globalMapRef = globalMapRef,
                                             communityPhotos = communityPhotos,
-                                            radioMarkers = radioSupportMarkers
+                                            radioMarkers = radioSupportMarkers,
+                                            pdfExportRequest = supportPdfExportRequest
                                         )
                                     }
                                 }
                             }
                             "operators" -> {
                                 if (showOperators) {
+                                    // Mode simplifié : les opérateurs se déplient ici même au lieu
+                                    // d'ouvrir la fiche site — c'est tout l'objet du mode.
+                                    val expandOperators = AppConfig.simpleModeActive()
                                     fr.geotower.ui.components.OperatorsListSection(
                                         antennas = antennas,
                                         techniques = techniquesMap,
@@ -1044,6 +1114,24 @@ fun SupportDetailScreen(
                                         useOneUi = useOneUi,
                                         priorityOperatorKey = priorityOperatorKey,
                                         activeOperatorKeys = activeOperatorKeys,
+                                        expandable = expandOperators,
+                                        initialExpandedAntennaId = expandAntennaId,
+                                        // Nul si le bloc « Partager » est masqué : l'export vit
+                                        // dans SupportShareMenu, qui ne serait alors pas composé.
+                                        onShareAllOperators = if (showShare && canUseSupportShare) {
+                                            { safeClick { supportPdfExportRequest++ } }
+                                        } else {
+                                            null
+                                        },
+                                        expandedContent = { antenna ->
+                                            SiteDetailScreen(
+                                                navController = navController,
+                                                repository = repository,
+                                                antennaId = antenna.idAnfr,
+                                                applyMapFilters = applyMapFilters,
+                                                embedded = true
+                                            )
+                                        },
                                         onAntennaClick = { idAnfr ->
                                             safeClick {
                                                 onAntennaClick(idAnfr)
@@ -1053,14 +1141,38 @@ fun SupportDetailScreen(
                                 }
                             }
                         }
+                        }
                     }
+
+                    fr.geotower.ui.components.PageCustomizationFooter(
+                        onClick = {
+                            settingsHighlightBlock = null
+                            showSupportSettingsSheet = true
+                        },
+                        modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))
+                    )
 
                     if (radioSupportMarkers.isNotEmpty()) {
                         Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
+                            // Mode simplifié : les stations non mobiles du pylône (TV, radio FM,
+                            // faisceaux, réseaux privés) se déplient ici comme les opérateurs.
+                            val expandRadioStations = AppConfig.simpleModeActive()
                             fr.geotower.ui.components.SupportRadioPresenceCard(
                                 radioMarkers = radioSupportMarkers,
                                 cardBgColor = cardBgColor,
                                 blockShape = blockShape,
+                                expandable = expandRadioStations,
+                                expandedContent = { marker ->
+                                    if (marker.stationId.isNotBlank() && marker.supportId.isNotBlank()) {
+                                        RadioSiteDetailScreen(
+                                            navController = navController,
+                                            radioRepository = radioRepository,
+                                            stationId = marker.stationId,
+                                            supportId = marker.supportId,
+                                            embedded = true
+                                        )
+                                    }
+                                },
                                 onRadioClick = { marker ->
                                     safeClick {
                                         if (marker.stationId.isNotBlank() && marker.supportId.isNotBlank()) {
@@ -1138,11 +1250,12 @@ fun SupportDetailScreen(
                     showSupportSettingsSheet = false
                     showSupportPhotosSettingsSheet = true
                 },
-                onDismiss = { showSupportSettingsSheet = false },
-                onBack = { showSupportSettingsSheet = false },
+                onDismiss = { showSupportSettingsSheet = false; settingsHighlightBlock = null },
+                onBack = { showSupportSettingsSheet = false; settingsHighlightBlock = null },
                 sheetState = pageSettingsSheetState,
                 useOneUi = uiStyle.useOneUi,
-                bubbleColor = uiStyle.bubbleColor
+                bubbleColor = uiStyle.bubbleColor,
+                highlightBlockId = settingsHighlightBlock
             )
         }
 

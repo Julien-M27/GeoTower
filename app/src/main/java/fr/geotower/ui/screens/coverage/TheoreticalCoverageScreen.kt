@@ -273,11 +273,16 @@ fun TheoreticalCoverageScreen(
                     backgroundColor = mainBgColor,
                     backEnabled = !safeBack.isLocked,
                     actions = {
-                        IconButton(onClick = { showSettings = true }) {
-                            Icon(
-                                Icons.Default.Settings,
-                                contentDescription = stringResource(R.string.appstrings_coverage_settings_title)
-                            )
+                        fr.geotower.ui.components.PageCustomizationHint(
+                            page = fr.geotower.utils.PageScrollPrefs.COVERAGE,
+                            onOpenSettings = { showSettings = true }
+                        ) {
+                            IconButton(onClick = { showSettings = true }) {
+                                Icon(
+                                    Icons.Default.Settings,
+                                    contentDescription = stringResource(R.string.appstrings_coverage_settings_title)
+                                )
+                            }
                         }
                     }
                 )
@@ -501,6 +506,8 @@ fun TheoreticalCoverageScreen(
                 style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+
+            fr.geotower.ui.components.PageCustomizationFooter(onClick = { showSettings = true })
         }
         PageScrollEdgeButtons(PageScrollPrefs.COVERAGE, scrollState)
         }

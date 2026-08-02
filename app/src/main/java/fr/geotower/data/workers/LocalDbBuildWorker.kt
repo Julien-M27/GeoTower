@@ -26,6 +26,7 @@ import fr.geotower.data.build.LocalDbBuildPipeline
 import fr.geotower.data.build.labelRes
 import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
@@ -243,6 +244,9 @@ class LocalDbBuildWorker(
     }
 
     private fun notifySafely(id: Int, notification: android.app.Notification) {
+        // La notification de fin suit l'interrupteur maître des notifications ; celle de progression
+        // est celle du service de premier plan, imposée par Android pendant la génération.
+        if (id != PROGRESS_NOTIFICATION_ID && !AppNotifications.canPost(context)) return
         runCatching { notificationManager.notify(id, notification) }
             .onFailure { AppLogger.w(TAG, "Local build notification failed", it) }
     }

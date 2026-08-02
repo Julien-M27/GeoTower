@@ -20,7 +20,10 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -72,6 +75,7 @@ import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
+import androidx.compose.ui.unit.Dp
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
@@ -169,6 +173,91 @@ import androidx.compose.ui.res.stringResource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+/** Hauteur de l'espace réservé aux chargements en mode inséré (pas de `fillMaxSize` possible). */
+private val EMBEDDED_PLACEHOLDER_HEIGHT = 160.dp
+
+/**
+ * Blocs de la fiche site retirés en mode inséré : la fiche support les affiche déjà une fois,
+ * au-dessus de la liste des opérateurs. Les répéter sous chaque opérateur n'apporterait rien.
+ */
+private val EMBEDDED_HIDDEN_BLOCKS = setOf(
+    "operator",        // la ligne dépliable porte déjà le nom et le logo de l'opérateur
+    "map",             // mini-carte du support
+    "open_map",        // bouton « ouvrir la carte »
+    "support_details", // caractéristiques du pylône
+    "nav",             // navigation vers le site
+    "address"          // adresse du support
+)
+
+/**
+ * Scaffold de la fiche site, sauf en mode inséré : un Scaffold imbriqué dans un contenu défilant
+ * se mesure en `fillMaxSize` et ajouterait une seconde barre de titre.
+ */
+@Composable
+private fun SiteDetailScaffold(
+    embedded: Boolean,
+    containerColor: Color,
+    topBar: @Composable () -> Unit,
+    content: @Composable (PaddingValues) -> Unit
+) {
+    if (embedded) {
+        content(PaddingValues(0.dp))
+    } else {
+        Scaffold(containerColor = containerColor, topBar = topBar, content = content)
+    }
+}
+
+/**
+ * Conteneur du contenu de la fiche site.
+ *
+ * En mode inséré : simple colonne, sans défilement propre — c'est la fiche support qui défile, et
+ * deux défilements verticaux imbriqués font mesurer l'enfant avec une hauteur infinie (plantage).
+ * Le tiré-pour-rafraîchir et les boutons de bord disparaissent avec lui, ils appartiennent à la
+ * page hôte.
+ */
+@Composable
+private fun SiteDetailScrollContainer(
+    embedded: Boolean,
+    isRefreshing: Boolean,
+    onRefresh: () -> Unit,
+    refreshEnabled: Boolean,
+    scrollState: ScrollState,
+    background: Color,
+    topPadding: Dp,
+    contentPadding: Dp,
+    content: @Composable ColumnScope.() -> Unit
+) {
+    if (embedded) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = contentPadding),
+            verticalArrangement = Arrangement.Top,
+            content = content
+        )
+        return
+    }
+
+    GeoTowerPullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        enabled = refreshEnabled,
+        modifier = Modifier.padding(top = topPadding).fillMaxSize().background(background)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .geoTowerFadingEdge(scrollState)
+                .pageScrollbar(PageScrollPrefs.SITE, scrollState)
+                .verticalScroll(scrollState)
+                .padding(contentPadding),
+            // L'espacement est porté par chaque CustomizableBlock, pour qu'un bloc masqué
+            // ne laisse aucun trou (voir CustomizableBlock).
+            verticalArrangement = Arrangement.Top,
+            content = content
+        )
+        PageScrollEdgeButtons(PageScrollPrefs.SITE, scrollState)
+    }
+}
+
 private const val TAG_SITE_DETAIL = "GeoTower"
 private const val TAG_SPEEDTEST = "GeoTowerUpload"
 private const val SIGNAL_QUEST_PACKAGE_NAME = "com.sfrmap.android"
@@ -185,7 +274,13 @@ fun SiteDetailScreen(
     isSplitScreen: Boolean = false,
     onCloseSplitScreen: () -> Unit = {},
     onOpenElevationProfile: ((String) -> Unit)? = null,
-    onOpenThroughputCalculator: ((String) -> Unit)? = null
+    onOpenThroughputCalculator: ((String) -> Unit)? = null,
+    // Mode « inséré » (accordéon de la fiche support en mode simplifié) : l'écran perd sa barre
+    // de titre, son fil d'Ariane, son tiré-pour-rafraîchir et surtout son propre défilement —
+    // deux défilements verticaux imbriqués font mesurer le contenu avec une hauteur infinie.
+    // Les blocs de niveau support (adresse, GPS, propriétaire…) sont aussi retirés : la fiche
+    // support les affiche déjà une fois au-dessus, les répéter par opérateur n'a pas de sens.
+    embedded: Boolean = false
 ) {
     SecureScreenEffect(RemoteFeatureFlags.SecureScreens.SITE_DETAIL)
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -221,10 +316,14 @@ fun SiteDetailScreen(
                         }
                     }
 
-                    prefs.edit()
-                        .putFloat("clicked_lat", site!!.latitude.toFloat())
-                        .putFloat("clicked_lon", site.longitude.toFloat())
-                        .apply()
+                    // Inséré : le dernier point cliqué appartient à la fiche support, qui s'en sert
+                    // pour sa distance. Une section opérateur dépliée n'a pas à le réécrire.
+                    if (!embedded) {
+                        prefs.edit()
+                            .putFloat("clicked_lat", site!!.latitude.toFloat())
+                            .putFloat("clicked_lon", site.longitude.toFloat())
+                            .apply()
+                    }
                 }
             } catch (e: Exception) { AppLogger.w(TAG_SITE_DETAIL, "Site selection restore failed", e) }
         }
@@ -232,7 +331,15 @@ fun SiteDetailScreen(
     }
 
     if (!isReady) {
-        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+        Box(
+            // Inséré : hauteur bornée, un fillMaxSize dans un parent défilant se mesure à l'infini.
+            modifier = if (embedded) {
+                Modifier.fillMaxWidth().height(EMBEDDED_PLACEHOLDER_HEIGHT)
+            } else {
+                Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)
+            },
+            contentAlignment = Alignment.Center
+        ) {
             GeoTowerLoadingMessage(
                 title = stringResource(R.string.appstrings_site_detail_loading_title),
                 detail = stringResource(R.string.appstrings_site_detail_loading_desc)
@@ -549,32 +656,65 @@ fun SiteDetailScreen(
         }
     }
 
+    // --- VISIBILITÉ DES BLOCS, PAR MODE ---
+    // Inséré (section opérateur du mode simplifié) : chaque bloc a sa propre clé, suffixée
+    // « _simple ». Cette section est un résumé, plusieurs blocs y sont masqués par défaut, et la
+    // régler ne doit pas dérégler la fiche site autonome. Défaut d'une clé encore absente :
+    // « masqué » pour les blocs de détail, sinon la valeur déjà choisie sur la fiche autonome.
+    fun blockVisibilityKey(prefKey: String): String =
+        if (embedded) prefKey + SitePagePrefs.EMBEDDED_SUFFIX else prefKey
+
+    fun readBlockVisibility(blockId: String, prefKey: String, standaloneValue: Boolean): Boolean {
+        if (!embedded) return standaloneValue
+        val fallback = if (blockId in SitePagePrefs.embeddedHiddenByDefault) false else standaloneValue
+        return prefs.getBoolean(prefKey + SitePagePrefs.EMBEDDED_SUFFIX, fallback)
+    }
+
     // 🚨 MODIFICATION : L'ordre par défaut (photos, speedtest, nav, share...)
+    // L'ORDRE reste commun aux deux modes : seule la visibilité diffère.
     var pageSiteOrder by remember {
         mutableStateOf(SitePagePrefs.order(prefs))
     }
-    var showOperator by remember { mutableStateOf(SitePagePrefs.operator.read(prefs)) }
-    var showBearingHeight by remember { mutableStateOf(SitePagePrefs.bearingHeight.read(prefs)) }
-    var showMap by remember { mutableStateOf(SitePagePrefs.map.read(prefs)) }
-    var showSupportDetails by remember { mutableStateOf(SitePagePrefs.supportDetails.read(prefs)) }
-    val showPhotos by AppConfig.siteShowPhotos
-    var showPanelHeights by remember { mutableStateOf(SitePagePrefs.panelHeights.read(prefs)) }
-    var showIds by remember { mutableStateOf(SitePagePrefs.ids.read(prefs)) }
-    var showNetworkIds by remember { mutableStateOf(SitePagePrefs.networkIds.read(prefs)) }
-    var showOpenMap by remember { mutableStateOf(SitePagePrefs.openMap.read(prefs)) }
-    var showElevationProfile by remember { mutableStateOf(SitePagePrefs.elevationProfile.read(prefs)) }
-    var showTheoreticalCoverage by remember { mutableStateOf(SitePagePrefs.theoreticalCoverage.read(prefs)) }
-    var showThroughputCalculator by remember { mutableStateOf(SitePagePrefs.throughputCalculator.read(prefs)) }
-    var showNav by remember { mutableStateOf(SitePagePrefs.nav.read(prefs)) }
-    var showShare by remember { mutableStateOf(SitePagePrefs.share.read(prefs)) }
-    var showDates by remember { mutableStateOf(SitePagePrefs.dates.read(prefs)) }
-    var showAddress by remember { mutableStateOf(SitePagePrefs.address.read(prefs)) }
-    var showFreqs by remember { mutableStateOf(SitePagePrefs.freqs.read(prefs)) }
-    var showLinks by remember { mutableStateOf(SitePagePrefs.links.read(prefs)) }
+    var showOperator by remember { mutableStateOf(readBlockVisibility("operator", SitePagePrefs.operator.key, SitePagePrefs.operator.read(prefs))) }
+    var showBearingHeight by remember { mutableStateOf(readBlockVisibility("bearing_height", SitePagePrefs.bearingHeight.key, SitePagePrefs.bearingHeight.read(prefs))) }
+    var showMap by remember { mutableStateOf(readBlockVisibility("map", SitePagePrefs.map.key, SitePagePrefs.map.read(prefs))) }
+    var showSupportDetails by remember { mutableStateOf(readBlockVisibility("support_details", SitePagePrefs.supportDetails.key, SitePagePrefs.supportDetails.read(prefs))) }
+    var showPanelHeights by remember { mutableStateOf(readBlockVisibility("panel_heights", SitePagePrefs.panelHeights.key, SitePagePrefs.panelHeights.read(prefs))) }
+    var showIds by remember { mutableStateOf(readBlockVisibility("ids", SitePagePrefs.ids.key, SitePagePrefs.ids.read(prefs))) }
+    var showNetworkIds by remember { mutableStateOf(readBlockVisibility("network_ids", SitePagePrefs.networkIds.key, SitePagePrefs.networkIds.read(prefs))) }
+    var showOpenMap by remember { mutableStateOf(readBlockVisibility("open_map", SitePagePrefs.openMap.key, SitePagePrefs.openMap.read(prefs))) }
+    var showElevationProfile by remember { mutableStateOf(readBlockVisibility("elevation_profile", SitePagePrefs.elevationProfile.key, SitePagePrefs.elevationProfile.read(prefs))) }
+    var showTheoreticalCoverage by remember { mutableStateOf(readBlockVisibility("theoretical_coverage", SitePagePrefs.theoreticalCoverage.key, SitePagePrefs.theoreticalCoverage.read(prefs))) }
+    var showThroughputCalculator by remember { mutableStateOf(readBlockVisibility("throughput_calculator", SitePagePrefs.throughputCalculator.key, SitePagePrefs.throughputCalculator.read(prefs))) }
+    var showNav by remember { mutableStateOf(readBlockVisibility("nav", SitePagePrefs.nav.key, SitePagePrefs.nav.read(prefs))) }
+    var showShare by remember { mutableStateOf(readBlockVisibility("share", SitePagePrefs.share.key, SitePagePrefs.share.read(prefs))) }
+    var showDates by remember { mutableStateOf(readBlockVisibility("dates", SitePagePrefs.dates.key, SitePagePrefs.dates.read(prefs))) }
+    var showAddress by remember { mutableStateOf(readBlockVisibility("address", SitePagePrefs.address.key, SitePagePrefs.address.read(prefs))) }
+    var showFreqs by remember { mutableStateOf(readBlockVisibility("freqs", SitePagePrefs.freqs.key, SitePagePrefs.freqs.read(prefs))) }
+    var showLinks by remember { mutableStateOf(readBlockVisibility("links", SitePagePrefs.links.key, SitePagePrefs.links.read(prefs))) }
+
+    // Photos, statut et speedtest sont portés par des états globaux d'AppConfig (partagés avec le
+    // partage et le rapport PDF) : en mode inséré on leur superpose un état local, pour ne pas
+    // masquer ces blocs ailleurs dans l'app.
+    val photosStandalone by AppConfig.siteShowPhotos
+    val statusStandalone by AppConfig.siteShowStatus
+    val speedtestStandalone by AppConfig.siteShowSpeedtest
+    var showPhotosEmbedded by remember { mutableStateOf(readBlockVisibility("photos", "site_show_photos", photosStandalone)) }
+    var showStatusEmbedded by remember { mutableStateOf(readBlockVisibility("status", "site_show_status", statusStandalone)) }
+    var showSpeedtestEmbedded by remember { mutableStateOf(readBlockVisibility("speedtest", "site_show_speedtest", speedtestStandalone)) }
+    val showPhotos = if (embedded) showPhotosEmbedded else photosStandalone
+    val showStatus = if (embedded) showStatusEmbedded else statusStandalone
+    val showSpeedtest = if (embedded) showSpeedtestEmbedded else speedtestStandalone
 
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val pageSettingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showSiteSettingsSheet by remember { mutableStateOf(false) }
+    // Bloc visé par un appui long : le panneau défile jusqu'à sa ligne et la met en surbrillance.
+    var settingsHighlightBlock by remember { mutableStateOf<String?>(null) }
+    val onCustomizeBlock: (String) -> Unit = { blockId ->
+        settingsHighlightBlock = blockId
+        showSiteSettingsSheet = true
+    }
     var showSpeedtestsSettingsSheet by remember { mutableStateOf(false) }
     var showSiteMiniMapSettingsSheet by remember { mutableStateOf(false) }
     var showSiteFreqSettingsSheet by remember { mutableStateOf(false) }
@@ -725,13 +865,14 @@ fun SiteDetailScreen(
     }
 
     // 🚀 CHARGEMENT DU SPEEDTEST (Signal Quest) - Séparé pour plus de stabilité
-    LaunchedEffect(antenna?.idAnfr, antenna?.operateur, physique?.idSupport, speedtestBestMetric, refreshTrigger, featureFlags) {
+    LaunchedEffect(antenna?.idAnfr, antenna?.operateur, physique?.idSupport, speedtestBestMetric, refreshTrigger, featureFlags, showSpeedtest) {
         val currentAntenna = antenna
         val currentPhysique = physique
         if (currentAntenna == null || currentAntenna.idAnfr.isBlank()) return@LaunchedEffect
 
         if (
-            fr.geotower.utils.AppConfig.siteShowSpeedtest.value &&
+            // Bloc masqué (défaut d'une section opérateur) : pas d'appel réseau inutile.
+            showSpeedtest &&
             canUseSiteSpeedtests &&
             SignalQuestOperators.supportsSpeedtests(currentAntenna.operateur) &&
             CommunityDataPreferences.isSignalQuestSpeedtestEnabled(prefs, currentAntenna.operateur)
@@ -880,11 +1021,15 @@ fun SiteDetailScreen(
     }
 
     // ✅ 2. ON GÈRE LE BOUTON RETOUR PHYSIQUE ICI
-    androidx.activity.compose.BackHandler(enabled = isSplitScreen || !safeBackNavigation.isLocked) {
+    // Inséré : c'est la fiche support qui possède le retour, pas chaque section opérateur.
+    androidx.activity.compose.BackHandler(
+        enabled = !embedded && (isSplitScreen || !safeBackNavigation.isLocked)
+    ) {
         handleBackNavigation()
     }
 
-    Scaffold(
+    SiteDetailScaffold(
+        embedded = embedded,
         containerColor = mainBgColor,
         topBar = {
             Column(modifier = Modifier.background(mainBgColor)) {
@@ -893,12 +1038,17 @@ fun SiteDetailScreen(
                     backgroundColor = mainBgColor,
                     backEnabled = isSplitScreen || !safeBackNavigation.isLocked,
                     actions = {
-                        IconButton(onClick = { safeClick { showSiteSettingsSheet = true } }) {
-                            Icon(
-                                Icons.Default.Settings,
-                                contentDescription = stringResource(R.string.appstrings_settings_title),
-                                tint = MaterialTheme.colorScheme.onSurface
-                            )
+                        fr.geotower.ui.components.PageCustomizationHint(
+                            page = fr.geotower.utils.PageScrollPrefs.SITE,
+                            onOpenSettings = { safeClick { settingsHighlightBlock = null; showSiteSettingsSheet = true } }
+                        ) {
+                            IconButton(onClick = { safeClick { settingsHighlightBlock = null; showSiteSettingsSheet = true } }) {
+                                Icon(
+                                    Icons.Default.Settings,
+                                    contentDescription = stringResource(R.string.appstrings_settings_title),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
                     }
                 ) {
@@ -924,13 +1074,19 @@ fun SiteDetailScreen(
                         key = "site_detail"
                     ),
                     currentRouteKeys = setOf("site_detail", "site_detail_from_map"),
-                    impliedParentItems = listOf(
-                        GeoTowerBreadcrumbItem(
-                            label = txtHomeTitle,
-                            icon = Icons.Default.Home,
-                            onClick = { navigateToBreadcrumbParent("home") },
-                            key = "home"
-                        ),
+                    impliedParentItems = listOfNotNull(
+                        // Le mode simplifié n'a pas d'accueil : le fil d'Ariane commence à la
+                        // carte (ou à « À proximité »), pas sur une page qui n'existe plus.
+                        if (AppConfig.simpleModeActive()) {
+                            null
+                        } else {
+                            GeoTowerBreadcrumbItem(
+                                label = txtHomeTitle,
+                                icon = Icons.Default.Home,
+                                onClick = { navigateToBreadcrumbParent("home") },
+                                key = "home"
+                            )
+                        },
                         if (applyMapFilters) {
                             GeoTowerBreadcrumbItem(
                                 label = txtMapTitle,
@@ -962,7 +1118,14 @@ fun SiteDetailScreen(
         }
     ) { padding ->
         if (antenna == null) {
-            Box(Modifier.fillMaxSize().padding(padding).background(mainBgColor), contentAlignment = Alignment.Center) {
+            Box(
+                modifier = if (embedded) {
+                    Modifier.fillMaxWidth().height(EMBEDDED_PLACEHOLDER_HEIGHT)
+                } else {
+                    Modifier.fillMaxSize().padding(padding).background(mainBgColor)
+                },
+                contentAlignment = Alignment.Center
+            ) {
                 GeoTowerLoadingMessage(
                     title = stringResource(R.string.appstrings_site_detail_loading_title),
                     detail = stringResource(R.string.appstrings_site_detail_loading_desc)
@@ -1201,7 +1364,8 @@ fun SiteDetailScreen(
                 fr.geotower.ui.components.NavigationBottomSheet(latitude = info.latitude, longitude = info.longitude, onDismiss = { showNavigationSheet = false }, sheetState = sheetState, useOneUi = useOneUi)
             }
 
-            GeoTowerPullToRefreshBox(
+            SiteDetailScrollContainer(
+                embedded = embedded,
                 isRefreshing = isRefreshing,
                 onRefresh = {
                     if (!isRefreshing) {
@@ -1209,13 +1373,12 @@ fun SiteDetailScreen(
                         refreshTrigger++
                     }
                 },
-                enabled = antenna != null,
-                modifier = Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().background(mainBgColor)
+                refreshEnabled = antenna != null,
+                scrollState = scrollState,
+                background = mainBgColor,
+                topPadding = padding.calculateTopPadding(),
+                contentPadding = sizing.spacing(16.dp)
             ) {
-                Column(
-                    modifier = Modifier.fillMaxSize().geoTowerFadingEdge(scrollState).pageScrollbar(PageScrollPrefs.SITE, scrollState).verticalScroll(scrollState).padding(sizing.spacing(16.dp)),
-                    verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))
-                ) {
                 val formattedAzimuths = remember(info.azimuts) {
                     if (info.azimuts.isNullOrBlank()) ""
                     else {
@@ -1225,8 +1388,11 @@ fun SiteDetailScreen(
                 }
 
                 pageSiteOrder.forEach { block ->
+                    // Inséré : on saute les blocs déjà rendus une fois par la fiche support.
+                    if (embedded && block in EMBEDDED_HIDDEN_BLOCKS) return@forEach
+                    fr.geotower.ui.components.CustomizableBlock(block, onCustomizeBlock) {
                     when (block) {
-                        "status" -> if (AppConfig.siteShowStatus.value) {
+                        "status" -> if (showStatus) {
                             val hsEntity = hsDataMap.values.firstOrNull()
                             val isOutage = hsEntity != null
                             val outageText = hsEntity?.let { fr.geotower.ui.components.formatOutageDetails(it) }
@@ -1453,7 +1619,9 @@ fun SiteDetailScreen(
                             }
                         }
                         "speedtest" -> {
-                            if (canUseSiteSpeedtests) {
+                            // SpeedtestCard lit lui-même l'état global : le gardien local est ici,
+                            // sinon le bloc resterait visible dans la section opérateur.
+                            if (canUseSiteSpeedtests && showSpeedtest) {
                                 SpeedtestCard(
                                     operatorName = info.operateur,
                                     speedtestData = speedtestData,
@@ -1648,10 +1816,21 @@ fun SiteDetailScreen(
                             }
                         }
                     }
+                    }
                 }
-                Spacer(modifier = Modifier.height(sizing.component(24.dp)).navigationBarsPadding())
-            }
-                PageScrollEdgeButtons(PageScrollPrefs.SITE, scrollState)
+                // Gardé même inséré : c'est le SEUL point d'entrée évident vers la personnalisation
+                // des blocs opérateur. Le bouton de la barre du haut, lui, ne règle que la fiche
+                // du pylône — sans ce pied, les blocs d'ici ne seraient réglables qu'à l'appui long.
+                fr.geotower.ui.components.PageCustomizationFooter(
+                    onClick = {
+                        settingsHighlightBlock = null
+                        showSiteSettingsSheet = true
+                    }
+                )
+                // Inséré : la marge de barre système est portée par la fiche support.
+                if (!embedded) {
+                    Spacer(modifier = Modifier.height(sizing.component(24.dp)).navigationBarsPadding())
+                }
             }
 
             if (showSiteSettingsSheet) {
@@ -1661,100 +1840,119 @@ fun SiteDetailScreen(
                         pageSiteOrder = SitePagePrefs.normalizeOrder(it)
                         prefs.edit().putString(SitePagePrefs.ORDER, pageSiteOrder.joinToString(",")).apply()
                     },
+                    // Chaque interrupteur écrit sur la clé du mode courant (cf. blockVisibilityKey) :
+                    // régler une section opérateur ne touche pas la fiche site autonome.
                     showOperator = showOperator,
                     onOperatorChange = {
                         showOperator = it
-                        prefs.edit().putBoolean(SitePagePrefs.operator.key, it).apply()
+                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.operator.key), it).apply()
                     },
                     showBearingHeight = showBearingHeight,
                     onBearingHeightChange = {
                         showBearingHeight = it
-                        prefs.edit().putBoolean(SitePagePrefs.bearingHeight.key, it).apply()
+                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.bearingHeight.key), it).apply()
                     },
                     showMap = showMap,
                     onMapChange = {
                         showMap = it
-                        prefs.edit().putBoolean(SitePagePrefs.map.key, it).apply()
+                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.map.key), it).apply()
                     },
                     showSupportDetails = showSupportDetails,
                     onSupportDetailsChange = {
                         showSupportDetails = it
-                        prefs.edit().putBoolean(SitePagePrefs.supportDetails.key, it).apply()
+                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.supportDetails.key), it).apply()
                     },
                     showPhotos = showPhotos,
                     onPhotosChange = {
-                        AppConfig.siteShowPhotos.value = it
-                        prefs.edit().putBoolean("site_show_photos", it).apply()
+                        if (embedded) {
+                            showPhotosEmbedded = it
+                        } else {
+                            AppConfig.siteShowPhotos.value = it
+                        }
+                        prefs.edit().putBoolean(blockVisibilityKey("site_show_photos"), it).apply()
                     },
                     showPanelHeights = showPanelHeights,
                     onPanelHeightsChange = {
                         showPanelHeights = it
-                        prefs.edit().putBoolean(SitePagePrefs.panelHeights.key, it).apply()
+                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.panelHeights.key), it).apply()
                     },
                     showIds = showIds,
                     onIdsChange = {
                         showIds = it
-                        prefs.edit().putBoolean(SitePagePrefs.ids.key, it).apply()
+                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.ids.key), it).apply()
                     },
                     showNetworkIds = showNetworkIds,
                     onNetworkIdsChange = {
                         showNetworkIds = it
-                        prefs.edit().putBoolean(SitePagePrefs.networkIds.key, it).apply()
+                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.networkIds.key), it).apply()
                     },
                     showOpenMap = showOpenMap,
                     onOpenMapChange = {
                         showOpenMap = it
-                        prefs.edit().putBoolean(SitePagePrefs.openMap.key, it).apply()
+                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.openMap.key), it).apply()
                     },
                     showElevationProfile = showElevationProfile,
                     onElevationProfileChange = {
                         showElevationProfile = it
-                        prefs.edit().putBoolean(SitePagePrefs.elevationProfile.key, it).apply()
+                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.elevationProfile.key), it).apply()
                     },
                     showThroughputCalculator = showThroughputCalculator,
                     onThroughputCalculatorChange = {
                         showThroughputCalculator = it
-                        prefs.edit().putBoolean(SitePagePrefs.throughputCalculator.key, it).apply()
+                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.throughputCalculator.key), it).apply()
+                    },
+                    showTheoreticalCoverage = showTheoreticalCoverage,
+                    onTheoreticalCoverageChange = {
+                        showTheoreticalCoverage = it
+                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.theoreticalCoverage.key), it).apply()
                     },
                     showNav = showNav,
                     onNavChange = {
                         showNav = it
-                        prefs.edit().putBoolean(SitePagePrefs.nav.key, it).apply()
+                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.nav.key), it).apply()
                     },
                     showShare = showShare,
                     onShareChange = {
                         showShare = it
-                        prefs.edit().putBoolean(SitePagePrefs.share.key, it).apply()
+                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.share.key), it).apply()
                     },
                     showDates = showDates,
                     onDatesChange = {
                         showDates = it
-                        prefs.edit().putBoolean(SitePagePrefs.dates.key, it).apply()
+                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.dates.key), it).apply()
                     },
                     showAddress = showAddress,
                     onAddressChange = {
                         showAddress = it
-                        prefs.edit().putBoolean(SitePagePrefs.address.key, it).apply()
+                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.address.key), it).apply()
                     },
-                    showStatus = AppConfig.siteShowStatus.value,
+                    showStatus = showStatus,
                     onStatusChange = {
-                        AppConfig.siteShowStatus.value = it
-                        prefs.edit().putBoolean("site_show_status", it).apply()
+                        if (embedded) {
+                            showStatusEmbedded = it
+                        } else {
+                            AppConfig.siteShowStatus.value = it
+                        }
+                        prefs.edit().putBoolean(blockVisibilityKey("site_show_status"), it).apply()
                     },
-                    showSpeedtest = AppConfig.siteShowSpeedtest.value,
+                    showSpeedtest = showSpeedtest,
                     onSpeedtestChange = {
-                        AppConfig.siteShowSpeedtest.value = it
-                        prefs.edit().putBoolean("site_show_speedtest", it).apply()
+                        if (embedded) {
+                            showSpeedtestEmbedded = it
+                        } else {
+                            AppConfig.siteShowSpeedtest.value = it
+                        }
+                        prefs.edit().putBoolean(blockVisibilityKey("site_show_speedtest"), it).apply()
                     },
                     showFreqs = showFreqs,
                     onFreqsChange = {
                         showFreqs = it
-                        prefs.edit().putBoolean(SitePagePrefs.freqs.key, it).apply()
+                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.freqs.key), it).apply()
                     },
                     showLinks = showLinks,
                     onLinksChange = {
                         showLinks = it
-                        prefs.edit().putBoolean(SitePagePrefs.links.key, it).apply()
+                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.links.key), it).apply()
                     },
                     onOpenMiniMapSettings = {
                         showSiteSettingsSheet = false
@@ -1772,11 +1970,12 @@ fun SiteDetailScreen(
                         showSiteSettingsSheet = false
                         showSpeedtestsSettingsSheet = true
                     },
-                    onDismiss = { showSiteSettingsSheet = false },
-                    onBack = { showSiteSettingsSheet = false },
+                    onDismiss = { showSiteSettingsSheet = false; settingsHighlightBlock = null },
+                    onBack = { showSiteSettingsSheet = false; settingsHighlightBlock = null },
                     sheetState = pageSettingsSheetState,
                     useOneUi = uiStyle.useOneUi,
-                    bubbleColor = uiStyle.bubbleColor
+                    bubbleColor = uiStyle.bubbleColor,
+                    highlightBlockId = settingsHighlightBlock
                 )
             }
 
@@ -1878,8 +2077,14 @@ fun SiteDetailScreen(
                     },
                     photosVisible = showPhotos,
                     onPhotosVisibilityChange = {
-                        AppConfig.siteShowPhotos.value = it
-                        prefs.edit().putBoolean("site_show_photos", it).apply()
+                        // Même règle que dans la feuille principale : en mode inséré, l'état est
+                        // local à la section opérateur (clé suffixée), pas global à l'app.
+                        if (embedded) {
+                            showPhotosEmbedded = it
+                        } else {
+                            AppConfig.siteShowPhotos.value = it
+                        }
+                        prefs.edit().putBoolean(blockVisibilityKey("site_show_photos"), it).apply()
                     },
                     onOpenCommunityDataSettings = {
                         communityDataSettingsFeatureId = CommunityDataPreferences.FEATURE_PHOTOS
@@ -1972,7 +2177,10 @@ fun RadioSiteDetailScreen(
     navController: NavController,
     radioRepository: RadioRepository,
     stationId: String,
-    supportId: String
+    supportId: String,
+    // Mode « inséré » : la station est dépliée dans la fiche du pylône (mode simplifié). Mêmes
+    // règles que pour la fiche site — ni barre de titre, ni défilement propre, ni mini-carte.
+    embedded: Boolean = false
 ) {
     val sizing = LocalGeoTowerUiSizing.current
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -2058,7 +2266,8 @@ fun RadioSiteDetailScreen(
         navController.navigate("map")
     }
 
-    Scaffold(
+    SiteDetailScaffold(
+        embedded = embedded,
         containerColor = mainBgColor,
         topBar = {
             GeoTowerBackTopBar(
@@ -2069,11 +2278,18 @@ fun RadioSiteDetailScreen(
             )
         }
     ) { padding ->
+        val isPlaceholder = isLoading || marker == null
         Box(
-            modifier = Modifier
-                .padding(top = padding.calculateTopPadding())
-                .fillMaxSize()
-                .background(mainBgColor)
+            modifier = when {
+                // Inséré : hauteur bornée pour l'attente, un fillMaxSize se mesurerait à l'infini
+                // dans le défilement de la fiche du pylône.
+                embedded && isPlaceholder -> Modifier.fillMaxWidth().height(EMBEDDED_PLACEHOLDER_HEIGHT)
+                embedded -> Modifier.fillMaxWidth()
+                else -> Modifier
+                    .padding(top = padding.calculateTopPadding())
+                    .fillMaxSize()
+                    .background(mainBgColor)
+            }
         ) {
             val site = marker
             when {
@@ -2084,16 +2300,25 @@ fun RadioSiteDetailScreen(
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 else -> Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .geoTowerFadingEdge(scrollState)
-                        .pageScrollbar(PageScrollPrefs.SITE, scrollState)
-                        .verticalScroll(scrollState)
-                        .navigationBarsPadding()
-                        .padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(12.dp)),
+                    modifier = (
+                        if (embedded) {
+                            Modifier.fillMaxWidth()
+                        } else {
+                            Modifier
+                                .fillMaxSize()
+                                .geoTowerFadingEdge(scrollState)
+                                .pageScrollbar(PageScrollPrefs.SITE, scrollState)
+                                .verticalScroll(scrollState)
+                                .navigationBarsPadding()
+                        }
+                        ).padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(12.dp)),
                     verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
                 ) {
-                    RadioSiteHeaderCard(site, cardBgColor, blockShape)
+                    // Inséré : la ligne dépliable de la carte « Autres usages » porte déjà la même
+                    // icône, le même nom de réseau et le même résumé — l'en-tête ferait doublon.
+                    if (!embedded) {
+                        RadioSiteHeaderCard(site, cardBgColor, blockShape)
+                    }
 
                     RadioSiteBearingHeightRow(
                         marker = site,
@@ -2102,21 +2327,25 @@ fun RadioSiteDetailScreen(
                         blockShape = blockShape
                     )
 
-                    fr.geotower.ui.components.SharedMiniMapCard(
-                        modifier = Modifier.fillMaxWidth(),
-                        centerLat = site.latitude,
-                        centerLon = site.longitude,
-                        mappedAntennas = emptyList(),
-                        radioMarkers = listOf(site),
-                        sitesHs = emptyList(),
-                        blockShape = blockShape,
-                        cardBorder = cardBorder,
-                        onMapReady = { globalMapRef = it },
-                        focusOperator = null,
-                        userLocation = userLocation,
-                        defaultViewMode = MiniMapViewMode.AntennaCentered,
-                        showViewModeToggle = true
-                    )
+                    // Inséré : la fiche du pylône a déjà sa carte au-dessus, et une MapView par
+                    // station dépliée coûterait cher pour montrer le même point.
+                    if (!embedded) {
+                        fr.geotower.ui.components.SharedMiniMapCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            centerLat = site.latitude,
+                            centerLon = site.longitude,
+                            mappedAntennas = emptyList(),
+                            radioMarkers = listOf(site),
+                            sitesHs = emptyList(),
+                            blockShape = blockShape,
+                            cardBorder = cardBorder,
+                            onMapReady = { globalMapRef = it },
+                            focusOperator = null,
+                            userLocation = userLocation,
+                            defaultViewMode = MiniMapViewMode.AntennaCentered,
+                            showViewModeToggle = true
+                        )
+                    }
 
                     RadioSiteSupportDetailsCard(
                         marker = site,
@@ -2228,7 +2457,10 @@ fun RadioSiteDetailScreen(
                     useOneUi = useOneUi
                 )
             }
-            PageScrollEdgeButtons(PageScrollPrefs.SITE, scrollState)
+            // Inséré : les boutons de bord appartiennent à la page hôte, qui porte le défilement.
+            if (!embedded) {
+                PageScrollEdgeButtons(PageScrollPrefs.SITE, scrollState)
+            }
         }
     }
 }

@@ -444,6 +444,13 @@ fun HomeScreen(navController: NavController) {
                 val isLandscape = maxWidth > maxHeight
                 val screenHeightDp = LocalConfiguration.current.screenHeightDp
                 val isCompactLandscape = isLandscape && (maxHeight < 700.dp || screenHeightDp < 700)
+                // Un Fold déplié en portrait passe le seuil « expanded » (600.dp) mais reste bien
+                // plus petit qu'une vraie tablette (~674x830.dp contre ~800x1280.dp). Sans ça il
+                // héritait des métriques tablette (titre 64.sp, logo 280.dp, boutons pleine taille),
+                // que le facteur d'échelle de largeur (plafonné à 1,15) agrandit encore : l'accueil
+                // arrivait « zoomé » et ne tenait plus dans la hauteur. On garde donc les métriques
+                // compactes, comme le fait déjà le paysage court.
+                val isCompactExpanded = !isLandscape && (maxWidth < 720.dp || maxHeight < 900.dp)
                 // Hauteur minimale pour forcer l'espace entre le titre, les boutons et le "À propos"
                 val minHeight = maxHeight
                 val showHelpButton = prefs.getBoolean("show_home_help", true)
@@ -565,7 +572,10 @@ fun HomeScreen(navController: NavController) {
                                 .heightIn(min = minHeight)
                                 .pageScrollbar(PageScrollPrefs.HOME, foldScrollState)
                                 .verticalScroll(foldScrollState)
-                                .padding(horizontal = sizing.spacing(32.dp), vertical = sizing.spacing(24.dp)),
+                                .padding(
+                                    horizontal = sizing.spacing(if (isCompactExpanded) 24.dp else 32.dp),
+                                    vertical = sizing.spacing(if (isCompactExpanded) 12.dp else 24.dp)
+                                ),
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Spacer(modifier = Modifier.weight(1f))
@@ -577,26 +587,33 @@ fun HomeScreen(navController: NavController) {
                                     style = sizing.textStyle(MaterialTheme.typography.displayLarge),
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary,
-                                    fontSize = sizing.text(64.sp),
+                                    fontSize = sizing.text(if (isCompactExpanded) 46.sp else 64.sp),
                                     textAlign = TextAlign.Center,
-                                    modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(32.dp))
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(bottom = sizing.spacing(if (isCompactExpanded) 20.dp else 32.dp))
                                 )
 
                                 if (isGrid) {
                                     // --- DISPOSITION EN GRILLE ---
-                                    MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !hideHomeLogo, displayLogoResId, isExpanded, isGrid = true)
+                                    MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !hideHomeLogo, displayLogoResId, isExpanded, isGrid = true, compact = isCompactExpanded)
                                 } else {
                                     // --- DISPOSITION CÔTE À CÔTE (Classique) ---
                                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                                        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                        // Sur Fold, les colonnes ne sont pas à 50/50 : les boutons ont une
+                                        // largeur fixe (métriques compactes) qui ne rentre pas dans la moitié
+                                        // d'un écran de ~674.dp, on donne donc la part large au menu.
+                                        Column(modifier = Modifier.weight(if (isCompactExpanded) 0.75f else 1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                             DrawableImage(
                                                 resId = displayLogoResId,
-                                                modifier = Modifier.size(sizing.component(280.dp)).clip(RoundedCornerShape(32.dp))
+                                                modifier = Modifier
+                                                    .size(sizing.component(if (isCompactExpanded) 190.dp else 280.dp))
+                                                    .clip(RoundedCornerShape(if (isCompactExpanded) 24.dp else 32.dp))
                                             )
                                         }
-                                        Column(modifier = Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                                        Column(modifier = Modifier.weight(if (isCompactExpanded) 1.25f else 1f), horizontalAlignment = Alignment.CenterHorizontally) {
                                             // ✅ CORRECTION : On passe "isOnline && !hideHomeLogo" pour forcer le masquage du logo sur tous les appareils si besoin
-                                            MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !hideHomeLogo, displayLogoResId, isExpanded, isGrid = false)
+                                            MenuButtonsList(navController, useOneUi, buttonBgColor, paleColor, onPaleColor, isOnline && !hideHomeLogo, displayLogoResId, isExpanded, isGrid = false, compact = isCompactExpanded)
                                         }
                                     }
                                 }
@@ -604,7 +621,7 @@ fun HomeScreen(navController: NavController) {
 
                             Spacer(modifier = Modifier.weight(1f))
 
-                            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
+                            Spacer(modifier = Modifier.height(sizing.spacing(if (isCompactExpanded) 16.dp else 32.dp)))
                             AboutSection(
                                 navController = navController,
                                 version = appVersion,

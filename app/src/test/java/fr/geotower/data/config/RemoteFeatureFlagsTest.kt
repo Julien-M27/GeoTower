@@ -46,7 +46,7 @@ class RemoteFeatureFlagsTest {
                 "message": "Intervention en cours",
                 "severity": "warning",
                 "actionLabel": "Details",
-                "actionUrl": "https://api.cajejuma.fr/status",
+                "actionUrl": "https://api.geotower.fr/status",
                 "dismissible": false,
                 "minAppVersionInclusive": "1.9.9.0",
                 "maxAppVersionExclusive": "2.0.0",
@@ -85,7 +85,7 @@ class RemoteFeatureFlagsTest {
         assertEquals("Intervention en cours", config.homeAnnouncement.message)
         assertEquals("warning", config.homeAnnouncement.severity)
         assertEquals("Details", config.homeAnnouncement.actionLabel)
-        assertEquals("https://api.cajejuma.fr/status", config.homeAnnouncement.actionUrl)
+        assertEquals("https://api.geotower.fr/status", config.homeAnnouncement.actionUrl)
         assertFalse(config.homeAnnouncement.dismissible)
         assertEquals("1.9.9.0", config.homeAnnouncement.minAppVersionInclusive)
         assertEquals("2.0.0", config.homeAnnouncement.maxAppVersionExclusive)
@@ -141,7 +141,7 @@ class RemoteFeatureFlagsTest {
                 "enabled": true,
                 "title": "Update",
                 "message": "Details available",
-                "actionUrl": "http://api.cajejuma.fr/status"
+                "actionUrl": "http://api.geotower.fr/status"
               }
             }
             """.trimIndent()

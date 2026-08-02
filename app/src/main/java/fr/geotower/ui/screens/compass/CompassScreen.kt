@@ -101,6 +101,7 @@ import fr.geotower.ui.components.LocationUnavailableBanner
 import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.utils.PageScrollPrefs
+import fr.geotower.ui.navigation.ROOT_FALLBACK_ROUTE
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.settings.CompassSettingsSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
@@ -196,7 +197,7 @@ fun CompassScreen(
 
     val defaultOp by AppConfig.defaultOperator
 
-    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = ROOT_FALLBACK_ROUTE)
 
     BackHandler(enabled = !safeBackNavigation.isLocked) {
         safeBackNavigation.navigateBack()
@@ -438,12 +439,17 @@ fun CompassScreen(
                 contentColor = oncompassBg,
                 backEnabled = !safeBackNavigation.isLocked,
                 actions = {
-                    IconButton(onClick = { showCompassSettingsSheet = true }) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.appstrings_settings_title),
-                            tint = oncompassBg
-                        )
+                    fr.geotower.ui.components.PageCustomizationHint(
+                        page = fr.geotower.utils.PageScrollPrefs.COMPASS,
+                        onOpenSettings = { showCompassSettingsSheet = true }
+                    ) {
+                        IconButton(onClick = { showCompassSettingsSheet = true }) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.appstrings_settings_title),
+                                tint = oncompassBg
+                            )
+                        }
                     }
                 }
             )

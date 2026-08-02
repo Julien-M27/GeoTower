@@ -35,6 +35,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.Tune
@@ -74,8 +75,11 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.build.LocalBuildCapability
+import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.workers.DatabaseDownloadWorker
+import fr.geotower.data.workers.LocalDbBuildWorker
 import fr.geotower.ui.components.SafeClick
 import fr.geotower.ui.components.colorPaletteFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
@@ -158,6 +162,9 @@ fun FirstStartScreen(
         }
     }
 
+    // Étape 2 : cette permission ne concerne QUE l'affichage des notifications (téléchargements,
+    // mises à jour, rapports…). Un refus ici ne coupe plus le suivi live de l'étape 3, qui a sa
+    // propre demande et ne dépend que de la localisation.
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { isGranted ->
@@ -191,7 +198,14 @@ fun FirstStartScreen(
     val workManager = remember { androidx.work.WorkManager.getInstance(context) }
     val workInfos by workManager.getWorkInfosForUniqueWorkFlow(DatabaseDownloadWorker.UNIQUE_WORK_NAME).collectAsState(initial = emptyList())
     val currentWork = workInfos.firstOrNull()
-    val isSyncing = currentWork?.state == androidx.work.WorkInfo.State.RUNNING || currentWork?.state == androidx.work.WorkInfo.State.ENQUEUED
+    val isDownloading = currentWork?.state == androidx.work.WorkInfo.State.RUNNING || currentWork?.state == androidx.work.WorkInfo.State.ENQUEUED
+    // La base peut aussi arriver par génération locale (étape 6) : on surveille les deux chemins,
+    // sinon le pop-up de succès ne s'afficherait jamais pour un utilisateur qui génère au lieu de
+    // télécharger.
+    val buildInfos by workManager.getWorkInfosForUniqueWorkFlow(LocalDbBuildWorker.UNIQUE_WORK_NAME).collectAsState(initial = emptyList())
+    val currentBuild = buildInfos.firstOrNull()
+    val isBuilding = currentBuild?.state == androidx.work.WorkInfo.State.RUNNING || currentBuild?.state == androidx.work.WorkInfo.State.ENQUEUED
+    val isSyncing = isDownloading || isBuilding
 
     // ✅ NOUVEAU : On détecte le passage exact de "En téléchargement" à "Terminé"
     LaunchedEffect(isSyncing) {
@@ -273,9 +287,9 @@ fun FirstStartScreen(
                             )
                             1 -> StepLocationPermissionDesign()
                             2 -> StepNotificationsPermissionDesign()
-                            // ✅ La notif live ne nécessite plus d'opérateur : on la place juste
-                            // après l'étape des notifications.
-                            3 -> StepLiveNotificationsDesign(
+                            // Le suivi live ne nécessite ni opérateur ni permission de notification :
+                            // il vient après l'étape des notifications, mais n'en dépend pas.
+                            3 -> StepLiveTrackingDesign(
                                 shape = cardShape,
                                 border = cardBorder,
                                 bubbleColor = bubbleColor,
@@ -506,14 +520,14 @@ fun FirstStartScreen(
             onSelect = { selectedOperator ->
                 AppConfig.defaultOperator.value = selectedOperator
                 prefs.edit().putString("default_operator", selectedOperator).apply()
-                if (selectedOperator != "Aucun" && AppConfig.enableLiveNotifications.value) {
-                    val eligibility = LiveTrackingController.startIfEligible(context)
-                    if (
-                        eligibility == LiveTrackingController.StartResult.Started &&
-                        LiveTrackingController.shouldOpenPromotedNotificationSettings(context)
-                    ) {
-                        LiveTrackingController.openPromotedNotificationSettings(context)
-                    }
+                // Le suivi se relance pour viser le nouvel opérateur — ou l'antenne la plus proche
+                // si « Aucun », il n'exige plus d'opérateur. On n'ouvre SURTOUT PAS l'écran système
+                // des notifications promues ici : tant que l'app-op n'est pas accordé, la condition
+                // reste vraie, et cette feuille est atteinte à la fin du tuto (carte « Opérateur »
+                // et dialogue « C'est parti » sans opérateur) — l'écran système se rouvrait à chaque
+                // choix. Il appartient au moment où l'on allume le suivi, pas à ce moment-ci.
+                if (AppConfig.enableLiveTracking.value) {
+                    LiveTrackingController.startIfEligible(context)
                 }
             },
             onDismiss = { showOperatorSheet = false },
@@ -627,6 +641,28 @@ fun StepPreferencesDesign(
                     Box(modifier = Modifier.size(sizing.component(32.dp)), contentAlignment = Alignment.Center) { Text(text = "📏", fontSize = sizing.text(24.sp)) }
                     Spacer(Modifier.width(sizing.spacing(8.dp)))
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+
+        // --- CARTE MODE SIMPLIFIÉ ---
+        // Proposé dès le tuto : c'est le moment où le choix coûte le moins cher à l'utilisateur.
+        if (RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIMPLE_MODE_ENABLED)) {
+            val simpleMode by AppConfig.simpleMode
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+            Surface(color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
+                Row(modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp)), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text(stringResource(R.string.settings_simple_mode_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                        Text(stringResource(R.string.settings_simple_mode_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Spacer(Modifier.width(sizing.spacing(12.dp)))
+                    fr.geotower.ui.components.GeoTowerSwitch(
+                        checked = simpleMode,
+                        onCheckedChange = { AppConfig.setSimpleMode(context, it) },
+                        useOneUi = useOneUi,
+                        checkedColor = MaterialTheme.colorScheme.primary
+                    )
                 }
             }
         }
@@ -825,8 +861,16 @@ fun StepNotificationsPermissionDesign() {
     }
 }
 
+/**
+ * Étape « suivi live » : elle allume le service de suivi GPS, pas les notifications de l'app.
+ *
+ * Les deux permissions y jouent des rôles distincts, d'où deux launchers :
+ *  - la localisation précise **conditionne** le suivi (sans elle, il n'y a rien à suivre) ;
+ *  - POST_NOTIFICATIONS ne décide que de la **visibilité** de la notification live. La refuser
+ *    (à l'étape précédente ou ici) n'empêche plus le suivi de tourner.
+ */
 @Composable
-fun StepLiveNotificationsDesign(
+fun StepLiveTrackingDesign(
     shape: Shape,
     border: BorderStroke?,
     bubbleColor: Color,
@@ -835,14 +879,65 @@ fun StepLiveNotificationsDesign(
     onOpenOperatorSheet: () -> Unit
 ) {
     val context = LocalContext.current
-    val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-    val liveNotifsEnabled by AppConfig.enableLiveNotifications
+    val liveTrackingEnabled by AppConfig.enableLiveTracking
     val hasOperator = defaultOperator != "Aucun"
     val sizing = LocalGeoTowerUiStyle.current.sizing
 
+    var notificationPermissionMissing by remember {
+        mutableStateOf(LiveTrackingController.notificationPermissionMissing(context))
+    }
+    var locationRefused by remember { mutableStateOf(false) }
+
+    // Launchers plutôt qu'un cast de LocalContext en Activity : le contexte fourni ici est le
+    // contexte localisé (GeoTowerLocaleProvider), le cast serait null.
+    fun enableTracking() {
+        val result = LiveTrackingController.setEnabled(context, true)
+        locationRefused = result == LiveTrackingController.StartResult.MissingPreciseLocation
+        if (
+            result == LiveTrackingController.StartResult.Started &&
+            LiveTrackingController.shouldOpenPromotedNotificationSettings(context)
+        ) {
+            LiveTrackingController.openPromotedNotificationSettings(context)
+        }
+    }
+
+    // Accordée ou non, le suivi démarre : cette permission ne pilote que l'affichage.
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted ->
+        notificationPermissionMissing = !isGranted
+        enableTracking()
+    }
+
+    fun offerNotificationThenEnable() {
+        if (
+            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            LiveTrackingController.notificationPermissionMissing(context)
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            enableTracking()
+        }
+    }
+
+    // La localisation, elle, est bloquante : refusée à l'étape 1, on la redemande ici plutôt que
+    // de laisser l'interrupteur retomber tout seul sans explication.
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        if (permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true) {
+            locationRefused = false
+            offerNotificationThenEnable()
+        } else {
+            locationRefused = true
+        }
+    }
+
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
-        Icon(Icons.Default.Notifications, null, modifier = Modifier.size(sizing.component(80.dp)), tint = MaterialTheme.colorScheme.primary)
+        // Icône de position et non de notification : l'étape précédente portait les notifications,
+        // celle-ci porte le suivi. Deux écrans identiques donnaient deux fois « les notifications ».
+        Icon(Icons.Default.MyLocation, null, modifier = Modifier.size(sizing.component(80.dp)), tint = MaterialTheme.colorScheme.primary)
         Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
 
         Text(stringResource(R.string.onboarding_live_notifications_title), style = sizing.textStyle(MaterialTheme.typography.headlineMedium), fontWeight = FontWeight.Bold)
@@ -861,7 +956,7 @@ fun StepLiveNotificationsDesign(
             verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
         ) {
             PermissionDetailItem(
-                icon = Icons.Default.Notifications,
+                icon = Icons.Default.MyLocation,
                 title = stringResource(R.string.onboarding_live_notifications_operator_title),
                 description = stringResource(R.string.onboarding_live_notifications_operator_desc)
             )
@@ -886,37 +981,21 @@ fun StepLiveNotificationsDesign(
             } else {
                 stringResource(R.string.onboarding_live_notifications_nearest_mode)
             },
-            checked = liveNotifsEnabled,
+            checked = liveTrackingEnabled,
             onCheckedChange = { isChecked ->
-                if (isChecked) {
-                    val eligibility = LiveTrackingController.eligibility(context)
-
-                    if (
-                        eligibility == LiveTrackingController.StartResult.MissingNotifications &&
-                        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
-                    ) {
-                        (context as? android.app.Activity)?.requestPermissions(
-                            arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
-                            1004
-                        )
-                    }
-
-                    if (eligibility == LiveTrackingController.StartResult.Started) {
-                        AppConfig.enableLiveNotifications.value = true
-                        prefs.edit().putBoolean("enable_live_notifications", true).apply()
-                        if (LiveTrackingController.shouldOpenPromotedNotificationSettings(context)) {
-                            LiveTrackingController.openPromotedNotificationSettings(context)
-                        }
-                        LiveTrackingController.startIfEligible(context)
-                    } else {
-                        AppConfig.enableLiveNotifications.value = false
-                        prefs.edit().putBoolean("enable_live_notifications", false).apply()
-                        LiveTrackingController.stop(context)
-                    }
+                if (!isChecked) {
+                    LiveTrackingController.setEnabled(context, false)
+                    locationRefused = false
+                } else if (LiveTrackingController.hasPreciseLocationPermission(context)) {
+                    offerNotificationThenEnable()
                 } else {
-                    AppConfig.enableLiveNotifications.value = false
-                    prefs.edit().putBoolean("enable_live_notifications", false).apply()
-                    LiveTrackingController.stop(context)
+                    // Localisation refusée à l'étape 1 : on la redemande, c'est elle qui manque.
+                    locationPermissionLauncher.launch(
+                        arrayOf(
+                            Manifest.permission.ACCESS_FINE_LOCATION,
+                            Manifest.permission.ACCESS_COARSE_LOCATION
+                        )
+                    )
                 }
             },
             enabled = true,
@@ -925,6 +1004,25 @@ fun StepLiveNotificationsDesign(
             bubbleColor = bubbleColor,
             useOneUi = useOneUi
         )
+
+        // Deux messages distincts, pour deux causes distinctes.
+        if (locationRefused) {
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
+            Text(
+                text = stringResource(R.string.onboarding_live_tracking_needs_location),
+                textAlign = TextAlign.Center,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                color = MaterialTheme.colorScheme.error
+            )
+        } else if (liveTrackingEnabled && notificationPermissionMissing) {
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
+            Text(
+                text = stringResource(R.string.onboarding_live_tracking_notification_hidden),
+                textAlign = TextAlign.Center,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
 
@@ -1026,6 +1124,10 @@ fun StepMapDesign(useOneUi: Boolean, bubbleColor: Color, onSafeClick: SafeClick)
 @Composable
 fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderStroke?, bubbleColor: Color, onSafeClick: SafeClick) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
+    val context = LocalContext.current
+    // Génération locale : réservée aux appareils éligibles (RAM/stockage). Dès le 1er lancement, un
+    // message « non disponible sur cet appareil » n'apporterait rien : on masque la carte.
+    val buildEligibility = remember { LocalBuildCapability.evaluate(context) }
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
         Icon(
@@ -1061,6 +1163,30 @@ fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderSt
             bubbleColor = bubbleColor,
             onSafeClick = onSafeClick
         )
+
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+        // Identifiants eNB/gNB : donnée du partenaire eNB-Analytics (pas de l'ANFR), d'où
+        // l'attribution cliquable portée par la carte elle-même.
+        fr.geotower.ui.components.EnbDatabaseDownloadCard(
+            useOneUi = useOneUi,
+            shape = cardShape,
+            border = cardBorder,
+            bubbleColor = bubbleColor,
+            onSafeClick = onSafeClick
+        )
+
+        if (buildEligibility.eligible) {
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+            fr.geotower.ui.components.LocalDbBuildCard(
+                useOneUi = useOneUi,
+                shape = cardShape,
+                border = cardBorder,
+                bubbleColor = bubbleColor,
+                onSafeClick = onSafeClick
+            )
+        }
     }
 }
 // --- COMPOSANTS UTILITAIRES ---

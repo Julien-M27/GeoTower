@@ -128,10 +128,9 @@ class LiveTrackingService : Service() {
         }
 
         val defaultOp = currentOperator
-        if (
-            !LiveTrackingController.hasPreciseLocationPermission(this) ||
-            !LiveTrackingController.hasPostNotificationsPermission(this)
-        ) {
+        // Seule la localisation conditionne le suivi. Sans POST_NOTIFICATIONS le service démarre
+        // quand même : Android accepte startForeground() et se contente de masquer la notification.
+        if (!LiveTrackingController.hasPreciseLocationPermission(this)) {
             return stopTrackingAndSelf()
         }
 
@@ -526,10 +525,10 @@ class LiveTrackingService : Service() {
         sitePhotoBitmap: Bitmap? = null,
         mirrorTrackerIcon: Boolean = false
     ) {
-        if (!LiveTrackingController.hasPostNotificationsPermission(this)) {
-            stopTrackingAndSelf()
-            return
-        }
+        // Notifications refusées : rien à afficher, mais le suivi continue (position, site verrouillé,
+        // distance) — l'utilisateur retrouve tout dans l'app. On sort avant de construire la
+        // notification, inutile de payer le rendu (bitmaps du site) pour un notify() sans effet.
+        if (!LiveTrackingController.hasPostNotificationsPermission(this)) return
 
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val notification = if (supportsProgressStyle()) {

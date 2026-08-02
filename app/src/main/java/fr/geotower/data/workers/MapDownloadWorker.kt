@@ -21,6 +21,7 @@ import fr.geotower.data.api.RetrofitClient
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 import fr.geotower.utils.OfflineMapDisplayNames
 import kotlinx.coroutines.CancellationException
@@ -305,6 +306,9 @@ class MapDownloadWorker(
         DownloadNotificationCenter.rememberMapDownloadNotification(applicationContext, mapFilename)
         ensureNotificationChannel()
         notificationManager.cancel(progressNotifId)
+        // La notification de fin suit l'interrupteur maître des notifications ; celle de progression
+        // appartient au service de premier plan et vient d'être retirée.
+        if (!AppNotifications.canPost(applicationContext)) return
 
         val notification = NotificationCompat.Builder(applicationContext, channelId)
             .setContentTitle(applicationContext.getString(R.string.notification_map_downloaded_title))

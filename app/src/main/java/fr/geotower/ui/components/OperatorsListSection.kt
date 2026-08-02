@@ -7,9 +7,21 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
+import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.UnfoldLess
+import androidx.compose.material.icons.filled.UnfoldMore
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -43,6 +55,15 @@ fun OperatorsListSection(
     useOneUi: Boolean,
     priorityOperatorKey: String? = null,
     activeOperatorKeys: Set<String>? = null,
+    // Mode simplifié : chaque ligne se déplie sur la fiche de l'opérateur au lieu d'ouvrir un
+    // écran. Le contenu n'est composé que lorsqu'il est visible — sur un pylône mutualisé,
+    // charger les quatre opérateurs d'un coup quadruplerait le temps d'ouverture de la fiche.
+    expandable: Boolean = false,
+    initialExpandedAntennaId: String? = null,
+    expandedContent: @Composable (LocalisationEntity) -> Unit = {},
+    // Lance l'export PDF multi-opérateurs de la fiche support (une page par station). Nul quand le
+    // bloc « Partager » du support est masqué : sans lui, l'export n'existe pas.
+    onShareAllOperators: (() -> Unit)? = null,
     onAntennaClick: (String) -> Unit
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -91,18 +112,105 @@ fun OperatorsListSection(
         }
     }
 
+    // Tout est replié à l'ouverture : c'est l'utilisateur qui déplie ce qu'il veut voir, un
+    // opérateur à la fois ou tout d'un coup avec la bascule ci-dessous. Seule exception, un
+    // opérateur explicitement visé (notification, widget, lien profond, historique) s'ouvre seul.
+    val targetedAntennaId = initialExpandedAntennaId
+        ?.takeIf { id -> sortedAntennas.any { it.idAnfr == id } }
+    // Plusieurs opérateurs peuvent rester ouverts en même temps : on garde une liste d'identifiants
+    // et non un seul. La clé du remember la remet à zéro au changement de pylône, sinon on
+    // garderait déplié un opérateur qui n'est plus dans la liste.
+    var expandedAntennaIds by rememberSaveable(sortedAntennas.first().idAnfr) {
+        mutableStateOf(listOfNotNull(targetedAntennaId))
+    }
+    val allExpanded = expandable && sortedAntennas.all { it.idAnfr in expandedAntennaIds }
+
+    // La fiche insérée est un écran entier : la composer dans la même image que la fiche support
+    // fait sauter l'ouverture. Utile uniquement quand un opérateur est déjà déplié à l'arrivée
+    // (cas d'un opérateur explicitement visé) ; ensuite le drapeau reste vrai et les dépliages
+    // manuels sont immédiats.
+    var deferredContentReady by remember(sortedAntennas.first().idAnfr) { mutableStateOf(false) }
+    LaunchedEffect(sortedAntennas.first().idAnfr) {
+        withFrameNanos { }
+        deferredContentReady = true
+    }
+
     Column(modifier = Modifier.padding(top = sizing.spacing(8.dp))) {
-        Text(
-            text = stringResource(R.string.operator_count, filteredAntennas.size), // ✅ Utilise la taille filtrée
-            color = MaterialTheme.colorScheme.primary,
-            fontSize = sizing.text(13.sp),
-            modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp)),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = stringResource(R.string.operator_count, filteredAntennas.size), // ✅ Utilise la taille filtrée
+                color = MaterialTheme.colorScheme.primary,
+                fontSize = sizing.text(13.sp),
+                modifier = Modifier.weight(1f)
+            )
+            // Bascule « tout ouvrir / tout fermer » : sur un pylône mutualisé, déplier les quatre
+            // opérateurs un par un est fastidieux. Inutile s'il n'y en a qu'un.
+            if (expandable && sortedAntennas.size > 1) {
+                TextButton(
+                    onClick = {
+                        expandedAntennaIds = if (allExpanded) {
+                            emptyList()
+                        } else {
+                            sortedAntennas.map { it.idAnfr }
+                        }
+                    },
+                    contentPadding = PaddingValues(horizontal = sizing.spacing(8.dp))
+                ) {
+                    Icon(
+                        imageVector = if (allExpanded) Icons.Default.UnfoldLess else Icons.Default.UnfoldMore,
+                        contentDescription = null,
+                        modifier = Modifier.size(sizing.component(18.dp))
+                    )
+                    Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                    Text(
+                        text = if (allExpanded) {
+                            stringResource(R.string.operators_collapse_all)
+                        } else {
+                            stringResource(R.string.operators_expand_all)
+                        },
+                        fontSize = sizing.text(13.sp),
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+        // Partage de tous les opérateurs d'un coup : c'est l'export PDF paginé déjà utilisé par le
+        // bloc « Partager » du support (une page par station), simplement rendu accessible ici.
+        if (expandable && onShareAllOperators != null && sortedAntennas.size > 1) {
+            Button(
+                onClick = onShareAllOperators,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(4.dp))
+                    .height(sizing.component(52.dp)),
+                shape = blockShape,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+            ) {
+                Icon(
+                    imageVector = Icons.Default.PictureAsPdf,
+                    contentDescription = null,
+                    modifier = Modifier.size(sizing.component(20.dp))
+                )
+                Spacer(modifier = Modifier.width(sizing.spacing(10.dp)))
+                Text(
+                    text = stringResource(R.string.operators_share_all),
+                    fontSize = sizing.text(15.sp),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
         if (!useOneUi) {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
         }
         sortedAntennas.forEach { antenna ->
             val operatorKeys = OperatorColors.keysFor(antenna.operateur)
+            val isExpanded = expandable && antenna.idAnfr in expandedAntennaIds
             OperatorDetailItem(
                 antenna = antenna,
                 technique = techniques[antenna.idAnfr],
@@ -112,8 +220,26 @@ fun OperatorsListSection(
                 useOneUi = useOneUi,
                 isMuted = (activeKeys != null && operatorKeys.none { it in activeKeys }) ||
                     (activeKeys == null && hasPriorityMatch && priorityOperatorKey !in operatorKeys),
-                onClick = { onAntennaClick(antenna.idAnfr) }
+                expandable = expandable,
+                isExpanded = isExpanded,
+                onClick = {
+                    if (expandable) {
+                        // Refermer libère le contenu de cet opérateur ; les autres ne bougent pas.
+                        expandedAntennaIds = if (isExpanded) {
+                            expandedAntennaIds - antenna.idAnfr
+                        } else {
+                            expandedAntennaIds + antenna.idAnfr
+                        }
+                    } else {
+                        onAntennaClick(antenna.idAnfr)
+                    }
+                }
             )
+            // Pas d'AnimatedVisibility ici : l'animation de hauteur remesure tout le sous-arbre à
+            // chaque image, et le sous-arbre est une fiche complète — c'est ce qui saccadait.
+            if (expandable && isExpanded && deferredContentReady) {
+                expandedContent(antenna)
+            }
             if (!useOneUi) {
                 HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant, thickness = 0.5.dp)
             }
@@ -130,6 +256,8 @@ fun OperatorDetailItem(
     blockShape: Shape,
     useOneUi: Boolean,
     isMuted: Boolean = false,
+    expandable: Boolean = false,
+    isExpanded: Boolean = false,
     onClick: () -> Unit
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -168,8 +296,14 @@ fun OperatorDetailItem(
 
             } // <-- Fin de la Column(weight = 1f)
 
-            // La flèche reste toute seule à droite
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, null, modifier = Modifier.size(sizing.component(28.dp)), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            // La flèche reste toute seule à droite. Dépliable : chevron haut/bas, pour ne pas
+            // promettre l'ouverture d'un écran alors que la fiche s'insère juste en dessous.
+            val trailingIcon = when {
+                !expandable -> Icons.AutoMirrored.Filled.KeyboardArrowRight
+                isExpanded -> Icons.Default.ExpandLess
+                else -> Icons.Default.ExpandMore
+            }
+            Icon(trailingIcon, null, modifier = Modifier.size(sizing.component(28.dp)), tint = MaterialTheme.colorScheme.onSurfaceVariant)
         } // <-- Fin de la Row contenant le logo, le titre et la flèche
 
         // 🚨 NOUVEAU PLACEMENT : Sous le logo complet, et au-dessus des dates (Implémentation)

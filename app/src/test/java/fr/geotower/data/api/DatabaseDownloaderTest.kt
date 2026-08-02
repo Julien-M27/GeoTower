@@ -19,11 +19,11 @@ class DatabaseDownloaderTest {
 
     @Test
     fun officialDatabaseDownloadUrlRequiresHttpsOfficialHostAndPath() {
-        assertTrue(DatabaseDownloader.isOfficialDatabaseDownloadUrl("https://api.cajejuma.fr/api/v2/download/db"))
-        assertFalse(DatabaseDownloader.isOfficialDatabaseDownloadUrl("http://api.cajejuma.fr/api/v2/download/db"))
+        assertTrue(DatabaseDownloader.isOfficialDatabaseDownloadUrl("https://api.geotower.fr/api/v2/download/db"))
+        assertFalse(DatabaseDownloader.isOfficialDatabaseDownloadUrl("http://api.geotower.fr/api/v2/download/db"))
         assertFalse(DatabaseDownloader.isOfficialDatabaseDownloadUrl("https://example.com/api/v2/download/db"))
-        assertFalse(DatabaseDownloader.isOfficialDatabaseDownloadUrl("https://user:pass@api.cajejuma.fr/api/v2/download/db"))
-        assertFalse(DatabaseDownloader.isOfficialDatabaseDownloadUrl("https://api.cajejuma.fr/api/v2/download/other"))
+        assertFalse(DatabaseDownloader.isOfficialDatabaseDownloadUrl("https://user:pass@api.geotower.fr/api/v2/download/db"))
+        assertFalse(DatabaseDownloader.isOfficialDatabaseDownloadUrl("https://api.geotower.fr/api/v2/download/other"))
     }
 
     private fun validInfo(

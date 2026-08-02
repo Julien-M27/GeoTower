@@ -82,6 +82,7 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
     }
 
     private fun showNotification() {
+        if (!fr.geotower.utils.AppNotifications.canPost(context)) return
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

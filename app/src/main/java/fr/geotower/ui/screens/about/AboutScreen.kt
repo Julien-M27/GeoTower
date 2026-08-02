@@ -100,6 +100,7 @@ import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.utils.PageScrollPrefs
+import fr.geotower.ui.navigation.ROOT_FALLBACK_ROUTE
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import kotlin.math.roundToInt
 import androidx.compose.ui.res.stringResource
@@ -111,7 +112,7 @@ private const val TAG_ABOUT = "GeoTower"
 fun AboutScreen(navController: NavController) {
 
     val safeClick = rememberSafeClick()
-    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = ROOT_FALLBACK_ROUTE)
 
     BackHandler(enabled = !safeBackNavigation.isLocked) {
         safeBackNavigation.navigateBack()
@@ -287,6 +288,9 @@ fun AboutScreen(navController: NavController) {
             modifier = Modifier.padding(top = innerPadding.calculateTopPadding()),
             // ✅ AJOUT : onCloseSidebar
             sidebar = { width, onCloseSidebar ->
+                // Même garde que dans les Réglages : la colonne défile, sinon les dernières entrées
+                // sont rognées dès que le contenu dépasse (échelle 120 %, traductions longues).
+                val sidebarScrollState = rememberScrollState()
                 Row(modifier = Modifier.width(width).fillMaxHeight().background(mainBgColor)) {
                     Column(
                         // 🚨 CORRECTION 2 : Ajout du navigationBarsPadding
@@ -294,6 +298,7 @@ fun AboutScreen(navController: NavController) {
                             .weight(1f)
                             .fillMaxHeight()
                             .navigationBarsPadding()
+                            .verticalScroll(sidebarScrollState)
                             .padding(top = sizing.spacing(16.dp), bottom = sizing.spacing(24.dp))
                     ) {
                         Row(
@@ -1064,16 +1069,16 @@ private data class SitesHsState(val serverDate: String, val localGeneratedAtMill
 
 /**
  * Lit l'état des sites HS (prefs uniquement, donc rejouable à volonté). L'horodatage de génération
- * n'est renvoyé que si les pannes sont réellement produites sur l'appareil — réglage « source
- * locale » ou mode traitement local (niveau ≥ 1) : sinon c'est la donnée serveur qui est affichée,
- * et un ancien horodatage local n'a plus de sens.
+ * n'est renvoyé que si les pannes sont réellement produites sur l'appareil (mode traitement local,
+ * niveau ≥ 1) : sinon c'est la donnée serveur qui est affichée, et un ancien horodatage local n'a
+ * plus de sens.
  */
 private fun readSitesHsState(context: Context): SitesHsState {
     val prefs = context.getSharedPreferences(OutageLocalConfig.PREFS_NAME, Context.MODE_PRIVATE)
     val config = OutageLocalConfig(prefs)
     return SitesHsState(
         serverDate = prefs.getString("last_hs_update", "-") ?: "-",
-        localGeneratedAtMillis = if (config.useLocalSource || AppConfig.outagesLocal()) {
+        localGeneratedAtMillis = if (AppConfig.outagesLocal()) {
             config.lastGeneratedAtMillis
         } else {
             0L

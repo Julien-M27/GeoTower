@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.ExpandLess
+import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -22,6 +24,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -42,10 +48,21 @@ fun SupportRadioPresenceCard(
     cardBgColor: Color,
     blockShape: Shape,
     modifier: Modifier = Modifier,
+    // Mode simplifié : chaque station se déplie ici même, comme les opérateurs mobiles, au lieu
+    // d'ouvrir un écran. Tout est replié à l'arrivée.
+    expandable: Boolean = false,
+    expandedContent: @Composable (RadioMapMarker) -> Unit = {},
     onRadioClick: (RadioMapMarker) -> Unit = {}
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     if (radioMarkers.isEmpty()) return
+
+    // Une station = un couple (station, support) : l'identifiant de station seul n'est pas unique
+    // d'un support à l'autre.
+    fun markerKey(marker: RadioMapMarker): String = "${marker.stationId}/${marker.supportId}"
+    var expandedKeys by rememberSaveable(markerKey(radioMarkers.first())) {
+        mutableStateOf(emptyList<String>())
+    }
 
     Surface(
         color = Color.Transparent,
@@ -80,10 +97,25 @@ fun SupportRadioPresenceCard(
 
             Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(10.dp))) {
                 radioMarkers.forEach { marker ->
+                    val key = markerKey(marker)
+                    val isExpanded = expandable && key in expandedKeys
                     SupportRadioItem(
                         marker = marker,
-                        onClick = { onRadioClick(marker) }
+                        expandable = expandable,
+                        isExpanded = isExpanded,
+                        onClick = {
+                            if (expandable) {
+                                expandedKeys = if (isExpanded) expandedKeys - key else expandedKeys + key
+                            } else {
+                                onRadioClick(marker)
+                            }
+                        }
                     )
+                    // Pas d'AnimatedVisibility : animer la hauteur d'une fiche entière remesure
+                    // tout le sous-arbre à chaque image (même raison que pour les opérateurs).
+                    if (isExpanded) {
+                        expandedContent(marker)
+                    }
                 }
             }
         }
@@ -93,6 +125,8 @@ fun SupportRadioPresenceCard(
 @Composable
 private fun SupportRadioItem(
     marker: RadioMapMarker,
+    expandable: Boolean = false,
+    isExpanded: Boolean = false,
     onClick: () -> Unit
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -138,7 +172,12 @@ private fun SupportRadioItem(
             )
         }
         Icon(
-            imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+            // Dépliable : chevron haut/bas, la fiche s'insère juste en dessous au lieu de s'ouvrir.
+            imageVector = when {
+                !expandable -> Icons.AutoMirrored.Filled.KeyboardArrowRight
+                isExpanded -> Icons.Default.ExpandLess
+                else -> Icons.Default.ExpandMore
+            },
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.size(sizing.component(26.dp))

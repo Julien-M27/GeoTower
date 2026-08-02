@@ -57,9 +57,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -78,6 +83,7 @@ import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.zIndex
 import fr.geotower.R
 import fr.geotower.utils.AppConfig
+import fr.geotower.utils.PageCustomizationPrefs
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.compose.ui.platform.LocalContext
@@ -350,12 +356,17 @@ fun PagesCustomizationSheet(
                 textAlign = TextAlign.Center
             )
 
-            // 1. La page de démarrage
-            NavigationMenuItem(title = stringResource(R.string.appstrings_startup_page_settings), icon = Icons.AutoMirrored.Filled.Launch, isSelected = false, isDark = isDark) { onStartupPageClick() }
-            Spacer(Modifier.height(sizing.spacing(12.dp)))
+            // 1. La page de démarrage — sans objet en mode simplifié : l'app démarre sur la carte.
+            val simpleMode = AppConfig.simpleModeActive()
+            if (!simpleMode) {
+                NavigationMenuItem(title = stringResource(R.string.appstrings_startup_page_settings), icon = Icons.AutoMirrored.Filled.Launch, isSelected = false, isDark = isDark) { onStartupPageClick() }
+                Spacer(Modifier.height(sizing.spacing(12.dp)))
+            }
 
-            // 2. Les menus individuels des pages
-            NavigationMenuItem(title = stringResource(R.string.appstrings_page_home_settings), icon = Icons.Default.Home, isSelected = false, isDark = isDark) { onHomeClick() }
+            // 2. Les menus individuels des pages (l'accueil n'existe pas en mode simplifié)
+            if (!simpleMode) {
+                NavigationMenuItem(title = stringResource(R.string.appstrings_page_home_settings), icon = Icons.Default.Home, isSelected = false, isDark = isDark) { onHomeClick() }
+            }
             if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)) {
                 NavigationMenuItem(title = stringResource(R.string.appstrings_page_nearby_settings), icon = Icons.Default.NearMe, isSelected = false, isDark = isDark) { onNearbyClick() }
             }
@@ -387,7 +398,18 @@ fun PagesCustomizationSheet(
                 NavigationMenuItem(title = stringResource(R.string.appstrings_throughput_calculator_title), icon = Icons.Default.Speed, isSelected = false, isDark = isDark) { onThroughputCalculatorClick() }
             }
 
-            // 3. Réglage transverse : la barre de défilement latérale sur toutes les pages
+            // 3. Comment cette page-ci se fait découvrir depuis le reste de l'application
+            Spacer(Modifier.height(sizing.spacing(16.dp)))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+            Spacer(Modifier.height(sizing.spacing(16.dp)))
+            PageCustomizationDiscoveryCard(
+                shape = oneUiActionButtonShape(useOneUi),
+                border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null,
+                bubbleColor = LocalGeoTowerUiStyle.current.bubbleColor,
+                useOneUi = useOneUi
+            )
+
+            // 4. Réglage transverse : la barre de défilement latérale sur toutes les pages
             Spacer(Modifier.height(sizing.spacing(16.dp)))
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
             Spacer(Modifier.height(sizing.spacing(16.dp)))
@@ -736,7 +758,9 @@ fun DraggableSwitchCard(
     shape: androidx.compose.ui.graphics.Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean,
     dragModifier: Modifier, isDragged: Boolean, dragOffset: Float, height: Dp,
     hideSwitch: Boolean = false,
-    onSettingsClick: (() -> Unit)? = null
+    onSettingsClick: (() -> Unit)? = null,
+    highlighted: Boolean = false,
+    anchorModifier: Modifier = Modifier
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val themeMode by AppConfig.themeMode
@@ -744,12 +768,18 @@ fun DraggableSwitchCard(
     val switchColor = MaterialTheme.colorScheme.primary
     val paleBgColor = if (isDark) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.primaryContainer
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
+    val restingColor = if (isDragged) MaterialTheme.colorScheme.surfaceVariant else cardBg
+    val highlightColor = MaterialTheme.colorScheme.primaryContainer
+    val surfaceColor by animateColorAsState(
+        targetValue = if (highlighted) highlightColor else restingColor,
+        label = "blockHighlight"
+    )
 
     Surface(
         shape = shape,
         border = border,
-        color = if (isDragged) MaterialTheme.colorScheme.surfaceVariant else cardBg,
-        modifier = Modifier
+        color = surfaceColor,
+        modifier = anchorModifier
             .fillMaxWidth()
             .defaultMinSize(minHeight = height)
             .zIndex(if (isDragged) 10f else 0f)
@@ -1410,6 +1440,75 @@ fun AllPagesScrollAidsCard(
     )
 }
 
+/**
+ * Les deux relais de découverte réglables : la bulle qui explique la roue dentée d'une page, et le
+ * rappel en bas des pages. L'appui long sur un bloc n'a pas d'interrupteur : c'est un geste, il ne
+ * s'affiche pas et ne dérange donc personne.
+ */
+@Composable
+fun PageCustomizationDiscoveryCard(
+    shape: androidx.compose.ui.graphics.Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
+    useOneUi: Boolean
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val context = LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE) }
+
+    SimpleSwitchCard(
+        title = stringResource(R.string.page_customization_hints_option),
+        showMapLocation = PageCustomizationPrefs.hintsEnabled.value,
+        onLocationChange = { PageCustomizationPrefs.setHintsEnabled(prefs, it) },
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi
+    )
+    Text(
+        text = stringResource(R.string.page_customization_hints_option_desc),
+        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = sizing.spacing(6.dp), start = sizing.spacing(4.dp), end = sizing.spacing(4.dp)),
+        textAlign = TextAlign.Center
+    )
+
+    if (PageCustomizationPrefs.hintsEnabled.value && PageCustomizationPrefs.hasSeenHints()) {
+        TextButton(onClick = { PageCustomizationPrefs.resetHints(prefs) }) {
+            Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.width(sizing.spacing(8.dp)))
+            Text(
+                text = stringResource(R.string.page_customization_reset_hints),
+                fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.primary
+            )
+        }
+    } else {
+        Spacer(Modifier.height(sizing.spacing(12.dp)))
+    }
+
+    SimpleSwitchCard(
+        title = stringResource(R.string.page_customization_footer_option),
+        showMapLocation = PageCustomizationPrefs.footerEnabled.value,
+        onLocationChange = { PageCustomizationPrefs.setFooterEnabled(prefs, it) },
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi
+    )
+    Text(
+        text = stringResource(R.string.page_customization_footer_option_desc),
+        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = sizing.spacing(6.dp), start = sizing.spacing(4.dp), end = sizing.spacing(4.dp)),
+        textAlign = TextAlign.Center
+    )
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SiteSpeedtestsSettingsSheet(
@@ -1577,7 +1676,8 @@ fun ThroughputCalculatorSettingsSheet(
     onBack: () -> Unit,
     sheetState: SheetState,
     useOneUi: Boolean,
-    bubbleColor: Color
+    bubbleColor: Color,
+    highlightBlockId: String? = null
 ) {
     ReorderableBlockSettingsSheet(
         title = stringResource(R.string.appstrings_throughput_calculator_title),
@@ -1627,7 +1727,8 @@ fun ThroughputCalculatorSettingsSheet(
         },
         contentAfterReset = { shape, border ->
             PageScrollAidsCards(PageScrollPrefs.THROUGHPUT_CALCULATOR, shape, border, bubbleColor, useOneUi)
-        }
+        },
+        highlightBlockId = highlightBlockId
     )
 }
 
@@ -1813,7 +1914,8 @@ private fun ReorderableBlockList(
     bubbleColor: Color,
     useOneUi: Boolean,
     cardHeight: Dp = 64.dp,
-    spacing: Dp = 12.dp
+    spacing: Dp = 12.dp,
+    highlightBlockId: String? = null
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val scaledCardHeight = sizing.component(cardHeight)
@@ -1821,6 +1923,17 @@ private fun ReorderableBlockList(
     val currentOrder by rememberUpdatedState(order)
     val reorderState = rememberReorderableDragState(currentOrder, scaledCardHeight, scaledSpacing, onOrderChange)
     val blocksById = blocks.associateBy { it.id }
+
+    // Ligne désignée par un appui long sur la page : amenée à l'écran puis teintée le temps que
+    // l'œil la trouve, avant de redevenir une ligne comme les autres.
+    val highlightRequester = remember { BringIntoViewRequester() }
+    var highlighted by remember(highlightBlockId) { mutableStateOf(highlightBlockId) }
+    LaunchedEffect(highlightBlockId) {
+        if (highlightBlockId == null) return@LaunchedEffect
+        highlightRequester.bringIntoView()
+        delay(2500)
+        highlighted = null
+    }
 
     Column(verticalArrangement = Arrangement.spacedBy(scaledSpacing)) {
         currentOrder.forEach { blockId ->
@@ -1840,7 +1953,13 @@ private fun ReorderableBlockList(
                         reorderState.offsetFor(blockId),
                         scaledCardHeight,
                         hideSwitch = block.hideSwitch,
-                        onSettingsClick = block.onSettingsClick
+                        onSettingsClick = block.onSettingsClick,
+                        highlighted = highlighted == blockId,
+                        anchorModifier = if (highlightBlockId == blockId) {
+                            Modifier.bringIntoViewRequester(highlightRequester)
+                        } else {
+                            Modifier
+                        }
                     )
                 }
             }
@@ -1862,7 +1981,8 @@ fun ReorderableBlockSettingsSheet(
     useOneUi: Boolean,
     bubbleColor: Color,
     contentBeforeList: @Composable ColumnScope.(Shape, BorderStroke?) -> Unit = { _, _ -> },
-    contentAfterReset: @Composable ColumnScope.(Shape, BorderStroke?) -> Unit = { _, _ -> }
+    contentAfterReset: @Composable ColumnScope.(Shape, BorderStroke?) -> Unit = { _, _ -> },
+    highlightBlockId: String? = null
 ) {
     val themeMode by AppConfig.themeMode
     val isOledMode by AppConfig.isOledMode
@@ -1911,7 +2031,8 @@ fun ReorderableBlockSettingsSheet(
                 shape = shape,
                 border = border,
                 bubbleColor = bubbleColor,
-                useOneUi = useOneUi
+                useOneUi = useOneUi,
+                highlightBlockId = highlightBlockId
             )
 
             Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
@@ -1940,7 +2061,8 @@ fun SupportSettingsSheet(
     onOpenMiniMapSettings: () -> Unit,
     onOpenPhotosSettings: () -> Unit,
     onDismiss: () -> Unit, onBack: () -> Unit,
-    sheetState: SheetState, useOneUi: Boolean, bubbleColor: Color
+    sheetState: SheetState, useOneUi: Boolean, bubbleColor: Color,
+    highlightBlockId: String? = null
 ) {
     ReorderableBlockSettingsSheet(
         title = stringResource(R.string.appstrings_page_support_settings),
@@ -1975,7 +2097,8 @@ fun SupportSettingsSheet(
         bubbleColor = bubbleColor,
         contentAfterReset = { shape, border ->
             PageScrollAidsCards(PageScrollPrefs.SUPPORT, shape, border, bubbleColor, useOneUi)
-        }
+        },
+        highlightBlockId = highlightBlockId
     )
 }
 
@@ -1994,6 +2117,9 @@ fun SiteSettingsSheet(
     showOpenMap: Boolean, onOpenMapChange: (Boolean) -> Unit,
     showElevationProfile: Boolean, onElevationProfileChange: (Boolean) -> Unit,
     showThroughputCalculator: Boolean, onThroughputCalculatorChange: (Boolean) -> Unit,
+    // La couverture théorique n'avait pas d'interrupteur : son bloc était donc impossible à
+    // masquer, alors que le mode simplifié le retire par défaut de ses sections opérateur.
+    showTheoreticalCoverage: Boolean, onTheoreticalCoverageChange: (Boolean) -> Unit,
     showNav: Boolean, onNavChange: (Boolean) -> Unit,
     showShare: Boolean, onShareChange: (Boolean) -> Unit,
     showDates: Boolean, onDatesChange: (Boolean) -> Unit,
@@ -2010,7 +2136,8 @@ fun SiteSettingsSheet(
     onBack: () -> Unit,
     sheetState: SheetState,
     useOneUi: Boolean,
-    bubbleColor: Color
+    bubbleColor: Color,
+    highlightBlockId: String? = null
 ) {
     ReorderableBlockSettingsSheet(
         title = stringResource(R.string.appstrings_page_site_settings),
@@ -2029,6 +2156,7 @@ fun SiteSettingsSheet(
             ConfigurableBlock("open_map", { stringResource(R.string.appstrings_site_open_map_option) }, showOpenMap, onOpenMapChange),
             ConfigurableBlock("elevation_profile", { stringResource(R.string.appstrings_site_elevation_profile_option) }, showElevationProfile, onElevationProfileChange),
             ConfigurableBlock("throughput_calculator", { stringResource(R.string.appstrings_site_throughput_calculator_option) }, showThroughputCalculator, onThroughputCalculatorChange),
+            ConfigurableBlock("theoretical_coverage", { stringResource(R.string.appstrings_coverage_button) }, showTheoreticalCoverage, onTheoreticalCoverageChange),
             ConfigurableBlock("nav", { stringResource(R.string.appstrings_site_nav_option) }, showNav, onNavChange),
             ConfigurableBlock("share", { stringResource(R.string.appstrings_site_share_option) }, showShare, onShareChange),
             ConfigurableBlock("dates", { stringResource(R.string.appstrings_site_dates_option) }, showDates, onDatesChange),
@@ -2058,6 +2186,7 @@ fun SiteSettingsSheet(
             onOpenMapChange(true)
             onElevationProfileChange(true)
             onThroughputCalculatorChange(true)
+            onTheoreticalCoverageChange(true)
             onNavChange(true)
             onShareChange(true)
             onDatesChange(true)
@@ -2073,7 +2202,8 @@ fun SiteSettingsSheet(
         bubbleColor = bubbleColor,
         contentAfterReset = { shape, border ->
             PageScrollAidsCards(PageScrollPrefs.SITE, shape, border, bubbleColor, useOneUi)
-        }
+        },
+        highlightBlockId = highlightBlockId
     )
 }
 
@@ -2410,7 +2540,8 @@ fun StatsSettingsSheet(
     onBack: () -> Unit,
     sheetState: SheetState,
     useOneUi: Boolean,
-    bubbleColor: Color
+    bubbleColor: Color,
+    highlightBlockId: String? = null
 ) {
     val context = LocalContext.current
     val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
@@ -2610,7 +2741,8 @@ fun StatsSettingsSheet(
                     shape = shape,
                     border = border,
                     bubbleColor = bubbleColor,
-                    useOneUi = useOneUi
+                    useOneUi = useOneUi,
+                    highlightBlockId = highlightBlockId
                 )
 
                 Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))

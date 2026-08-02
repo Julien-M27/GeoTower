@@ -117,6 +117,7 @@ object PreferenceProfileManager {
         "distance_unit",
         "speed_unit",
         "default_operator",
+        AppNotifications.PREF_ENABLED,
         "enable_update_notifications",
         "enable_live_notifications",
         "nearby_search_radius",
@@ -220,6 +221,7 @@ object PreferenceProfileManager {
         AppConfig.PREF_SETTINGS_SECTIONS_MODE to "Apparence",
         "display_style" to "Apparence",
         // Ce qui tourne hors de l'app, comme dans les réglages.
+        AppNotifications.PREF_ENABLED to "Notifications",
         "enable_update_notifications" to "Notifications",
         "enable_live_notifications" to "Notifications",
         "widget_sync_freq" to "Notifications",
@@ -256,8 +258,9 @@ object PreferenceProfileManager {
         "nav_mode" to "Navigation des paramètres",
         AppConfig.PREF_SETTINGS_SECTIONS_MODE to "Navigation des paramètres (téléphone)",
         "display_style" to "Style d'affichage",
+        AppNotifications.PREF_ENABLED to "Notifications de l'app",
         "enable_update_notifications" to "Notifications de mise à jour",
-        "enable_live_notifications" to "Notification live",
+        "enable_live_notifications" to "Suivi live",
         "widget_sync_freq" to "Fréquence des widgets",
         "live_tracking_location_update_interval_seconds" to "Rafraîchissement live",
         "startup_page" to "Page de démarrage",
@@ -563,9 +566,11 @@ object PreferenceProfileManager {
         AppConfig.defaultOperator.value = prefs.getString("default_operator", "Aucun") ?: "Aucun"
         AppConfig.uiScalePercent.intValue = AppConfig.readUiScalePercent(prefs)
         AppConfig.loadSavedFilters(prefs)
+        // Un profil écrase toutes les clés : les états miroités en mémoire doivent être relus.
+        PageCustomizationPrefs.load(prefs)
 
         UpdateCheckScheduler.onNotificationsPreferenceChanged(context, AppConfig.enableUpdateNotifications.value)
-        if (AppConfig.enableLiveNotifications.value) {
+        if (AppConfig.enableLiveTracking.value) {
             LiveTrackingController.startIfEligible(context)
         } else {
             LiveTrackingController.stop(context)

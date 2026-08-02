@@ -72,6 +72,7 @@ import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.geoTowerLazyListFadingEdge
 import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.utils.PageScrollPrefs
+import fr.geotower.ui.navigation.ROOT_FALLBACK_ROUTE
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
@@ -173,7 +174,7 @@ fun HelpScreen(navController: NavController) {
     var query by rememberSaveable { mutableStateOf("") }
     var selectedTopicId by rememberSaveable { mutableStateOf<String?>(null) }
     var lastClickTime by remember { mutableLongStateOf(0L) }
-    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = ROOT_FALLBACK_ROUTE)
     val themeMode by AppConfig.themeMode
     val isOled by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())

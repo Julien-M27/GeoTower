@@ -6,6 +6,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -61,7 +62,6 @@ import fr.geotower.ui.screens.settings.SettingsScreen
 import fr.geotower.ui.screens.settings.PhotosFavoritesScreen
 import fr.geotower.ui.screens.settings.ShareHistoryScreen
 import fr.geotower.data.share.ShareHistoryStore
-import fr.geotower.ui.screens.settings.OutageSourceScreen
 import fr.geotower.ui.screens.coverage.TheoreticalCoverageScreen
 import fr.geotower.ui.screens.emitters.ElevationProfileScreen
 import fr.geotower.ui.screens.emitters.NearEmittersSupportWrapperScreen
@@ -108,14 +108,70 @@ object AppGlobalState {
     const val EXTRA_UPLOAD_RESULT_UPLOAD_ID = "SQ_UPLOAD_RESULT_UPLOAD_ID"
 }
 
+/**
+ * Mode simplifié : la fiche site autonome n'existe plus, elle est dépliée sous son opérateur dans
+ * la fiche support. Notifications, widget, liens profonds `geotower://site/{id}` et historiques
+ * visent toujours `site_detail/{id}` — on résout ici le pylône porteur pour les y renvoyer.
+ *
+ * Si l'antenne n'a pas de pylône exploitable (donnée incomplète), on laisse l'ancienne fiche
+ * s'ouvrir plutôt que de bloquer l'utilisateur sur un écran vide.
+ */
+@Composable
+private fun SiteDetailSimpleModeRoute(
+    navController: NavHostController,
+    repository: AnfrRepository,
+    antennaId: String,
+    applyMapFilters: Boolean
+) {
+    // null = résolution en cours, "" = pas de pylône, sinon l'identifiant du support.
+    var resolvedSupportId by remember(antennaId) { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(antennaId) {
+        val supportId = withContext(Dispatchers.IO) {
+            runCatching {
+                repository.getPhysiqueByAnfr(antennaId)
+                    .firstNotNullOfOrNull { physique -> physique.idSupport.takeIf { it.isNotBlank() } }
+            }.getOrNull()
+        }
+        if (supportId != null) {
+            navController.navigate(
+                "support_detail/${Uri.encode(supportId)}?operator=&fromMap=$applyMapFilters" +
+                    "&expand=${Uri.encode(antennaId)}"
+            ) {
+                // Le patron, pas la route remplie : popUpTo compare les destinations du graphe.
+                popUpTo("site_detail/{id}") { inclusive = true }
+                launchSingleTop = true
+            }
+        }
+        resolvedSupportId = supportId.orEmpty()
+    }
+
+    when (resolvedSupportId) {
+        // Pas de pylône exploitable : on garde l'ancienne fiche autonome plutôt qu'un écran vide.
+        "" -> SiteDetailToolWrapperScreen(navController, repository, antennaId, applyMapFilters = applyMapFilters)
+        // Résolution en cours, ou navigation déjà lancée : on occupe l'écran le temps du basculement.
+        else -> Box(
+            modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background),
+            contentAlignment = androidx.compose.ui.Alignment.Center
+        ) {
+            fr.geotower.ui.components.GeoTowerLoadingMessage(
+                title = stringResource(R.string.appstrings_site_detail_loading_title),
+                detail = stringResource(R.string.appstrings_site_detail_loading_desc)
+            )
+        }
+    }
+}
+
 @Composable
 private fun DisabledFeatureRoute(navController: NavHostController, message: String) {
     val context = LocalContext.current
     LaunchedEffect(message) {
         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
-        navController.navigate("home") {
+        // En mode simplifié il n'y a pas d'accueil : le repli est la carte.
+        val fallback = AppConfig.homeRoute()
+        navController.navigate(fallback) {
             launchSingleTop = true
-            popUpTo("home") { inclusive = false }
+            popUpTo(fallback) { inclusive = false }
         }
     }
 }
@@ -397,7 +453,15 @@ class MainActivity : ComponentActivity() {
         val assistantFeature = intent.getStringExtra("app_feature")
 
         // --- NOUVEAU : Lecture de la page de démarrage choisie par l'utilisateur ---
-        val savedStartupPage = sharedPref.getString("startup_page", "home") ?: "home"
+        // Le mode simplifié n'a pas d'accueil : il démarre toujours sur la carte, qui devient la
+        // racine du backstack (le retour système quitte l'app, comme depuis l'accueil).
+        val simpleModeAtLaunch = AppConfig.isSimpleModeActive(sharedPref)
+        val simpleModeHomeRoute = "map"
+        val savedStartupPage = if (simpleModeAtLaunch) {
+            simpleModeHomeRoute
+        } else {
+            sharedPref.getString("startup_page", "home") ?: "home"
+        }
 
         // On détermine la destination finale en fonction de la demande
         val destinationApresSplash = if (isFirstRun) {
@@ -407,7 +471,8 @@ class MainActivity : ComponentActivity() {
         } else if (mapDeepLinkRoute != null) {
             mapDeepLinkRoute
         } else if (isDeepLink) {
-            "home" // ✅ On laisse le NavHost gérer la navigation profonde
+            // ✅ On laisse le NavHost gérer la navigation profonde
+            if (simpleModeAtLaunch) simpleModeHomeRoute else "home"
         } else if (notifSiteId != null) {
             "site_detail/$notifSiteId" // 🌟 Ouvre le détail si on vient de la notif
         } else if (widgetDest == "nearby") {
@@ -426,7 +491,7 @@ class MainActivity : ComponentActivity() {
                 "map" -> "map"
                 "compass" -> "compass"
                 "stats" -> "stats"
-                else -> "home"
+                else -> if (simpleModeAtLaunch) simpleModeHomeRoute else "home"
             }
         }
 
@@ -588,7 +653,9 @@ class MainActivity : ComponentActivity() {
                                             onFinished = {
                                                 sharedPref.edit().putBoolean("isFirstRun", false)
                                                     .apply()
-                                                navController.navigate("home") {
+                                                // Le tuto propose le mode simplifié : on relit le
+                                                // choix ici pour atterrir sur la bonne racine.
+                                                navController.navigate(AppConfig.homeRoute()) {
                                                     popUpTo("first_start") { inclusive = true }
                                                 }
                                             }
@@ -596,7 +663,7 @@ class MainActivity : ComponentActivity() {
                                     } else {
                                         LaunchedEffect(Unit) {
                                             sharedPref.edit().putBoolean("isFirstRun", false).apply()
-                                            navController.navigate("home") {
+                                            navController.navigate(AppConfig.homeRoute()) {
                                                 popUpTo("first_start") { inclusive = true }
                                             }
                                         }
@@ -634,11 +701,31 @@ class MainActivity : ComponentActivity() {
                             ) { backStackEntry ->
                                 val photoDraftId = backStackEntry.arguments?.getString("photoDraftId")
                                 if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
-                                    MapScreen(
-                                        navController = navController,
-                                        viewModel = sharedMapViewModel,
-                                        photoDraftId = photoDraftId
-                                    )
+                                    // Mode simplifié : la carte est la racine, le tiroir remplace
+                                    // l'accueil. Il n'enveloppe que cette destination.
+                                    if (AppConfig.simpleModeActive()) {
+                                        val drawerState = rememberDrawerState(DrawerValue.Closed)
+                                        val drawerScope = rememberCoroutineScope()
+                                        fr.geotower.ui.components.SimpleModeDrawer(
+                                            navController = navController,
+                                            drawerState = drawerState
+                                        ) {
+                                            MapScreen(
+                                                navController = navController,
+                                                viewModel = sharedMapViewModel,
+                                                photoDraftId = photoDraftId,
+                                                onOpenSimpleModeMenu = {
+                                                    drawerScope.launch { drawerState.open() }
+                                                }
+                                            )
+                                        }
+                                    } else {
+                                        MapScreen(
+                                            navController = navController,
+                                            viewModel = sharedMapViewModel,
+                                            photoDraftId = photoDraftId
+                                        )
+                                    }
                                 } else {
                                     DisabledFeatureRoute(navController, txtUnavailable)
                                 }
@@ -767,22 +854,17 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            // Source des pannes (ouvert depuis Réglages ▸ au-dessus de la base de
-                            // données, ou depuis la notification de génération des pannes).
-                            composable(
-                                route = "outage_source",
-                                deepLinks = listOf(navDeepLink { uriPattern = "geotower://outage_source" })
-                            ) {
-                                Box(modifier = Modifier.padding(innerPadding)) {
-                                    OutageSourceScreen(
-                                        navController = navController,
-                                        repository = repository
-                                    )
-                                }
-                            }
-
                             // Traitement local des données (niveaux 0..3), ouvert depuis Réglages.
-                            composable("local_mode") {
+                            // Les réglages des pannes y vivent désormais (niveau ≥ 1) : le lien
+                            // profond historique `geotower://outage_source`, encore porté par les
+                            // notifications de récupération déjà postées, atterrit donc ici.
+                            composable(
+                                route = "local_mode",
+                                deepLinks = listOf(
+                                    navDeepLink { uriPattern = "geotower://local_mode" },
+                                    navDeepLink { uriPattern = "geotower://outage_source" }
+                                )
+                            ) {
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     fr.geotower.ui.screens.settings.LocalModeScreen(
                                         navController = navController,
@@ -889,7 +971,7 @@ class MainActivity : ComponentActivity() {
 
                             // --- 1. DÉTAIL DU SUPPORT (Le Pylône) ---
                             composable(
-                                route = "support_detail/{id}?operator={operator}&fromMap={fromMap}&photoDraftId={photoDraftId}",
+                                route = "support_detail/{id}?operator={operator}&fromMap={fromMap}&photoDraftId={photoDraftId}&expand={expand}",
                                 arguments = listOf(
                                     navArgument("id") { type = NavType.StringType },
                                     navArgument("operator") {
@@ -905,6 +987,12 @@ class MainActivity : ComponentActivity() {
                                         type = NavType.StringType
                                         nullable = true
                                         defaultValue = null
+                                    },
+                                    // Mode simplifié : opérateur à déplier d'emblée sur la fiche.
+                                    navArgument("expand") {
+                                        type = NavType.StringType
+                                        nullable = true
+                                        defaultValue = null
                                     }
                                 ),
                                 deepLinks = listOf(navDeepLink { uriPattern = "geotower://support/{id}" })
@@ -913,6 +1001,7 @@ class MainActivity : ComponentActivity() {
                                 val highlightedOperatorKey = backStackEntry.arguments?.getString("operator")
                                 val applyMapFilters = backStackEntry.arguments?.getBoolean("fromMap") ?: false
                                 val photoDraftId = backStackEntry.arguments?.getString("photoDraftId")
+                                val expandAntennaId = backStackEntry.arguments?.getString("expand")
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SUPPORT_DETAIL)) {
                                         fr.geotower.ui.screens.emitters.SupportSiteWrapperScreen(
@@ -922,7 +1011,8 @@ class MainActivity : ComponentActivity() {
                                             id,
                                             highlightedOperatorKey = highlightedOperatorKey,
                                             applyMapFilters = applyMapFilters,
-                                            photoDraftId = photoDraftId
+                                            photoDraftId = photoDraftId,
+                                            expandAntennaId = expandAntennaId
                                         )
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
@@ -939,7 +1029,11 @@ class MainActivity : ComponentActivity() {
                                 val id = backStackEntry.arguments?.getString("id") ?: ""
                                 Box(modifier = Modifier.padding(innerPadding)) {
                                     if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)) {
-                                        SiteDetailToolWrapperScreen(navController, repository, id)
+                                        if (AppConfig.simpleModeActive()) {
+                                            SiteDetailSimpleModeRoute(navController, repository, id, applyMapFilters = false)
+                                        } else {
+                                            SiteDetailToolWrapperScreen(navController, repository, id)
+                                        }
                                     } else {
                                         DisabledFeatureRoute(navController, txtUnavailable)
                                     }

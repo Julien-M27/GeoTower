@@ -71,7 +71,8 @@ fun RadioDatabaseDownloadCard(
     shape: Shape,
     border: BorderStroke?,
     bubbleColor: Color,
-    onSafeClick: SafeClick? = null
+    onSafeClick: SafeClick? = null,
+    refreshState: DatabaseRefreshState? = null
 ) {
     val context = LocalContext.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -109,7 +110,11 @@ fun RadioDatabaseDownloadCard(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(isSyncing, refreshTrigger, txtSearching, txtUnknown, txtNoDb, txtInvalidDb, featureFlags) {
+    // Actualisation de toute la section « Base de données » : clé partagée par les quatre cartes.
+    val sectionRefreshKey = refreshState?.refreshKey ?: 0
+    DatabaseRefreshMembership(refreshState, DatabaseRefreshIds.RADIO)
+
+    LaunchedEffect(isSyncing, refreshTrigger, sectionRefreshKey, txtSearching, txtUnknown, txtNoDb, txtInvalidDb, featureFlags) {
         withContext(Dispatchers.IO) {
             val dbPath = context.getDatabasePath(RadioDatabaseValidator.DB_NAME)
             var nextLocalVersion = txtNoDb
@@ -156,6 +161,7 @@ fun RadioDatabaseDownloadCard(
                 -1.0
             }
         }
+        refreshState?.reportRefreshed(DatabaseRefreshIds.RADIO, sectionRefreshKey)
     }
 
     Surface(

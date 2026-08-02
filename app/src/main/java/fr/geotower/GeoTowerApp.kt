@@ -33,6 +33,8 @@ class GeoTowerApp : Application() {
         )
         Configuration.getInstance().userAgentValue = packageName
         RemoteFeatureFlags.loadCached(applicationContext)
+        // Dernière version connue de l'app : le bandeau du tiroir doit être juste dès l'ouverture.
+        fr.geotower.data.api.AppUpdateState.loadCached(applicationContext)
         PreferenceProfileManager.install(applicationContext)
         fr.geotower.utils.SystemPower.init(applicationContext)
         // Niveau faible conso chargé tôt (avant tout service/worker) → PowerProfile fiable même sans UI lancée.
@@ -40,6 +42,8 @@ class GeoTowerApp : Application() {
         fr.geotower.utils.AppConfig.lowPowerLevel.intValue = ecoPrefs.getInt(fr.geotower.utils.AppConfig.PREF_LOW_POWER_LEVEL, 0)
         fr.geotower.utils.AppConfig.lowPowerFollowSystem.value = ecoPrefs.getBoolean(fr.geotower.utils.AppConfig.PREF_LOW_POWER_FOLLOW_SYSTEM, false)
         // Mode « traitement local » chargé tôt (avant tout worker) + éligibilité de génération DB.
+        // La migration de l'ancien interrupteur « pannes en local » doit précéder la lecture.
+        fr.geotower.utils.AppConfig.migrateLegacyOutageSourcePref(applicationContext)
         fr.geotower.utils.AppConfig.localModeLevel.intValue =
             ecoPrefs.getInt(fr.geotower.utils.AppConfig.PREF_LOCAL_MODE_LEVEL, 0).coerceIn(0, 3)
         fr.geotower.utils.AppConfig.localBuildEligible.value =

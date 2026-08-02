@@ -11,7 +11,9 @@ import android.os.PowerManager
 import android.provider.Settings
 import androidx.core.content.ContextCompat
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.PreferenceStores
 
 object LiveTrackingController {
 
@@ -20,6 +22,11 @@ object LiveTrackingController {
         Started,
         MissingOperator,
         MissingPreciseLocation,
+
+        /**
+         * Plus jamais renvoyé par [eligibility] : le suivi ne dépend plus de POST_NOTIFICATIONS.
+         * Conservé pour ne pas casser un `when` existant sur l'enum.
+         */
         MissingNotifications
     }
 
@@ -46,11 +53,46 @@ object LiveTrackingController {
 
     fun startOnAppLaunchIfEnabled(context: Context): StartResult {
         if (!RemoteFeatureFlags.isPlatformEnabled(RemoteFeatureFlags.Platform.LIVE_TRACKING)) return StartResult.Stopped
-        val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
-        if (!prefs.getBoolean("enable_live_notifications", false)) return StartResult.Stopped
+        if (!isEnabled(context)) return StartResult.Stopped
         if (LiveTrackingService.isRunning) return StartResult.Started
         return startIfEligible(context)
     }
+
+    fun isEnabled(context: Context): Boolean = prefs(context).getBoolean(AppConfig.PREF_ENABLE_LIVE_TRACKING, false)
+
+    /**
+     * Écrit le réglage du suivi live, met à jour l'état en mémoire et applique au service.
+     *
+     * Renvoie le résultat réel : allumer alors que la localisation manque laisse le réglage à
+     * `false` (l'interrupteur retombe) plutôt que d'afficher un suivi qui ne tourne pas.
+     * La permission de notification n'intervient pas ici — voir [eligibility].
+     */
+    fun setEnabled(context: Context, enabled: Boolean): StartResult {
+        val appContext = context.applicationContext
+        if (!enabled) {
+            persistEnabled(appContext, false)
+            stop(appContext)
+            return StartResult.Stopped
+        }
+
+        val eligibility = eligibility(appContext)
+        if (eligibility != StartResult.Started) {
+            persistEnabled(appContext, false)
+            stop(appContext)
+            return eligibility
+        }
+
+        persistEnabled(appContext, true)
+        return startIfEligible(appContext)
+    }
+
+    private fun persistEnabled(context: Context, enabled: Boolean) {
+        AppConfig.enableLiveTracking.value = enabled
+        prefs(context).edit().putBoolean(AppConfig.PREF_ENABLE_LIVE_TRACKING, enabled).apply()
+    }
+
+    private fun prefs(context: Context) =
+        context.applicationContext.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
 
     fun stop(context: Context) {
         context.applicationContext.stopService(
@@ -88,16 +130,34 @@ object LiveTrackingController {
         }
     }
 
+    /**
+     * Le suivi live ne dépend QUE de la localisation précise.
+     *
+     * La permission de notification n'entre plus dans l'éligibilité : Android laisse tourner un
+     * service de premier plan sans POST_NOTIFICATIONS, il masque seulement sa notification (le
+     * service reste visible dans le gestionnaire de tâches). Refuser les notifications coupait donc
+     * le suivi GPS tout entier, alors que l'utilisateur ne refusait qu'un affichage.
+     *
+     * Plus d'exigence d'opérateur non plus : sans opérateur choisi, le suivi se rabat sur l'antenne
+     * la plus proche (tous opérateurs). On garde StartResult.MissingOperator dans l'enum pour
+     * compatibilité, mais l'éligibilité ne le renvoie plus.
+     */
     fun eligibility(context: Context): StartResult {
-        // Plus d'exigence d'opérateur : sans opérateur choisi, le suivi se rabat sur
-        // l'antenne la plus proche (tous opérateurs). On garde StartResult.MissingOperator
-        // dans l'enum pour compatibilité, mais l'éligibilité ne le renvoie plus.
         return when {
             !RemoteFeatureFlags.isPlatformEnabled(RemoteFeatureFlags.Platform.LIVE_TRACKING) -> StartResult.Stopped
             !hasPreciseLocationPermission(context) -> StartResult.MissingPreciseLocation
-            !hasPostNotificationsPermission(context) -> StartResult.MissingNotifications
             else -> StartResult.Started
         }
+    }
+
+    /**
+     * Vrai si la notification du suivi live serait invisible faute de POST_NOTIFICATIONS.
+     *
+     * À utiliser pour *proposer* la permission au moment d'allumer le suivi, jamais pour le
+     * bloquer : le tracking fonctionne sans, seule sa notification manque à l'appel.
+     */
+    fun notificationPermissionMissing(context: Context): Boolean {
+        return !hasPostNotificationsPermission(context)
     }
 
     fun shouldOpenPromotedNotificationSettings(context: Context): Boolean {

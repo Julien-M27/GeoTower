@@ -32,6 +32,7 @@ import fr.geotower.data.upload.SignalQuestUploadManifest
 import fr.geotower.data.upload.SignalQuestUploadQueue
 import fr.geotower.data.upload.SignalQuestUploadQueueException
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 import fr.geotower.utils.OperatorColors
 import kotlinx.coroutines.CancellationException
@@ -201,6 +202,7 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
     }
 
     private fun showCancelledNotification(uploadId: String, summary: CancelledUploadSummary, resultNotificationId: Int) {
+        if (!AppNotifications.canPost(applicationContext)) return
         notifySafely(
             resultNotificationId,
             createResultNotification(
@@ -369,6 +371,9 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
         resultNotificationId: Int
     ) {
         cancelSafely(progressNotificationId)
+        // Le bilan de l'envoi suit l'interrupteur maître des notifications ; la progression, elle,
+        // appartient au service de premier plan et vient d'être retirée juste au-dessus.
+        if (!AppNotifications.canPost(applicationContext)) return
         val message = if (!partial) {
             applicationContext.resources.getQuantityString(R.plurals.notification_upload_success, total, successCount, total)
         } else {
@@ -389,6 +394,7 @@ class SignalQuestUploadWorker(context: Context, params: WorkerParameters) : Coro
 
     private fun showRetryNotification(progressNotificationId: Int, resultNotificationId: Int) {
         cancelSafely(progressNotificationId)
+        if (!AppNotifications.canPost(applicationContext)) return
         notifySafely(
             resultNotificationId,
             createResultNotification(

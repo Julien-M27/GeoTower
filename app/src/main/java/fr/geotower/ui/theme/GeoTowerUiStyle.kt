@@ -36,21 +36,43 @@ internal const val GEO_TOWER_UI_REFERENCE_WIDTH_DP = 400f
 // Bornes du facteur d'ecran : evite une UI minuscule sur tres petit ecran et geante sur tablette.
 internal const val GEO_TOWER_UI_SCREEN_FACTOR_MIN = 0.9f
 internal const val GEO_TOWER_UI_SCREEN_FACTOR_MAX = 1.15f
+// Au-dela de ce seuil (plus petite dimension, en dp) on est sur un grand ecran : Fold deplie ou
+// tablette. Le facteur y est fige a 1.0 : un grand ecran doit montrer PLUS de contenu, pas du
+// contenu PLUS GROS. En pratique la bande 460..600.dp est vide (les telephones plafonnent vers
+// 450.dp de plus petite largeur, le palier tablette commence a 600.dp), la marche est donc
+// invisible sur les appareils reels.
+internal const val GEO_TOWER_UI_LARGE_SCREEN_MIN_DIMENSION_DP = 600
+internal const val GEO_TOWER_UI_LARGE_SCREEN_FACTOR = 1f
 
 // Reglage utilisateur, en pourcentage (100 = rendu de reference).
 internal const val GEO_TOWER_UI_SCALE_PERCENT_MIN = 80
 internal const val GEO_TOWER_UI_SCALE_PERCENT_MAX = 120
 internal const val GEO_TOWER_UI_SCALE_PERCENT_DEFAULT = 100
 
-/** Facteur d'echelle derive de la largeur d'ecran (borne). Vaut 1.0 a la largeur de reference. */
-fun geoTowerScreenFactor(screenWidthDp: Int): Float =
-    (screenWidthDp / GEO_TOWER_UI_REFERENCE_WIDTH_DP)
+/**
+ * Facteur d'echelle derive de la taille d'ecran (borne). Vaut 1.0 a la largeur de reference.
+ *
+ * On raisonne sur la PLUS PETITE dimension de la fenetre, pas sur la largeur courante : sinon un
+ * telephone bascule en paysage franchit d'un coup la largeur de reference et voit toute son UI
+ * grossir a la rotation.
+ *
+ * Sur grand ecran le facteur est fige a 1.0. Le rapport largeur/400 saturait des 460.dp : un Fold
+ * deplie (700 a 900.dp) etait donc colle au plafond de 1.15 et rendait toute l'application ~15%
+ * plus grosse que sur un telephone, d'ou l'accueil, les reglages et « A propos » « trop zoomes ».
+ */
+fun geoTowerScreenFactor(screenWidthDp: Int, screenHeightDp: Int): Float {
+    val smallestDimensionDp = minOf(screenWidthDp, screenHeightDp)
+    if (smallestDimensionDp >= GEO_TOWER_UI_LARGE_SCREEN_MIN_DIMENSION_DP) {
+        return GEO_TOWER_UI_LARGE_SCREEN_FACTOR
+    }
+    return (smallestDimensionDp / GEO_TOWER_UI_REFERENCE_WIDTH_DP)
         .coerceIn(GEO_TOWER_UI_SCREEN_FACTOR_MIN, GEO_TOWER_UI_SCREEN_FACTOR_MAX)
+}
 
 /** Echelle effective appliquee a toute l'UI = reference x facteur ecran x reglage utilisateur. */
-fun geoTowerEffectiveScale(scalePercent: Int, screenWidthDp: Int): Float =
+fun geoTowerEffectiveScale(scalePercent: Int, screenWidthDp: Int, screenHeightDp: Int): Float =
     GEO_TOWER_UI_BASELINE_SCALE *
-        geoTowerScreenFactor(screenWidthDp) *
+        geoTowerScreenFactor(screenWidthDp, screenHeightDp) *
         (scalePercent.coerceIn(GEO_TOWER_UI_SCALE_PERCENT_MIN, GEO_TOWER_UI_SCALE_PERCENT_MAX) / 100f)
 
 @Immutable
@@ -123,7 +145,9 @@ fun rememberGeoTowerUiStyle(): GeoTowerUiStyle {
     val isOled by AppConfig.isOledMode
     val uiMode by AppConfig.uiMode
     val scalePercent by AppConfig.uiScalePercent
-    val screenWidthDp = LocalConfiguration.current.screenWidthDp
+    val configuration = LocalConfiguration.current
+    val screenWidthDp = configuration.screenWidthDp
+    val screenHeightDp = configuration.screenHeightDp
     val isDark = themeMode == 2 || (themeMode == 0 && isSystemInDarkTheme())
     val useOneUi = uiMode.usesOneUi()
     val backgroundColor = if (isDark && isOled) Color.Black else MaterialTheme.colorScheme.background
@@ -144,7 +168,7 @@ fun rememberGeoTowerUiStyle(): GeoTowerUiStyle {
     }
     val cardBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
     val subtleBorder = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.16f))
-    val sizing = geoTowerUiSizing(scalePercent, screenWidthDp)
+    val sizing = geoTowerUiSizing(scalePercent, screenWidthDp, screenHeightDp)
 
     return GeoTowerUiStyle(
         useOneUi = useOneUi,
@@ -165,8 +189,8 @@ fun rememberGeoTowerUiStyle(): GeoTowerUiStyle {
     )
 }
 
-private fun geoTowerUiSizing(scalePercent: Int, screenWidthDp: Int): GeoTowerUiSizing {
-    val scale = geoTowerEffectiveScale(scalePercent, screenWidthDp)
+private fun geoTowerUiSizing(scalePercent: Int, screenWidthDp: Int, screenHeightDp: Int): GeoTowerUiSizing {
+    val scale = geoTowerEffectiveScale(scalePercent, screenWidthDp, screenHeightDp)
     return GeoTowerUiSizing(
         scalePercent = scalePercent,
         componentScale = scale,

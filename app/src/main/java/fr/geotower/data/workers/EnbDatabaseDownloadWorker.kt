@@ -25,6 +25,7 @@ import fr.geotower.data.api.EnbDatabaseDownloader
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DbOperationTimings
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.AppNotifications
 import fr.geotower.utils.NotificationIconResources
 import kotlinx.coroutines.CancellationException
 import java.util.concurrent.TimeUnit
@@ -91,6 +92,9 @@ class EnbDatabaseDownloadWorker(
     }
 
     private fun notifySafely(id: Int, notification: android.app.Notification) {
+        // Voir DatabaseDownloadWorker : seule la notification de progression (service de premier
+        // plan) échappe à l'interrupteur maître des notifications.
+        if (id != notificationId && !AppNotifications.canPost(context)) return
         runCatching {
             notificationManager.notify(id, notification)
         }.onFailure { error ->

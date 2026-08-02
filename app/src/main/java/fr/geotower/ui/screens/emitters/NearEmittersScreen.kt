@@ -103,6 +103,7 @@ import fr.geotower.data.api.NominatimGeoPoint
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.ui.components.SecureScreenEffect
 import fr.geotower.ui.components.rememberSafeClick
+import fr.geotower.ui.navigation.ROOT_FALLBACK_ROUTE
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.map.FilterToggleButton
 import fr.geotower.ui.screens.map.FreqRow
@@ -269,7 +270,7 @@ fun NearEmittersScreen(
 
     val safeClick = rememberSafeClick()
 
-    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = "home")
+    val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = ROOT_FALLBACK_ROUTE)
 
     BackHandler(enabled = !safeBackNavigation.isLocked) {
         safeBackNavigation.navigateBack()
@@ -782,12 +783,17 @@ fun NearEmittersScreen(
                 backEnabled = !safeBackNavigation.isLocked,
                 actionsWidth = 48.dp,
                 actions = {
-                    IconButton(onClick = { safeClick { showNearbySettingsSheet = true } }) {
-                        Icon(
-                            Icons.Default.Settings,
-                            contentDescription = stringResource(R.string.appstrings_settings_title),
-                            tint = MaterialTheme.colorScheme.onSurface
-                        )
+                    fr.geotower.ui.components.PageCustomizationHint(
+                        page = fr.geotower.utils.PageScrollPrefs.NEARBY,
+                        onOpenSettings = { safeClick { showNearbySettingsSheet = true } }
+                    ) {
+                        IconButton(onClick = { safeClick { showNearbySettingsSheet = true } }) {
+                            Icon(
+                                Icons.Default.Settings,
+                                contentDescription = stringResource(R.string.appstrings_settings_title),
+                                tint = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                     }
                 }
             )

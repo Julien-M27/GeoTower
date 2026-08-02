@@ -1399,7 +1399,7 @@ class AnfrRepository(
 
     /** Distingue les deux sources possibles : un changement de réglage doit invalider le cache. */
     private fun currentSitesHsSourceKey(): String {
-        return if (outageLocalConfig.useLocalSource || AppConfig.outagesLocal()) "local" else "remote"
+        return if (AppConfig.outagesLocal()) "local" else "remote"
     }
 
     private fun readSitesHsCache(sourceKey: String): List<SiteHsEntity>? {
@@ -1415,8 +1415,8 @@ class AnfrRepository(
 
     private suspend fun loadSitesHs(): List<SiteHsEntity> {
         // Source « traitée localement » : télécharge les CSV opérateurs + géocode via la base ANFR.
-        // Activée par le réglage outage OU par le mode « traitement local » (niveau ≥ 1).
-        if (outageLocalConfig.useLocalSource || AppConfig.outagesLocal()) {
+        // Activée par le mode « traitement local » (niveau ≥ 1), seul réglage qui en décide.
+        if (AppConfig.outagesLocal()) {
             return localOutageProvider.getSites()
         }
         if (!RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.OUTAGES_GEOTOWER)) {

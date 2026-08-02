@@ -17,7 +17,7 @@ import java.util.concurrent.TimeUnit
 
 private val OFFICIAL_ANNOUNCEMENT_URLS = listOf(
     OfficialAnnouncementUrl(
-        host = "api.cajejuma.fr",
+        host = "api.geotower.fr",
         pathPrefixes = listOf("/status", "/api/", "/geotower/")
     ),
     OfficialAnnouncementUrl(
@@ -264,6 +264,9 @@ object RemoteFeatureFlags {
         const val APP_UPDATE_CHECK = "appUpdate.check"
         // Kill-switch distant du mode « traitement local » (défaut activé) : false ⇒ niveau effectif = 0.
         const val LOCAL_MODE_ENABLED = "localMode.enabled"
+        // Kill-switch distant du mode simplifié (défaut activé) : false ⇒ l'app reprend sa
+        // navigation habituelle (accueil, fiches séparées), sans effacer le choix de l'utilisateur.
+        const val SIMPLE_MODE_ENABLED = "simpleMode.enabled"
         const val OUTAGES_DATA = "outages.data"
         const val OUTAGES_MAP_LAYER = "outages.mapLayer"
         const val OUTAGES_SITE_STATUS = "outages.siteStatus"
@@ -424,6 +427,7 @@ object RemoteFeatureFlags {
             Features.DATABASE_UPDATE_CHECK to true,
             Features.APP_UPDATE_CHECK to true,
             Features.LOCAL_MODE_ENABLED to true,
+            Features.SIMPLE_MODE_ENABLED to true,
             Features.OUTAGES_DATA to true,
             Features.OUTAGES_MAP_LAYER to true,
             Features.OUTAGES_SITE_STATUS to true,

@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -36,6 +37,11 @@ import fr.geotower.utils.AppConfig
  * backend GeoTower. Le rafraîchissement des feature-flags reste actif à tous les niveaux (contrôle
  * distant), et un kill-switch distant ([RemoteFeatureFlags.Features.LOCAL_MODE_ENABLED]) peut forcer
  * le niveau effectif à 0. Les services tiers (carto, altimétrie, recherche) ne sont jamais touchés.
+ *
+ * Chaque palier affiche SES réglages juste sous la liste, au lieu de les disperser dans d'autres
+ * pages : niveau ≥ 1 → [OutageLocalControls] (fréquence, arrière-plan, mise à jour immédiate des
+ * pannes), niveau ≥ 2 → [LocalDbBuildCard] (génération de la base). Le niveau est ainsi la seule
+ * vérité, et l'ancienne page « Source des pannes » n'existe plus.
  */
 @Composable
 fun LocalModeScreen(
@@ -126,8 +132,19 @@ fun LocalModeScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
+            // Niveau ≥ 1 : les pannes sont récupérées ici, donc leurs réglages s'affichent ici.
+            if (level >= 1) {
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                )
+                OutageLocalControls()
+            }
+
             // Niveau ≥ 2 : la base doit être générée sur l'appareil (si éligible) au lieu d'être téléchargée.
             if (level >= 2) {
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                )
                 Text(
                     text = stringResource(
                         if (eligibility.eligible) R.string.local_mode_db_eligible else R.string.local_mode_db_ineligible,

@@ -93,6 +93,32 @@ object MapDisplayPrefs {
 object SitePagePrefs {
     const val ORDER = "page_site_order"
     const val MINI_MAP_MODE = "page_site_mini_map_mode"
+
+    /**
+     * Suffixe des clés de visibilité propres aux sections opérateur du mode simplifié.
+     *
+     * Ces sections sont un résumé inséré dans la fiche du pylône, pas la fiche site autonome :
+     * elles n'affichent pas les mêmes blocs, et régler l'une ne doit pas dérégler l'autre.
+     */
+    const val EMBEDDED_SUFFIX = "_simple"
+
+    /**
+     * Blocs masqués **par défaut** dans une section opérateur du mode simplifié (l'utilisateur peut
+     * les rétablir depuis « Personnaliser cette page », au pied de la section).
+     *
+     * Ce sont les blocs de détail ou d'outillage : la section sert à comparer les opérateurs d'un
+     * pylône d'un coup d'œil, pas à tout déplier.
+     */
+    val embeddedHiddenByDefault = setOf(
+        "status",
+        "bearing_height",
+        "dates",
+        "network_ids",
+        "speedtest",
+        "elevation_profile",
+        "theoretical_coverage",
+        "throughput_calculator"
+    )
     const val DEFAULT_ORDER =
         "operator,bearing_height,map,support_details,elevation_profile,theoretical_coverage,throughput_calculator,open_map,photos,speedtest,nav,share,panel_heights,ids,network_ids,dates,address,status,freqs,links"
 

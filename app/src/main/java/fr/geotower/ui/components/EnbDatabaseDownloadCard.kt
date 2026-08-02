@@ -3,6 +3,7 @@ package fr.geotower.ui.components
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -76,7 +77,8 @@ fun EnbDatabaseDownloadCard(
     shape: Shape,
     border: BorderStroke?,
     bubbleColor: Color,
-    onSafeClick: SafeClick? = null
+    onSafeClick: SafeClick? = null,
+    refreshState: DatabaseRefreshState? = null
 ) {
     val context = LocalContext.current
     val sizing = LocalGeoTowerUiStyle.current.sizing
@@ -114,7 +116,11 @@ fun EnbDatabaseDownloadCard(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var refreshTrigger by remember { mutableIntStateOf(0) }
 
-    LaunchedEffect(isSyncing, refreshTrigger, txtSearching, txtUnknown, txtNoDb, txtInvalidDb, featureFlags) {
+    // Actualisation de toute la section « Base de données » : clé partagée par les quatre cartes.
+    val sectionRefreshKey = refreshState?.refreshKey ?: 0
+    DatabaseRefreshMembership(refreshState, DatabaseRefreshIds.ENB)
+
+    LaunchedEffect(isSyncing, refreshTrigger, sectionRefreshKey, txtSearching, txtUnknown, txtNoDb, txtInvalidDb, featureFlags) {
         withContext(Dispatchers.IO) {
             val dbPath = context.getDatabasePath(EnbDatabaseValidator.DB_NAME)
             var nextLocalVersion = txtNoDb
@@ -158,6 +164,7 @@ fun EnbDatabaseDownloadCard(
                 -1.0
             }
         }
+        refreshState?.reportRefreshed(DatabaseRefreshIds.ENB, sectionRefreshKey)
     }
 
     Surface(
@@ -363,14 +370,15 @@ fun EnbDatabaseDownloadCard(
                 )
             }
 
-            // Attribution du partenaire : la donnee eNB/gNB n'est pas de l'ANFR.
+            // Attribution du partenaire : la donnee eNB/gNB n'est pas de l'ANFR. Cliquable : ouvre
+            // la presentation du projet et le lien vers son site (meme dialogue que la fiche site).
             Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
-            Text(
-                text = stringResource(R.string.enb_database_source_attribution),
+            EnbSourceAttribution(
+                dialogShape = shape,
                 modifier = Modifier.fillMaxWidth(),
-                fontSize = sizing.text(11.sp),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center
+                label = stringResource(R.string.enb_database_source_attribution),
+                horizontalArrangement = Arrangement.Center,
+                textStyle = MaterialTheme.typography.bodySmall.copy(fontSize = sizing.text(11.sp))
             )
 
             if (!isSyncing && localVersion != txtNoDb && localVersion != txtUnknown && localVersion != txtInvalidDb) {
