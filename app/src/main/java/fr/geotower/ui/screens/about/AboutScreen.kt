@@ -80,6 +80,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.navigation.NavController
 import fr.geotower.data.outages.OutageLocalConfig
+import fr.geotower.data.outages.OutageServerInfo
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
@@ -94,10 +95,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBarsPadding
 import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.pageScrollbar
+import fr.geotower.ui.components.rememberLocalDbBuildStatus
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.ui.navigation.ROOT_FALLBACK_ROUTE
@@ -276,6 +279,10 @@ fun AboutScreen(navController: NavController) {
 
     Scaffold(
         containerColor = mainBgColor, // Utilisation de la couleur de fond dynamique
+        // Même raison que dans les réglages : la route enveloppe déjà l'écran dans le padding du
+        // Scaffold racine, donc sans barre supérieure (grand écran) l'inset de la barre d'état
+        // était appliqué deux fois.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             if (!isWideScreen) {
                 AboutTopBar { safeBackNavigation.navigateBack() }
@@ -299,7 +306,9 @@ fun AboutScreen(navController: NavController) {
                             .fillMaxHeight()
                             .navigationBarsPadding()
                             .verticalScroll(sidebarScrollState)
-                            .padding(top = sizing.spacing(16.dp), bottom = sizing.spacing(24.dp))
+                            // Même resserrage que l'en-tête du volet de contenu, pour que la ligne
+                            // retour/menu et le titre restent sur le même axe.
+                            .padding(top = sizing.spacing(4.dp), bottom = sizing.spacing(24.dp))
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -336,6 +345,11 @@ fun AboutScreen(navController: NavController) {
                                             kotlinx.coroutines.delay(80)
                                             alignAnchorToViewportTop(sectionContentPositions[index])
                                         }
+                                    } else {
+                                        // Mode « pages » : la nouvelle section remplace l'ancienne,
+                                        // on repart de son début (sinon on hérite du défilement
+                                        // précédent, désormais possible dans ce mode aussi).
+                                        scope.launch { scrollState.scrollTo(0) }
                                     }
                                 }
                             )
@@ -390,8 +404,10 @@ fun AboutScreen(navController: NavController) {
 
                     // --- EN-TÊTE TABLETTE ---
                     if (isExpanded) {
+                        // Marges serrées, comme dans les réglages : la bande est déjà repoussée
+                        // sous la barre d'état et sa hauteur est imposée par les boutons.
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(16.dp), bottom = sizing.spacing(16.dp)),
+                            modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(4.dp), bottom = sizing.spacing(8.dp)),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             AnimatedVisibility(
@@ -409,7 +425,7 @@ fun AboutScreen(navController: NavController) {
 
                             Text(
                                 text = stringResource(R.string.appstrings_about),
-                                style = sizing.textStyle(MaterialTheme.typography.headlineMedium),
+                                style = sizing.textStyle(MaterialTheme.typography.headlineSmall),
                                 fontWeight = FontWeight.Bold,
                                 modifier = Modifier.weight(1f),
                                 textAlign = TextAlign.Center
@@ -434,9 +450,12 @@ fun AboutScreen(navController: NavController) {
                                 scrollViewportTop = coordinates.positionInRoot().y
                                 scrollViewportHeight = coordinates.size.height.toFloat()
                             }
-                            .then(if (navMode == 0 || !isExpanded) Modifier.geoTowerFadingEdge(scrollState) else Modifier)
-                            .then(if (navMode == 0 || !isExpanded) Modifier.pageScrollbar(PageScrollPrefs.ABOUT, scrollState) else Modifier)
-                            .then(if (navMode == 0 || !isExpanded) Modifier.verticalScroll(scrollState) else Modifier)
+                            // Le défilement vaut pour TOUS les modes : en « pages » sur grand écran
+                            // une section (Nouveautés, Sources…) peut dépasser la hauteur d'écran,
+                            // et sans défilement son bas était simplement inatteignable.
+                            .geoTowerFadingEdge(scrollState)
+                            .pageScrollbar(PageScrollPrefs.ABOUT, scrollState)
+                            .verticalScroll(scrollState)
                             .padding(horizontal = sizing.spacing(if (isExpanded) 48.dp else 24.dp))
                             // 🚨 CORRECTION 3 : Ajout de la marge de sécurité
                             .navigationBarsPadding()
@@ -493,9 +512,8 @@ fun AboutScreen(navController: NavController) {
                             }
                         }
                     }
-                    if (navMode == 0 || !isExpanded) {
-                        PageScrollEdgeButtons(PageScrollPrefs.ABOUT, scrollState)
-                    }
+                    // Le contenu défile dans tous les modes : les aides au défilement suivent.
+                    PageScrollEdgeButtons(PageScrollPrefs.ABOUT, scrollState)
                     }
                 }
             }
@@ -830,12 +848,16 @@ fun SectionVersions(
     var appVersion by remember { mutableStateOf("-") }
     var dbVersion by remember { mutableStateOf("-") }
     var radioDbVersion by remember { mutableStateOf("-") }
+    var enbDbVersion by remember { mutableStateOf("-") }
     var anfrDate by remember { mutableStateOf("-") }
     var quarterlyVersion by remember { mutableStateOf("-") }
     var rawMonthlyVersion by remember { mutableStateOf("-") } // ✅ Changé en "rawMonthlyVersion"
     var hsDate by remember { mutableStateOf("-") }
-    // > 0 uniquement si les sites HS sont produits sur l'appareil : on affiche alors l'heure de génération.
+    // Heure de génération des sites HS : l'appareil la connaît pour une génération locale, le
+    // serveur la publie dans les métadonnées du fichier téléchargé. Une seule des deux est > 0 à la
+    // fois, celle de la source réellement utilisée.
     var hsLocalGeneratedAt by remember { mutableLongStateOf(0L) }
+    var hsServerGeneratedAt by remember { mutableLongStateOf(0L) }
     var hsRefreshTick by remember { mutableIntStateOf(0) }
     val txtDownloadNewBase = stringResource(R.string.appstrings_about_download_new_database)
     val txtInvalidLocalDatabase = stringResource(R.string.appstrings_invalid_local_database)
@@ -939,6 +961,14 @@ fun SectionVersions(
                 radioDbVersion = "-"
                 AppLogger.w(TAG_ABOUT, "Radio database version info could not be read", e)
             }
+
+            // 4. Base des identifiants eNB/gNB (optionnelle, hors Room)
+            enbDbVersion = readEnbDatabaseVersion(
+                context = context,
+                notInstalledLabel = txtNotInstalled,
+                invalidLabel = txtInvalidLocalDatabase,
+                timeAtLabel = txtVersionTimeAt
+            )
         }
     }
 
@@ -954,6 +984,7 @@ fun SectionVersions(
             val state = readSitesHsState(context)
             hsDate = state.serverDate
             hsLocalGeneratedAt = state.localGeneratedAtMillis
+            hsServerGeneratedAt = state.serverGeneratedAtMillis
         }
     }
 
@@ -967,23 +998,37 @@ fun SectionVersions(
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(10.dp))) {
-            // Sites HS produits sur l'appareil : le libellé l'annonce et la valeur porte l'heure de
-            // génération (à la minute), là où la source serveur ne connaît que le jour.
+            // Sites HS produits sur l'appareil : le libellé l'annonce. Les deux sources portent
+            // désormais leur heure de génération (à la minute) ; il ne reste que la date seule
+            // quand le fichier serveur ne l'annonce pas.
             val hsGeneratedLocally = hsLocalGeneratedAt > 0L
             val hsLabel = stringResource(
                 if (hsGeneratedLocally) R.string.appstrings_version_hs_local_label
                 else R.string.appstrings_version_hs_label
             )
-            val hsValue = if (hsGeneratedLocally) {
-                LocalizedDateLabels.formatVersionDateTime(context, hsLocalGeneratedAt, txtVersionTimeAt)
-            } else {
-                LocalizedDateLabels.formatVersionDate(context, hsDate)
+            val hsValue = when {
+                hsGeneratedLocally ->
+                    LocalizedDateLabels.formatVersionDateTime(context, hsLocalGeneratedAt, txtVersionTimeAt)
+                hsServerGeneratedAt > 0L ->
+                    LocalizedDateLabels.formatVersionDateTime(context, hsServerGeneratedAt, txtVersionTimeAt)
+                else -> LocalizedDateLabels.formatVersionDate(context, hsDate)
             }
+
+            // Génération locale en cours : la base n'est installée qu'à la fin du build. On dit
+            // « génération en cours » au lieu de « non installée » (la lecture SQLite ci-dessus ne
+            // peut rien trouver tant que le fichier final n'est pas posé).
+            val localBuild = rememberLocalDbBuildStatus()
+            val txtGenerating = stringResource(R.string.appstrings_db_generation_in_progress)
+            val dbVersionShown =
+                if (localBuild.mobileRunning && dbVersion == txtNotInstalled) txtGenerating else dbVersion
+            val radioDbVersionShown =
+                if (localBuild.radioRunning && radioDbVersion == txtNotInstalled) txtGenerating else radioDbVersion
 
             val versionRows = listOf(
                 stringResource(R.string.appstrings_version_app_label) to appVersion,
-                stringResource(R.string.appstrings_version_db_label) to dbVersion,
-                stringResource(R.string.appstrings_version_radio_db_label) to radioDbVersion,
+                stringResource(R.string.appstrings_version_db_label) to dbVersionShown,
+                stringResource(R.string.appstrings_version_radio_db_label) to radioDbVersionShown,
+                stringResource(R.string.appstrings_version_enb_db_label) to enbDbVersion,
                 stringResource(R.string.appstrings_version_weekly_label) to LocalizedDateLabels.formatWeeklyVersionWithWeekNumber(context, anfrDate),
                 stringResource(R.string.appstrings_version_monthly_label) to LocalizedDateLabels.formatMonthlyVersion(context, rawMonthlyVersion),
                 stringResource(R.string.appstrings_version_quarterly_label) to LocalizedDateLabels.formatQuarterlyVersion(context, quarterlyVersion),
@@ -1064,26 +1109,80 @@ private fun readQuarterlyDataVersion(db: SQLiteDatabase): String {
     }
 }
 
-/** Ligne « sites HS » : date de la donnée serveur + horodatage de génération locale (0 si aucune). */
-private data class SitesHsState(val serverDate: String, val localGeneratedAtMillis: Long)
+/**
+ * Ligne « sites HS » : date de la donnée serveur, plus l'horodatage de génération de chaque source
+ * (0 pour celle qui n'est pas utilisée).
+ */
+private data class SitesHsState(
+    val serverDate: String,
+    val serverGeneratedAtMillis: Long,
+    val localGeneratedAtMillis: Long
+)
 
 /**
- * Lit l'état des sites HS (prefs uniquement, donc rejouable à volonté). L'horodatage de génération
- * n'est renvoyé que si les pannes sont réellement produites sur l'appareil (mode traitement local,
- * niveau ≥ 1) : sinon c'est la donnée serveur qui est affichée, et un ancien horodatage local n'a
- * plus de sens.
+ * Lit l'état des sites HS (prefs uniquement, donc rejouable à volonté). Les horodatages sont rendus
+ * exclusifs par la source réellement active (mode traitement local, niveau ≥ 1) : afficher l'heure
+ * de la génération locale sur une donnée serveur - ou l'inverse - annoncerait une fraîcheur fausse.
  */
 private fun readSitesHsState(context: Context): SitesHsState {
     val prefs = context.getSharedPreferences(OutageLocalConfig.PREFS_NAME, Context.MODE_PRIVATE)
     val config = OutageLocalConfig(prefs)
+    val generatedLocally = AppConfig.outagesLocal()
     return SitesHsState(
-        serverDate = prefs.getString("last_hs_update", "-") ?: "-",
-        localGeneratedAtMillis = if (AppConfig.outagesLocal()) {
-            config.lastGeneratedAtMillis
-        } else {
-            0L
-        }
+        serverDate = OutageServerInfo.lastUpdate(prefs),
+        serverGeneratedAtMillis = if (generatedLocally) 0L else OutageServerInfo.generatedAtMillis(prefs),
+        localGeneratedAtMillis = if (generatedLocally) config.lastGeneratedAtMillis else 0L
     )
+}
+
+/**
+ * Ligne « base eNB/gNB » : heure de production du fichier par le serveur (`metadata.generated_at`,
+ * en UTC), avec repli sur la date de la version quand la base est trop ancienne pour la porter.
+ *
+ * Lecture volontairement légère - pas de [fr.geotower.data.db.EnbDatabaseValidator.validateDatabaseFile]
+ * ici : son `PRAGMA integrity_check` balaye tout le fichier, ce qui n'a pas sa place à l'ouverture
+ * d'une page. Une base illisible se signale d'elle-même par l'exception.
+ */
+private fun readEnbDatabaseVersion(
+    context: Context,
+    notInstalledLabel: String,
+    invalidLabel: String,
+    timeAtLabel: String
+): String {
+    val dbPath = context.getDatabasePath(fr.geotower.data.db.EnbDatabaseValidator.DB_NAME)
+    if (!dbPath.exists()) return notInstalledLabel
+
+    return try {
+        SQLiteDatabase.openDatabase(dbPath.absolutePath, null, SQLiteDatabase.OPEN_READONLY).use { db ->
+            // `generated_at` n'est pas exigé par le validateur : requête en cascade, comme pour la
+            // base mobile, pour rester lisible face à un fichier plus ancien.
+            val cursor = try {
+                db.rawQuery("SELECT version, generated_at FROM metadata LIMIT 1", null)
+            } catch (e: Exception) {
+                db.rawQuery("SELECT version FROM metadata LIMIT 1", null)
+            }
+            cursor.use { c ->
+                if (!c.moveToFirst()) {
+                    invalidLabel
+                } else {
+                    val generatedAt = if (c.columnCount > 1 && !c.isNull(1)) {
+                        LocalizedDateLabels.isoInstantMillis(c.getString(1))
+                    } else {
+                        0L
+                    }
+                    if (generatedAt > 0L) {
+                        LocalizedDateLabels.formatVersionDateTime(context, generatedAt, timeAtLabel)
+                    } else {
+                        // La version eNB est « <date des données>-<digest> » : seule la date en sort.
+                        formatAboutDatabaseVersion(c.getString(0), timeAtLabel)
+                    }
+                }
+            }
+        }
+    } catch (e: Exception) {
+        AppLogger.w(TAG_ABOUT, "eNB database version info could not be read", e)
+        invalidLabel
+    }
 }
 
 private fun normalizeQuarterlyVersion(rawValue: String?): String {

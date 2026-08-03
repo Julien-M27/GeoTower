@@ -18,6 +18,7 @@ import fr.geotower.MainActivity
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.RetrofitClient
+import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.outages.OutageGenerationStep
 import fr.geotower.data.outages.OutageLocalConfig
 import fr.geotower.data.outages.labelRes
@@ -27,9 +28,11 @@ import fr.geotower.utils.NotificationIconResources
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * Worker foreground (dataSync) de génération LOCALE des pannes. Affiche une notification **live**
@@ -56,6 +59,14 @@ class OutageGenerationWorker(
             if (!fr.geotower.utils.AppConfig.outagesLocal() || !config.backgroundEnabled) {
                 return@coroutineScope Result.success()
             }
+            // Pendant du verrou de la page : sans base ANFR, le géocodage n'a pas de référentiel et
+            // les pannes sortiraient sans identifiant de station. On saute le cycle en silence
+            // (l'utilisateur n'a rien demandé) plutôt que de produire une liste inexploitable.
+            val databaseReady = withContext(Dispatchers.IO) {
+                GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context).state ==
+                    GeoTowerDatabaseValidator.LocalDatabaseState.VALID
+            }
+            if (!databaseReady) return@coroutineScope Result.success()
         }
 
         createChannel()
@@ -112,7 +123,14 @@ class OutageGenerationWorker(
             ticker.cancel()
             cancelSafely(PROGRESS_NOTIFICATION_ID)
             AppLogger.w(TAG, "Outage generation worker crashed", e)
-            Result.retry()
+            // Échec DIT, pas Result.retry() : la raison remonte à la page de réglages via
+            // outputData, et une planification en échec ne reste plus indéfiniment ENQUEUED —
+            // ce qui, avec ExistingWorkPolicy.KEEP, figeait le bouton sur « mise à jour en cours ».
+            val message = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
+            // Notification réservée au geste de l'utilisateur : une planification qui échoue tous
+            // les cycles ne doit pas le harceler, la page de réglages porte déjà la raison.
+            if (!inputData.getBoolean(KEY_CHECK_ENABLED, false)) showFailure(message)
+            Result.failure(workDataOf(KEY_ERROR to message))
         }
     }
 
@@ -169,6 +187,17 @@ class OutageGenerationWorker(
         notifySafely(RESULT_NOTIFICATION_ID, builder.build())
     }
 
+    private fun showFailure(message: String) {
+        val builder = NotificationCompat.Builder(context, channelId)
+            .setContentTitle(context.getString(R.string.outage_gen_notif_title))
+            .setContentText(context.getString(R.string.outage_gen_notif_failed, message))
+            .setContentIntent(settingsPendingIntent())
+            .setStyle(NotificationCompat.BigTextStyle().bigText(context.getString(R.string.outage_gen_notif_failed, message)))
+            .setAutoCancel(true)
+        NotificationIconResources.applyTo(builder, context)
+        notifySafely(RESULT_NOTIFICATION_ID, builder.build())
+    }
+
     private fun settingsPendingIntent(): PendingIntent {
         // La récupération des pannes se pilote depuis « Traitement local » (niveau ≥ 1) : on ouvre
         // cette page, pas la racine des réglages.
@@ -200,6 +229,7 @@ class OutageGenerationWorker(
         const val KEY_PERCENT = "percent"
         const val KEY_DETAIL = "detail"
         const val KEY_COUNT = "count"
+        const val KEY_ERROR = "error"
 
         private const val TAG = "OutageGeneration"
         private const val PROGRESS_NOTIFICATION_ID = 472_001

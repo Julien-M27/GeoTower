@@ -3,6 +3,7 @@ package fr.geotower.data.outages
 import fr.geotower.data.models.SiteHsEntity
 import kotlinx.coroutines.runBlocking
 import org.junit.Assert.assertEquals
+import org.junit.Assert.fail
 import org.junit.Test
 import java.io.File
 import java.io.IOException
@@ -94,6 +95,32 @@ class LocalOutageProviderTest {
                 cache, { oneHourMs }, { _, _ -> }, { _, _ -> throw IOException("down") }, { now },
             )
             // Génération en échec → on conserve l'ancien cache plutôt que rien.
+            assertEquals(listOf("A"), provider.getSites().map { it.idAnfr })
+        } finally {
+            file.delete()
+        }
+    }
+
+    /**
+     * Déclenchement EXPLICITE en échec : l'exception remonte, sinon le bouton « mettre à jour
+     * maintenant » est indiscernable d'un bouton qui ne fait rien.
+     */
+    @Test
+    fun forcedRegenerationPropagatesFailure() = runBlocking {
+        val (cache, file) = tempCache()
+        try {
+            val now = 30_000_000L
+            cache.save(CachedOutages(now, "d", listOf(site("A")))) // cache frais : force doit passer outre
+            val provider = LocalOutageProvider(
+                cache, { oneHourMs }, { _, _ -> }, { _, _ -> throw IOException("aucun opérateur") }, { now },
+            )
+            try {
+                provider.regenerate(force = true)
+                fail("une régénération forcée en échec doit lever")
+            } catch (e: IOException) {
+                assertEquals("aucun opérateur", e.message)
+            }
+            // Le cache reste intact : l'échec ne détruit pas les dernières pannes connues.
             assertEquals(listOf("A"), provider.getSites().map { it.idAnfr })
         } finally {
             file.delete()

@@ -1,0 +1,881 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Prototype carte GeoTower</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    >
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f5f7fa;
+        --panel: #ffffff;
+        --text: #172033;
+        --muted: #647084;
+        --primary: #1664d9;
+        --border: #d8dee8;
+        --shadow: 0 12px 30px rgba(23, 32, 51, 0.12);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family:
+          Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+      }
+
+      .app {
+        display: grid;
+        grid-template-columns: 350px minmax(0, 1fr);
+        min-height: 100vh;
+      }
+
+      aside {
+        z-index: 500;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 22px;
+        background: var(--panel);
+        border-right: 1px solid var(--border);
+        box-shadow: var(--shadow);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 24px;
+        line-height: 1.15;
+      }
+
+      p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .stat {
+        min-height: 74px;
+        padding: 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #fbfcfe;
+      }
+
+      .stat strong {
+        display: block;
+        font-size: 24px;
+        line-height: 1;
+      }
+
+      .stat span {
+        display: block;
+        margin-top: 7px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .controls,
+      .filters {
+        display: grid;
+        gap: 10px;
+      }
+
+      button,
+      select {
+        width: 100%;
+        min-height: 42px;
+        border-radius: 8px;
+        font: inherit;
+      }
+
+      button {
+        border: 0;
+        background: var(--primary);
+        color: #ffffff;
+        font-weight: 700;
+        cursor: pointer;
+      }
+
+      button.secondary {
+        background: #e8eef8;
+        color: var(--text);
+      }
+
+      button:hover {
+        filter: brightness(0.96);
+      }
+
+      select {
+        border: 1px solid var(--border);
+        background: #ffffff;
+        color: var(--text);
+        padding: 0 10px;
+      }
+
+      .field {
+        display: grid;
+        gap: 6px;
+      }
+
+      label {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .check {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        min-height: 42px;
+        padding: 0 10px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #fbfcfe;
+        color: var(--text);
+      }
+
+      .check input {
+        width: 16px;
+        height: 16px;
+      }
+
+      output {
+        min-height: 42px;
+        padding: 11px 12px;
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: #fbfcfe;
+        color: var(--text);
+        font-family: Consolas, "Courier New", monospace;
+        font-size: 14px;
+        overflow-wrap: anywhere;
+      }
+
+      .status {
+        padding: 12px;
+        border-radius: 8px;
+        background: #edf6ff;
+        color: #27506f;
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .legend {
+        display: grid;
+        gap: 7px;
+        color: var(--muted);
+        font-size: 13px;
+      }
+
+      .legend-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .dot {
+        width: 12px;
+        height: 12px;
+        border: 2px solid #ffffff;
+        border-radius: 999px;
+        box-shadow: 0 0 0 1px rgba(23, 32, 51, 0.18);
+      }
+
+      #map {
+        width: 100%;
+        min-height: 100vh;
+      }
+
+      .leaflet-popup-content {
+        margin: 12px;
+        line-height: 1.45;
+      }
+
+      .popup-title {
+        margin: 0 0 8px;
+        color: var(--text);
+        font-size: 16px;
+        font-weight: 800;
+      }
+
+      .popup-line {
+        margin: 3px 0;
+      }
+
+      .popup-muted {
+        color: var(--muted);
+      }
+
+      .popup-action {
+        margin-top: 10px;
+        min-height: 34px;
+        padding: 0 12px;
+        border-radius: 7px;
+        background: var(--primary);
+        color: #ffffff;
+        font-size: 13px;
+        font-weight: 700;
+      }
+
+      .antenna-list {
+        margin: 8px 0 0;
+        padding-left: 18px;
+      }
+
+      @media (max-width: 820px) {
+        .app {
+          grid-template-columns: 1fr;
+          grid-template-rows: auto 1fr;
+        }
+
+        aside {
+          border-right: 0;
+          border-bottom: 1px solid var(--border);
+          box-shadow: 0 8px 20px rgba(23, 32, 51, 0.1);
+        }
+
+        #map {
+          min-height: 65vh;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <aside>
+        <div>
+          <h1>Carte GeoTower</h1>
+          <p>
+            Les marqueurs colores representent les sites antennes charges autour
+            de la vue. Clique un marqueur pour voir les infos ANFR.
+          </p>
+        </div>
+
+        <div class="stats">
+          <div class="stat">
+            <strong id="siteCount">0</strong>
+            <span>sites affiches</span>
+          </div>
+          <div class="stat">
+            <strong id="sourceName">-</strong>
+            <span>source</span>
+          </div>
+        </div>
+
+        <div class="controls">
+          <button id="loadButton" type="button">Charger antennes visibles</button>
+          <button id="locateButton" class="secondary" type="button">Me localiser</button>
+          <button id="resetButton" class="secondary" type="button">
+            Recentrer sur Paris
+          </button>
+          <button id="franceButton" class="secondary" type="button">
+            Vue France
+          </button>
+        </div>
+
+        <div class="filters">
+          <div class="field">
+            <label for="operatorFilter">Operateur</label>
+            <select id="operatorFilter">
+              <option value="">Tous les operateurs</option>
+            </select>
+          </div>
+          <label class="check" for="activeOnly">
+            <input id="activeOnly" type="checkbox" checked>
+            Actives uniquement
+          </label>
+        </div>
+
+        <div class="field">
+          <label for="coords">Point selectionne</label>
+          <output id="coords">Aucun point pour le moment</output>
+        </div>
+
+        <div class="legend">
+          <div class="legend-row"><span class="dot" style="background:#ff7900"></span>Orange</div>
+          <div class="legend-row"><span class="dot" style="background:#009fe3"></span>Bouygues Telecom</div>
+          <div class="legend-row"><span class="dot" style="background:#e2001a"></span>SFR</div>
+          <div class="legend-row"><span class="dot" style="background:#757575"></span>Free Mobile / autre</div>
+        </div>
+
+        <div class="status" id="status">
+          Chargement des antennes autour de Paris...
+        </div>
+      </aside>
+
+      <div id="map" aria-label="Carte interactive des antennes"></div>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+      const parisView = {
+        center: [48.8566, 2.3522],
+        zoom: 12,
+      };
+      const franceView = {
+        center: [46.7111, 1.7191],
+        zoom: 6,
+      };
+      const maxLiveSpanDegrees = 3;
+      const apiLocalBase = "/api/live-fr";
+      const apiRemoteBase = "https://api.geotower.fr/api/v2/live/fr";
+
+      const fallbackSites = [
+        {
+          id_anfr: "DEMO-75001-ORANGE",
+          operator_name: "Orange",
+          latitude: 48.85837,
+          longitude: 2.29448,
+          commune: "Paris 7e",
+          adresse: "Champ de Mars",
+          azimuts: "0, 120, 240",
+          technologies: "4G, 5G",
+          statut: "Demo locale",
+          has_active: 1,
+          support_count: 2,
+          antennas: [
+            { type_antenne: "Panneau", azimut: 0, hauteur_bas: 28 },
+            { type_antenne: "Panneau", azimut: 120, hauteur_bas: 28 },
+            { type_antenne: "Panneau", azimut: 240, hauteur_bas: 28 },
+          ],
+        },
+        {
+          id_anfr: "DEMO-75002-SFR",
+          operator_name: "SFR",
+          latitude: 48.8738,
+          longitude: 2.295,
+          commune: "Paris 16e",
+          adresse: "Avenue Foch",
+          azimuts: "60, 180, 300",
+          technologies: "3G, 4G, 5G",
+          statut: "Demo locale",
+          has_active: 1,
+          support_count: 1,
+          antennas: [
+            { type_antenne: "Panneau", azimut: 60, hauteur_bas: 34 },
+            { type_antenne: "Panneau", azimut: 180, hauteur_bas: 34 },
+            { type_antenne: "Panneau", azimut: 300, hauteur_bas: 34 },
+          ],
+        },
+        {
+          id_anfr: "DEMO-75003-BOUYGUES",
+          operator_name: "Bouygues Telecom",
+          latitude: 48.8455,
+          longitude: 2.3744,
+          commune: "Paris 12e",
+          adresse: "Gare de Lyon",
+          azimuts: "20, 140, 260",
+          technologies: "4G, 5G",
+          statut: "Demo locale",
+          has_active: 1,
+          support_count: 3,
+          antennas: [
+            { type_antenne: "Panneau", azimut: 20, hauteur_bas: 31 },
+            { type_antenne: "Panneau", azimut: 140, hauteur_bas: 31 },
+            { type_antenne: "Panneau", azimut: 260, hauteur_bas: 31 },
+          ],
+        },
+        {
+          id_anfr: "DEMO-75004-FREE",
+          operator_name: "Free Mobile",
+          latitude: 48.8867,
+          longitude: 2.3431,
+          commune: "Paris 18e",
+          adresse: "Montmartre",
+          azimuts: "90, 210, 330",
+          technologies: "3G, 4G, 5G",
+          statut: "Demo locale",
+          has_active: 1,
+          support_count: 1,
+          antennas: [
+            { type_antenne: "Panneau", azimut: 90, hauteur_bas: 24 },
+            { type_antenne: "Panneau", azimut: 210, hauteur_bas: 24 },
+            { type_antenne: "Panneau", azimut: 330, hauteur_bas: 24 },
+          ],
+        },
+        {
+          id_anfr: "DEMO-75005-ORANGE",
+          operator_name: "Orange",
+          latitude: 48.8312,
+          longitude: 2.3559,
+          commune: "Paris 13e",
+          adresse: "Place d'Italie",
+          azimuts: "30, 150, 270",
+          technologies: "2G, 3G, 4G",
+          statut: "Demo locale",
+          has_active: 1,
+          support_count: 2,
+          antennas: [
+            { type_antenne: "Panneau", azimut: 30, hauteur_bas: 22 },
+            { type_antenne: "Panneau", azimut: 150, hauteur_bas: 22 },
+            { type_antenne: "Panneau", azimut: 270, hauteur_bas: 22 },
+          ],
+        },
+        {
+          id_anfr: "DEMO-92001-SFR",
+          operator_name: "SFR",
+          latitude: 48.8919,
+          longitude: 2.2387,
+          commune: "Courbevoie",
+          adresse: "La Defense",
+          azimuts: "10, 130, 250",
+          technologies: "4G, 5G",
+          statut: "Demo locale",
+          has_active: 1,
+          support_count: 2,
+          antennas: [
+            { type_antenne: "Panneau", azimut: 10, hauteur_bas: 38 },
+            { type_antenne: "Panneau", azimut: 130, hauteur_bas: 38 },
+            { type_antenne: "Panneau", azimut: 250, hauteur_bas: 38 },
+          ],
+        },
+        {
+          id_anfr: "DEMO-69001-BOUYGUES",
+          operator_name: "Bouygues Telecom",
+          latitude: 45.764,
+          longitude: 4.8357,
+          commune: "Lyon",
+          adresse: "Presqu'ile",
+          azimuts: "0, 120, 240",
+          technologies: "4G, 5G",
+          statut: "Demo locale",
+          has_active: 1,
+          support_count: 1,
+          antennas: [{ type_antenne: "Panneau", azimut: 120, hauteur_bas: 30 }],
+        },
+        {
+          id_anfr: "DEMO-13001-FREE",
+          operator_name: "Free Mobile",
+          latitude: 43.2965,
+          longitude: 5.3698,
+          commune: "Marseille",
+          adresse: "Vieux-Port",
+          azimuts: "40, 160, 280",
+          technologies: "3G, 4G, 5G",
+          statut: "Demo locale",
+          has_active: 1,
+          support_count: 1,
+          antennas: [{ type_antenne: "Panneau", azimut: 40, hauteur_bas: 26 }],
+        },
+        {
+          id_anfr: "DEMO-33001-ORANGE",
+          operator_name: "Orange",
+          latitude: 44.8378,
+          longitude: -0.5792,
+          commune: "Bordeaux",
+          adresse: "Centre-ville",
+          azimuts: "75, 195, 315",
+          technologies: "4G, 5G",
+          statut: "Demo locale",
+          has_active: 1,
+          support_count: 1,
+          antennas: [{ type_antenne: "Panneau", azimut: 195, hauteur_bas: 25 }],
+        },
+        {
+          id_anfr: "DEMO-31001-SFR",
+          operator_name: "SFR",
+          latitude: 43.6047,
+          longitude: 1.4442,
+          commune: "Toulouse",
+          adresse: "Capitole",
+          azimuts: "55, 175, 295",
+          technologies: "4G, 5G",
+          statut: "Demo locale",
+          has_active: 1,
+          support_count: 1,
+          antennas: [{ type_antenne: "Panneau", azimut: 55, hauteur_bas: 27 }],
+        },
+      ];
+
+      const coordsOutput = document.querySelector("#coords");
+      const statusBox = document.querySelector("#status");
+      const siteCount = document.querySelector("#siteCount");
+      const sourceName = document.querySelector("#sourceName");
+      const locateButton = document.querySelector("#locateButton");
+      const loadButton = document.querySelector("#loadButton");
+      const resetButton = document.querySelector("#resetButton");
+      const franceButton = document.querySelector("#franceButton");
+      const activeOnly = document.querySelector("#activeOnly");
+      const operatorFilter = document.querySelector("#operatorFilter");
+
+      const map = L.map("map", {
+        zoomControl: true,
+      }).setView(parisView.center, parisView.zoom);
+
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+      }).addTo(map);
+
+      const antennaLayer = L.layerGroup().addTo(map);
+      let selectedMarker;
+      let currentSites = [];
+      let currentSource = "-";
+      let loadTimer;
+      let abortController;
+
+      function escapeHtml(value) {
+        return String(value ?? "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function formatCoords(latlng) {
+        return `${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`;
+      }
+
+      function setStatus(message) {
+        statusBox.textContent = message;
+      }
+
+      function operatorName(site) {
+        return site.operator_name || site.operateur || site.operator || "Inconnu";
+      }
+
+      function siteId(site) {
+        return site.id_anfr || site.idAnfr || site.site_id || "";
+      }
+
+      function techText(site) {
+        if (site.technologies) return site.technologies;
+        const mask = Number(site.tech_mask || site.techMask || 0);
+        const labels = [];
+        if (mask & 1) labels.push("2G");
+        if (mask & 2) labels.push("3G");
+        if (mask & 4) labels.push("4G");
+        if (mask & 8) labels.push("5G");
+        if (mask & 16) labels.push("FH");
+        return labels.join(", ") || "Technologies non precisees";
+      }
+
+      function colorForOperator(name) {
+        const normalized = String(name || "").toUpperCase();
+        if (normalized.includes("ORANGE")) return "#ff7900";
+        if (normalized.includes("BOUYGUES") || normalized.includes("BYTEL")) return "#009fe3";
+        if (normalized.includes("SFR")) return "#e2001a";
+        if (normalized.includes("FREE")) return "#757575";
+        return "#808080";
+      }
+
+      function pointFromSite(site) {
+        const lat = Number(site.latitude);
+        const lng = Number(site.longitude);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        return L.latLng(lat, lng);
+      }
+
+      function boundsAreTooWide(bounds) {
+        return (
+          Math.abs(bounds.getNorth() - bounds.getSouth()) > maxLiveSpanDegrees ||
+          Math.abs(bounds.getEast() - bounds.getWest()) > maxLiveSpanDegrees
+        );
+      }
+
+      function markerPopup(site, options = {}) {
+        const id = siteId(site);
+        const name = operatorName(site);
+        const antennas = Array.isArray(options.antennas) ? options.antennas : site.antennas || [];
+        const azimuts = site.azimuts || site.azimuts_fh || site.azimutsFh || "";
+        const supportCount = site.support_count || site.supportCount || "";
+        const status = site.statut || (site.has_active || site.hasActive ? "Actif" : "Declare");
+        const address = site.adresse || site.address || "";
+        const commune = site.commune || "";
+
+        const antennaList = antennas.length
+          ? `<ul class="antenna-list">${antennas
+              .slice(0, 8)
+              .map((antenna) => {
+                const type = antenna.type_antenne || antenna.typeAntenne || "Antenne";
+                const azimut = antenna.azimut == null ? "-" : `${antenna.azimut} deg`;
+                const height = antenna.hauteur_bas || antenna.hauteurBas;
+                const heightText = height == null ? "" : `, bas ${height} m`;
+                return `<li>${escapeHtml(type)} : ${escapeHtml(azimut + heightText)}</li>`;
+              })
+              .join("")}</ul>`
+          : "";
+
+        const detailButton = options.canLoadDetail && id
+          ? '<button class="popup-action" type="button" data-action="detail">Voir les antennes du site</button>'
+          : "";
+
+        return `
+          <div>
+            <p class="popup-title">${escapeHtml(name)}</p>
+            <p class="popup-line"><strong>Site ANFR :</strong> ${escapeHtml(id || "Inconnu")}</p>
+            <p class="popup-line"><strong>Tech :</strong> ${escapeHtml(techText(site))}</p>
+            <p class="popup-line"><strong>Statut :</strong> ${escapeHtml(status)}</p>
+            ${supportCount ? `<p class="popup-line"><strong>Supports :</strong> ${escapeHtml(supportCount)}</p>` : ""}
+            ${azimuts ? `<p class="popup-line"><strong>Azimuts :</strong> ${escapeHtml(azimuts)}</p>` : ""}
+            ${commune ? `<p class="popup-line"><strong>Commune :</strong> ${escapeHtml(commune)}</p>` : ""}
+            ${address ? `<p class="popup-line popup-muted">${escapeHtml(address)}</p>` : ""}
+            ${antennaList}
+            ${detailButton}
+          </div>
+        `;
+      }
+
+      function updateOperatorOptions(sites) {
+        const previous = operatorFilter.value;
+        const names = [...new Set(sites.map(operatorName).filter(Boolean))]
+          .sort((a, b) => a.localeCompare(b, "fr"));
+        operatorFilter.innerHTML = '<option value="">Tous les operateurs</option>';
+        for (const name of names) {
+          const option = document.createElement("option");
+          option.value = name;
+          option.textContent = name;
+          operatorFilter.append(option);
+        }
+        if (names.includes(previous)) {
+          operatorFilter.value = previous;
+        }
+      }
+
+      function filteredSites() {
+        const selected = operatorFilter.value;
+        return currentSites.filter((site) => !selected || operatorName(site) === selected);
+      }
+
+      function renderMarkers() {
+        antennaLayer.clearLayers();
+        const sites = filteredSites();
+
+        for (const site of sites) {
+          const latlng = pointFromSite(site);
+          if (!latlng) continue;
+
+          const color = colorForOperator(operatorName(site));
+          const marker = L.circleMarker(latlng, {
+            radius: 7,
+            color: "#ffffff",
+            weight: 2,
+            fillColor: color,
+            fillOpacity: 0.92,
+            bubblingMouseEvents: false,
+          });
+
+          marker.bindPopup(markerPopup(site, { canLoadDetail: currentSource === "Live" }));
+          marker.on("popupopen", () => {
+            const button = marker.getPopup()?.getElement()?.querySelector('[data-action="detail"]');
+            if (button) {
+              L.DomEvent.disableClickPropagation(button);
+              L.DomEvent.disableScrollPropagation(button);
+              button.addEventListener(
+                "click",
+                (event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  loadSiteDetail(site, marker);
+                },
+                { once: true }
+              );
+            }
+          });
+          marker.addTo(antennaLayer);
+        }
+
+        siteCount.textContent = String(sites.length);
+        sourceName.textContent = currentSource;
+      }
+
+      function setSites(sites, source) {
+        currentSites = sites;
+        currentSource = source;
+        updateOperatorOptions(sites);
+        renderMarkers();
+      }
+
+      function fallbackVisibleSites() {
+        const bounds = map.getBounds();
+        const visible = fallbackSites.filter((site) => {
+          const point = pointFromSite(site);
+          return point && bounds.contains(point);
+        });
+        return visible.length ? visible : fallbackSites;
+      }
+
+      function showFallback(reason) {
+        const sites = fallbackVisibleSites();
+        setSites(sites, "Demo");
+        setStatus(`${reason} Affichage de ${sites.length} antennes de demonstration.`);
+      }
+
+      async function fetchJson(pathAndQuery, signal) {
+        const candidates = [];
+        if (window.location.protocol.startsWith("http")) {
+          candidates.push(`${apiLocalBase}${pathAndQuery}`);
+        }
+        candidates.push(`${apiRemoteBase}${pathAndQuery}`);
+
+        let lastError = new Error("Aucune URL API disponible.");
+        for (const url of candidates) {
+          try {
+            const response = await fetch(url, {
+              headers: { Accept: "application/json" },
+              cache: "no-store",
+              signal,
+            });
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            return await response.json();
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        throw lastError;
+      }
+
+      async function loadAntennasForView(origin = "manual") {
+        const bounds = map.getBounds();
+
+        if (boundsAreTooWide(bounds)) {
+          showFallback("Vue trop large pour l'API live. Zoome sur une ville pour charger les vraies donnees.");
+          return;
+        }
+
+        if (abortController) abortController.abort();
+        abortController = new AbortController();
+
+        const params = new URLSearchParams({
+          north: bounds.getNorth().toFixed(6),
+          south: bounds.getSouth().toFixed(6),
+          east: bounds.getEast().toFixed(6),
+          west: bounds.getWest().toFixed(6),
+          limit: "500",
+          active_only: String(activeOnly.checked),
+        });
+
+        try {
+          setStatus(origin === "initial" ? "Chargement des antennes live..." : "Actualisation des antennes visibles...");
+          const data = await fetchJson(`/sites/bbox?${params}`, abortController.signal);
+          const sites = Array.isArray(data.sites) ? data.sites : [];
+          setSites(sites, "Live");
+          setStatus(
+            sites.length
+              ? `${sites.length} sites antennes charges depuis l'API GeoTower live.`
+              : "Aucune antenne trouvee dans cette vue."
+          );
+        } catch (error) {
+          if (error.name === "AbortError") return;
+          showFallback("API live indisponible depuis cette page.");
+        }
+      }
+
+      async function loadSiteDetail(site, marker) {
+        const id = siteId(site);
+        if (!id) return;
+
+        marker.setPopupContent(`
+          <div>
+            <p class="popup-title">${escapeHtml(operatorName(site))}</p>
+            <p>Chargement du detail des antennes...</p>
+          </div>
+        `);
+
+        try {
+          const detail = await fetchJson(`/sites/${encodeURIComponent(id)}`, undefined);
+          const summary = detail.summary || site;
+          const merged = { ...summary, ...(detail.detail || {}) };
+          marker.setPopupContent(markerPopup(merged, { antennas: detail.antennas || [] }));
+        } catch (error) {
+          marker.setPopupContent(
+            markerPopup(site, { antennas: site.antennas || [] }) +
+              "<p class=\"popup-muted\">Detail live indisponible pour ce site.</p>"
+          );
+        }
+      }
+
+      function placeMarker(latlng, label) {
+        if (!selectedMarker) {
+          selectedMarker = L.marker(latlng).addTo(map);
+        } else {
+          selectedMarker.setLatLng(latlng);
+        }
+
+        const formatted = formatCoords(latlng);
+        coordsOutput.value = formatted;
+        selectedMarker
+          .bindPopup(`<strong>${label}</strong><br>${formatted}`)
+          .openPopup();
+      }
+
+      map.on("click", (event) => {
+        if (event.originalEvent?.target?.closest?.(".leaflet-popup")) return;
+        placeMarker(event.latlng, "Point selectionne");
+        setStatus("Marqueur place. Tu peux recliquer ailleurs pour le deplacer.");
+      });
+
+      map.on("moveend", () => {
+        clearTimeout(loadTimer);
+        loadTimer = window.setTimeout(() => loadAntennasForView("map"), 350);
+      });
+
+      loadButton.addEventListener("click", () => loadAntennasForView("manual"));
+      operatorFilter.addEventListener("change", renderMarkers);
+      activeOnly.addEventListener("change", () => loadAntennasForView("filter"));
+
+      locateButton.addEventListener("click", () => {
+        if (!navigator.geolocation) {
+          setStatus("La geolocalisation n'est pas disponible dans ce navigateur.");
+          return;
+        }
+
+        setStatus("Recherche de ta position...");
+        navigator.geolocation.getCurrentPosition(
+          (position) => {
+            const latlng = L.latLng(
+              position.coords.latitude,
+              position.coords.longitude
+            );
+            map.setView(latlng, 15);
+            placeMarker(latlng, "Position estimee");
+            setStatus("Position trouvee. Chargement des antennes autour de toi...");
+            loadAntennasForView("location");
+          },
+          () => {
+            setStatus(
+              "Impossible de recuperer la position. Le clic sur la carte fonctionne toujours."
+            );
+          },
+          {
+            enableHighAccuracy: true,
+            timeout: 10000,
+            maximumAge: 60000,
+          }
+        );
+      });
+
+      resetButton.addEventListener("click", () => {
+        map.setView(parisView.center, parisView.zoom);
+        setStatus("Carte recentree sur Paris. Chargement des antennes...");
+        loadAntennasForView("reset");
+      });
+
+      franceButton.addEventListener("click", () => {
+        map.setView(franceView.center, franceView.zoom);
+        setStatus("Vue France. Zoome sur une ville pour charger les donnees live.");
+      });
+
+      loadAntennasForView("initial");
+    </script>
+  </body>
+</html>

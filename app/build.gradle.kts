@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
@@ -6,6 +8,16 @@ plugins {
 
 fun String.asBuildConfigString(): String {
     return "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
+}
+
+// Signature de release. Le keystore et ses mots de passe vivent dans keystore.properties, non
+// versionne : sans ce fichier la configuration est simplement absente et `assembleRelease` produit
+// un binaire non signe, ce qui laisse les builds de CI et les checkouts propres fonctionner.
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.exists()) {
+        keystorePropertiesFile.inputStream().use { load(it) }
+    }
 }
 
 val defaultManifestPublicKeys =
@@ -21,8 +33,10 @@ android {
         applicationId = "fr.geotower"
         minSdk = 24
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.9.9.6.6"
+        // Google Play ne compare QUE versionCode : il doit augmenter a chaque envoi et un numero
+        // deja envoye ne peut jamais etre reutilise. versionName n'est qu'un libelle d'affichage.
+        versionCode = 3
+        versionName = "2.0.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         val manifestPublicKeys = providers
@@ -38,8 +52,20 @@ android {
         buildConfig = true
     }
 
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig = signingConfigs.findByName("release")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(

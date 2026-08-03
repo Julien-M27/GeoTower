@@ -14,3 +14,14 @@
 .externalNativeBuild
 .cxx
 local.properties
+# Signature de release : ni le keystore ni ses mots de passe ne doivent etre versionnes.
+# Le keystore genere par l'assistant Android Studio n'a pas d'extension : il est nomme
+# explicitement, les motifs *.jks / *.keystore ne l'attrapent pas.
+keystore.properties
+geotower-release
+*.jks
+*.keystore
+# Sortie de l'assistant « Generate Signed App Bundle » (l'AAB de reference vient de build/outputs).
+/app/release/
+# Journaux de build laisses par les executions de test.
+/build-*.log

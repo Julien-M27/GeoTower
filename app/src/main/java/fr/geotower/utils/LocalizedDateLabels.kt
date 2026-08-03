@@ -10,6 +10,7 @@ import java.text.ParsePosition
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import java.util.TimeZone
 
 object LocalizedDateLabels {
     fun monthName(context: Context, monthIndex: String): String {
@@ -67,6 +68,26 @@ object LocalizedDateLabels {
         val date = DateFormat.getDateInstance(DateFormat.SHORT, locale).format(moment)
         val time = DateFormat.getTimeInstance(DateFormat.SHORT, locale).format(moment)
         return "$date\n$timeAtLabel $time"
+    }
+
+    /**
+     * Horodatage ISO 8601 produit par le serveur (« 2026-08-02T04:15:00Z » pour les sites HS,
+     * « 2026-07-24T02:15:00+00:00 » pour la base eNB) -> millisecondes, 0 si absent ou illisible.
+     * Volontairement séparé de [versionDatePatterns] : une date seule n'est pas un instant, la
+     * convertir donnerait minuit et un faux « à 00:00 ».
+     */
+    fun isoInstantMillis(rawValue: String?): Long {
+        val value = rawValue?.trim().orEmpty()
+        if (value.isBlank()) return 0L
+
+        return instantPatterns.firstNotNullOfOrNull { pattern ->
+            SimpleDateFormat(pattern, Locale.US).apply {
+                isLenient = false
+                // Pour SimpleDateFormat, le « Z » de ce motif est une lettre littérale : sans ce
+                // forçage l'instant serait lu dans le fuseau du téléphone, donc décalé.
+                if (pattern.endsWith("'Z'")) timeZone = TimeZone.getTimeZone("UTC")
+            }.parseFull(value)?.time
+        } ?: 0L
     }
 
     fun formatQuarterlyVersion(context: Context, rawValue: String): String {
@@ -213,6 +234,15 @@ object LocalizedDateLabels {
         "yyyy-MM-dd'T'HH:mm:ssX",
         "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
         "yyyy-MM-dd'T'HH:mm:ss'Z'"
+    )
+
+    /** Date + heure uniquement : « XXX » couvre aussi bien « Z » que « +02:00 ». */
+    private val instantPatterns = listOf(
+        "yyyy-MM-dd'T'HH:mm:ssXXX",
+        "yyyy-MM-dd'T'HH:mm:ss.SSSXXX",
+        "yyyy-MM-dd'T'HH:mm:ss'Z'",
+        "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'",
+        "yyyy-MM-dd HH:mm:ss"
     )
 
     private val versionDatePatterns = listOf(

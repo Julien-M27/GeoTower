@@ -33,7 +33,10 @@ import fr.geotower.data.outages.LocalOutageProvider
 import fr.geotower.data.outages.NoOutageProgress
 import fr.geotower.data.outages.OutageLocalCache
 import fr.geotower.data.outages.OutageLocalConfig
+import fr.geotower.data.outages.CachedServerOutages
 import fr.geotower.data.outages.OutageProgressCallback
+import fr.geotower.data.outages.OutageServerInfo
+import fr.geotower.data.outages.ServerOutageCache
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
 import fr.geotower.utils.FrequencyFilterSelection
@@ -43,9 +46,11 @@ import fr.geotower.data.models.toRadioStatRow
 import fr.geotower.data.models.toTechniqueEntity
 import fr.geotower.data.models.toWeeklyRadioStatRow
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
 import kotlinx.coroutines.sync.withLock
@@ -355,6 +360,12 @@ class AnfrRepository(
 
     // Génération LOCALE des pannes (opt-in) : config + cache/TTL, adossés à la base ANFR locale.
     private val outageLocalConfig by lazy { OutageLocalConfig(context) }
+
+    // Copie sur l'appareil du fichier de pannes SERVEUR (l'autre source).
+    private val serverOutageCache by lazy { ServerOutageCache(context) }
+    private val outagePrefs by lazy {
+        context.getSharedPreferences(OutageLocalConfig.PREFS_NAME, Context.MODE_PRIVATE)
+    }
     private val localOutageProvider by lazy {
         LocalOutageProvider(
             cache = OutageLocalCache(context),
@@ -1389,7 +1400,7 @@ class AnfrRepository(
             // Un appel concurrent a pu remplir le cache pendant l'attente du verrou.
             if (!forceRefresh) readSitesHsCache(sourceKey)?.let { return@withLock it }
 
-            val sites = loadSitesHs()
+            val sites = loadSitesHs(forceRefresh)
             // Une liste vide vient presque toujours d'un échec (réseau coupé, provider off) :
             // on ne la mémorise pas, sinon l'app resterait « sans pannes » pendant tout le TTL.
             if (sites.isNotEmpty()) storeSitesHsCache(sourceKey, sites)
@@ -1399,7 +1410,7 @@ class AnfrRepository(
 
     /** Distingue les deux sources possibles : un changement de réglage doit invalider le cache. */
     private fun currentSitesHsSourceKey(): String {
-        return if (AppConfig.outagesLocal()) "local" else "remote"
+        return if (AppConfig.outagesLocal()) SOURCE_KEY_LOCAL else SOURCE_KEY_REMOTE
     }
 
     private fun readSitesHsCache(sourceKey: String): List<SiteHsEntity>? {
@@ -1413,125 +1424,203 @@ class AnfrRepository(
         sitesHsCache = CachedSitesHs(sourceKey, System.currentTimeMillis(), sites)
     }
 
-    private suspend fun loadSitesHs(): List<SiteHsEntity> {
+    private suspend fun loadSitesHs(forceRefresh: Boolean): List<SiteHsEntity> {
         // Source « traitée localement » : télécharge les CSV opérateurs + géocode via la base ANFR.
         // Activée par le mode « traitement local » (niveau ≥ 1), seul réglage qui en décide.
         if (AppConfig.outagesLocal()) {
             return localOutageProvider.getSites()
         }
+        return loadServerSitesHs(forceRefresh)
+    }
+
+    /**
+     * Pannes servies par le serveur GeoTower, adossées à une copie conservée sur l'appareil.
+     *
+     * La copie sert trois choses : afficher des pannes dès le lancement sans attendre le réseau,
+     * en garder quand le serveur est injoignable (avant, l'app n'avait tout simplement rien hors
+     * ligne), et alimenter la carte « Sites en panne » des réglages. Sa fenêtre de fraîcheur est
+     * volontairement la même que celle du cache mémoire : le rythme de téléchargement automatique
+     * ne change pas, seul le redémarrage du process cesse de coûter un fichier national.
+     */
+    private suspend fun loadServerSitesHs(forceRefresh: Boolean): List<SiteHsEntity> {
         if (!RemoteFeatureFlags.isProviderEnabled(RemoteFeatureFlags.Providers.OUTAGES_GEOTOWER)) {
             return emptyList()
         }
+
+        // Lecture + parsing d'un fichier national : jamais sur le dispatcher de l'appelant, qui
+        // peut être le fil principal (fiche site, carte).
+        val stored = withContext(Dispatchers.IO) { serverOutageCache.load() }
+        if (!forceRefresh && stored != null &&
+            System.currentTimeMillis() - stored.downloadedAtMillis < SITES_HS_CACHE_TTL_MS
+        ) {
+            return stored.sites
+        }
+
         return try {
-            val sourceLastUpdate = runCatching {
-                api.getSitesHsInfo().lastUpdate
-                    ?.trim()
-                    ?.takeIf { it.isNotBlank() && !it.equals("Inconnue", ignoreCase = true) }
-            }.getOrNull()
-
-            // 1. On télécharge le fichier brut depuis ton serveur
-            val response = api.getSitesHsGeoJson()
-            val jsonString = response.string()
-
-            // 2. On lit la structure GeoJSON
-            val jsonObject = org.json.JSONObject(jsonString)
-            val features = jsonObject.getJSONArray("features")
-
-            val hsList = mutableListOf<SiteHsEntity>()
-
-            // 3. On extrait chaque point (Version blindée anti-crash)
-            for (i in 0 until features.length()) {
-                val feature = features.getJSONObject(i)
-                val properties = feature.optJSONObject("properties") ?: org.json.JSONObject()
-
-                // 🚨 CORRECTION : L'ARCEP publie parfois des pannes SANS coordonnées GPS !
-                // optJSONObject évite que l'application ne crashe si la géométrie est absente.
-                val geometry = feature.optJSONObject("geometry")
-                val coordinates = geometry?.optJSONArray("coordinates")
-                val geometryType = geometry?.optNullableString("type")
-
-                // GeoJSON range toujours [Longitude, Latitude]
-                val lon = coordinates?.optDouble(0, 0.0) ?: 0.0
-                val lat = coordinates?.optDouble(1, 0.0) ?: 0.0
-
-                // 1. Extraction de toutes les propriétés du JSON
-                val stationAnfr = properties.optString("station_anfr", "")
-                val operateurStr = properties.optString("operateur", "")
-
-                // Détail technique des pannes par technologie
-                val v2g = properties.optNullableString("voix2g")
-                val v3g = properties.optNullableString("voix3g")
-                val v4g = properties.optNullableString("voix4g")
-                val v5g = properties.optNullableString("voix5g")
-
-                val d2g = properties.optNullableString("data2g")
-                val d3g = properties.optNullableString("data3g")
-                val d4g = properties.optNullableString("data4g")
-                val d5g = properties.optNullableString("data5g")
-
-                // Infos de localisation
-                val dept = properties.optNullableString("departement")
-                val cp = properties.optNullableString("code_postal")
-                val insee = properties.optNullableString("code_insee")
-                val com = properties.optNullableString("commune")
-
-                // 2. Création de l'objet complet
-                val site = SiteHsEntity(
-                    idAnfr = stationAnfr,
-                    operateur = operateurStr,
-                    latitude = lat,
-                    longitude = lon,
-                    geometryType = geometryType,
-
-                    // Localisation
-                    departement = dept,
-                    codePostal = cp,
-                    codeInsee = insee,
-                    commune = com,
-
-                    // Voix
-                    voix2g = v2g,
-                    voix3g = v3g,
-                    voix4g = v4g,
-                    voix5g = v5g,
-
-                    // Data
-                    data2g = d2g,
-                    data3g = d3g,
-                    data4g = d4g,
-                    data5g = d5g,
-
-                    // Global et Détails
-                    voixGlobal = properties.optNullableString("voix"),
-                    dataGlobal = properties.optNullableString("data"),
-                    raison = properties.optNullableString("raison"),
-                    detail = properties.optNullableString("detail"),
-                    propre = properties.optInt("propre", 0),
-
-                    // Dates
-                    debutVoix = properties.optNullableString("debut_voix"),
-                    finVoix = properties.optNullableString("fin_voix"),
-                    debutData = properties.optNullableString("debut_data"),
-                    finData = properties.optNullableString("fin_data"),
-                    dateDebut = properties.optNullableString("debut"),
-                    dateFin = properties.optNullableString("fin"),
-                    sourceLastUpdate = sourceLastUpdate
-                )
-                hsList.add(site)
-            }
-
-            // 🚨 AJOUT : Sauvegarde de la date du jour (Dernière vérification réussie)
-            val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
-            val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date())
-            prefs.edit().putString("last_hs_update", sourceLastUpdate ?: currentDate).apply()
-
-            hsList
+            downloadServerSitesHsFile()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             AppLogger.w(TAG_MAP, "Outage data request failed", e)
-            emptyList()
+            // Serveur injoignable : la copie conservée, même vieille, vaut mieux que « aucune panne ».
+            stored?.sites ?: emptyList()
         }
+    }
+
+    /**
+     * Télécharge le fichier de pannes du serveur, le range sur l'appareil et renvoie son contenu.
+     *
+     * Volontairement SANS filet : le bouton « Télécharger les pannes » des réglages a besoin de
+     * l'échec pour le dire à l'utilisateur. C'est [loadServerSitesHs] qui décide du repli.
+     */
+    private suspend fun downloadServerSitesHsFile(): List<SiteHsEntity> {
+        val sourceLastUpdate = runCatching {
+            api.getSitesHsInfo().lastUpdate
+                ?.trim()
+                ?.takeIf { it.isNotBlank() && !it.equals("Inconnue", ignoreCase = true) }
+        }.getOrNull()
+
+        // 1. On télécharge le fichier brut depuis ton serveur
+        val response = api.getSitesHsGeoJson()
+        val jsonString = response.string()
+
+        // 2. On lit la structure GeoJSON
+        val jsonObject = org.json.JSONObject(jsonString)
+        val features = jsonObject.getJSONArray("features")
+
+        val hsList = mutableListOf<SiteHsEntity>()
+
+        // 3. On extrait chaque point (Version blindée anti-crash)
+        for (i in 0 until features.length()) {
+            val feature = features.getJSONObject(i)
+            val properties = feature.optJSONObject("properties") ?: org.json.JSONObject()
+
+            // 🚨 CORRECTION : L'ARCEP publie parfois des pannes SANS coordonnées GPS !
+            // optJSONObject évite que l'application ne crashe si la géométrie est absente.
+            val geometry = feature.optJSONObject("geometry")
+            val coordinates = geometry?.optJSONArray("coordinates")
+            val geometryType = geometry?.optNullableString("type")
+
+            // GeoJSON range toujours [Longitude, Latitude]
+            val lon = coordinates?.optDouble(0, 0.0) ?: 0.0
+            val lat = coordinates?.optDouble(1, 0.0) ?: 0.0
+
+            // 1. Extraction de toutes les propriétés du JSON
+            val stationAnfr = properties.optString("station_anfr", "")
+            val operateurStr = properties.optString("operateur", "")
+
+            // Détail technique des pannes par technologie
+            val v2g = properties.optNullableString("voix2g")
+            val v3g = properties.optNullableString("voix3g")
+            val v4g = properties.optNullableString("voix4g")
+            val v5g = properties.optNullableString("voix5g")
+
+            val d2g = properties.optNullableString("data2g")
+            val d3g = properties.optNullableString("data3g")
+            val d4g = properties.optNullableString("data4g")
+            val d5g = properties.optNullableString("data5g")
+
+            // Infos de localisation
+            val dept = properties.optNullableString("departement")
+            val cp = properties.optNullableString("code_postal")
+            val insee = properties.optNullableString("code_insee")
+            val com = properties.optNullableString("commune")
+
+            // 2. Création de l'objet complet
+            val site = SiteHsEntity(
+                idAnfr = stationAnfr,
+                operateur = operateurStr,
+                latitude = lat,
+                longitude = lon,
+                geometryType = geometryType,
+
+                // Localisation
+                departement = dept,
+                codePostal = cp,
+                codeInsee = insee,
+                commune = com,
+
+                // Voix
+                voix2g = v2g,
+                voix3g = v3g,
+                voix4g = v4g,
+                voix5g = v5g,
+
+                // Data
+                data2g = d2g,
+                data3g = d3g,
+                data4g = d4g,
+                data5g = d5g,
+
+                // Global et Détails
+                voixGlobal = properties.optNullableString("voix"),
+                dataGlobal = properties.optNullableString("data"),
+                raison = properties.optNullableString("raison"),
+                detail = properties.optNullableString("detail"),
+                propre = properties.optInt("propre", 0),
+
+                // Dates
+                debutVoix = properties.optNullableString("debut_voix"),
+                finVoix = properties.optNullableString("fin_voix"),
+                debutData = properties.optNullableString("debut_data"),
+                finData = properties.optNullableString("fin_data"),
+                dateDebut = properties.optNullableString("debut"),
+                dateFin = properties.optNullableString("fin"),
+                sourceLastUpdate = sourceLastUpdate
+            )
+            hsList.add(site)
+        }
+
+        // 🚨 AJOUT : Sauvegarde de la date du jour (Dernière vérification réussie), plus
+        // l'heure de génération que le fichier porte dans ses métadonnées : c'est le seul
+        // endroit où le serveur la publie, et « À propos » l'affiche à la minute, comme pour
+        // une génération locale. Le résumé (nombre, répartition) sert la carte des réglages.
+        val downloadedAt = System.currentTimeMillis()
+        val currentDate = SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(downloadedAt))
+        val generatedAt = OutageServerInfo.recordDownload(
+            prefs = outagePrefs,
+            lastUpdate = sourceLastUpdate ?: currentDate,
+            generatedAtIso = jsonObject.optJSONObject("metadata")?.optNullableString("generated_at"),
+            sites = hsList,
+            downloadedAtMillis = downloadedAt,
+        )
+
+        // Un fichier vide est enregistré comme tel : il dit « plus aucune panne », et garder
+        // l'ancienne copie afficherait des pannes déjà résolues.
+        withContext(Dispatchers.IO) {
+            serverOutageCache.save(
+                CachedServerOutages(
+                    downloadedAtMillis = downloadedAt,
+                    sourceLastUpdate = sourceLastUpdate,
+                    serverGeneratedAtMillis = generatedAt,
+                    sites = hsList,
+                )
+            )
+        }
+
+        return hsList
+    }
+
+    /**
+     * Force le téléchargement du fichier de pannes du SERVEUR (bouton « Télécharger les pannes »
+     * des réglages), en ignorant la copie conservée. Propage l'échec pour que la carte puisse le dire.
+     */
+    suspend fun downloadServerSitesHs(): List<SiteHsEntity> {
+        val sites = downloadServerSitesHsFile()
+        // Le cache mémoire ne porte les pannes serveur que si c'est bien la source active : au
+        // niveau ≥ 1 du traitement local, il contient les pannes produites sur l'appareil.
+        if (!AppConfig.outagesLocal()) {
+            sitesHsCache = null
+            if (sites.isNotEmpty()) storeSitesHsCache(SOURCE_KEY_REMOTE, sites)
+        }
+        return sites
+    }
+
+    /** Supprime la copie du fichier serveur et tout ce que l'app en retenait. */
+    fun clearServerSitesHs() {
+        serverOutageCache.clear()
+        OutageServerInfo.clear(outagePrefs)
+        if (!AppConfig.outagesLocal()) sitesHsCache = null
     }
 
     /**
@@ -1570,6 +1659,10 @@ class AnfrRepository(
          * application, activité, service live, worker).
          */
         const val SITES_HS_CACHE_TTL_MS = 5 * 60 * 1000L
+
+        /** Les deux sources possibles des pannes, clés du cache mémoire. */
+        const val SOURCE_KEY_LOCAL = "local"
+        const val SOURCE_KEY_REMOTE = "remote"
 
         val sitesHsCacheMutex = Mutex()
 

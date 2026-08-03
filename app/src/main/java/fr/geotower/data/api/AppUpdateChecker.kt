@@ -43,7 +43,13 @@ object AppUpdateChecker {
             pathPrefixes = listOf("/app/share/2149816/6d30423f-ac8b-4509-9857-86684d3a2e03")
         ),
         OfficialDownloadUrl(
-            host = "api.geotower.fr",
+            host = ApiServer.PRIMARY.host,
+            pathPrefixes = listOf("/downloads/geotower/")
+        ),
+        // Miroir : quand le principal est injoignable, c'est lui qui sert le JSON de version, avec
+        // une URL d'APK sur son propre hôte.
+        OfficialDownloadUrl(
+            host = ApiServer.MIRROR.host,
             pathPrefixes = listOf("/downloads/geotower/")
         ),
         OfficialDownloadUrl(
@@ -53,6 +59,9 @@ object AppUpdateChecker {
     )
 
     suspend fun getLatestRelease(): AppReleaseInfo? {
+        // Installation venue du Play Store : c'est lui qui met l'app à jour. Proposer en plus un
+        // téléchargement direct est interdit par la politique « Device and Network Abuse ».
+        if (fr.geotower.utils.AppDistribution.isPlayInstall) return null
         if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.APP_UPDATE_CHECK) ||
             fr.geotower.utils.AppConfig.blockCommunityAndUpdates()
         ) {

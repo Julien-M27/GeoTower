@@ -1,0 +1,314 @@
+PROMPT POUR AGENT IA - GEOTOWER ANDROID HARDENING
+
+Role:
+Tu es un agent IA senior Android/Kotlin/Gradle charge de corriger les risques identifies par audit dans le projet GeoTower.
+
+Contexte projet:
+- Workspace: C:\Users\Julien\AndroidStudioProjects\GeoTower
+- App: GeoTower
+- Package / namespace / applicationId: fr.geotower
+- Stack: Kotlin, Jetpack Compose, Material 3, Navigation Compose, Room, Coroutines, WorkManager, Retrofit, OkHttp, OSMDroid, Mapsforge, Glance Widgets, Google Play Services Location, Android Auto / AndroidX Car App.
+- minSdk: 24
+- compileSdk: 36
+- targetSdk: 36
+- versionName actuelle: 1.9.9.4
+- GeoTower est offline-first avec base ANFR locale, cartes hors ligne, widgets, suivi live, Android Auto et integration communautaire SignalQuest.
+- SignalQuest / Signal Quest n'est pas le nom de l'application. Ne jamais renommer GeoTower en SignalQuest.
+
+Contraintes fortes:
+- Ne fais pas de refonte large.
+- Preserve l'architecture existante.
+- Ne casse pas la compatibilite Android 7 / API 24.
+- Ne supprime pas de fonctionnalite sans alternative claire.
+- Ne modifie pas les changements utilisateur non lies a ta tache.
+- Fais des patchs petits, separes par theme, faciles a relire.
+- Ajoute ou adapte des tests quand le comportement change.
+- Cite les fichiers touches dans ton compte rendu.
+- Compile et lance les tests pertinents avant de conclure si l'environnement le permet.
+- Si tu changes le toolchain Gradle/AGP/Kotlin, fais-le dans une phase separee et explique le risque.
+
+Etat de verification avant correction:
+- :app:compileDebugKotlin passe.
+- :app:testDebugUnitTest echoue: 75 tests lances, 2 echecs dans AndroidI18nResourcesTest.
+- :app:lintDebug echoue par crash lint/toolchain: NonNullableMutableLiveDataDetector, IncompatibleClassChangeError, sur AnfrRepository.kt.
+- Aucun code n'a ete modifie pendant l'audit initial.
+
+Priorites de correction:
+
+P0 / P1 - A corriger en premier
+
+1. Android Auto HostValidator trop permissif
+Fichier:
+- app/src/main/java/fr/geotower/services/GeoTowerCarAppService.kt
+Zone:
+- createHostValidator(), ligne environ 15-17
+Probleme:
+- Le service exporte retourne HostValidator.ALLOW_ALL_HOSTS_VALIDATOR.
+- La documentation AndroidX Car indique que ce validateur est reserve au developpement.
+Risque:
+- Host non autorise pouvant se connecter au CarAppService.
+- Risque securite et risque de rejet Android Auto / Play.
+Correction attendue:
+- Garder ALLOW_ALL_HOSTS_VALIDATOR uniquement en debug.
+- En release, utiliser HostValidator.Builder(this)
+  .addAllowedHosts(androidx.car.app.R.array.hosts_allowlist_sample)
+  .build()
+- Ajouter un commentaire court expliquant debug vs release.
+- Verifier que le chemin de fichier est bien services/GeoTowerCarAppService.kt, pas car/.
+
+2. Toolchain incoherent avec targetSdk/compileSdk 36
+Fichiers:
+- app/build.gradle.kts
+- gradle/libs.versions.toml
+- gradle.properties
+- gradle/wrapper/gradle-wrapper.properties si necessaire
+Probleme:
+- compileSdk/targetSdk = 36.
+- AGP = 8.7.2.
+- gradle.properties masque android.suppressUnsupportedCompileSdk=36.
+- lintDebug plante.
+Correction attendue:
+- Phase separee recommandee: migrer AGP vers une version qui supporte officiellement API 36.
+- Selon l'environnement, aligner Gradle/JDK/AGP avec les release notes officielles.
+- Supprimer android.suppressUnsupportedCompileSdk=36 une fois AGP compatible.
+- Relancer :app:lintDebug.
+- Si la migration est trop risquee dans cette passe, documenter precisement le blocage et ne pas masquer le probleme.
+
+3. Widgets: periodic work fragile et annulation globale
+Fichiers:
+- app/src/main/java/fr/geotower/widget/AntennaWidgetReceiver.kt
+- app/src/main/java/fr/geotower/widget/AntennaWidgetMediumReceiver.kt
+- app/src/main/java/fr/geotower/widget/AntennaWidgetLargeReceiver.kt
+- app/src/main/java/fr/geotower/widget/AntennaMapWidgetReceiver.kt
+Zones:
+- lecture widget_sync_freq
+- PeriodicWorkRequestBuilder
+- cancelUniqueWork("WidgetPeriodicUpdate")
+Problemes:
+- Si une ancienne preference widget_sync_freq est inferieure a 15 minutes, WorkManager peut lever une IllegalArgumentException.
+- Les 4 receivers utilisent le meme unique work name "WidgetPeriodicUpdate".
+- onDisabled annule le work global meme si un autre type de widget existe encore.
+Correction attendue:
+- Centraliser la planification dans un WidgetUpdateScheduler.
+- Clamper la frequence: au minimum 15 minutes, idealement garder 30 minutes comme valeur UI actuelle.
+- Ne faire cancelUniqueWork que si plus aucun widget GeoTower n'est actif.
+- Ajouter tests unitaires pour le clamp et la logique "cancel only when no widgets".
+
+Exemple attendu:
+val freqMinutes = prefs.getInt("widget_sync_freq", 60)
+    .coerceAtLeast(30)
+    .toLong()
+
+4. CompassScreen: appels LocationManager non proteges
+Fichier:
+- app/src/main/java/fr/geotower/ui/screens/compass/CompassScreen.kt
+Zones:
+- registerListener avec rotationSensor potentiellement null
+- getLastKnownLocation GPS/NETWORK
+- requestLocationUpdates GPS/NETWORK
+Probleme:
+- Peut crasher si provider absent/desactive, permission revoke, GPS off, ROM OEM stricte.
+Correction attendue:
+- Verifier sensor != null avant registerListener.
+- Verifier fine/coarse.
+- Utiliser getProviders(true).
+- Entourer getLastKnownLocation et requestLocationUpdates avec runCatching.
+- Ne demander GPS que si ACCESS_FINE_LOCATION est accordee.
+- NETWORK peut fonctionner avec coarse.
+- Ajouter tests si la logique est extraite, sinon au minimum verifier manuellement: GPS off, permission refusee, permission precise vs approximative.
+
+5. Foreground service location: start non protege Android 12+
+Fichiers:
+- app/src/main/java/fr/geotower/services/LiveTrackingController.kt
+- app/src/main/java/fr/geotower/services/LiveTrackingService.kt
+Probleme:
+- startForegroundService est appele sans try/catch.
+- Android 12+ peut lever ForegroundServiceStartNotAllowedException.
+- Android 14+ applique les restrictions while-in-use pour les FGS location.
+Correction attendue:
+- Utiliser ContextCompat.startForegroundService si pertinent.
+- Catcher ForegroundServiceStartNotAllowedException, SecurityException, IllegalStateException.
+- Ne lancer le service que depuis un parcours utilisateur visible ou une exemption valide.
+- Si lancement depuis background, verifier ACCESS_BACKGROUND_LOCATION sur Android 10+.
+- Conserver foregroundServiceType="location" et permissions manifest existantes.
+- Documenter le parcours pour Play Console.
+
+6. Workers longs: ne pas continuer si setForeground echoue
+Fichiers:
+- app/src/main/java/fr/geotower/data/workers/MapDownloadWorker.kt
+- app/src/main/java/fr/geotower/data/workers/SignalQuestUploadWorker.kt
+Probleme:
+- Si setForeground echoue, le worker continue un transfert long en background.
+- Sur Android 14/15/16 et ROM OEM, risque kill, retry incoherent, batterie, UX invisible.
+Correction attendue:
+- Pour les transferts longs, retourner Result.retry() ou Result.failure() si foreground impossible.
+- Ne pas masquer l'echec par une notification classique.
+- Ajouter contraintes reseau au MapDownloadWorker depuis MapDownloadCard.
+- Garder la validation SHA256 des cartes.
+
+7. Background location Android 11+ et Play policy
+Fichier:
+- app/src/main/java/fr/geotower/ui/screens/settings/SettingsScreen.kt
+Zone:
+- bloc ACCESS_BACKGROUND_LOCATION, autour des lignes 2178-2231
+Probleme:
+- Sur Android 11+, le dialogue runtime ne propose pas "Allow all the time"; l'utilisateur doit passer par les parametres.
+- Play exige une justification claire si ACCESS_BACKGROUND_LOCATION est declaree.
+Correction attendue:
+- Demander foreground location d'abord.
+- Pour Android 10, RequestPermission(ACCESS_BACKGROUND_LOCATION) peut etre utilise.
+- Pour Android 11+, afficher une UI educative claire puis ouvrir les parametres de l'app / page permission location.
+- Utiliser getBackgroundPermissionOptionLabel() si disponible pour label localise.
+- L'utilisateur doit pouvoir refuser et continuer a utiliser l'app.
+
+8. Tests i18n en echec
+Fichiers:
+- app/src/main/res/values/strings.xml
+- app/src/main/res/values-en/strings.xml
+- app/src/main/res/values-pt/strings.xml
+- app/src/main/res/values-it/strings.xml
+- app/src/main/res/values-de/strings.xml
+- app/src/main/res/values-es/strings.xml
+Tests:
+- app/src/test/java/fr/geotower/utils/AndroidI18nResourcesTest.kt
+Probleme:
+- 20 cles speedtests manquent dans en/pt/it/de/es.
+Liste des cles:
+- appstrings_page_speedtests_settings
+- appstrings_speedtests_anfr_label
+- appstrings_speedtests_filter_major_enb
+- appstrings_speedtests_include_missing_enb
+- appstrings_speedtests_settings_title
+- appstrings_speedtests_show_coordinates
+- appstrings_speedtests_show_count
+- appstrings_speedtests_show_network_details
+- appstrings_speedtests_show_radio_details
+- appstrings_speedtests_support_label
+- appstrings_speedtests_best_average
+- appstrings_speedtests_best_download
+- appstrings_speedtests_best_max
+- appstrings_speedtests_best_metric_title
+- appstrings_speedtests_display_title
+- appstrings_speedtests_sort_average
+- appstrings_speedtests_sort_descending
+- appstrings_speedtests_sort_download
+- appstrings_speedtests_sort_max
+- appstrings_speedtests_sort_title
+Correction attendue:
+- Ajouter les cles manquantes dans chaque locale.
+- Conserver exactement les placeholders de values/strings.xml.
+- Relancer :app:testDebugUnitTest.
+
+9. EXIF photo conserve par defaut
+Fichiers:
+- app/src/main/java/fr/geotower/ui/screens/emitters/SignalQuestUploadScreen.kt
+- app/src/main/java/fr/geotower/data/upload/SignalQuestUploadQueue.kt
+Probleme:
+- stripExifBeforeUpload vaut false par defaut.
+- Les metadonnees EXIF peuvent contenir position GPS, date, modele camera.
+Correction attendue:
+- Mettre stripExifBeforeUpload a true par defaut ou afficher une confirmation explicite avant conservation.
+- S'assurer que l'upload original JPEG ne conserve pas GPS EXIF sans consentement clair.
+- Ajouter test sur metadata null quand strip true.
+
+P2 - Stabilite multi-OEM / qualite
+
+10. Fallback localisation sans Google Play Services
+Fichiers a rechercher:
+- usages LocationServices.getFusedLocationProviderClient
+Probleme:
+- Huawei/Honor sans GMS ou Google Play Services absent peuvent degrader location/widget/live tracking.
+Correction attendue:
+- Detecter indisponibilite Google Play Services si necessaire.
+- Fallback LocationManager pour fonctions critiques.
+- UX claire si aucun provider n'est disponible.
+
+11. NetworkMonitor: faux online possible
+Fichier:
+- app/src/main/java/fr/geotower/utils/NetworkMonitor.kt
+Probleme:
+- Teste NET_CAPABILITY_INTERNET mais pas NET_CAPABILITY_VALIDATED.
+Correction attendue:
+- Utiliser VALIDATED quand l'objectif est "internet reel disponible".
+- Conserver nuance si certaines UI veulent seulement "reseau connecte".
+
+12. Manifest: permissions et features
+Fichier:
+- app/src/main/AndroidManifest.xml
+Corrections attendues:
+- Mettre READ_EXTERNAL_STORAGE avec android:maxSdkVersion="32" ou supprimer si inutile.
+- Ajouter uses-feature required=false pour GPS/compass/location si l'app doit rester visible sur tablettes/appareils sans capteur.
+- Verifier Android Auto declarations et metadata.
+- Ne pas ajouter CAMERA permission si l'app utilise seulement intents/Photo Picker/FileProvider.
+
+13. Large screens / Android 16
+Fichier:
+- app/src/main/AndroidManifest.xml
+Probleme:
+- screenOrientation="portrait" est ignore sur grands ecrans avec targetSdk 36.
+Correction attendue:
+- Verifier UI responsive sur sw600dp/tablette/foldable.
+- Corriger les ecrans qui supposent portrait.
+- Eviter opt-out temporaire sauf urgence documentee.
+
+14. VersionCode et release
+Fichier:
+- app/build.gradle.kts
+Probleme:
+- versionCode=1 avec versionName=1.9.9.4.
+Correction attendue:
+- Ne changer que si la demande inclut preparation release.
+- Sinon signaler dans le compte rendu.
+
+Commandes de verification recommandees:
+- $env:JAVA_HOME='C:\Program Files\Android\Android Studio1\jbr'; $env:ANDROID_HOME='C:\Users\Julien\AppData\Local\Android\Sdk'; .\gradlew.bat :app:compileDebugKotlin
+- $env:JAVA_HOME='C:\Program Files\Android\Android Studio1\jbr'; $env:ANDROID_HOME='C:\Users\Julien\AppData\Local\Android\Sdk'; .\gradlew.bat :app:testDebugUnitTest
+- $env:JAVA_HOME='C:\Program Files\Android\Android Studio1\jbr'; $env:ANDROID_HOME='C:\Users\Julien\AppData\Local\Android\Sdk'; .\gradlew.bat :app:lintDebug
+
+Tests manuels obligatoires apres corrections:
+- Android 7 / API 24: premier lancement, DB absente, carte, navigation, widgets.
+- Android 8 / API 26: notification channels, WorkManager, Doze.
+- Android 10 / API 29: background location, scoped storage, photos.
+- Android 11 / API 30: permission "only this time", background location via settings.
+- Android 12 / API 31: startForegroundService restrictions.
+- Android 13 / API 33: POST_NOTIFICATIONS refusee/acceptee/revoquee.
+- Android 14 / API 34: FGS type location/dataSync, permissions runtime.
+- Android 15 / API 35: timeout FGS dataSync, downloads longs.
+- Android 16 / API 36: large screens, orientation ignored, edge-to-edge.
+- Android 17 preview / API 37 si disponible: regression smoke test.
+
+Matrice OEM minimale:
+- Pixel Android stock
+- Samsung One UI
+- Xiaomi / Redmi / Poco HyperOS ou MIUI avec battery restriction
+- Oppo / OnePlus ColorOS/OxygenOS
+- Huawei/Honor sans GMS si possible
+
+Criteres de sortie:
+- compileDebugKotlin vert.
+- testDebugUnitTest vert.
+- lintDebug vert ou blocage toolchain documente avec cause precise.
+- Pas de regression visible sur premier lancement, permission location refusee, GPS off, reseau off, background/foreground, reboot, widget, upload photo, download carte.
+- Compte rendu final avec fichiers modifies, risques restants, tests lances et resultats.
+
+Sources Android officielles a consulter si doute:
+- Foreground service types Android 14:
+  https://developer.android.com/about/versions/14/changes/fgs-types-required
+- Restrictions foreground service background:
+  https://developer.android.com/about/versions/12/foreground-services
+- Android 15 behavior changes:
+  https://developer.android.com/about/versions/15/behavior-changes-15
+- Android 16 behavior changes:
+  https://developer.android.com/about/versions/16/behavior-changes-16
+- Android 17 behavior changes:
+  https://developer.android.com/about/versions/17/behavior-changes-17
+- Background location:
+  https://developer.android.com/develop/sensors-and-location/location/permissions/background
+- Notification runtime permission:
+  https://developer.android.com/guide/topics/ui/notifiers/notification-permission
+- WorkManager PeriodicWorkRequest:
+  https://developer.android.com/reference/androidx/work/PeriodicWorkRequest
+- AndroidX Car HostValidator:
+  https://developer.android.com/reference/androidx/car/app/validation/HostValidator
+- AGP release notes:
+  https://developer.android.com/build/releases/gradle-plugin

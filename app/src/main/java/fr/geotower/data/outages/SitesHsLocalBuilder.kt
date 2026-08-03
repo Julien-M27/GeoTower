@@ -1,6 +1,7 @@
 package fr.geotower.data.outages
 
 import fr.geotower.data.models.SiteHsEntity
+import kotlinx.coroutines.CancellationException
 
 /** Résultat d'un géocodage : la station ANFR retrouvée, la distance et le type d'appariement. */
 data class GeocodeMatch(
@@ -39,6 +40,8 @@ data class OutageBuildStats(
     val withoutStation: MutableMap<String, Int> = mutableMapOf(),
     val duplicatesMerged: MutableMap<String, Int> = mutableMapOf(),
     var outputFeatures: Int = 0,
+    /** Raison de l'abandon du géocodage (base ANFR absente/illisible), null si tout s'est bien passé. */
+    var geocodeError: String? = null,
 )
 
 data class SitesHsBuildResult(
@@ -69,6 +72,9 @@ class SitesHsLocalBuilder(
         val records = LinkedHashMap<String, OutageRecord>()
         val totalRows = rowsBySource.values.sumOf { it.size }
         var processed = 0
+        // Base ANFR absente ou illisible : on arrête d'interroger au premier échec (sinon des
+        // milliers d'exceptions) et on continue sans rattachement.
+        var geocodingAvailable = true
 
         for ((source, rows) in rowsBySource) {
             var kept = 0
@@ -86,14 +92,30 @@ class SitesHsLocalBuilder(
                     stats.stationFromOperator.increment(source.key)
                     base.copy(matchType = "operator")
                 } else {
-                    val match = geocoder.bestMatch(
-                        operatorKey = base.operatorKey,
-                        codeInsee = base.codeInsee,
-                        lat = base.lat,
-                        lon = base.lon,
-                        sameInseeThresholdMeters = sameInseeThresholdMeters,
-                        spatialThresholdMeters = spatialThresholdMeters,
-                    )
+                    // Le géocodage n'est qu'un ENRICHISSEMENT : une panne sans station ANFR reste
+                    // publiée avec les coordonnées brutes de l'opérateur, exactement comme côté
+                    // serveur. Le faire échouer toute la récupération privait l'utilisateur des
+                    // pannes entières dès que la base ANFR n'était pas lisible.
+                    val match = if (!geocodingAvailable) {
+                        null
+                    } else {
+                        try {
+                            geocoder.bestMatch(
+                                operatorKey = base.operatorKey,
+                                codeInsee = base.codeInsee,
+                                lat = base.lat,
+                                lon = base.lon,
+                                sameInseeThresholdMeters = sameInseeThresholdMeters,
+                                spatialThresholdMeters = spatialThresholdMeters,
+                            )
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: Exception) {
+                            geocodingAvailable = false
+                            stats.geocodeError = e.message?.takeIf { it.isNotBlank() } ?: e.javaClass.simpleName
+                            null
+                        }
+                    }
                     if (match != null) {
                         stats.stationFromDb.increment(source.key)
                         base.copy(

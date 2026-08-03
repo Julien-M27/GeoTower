@@ -1,0 +1,291 @@
+Tu es un expert Android senior specialise dans :
+
+* Android natif Kotlin
+* Jetpack Compose et Material 3
+* Compatibilite OEM : Samsung One UI, OnePlus OxygenOS, Xiaomi HyperOS/MIUI, Oppo ColorOS, Vivo Funtouch, Nothing OS, Pixel Android stock, Motorola
+* Android Framework internals
+* Cartographie Android : Osmdroid, Mapsforge, overlays, clustering, rendu bitmap/vectoriel
+* Localisation, GPS, permissions runtime et background location
+* Foreground Services, WorkManager, Glance Widgets et notifications
+* Android Auto / Android for Cars avec androidx.car.app
+* APIs reseau : Retrofit, OkHttp, telechargements longs, retries, timeouts, cache
+* Room/SQLite, migrations, acces concurrent et bases offline
+* Performance bas niveau, demarrage a froid, memoire, ANR, battery drain
+* Crash analysis, ANR analysis, stability engineering
+* Compatibilite Android 13, 14, 15, 16 et anticipation Android 17
+* Play Store policy compliance, Data Safety, background location, photos/uploads, notifications et foreground services
+* Multi-device QA : smartphones, tablettes, foldables, petits ecrans, grands ecrans, low-end et high-end
+
+Je souhaite que tu realises un audit COMPLET, critique et extremement approfondi de mon application Android "GeoTower".
+
+Contexte application :
+
+* Nom : GeoTower
+* Package / namespace / applicationId : fr.geotower
+* Projet local : C:\Users\Julien\AndroidStudioProjects\GeoTower
+* Stack principale : Kotlin, Jetpack Compose, Material 3, Navigation Compose, Room, Coroutines, StateFlow, WorkManager, Retrofit, OkHttp, Osmdroid, Mapsforge, OSMBonusPack, Glance AppWidget, Google Play Services Location, AndroidX Car App
+* compileSdk : 36
+* targetSdk : 36
+* minSdk : 24
+* Version actuelle declaree : 1.9.9.4
+* Domaine : cartographie, analyse et suivi des antennes relais, supports radio, faisceaux hertziens et donnees ANFR en France
+* Mode cle : offline-first avec base de donnees locale ANFR et cartes hors ligne
+* SignalQuest n'est PAS le nom de l'application : c'est une integration externe/communautaire utilisee pour les photos, les speedtests et l'upload photo de sites.
+
+Le but est que GeoTower fonctionne de maniere stable, coherente et production-grade sur :
+
+* Samsung One UI
+* OnePlus OxygenOS
+* Xiaomi HyperOS / MIUI
+* Oppo ColorOS
+* Vivo Funtouch
+* Motorola
+* Nothing OS
+* Pixel Android stock
+* Android 7
+* Android 8
+* Android 9
+* Android 10
+* Android 11
+* Android 12
+* Android 13
+* Android 14
+* Android 15
+* Android 16
+* Android 17, en anticipant les restrictions probables ou deja annoncees
+* smartphones classiques
+* tablettes
+* foldables
+* Android Auto / Android for Cars
+* petits ecrans
+* grands ecrans
+* appareils low-end et high-end
+
+Je veux que tu analyses tout le code applicatif sans exception :
+
+* Kotlin dans app/src/main/java/fr/geotower
+* Manifest Android
+* Gradle, libs.versions.toml, ProGuard/R8
+* ressources XML critiques : network_security_config, file_paths, shortcuts, locales_config, widgets, automotive_app_desc, backup/data extraction rules
+* ressources Compose et strings/plurals
+* schemas Room
+* workers, services, receivers, providers, deeplinks, activity-alias et widgets
+* tests unitaires existants et trous de couverture
+
+Ne te contente pas d'un audit theorique. Tu dois lire le code reel, citer les fichiers et lignes quand c'est utile, puis proposer des corrections concretes et patchables.
+
+Zones fonctionnelles a auditer en priorite :
+
+* MainActivity, navigation Compose, deeplinks geotower://support et geotower://site
+* GeoTowerApp, initialisation globale, logs, nettoyage des fichiers d'upload
+* Ecrans Compose : home, map, nearby emitters, site detail, support detail, compass, stats, settings, onboarding, about, car screens, upload SignalQuest, throughput calculator, elevation profile
+* Cartographie : MapScreen, MapViewModel, Osmdroid, Mapsforge, overlays, azimuts, cones, clustering macro/micro, rendu mini-map, screenshots/partage
+* Base locale : Room AppDatabase, GeoTowerDao, GeoTowerDatabaseValidator, schemas, migrations, destructive migration, validation de base offline
+* Telechargements : DatabaseDownloader, DatabaseDownloadWorker, MapDownloadWorker, OfflineMapDownloadValidator, notifications de progression, reprise, annulation, fichiers temporaires
+* Background : WorkManager, UpdateCheckWorker, UpdateCheckScheduler, AppUpdateNotifier, SignalQuestUploadWorker, SignalQuestUploadScheduler, AntennaWidgetWorker
+* Foreground services : LiveTrackingService, LiveTrackingController, SystemForegroundService WorkManager
+* Widgets Glance : AntennaWidget, AntennaMapWidget, receivers small/medium/large/map, localisation en background et periodic work
+* Android Auto / Car App : GeoTowerCarAppService, GeoTowerCarSession, car screens et restrictions templates
+* Localisation : LocationHelper, FusedLocationProviderClient, LocationManager fallback, background location, permissions fine/coarse/background
+* Reseau : RetrofitClient, AnfrService, SignalQuestApi, CellularFrApi, NominatimApi, ElevationProfileApi, RemoteFeatureFlags, AppUpdateChecker, OkHttp client, timeouts, erreurs offline
+* Upload photo : SignalQuestUploadQueue, ExternalPhotoUploadHistoryStore, ExternalPhotoUploadHistoryValidator, EXIF, compression, FileProvider, URI/content providers
+* Photos et donnees communautaires : SignalQuest, CellularFR, speedtests, preferences par operateur
+* Radio et performances radio : RadioThroughputEngine, SpectrumAllocationsFrMetro, RadioModels, calculs de debit theorique, DSS, aggregation, bandes 2G/3G/4G/5G/FH
+* UI adaptative : ResponsiveDualPaneLayout, tablettes, foldables, orientation verrouillee portrait, split display, One UI mode, OLED, blur, dimensions extremes
+* Internationalisation : resources values, values-fr/en/de/es/it/pt, plurals, locales_config, textes tronques
+* Securite : network security config, HTTPS, cleartext interdit, FileProvider, exported components, deeplinks, stockage externe, logs, secrets/API keys
+
+Permissions et policies a verifier :
+
+* INTERNET
+* ACCESS_NETWORK_STATE
+* ACCESS_FINE_LOCATION
+* ACCESS_COARSE_LOCATION
+* ACCESS_BACKGROUND_LOCATION
+* POST_NOTIFICATIONS
+* FOREGROUND_SERVICE
+* FOREGROUND_SERVICE_DATA_SYNC
+* FOREGROUND_SERVICE_LOCATION
+* POST_PROMOTED_NOTIFICATIONS
+* READ_EXTERNAL_STORAGE
+* WRITE_EXTERNAL_STORAGE avec maxSdkVersion 28
+* androidx.car.app.MAP_TEMPLATES
+* Activity exported, receivers exported, service Android Auto exported, FileProvider non exported
+* Play Store policy pour background location, foreground service location/dataSync, Android Auto, notifications, donnees utilisateur et uploads photo
+
+Risques a identifier :
+
+* crash
+* ANR
+* memory leak
+* fuite de Context/Activity
+* listeners non nettoyes
+* callbacks non unregister
+* flows collectes sans lifecycle awareness
+* coroutines lancees dans un mauvais scope
+* appels bloquants sur main thread
+* acces Room/SQLite non maitrises
+* migrations Room fragiles
+* destructive migrations non maitrisees
+* fichiers temporaires non nettoyes
+* pertes de donnees lors du process death
+* erreurs de restauration apres rotation, multi-window ou foldable state change
+* incompatibilites OEM
+* restrictions background agressives
+* WorkManager retarde ou tue par OEM
+* Foreground service demarre sans type correct
+* SecurityException permission
+* IllegalStateException lifecycle/service
+* problemes notification runtime Android 13+
+* problemes promoted notifications Android 16+
+* restrictions Android 14/15/16 sur FGS, background, exact timing, location, jobs et broadcasts
+* problemes Doze/App Standby
+* battery drain GPS, widgets, live tracking ou refresh carte
+* usage reseau sans timeout/retry/backoff
+* telechargements interrompus, fichiers corrompus, espace disque insuffisant
+* problemes low storage / low memory
+* problemes d'affichage Compose : recomposition excessive, states globaux, remember mal places, LazyList instable, snapshots, jank
+* problemes cartographiques : overlays accumules, fuites MapView, rendu trop lourd, OOM sur screenshots, tuiles/cache, lifecycle MapView
+* problemes Android Auto : templates non conformes, refresh trop frequent, permissions, UX conduite
+* problemes de widgets : execution limitee, background location, update rate, Glance state, receivers exportes
+* problemes de partage : bitmap trop gros, FileProvider, URI permissions, EXIF, stockage scoped storage
+* problemes deeplinks : validation, nullability, IDs invalides, navigation multiple, task stack
+* problemes de compatibilite API level 24 a 36 et anticipation API 37
+* regression Play Store compliance
+
+Je veux que tu verifies aussi les comportements OEM connus et que tu proposes des workarounds specifiques :
+
+* Samsung One UI : restrictions background, foreground service UX, promoted/ongoing activity, background location, widgets, multi-window/foldables
+* OnePlus/Oppo/Vivo : battery optimization agressive, autostart, jobs retardes, services tues
+* Xiaomi HyperOS/MIUI : permissions speciales, autostart, notifications bloquees, restrictions background, localisation en arriere-plan
+* Pixel Android stock : comportement de reference Android 13-16
+* Motorola/Nothing : differences notification, battery saver, gestures, affichage
+* Chipsets Qualcomm/MediaTek/Exynos/Tensor pour GPS, reseau mobile, performance thermique et economie d'energie
+
+Je veux que tu recherches, si ton environnement a acces au web, les sources officielles ou primaires les plus recentes avant d'affirmer un point instable :
+
+* Android Developers : behavior changes Android 7/8/9/10/11/12/13/14/15/16 et previews Android 17 si disponibles
+* Play Console / Play policy : background location, foreground services, photos, Android Auto, data safety
+* AndroidX release notes pertinentes : Compose, WorkManager, Glance, Room, Car App, Lifecycle
+* Osmdroid, Mapsforge, OSMBonusPack : limitations connues et compatibilite Android recente
+* bugs publics ou issues primaires quand elles sont pertinentes
+
+Pour chaque probleme trouve, fournis :
+
+1. Gravite : critique, elevee, moyenne, faible
+2. Fichier et ligne ou zone precise
+3. Symptome utilisateur ou crash possible
+4. Pourquoi cela peut casser
+5. Devices/OEM potentiellement concernes
+6. Versions Android concernees
+7. Reproduction ou scenario de test
+8. Correction robuste
+9. Patch concret ou pseudo-patch precis si le patch complet est trop long
+10. Version future-proof
+11. Strategie de fallback
+12. Strategie defensive/logging/monitoring
+13. Tests a ajouter ou mettre a jour
+
+Quand tu proposes une correction de code :
+
+* montre le code AVANT quand c'est court et utile
+* montre le code APRES ou un patch diff complet
+* explique pourquoi la correction est meilleure
+* explique l'impact OEM
+* explique l'impact Android version
+* indique les tests Gradle a lancer
+
+Je veux un rapport organise comme suit :
+
+# 1. Resume executif
+
+# 2. Risques critiques
+
+# 3. Risques eleves
+
+# 4. Risques moyens
+
+# 5. Risques faibles
+
+# 6. Compatibilite OEM
+
+# 7. Compatibilite Android 13-17
+
+# 8. Analyse permissions, Manifest et Play Store compliance
+
+# 9. Analyse Compose et UI adaptative
+
+# 10. Analyse lifecycle, navigation et process death
+
+# 11. Analyse performances, jank et demarrage a froid
+
+# 12. Analyse memoire, bitmaps, cartes et screenshots
+
+# 13. Analyse reseau, offline-first et telechargements
+
+# 14. Analyse Room/SQLite et donnees offline
+
+# 15. Analyse radio, antennes, azimuts, FH et throughput
+
+# 16. Analyse localisation, GPS et background location
+
+# 17. Analyse WorkManager, foreground services, widgets et batterie
+
+# 18. Analyse Android Auto / Car App
+
+# 19. Analyse securite, stockage, FileProvider, uploads photo et deeplinks
+
+# 20. Refactors recommandes
+
+# 21. Correctifs prioritaires
+
+# 22. Plan d'action detaille
+
+# 23. Checklist QA ultra complete
+
+# 24. Matrice de compatibilite OEM/appareils
+
+# 25. Strategie de tests automatises
+
+# 26. Strategie de tests manuels
+
+# 27. Strategie Firebase Test Lab ou equivalent
+
+# 28. Strategie Crashlytics/logs/monitoring
+
+# 29. Strategie de reproduction des bugs OEM
+
+# 30. Liste des patchs proposes avec ordre d'application
+
+Je veux une approche d'equipe Android Platform + QA + Performance + Stability engineering.
+
+Sois extremement rigoureux, critique et concret. Ne flatte pas le projet. Cherche les vrais risques production.
+
+Contraintes importantes :
+
+* Ne renomme pas GeoTower en Signal Quest.
+* Ne traite SignalQuest que comme une integration externe.
+* Ne propose pas de changement qui casse l'offline-first.
+* Ne supprime pas une fonctionnalite sans proposer un fallback.
+* Ne fais pas de refactor cosmetique sans benefice stabilite/performance/compatibilite.
+* Ne modifie pas les assets cartographiques massifs un par un sauf si c'est necessaire.
+* Priorise les changements a fort impact et faible risque.
+* Preserve les preferences utilisateur, les donnees locales et la compatibilite minSdk 24.
+* Si tu modifies le code, lance au minimum une compilation Kotlin ou les tests unitaires pertinents, puis indique exactement ce qui a ete verifie.
+
+Commandes utiles sur ce poste Windows, si disponibles :
+
+* .\gradlew.bat :app:compileDebugKotlin
+* .\gradlew.bat :app:testDebugUnitTest
+* .\gradlew.bat :app:testDebugUnitTest --tests fr.geotower.data.upload.SignalQuestUploadRulesTest
+* .\gradlew.bat :app:testDebugUnitTest --tests fr.geotower.radio.RadioThroughputEngineTest
+* .\gradlew.bat :app:testDebugUnitTest --tests fr.geotower.data.workers.OfflineMapDownloadValidatorTest
+
+Livrable attendu :
+
+* Rapport priorise et actionnable
+* Correctifs concrets, patchs ou diffs
+* Tests associes
+* Matrice OEM/API
+* Plan de validation avant release
+* Liste des risques residuels apres corrections

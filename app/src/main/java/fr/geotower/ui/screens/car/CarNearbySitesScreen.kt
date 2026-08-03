@@ -15,13 +15,16 @@ import androidx.car.app.model.ListTemplate
 import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
+import androidx.car.app.constraints.ConstraintManager
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.utils.AppFileLog
 import fr.geotower.utils.LocationHelper
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -46,8 +49,8 @@ class CarNearbySitesScreen(
         loadNearbySites()
     }
 
-    override fun onGetTemplate(): Template {
-        return when (val currentState = state) {
+    override fun onGetTemplate(): Template = carTemplateOrError(carContext, "CarNearbySitesScreen") {
+        when (val currentState = state) {
             NearbySitesState.Loading -> loadingTemplate()
             NearbySitesState.MissingLocationPermission -> missingPermissionTemplate()
             NearbySitesState.Empty -> messageTemplate(
@@ -71,31 +74,54 @@ class CarNearbySitesScreen(
         invalidate()
 
         screenScope.launch {
-            if (!hasLocationPermission()) {
-                state = NearbySitesState.MissingLocationPermission
+            try {
+                if (!hasLocationPermission()) {
+                    carLog("Sites proches : permission de localisation absente")
+                    state = NearbySitesState.MissingLocationPermission
+                    invalidate()
+                    return@launch
+                }
+
+                val location = getCarLocation()
+                if (location == null) {
+                    carLog("Sites proches : aucune position disponible")
+                    state = NearbySitesState.Error(carContext.getString(R.string.car_location_unavailable))
+                    invalidate()
+                    return@launch
+                }
+
+                val sites = withContext(Dispatchers.IO) {
+                    val antennas = repository.getNearest100(location.latitude, location.longitude)
+                    antennas.toCarSiteListItems(location).take(25)
+                }
+
+                carLog("Sites proches : ${sites.size} site(s) prêts à être affichés")
+                state = if (sites.isEmpty()) NearbySitesState.Empty else NearbySitesState.Loaded(sites)
                 invalidate()
-                return@launch
-            }
-
-            val location = getCarLocation()
-            if (location == null) {
-                state = NearbySitesState.Error(carContext.getString(R.string.car_location_unavailable))
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Throwable) {
+                // Sans ce filet, l'exception traverse le scope de l'écran et l'hôte n'affiche que
+                // son bandeau générique — l'utilisateur ne saurait pas si c'est la base, le GPS ou
+                // le réseau qui a lâché.
+                AppFileLog.e(CAR_LOG_TAG, "Echec du chargement des sites proches", error)
+                state = NearbySitesState.Error(
+                    "${error.javaClass.simpleName} : ${error.message ?: "-"}".take(200)
+                )
                 invalidate()
-                return@launch
             }
-
-            val sites = withContext(Dispatchers.IO) {
-                val antennas = repository.getNearest100(location.latitude, location.longitude)
-                antennas.toCarSiteListItems(location).take(25)
-            }
-
-            state = if (sites.isEmpty()) NearbySitesState.Empty else NearbySitesState.Loaded(sites)
-            invalidate()
         }
     }
 
     private fun loadedTemplate(sites: List<CarSiteListItem>): Template {
         val screenManager = carContext.getCarService(ScreenManager::class.java)
+        // Trace volontaire : l'hôte refuse un ListTemplate qui dépasse sa limite de contenu
+        // (6 lignes sur Android Auto). Le journal dira si c'est bien ce qui casse cet écran.
+        val hostLimit = runCatching {
+            carContext.getCarService(ConstraintManager::class.java)
+                .getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_LIST)
+        }.getOrElse { -1 }
+        carLog("Sites proches : ${sites.size} ligne(s) construites, limite de l'hôte = $hostLimit")
         val itemListBuilder = ItemList.Builder()
 
         sites.forEach { site ->

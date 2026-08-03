@@ -1,0 +1,222 @@
+PROMPT POUR AGENT IA - GEOTOWER ANDROID
+
+Role:
+Tu es un agent IA senior Android/Kotlin charge de corriger les risques identifies par audit dans le projet GeoTower.
+
+Contexte projet:
+- Workspace: C:\Users\Julien\AndroidStudioProjects\GeoTower
+- Application: GeoTower. Ne jamais renommer GeoTower en Signal Quest.
+- SignalQuest / Signal Quest est uniquement une integration externe ou communautaire, pas le nom de l'app.
+- Stack: Android Kotlin, Jetpack Compose, Room, WorkManager, OSMDroid, Mapsforge, Glance widgets, Android Auto Car App.
+- Min SDK a preserver: 24.
+- compileSdk / targetSdk actuels: 36.
+- Architecture a preserver: offline-first, base locale, telechargements controles, fonctionnalites radio/cartographie.
+
+Contraintes fortes:
+- Ne fais pas de refactor large non necessaire.
+- Ne casse pas la compatibilite API 24.
+- Ne supprime pas une fonctionnalite sans alternative.
+- Ne modifie pas les changements utilisateur non lies a ta tache.
+- Utilise des patchs petits, testables et separes par theme.
+- Cite les fichiers touches dans ton compte rendu.
+- Ajoute ou adapte des tests quand le comportement change.
+- Verifie compile/tests avant de conclure si l'environnement le permet.
+- Pour cette passe, ne touche pas aux versions: pas de modification de versionCode, versionName, versions de dependances, schemas Room, ni logique de comparaison de versions DB. Si tu vois un risque lie aux versions, signale-le seulement dans le compte rendu.
+
+Priorites de correction:
+
+P0 - A corriger en premier
+
+1. Android Auto HostValidator trop permissif
+Fichier: app/src/main/java/fr/geotower/car/GeoTowerCarAppService.kt
+Symptome: createHostValidator retourne HostValidator.ALLOW_ALL_HOSTS_VALIDATOR alors que le service est exporte.
+Risque: un host non autorise peut se connecter au CarAppService; non conforme production.
+Correction attendue:
+- Garder ALLOW_ALL_HOSTS_VALIDATOR uniquement si BuildConfig.DEBUG.
+- En release, utiliser HostValidator.Builder(context).addAllowedHosts(androidx.car.app.R.array.hosts_allowlist_sample).build(), ou une allowlist equivalente officielle.
+- Ajouter un test ou au minimum un commentaire court expliquant le mode debug/release.
+
+2. Etat Compose mute hors thread UI
+Fichiers:
+- app/src/main/java/fr/geotower/ui/components/DatabaseDownloadCard.kt
+- app/src/main/java/fr/geotower/ui/screens/MapScreen.kt
+- app/src/main/java/fr/geotower/ui/screens/CompassScreen.kt
+Symptome: des variables Compose sont modifiees dans withContext(Dispatchers.IO) ou withContext(Dispatchers.Default).
+Risque: crash snapshot, comportement instable, jank.
+Correction attendue:
+- Faire les calculs lourds en IO/Default.
+- Retourner un objet resultat immutable.
+- Assigner les mutableState uniquement apres retour sur Main.
+
+3. OSMDroid manipule hors main thread
+Fichier: app/src/main/java/fr/geotower/ui/screens/MapScreen.kt
+Symptome: creation de Marker, Drawable, BitmapDrawable ou acces MapView depuis Dispatchers.Default.
+Risque: crashes aleatoires, fuites, incoherences UI.
+Correction attendue:
+- Background: calcul de specs pures seulement.
+- Main thread: creation des markers, drawables lies au contexte, ajout/retrait d'overlays.
+- Eviter de lire map.zoomLevelDouble depuis un thread background.
+
+4. Permission location manquante avant enableMyLocation
+Fichier: app/src/main/java/fr/geotower/ui/screens/MapScreen.kt
+Symptome: enableMyLocation() appele sans verifier ACCESS_FINE_LOCATION ou ACCESS_COARSE_LOCATION.
+Risque: SecurityException apres revoke permission ou comportements OEM.
+Correction attendue:
+- Verifier fine/coarse avant toute activation de MyLocationNewOverlay.
+- Afficher un CTA permission si necessaire.
+- Ne pas activer l'overlay si permission absente.
+
+P1 - Stabilite Android moderne / Play policy
+
+5. Foreground service location et Android 12-16
+Fichiers:
+- app/src/main/java/fr/geotower/services/LiveTrackingController.kt
+- app/src/main/java/fr/geotower/services/LiveTrackingService.kt
+- app/src/main/AndroidManifest.xml
+Correction attendue:
+- Entourer startForegroundService avec gestion ForegroundServiceStartNotAllowedException / IllegalStateException selon API.
+- Verifier que le demarrage se fait depuis un parcours utilisateur visible ou une exemption valide.
+- Conserver foregroundServiceType="location" et permissions associees.
+- Documenter le parcours utilisateur pour Play Console.
+
+6. Background location pour widgets
+Fichier: app/src/main/java/fr/geotower/widget/AntennaWidgetWorker.kt
+Symptome: worker periodique utilise la localisation avec fine/coarse mais sans gate clair ACCESS_BACKGROUND_LOCATION sur API 29+.
+Correction attendue:
+- Sur API 29+, verifier ACCESS_BACKGROUND_LOCATION pour les mises a jour periodiques en arriere-plan.
+- Si permission absente: mettre a jour le widget avec un etat "permission requise" et ne pas retry en boucle.
+- Distinguer refresh manuel visible vs periodic background.
+
+7. Notifications Android 13+
+Fichiers a inspecter:
+- app/src/main/java/fr/geotower/workers/MapDownloadWorker.kt
+- app/src/main/java/fr/geotower/workers/DatabaseDownloadWorker.kt
+- app/src/main/java/fr/geotower/workers/SignalQuestUploadWorker.kt
+- app/src/main/java/fr/geotower/services/LiveTrackingController.kt
+Correction attendue:
+- Centraliser un notifySafely qui verifie NotificationManagerCompat.areNotificationsEnabled() quand pertinent.
+- Ne pas crasher si POST_NOTIFICATIONS est refuse.
+- Garder la notification obligatoire des FGS.
+
+8. Robustesse des telechargements
+Fichiers:
+- app/src/main/java/fr/geotower/data/download/DatabaseDownloader.kt
+- app/src/main/java/fr/geotower/workers/MapDownloadWorker.kt
+- app/src/main/java/fr/geotower/data/download/OfflineMapDownloadValidator.kt
+Correction attendue:
+- Remplacer callTimeout(0) par timeout long mais borne.
+- Pour les grosses cartes, ne pas utiliser un callTimeout trop court.
+- Preferer move atomique NIO quand possible, fallback copie robuste.
+- Exiger checksum quand fourni; log/etat clair quand absent.
+
+9. Comparaison version DB incorrecte - HORS SCOPE POUR CETTE PASSE
+Fichier: app/src/main/java/fr/geotower/data/DatabaseVersionPolicy.kt
+Symptome: versions avec prefixe commun peuvent etre considerees equivalentes.
+Consigne:
+- Ne pas modifier ce fichier pour le moment.
+- Ne pas ajouter de tests lies a cette logique pour le moment.
+- Mentionner uniquement le risque dans le compte rendu si pertinent.
+
+10. Deep links trop larges et ids invalides
+Fichiers:
+- app/src/main/AndroidManifest.xml
+- app/src/main/java/fr/geotower/MainActivity.kt
+Correction attendue:
+- Restreindre intent-filters geotower aux hosts/path utilises.
+- Ne pas convertir un id invalide en 0 silencieusement.
+- Ajouter validation et fallback neutre.
+
+11. Update URL en HTTP
+Fichier: app/src/main/java/fr/geotower/data/update/AppUpdateChecker.kt
+Symptome: http:// accepte comme download URL.
+Correction attendue:
+- Refuser http:// pour les URLs de mise a jour.
+- Ajouter test unitaire.
+
+12. Widgets multi-tailles et unique work partage
+Fichiers:
+- app/src/main/java/fr/geotower/widget/AntennaWidgetReceiver.kt
+- app/src/main/java/fr/geotower/widget/AntennaWidgetMediumReceiver.kt
+- app/src/main/java/fr/geotower/widget/AntennaWidgetLargeReceiver.kt
+- app/src/main/java/fr/geotower/widget/AntennaWidgetMapReceiver.kt
+Symptome: onDisabled peut annuler le work partage alors qu'une autre taille existe encore.
+Correction attendue:
+- Centraliser la detection des widgets actifs toutes tailles.
+- Annuler le periodic work seulement si aucun widget GeoTower n'est actif.
+
+13. Cycle de vie MapView
+Fichiers:
+- app/src/main/java/fr/geotower/ui/screens/MapScreen.kt
+- app/src/main/java/fr/geotower/ui/components/SharedMiniMapCard.kt
+Correction attendue:
+- Ajouter AndroidView onRelease ou DisposableEffect robuste.
+- Appeler onPause/onDetach, nettoyer overlays et references.
+
+P2 - Release quality / maintenance
+
+14. Release hardening
+Fichier: app/build.gradle.kts
+Constats:
+- versionCode est a 1.
+- minify release est desactive.
+Correction attendue:
+- Ne pas modifier versionCode ou versionName pour le moment.
+- Ne pas modifier les versions de dependances pour le moment.
+- Si l'objectif de la tache devient release plus tard, preparer un plan separe avant tout patch.
+- Minify/shrink peut etre traite seulement si explicitement demande dans une tache release separee.
+
+15. Donnee mojibake
+Fichier: app/src/main/java/fr/geotower/data/GeoTowerDao.kt
+Symptome: chaine "opÃ©rationnel".
+Correction attendue:
+- Corriger l'encodage si cela correspond bien a "operationnel" accentue en base.
+- Ajouter test DAO ou parser si simple.
+
+16. collectAsStateWithLifecycle
+Fichiers Compose a inspecter:
+- MainActivity.kt
+- MapScreen.kt
+- DatabaseDownloadCard.kt
+- MapDownloadCard.kt
+Correction attendue:
+- Remplacer collectAsState par collectAsStateWithLifecycle quand le flow depend du cycle de vie UI.
+
+Tests recommandes:
+- ./gradlew.bat :app:testDebugUnitTest
+- ./gradlew.bat :app:compileDebugKotlin
+- Tests cibles:
+  - AppUpdateCheckerTest pour refus HTTP
+  - Deep link parser/handler si extrait
+  - Widget scheduler actif/inactif toutes tailles
+  - Permission/background location worker
+
+QA manuelle recommandee:
+- API 24, 29, 33, 34, 36.
+- Permissions: location fine, coarse, revoke en settings, background location refusee, notifications refusees.
+- Telechargement DB et carte sur reseau lent/interrompu.
+- Widgets small/medium/large/map avec suppression partielle.
+- Android Auto via DHU ou emulator Automotive.
+- Mode offline complet: base locale deja presente, aucun reseau.
+
+References officielles a consulter:
+- Android foreground service restrictions:
+  https://developer.android.com/develop/background-work/services/fgs/restrictions-bg-start
+- WorkManager long-running workers / foreground service types:
+  https://developer.android.com/develop/background-work/background-tasks/persistent/how-to/long-running
+- Android notification runtime permission:
+  https://developer.android.com/develop/ui/compose/notifications/notification-permission
+- Android 16 progress-centric notifications:
+  https://developer.android.com/about/versions/16/features/progress-centric-notifications
+- Android Car HostValidator:
+  https://developer.android.com/reference/androidx/car/app/validation/HostValidator
+- Android for Cars app quality:
+  https://developer.android.com/docs/quality-guidelines/car-app-quality
+- Google Play background location policy:
+  https://support.google.com/googleplay/android-developer/answer/9799150?hl=en
+
+Livrable attendu:
+- Patchs petits et commentes dans le compte rendu.
+- Liste des fichiers modifies.
+- Tests executes et resultat.
+- Risques restants.
+- Ne pas annoncer que tout est corrige si une partie n'a pas ete verifiee.

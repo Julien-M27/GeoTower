@@ -44,20 +44,9 @@ class OutageLocalConfig(private val prefs: SharedPreferences) {
      * et les tabulations/retours ligne sont neutralisés à l'écriture.
      */
     var lastBreakdown: List<Pair<String, Int>>
-        get() = prefs.getString(KEY_LAST_BREAKDOWN, null)
-            ?.lineSequence()
-            ?.mapNotNull { line ->
-                val parts = line.split('\t')
-                val count = parts.getOrNull(1)?.trim()?.toIntOrNull()
-                if (parts.size == 2 && count != null && parts[0].isNotBlank()) parts[0] to count else null
-            }
-            ?.toList()
-            .orEmpty()
+        get() = decodeBreakdown(prefs.getString(KEY_LAST_BREAKDOWN, null))
         set(value) {
-            val encoded = value.joinToString("\n") { (operateur, nombre) ->
-                "${operateur.replace('\t', ' ').replace('\n', ' ')}\t$nombre"
-            }
-            prefs.edit().putString(KEY_LAST_BREAKDOWN, encoded).apply()
+            prefs.edit().putString(KEY_LAST_BREAKDOWN, encodeBreakdown(value)).apply()
         }
 
     /**
@@ -80,6 +69,22 @@ class OutageLocalConfig(private val prefs: SharedPreferences) {
             sites.groupingBy { it.operateur }.eachCount()
                 .entries.sortedByDescending { it.value }
                 .map { it.key to it.value }
+
+        /** Encodage « opérateur<TAB>nombre » par ligne, partagé avec [OutageServerInfo]. */
+        fun encodeBreakdown(breakdown: List<Pair<String, Int>>): String =
+            breakdown.joinToString("\n") { (operateur, nombre) ->
+                "${operateur.replace('\t', ' ').replace('\n', ' ')}\t$nombre"
+            }
+
+        fun decodeBreakdown(encoded: String?): List<Pair<String, Int>> =
+            encoded?.lineSequence()
+                ?.mapNotNull { line ->
+                    val parts = line.split('\t')
+                    val count = parts.getOrNull(1)?.trim()?.toIntOrNull()
+                    if (parts.size == 2 && count != null && parts[0].isNotBlank()) parts[0] to count else null
+                }
+                ?.toList()
+                .orEmpty()
 
         const val PREFS_NAME = "settings"
 

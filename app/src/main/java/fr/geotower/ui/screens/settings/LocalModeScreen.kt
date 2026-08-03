@@ -25,6 +25,7 @@ import fr.geotower.data.build.LocalBuildCapability
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.LocalDbBuildCard
+import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
@@ -63,6 +64,7 @@ fun LocalModeScreen(
     val level = AppConfig.localModeLevel.intValue
     val remoteEnabled = RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.LOCAL_MODE_ENABLED)
     val eligibility = remember { LocalBuildCapability.evaluate(context) }
+    val scrollState = rememberScrollState()
 
     Scaffold(
         containerColor = uiStyle.backgroundColor,
@@ -78,7 +80,10 @@ fun LocalModeScreen(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                // Flou au défilement : posé AVANT verticalScroll pour délaver la bande haute/basse
+                // du hublot, pas le contenu défilé (voir geoTowerFadingEdge).
+                .geoTowerFadingEdge(scrollState, fadeHeight = sizing.component(72.dp))
+                .verticalScroll(scrollState)
                 .padding(sizing.spacing(16.dp)),
             verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)),
         ) {

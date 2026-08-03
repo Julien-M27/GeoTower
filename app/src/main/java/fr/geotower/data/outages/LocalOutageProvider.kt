@@ -34,6 +34,13 @@ class LocalOutageProvider(
     /**
      * Régénère les pannes. Avec [force] = false, un cache encore frais court-circuite (utile quand
      * plusieurs appels concurrents arrivent après péremption). [force] = true = bouton « générer maintenant ».
+     *
+     * L'échec est traité différemment selon l'origine : un déclenchement EXPLICITE ([force] = true,
+     * bouton ou planification) **propage** l'exception, parce que l'appelant doit pouvoir dire à
+     * l'utilisateur pourquoi ça n'a pas marché ; le chemin paresseux, lui, garde silencieusement le
+     * dernier cache pour ne pas casser la carte ou une fiche. Sans cette distinction, une source
+     * injoignable ou une base ANFR illisible donnaient exactement la même chose qu'un succès à zéro
+     * panne : un bouton qui « ne fait rien ».
      */
     suspend fun regenerate(
         force: Boolean,
@@ -54,8 +61,9 @@ class LocalOutageProvider(
             result.sites
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             // Échec (ex. aucun opérateur joignable) : on garde le dernier cache plutôt que rien.
+            if (force) throw e
             existing?.sites ?: emptyList()
         }
     }

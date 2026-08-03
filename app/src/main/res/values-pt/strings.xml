@@ -19,12 +19,14 @@
     <string name="settings_database_refresh">Atualizar a secção base de dados</string>
     <string name="settings_section_background">Notificações e segundo plano</string>
     <string name="settings_hub_background_desc">Notificação em direto, atualizações, bateria, widget</string>
+    <string name="settings_sections_home_title">Todas as secções</string>
     <string name="settings_sections_home_subtitle">Escolha uma categoria</string>
     <string name="settings_hub_appearance_desc">Tema, cores, ícone, tamanho, disposição</string>
     <string name="settings_hub_mapping_desc">Fundo do mapa, estilo IGN, mapas offline</string>
     <string name="settings_hub_preferences_desc">Operadora, idioma, unidades, páginas, ligações, partilha</string>
-    <string name="settings_hub_system_desc">Permissões e diagnóstico</string>
+    <string name="settings_hub_system_desc">Permissões, servidor, diagnóstico</string>
     <string name="settings_hub_database_desc">Descargas, geração local, processamento local</string>
+    <string name="settings_api_server_desc">Servidor principal ou espelho de reserva</string>
     <string name="settings_database_online_title">Base de dados de operadoras online</string>
     <string name="settings_search_placeholder">Pesquisar uma definição</string>
     <string name="settings_search_no_results">Nenhuma definição encontrada</string>
@@ -152,7 +154,7 @@
     <string name="settings_navigation_scroll_title">Rolagem</string>
     <string name="settings_navigation_scroll_desc">Todas as opções numa página</string>
     <string name="settings_navigation_pages_title">Páginas</string>
-    <string name="settings_navigation_pages_desc">Mostrar uma categoria de cada vez</string>
+    <string name="settings_navigation_pages_desc">Início por secções, depois uma categoria de cada vez</string>
     <string name="settings_display_style_title">Estilo de exibição</string>
     <string name="settings_simple_mode_title">Modo simplificado</string>
     <string name="operators_expand_all">Expandir tudo</string>
@@ -273,6 +275,7 @@
     <string name="car_coordinates">Coordenadas</string>
     <string name="car_navigate">Navegar</string>
     <string name="car_site_distance_operators">%1$s - %2$s</string>
+    <string name="car_error_title">Erro do GeoTower</string>
     <string name="site_anfr_title">Site ANFR %1$s</string>
     <string name="widget_title">Antenas próximas</string>
     <string name="widget_map_title">Mapa de antenas</string>
@@ -1346,6 +1349,9 @@
     <string name="appstrings_unknown_status">Estado desconhecido</string>
     <string name="appstrings_up_to_date">Atualizado</string>
     <string name="appstrings_downloading_db_banner_title">A transferir</string>
+    <string name="appstrings_generating_db_banner_title">A gerar a base</string>
+    <string name="appstrings_generating_db_banner_desc">A base está a ser gerada no aparelho: não é preciso transferir nada.</string>
+    <string name="appstrings_db_generation_in_progress">A gerar…</string>
     <string name="appstrings_update_db_banner_title">Atualização disponible</string>
     <string name="appstrings_update_notif_setting_desc">Ser alertado quando uma nova base de dados ou APK estiver disponivel</string>
     <string name="appstrings_update_notif_setting_title">Notificações de atualização</string>
@@ -1377,6 +1383,7 @@
     <string name="appstrings_version_app_label">Versão do\napp</string>
     <string name="appstrings_version_db_label">Versão da base\nde dados</string>
     <string name="appstrings_version_radio_db_label">Base anexa\nde rádio</string>
+    <string name="appstrings_version_enb_db_label">Identificadores\neNB / gNB</string>
     <string name="appstrings_version_hs_label">Dados dos\nsites HS</string>
     <string name="appstrings_version_hs_local_label">Sites HS gerados\nneste telemóvel</string>
     <string name="appstrings_version_monthly_label">Dados\nmensais</string>
@@ -2031,6 +2038,11 @@
     <string name="appstrings_diagnostic_refresh">Atualizar</string>
     <string name="appstrings_diagnostic_copy_report">Copiar relatório</string>
     <string name="appstrings_diagnostic_report_copied">Relatório de diagnóstico copiado</string>
+    <string name="appstrings_diagnostic_log_size">Registo de depuração: %1$s</string>
+    <string name="appstrings_diagnostic_share_log">Partilhar registo</string>
+    <string name="appstrings_diagnostic_clear_log">Limpar</string>
+    <string name="appstrings_diagnostic_log_empty">O registo está vazio.</string>
+    <string name="appstrings_diagnostic_log_cleared">Registo apagado</string>
     <string name="appstrings_diagnostic_global_ok">Tudo parece pronto</string>
     <string name="appstrings_diagnostic_global_warning">Alguns pontos a verificar</string>
     <string name="appstrings_diagnostic_global_error">Ação necessária</string>
@@ -2049,6 +2061,27 @@
     <string name="appstrings_diagnostic_section_notifications">Notificações</string>
     <string name="appstrings_diagnostic_section_storage">Armazenamento e cache</string>
     <string name="appstrings_diagnostic_section_environment">App e dispositivo</string>
+    <string name="appstrings_diagnostic_section_api_server">Servidor GeoTower</string>
+    <string name="appstrings_diagnostic_summary_api_primary">Servidor principal: %1$s</string>
+    <string name="appstrings_diagnostic_summary_api_mirror">Espelho de reserva em uso: %1$s</string>
+    <string name="appstrings_diagnostic_summary_api_unreachable">Nenhum servidor GeoTower responde.</string>
+    <string name="appstrings_diagnostic_detail_api_host">Anfitrião utilizado: %1$s</string>
+    <string name="appstrings_diagnostic_detail_api_primary">Servidor principal: %1$s</string>
+    <string name="appstrings_diagnostic_detail_api_mirror">Espelho: %1$s</string>
+    <string name="appstrings_diagnostic_detail_api_mode">Seleção: %1$s</string>
+    <string name="appstrings_diagnostic_detail_api_status">Último teste: %1$s</string>
+    <string name="appstrings_diagnostic_detail_api_checked_at">Verificado em: %1$s</string>
+    <string name="appstrings_diagnostic_detail_api_switched_at">Última mudança: %1$s</string>
+    <string name="appstrings_diagnostic_api_status_reachable">Responde</string>
+    <string name="appstrings_diagnostic_api_status_unreachable">Não responde</string>
+    <string name="appstrings_diagnostic_api_status_unknown">Ainda não verificado</string>
+    <string name="appstrings_diagnostic_api_mode_auto">Automático (espelho se necessário)</string>
+    <string name="appstrings_diagnostic_api_mode_primary">Sempre o servidor principal</string>
+    <string name="appstrings_diagnostic_api_mode_mirror">Sempre o espelho</string>
+    <string name="appstrings_diagnostic_api_never">Nunca</string>
+    <string name="appstrings_diagnostic_action_choose_api_server">Escolher o servidor</string>
+    <string name="appstrings_diagnostic_api_dialog_title">Servidor GeoTower</string>
+    <string name="appstrings_diagnostic_api_dialog_desc">O GeoTower é servido por dois servidores idênticos. O modo automático usa o principal e muda para o espelho quando este deixa de responder.</string>
     <string name="appstrings_diagnostic_action_open_database_settings">Abrir definições dos dados</string>
     <string name="appstrings_diagnostic_action_open_offline_maps">Abrir mapas offline</string>
     <string name="appstrings_diagnostic_action_open_app_settings">Abrir definições Android da app</string>
@@ -2068,6 +2101,8 @@
     <string name="appstrings_diagnostic_summary_radio_ok">Base rádio instalada, versão %1$s</string>
     <string name="appstrings_diagnostic_summary_radio_missing">A base rádio não está instalada. O GeoTower ainda pode funcionar.</string>
     <string name="appstrings_diagnostic_summary_radio_invalid">A base rádio é inválida ou incompatível.</string>
+    <string name="appstrings_diagnostic_summary_antennas_generating">A base de antenas está a ser gerada no aparelho.</string>
+    <string name="appstrings_diagnostic_summary_radio_generating">A base rádio está a ser gerada no aparelho.</string>
     <string name="appstrings_diagnostic_summary_maps_ok">Mapas instalados: %1$d (%2$s)</string>
     <string name="appstrings_diagnostic_summary_maps_empty">Nenhum mapa offline instalado.</string>
     <string name="appstrings_diagnostic_summary_maps_warning">Um ficheiro de mapa offline pode estar incompleto.</string>
@@ -2108,6 +2143,7 @@
     <string name="appstrings_diagnostic_detail_storage_db_antennas">Base de antenas: %1$s</string>
     <string name="appstrings_diagnostic_detail_storage_db_radio">Base rádio: %1$s</string>
     <string name="appstrings_diagnostic_detail_storage_db_enb">Base eNB / gNB: %1$s</string>
+    <string name="appstrings_diagnostic_detail_storage_outages">Falhas de rede: %1$s</string>
     <string name="appstrings_diagnostic_detail_storage_maps">Mapas offline: %1$s</string>
     <string name="appstrings_diagnostic_detail_storage_cache">Cache: %1$s</string>
     <string name="appstrings_diagnostic_detail_storage_available">Armazenamento disponível da app: %1$s</string>
@@ -2285,6 +2321,26 @@
     <string name="outage_source_last_generated">Última atualização: %1$s</string>
     <string name="outage_source_never">Nunca atualizado</string>
     <string name="outage_source_generated_count">%1$d falhas</string>
+    <string name="outage_source_failed">Falha na atualização: %1$s</string>
+    <string name="outage_source_db_missing">Base de dados em falta: sem a base ANFR, as falhas não podem ser associadas aos sites. Transfira-a ou gere-a em Definições ▸ Base de dados.</string>
+    <string name="outage_source_db_invalid">Base de dados inutilizável: reinstale-a em Definições ▸ Base de dados antes de preparar as falhas neste dispositivo.</string>
+    <!-- Falhas de rede: transferência do ficheiro do servidor -->
+    <string name="outage_download_title">Falhas de rede</string>
+    <string name="outage_download_desc">Falhas publicadas pela Orange, SFR, Bouygues Telecom e Free, reunidas pelo servidor GeoTower. Fica uma cópia no dispositivo para as mostrar ao iniciar e sem ligação.</string>
+    <string name="outage_download_server_data">Relatório oficial dos operadores:\u0020</string>
+    <string name="outage_download_local_copy">Recebido no dispositivo:\u0020</string>
+    <string name="outage_download_no_copy">Sem cópia</string>
+    <string name="outage_download_never">Desconhecida</string>
+    <string name="outage_download_count">%1$d falhas guardadas</string>
+    <string name="outage_download_size">Espaço ocupado: %1$s</string>
+    <string name="outage_download_now">Transferir as falhas</string>
+    <string name="outage_download_refresh">Atualizar as falhas</string>
+    <string name="outage_download_running">A transferir…</string>
+    <string name="outage_download_error">Falha na transferência: %1$s</string>
+    <string name="outage_download_failed">Servidor inacessível</string>
+    <string name="outage_download_local_source_note">As falhas são atualmente preparadas no dispositivo (Processamento local): o ficheiro do servidor não é usado.</string>
+    <string name="outage_download_unavailable">As falhas não estão disponíveis de momento.</string>
+    <string name="outage_download_delete_desc">Tem a certeza de que quer eliminar a cópia das falhas guardada no dispositivo?</string>
     <!-- Atualização das falhas: notificação em direto + etapas -->
     <string name="outage_gen_notif_title">A atualizar as falhas</string>
     <string name="outage_gen_channel_name">Atualização das falhas</string>
@@ -2293,6 +2349,7 @@
     <string name="outage_gen_step_finalize">A finalizar</string>
     <string name="outage_gen_step_done">Concluído</string>
     <string name="outage_gen_notif_done">%1$d falhas obtidas</string>
+    <string name="outage_gen_notif_failed">Falha ao obter as falhas: %1$s</string>
     <string name="appstrings_release_section_outages">Falhas de rede</string>
     <string name="appstrings_release_v1965_outage_local_source">Escolha a origem das falhas: o servidor GeoTower ou uma obtenção diretamente no seu dispositivo a partir dos ficheiros oficiais das operadoras</string>
     <string name="appstrings_release_v1965_outage_generation">Novo ecrã «Origem das falhas»: frequência de atualização, atualização em segundo plano (opcional), botão «Atualizar agora», data e número de falhas obtidas, com notificação de progresso</string>
@@ -2383,4 +2440,22 @@
     <string name="appstrings_release_v1966_page_customization_discovery">A personalização das páginas é mais fácil de descobrir: um balão explica a roda dentada (uma vez por página), aparece um lembrete discreto no fundo das páginas e uma pressão longa num bloco abre a sua definição — tudo desativável</string>
     <string name="appstrings_release_v1966_outage_source_merged">A página «Origem das falhas» faz agora parte do ecrã «Processamento local» e a secção Base de dados pode ser atualizada com um botão</string>
     <string name="appstrings_release_v1966_operators_actions">Lista de operadoras: botões para expandir tudo, recolher tudo e partilhar todas as operadoras em PDF</string>
+
+    <!-- Divulgacao em destaque exigida pelo Google Play antes de qualquer pedido de localizacao em segundo plano. -->
+    <string name="bg_location_disclosure_title">Localização em segundo plano</string>
+    <string name="bg_location_disclosure_body">Para mostrar a antena mais próxima e atualizar-se sozinho, o widget GeoTower precisa de aceder à sua localização em segundo plano, incluindo quando a aplicação está fechada.\n\nEsta localização é usada apenas no seu dispositivo, para calcular o site mais próximo. Não é armazenada nem partilhada com terceiros.\n\nPode revogar esta autorização a qualquer momento: apenas o widget deixará de se atualizar.</string>
+    <string name="bg_location_disclosure_option">No ecrã seguinte, escolha «%1$s».</string>
+
+    <!-- Notas da versão 2.0 -->
+    <string name="appstrings_release_section_diagnostic">Diagnóstico</string>
+    <string name="appstrings_release_v20_play_store">O GeoTower é agora distribuído no Google Play</string>
+    <string name="appstrings_release_v20_api_mirror">Mudança automática para um servidor espelho quando o principal deixa de responder</string>
+    <string name="appstrings_release_v20_api_choice">Escolha manual do servidor a partir da página de Diagnóstico</string>
+    <string name="appstrings_release_v20_outage_card">Novo cartão «Sites em falha» em Definições ▸ Base de dados: data do levantamento, número de falhas e espaço ocupado</string>
+    <string name="appstrings_release_v20_outage_local_copy">É guardada uma cópia das falhas no dispositivo: aparecem logo no arranque e sem ligação</string>
+    <string name="appstrings_release_v20_outage_errors">Mensagens claras quando a base ANFR falta ou está inutilizável</string>
+    <string name="appstrings_release_v20_db_generating_banner">Faixa «A gerar» no cartão de transferência da base de dados</string>
+    <string name="appstrings_release_v20_debug_log">Registo de depuração que pode consultar, partilhar e apagar</string>
+    <string name="appstrings_release_v20_diagnostic_server">Nova secção que indica qual servidor GeoTower responde</string>
+    <string name="appstrings_release_v20_bg_location_disclosure">Ecrã explicativo antes do pedido de localização em segundo plano do widget</string>
 </resources>

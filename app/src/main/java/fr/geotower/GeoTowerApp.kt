@@ -26,13 +26,23 @@ class GeoTowerApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        // Journal disque en premier : c'est le seul moyen de voir ce qui se passe là où logcat n'est
+        // pas branchable (Android Auto), et le piège à exceptions doit couvrir tout le démarrage.
+        fr.geotower.utils.AppFileLog.init(this)
+        fr.geotower.utils.AppFileLog.installCrashHandler()
         RetrofitClient.init(applicationContext)
+        // Choix principal / miroir : doit précéder la première requête, sinon un appareil réglé sur
+        // le miroir repartirait sur le serveur principal le temps du démarrage.
+        fr.geotower.data.api.ApiEndpoints.init(applicationContext)
         Configuration.getInstance().load(
             applicationContext,
             PreferenceManager.getDefaultSharedPreferences(applicationContext)
         )
         Configuration.getInstance().userAgentValue = packageName
         RemoteFeatureFlags.loadCached(applicationContext)
+        // Origine de l'installation : doit précéder AppUpdateState, qui s'en sert pour ne jamais
+        // afficher de bandeau « nouvelle version » sur une installation venue du Play Store.
+        fr.geotower.utils.AppDistribution.init(applicationContext)
         // Dernière version connue de l'app : le bandeau du tiroir doit être juste dès l'ouverture.
         fr.geotower.data.api.AppUpdateState.loadCached(applicationContext)
         PreferenceProfileManager.install(applicationContext)

@@ -94,6 +94,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.Error
+import androidx.compose.material.icons.filled.Memory
 import androidx.compose.runtime.collectAsState
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -106,6 +107,7 @@ import fr.geotower.data.api.ServerStatus
 import fr.geotower.ui.components.LocationUnavailableBanner
 import fr.geotower.ui.components.PageScrollEdgeButtons
 import fr.geotower.ui.components.ServerUnreachableBanner
+import fr.geotower.ui.components.rememberLocalDbBuildStatus
 import fr.geotower.ui.components.rememberServerReachabilityState
 import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.ui.components.rememberSafeClick
@@ -256,6 +258,12 @@ fun HomeScreen(navController: NavController) {
     // le bandeau clignoterait (disparition « Mise à jour disponible » → réapparition « Téléchargement en cours »).
     var isDownloadStarting by remember { mutableStateOf(false) }
     val isDownloading = isSyncing || isDownloadStarting
+
+    // Génération locale en cours : la base mobile est construite dans un fichier à part et n'est
+    // installée qu'à la toute fin. Pendant ce temps elle est bel et bien absente du disque — le
+    // bandeau doit dire « génération en cours », surtout pas « base manquante ».
+    val localBuild = rememberLocalDbBuildStatus()
+    val isGeneratingDb = localBuild.mobileRunning
 
     val localDbState by AppConfig.localDatabaseState
     var wasSyncing by remember { mutableStateOf(isSyncing) }
@@ -409,7 +417,7 @@ fun HomeScreen(navController: NavController) {
 
             // ---> 2. LE BANDEAU DE BASE DE DONNÉES (S'affiche juste en dessous si besoin) <---
             val isDbUnavailable = isDbChecked && localDbState != GeoTowerDatabaseValidator.LocalDatabaseState.VALID
-            val isDbBannerVisible = isDbUnavailable || isUpdateAvailable || isDownloading
+            val isDbBannerVisible = isDbUnavailable || isUpdateAvailable || isDownloading || isGeneratingDb
             // Un bandeau occupe le haut de l'écran : on masque le logo (et on passe en grille sur
             // grand écran) comme le font déjà le hors-ligne et le bandeau base de données.
             val hideHomeLogo = isDbBannerVisible || isServerUnreachable
@@ -419,7 +427,8 @@ fun HomeScreen(navController: NavController) {
                 isInvalid = isDbInvalid,
                 isUpdateAvailable = isUpdateAvailable,
                 isDownloading = isDownloading,
-                downloadProgress = downloadProgress,
+                isGenerating = isGeneratingDb,
+                downloadProgress = if (isGeneratingDb) localBuild.progress else downloadProgress,
                 onDownloadClick = {
                     // On cache le bandeau et on lance le téléchargement manuel
                     isUpdateAvailable = false
@@ -1135,28 +1144,37 @@ fun DatabaseWarningBanner(
     isInvalid: Boolean,
     isUpdateAvailable: Boolean,
     isDownloading: Boolean,
-    downloadProgress: Int, // ✅ NOUVEAU PARAMÈTRE
+    // Génération locale de la base en cours : prime sur « manquante » / « invalide », puisque la
+    // base absente est précisément celle en train d'être construite sur l'appareil.
+    isGenerating: Boolean,
+    downloadProgress: Int, // ✅ NOUVEAU PARAMÈTRE (progression du téléchargement OU de la génération)
     onDownloadClick: () -> Unit
 ) {
     val sizing = LocalGeoTowerUiSizing.current
     androidx.compose.animation.AnimatedVisibility(
-        visible = isMissing || isInvalid || isUpdateAvailable || isDownloading,
+        visible = isMissing || isInvalid || isUpdateAvailable || isDownloading || isGenerating,
         enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
         exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
         // ✅ AJOUT DES MARGES (Comme pour le bandeau hors-ligne)
         modifier = androidx.compose.ui.Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))
     ) {
-        val containerColor = if (isMissing || isInvalid) {
+        // Une génération en cours n'est pas un problème : ni rouge, ni icône d'erreur.
+        val isProblem = (isMissing || isInvalid) && !isGenerating
+        val containerColor = if (isProblem) {
             androidx.compose.material3.MaterialTheme.colorScheme.errorContainer
         } else {
             androidx.compose.material3.MaterialTheme.colorScheme.primaryContainer
         }
-        val contentColor = if (isMissing || isInvalid) {
+        val contentColor = if (isProblem) {
             androidx.compose.material3.MaterialTheme.colorScheme.onErrorContainer
         } else {
             androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer
         }
-        val icon = if (isMissing || isInvalid) Icons.Default.Error else Icons.Default.CloudDownload
+        val icon = when {
+            isGenerating -> Icons.Default.Memory
+            isProblem -> Icons.Default.Error
+            else -> Icons.Default.CloudDownload
+        }
 
         androidx.compose.material3.Surface(
             color = containerColor,
@@ -1179,6 +1197,7 @@ fun DatabaseWarningBanner(
                 androidx.compose.foundation.layout.Column(modifier = androidx.compose.ui.Modifier.weight(1f)) {
                     androidx.compose.material3.Text(
                         text = when {
+                            isGenerating -> stringResource(R.string.appstrings_generating_db_banner_title)
                             isDownloading -> stringResource(R.string.appstrings_downloading_db_banner_title)
                             isInvalid -> stringResource(R.string.appstrings_invalid_db_banner_title)
                             isMissing -> stringResource(R.string.appstrings_missing_db_banner_title)
@@ -1188,7 +1207,13 @@ fun DatabaseWarningBanner(
                         color = contentColor,
                         style = androidx.compose.material3.MaterialTheme.typography.titleSmall
                     )
-                    if ((isMissing || isInvalid) && !isDownloading) {
+                    if (isGenerating) {
+                        androidx.compose.material3.Text(
+                            text = stringResource(R.string.appstrings_generating_db_banner_desc),
+                            color = contentColor,
+                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                        )
+                    } else if ((isMissing || isInvalid) && !isDownloading) {
                         androidx.compose.material3.Text(
                             text = if (isInvalid) {
                                 stringResource(R.string.appstrings_invalid_db_banner_desc)
@@ -1201,8 +1226,8 @@ fun DatabaseWarningBanner(
                     }
                 }
 
-                // ✅ NOUVEAU : Si ça télécharge, on affiche l'animation WavyLoader + LE POURCENTAGE
-                if (isDownloading) {
+                // ✅ NOUVEAU : Si ça télécharge (ou génère), on affiche l'animation WavyLoader + LE POURCENTAGE
+                if (isDownloading || isGenerating) {
                     androidx.compose.foundation.layout.Row(
                         modifier = androidx.compose.ui.Modifier.height(sizing.component(36.dp)).width(sizing.component(100.dp)),
                         verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,

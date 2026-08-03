@@ -35,6 +35,13 @@ object AppUpdateState {
     /** À appeler au démarrage du process : restaure ce qu'on savait au lancement précédent. */
     fun loadCached(context: Context) {
         val prefs = prefs(context)
+        // Garde-fou : une installation Play ne doit jamais afficher de bandeau « nouvelle version »,
+        // quelle que soit la façon dont les préférences ont été remplies (cf. AppDistribution).
+        if (fr.geotower.utils.AppDistribution.isPlayInstall) {
+            current.value = null
+            prefs.edit().remove(PREF_VERSION).remove(PREF_URL).apply()
+            return
+        }
         val versionName = prefs.getString(PREF_VERSION, null)?.takeIf { it.isNotBlank() }
         val downloadUrl = prefs.getString(PREF_URL, null)?.takeIf { it.isNotBlank() }
 

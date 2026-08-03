@@ -10,6 +10,7 @@ import androidx.car.app.model.PaneTemplate
 import androidx.car.app.model.Row
 import androidx.car.app.model.Template
 import fr.geotower.R
+import fr.geotower.utils.AppFileLog
 import java.util.Locale
 
 class CarSiteDetailScreen(
@@ -17,7 +18,8 @@ class CarSiteDetailScreen(
     private val site: CarSiteListItem
 ) : Screen(carContext) {
 
-    override fun onGetTemplate(): Template {
+    override fun onGetTemplate(): Template = carTemplateOrError(carContext, "CarSiteDetailScreen") {
+        carLog("Rendu de la fiche site ${site.idAnfr}")
         val pane = Pane.Builder()
             .addRow(Row.Builder().setTitle(carContext.getString(R.string.car_operators)).addText(site.operators).build())
             .addRow(Row.Builder().setTitle(carContext.getString(R.string.car_distance)).addText(formatCarDistance(site.distanceMeters)).build())
@@ -31,7 +33,7 @@ class CarSiteDetailScreen(
             )
             .build()
 
-        return PaneTemplate.Builder(pane)
+        PaneTemplate.Builder(pane)
             .setTitle(carContext.getString(R.string.site_anfr_title, site.idAnfr))
             .setHeaderAction(Action.BACK)
             .build()
@@ -41,7 +43,10 @@ class CarSiteDetailScreen(
         val label = Uri.encode("GeoTower ${site.idAnfr}")
         val uri = Uri.parse("geo:${site.latitude},${site.longitude}?q=${site.latitude},${site.longitude}($label)")
         val intent = Intent(Intent.ACTION_VIEW, uri)
-        carContext.startCarApp(intent)
+        // L'hôte refuse l'appel s'il n'a aucune app de navigation à qui le passer : sans garde,
+        // l'exception remonte au host et on retombe sur son écran d'erreur générique.
+        runCatching { carContext.startCarApp(intent) }
+            .onFailure { AppFileLog.e(CAR_LOG_TAG, "Echec du lancement de la navigation vers ${site.idAnfr}", it) }
     }
 
     private fun formatCoordinates(): String {

@@ -533,7 +533,7 @@ class MainActivity : ComponentActivity() {
         AppConfig.colorPalette.value = appPrefs.getString(AppConfig.PREF_COLOR_PALETTE, AppConfig.DEFAULT_COLOR_PALETTE) ?: AppConfig.DEFAULT_COLOR_PALETTE
         AppConfig.mapProvider.intValue = appPrefs.getInt("map_provider", 1)
         AppConfig.ignStyle.intValue = appPrefs.getInt("ign_style", 0)
-        AppConfig.navMode.intValue = appPrefs.getInt("nav_mode", 0)
+        AppConfig.navMode.intValue = appPrefs.getInt(AppConfig.PREF_NAV_MODE, AppConfig.DEFAULT_NAV_MODE)
         AppConfig.settingsSectionsMode.value = appPrefs.getBoolean(AppConfig.PREF_SETTINGS_SECTIONS_MODE, true)
         AppConfig.defaultOperator.value = appPrefs.getString("default_operator", "Aucun") ?: "Aucun"
         AppConfig.loadSavedFilters(appPrefs)

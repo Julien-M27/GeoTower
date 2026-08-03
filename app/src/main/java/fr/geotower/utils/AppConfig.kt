@@ -247,8 +247,12 @@ object AppConfig {
     // Variable globale pour l'opérateur par défaut
     val defaultOperator = mutableStateOf("Aucun")
 
-    // Mode de navigation (0 = Défilant, 1 = Pages)
-    var navMode = mutableIntStateOf(0)
+    // Mode de navigation des réglages sur GRAND ÉCRAN (0 = défilement continu, 1 = pages).
+    // Défaut 1 : comme sur téléphone, on arrive sur l'accueil par sections. Inerte sur téléphone,
+    // où c'est settingsSectionsMode qui décide.
+    const val PREF_NAV_MODE = "nav_mode"
+    const val DEFAULT_NAV_MODE = 1
+    var navMode = mutableIntStateOf(DEFAULT_NAV_MODE)
 
     // Téléphone : accueil des réglages par sections (true) ou tout sur une seule page (false).
     // Le mode « pages » des grands écrans reste piloté par navMode (il a sa barre latérale).

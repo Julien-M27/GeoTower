@@ -86,9 +86,14 @@ fun RadioDatabaseDownloadCard(
         currentWork?.state == androidx.work.WorkInfo.State.ENQUEUED
     val downloadProgress = currentWork?.progress?.getInt(RadioDatabaseDownloadWorker.KEY_PROGRESS, 0)?.div(100f) ?: 0f
 
+    // Génération locale en cours (packs radio) : la base n'est installée qu'à la fin du build, on
+    // annonce donc « génération en cours » au lieu de « aucune base installée ».
+    val isGeneratingRadio = rememberLocalDbBuildStatus().radioRunning
+
     val txtSearching = stringResource(R.string.database_searching)
     val txtUnknown = stringResource(R.string.database_unknown)
     val txtNoDb = stringResource(R.string.database_not_installed)
+    val txtGenerating = stringResource(R.string.appstrings_db_generation_in_progress)
     val txtInvalidDb = stringResource(R.string.database_invalid_local)
     val txtLatestDb = stringResource(R.string.database_latest_available)
     val txtDownloadedDb = stringResource(R.string.database_currently_downloaded)
@@ -208,7 +213,7 @@ fun RadioDatabaseDownloadCard(
                 RadioInfoRow(
                     icon = { Icon(Icons.Default.CloudDone, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(sizing.component(18.dp))) },
                     label = txtDownloadedDb,
-                    value = localVersion,
+                    value = if (isGeneratingRadio && localVersion == txtNoDb) txtGenerating else localVersion,
                     iconColumnWidth = iconColumnWidth,
                     textStartPadding = textStartPadding
                 )
@@ -314,7 +319,7 @@ fun RadioDatabaseDownloadCard(
                             }
                         }
                     },
-                    enabled = canDownload && !showAsUpToDate && !isSearching,
+                    enabled = canDownload && !showAsUpToDate && !isSearching && !isGeneratingRadio,
                     modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(56.dp)),
                     shape = RoundedCornerShape(sizing.component(12.dp)),
                     colors = ButtonDefaults.buttonColors(

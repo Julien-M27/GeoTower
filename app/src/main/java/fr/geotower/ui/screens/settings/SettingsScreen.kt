@@ -57,6 +57,7 @@ import androidx.compose.material.icons.filled.VerticalAlignTop
 import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.Dashboard
+import androidx.compose.material.icons.outlined.Dns
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Notifications
@@ -120,6 +121,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 import fr.geotower.R
 import fr.geotower.data.AnfrRepository
+import fr.geotower.data.api.ApiEndpoints
 import fr.geotower.data.workers.DownloadNotificationCenter
 import fr.geotower.data.workers.UpdateCheckScheduler
 import fr.geotower.utils.AppConfig
@@ -142,6 +144,7 @@ import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SimCard
 import androidx.compose.material.icons.filled.Place
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
@@ -149,6 +152,9 @@ import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.community.CommunityDataPreferences
 import fr.geotower.ui.navigation.ROOT_FALLBACK_ROUTE
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
+import fr.geotower.ui.components.ApiServerModeDialog
+import fr.geotower.ui.components.apiServerModeLabelRes
+import fr.geotower.ui.components.applyApiServerMode
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.GeoTowerPullToRefreshBox
 import fr.geotower.ui.components.DatabaseRefreshState
@@ -196,15 +202,18 @@ private const val SECTION_COUNT = 6
 // liens profonds `geotower://settings?section=…` émis par les notifications de téléchargement
 // (DatabaseDownloadWorker, RadioDatabaseDownloadWorker, EnbDatabaseDownloadWorker,
 // LocalDbBuildWorker, UpdateCheckWorker). Chaque identifiant amène pile sur SA carte, alors que
-// `section=database` s'arrête au titre de la section.
+// `section=database` s'arrête au titre de la section. `db_outages` n'est émis par aucun worker
+// (les pannes se téléchargent depuis la carte elle-même), il reste une cible de lien valable.
 private const val ANCHOR_DB_MOBILE = "db_mobile"
 private const val ANCHOR_DB_RADIO = "db_radio"
 private const val ANCHOR_DB_ENB = "db_enb"
+private const val ANCHOR_DB_OUTAGES = "db_outages"
 private const val ANCHOR_DB_LOCAL_BUILD = "db_local_build"
 private val DATABASE_CARD_ANCHORS = listOf(
     ANCHOR_DB_MOBILE,
     ANCHOR_DB_RADIO,
     ANCHOR_DB_ENB,
+    ANCHOR_DB_OUTAGES,
     ANCHOR_DB_LOCAL_BUILD
 )
 
@@ -277,6 +286,7 @@ fun SettingsScreen(
     var shouldBringDatabaseIntoView by rememberSaveable(initialSection) { mutableStateOf(initialSection == "database") }
     var shouldBringOfflineMapsIntoView by rememberSaveable(initialSection) { mutableStateOf(initialSection == "offline_maps") }
     // Cibles fines des cartes de la section base de donnees (base mobile, base radio, base eNB,
+    // sites en panne,
     // generation locale) : la notif d'un telechargement doit arriver precisement sur SA carte, pas
     // au titre de la section.
     val initialDatabaseCardAnchor = initialSection?.takeIf { it in DATABASE_CARD_ANCHORS }
@@ -324,32 +334,49 @@ fun SettingsScreen(
     val safeClick = rememberSafeClick()
     val safeBackNavigation = rememberSafeBackNavigation(navController, fallbackRoute = ROOT_FALLBACK_ROUTE)
 
-    // TÉLÉPHONE : accueil des réglages par sections (un bouton par section) au lieu de la longue
-    // page unique. `phoneSectionIndex` = null → on est sur l'accueil, sinon section ouverte.
-    // Les grands écrans gardent leur barre latérale (navMode), ce réglage ne les concerne pas.
+    // Accueil des réglages par sections (un bouton par section) au lieu de la longue page unique :
+    // `openedSection` = null → on est sur l'accueil, sinon la section occupe la page.
+    //   • téléphone : piloté par `settings_sections_mode` (bouton de la barre du haut) ;
+    //   • grand écran (Fold déplié, tablette) : c'est le mode « pages » (nav_mode ≠ 0) qui ouvre
+    //     le même accueil, la barre latérale restant un raccourci direct vers les sections.
+    val navMode = AppConfig.navMode.intValue
     val settingsSectionsMode by AppConfig.settingsSectionsMode
     val usePhoneSections = !isWideScreen && settingsSectionsMode
+    val useWideSections = isWideScreen && navMode != 0
+    val useSectionsHome = usePhoneSections || useWideSections
     // rememberSaveable : partir sur un sous-écran (Traitement local, Diagnostic, Historiques…) ou
     // tourner l'appareil détruit la composition. Avec un simple `remember`, le retour retombait sur
     // l'accueil des sections au lieu de la section d'où l'on venait.
-    var phoneSectionIndex by rememberSaveable { mutableStateOf<Int?>(null) }
+    var openedSection by rememberSaveable { mutableStateOf<Int?>(null) }
+    // Section « active » de la barre latérale en défilement continu (nav_mode = 0) : elle suit le
+    // défilement, alors qu'en accueil par sections c'est `openedSection` qui fait foi.
+    var activeSectionIndex by rememberSaveable { mutableIntStateOf(0) }
 
-    fun openPhoneSection(section: Int?) {
-        phoneSectionIndex = section
+    fun openSection(section: Int?) {
+        openedSection = section
+        if (section != null) activeSectionIndex = section
         scope.launch { scrollState.scrollTo(0) }
     }
 
     fun setSettingsSectionsMode(enabled: Boolean) {
         AppConfig.settingsSectionsMode.value = enabled
         prefs.edit().putBoolean(AppConfig.PREF_SETTINGS_SECTIONS_MODE, enabled).apply()
-        openPhoneSection(null)
+        openSection(null)
+    }
+
+    fun setNavMode(mode: Int) {
+        AppConfig.navMode.intValue = mode
+        prefs.edit().putInt(AppConfig.PREF_NAV_MODE, mode).apply()
+        // Passage en « pages » : on ramène sur l'accueil des sections, c'est là qu'on arrive
+        // désormais en ouvrant les réglages sur grand écran.
+        openSection(null)
     }
 
     // Un seul cran par appui sur « retour », dans cet ordre :
     //   palette de couleurs → recherche → section ouverte → sortie de l'écran.
     // Les conditions sont mutuellement exclusives : on ne dépend pas de l'ordre d'enregistrement
     // des BackHandler dans le dispatcher (LIFO), qui est un détail d'implémentation.
-    val isPhoneSectionOpen = usePhoneSections && phoneSectionIndex != null
+    val isSectionOpen = useSectionsHome && openedSection != null
     val isSearchActive = settingsSearchQuery.isNotBlank()
 
     BackHandler(enabled = showColorPalettePage) {
@@ -362,12 +389,12 @@ fun SettingsScreen(
     }
 
     // Accueil par sections : le retour remonte d'abord à la liste des sections.
-    BackHandler(enabled = !showColorPalettePage && !isSearchActive && isPhoneSectionOpen) {
-        openPhoneSection(null)
+    BackHandler(enabled = !showColorPalettePage && !isSearchActive && isSectionOpen) {
+        openSection(null)
     }
 
     BackHandler(
-        enabled = !showColorPalettePage && !isSearchActive && !isPhoneSectionOpen &&
+        enabled = !showColorPalettePage && !isSearchActive && !isSectionOpen &&
             !safeBackNavigation.isLocked
     ) {
         safeBackNavigation.navigateBack()
@@ -377,21 +404,17 @@ fun SettingsScreen(
     var mapProvider by AppConfig.mapProvider
     var ignStyle by AppConfig.ignStyle
     var defaultOperator by AppConfig.defaultOperator
-    val navMode = AppConfig.navMode.intValue
-    // Même raison que phoneSectionIndex : le mode « pages » des grands écrans doit retrouver sa
-    // section au retour d'un sous-écran, pas repartir sur « Apparence ».
-    var activeSectionIndex by rememberSaveable { mutableIntStateOf(0) }
 
-    // Une seule section à l'écran : mode « pages » des grands écrans (Fold déplié) ou section
-    // ouverte depuis l'accueil par sections d'un téléphone. Sinon tout est empilé sur une page.
-    val showsSingleSection = if (usePhoneSections) phoneSectionIndex != null else navMode != 0 && isWideScreen
+    // Une seule section à l'écran : section ouverte depuis l'accueil par sections (téléphone comme
+    // grand écran en mode « pages »). Sinon tout est empilé sur une page.
+    val showsSingleSection = isSectionOpen
 
     // Recherche : actions de navigation déclenchées depuis un résultat.
     fun searchScrollTo(section: Int) {
         settingsSearchQuery = ""
         activeSectionIndex = section
         // Accueil par sections : on ouvre directement la section, il n'y a rien à faire défiler.
-        if (usePhoneSections) openPhoneSection(section) else pendingSearchScrollSection = section
+        if (useSectionsHome) openSection(section) else pendingSearchScrollSection = section
     }
     // Ouvrir un réglage depuis la recherche positionne aussi la section : en refermant la fenêtre
     // (ou en revenant du sous-écran), on retombe sur la section du réglage, pas sur l'accueil.
@@ -399,7 +422,7 @@ fun SettingsScreen(
         settingsSearchQuery = ""
         if (section != null) {
             activeSectionIndex = section
-            if (usePhoneSections) openPhoneSection(section)
+            if (useSectionsHome) openSection(section)
         }
         action()
     }
@@ -445,7 +468,7 @@ fun SettingsScreen(
             // Les cartes hors ligne vivent maintenant dans la section Cartographie.
             val target = if (initialSection == "offline_maps") SECTION_MAPPING else SECTION_DATABASE
             activeSectionIndex = target
-            if (usePhoneSections) phoneSectionIndex = target
+            if (useSectionsHome) openedSection = target
             shouldBringDatabaseIntoView = initialSection == "database"
             shouldBringOfflineMapsIntoView = initialSection == "offline_maps"
             pendingDatabaseCardAnchor = initialDatabaseCardAnchor
@@ -760,8 +783,8 @@ fun SettingsScreen(
             "nearby", "map", "compass", "support", "site", "throughput" -> {
                 kotlinx.coroutines.delay(300)
                 activeSectionIndex = SECTION_PREFERENCES
-                if (usePhoneSections) {
-                    phoneSectionIndex = SECTION_PREFERENCES
+                if (useSectionsHome) {
+                    openedSection = SECTION_PREFERENCES
                 } else if (navMode == 0 || !isWideScreen) {
                     sectionBringIntoViewRequesters[SECTION_PREFERENCES].bringIntoView()
                     kotlinx.coroutines.delay(80)
@@ -894,11 +917,15 @@ fun SettingsScreen(
             // --- Système ---
             entry(context.getString(R.string.appstrings_manage_permissions), "permissions autorisations systeme application acces", SECTION_SYSTEM)
             entry(context.getString(R.string.appstrings_bg_location_perm_title), "position arriere plan background localisation permission autorisation", SECTION_SYSTEM)
+            entry(context.getString(R.string.appstrings_diagnostic_api_dialog_title), "serveur server miroir mirror principal secours bascule api hote host reseau geotower cajejuma", SECTION_SYSTEM)
             entry(context.getString(R.string.appstrings_diagnostic_title), "diagnostic logs debogage info journal probleme", SECTION_SYSTEM) { navController.navigate("diagnostic") }
 
             // --- Base de données ---
             entry(context.getString(R.string.settings_section_database), "base de donnees database telechargement anfr support antenne", SECTION_DATABASE)
             entry(context.getString(R.string.appstrings_radio_data_title), "radio donnees frequences base anfr", SECTION_DATABASE)
+            // Pannes : la carte de la section télécharge le fichier serveur, ou lance la génération
+            // locale selon le niveau de traitement local — les deux vocabulaires mènent donc ici.
+            entry(context.getString(R.string.outage_download_title), "pannes sites hs telecharger actualiser generer copie hors ligne serveur coupures", SECTION_DATABASE)
             entry(context.getString(R.string.local_mode_settings_title), "traitement local autonomie serveur hors ligne generation", SECTION_DATABASE) { navController.navigate("local_mode") }
             // Les pannes n'ont plus de page dédiée : leurs réglages vivent dans « Traitement local »
             // (niveau ≥ 1). On garde l'entrée de recherche pour que les mots-clés continuent de mener au bon endroit.
@@ -912,7 +939,7 @@ fun SettingsScreen(
                     context.getString(R.string.settings_simple_mode_title),
                     "mode simplifie simple carte demarrage tiroir menu lateral debutant epure",
                     Icons.Outlined.Tune
-                ) { openPhoneSection(null) }
+                ) { openSection(null) }
             }
             directEntry(
                 context.getString(R.string.photos_favorites_title),
@@ -975,12 +1002,11 @@ fun SettingsScreen(
         scrollViewportTop,
         scrollViewportBottom,
         activeSectionIndex,
-        phoneSectionIndex,
+        openedSection,
         navMode,
         isWideScreen
     ) {
-        val isDatabasePageOpen = (isWideScreen && navMode != 0 && activeSectionIndex == SECTION_DATABASE) ||
-            (usePhoneSections && phoneSectionIndex == SECTION_DATABASE)
+        val isDatabasePageOpen = useSectionsHome && openedSection == SECTION_DATABASE
         if (isDatabasePageOpen || isDisplayedAsMuchAsPossible(databaseBounds)) {
             DownloadNotificationCenter.clearDatabaseSectionNotifications(context)
         }
@@ -988,21 +1014,27 @@ fun SettingsScreen(
 
     Scaffold(
         containerColor = mainBgColor,
+        // L'écran est déjà posé dans un `Box(padding(innerPadding))` du NavHost, donc DÉJÀ décalé
+        // sous la barre d'état. Sans ça, le Scaffold sans barre supérieure (grand écran) rajoute
+        // l'inset une seconde fois : la hauteur de la barre d'état — celle de l'encoche sur un
+        // Fold, ~40 dp — était comptée deux fois. Avec une barre supérieure (téléphone), le padding
+        // vaut la hauteur de la barre et ne change pas.
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         topBar = {
             if (!isWideScreen) {
                 // On remet la vraie barre supérieure pour les téléphones !
                 if (showColorPalettePage) {
                     fr.geotower.ui.components.ColorPaletteTopBar(onBack = { showColorPalettePage = false })
                 } else {
-                    val openSection = phoneSectionIndex?.takeIf { usePhoneSections }
+                    val phoneOpenSection = openedSection?.takeIf { usePhoneSections }
                     GeoTowerBackTopBar(
-                        title = openSection?.let { menuItems[it].first }
+                        title = phoneOpenSection?.let { menuItems[it].first }
                             ?: stringResource(R.string.nav_settings),
                         // Même échelle que le retour système : recherche, puis section, puis sortie.
                         onBack = {
                             when {
                                 isSearchActive -> settingsSearchQuery = ""
-                                openSection != null -> openPhoneSection(null)
+                                phoneOpenSection != null -> openSection(null)
                                 else -> safeBackNavigation.navigateBack()
                             }
                         },
@@ -1081,7 +1113,9 @@ fun SettingsScreen(
                             // `Spacer(weight(1f))` continue donc de plaquer la version en bas quand
                             // il reste de la place, et la colonne défile quand il n'y en a plus.
                             .verticalScroll(sidebarScrollState)
-                            .padding(top = sizing.spacing(16.dp), bottom = sizing.spacing(16.dp))
+                            // Même resserrage que l'en-tête du volet de contenu, pour que la ligne
+                            // retour/menu et le titre restent sur le même axe.
+                            .padding(top = sizing.spacing(4.dp), bottom = sizing.spacing(16.dp))
                     ) {
                         // ✅ RETOUR DU ROW AVEC LES DEUX BOUTONS
                         Row(
@@ -1106,9 +1140,24 @@ fun SettingsScreen(
                                 Icon(Icons.Default.Menu, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
                             }
                         }
-                        Spacer(Modifier.height(sizing.spacing(16.dp)))
+                        Spacer(Modifier.height(sizing.spacing(8.dp)))
+                        // Mode « pages » : première entrée = l'accueil des sections, sur lequel on
+                        // arrive en ouvrant les réglages. Sans elle, la barre latérale n'offrirait
+                        // aucun moyen d'y revenir une fois une section ouverte.
+                        if (useWideSections) {
+                            NavigationMenuItem(
+                                stringResource(R.string.settings_sections_home_title),
+                                Icons.Outlined.Dashboard,
+                                openedSection == null,
+                                isDark
+                            ) {
+                                openSection(null)
+                            }
+                            Spacer(Modifier.height(sizing.spacing(8.dp)))
+                        }
                         menuItems.forEach { (title, icon, index) ->
-                            NavigationMenuItem(title, icon, activeSectionIndex == index, isDark) {
+                            val isSelected = if (useWideSections) openedSection == index else activeSectionIndex == index
+                            NavigationMenuItem(title, icon, isSelected, isDark) {
                                 activeSectionIndex = index
                                 if (navMode == 0) {
                                     scope.launch {
@@ -1117,9 +1166,10 @@ fun SettingsScreen(
                                         alignAnchorToViewportTop(sectionRootPositions[index])
                                     }
                                 } else {
-                                    // Mode « pages » : la nouvelle section remplace l'ancienne, on
-                                    // repart de son début (sinon on hérite du défilement précédent).
-                                    scope.launch { scrollState.scrollTo(0) }
+                                    // Mode « pages » : la nouvelle section remplace l'ancienne (ou
+                                    // l'accueil), on repart de son début (sinon on hérite du
+                                    // défilement précédent).
+                                    openSection(index)
                                 }
                             }
                         }
@@ -1170,8 +1220,14 @@ fun SettingsScreen(
 
                     // --- EN-TÊTE TABLETTE (Apparaît quand le menu latéral est replié) ---
                     if (isExpanded) {
+                        // Section ouverte depuis l'accueil : l'en-tête prend son nom et gagne une
+                        // flèche de retour, exactement comme la barre du haut d'un téléphone.
+                        val wideOpenSection = openedSection?.takeIf { useWideSections }
+                        // Marges volontairement serrées : la bande de titre est déjà repoussée sous
+                        // la barre d'état (et sous l'encoche du Fold, plus haute), et sa hauteur est
+                        // imposée par les boutons. Chaque dp rendu ici est du contenu visible.
                         Row(
-                            modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(16.dp), bottom = sizing.spacing(16.dp)),
+                            modifier = Modifier.fillMaxWidth().padding(top = sizing.spacing(4.dp), bottom = sizing.spacing(8.dp)),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             AnimatedVisibility(visible = !isSidebarVisible, enter = fadeIn() + expandHorizontally(), exit = fadeOut() + shrinkHorizontally()) {
@@ -1179,8 +1235,47 @@ fun SettingsScreen(
                                     Icon(Icons.Default.Menu, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface)
                                 }
                             }
-                            Text(stringResource(R.string.nav_settings), style = sizing.textStyle(MaterialTheme.typography.headlineMedium), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
+                            AnimatedVisibility(visible = wideOpenSection != null, enter = fadeIn() + expandHorizontally(), exit = fadeOut() + shrinkHorizontally()) {
+                                IconButton(onClick = { openSection(null) }, modifier = Modifier.padding(start = sizing.spacing(8.dp))) {
+                                    Icon(
+                                        Icons.AutoMirrored.Filled.ArrowBack,
+                                        contentDescription = stringResource(R.string.settings_sections_home_title),
+                                        tint = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                            }
+                            // Contrepoids du bouton de bascule posé à droite : sans lui le titre
+                            // serait décentré de la moitié de sa largeur.
+                            Spacer(Modifier.width(sizing.component(56.dp)))
+                            Text(
+                                text = wideOpenSection?.let { menuItems[it].first } ?: stringResource(R.string.nav_settings),
+                                style = sizing.textStyle(MaterialTheme.typography.headlineSmall),
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.weight(1f),
+                                textAlign = TextAlign.Center
+                            )
                             AnimatedVisibility(visible = !isSidebarVisible) { Spacer(Modifier.width(sizing.component(56.dp))) }
+                            AnimatedVisibility(visible = wideOpenSection != null) { Spacer(Modifier.width(sizing.component(56.dp))) }
+                            // Bascule « accueil par sections » ↔ « tout sur une page », pendant
+                            // exact du bouton de la barre du haut des téléphones.
+                            IconButton(
+                                onClick = {
+                                    safeClick("settings_nav_mode") {
+                                        setNavMode(if (useWideSections) 0 else 1)
+                                    }
+                                },
+                                modifier = Modifier.padding(end = sizing.spacing(8.dp))
+                            ) {
+                                Icon(
+                                    imageVector = if (useWideSections) {
+                                        Icons.Outlined.ViewAgenda
+                                    } else {
+                                        Icons.Outlined.Dashboard
+                                    },
+                                    contentDescription = stringResource(R.string.settings_navigation_mode_title),
+                                    tint = MaterialTheme.colorScheme.onSurface
+                                )
+                            }
                         }
                     }
 
@@ -1189,10 +1284,10 @@ fun SettingsScreen(
                     // Modes d'affichage, décidés ici puis réutilisés tels quels par les branches
                     // plus bas : la condition du tirage vers le bas doit suivre EXACTEMENT ce qui
                     // est réellement rendu, sinon le geste survit à un changement de mode.
-                    val isSectionsHome = usePhoneSections && phoneSectionIndex == null
+                    val isSectionsHome = useSectionsHome && openedSection == null
                     val isAllInOnePage = !usePhoneSections && (navMode == 0 || !isExpanded)
                     val openSectionIndex =
-                        if (usePhoneSections) phoneSectionIndex ?: SECTION_APPEARANCE else activeSectionIndex
+                        if (useSectionsHome) openedSection ?: SECTION_APPEARANCE else activeSectionIndex
                     // Le tirage n'a de sens que si la section « Base de données » occupe la page à
                     // elle seule : ailleurs elle n'est pas en haut du défilement, et c'est le bouton
                     // posé sur son titre qui l'actualise.
@@ -1237,7 +1332,7 @@ fun SettingsScreen(
                             // la page) et sur une section ouverte (il n'appartient à aucune).
                             if (
                                 settingsSearchQuery.isBlank() &&
-                                !isPhoneSectionOpen &&
+                                !isSectionOpen &&
                                 RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIMPLE_MODE_ENABLED)
                             ) {
                                 val simpleModeEnabled by AppConfig.simpleMode
@@ -1277,11 +1372,14 @@ fun SettingsScreen(
                                 )
                             } else {
                             if (isSectionsHome) {
-                                // Téléphone : accueil des réglages, un bouton par section.
+                                // Accueil des réglages : un bouton par section. Le raccourci
+                                // « tout sur une page » vise le réglage du mode courant — la
+                                // bascule par sections sur téléphone, le mode de navigation
+                                // (nav_mode) sur grand écran.
                                 SettingsSectionsHome(
                                     sections = menuItems,
-                                    onSectionClick = { openPhoneSection(it) },
-                                    onShowAll = { setSettingsSectionsMode(false) },
+                                    onSectionClick = { openSection(it) },
+                                    onShowAll = { if (useWideSections) setNavMode(0) else setSettingsSectionsMode(false) },
                                     onPhotosFavorites = { navController.navigate("photos_favorites") },
                                     onPhotoUploadHistory = { navController.navigate("photo_upload_history") },
                                     onShareHistory = { navController.navigate("share_history") },
@@ -1296,7 +1394,7 @@ fun SettingsScreen(
                                 AllSettingsContent(
                                     isWide = isExpanded,
                                     nav = navMode,
-                                    onNav = { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = SECTION_APPEARANCE },
+                                    onNav = { setNavMode(it) },
                                     theme = themeMode,
                                     onTheme = { themeMode = it; prefs.edit().putInt("theme_mode", it).apply() },
                                     oled = isOledMode,
@@ -1351,11 +1449,14 @@ fun SettingsScreen(
                                     databaseCardModifiers = databaseCardAnchorModifiers,
                                     databaseRefreshState = databaseRefreshState
                                 )
-                                if (!isExpanded) {
-                                    // Retour vers l'accueil par sections (pendant du bouton de la barre du haut).
+                                run {
+                                    // Passage à l'accueil par sections : pendant du bouton de la
+                                    // barre du haut sur téléphone, du mode « pages » sur grand
+                                    // écran (sinon le réglage n'est atteignable que depuis la
+                                    // carte « Mode de navigation » d'Apparence).
                                     Spacer(Modifier.height(sizing.spacing(8.dp)))
                                     TextButton(
-                                        onClick = { setSettingsSectionsMode(true) },
+                                        onClick = { if (isExpanded) setNavMode(1) else setSettingsSectionsMode(true) },
                                         modifier = Modifier.fillMaxWidth()
                                     ) {
                                         Icon(
@@ -1395,7 +1496,7 @@ fun SettingsScreen(
                                         { showColorPalettePage = true },
                                         isWide = isExpanded,
                                         nav = navMode,
-                                        onNav = { AppConfig.navMode.intValue = it; prefs.edit().putInt("nav_mode", it).apply(); if (it == 1) activeSectionIndex = SECTION_APPEARANCE }
+                                        onNav = { setNavMode(it) }
                                     )
                                     SECTION_MAPPING -> SectionCartographie(
                                         mapProvider,
@@ -3249,6 +3350,104 @@ fun SectionSysteme(
             )
         }
 
+        // Divulgation « bien visible » exigée par Google Play : elle doit précéder TOUTE demande de
+        // localisation en arrière-plan, et n'être franchie que par une action explicite. La carte
+        // ne déclenche donc plus la demande directement, elle ouvre ce dialogue.
+        var showBgDisclosure by remember { mutableStateOf(false) }
+
+        fun requestBackgroundLocation() {
+            // Trouver la VRAIE activité (on déballe le contexte de Compose pour réparer
+            // le bug de redirection).
+            var currentContext: Context = ctx
+            while (currentContext is android.content.ContextWrapper && currentContext !is android.app.Activity) {
+                currentContext = currentContext.baseContext
+            }
+            val activity = currentContext as? android.app.Activity
+            val hasFineLocation = androidx.core.content.ContextCompat.checkSelfPermission(
+                ctx,
+                android.Manifest.permission.ACCESS_FINE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            val hasCoarseLocation = androidx.core.content.ContextCompat.checkSelfPermission(
+                ctx,
+                android.Manifest.permission.ACCESS_COARSE_LOCATION
+            ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+            if (!hasFineLocation && !hasCoarseLocation) {
+                activity?.requestPermissions(
+                    arrayOf(
+                        android.Manifest.permission.ACCESS_FINE_LOCATION,
+                        android.Manifest.permission.ACCESS_COARSE_LOCATION
+                    ),
+                    1005
+                )
+                return
+            }
+
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", ctx.packageName, null)
+                    // FLAG_ACTIVITY_NEW_TASK : LocalContext est le contexte localisé (LocaleProvider),
+                    // pas une Activity → sans ce flag, l'ouverture des réglages échoue silencieusement sur OnePlus.
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                runCatching { ctx.startActivity(intent) }
+                return
+            }
+
+            // Analyser l'état de la permission
+            val shouldShowRationale = activity?.shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) ?: false
+            val alreadyAsked = prefs.getBoolean("bg_loc_asked", false)
+
+            // Si on a déjà demandé, que l'OS refuse d'afficher l'alerte, ET qu'on a bien trouvé l'activité
+            if (alreadyAsked && !shouldShowRationale && activity != null) {
+                // Plan B : le blocage est total (« Ne plus demander » coché), on ouvre les paramètres globaux
+                val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                    data = Uri.fromParts("package", ctx.packageName, null)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) // idem : contexte localisé sans Activity
+                }
+                ctx.startActivity(intent)
+            } else {
+                // Plan A : ouvre le sous-menu « Position » d'Android
+                prefs.edit().putBoolean("bg_loc_asked", true).apply()
+                bgLocationLauncher.launch(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION)
+            }
+        }
+
+        if (showBgDisclosure) {
+            AlertDialog(
+                onDismissRequest = { showBgDisclosure = false },
+                icon = { Icon(Icons.Default.Place, contentDescription = null) },
+                title = { Text(stringResource(R.string.bg_location_disclosure_title)) },
+                text = {
+                    Text(
+                        buildString {
+                            append(stringResource(R.string.bg_location_disclosure_body))
+                            if (!backgroundPermissionLabel.isNullOrBlank()) {
+                                append("\n\n")
+                                append(
+                                    stringResource(
+                                        R.string.bg_location_disclosure_option,
+                                        backgroundPermissionLabel
+                                    )
+                                )
+                            }
+                        }
+                    )
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        showBgDisclosure = false
+                        requestBackgroundLocation()
+                    }) { Text(stringResource(R.string.common_continue)) }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showBgDisclosure = false }) {
+                        Text(stringResource(R.string.common_cancel))
+                    }
+                }
+            )
+        }
+
         // On écoute le retour sur l'application pour revérifier la permission instantanément
         val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
         androidx.compose.runtime.DisposableEffect(lifecycleOwner) {
@@ -3276,63 +3475,8 @@ fun SectionSysteme(
                             append(backgroundPermissionLabel)
                         }
                     },
-                    onClick = {
-                        // Trouver la VRAIE activité (on déballe le contexte de Compose pour réparer
-                        // le bug de redirection).
-                        var currentContext: Context = ctx
-                        while (currentContext is android.content.ContextWrapper && currentContext !is android.app.Activity) {
-                            currentContext = currentContext.baseContext
-                        }
-                        val activity = currentContext as? android.app.Activity
-                        val hasFineLocation = androidx.core.content.ContextCompat.checkSelfPermission(
-                            ctx,
-                            android.Manifest.permission.ACCESS_FINE_LOCATION
-                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-                        val hasCoarseLocation = androidx.core.content.ContextCompat.checkSelfPermission(
-                            ctx,
-                            android.Manifest.permission.ACCESS_COARSE_LOCATION
-                        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-
-                        if (!hasFineLocation && !hasCoarseLocation) {
-                            activity?.requestPermissions(
-                                arrayOf(
-                                    android.Manifest.permission.ACCESS_FINE_LOCATION,
-                                    android.Manifest.permission.ACCESS_COARSE_LOCATION
-                                ),
-                                1005
-                            )
-                            return@PreferenceActionCard
-                        }
-
-                        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.fromParts("package", ctx.packageName, null)
-                                // FLAG_ACTIVITY_NEW_TASK : LocalContext est le contexte localisé (LocaleProvider),
-                                // pas une Activity → sans ce flag, l'ouverture des réglages échoue silencieusement sur OnePlus.
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            }
-                            runCatching { ctx.startActivity(intent) }
-                            return@PreferenceActionCard
-                        }
-
-                        // Analyser l'état de la permission
-                        val shouldShowRationale = activity?.shouldShowRequestPermissionRationale(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION) ?: false
-                        val alreadyAsked = prefs.getBoolean("bg_loc_asked", false)
-
-                        // Si on a déjà demandé, que l'OS refuse d'afficher l'alerte, ET qu'on a bien trouvé l'activité
-                        if (alreadyAsked && !shouldShowRationale && activity != null) {
-                            // Plan B : le blocage est total (« Ne plus demander » coché), on ouvre les paramètres globaux
-                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                                data = Uri.fromParts("package", ctx.packageName, null)
-                                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK) // idem : contexte localisé sans Activity
-                            }
-                            ctx.startActivity(intent)
-                        } else {
-                            // Plan A : ouvre le sous-menu « Position » d'Android
-                            prefs.edit().putBoolean("bg_loc_asked", true).apply()
-                            bgLocationLauncher.launch(android.Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                        }
-                    },
+                    // La divulgation passe d'abord : c'est elle qui déclenche la demande système.
+                    onClick = { showBgDisclosure = true },
                     shape = shape, border = border, bubbleColor = MaterialTheme.colorScheme.errorContainer, useOneUi = useOneUi, safeClick = safeClick,
                     icon = Icons.Default.Place
                 )
@@ -3340,6 +3484,51 @@ fun SectionSysteme(
             }
         }
     }
+
+    // --- SERVEUR GEOTOWER ---
+    // Raccourci vers le même réglage que la carte « Serveur GeoTower » de la page Diagnostic
+    // (elle-même atteignable depuis « À propos ») : état unique dans ApiEndpoints, dialogue commun,
+    // et sonde forcée à la sélection. Les deux entrées ne peuvent donc pas se contredire.
+    val apiServerScope = rememberCoroutineScope()
+    var showApiServerDialog by remember { mutableStateOf(false) }
+    val apiServerMode = ApiEndpoints.mode.value
+    val apiServerActive = ApiEndpoints.activeServer.value
+    Surface(
+        onClick = { safeClick("system_api_server") { showApiServerDialog = true } },
+        shape = shape,
+        border = border,
+        color = cardBg,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Row(modifier = Modifier.padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Outlined.Dns, contentDescription = null, tint = MaterialTheme.colorScheme.onSurface, modifier = Modifier.size(sizing.component(24.dp)))
+            Spacer(Modifier.width(sizing.spacing(16.dp)))
+            Column {
+                Text(stringResource(R.string.appstrings_diagnostic_api_dialog_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                Text(stringResource(R.string.settings_api_server_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // Le mode dit ce qui a été choisi, l'hôte ce qui est réellement utilisé : en mode
+                // automatique, les deux diffèrent dès que la bascule sur le miroir a eu lieu.
+                Text(
+                    text = "${stringResource(apiServerModeLabelRes(apiServerMode))} · ${apiServerActive.host}",
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+
+    if (showApiServerDialog) {
+        ApiServerModeDialog(
+            currentMode = apiServerMode,
+            onDismiss = { showApiServerDialog = false },
+            onSelect = { selectedMode ->
+                showApiServerDialog = false
+                applyApiServerMode(ctx, apiServerScope, selectedMode)
+            }
+        )
+    }
+
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
 
     Surface(
         onClick = { safeClick("system_diagnostic") { onOpenDiagnostic() } },
@@ -3436,6 +3625,23 @@ fun SectionDatabase(
                 shape = shape,
                 border = border,
                 bubbleColor = bubbleColor,
+                refreshState = refreshState
+            )
+        }
+
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+        // Sites en panne : fichier national du serveur, conservé sur l'appareil pour l'afficher
+        // hors ligne. Il vit ici, avec les autres données téléchargées, plutôt que dans l'écran
+        // Traitement local qui ne porte que la source ALTERNATIVE (récupération sur l'appareil).
+        Box(modifier = cardAnchor(ANCHOR_DB_OUTAGES).fillMaxWidth()) {
+            fr.geotower.ui.components.OutageDownloadCard(
+                repository = repository,
+                useOneUi = useOneUi,
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                onSafeClick = safeClick,
                 refreshState = refreshState
             )
         }

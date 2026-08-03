@@ -1,0 +1,240 @@
+PROMPT POUR AGENT IA - PLAN AUTHENTICITE ET CHIFFREMENT CIBLE GEOTOWER
+
+Date de reference: 2026-05-26
+Projet local: C:\Users\Julien\AndroidStudioProjects\GeoTower
+
+Role:
+Tu es un agent IA senior Android/Kotlin et backend Python/FastAPI charge de durcir GeoTower.
+
+Contexte:
+- Application: GeoTower.
+- Package / namespace / applicationId: fr.geotower.
+- Ne jamais renommer GeoTower en SignalQuest. SignalQuest est uniquement une integration externe/communautaire.
+- Stack Android: Kotlin, Jetpack Compose, Room, WorkManager, Retrofit, OkHttp, OSMDroid, Mapsforge, Glance widgets, Android Auto.
+- Stack serveur dans docs/server: FastAPI, httpx, SQLite.
+- La grosse base hors-ligne ANFR/GeoTower contient des donnees publiques.
+
+Decision de securite importante:
+- Ne pas chiffrer la grosse DB publique ANFR/offline globale en priorite.
+- Le chiffrement global de cette DB apporterait surtout de l'obfuscation, car l'app doit pouvoir la lire hors ligne et une cle embarquee ou derivable serait extractible.
+- Priorite reelle: authenticite, integrite, plafonds de telechargement, URLs officielles, puis chiffrement local cible pour les donnees utilisateur sensibles.
+
+Contraintes fortes:
+- Ne pas embarquer de secret durable dans l'APK.
+- Ne pas modifier versionCode/versionName sauf demande explicite.
+- Ne pas modifier les schemas Room sauf necessite directe et justifiee.
+- Preserver les changements utilisateur existants; ne rien revert sans demande explicite.
+- Ajouter ou adapter les tests unitaires pour chaque comportement de securite change.
+- Avant de conclure, lancer les tests cibles et au minimum :app:compileDebugKotlin si l'environnement le permet.
+- Si R8/release est touche, lancer aussi :app:assembleRelease si possible.
+
+Commandes utiles:
+- Tests cibles Android:
+  $env:JAVA_HOME='C:\Program Files\Android\Android Studio1\jbr'; $env:ANDROID_HOME='C:\Users\Julien\AppData\Local\Android\Sdk'; .\gradlew.bat :app:testDebugUnitTest --tests fr.geotower.data.workers.OfflineMapDownloadValidatorTest --tests fr.geotower.data.api.AppUpdateCheckerTest --tests fr.geotower.data.api.DatabaseDownloaderTest --tests fr.geotower.data.config.RemoteFeatureFlagsTest
+- Compilation Kotlin:
+  $env:JAVA_HOME='C:\Program Files\Android\Android Studio1\jbr'; $env:ANDROID_HOME='C:\Users\Julien\AppData\Local\Android\Sdk'; .\gradlew.bat :app:compileDebugKotlin
+- Verification release si R8/proguard touche:
+  $env:JAVA_HOME='C:\Program Files\Android\Android Studio1\jbr'; $env:ANDROID_HOME='C:\Users\Julien\AppData\Local\Android\Sdk'; .\gradlew.bat :app:assembleRelease
+
+
+P0 - Manifeste signe pour la DB et les cartes
+
+Objectif:
+Empecher l'app d'accepter une DB ou une carte modifiee, meme si le backend, le CDN, ou un TLS local est compromis.
+
+Fichiers probables:
+- docs/server/main.py
+- app/src/main/java/fr/geotower/data/api/DatabaseDownloader.kt
+- app/src/main/java/fr/geotower/data/workers/OfflineMapDownloadValidator.kt
+- app/src/main/java/fr/geotower/data/workers/MapDownloadWorker.kt
+- app/src/main/java/fr/geotower/data/models/OfflineMapDto.kt
+- tests sous app/src/test/java/fr/geotower/data/...
+
+Travail attendu cote serveur:
+- Ajouter un endpoint de manifeste officiel, par exemple:
+  /api/v2/download/manifest
+- Le manifeste doit contenir au minimum:
+  - schemaVersion
+  - generatedAt
+  - expiresAt si possible
+  - keyId
+  - db:
+    - filename
+    - url
+    - size_bytes
+    - sha256
+    - schema_version
+    - country_code
+    - version
+  - maps:
+    - id
+    - map_filename
+    - map_url
+    - estimated_size_mb
+    - sha256
+- Signer le payload canonique avec une cle privee Ed25519 cote serveur.
+- La cle privee ne doit jamais etre dans le repo ni dans l'app Android.
+- Publier une reponse du type:
+  {
+    "payload": { ... },
+    "signature": "base64url...",
+    "keyId": "geotower-prod-2026-01"
+  }
+- La signature doit porter sur le payload canonique, pas sur une chaine JSON construite de maniere fragile.
+- Prevoir une politique de rotation via keyId.
+
+Travail attendu cote Android:
+- Embarquer uniquement la ou les cles publiques autorisees.
+- Verifier la signature du manifeste avant d'utiliser ses champs.
+- Refuser tout manifeste:
+  - non signe;
+  - mal forme;
+  - signe avec une cle inconnue;
+  - expire;
+  - dont schema_version ou country_code ne correspondent pas;
+  - dont les hashes manquent ou sont invalides.
+- Utiliser les champs verifies du manifeste pour piloter les telechargements DB/cartes.
+
+Tests attendus:
+- accepte un manifeste valide signe;
+- refuse une signature invalide;
+- refuse un keyId inconnu;
+- refuse un manifeste expire;
+- refuse un hash absent;
+- refuse schema_version incorrect;
+- refuse country_code incorrect.
+
+
+P1 - SHA-256 obligatoire partout
+
+Objectif:
+Aucune donnee telechargee ne doit etre installee sans hash attendu.
+
+Travail attendu:
+- Pour la DB:
+  - refuser /api/v2/db/info ou le manifeste si sha256 manque ou est invalide;
+  - calculer le SHA-256 du fichier temporaire apres telechargement;
+  - installer uniquement si le hash correspond exactement.
+- Pour les cartes:
+  - refuser tout catalogue/manifeste sans sha256 valide;
+  - calculer le SHA-256 du fichier temporaire;
+  - installer uniquement si le hash correspond exactement.
+
+Tests attendus:
+- DB info sans hash refuse;
+- DB info avec hash invalide refuse;
+- carte sans hash refusee;
+- carte avec mauvais hash refusee;
+- fichier valide accepte.
+
+
+P1 - Plafonds d'octets pendant telechargement
+
+Objectif:
+Eviter remplissage disque, consommation reseau excessive, ou blocage si Content-Length est absent ou mensonger.
+
+Travail attendu:
+- DB:
+  - utiliser size_bytes du manifeste signe ou de /api/v2/db/info;
+  - definir une marge stricte;
+  - refuser avant telechargement si Content-Length depasse le plafond;
+  - pendant la copie, arreter immediatement si bytesCopied depasse le plafond;
+  - supprimer les fichiers temporaires en erreur ou annulation;
+  - ne pas utiliser callTimeout(0).
+- Cartes:
+  - utiliser taille exacte si disponible;
+  - sinon utiliser estimated_size_mb avec une marge stricte;
+  - appliquer le meme refus avant et pendant la copie.
+
+Tests attendus:
+- Content-Length trop grand refuse;
+- flux depassant le plafond interrompu;
+- fichier temporaire supprime apres erreur;
+- progression bornee a 100%.
+
+
+P1 - TLS et allowlists strictes
+
+Objectif:
+Empêcher l'app d'ouvrir ou de telecharger depuis des sources non officielles.
+
+Travail attendu:
+- DB, cartes, mises a jour APK, annonces accueil: HTTPS uniquement.
+- Ajouter des allowlists strictes:
+  - API GeoTower officielle;
+  - domaine officiel de telechargement APK;
+  - domaine cartes autorise;
+  - pages d'annonce officielles.
+- Refuser:
+  - http://;
+  - domaine inconnu;
+  - URL avec userinfo;
+  - chemin non officiel.
+- Garder cleartextTraffic=false.
+
+Tests attendus:
+- http:// refuse;
+- domaine non allowliste refuse;
+- domaine officiel + chemin officiel accepte;
+- URL avec user:pass@host refusee.
+
+
+P2 - Chiffrement local cible
+
+Objectif:
+Chiffrer uniquement ce qui peut contenir des donnees utilisateur sensibles. Ne pas chiffrer la grosse DB publique ANFR.
+
+Donnees a evaluer:
+- Historique d'upload photo.
+- Brouillons d'upload.
+- Metadonnees locales de fichiers/photo.
+- Preferences sensibles eventuelles.
+- Caches lies a localisation ou activite utilisateur.
+- Tokens temporaires si l'app en persiste, mais idealement ne pas les persister.
+
+Approche recommandee:
+- Utiliser Android Keystore via AndroidX Security / EncryptedSharedPreferences si la dependance est disponible ou acceptable.
+- Pour une petite quantite de donnees, preferer un stockage cle-valeur chiffre.
+- Pour une vraie DB privee future, evaluer SQLCipher uniquement si le besoin est avere.
+- Prevoir une migration douce depuis l'ancien stockage en clair.
+- En cas d'indisponibilite Keystore, echouer proprement ou degrader sans crash, mais ne pas stocker de nouveau secret durable en clair.
+
+Tests attendus:
+- migration lit l'ancien stockage puis ecrit dans le nouveau stockage chiffre;
+- absence de crash si Keystore indisponible;
+- tokens expires supprimes;
+- aucune nouvelle donnee sensible stockee en clair.
+
+
+P2 - Hygiene release et obfuscation
+
+Objectif:
+Reduire la facilite de reverse engineering sans casser les integrations.
+
+Travail attendu:
+- Verifier que release.isMinifyEnabled = true.
+- Garder/ajouter les regles R8 necessaires pour:
+  - Retrofit/Gson DTOs;
+  - Room;
+  - Android Auto;
+  - classes appelees par reflection si presentes.
+- Lancer :app:assembleRelease apres tout changement R8.
+
+Tests/verifications attendus:
+- :app:compileDebugKotlin OK;
+- :app:assembleRelease OK;
+- pas de regression de parsing JSON dans les tests.
+
+
+Compte rendu final attendu:
+- Liste des fichiers modifies.
+- Risques corriges par priorite.
+- Tests lances et resultat.
+- Risques residuels.
+- Configuration infra necessaire:
+  - generation et stockage de la cle privee Ed25519;
+  - publication de la cle publique Android;
+  - rotation keyId;
+  - procedure de signature manifeste;
+  - maintien des allowlists;
+  - source fiable des SHA-256 DB/cartes.

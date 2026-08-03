@@ -30,10 +30,15 @@ enum class ServerStatus {
  *
  * On interroge l'endpoint des feature flags : c'est la plus petite réponse JSON du serveur, elle est
  * toujours servie et n'est jamais coupée par le mode « traitement local ».
+ *
+ * C'est aussi l'arbitre de la bascule principal ↔ miroir ([ApiEndpoints]) : chaque serveur est sondé
+ * sur son hôte **imposé** (en-tête [ApiEndpoints.PIN_HOST_HEADER]), sinon l'intercepteur de
+ * [RetrofitClient] réécrirait l'URL et les deux sondes viseraient le même serveur. Le verdict
+ * UNREACHABLE n'est donc rendu que si **aucun** des deux ne répond.
  */
 object ServerReachability {
     private const val TAG = "GeoTowerServer"
-    private const val PROBE_URL = "${RetrofitClient.BASE_URL}api/v2/app/features"
+    private const val PROBE_PATH = "api/v2/app/features"
 
     /** Anti-rafale : deux sondes rapprochées ne servent à rien (sauf `force`). */
     private const val MIN_CHECK_INTERVAL_MS = 30_000L
@@ -45,6 +50,9 @@ object ServerReachability {
 
     @Volatile
     private var lastCheckAt = 0L
+
+    /** Date (epoch ms) de la dernière sonde, 0 si aucune depuis le lancement. */
+    val lastCheckedAt: Long get() = lastCheckAt
 
     /**
      * Client dédié : timeouts courts (on veut un verdict, pas un téléchargement) et surtout AUCUN
@@ -71,23 +79,7 @@ object ServerReachability {
         return probeMutex.withLock {
             if (!force && isThrottled()) return@withLock statusState.value
 
-            val request = Request.Builder()
-                .url(PROBE_URL)
-                .cacheControl(CacheControl.FORCE_NETWORK)
-                .header("Accept", "application/json")
-                .build()
-
-            val verdict = withContext(Dispatchers.IO) {
-                try {
-                    probeClient.newCall(request).execute().use { response ->
-                        // 5xx = le serveur (ou son proxy) est en vrac ; le reste = il répond.
-                        if (response.code >= 500) ServerStatus.UNREACHABLE else ServerStatus.REACHABLE
-                    }
-                } catch (e: Exception) {
-                    AppLogger.w(TAG, "Server probe failed", e)
-                    ServerStatus.UNREACHABLE
-                }
-            }
+            val verdict = withContext(Dispatchers.IO) { probeServers() }
 
             lastCheckAt = System.currentTimeMillis()
             withContext(Dispatchers.Main) { statusState.value = verdict }
@@ -99,6 +91,46 @@ object ServerReachability {
     fun reset() {
         lastCheckAt = 0L
         statusState.value = ServerStatus.UNKNOWN
+    }
+
+    /**
+     * Sonde le serveur qu'il faut essayer en premier, puis l'autre. Après un moment passé sur le
+     * miroir, le principal repasse en tête : c'est ce qui ramène l'app sur `api.geotower.fr` dès
+     * qu'il est réparé, sans rien demander à l'utilisateur.
+     */
+    private fun probeServers(): ServerStatus {
+        val first = if (ApiEndpoints.shouldRetryPrimary()) ApiServer.PRIMARY else ApiEndpoints.active()
+        if (probe(first)) {
+            ApiEndpoints.switchTo(first)
+            return ServerStatus.REACHABLE
+        }
+
+        val second = ApiEndpoints.failoverTarget(first) ?: return ServerStatus.UNREACHABLE
+        if (probe(second)) {
+            ApiEndpoints.switchTo(second)
+            return ServerStatus.REACHABLE
+        }
+        return ServerStatus.UNREACHABLE
+    }
+
+    /** true si [server] répond (même par une 4xx : il est bien vivant). */
+    private fun probe(server: ApiServer): Boolean {
+        val request = Request.Builder()
+            .url("${server.baseUrl}$PROBE_PATH")
+            .cacheControl(CacheControl.FORCE_NETWORK)
+            .header("Accept", "application/json")
+            .header(ApiEndpoints.PIN_HOST_HEADER, server.host)
+            .build()
+
+        return try {
+            probeClient.newCall(request).execute().use { response ->
+                // 5xx = le serveur (ou son proxy) est en vrac ; le reste = il répond.
+                response.code < 500
+            }
+        } catch (e: Exception) {
+            AppLogger.w(TAG, "Server probe failed on ${server.host}", e)
+            false
+        }
     }
 
     private fun isThrottled(): Boolean {

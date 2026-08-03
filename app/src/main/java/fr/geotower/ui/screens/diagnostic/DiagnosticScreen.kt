@@ -55,6 +55,7 @@ import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -97,18 +98,27 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.navigation.NavController
 import fr.geotower.R
+import fr.geotower.data.api.ApiEndpoints
+import fr.geotower.data.api.ApiServer
+import fr.geotower.data.api.ServerReachability
+import fr.geotower.data.api.ServerStatus
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.GeoTowerDatabaseValidator
+import fr.geotower.data.db.LocalDbBuildStatus
 import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.data.workers.OfflineMapDownloadValidator
+import fr.geotower.ui.components.ApiServerModeDialog
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.GeoTowerLoadingMessage
 import fr.geotower.ui.components.PageScrollEdgeButtons
+import fr.geotower.ui.components.apiServerModeLabelRes
+import fr.geotower.ui.components.applyApiServerMode
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
+import fr.geotower.utils.AppFileLog
 import fr.geotower.utils.LiveTrackingPrefs
 import fr.geotower.utils.PowerProfile
 import fr.geotower.utils.PreferenceStores
@@ -141,6 +151,7 @@ fun DiagnosticScreen(navController: NavController) {
     val liveFallbackEnabled = RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.LIVE_API_FR)
     var state by remember { mutableStateOf<DiagnosticState?>(null) }
     var isRefreshing by remember { mutableStateOf(false) }
+    var showApiServerDialog by remember { mutableStateOf(false) }
     val scrollState = rememberScrollState()
     val uiStyle = LocalGeoTowerUiStyle.current
     val sizing = LocalGeoTowerUiSizing.current
@@ -260,7 +271,11 @@ fun DiagnosticScreen(navController: NavController) {
                         currentState.items.forEach { item ->
                             DiagnosticItemCard(
                                 item = item,
-                                onAction = { action -> handleDiagnosticAction(context, navController, action) }
+                                onAction = { action ->
+                                    handleDiagnosticAction(context, navController, action) {
+                                        showApiServerDialog = true
+                                    }
+                                }
                             )
                         }
                     }
@@ -273,11 +288,65 @@ fun DiagnosticScreen(navController: NavController) {
                         Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                         Text(stringResource(R.string.appstrings_diagnostic_copy_report))
                     }
+
+                    // Journal disque (AppFileLog) : la seule trace exploitable pour les chemins
+                    // qu'on ne peut pas observer avec un PC branché (Android Auto, workers, crash
+                    // au démarrage). `logSize` est relu à chaque analyse pour refléter l'effacement.
+                    var logSize by remember(currentState.generatedAt) {
+                        mutableStateOf(AppFileLog.sizeBytes(context))
+                    }
+                    Text(
+                        text = stringResource(
+                            R.string.appstrings_diagnostic_log_size,
+                            formatBytes(context, logSize)
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Button(
+                            onClick = { shareDebugLog(context) },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(sizing.component(18.dp)))
+                            Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                            Text(stringResource(R.string.appstrings_diagnostic_share_log))
+                        }
+                        TextButton(
+                            onClick = {
+                                AppFileLog.clear(context)
+                                logSize = AppFileLog.sizeBytes(context)
+                                Toast.makeText(context, R.string.appstrings_diagnostic_log_cleared, Toast.LENGTH_SHORT).show()
+                            },
+                            enabled = logSize > 0L
+                        ) {
+                            Text(stringResource(R.string.appstrings_diagnostic_clear_log))
+                        }
+                    }
                 }
                 PageScrollEdgeButtons(PageScrollPrefs.DIAGNOSTIC, scrollState)
                 }
             }
         }
+    }
+
+    if (showApiServerDialog) {
+        // Même dialogue que la carte « Serveur GeoTower » des Réglages (Système) : le réglage n'a
+        // qu'un seul état, les deux pages ne peuvent donc pas diverger.
+        ApiServerModeDialog(
+            currentMode = ApiEndpoints.mode.value,
+            onDismiss = { showApiServerDialog = false },
+            onSelect = { selectedMode ->
+                showApiServerDialog = false
+                // Le scan est rejoué après la sonde forcée, sinon la carte afficherait encore le
+                // verdict de l'ancien serveur.
+                applyApiServerMode(context, scope, selectedMode) { refresh() }
+            }
+        )
     }
 }
 
@@ -759,12 +828,19 @@ private suspend fun buildDiagnosticState(
 ): DiagnosticState = withContext(Dispatchers.IO) {
     val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
     val generatedAt = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())
-    val antennaItem = buildAntennaDatabaseItem(context, liveFallbackEnabled)
-    val radioItem = buildRadioDatabaseItem(context)
+    // Une base en cours de generation est absente du disque jusqu'a la fin du build : le diagnostic
+    // doit dire « generation en cours », pas « base absente ».
+    val localBuild = LocalDbBuildStatus.read(context)
+    val antennaItem = buildAntennaDatabaseItem(context, liveFallbackEnabled, localBuild)
+    val radioItem = buildRadioDatabaseItem(context, localBuild)
     val mapsItem = buildOfflineMapsItem(context)
     val permissionsItem = buildPermissionsItem(context, prefs.getBoolean("enable_live_notifications", false))
     val notificationsItem = buildNotificationsItem(context, prefs)
     val storageItem = buildStorageItem(context)
+    // Sonde non forcée : le verdict de moins de 30 s est réutilisé, une analyse manuelle plus
+    // tardive re-teste réellement les deux serveurs.
+    ServerReachability.refresh()
+    val apiServerItem = buildApiServerItem(context)
     val environmentItem = buildEnvironmentItem(context, generatedAt)
     val items = listOf(
         antennaItem,
@@ -772,6 +848,7 @@ private suspend fun buildDiagnosticState(
         mapsItem,
         permissionsItem,
         notificationsItem,
+        apiServerItem,
         storageItem,
         environmentItem
     )
@@ -801,19 +878,28 @@ private suspend fun buildDiagnosticState(
     )
 }
 
-private fun buildAntennaDatabaseItem(context: Context, liveFallbackEnabled: Boolean): DiagnosticItem {
+private fun buildAntennaDatabaseItem(
+    context: Context,
+    liveFallbackEnabled: Boolean,
+    localBuild: LocalDbBuildStatus
+): DiagnosticItem {
     val dbFile = context.getDatabasePath(GeoTowerDatabaseValidator.DB_NAME)
     val status = GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context)
     val version = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context)
     val sidecars = databaseSidecars(context, GeoTowerDatabaseValidator.DB_NAME)
     val downloadArtifact = sidecars.firstOrNull { it.name.endsWith(".download") && it.length() > 0L }
+    // Base en cours de generation sur l'appareil : ce n'est pas une anomalie, juste une attente.
+    val generating = localBuild.mobileRunning &&
+        status.state != GeoTowerDatabaseValidator.LocalDatabaseState.VALID
     val severity = when {
+        generating -> DiagnosticSeverity.Info
         downloadArtifact != null -> DiagnosticSeverity.Warning
         status.state == GeoTowerDatabaseValidator.LocalDatabaseState.VALID -> DiagnosticSeverity.Ok
         liveFallbackEnabled -> DiagnosticSeverity.Warning
         else -> DiagnosticSeverity.Error
     }
     val summary = when {
+        generating -> context.getString(R.string.appstrings_diagnostic_summary_antennas_generating)
         downloadArtifact != null -> context.getString(R.string.appstrings_diagnostic_summary_antennas_incomplete)
         status.state == GeoTowerDatabaseValidator.LocalDatabaseState.VALID -> {
             context.getString(
@@ -855,21 +941,25 @@ private fun buildAntennaDatabaseItem(context: Context, liveFallbackEnabled: Bool
     )
 }
 
-private fun buildRadioDatabaseItem(context: Context): DiagnosticItem {
+private fun buildRadioDatabaseItem(context: Context, localBuild: LocalDbBuildStatus): DiagnosticItem {
     val dbFile = context.getDatabasePath(RadioDatabaseValidator.DB_NAME)
     val validation = if (dbFile.isFile) RadioDatabaseValidator.validateDatabaseFile(dbFile) else null
     val metadata = if (validation?.isValid == true) readRadioMetadata(dbFile) else RadioMetadata()
+    // Base radio en cours de generation : on l'annonce plutot que « non installee » / « invalide ».
+    val generating = localBuild.radioRunning && validation?.isValid != true
     val severity = when {
+        generating -> DiagnosticSeverity.Info
         !dbFile.isFile || dbFile.length() <= 0L -> DiagnosticSeverity.Info
         validation?.isValid == true -> DiagnosticSeverity.Ok
         else -> DiagnosticSeverity.Warning
     }
-    val summary = when (severity) {
-        DiagnosticSeverity.Ok -> context.getString(
+    val summary = when {
+        generating -> context.getString(R.string.appstrings_diagnostic_summary_radio_generating)
+        severity == DiagnosticSeverity.Ok -> context.getString(
             R.string.appstrings_diagnostic_summary_radio_ok,
             metadata.version ?: context.getString(R.string.appstrings_diagnostic_value_unknown)
         )
-        DiagnosticSeverity.Info -> context.getString(R.string.appstrings_diagnostic_summary_radio_missing)
+        severity == DiagnosticSeverity.Info -> context.getString(R.string.appstrings_diagnostic_summary_radio_missing)
         else -> context.getString(R.string.appstrings_diagnostic_summary_radio_invalid)
     }
     val details = buildList {
@@ -1037,6 +1127,11 @@ private fun buildStorageItem(context: Context): DiagnosticItem {
     val antennaDb = context.getDatabasePath(GeoTowerDatabaseValidator.DB_NAME)
     val radioDb = context.getDatabasePath(RadioDatabaseValidator.DB_NAME)
     val enbDb = context.getDatabasePath(fr.geotower.data.db.EnbDatabaseValidator.DB_NAME)
+    // Copies des pannes : celle du serveur et celle produite sur l'appareil, jamais les deux en usage.
+    val outagesSize = listOf(
+        fr.geotower.data.outages.ServerOutageCache.FILE_NAME,
+        fr.geotower.data.outages.OutageLocalCache.FILE_NAME,
+    ).sumOf { File(context.filesDir, it).lengthOrZero() }
     val mapsDir = context.getExternalFilesDir(null)?.let { File(it, "maps") }
     val mapFiles = mapsDir?.let { OfflineMapDownloadValidator.listSafeMapFiles(it) }.orEmpty()
     val mapsSize = mapFiles.sumOf { it.lengthOrZero() }
@@ -1045,11 +1140,13 @@ private fun buildStorageItem(context: Context): DiagnosticItem {
         val stat = StatFs(context.filesDir.path)
         stat.availableBytes
     }.getOrDefault(0L)
-    val knownSize = antennaDb.lengthOrZero() + radioDb.lengthOrZero() + enbDb.lengthOrZero() + mapsSize + cacheSize
+    val knownSize = antennaDb.lengthOrZero() + radioDb.lengthOrZero() + enbDb.lengthOrZero() +
+        outagesSize + mapsSize + cacheSize
     val details = listOf(
         context.getString(R.string.appstrings_diagnostic_detail_storage_db_antennas, formatBytes(context, antennaDb.lengthOrZero())),
         context.getString(R.string.appstrings_diagnostic_detail_storage_db_radio, formatBytes(context, radioDb.lengthOrZero())),
         context.getString(R.string.appstrings_diagnostic_detail_storage_db_enb, formatBytes(context, enbDb.lengthOrZero())),
+        context.getString(R.string.appstrings_diagnostic_detail_storage_outages, formatBytes(context, outagesSize)),
         context.getString(R.string.appstrings_diagnostic_detail_storage_maps, formatBytes(context, mapsSize)),
         context.getString(R.string.appstrings_diagnostic_detail_storage_cache, formatBytes(context, cacheSize)),
         context.getString(R.string.appstrings_diagnostic_detail_storage_available, formatBytes(context, available))
@@ -1060,6 +1157,72 @@ private fun buildStorageItem(context: Context): DiagnosticItem {
         summary = context.getString(R.string.appstrings_diagnostic_summary_storage, formatBytes(context, knownSize)),
         severity = DiagnosticSeverity.Info,
         details = details
+    )
+}
+
+/**
+ * Serveur GeoTower réellement utilisé : principal, ou miroir de secours après bascule. Le réglage
+ * (auto / forcé) est modifiable depuis l'action de la carte.
+ */
+private fun buildApiServerItem(context: Context): DiagnosticItem {
+    val server = ApiEndpoints.active()
+    val mode = ApiEndpoints.mode.value
+    val status = ServerReachability.status.value
+    val onMirror = server == ApiServer.MIRROR
+    val severity = when {
+        status == ServerStatus.UNREACHABLE -> DiagnosticSeverity.Error
+        onMirror -> DiagnosticSeverity.Warning
+        status == ServerStatus.REACHABLE -> DiagnosticSeverity.Ok
+        else -> DiagnosticSeverity.Info
+    }
+    val summary = when {
+        status == ServerStatus.UNREACHABLE -> {
+            context.getString(R.string.appstrings_diagnostic_summary_api_unreachable)
+        }
+        onMirror -> context.getString(R.string.appstrings_diagnostic_summary_api_mirror, server.host)
+        else -> context.getString(R.string.appstrings_diagnostic_summary_api_primary, server.host)
+    }
+    val details = buildList {
+        add(context.getString(R.string.appstrings_diagnostic_detail_api_host, server.host))
+        add(context.getString(R.string.appstrings_diagnostic_detail_api_primary, ApiServer.PRIMARY.host))
+        add(context.getString(R.string.appstrings_diagnostic_detail_api_mirror, ApiServer.MIRROR.host))
+        add(context.getString(R.string.appstrings_diagnostic_detail_api_mode, context.getString(apiServerModeLabelRes(mode))))
+        add(
+            context.getString(
+                R.string.appstrings_diagnostic_detail_api_status,
+                context.getString(
+                    when (status) {
+                        ServerStatus.REACHABLE -> R.string.appstrings_diagnostic_api_status_reachable
+                        ServerStatus.UNREACHABLE -> R.string.appstrings_diagnostic_api_status_unreachable
+                        ServerStatus.UNKNOWN -> R.string.appstrings_diagnostic_api_status_unknown
+                    }
+                )
+            )
+        )
+        val checkedAt = ServerReachability.lastCheckedAt
+        add(
+            context.getString(
+                R.string.appstrings_diagnostic_detail_api_checked_at,
+                if (checkedAt > 0L) {
+                    formatDateTime(checkedAt)
+                } else {
+                    context.getString(R.string.appstrings_diagnostic_api_never)
+                }
+            )
+        )
+        val switchedAt = ApiEndpoints.lastSwitchAt.value
+        if (switchedAt > 0L) {
+            add(context.getString(R.string.appstrings_diagnostic_detail_api_switched_at, formatDateTime(switchedAt)))
+        }
+    }
+    return DiagnosticItem(
+        id = "api_server",
+        title = context.getString(R.string.appstrings_diagnostic_section_api_server),
+        summary = summary,
+        severity = severity,
+        details = details,
+        actionLabel = context.getString(R.string.appstrings_diagnostic_action_choose_api_server),
+        action = DiagnosticAction.ChooseApiServer
     )
 }
 
@@ -1145,12 +1308,14 @@ private fun readRadioMetadata(file: File): RadioMetadata {
 private fun handleDiagnosticAction(
     context: Context,
     navController: NavController,
-    action: DiagnosticAction
+    action: DiagnosticAction,
+    onChooseApiServer: () -> Unit
 ) {
     when (action) {
         is DiagnosticAction.Navigate -> navController.navigate(action.route)
         DiagnosticAction.OpenAppSettings -> openAppSettings(context)
         DiagnosticAction.OpenNotificationSettings -> openNotificationSettings(context)
+        DiagnosticAction.ChooseApiServer -> onChooseApiServer()
     }
 }
 
@@ -1186,6 +1351,13 @@ private fun copyDiagnosticReport(context: Context, report: String) {
         )
     )
     Toast.makeText(context, R.string.appstrings_diagnostic_report_copied, Toast.LENGTH_SHORT).show()
+}
+
+private fun shareDebugLog(context: Context) {
+    val chooserTitle = context.getString(R.string.appstrings_diagnostic_share_log)
+    if (!AppFileLog.share(context, chooserTitle)) {
+        Toast.makeText(context, R.string.appstrings_diagnostic_log_empty, Toast.LENGTH_SHORT).show()
+    }
 }
 
 private fun hasPermission(context: Context, permission: String): Boolean {

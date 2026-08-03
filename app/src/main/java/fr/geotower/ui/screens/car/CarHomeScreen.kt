@@ -16,22 +16,25 @@ class CarHomeScreen(
     private val repository: AnfrRepository
 ) : Screen(carContext) {
 
-    override fun onGetTemplate(): Template {
+    override fun onGetTemplate(): Template = carTemplateOrError(carContext, "CarHomeScreen") {
         AppLogger.i(TAG, "Rendering Android Auto home template")
+        carLog("Rendu du template d'accueil")
         if (!RemoteFeatureFlags.isPlatformEnabled(RemoteFeatureFlags.Platform.ANDROID_AUTO)) {
-            return MessageTemplate.Builder(carContext.getString(R.string.appstrings_unavailable))
+            carLog("Android Auto désactivé par le kill-switch distant")
+            return@carTemplateOrError MessageTemplate.Builder(carContext.getString(R.string.appstrings_unavailable))
                 .setTitle(carContext.getString(R.string.app_name))
                 .setHeaderAction(Action.APP_ICON)
                 .build()
         }
         val screenManager = carContext.getCarService(ScreenManager::class.java)
-        return MessageTemplate.Builder(carContext.getString(R.string.car_connected))
+        MessageTemplate.Builder(carContext.getString(R.string.car_connected))
             .setTitle(carContext.getString(R.string.app_name))
             .setHeaderAction(Action.APP_ICON)
             .addAction(
                 Action.Builder()
                     .setTitle(carContext.getString(R.string.car_nearby_sites))
                     .setOnClickListener {
+                        carLog("Ouverture de l'écran des sites proches")
                         screenManager.push(CarNearbySitesScreen(carContext, repository))
                     }
                     .build()

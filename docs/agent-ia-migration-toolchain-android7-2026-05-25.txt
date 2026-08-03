@@ -1,0 +1,303 @@
+# Mission IA - Migration toolchain Android GeoTower avec compatibilite Android 7
+
+Date de redaction : 2026-05-25
+Projet : GeoTower
+Objectif : migrer progressivement Gradle, Android Gradle Plugin, Kotlin, KSP, Compose, Room et les dependances AndroidX vers des versions stables recentes, sans denaturer l'application et sans provoquer de crash.
+
+CONTRAINTE BLOQUANTE
+====================
+
+GeoTower doit rester compatible Android 7.x.
+
+Regles obligatoires :
+- Ne jamais augmenter minSdk au-dessus de 24.
+- L'application doit rester installable et utilisable sur Android 7 API 24/25.
+- Si une dependance impose minSdk > 24, ne pas l'utiliser.
+- compileSdk et targetSdk peuvent etre modernes, mais minSdk doit rester 24.
+- Tout appel a une API Android recente doit etre protege avec Build.VERSION.SDK_INT.
+- Ne pas charger directement au runtime une classe inexistante sur Android 7 si cela peut provoquer un crash.
+- La stabilite Android 7 est prioritaire sur le fait d'avoir absolument la toute derniere version.
+
+Sources officielles a verifier le jour de la migration :
+- Android Gradle Plugin : https://developer.android.com/build/releases/gradle-plugin
+- Migration AGP built-in Kotlin : https://developer.android.com/build/migrate-to-built-in-kotlin
+- Compatibilite Kotlin / AGP / D8 / R8 : https://developer.android.com/build/kotlin-support
+- Kotlin releases : https://kotlinlang.org/docs/releases.html
+- KSP releases : https://github.com/google/ksp/releases
+- Compose BOM : https://developer.android.com/develop/ui/compose/setup-compose-dependencies-and-compiler
+- AndroidX versions : https://developer.android.com/jetpack/androidx/versions
+- Room releases : https://developer.android.com/jetpack/androidx/releases/room
+
+
+Etat connu avant migration
+==========================
+
+Au 2026-05-25, le projet a deja montre les points sensibles suivants :
+- AGP 9 avec Kotlin integre peut entrer en conflit avec le plugin org.jetbrains.kotlin.android si la migration n'est pas faite proprement.
+- AGP 9 / built-in Kotlin peut refuser certaines configurations de type kotlin.sourceSets.
+- Un couple AGP/Kotlin/KSP/Room mal aligne peut produire des erreurs dans les DAO Room generes, notamment autour des Continuation<List<T>>.
+- lintDebug peut echouer a cause d'une incompatibilite entre lint, Kotlin Analysis API et certains detecteurs AndroidX.
+
+Ne pas ignorer ces signaux.
+Ne pas masquer un probleme de toolchain par une suppression lint globale sauf urgence documentee.
+
+
+Commandes de validation Windows
+===============================
+
+Depuis la racine du projet :
+
+$env:JAVA_HOME='C:\Program Files\Android\Android Studio1\jbr'
+$env:ANDROID_HOME='C:\Users\Julien\AppData\Local\Android\Sdk'
+
+Commandes principales :
+
+.\gradlew.bat :app:compileDebugKotlin
+.\gradlew.bat :app:testDebugUnitTest
+.\gradlew.bat :app:lintDebug
+.\gradlew.bat :app:assembleDebug
+
+Si une commande echoue, traiter l'erreur avant de continuer l'etape suivante.
+
+
+Plan d'execution
+================
+
+Etape 0 - Baseline obligatoire
+------------------------------
+
+1. Lire les fichiers suivants :
+   - settings.gradle.kts
+   - build.gradle.kts
+   - app/build.gradle.kts
+   - gradle.properties
+   - gradle/wrapper/gradle-wrapper.properties
+   - gradle/libs.versions.toml si present
+
+2. Noter les versions actuelles :
+   - Gradle wrapper
+   - Android Gradle Plugin
+   - Kotlin
+   - KSP
+   - Compose BOM
+   - Room
+   - AndroidX principales
+   - Google Play Services / Maps / Location si presents
+
+3. Verifier que minSdk vaut 24.
+   Si minSdk est deja superieur a 24, c'est un blocage a corriger avant migration.
+
+4. Lancer :
+   .\gradlew.bat :app:compileDebugKotlin
+   .\gradlew.bat :app:testDebugUnitTest
+   .\gradlew.bat :app:lintDebug
+
+5. Si une erreur existe deja avant migration, la noter clairement comme probleme preexistant.
+
+
+Etape 1 - Centraliser les versions sans upgrader
+------------------------------------------------
+
+Objectif : rendre la migration controlable.
+
+1. Si les versions sont dispersees dans plusieurs fichiers, les centraliser dans gradle/libs.versions.toml.
+2. Ne pas changer les versions a cette etape.
+3. Ne pas modifier le code applicatif.
+4. Valider :
+   .\gradlew.bat :app:compileDebugKotlin
+   .\gradlew.bat :app:testDebugUnitTest
+
+Critere de passage :
+- Le build doit rester equivalent a l'etat initial.
+
+
+Etape 2 - Mettre a jour Room et KSP prudemment
+----------------------------------------------
+
+Objectif : securiser la generation de code avant la migration AGP.
+
+1. Mettre Room vers une version stable recente compatible minSdk 24.
+2. Mettre KSP sur une version compatible avec la version Kotlin actuellement utilisee.
+3. Ne pas changer AGP dans cette etape.
+4. Compiler :
+   .\gradlew.bat :app:compileDebugKotlin
+   .\gradlew.bat :app:testDebugUnitTest
+
+Points de controle :
+- Les DAO Room generes doivent compiler.
+- Aucune erreur autour des Continuation Kotlin ne doit apparaitre.
+- Aucune migration de schema Room ne doit etre cassee.
+
+Si Room/KSP casse la compilation :
+- revenir a la derniere combinaison stable,
+- documenter le couple de versions qui echoue,
+- ne pas continuer vers AGP tant que Room/KSP n'est pas stable.
+
+
+Etape 3 - Mettre a jour Kotlin, KSP et Compose ensemble
+-------------------------------------------------------
+
+Objectif : garder les versions Kotlin/KSP/Compose coherentes.
+
+1. Verifier la derniere version stable Kotlin.
+2. Choisir la version KSP correspondant exactement au Kotlin choisi.
+3. Mettre a jour le Compose BOM vers une version stable compatible.
+4. Verifier si le plugin Compose est requis ou deja gere par la configuration actuelle.
+5. Ne pas modifier l'UI Compose sauf si une API compile-time l'exige.
+
+Valider :
+.\gradlew.bat :app:compileDebugKotlin
+.\gradlew.bat :app:testDebugUnitTest
+
+Points de controle Android 7 :
+- Aucun usage d'API runtime recente non protege.
+- Aucun changement de minSdk.
+
+
+Etape 4 - Migrer Gradle wrapper et Android Gradle Plugin
+--------------------------------------------------------
+
+Objectif : migrer AGP apres avoir stabilise Kotlin/KSP/Room.
+
+1. Verifier la version Gradle requise par la version AGP cible.
+2. Mettre a jour gradle/wrapper/gradle-wrapper.properties.
+3. Mettre a jour AGP.
+4. Si AGP 9+ est utilise, traiter la migration built-in Kotlin proprement :
+   - verifier si org.jetbrains.kotlin.android doit etre retire ou garde selon la documentation officielle,
+   - supprimer les usages Gradle incompatibles avec built-in Kotlin,
+   - eviter kotlin.sourceSets si le nouveau DSL le refuse,
+   - ne pas utiliser android.builtInKotlin=false comme solution finale.
+
+Valider immediatement :
+.\gradlew.bat :app:compileDebugKotlin
+.\gradlew.bat :app:testDebugUnitTest
+
+Si AGP 9+ casse fortement le build :
+- documenter l'erreur exacte,
+- revenir au dernier AGP stable compatible,
+- proposer une migration intermediaire au lieu de forcer.
+
+
+Etape 5 - Corriger lint et le DSL Gradle
+----------------------------------------
+
+Objectif : retrouver un lint exploitable sans cacher les vrais problemes.
+
+1. Lancer :
+   .\gradlew.bat :app:lintDebug
+
+2. Si lint echoue par crash interne :
+   - verifier les versions lint/AGP/Kotlin/AndroidX,
+   - verifier les issues connues officielles,
+   - chercher une combinaison stable.
+
+3. Ne desactiver un detecteur lint que si :
+   - le crash est confirme comme bug d'outil,
+   - il bloque la release,
+   - la desactivation est locale, temporaire et documentee.
+
+
+Etape 6 - Mettre a jour AndroidX famille par famille
+----------------------------------------------------
+
+Objectif : limiter le risque de regression.
+
+Mettre a jour une seule famille a la fois :
+
+1. androidx.core / appcompat si presents
+2. activity / lifecycle
+3. navigation
+4. compose via BOM
+5. workmanager
+6. room si pas deja finalise
+7. datastore / preferences si presents
+8. camera / media / exifinterface si presents
+9. play-services maps / location si presents
+10. autres bibliotheques
+
+Apres chaque famille :
+- verifier que minSdk reste 24,
+- verifier que les manifests fusionnes n'imposent pas minSdk > 24,
+- lancer compileDebugKotlin,
+- lancer testDebugUnitTest,
+- inspecter les warnings importants.
+
+Si une dependance impose Android 8+ ou plus :
+- ne pas l'adopter,
+- chercher la derniere version compatible Android 7,
+- documenter le blocage.
+
+
+Etape 7 - Passe speciale compatibilite Android 7
+------------------------------------------------
+
+Chercher et verifier tous les usages sensibles :
+
+- NotificationChannel : Android 8+, proteger avec SDK_INT >= O.
+- Permissions notification POST_NOTIFICATIONS : Android 13+, proteger avec SDK_INT >= TIRAMISU.
+- Permissions localisation arriere-plan : Android 10+, proteger avec SDK_INT >= Q.
+- Restrictions Android 11+ sur les permissions : proteger avec SDK_INT >= R.
+- Foreground service start restrictions : Android 12+, proteger avec SDK_INT >= S.
+- Foreground service types Android 14+ : proteger avec SDK_INT >= UPSIDE_DOWN_CAKE si necessaire.
+- Stockage/scoped storage : Android 10+, verifier les branches legacy.
+- Widgets : verifier les receivers et WorkManager sur API 24.
+- Capteurs/compas/localisation : ne pas supposer que le materiel existe.
+
+Regle importante :
+Ne pas faire de catch direct sur une classe Android recente si cette classe peut etre chargee sur Android 7 et provoquer une erreur de linkage. Preferer attraper une superclasse disponible sur API 24 quand c'est possible.
+
+
+Etape 8 - Validation finale
+---------------------------
+
+Validation build :
+.\gradlew.bat :app:compileDebugKotlin
+.\gradlew.bat :app:testDebugUnitTest
+.\gradlew.bat :app:lintDebug
+.\gradlew.bat :app:assembleDebug
+
+Validation appareils/emulateurs :
+- Android 7 API 24 ou 25 obligatoire.
+- Android recent API 35/36 recommande.
+
+Scenarios minimum a tester :
+- lancement de l'application,
+- navigation principale,
+- carte,
+- permissions localisation,
+- localisation avec GPS indisponible,
+- compas/capteur absent,
+- widgets,
+- WorkManager periodique,
+- tracking/live service,
+- telechargement de carte,
+- upload SignalQuest si disponible,
+- parametres,
+- changement de langue si pertinent.
+
+
+Critere d'acceptation final
+===========================
+
+La migration est acceptable seulement si :
+
+- minSdk est toujours 24.
+- L'application compile.
+- Les tests unitaires passent.
+- lintDebug passe, ou son echec est un bug outil documente avec contournement temporaire explicite.
+- assembleDebug passe.
+- L'application se lance sans crash sur Android 7 API 24/25.
+- Aucune dependance ne force minSdk > 24.
+- Les comportements existants de GeoTower sont conserves.
+- Les changements sont separes par etapes logiques.
+- Les erreurs restantes sont documentees clairement.
+
+
+Consigne finale pour l'IA
+=========================
+
+Ne pas chercher a tout mettre a jour d'un seul coup.
+Ne pas sacrifier Android 7.
+Ne pas masquer les erreurs sans comprendre leur cause.
+Si une version recente casse la compatibilite ou la stabilite, garder la derniere version stable compatible et documenter pourquoi.
+

@@ -12,6 +12,9 @@ sealed class DiagnosticAction {
     data class Navigate(val route: String) : DiagnosticAction()
     object OpenAppSettings : DiagnosticAction()
     object OpenNotificationSettings : DiagnosticAction()
+
+    /** Ouvre le choix « serveur principal / miroir / automatique » (voir `ApiEndpoints`). */
+    object ChooseApiServer : DiagnosticAction()
 }
 
 data class DiagnosticItem(

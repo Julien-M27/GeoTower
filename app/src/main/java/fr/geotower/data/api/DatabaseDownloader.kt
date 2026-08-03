@@ -41,7 +41,7 @@ object DatabaseDownloader {
             return 0.0
         }
         return try {
-            val sizeBytes = readVerifiedDatabaseInfo()?.sizeBytes ?: 0L
+            val sizeBytes = readVerifiedDatabaseInfo()?.value?.sizeBytes ?: 0L
             if (sizeBytes > 0L) sizeBytes / (1024.0 * 1024.0) else 0.0
         } catch (e: Exception) {
             0.0
@@ -54,7 +54,7 @@ object DatabaseDownloader {
         }
         return withContext(Dispatchers.IO) {
             try {
-                readVerifiedDatabaseInfo()?.version
+                readVerifiedDatabaseInfo()?.value?.version
             } catch (e: Exception) {
                 null
             }
@@ -66,11 +66,12 @@ object DatabaseDownloader {
             return false
         }
         return withContext(Dispatchers.IO) {
-            val remoteInfo = readVerifiedDatabaseInfo()
-            if (remoteInfo == null) {
+            val served = readVerifiedDatabaseInfo()
+            if (served == null) {
                 AppLogger.w(TAG, "Remote database is unavailable or incompatible")
                 return@withContext false
             }
+            val remoteInfo = served.value
             val expectedSizeBytes = remoteInfo.sizeBytes
             val expectedSha256 = remoteInfo.sha256
             val maxAllowedBytes = maxAllowedDatabaseDownloadBytes(expectedSizeBytes)
@@ -86,8 +87,11 @@ object DatabaseDownloader {
             try {
                 if (tempFile.exists()) tempFile.delete()
 
+                // Épinglé au serveur du manifeste : les deux serveurs construisent leur base
+                // séparément, donc un rejeu sur l'autre ferait échouer le SHA-256 après 145 Mo.
                 val request = Request.Builder()
-                    .url(remoteInfo.url)
+                    .url(ApiEndpoints.urlOnHost(remoteInfo.url, served.host))
+                    .header(ApiEndpoints.PIN_HOST_HEADER, served.host)
                     .header("Accept-Encoding", "identity")
                     .build()
                 val response = downloadClient.newCall(request).execute()
@@ -209,24 +213,27 @@ object DatabaseDownloader {
             true
         }
 
-    private fun readVerifiedDatabaseInfo(): DownloadManifestDatabase? {
+    private fun readVerifiedDatabaseInfo(): ServedFrom<DownloadManifestDatabase>? {
         // Mode « traitement local » (niveau ≥ 2, appareil éligible) : aucun accès au manifeste serveur.
         if (AppConfig.dbForcedLocal()) return null
-        return readVerifiedDownloadManifest()
-            ?.database
-            ?.takeIf { database ->
-                isOfficialDatabaseDownloadUrl(database.url) &&
-                    isValidRemoteDatabaseInfo(
-                        filename = database.filename,
-                        sizeBytes = database.sizeBytes,
-                        sha256 = database.sha256,
-                        schemaVersion = database.schemaVersion,
-                        countryCode = database.countryCode
-                    )
-            }
+        val served = readVerifiedDownloadManifest() ?: return null
+        val database = served.value.database ?: return null
+        if (
+            !isOfficialDatabaseDownloadUrl(database.url) ||
+            !isValidRemoteDatabaseInfo(
+                filename = database.filename,
+                sizeBytes = database.sizeBytes,
+                sha256 = database.sha256,
+                schemaVersion = database.schemaVersion,
+                countryCode = database.countryCode
+            )
+        ) {
+            return null
+        }
+        return ServedFrom(database, served.host)
     }
 
-    private fun readVerifiedDownloadManifest(): DownloadManifest? {
+    private fun readVerifiedDownloadManifest(): ServedFrom<DownloadManifest>? {
         val request = Request.Builder()
             .url(DOWNLOAD_MANIFEST_URL)
             .header("Accept-Encoding", "identity")
@@ -236,7 +243,10 @@ object DatabaseDownloader {
             RetrofitClient.currentClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return null
                 val body = response.body?.string() ?: return null
-                DownloadManifestVerifier.verifyAndParse(body)
+                val manifest = DownloadManifestVerifier.verifyAndParse(body) ?: return null
+                // `response.request` porte l'URL réellement partie sur le réseau : c'est l'hôte
+                // choisi par l'intercepteur de bascule, donc le serveur qui engage ce manifeste.
+                ServedFrom(manifest, response.request.url.host)
             }
         } catch (e: Exception) {
             null
@@ -264,9 +274,11 @@ object DatabaseDownloader {
 
     internal fun isOfficialDatabaseDownloadUrl(url: String): Boolean {
         val uri = runCatching { URI(url) }.getOrNull() ?: return false
+        // Le miroir sert son propre manifeste, avec ses propres URLs : les deux hôtes officiels
+        // sont acceptés (la signature du manifeste reste, elle, la garantie de fond).
         return uri.scheme.equals("https", ignoreCase = true) &&
             uri.userInfo == null &&
-            uri.host.equals("api.geotower.fr", ignoreCase = true) &&
+            ApiEndpoints.isOfficialApiHost(uri.host) &&
             uri.path == "/api/v2/download/db"
     }
 

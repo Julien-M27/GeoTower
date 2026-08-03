@@ -20,6 +20,11 @@ private val OFFICIAL_ANNOUNCEMENT_URLS = listOf(
         host = "api.geotower.fr",
         pathPrefixes = listOf("/status", "/api/", "/geotower/")
     ),
+    // Miroir de secours : il sert les mêmes annonces quand le principal est injoignable.
+    OfficialAnnouncementUrl(
+        host = "api.cajejuma.fr",
+        pathPrefixes = listOf("/status", "/api/", "/geotower/")
+    ),
     OfficialAnnouncementUrl(
         host = "cajejuma.fr",
         pathPrefixes = listOf("/geotower/")

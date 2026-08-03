@@ -60,9 +60,11 @@ object OutageBackgroundScheduler {
             .setConstraints(networkConstraints())
             .setInputData(workDataOf(OutageGenerationWorker.KEY_CHECK_ENABLED to false))
             .build()
+        // REPLACE et pas KEEP : « maintenant » doit toujours repartir. Avec KEEP, un travail resté
+        // en attente (échec précédent, contrainte réseau) absorbait silencieusement chaque appui.
         WorkManager.getInstance(context.applicationContext).enqueueUniqueWork(
             UNIQUE_ONESHOT_WORK,
-            ExistingWorkPolicy.KEEP,
+            ExistingWorkPolicy.REPLACE,
             request,
         )
     }

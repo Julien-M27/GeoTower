@@ -257,6 +257,13 @@ class LocalDbBuildWorker(
 
     companion object {
         const val UNIQUE_WORK_NAME = "db_local_build"
+
+        // Tags de pack : `WorkInfo` ne transporte pas les donnees d'entree, mais bien les tags. Ils
+        // permettent aux ecrans de savoir QUELLE base est en cours de generation (et donc de ne pas
+        // l'annoncer « manquante ») des l'etat ENQUEUED, avant la premiere progression.
+        const val TAG_PACK_MOBILE = "local_build_pack_mobile"
+        const val TAG_PACK_RADIO = "local_build_pack_radio"
+
         const val KEY_PROGRESS = "progress"
         const val KEY_PHASE = "phase"
         const val KEY_DETAIL = "detail"
@@ -286,6 +293,11 @@ class LocalDbBuildWorker(
                         KEY_PACK_NONMOBILE to nonMobileTech,
                     ),
                 )
+                .apply {
+                    if (mobile) addTag(TAG_PACK_MOBILE)
+                    // Les deux packs non-mobiles alimentent la meme base radio.
+                    if (radioBroadcast || nonMobileTech) addTag(TAG_PACK_RADIO)
+                }
                 .build()
 
         fun enqueue(

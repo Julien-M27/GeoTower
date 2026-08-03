@@ -59,9 +59,15 @@ fun DatabaseDownloadCard(
     val isSyncing = currentWork?.state == androidx.work.WorkInfo.State.RUNNING || currentWork?.state == androidx.work.WorkInfo.State.ENQUEUED
     val downloadProgress = currentWork?.progress?.getInt(DatabaseDownloadWorker.KEY_PROGRESS, 0)?.div(100f) ?: 0f
 
+    // Génération locale en cours : la base mobile n'est installée qu'à la toute fin du build, donc
+    // elle est absente du disque pendant tout ce temps. On annonce « génération en cours » plutôt
+    // que « aucune base installée », et on n'autorise pas un téléchargement par-dessus.
+    val isGeneratingMobile = rememberLocalDbBuildStatus().mobileRunning
+
     val txtSearching = stringResource(R.string.database_searching)
     val txtUnknown = stringResource(R.string.database_unknown)
     val txtNoDb = stringResource(R.string.database_not_installed)
+    val txtGenerating = stringResource(R.string.appstrings_db_generation_in_progress)
     val txtInvalidDb = stringResource(R.string.database_invalid_local)
     val txtOldDb = stringResource(R.string.database_old_undated)
     val txtLatestDb = stringResource(R.string.database_latest_available)
@@ -308,7 +314,12 @@ fun DatabaseDownloadCard(
 
                     Column {
                         Text(text = txtDownloadedDb, fontWeight = FontWeight.SemiBold, fontSize = sizing.text(14.sp), color = MaterialTheme.colorScheme.onSurface)
-                        Text(text = localDbVersion, fontWeight = FontWeight.Bold, fontSize = sizing.text(13.sp), color = MaterialTheme.colorScheme.primary)
+                        Text(
+                            text = if (isGeneratingMobile && localDbVersion == txtNoDb) txtGenerating else localDbVersion,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = sizing.text(13.sp),
+                            color = MaterialTheme.colorScheme.primary
+                        )
                     }
                 }
             }
@@ -408,7 +419,7 @@ fun DatabaseDownloadCard(
                             }
                         }
                     },
-                    enabled = canDownloadRemoteDatabase && !showAsUpToDate && !isSearchingDatabaseInfo,
+                    enabled = canDownloadRemoteDatabase && !showAsUpToDate && !isSearchingDatabaseInfo && !isGeneratingMobile,
                     modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(56.dp)),
                     shape = RoundedCornerShape(sizing.component(12.dp)),
                     colors = ButtonDefaults.buttonColors(

@@ -26,24 +26,32 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_interface)) {
-        item(stringResource(R.string.appstrings_release_v1966_simple_mode))
-        item(stringResource(R.string.appstrings_release_v1966_simple_mode_banner))
+    section(stringResource(R.string.appstrings_release_section_global)) {
+        item(stringResource(R.string.appstrings_release_v20_play_store))
     }
 
-    section(stringResource(R.string.appstrings_release_section_notifications)) {
-        item(stringResource(R.string.appstrings_release_v1966_notifications_master))
-        item(stringResource(R.string.appstrings_release_v1966_live_without_notif))
-        item(stringResource(R.string.appstrings_release_v1966_onboarding_notifications))
+    section(stringResource(R.string.appstrings_release_section_online_data)) {
+        item(stringResource(R.string.appstrings_release_v20_api_mirror))
+        item(stringResource(R.string.appstrings_release_v20_api_choice))
     }
 
-    section(stringResource(R.string.appstrings_release_section_settings)) {
-        item(stringResource(R.string.appstrings_release_v1966_page_customization_discovery))
-        item(stringResource(R.string.appstrings_release_v1966_outage_source_merged))
+    section(stringResource(R.string.appstrings_release_section_outages)) {
+        item(stringResource(R.string.appstrings_release_v20_outage_card))
+        item(stringResource(R.string.appstrings_release_v20_outage_local_copy))
+        item(stringResource(R.string.appstrings_release_v20_outage_errors))
     }
 
-    section(stringResource(R.string.appstrings_release_section_support_detail)) {
-        item(stringResource(R.string.appstrings_release_v1966_operators_actions))
+    section(stringResource(R.string.appstrings_release_section_database)) {
+        item(stringResource(R.string.appstrings_release_v20_db_generating_banner))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_diagnostic)) {
+        item(stringResource(R.string.appstrings_release_v20_debug_log))
+        item(stringResource(R.string.appstrings_release_v20_diagnostic_server))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_location)) {
+        item(stringResource(R.string.appstrings_release_v20_bg_location_disclosure))
     }
 }
 

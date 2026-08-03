@@ -46,6 +46,32 @@ class LocalOutageGeneratorTest {
         assertEquals("2026-07-13", result.sites.first().sourceLastUpdate)
     }
 
+    /**
+     * Base ANFR absente ou illisible : le géocodage n'est qu'un enrichissement, les pannes doivent
+     * quand même sortir (avec les coordonnées brutes de l'opérateur), et la raison être remontée.
+     */
+    @Test
+    fun keepsOutagesWhenGeocoderFails() = runBlocking {
+        // Code site non convertible en identifiant ANFR → le géocodeur est bien sollicité.
+        val csvWithoutStation = "code_site_op;lat;lon;commune\nABC123;48.85;2.35;PARIS\n"
+        val failingGeocoder = object : SiteGeocoder {
+            override suspend fun bestMatch(
+                operatorKey: String,
+                codeInsee: String?,
+                lat: Double,
+                lon: Double,
+                sameInseeThresholdMeters: Double,
+                spatialThresholdMeters: Double,
+            ): GeocodeMatch = throw IllegalStateException("base ANFR absente")
+        }
+        val fetcher = OperatorOutageFetcher { csvWithoutStation.toByteArray() }
+        val result = LocalOutageGenerator(fetcher, failingGeocoder).generate()
+
+        assertEquals(4, result.sites.size) // 4 opérateurs × 1 ligne, aucune perdue
+        assertEquals("base ANFR absente", result.stats.geocodeError)
+        assertTrue(result.sites.all { it.latitude == 48.85 })
+    }
+
     @Test
     fun throwsWhenNoOperatorAvailable() = runBlocking {
         val fetcher = OperatorOutageFetcher { throw IOException("down") }

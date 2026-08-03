@@ -34,7 +34,7 @@ object RadioDatabaseDownloader {
             return 0.0
         }
         return try {
-            val sizeBytes = readVerifiedRadioDatabaseInfo()?.sizeBytes ?: 0L
+            val sizeBytes = readVerifiedRadioDatabaseInfo()?.value?.sizeBytes ?: 0L
             if (sizeBytes > 0L) sizeBytes / (1024.0 * 1024.0) else 0.0
         } catch (e: Exception) {
             0.0
@@ -47,7 +47,7 @@ object RadioDatabaseDownloader {
         }
         return withContext(Dispatchers.IO) {
             try {
-                readVerifiedRadioDatabaseInfo()?.version
+                readVerifiedRadioDatabaseInfo()?.value?.version
             } catch (e: Exception) {
                 null
             }
@@ -59,12 +59,13 @@ object RadioDatabaseDownloader {
             return false
         }
         return withContext(Dispatchers.IO) {
-            val remoteInfo = readVerifiedRadioDatabaseInfo()
-            if (remoteInfo == null) {
+            val served = readVerifiedRadioDatabaseInfo()
+            if (served == null) {
                 AppLogger.w(TAG, "Remote radio database is unavailable or incompatible")
                 return@withContext false
             }
 
+            val remoteInfo = served.value
             val expectedSizeBytes = remoteInfo.sizeBytes
             val expectedSha256 = remoteInfo.sha256
             val maxAllowedBytes = maxAllowedRadioDatabaseDownloadBytes(expectedSizeBytes)
@@ -79,8 +80,10 @@ object RadioDatabaseDownloader {
             try {
                 if (tempFile.exists()) tempFile.delete()
 
+                // Épinglé au serveur du manifeste : voir DatabaseDownloader (SHA-256 par serveur).
                 val request = Request.Builder()
-                    .url(remoteInfo.url)
+                    .url(ApiEndpoints.urlOnHost(remoteInfo.url, served.host))
+                    .header(ApiEndpoints.PIN_HOST_HEADER, served.host)
                     .header("Accept-Encoding", "identity")
                     .build()
                 val response = downloadClient.newCall(request).execute()
@@ -190,24 +193,27 @@ object RadioDatabaseDownloader {
             true
         }
 
-    private fun readVerifiedRadioDatabaseInfo(): DownloadManifestDatabase? {
+    private fun readVerifiedRadioDatabaseInfo(): ServedFrom<DownloadManifestDatabase>? {
         // Mode « traitement local » (niveau ≥ 2, appareil éligible) : aucun accès au manifeste serveur.
         if (AppConfig.dbForcedLocal()) return null
-        return readVerifiedDownloadManifest()
-            ?.radioDatabase
-            ?.takeIf { database ->
-                isOfficialRadioDatabaseDownloadUrl(database.url) &&
-                    isValidRemoteRadioDatabaseInfo(
-                        filename = database.filename,
-                        sizeBytes = database.sizeBytes,
-                        sha256 = database.sha256,
-                        schemaVersion = database.schemaVersion,
-                        countryCode = database.countryCode
-                    )
-            }
+        val served = readVerifiedDownloadManifest() ?: return null
+        val database = served.value.radioDatabase ?: return null
+        if (
+            !isOfficialRadioDatabaseDownloadUrl(database.url) ||
+            !isValidRemoteRadioDatabaseInfo(
+                filename = database.filename,
+                sizeBytes = database.sizeBytes,
+                sha256 = database.sha256,
+                schemaVersion = database.schemaVersion,
+                countryCode = database.countryCode
+            )
+        ) {
+            return null
+        }
+        return ServedFrom(database, served.host)
     }
 
-    private fun readVerifiedDownloadManifest(): DownloadManifest? {
+    private fun readVerifiedDownloadManifest(): ServedFrom<DownloadManifest>? {
         val request = Request.Builder()
             .url(DOWNLOAD_MANIFEST_URL)
             .header("Accept-Encoding", "identity")
@@ -217,7 +223,10 @@ object RadioDatabaseDownloader {
             RetrofitClient.currentClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return null
                 val body = response.body?.string() ?: return null
-                DownloadManifestVerifier.verifyAndParse(body)
+                val manifest = DownloadManifestVerifier.verifyAndParse(body) ?: return null
+                // `response.request` porte l'URL réellement partie sur le réseau : c'est l'hôte
+                // choisi par l'intercepteur de bascule, donc le serveur qui engage ce manifeste.
+                ServedFrom(manifest, response.request.url.host)
             }
         } catch (e: Exception) {
             null
@@ -228,7 +237,7 @@ object RadioDatabaseDownloader {
         val uri = runCatching { URI(url) }.getOrNull() ?: return false
         return uri.scheme.equals("https", ignoreCase = true) &&
             uri.userInfo == null &&
-            uri.host.equals("api.geotower.fr", ignoreCase = true) &&
+            ApiEndpoints.isOfficialApiHost(uri.host) &&
             uri.path == "/api/v2/download/radio_db"
     }
 

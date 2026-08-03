@@ -561,7 +561,7 @@ object PreferenceProfileManager {
             ?: AppConfig.DEFAULT_COLOR_PALETTE
         AppConfig.mapProvider.intValue = prefs.getInt("map_provider", 1)
         AppConfig.ignStyle.intValue = prefs.getInt("ign_style", 0)
-        AppConfig.navMode.intValue = prefs.getInt("nav_mode", 0)
+        AppConfig.navMode.intValue = prefs.getInt(AppConfig.PREF_NAV_MODE, AppConfig.DEFAULT_NAV_MODE)
         AppConfig.settingsSectionsMode.value = prefs.getBoolean(AppConfig.PREF_SETTINGS_SECTIONS_MODE, true)
         AppConfig.defaultOperator.value = prefs.getString("default_operator", "Aucun") ?: "Aucun"
         AppConfig.uiScalePercent.intValue = AppConfig.readUiScalePercent(prefs)

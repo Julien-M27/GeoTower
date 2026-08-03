@@ -3,6 +3,8 @@
     <cache-path name="shared_images" path="images/"/>
     <cache-path name="sq_camera" path="sq_camera/"/>
     <cache-path name="profile_exports" path="profile_exports/"/>
+    <!-- Journal de débogage (AppFileLog) : dans filesDir, pour survivre au vidage du cache. -->
+    <files-path name="debug_logs" path="logs/"/>
     <!-- Rapports PDF enregistrés dans Téléchargements avant Android 10 (MediaStore ensuite). -->
     <external-path name="downloaded_reports" path="Download/GeoTower/"/>
 </paths>

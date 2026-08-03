@@ -36,6 +36,7 @@ object DatabaseRefreshIds {
     const val MOBILE = "mobile"
     const val RADIO = "radio"
     const val ENB = "enb"
+    const val OUTAGES = "outages"
     const val LOCAL_BUILD = "local_build"
 }
 

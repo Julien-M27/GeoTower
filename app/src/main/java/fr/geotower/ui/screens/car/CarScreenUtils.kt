@@ -2,9 +2,51 @@ package fr.geotower.ui.screens.car
 
 import android.content.Context
 import android.location.Location
+import androidx.car.app.CarContext
+import androidx.car.app.model.Action
+import androidx.car.app.model.MessageTemplate
+import androidx.car.app.model.Template
 import fr.geotower.R
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.utils.AppFileLog
 import java.util.Locale
+
+internal const val CAR_LOG_TAG = "GeoTowerCar"
+
+/** Un template ne doit pas dépasser la largeur d'un écran de voiture, message d'erreur compris. */
+private const val CAR_ERROR_DETAIL_MAX_CHARS = 240
+
+internal fun carLog(message: String) = AppFileLog.i(CAR_LOG_TAG, message)
+
+/**
+ * Une exception levée dans `onGetTemplate` n'atteint jamais l'app : l'hôte Android Auto l'avale et
+ * affiche son écran générique « a rencontré une erreur inattendue », sans rien laisser derrière.
+ * On l'attrape donc ici pour l'écrire dans [AppFileLog] et la montrer telle quelle sur l'écran de
+ * la voiture, ce qui rend le diagnostic possible sans PC branché.
+ */
+internal fun carTemplateOrError(
+    carContext: CarContext,
+    where: String,
+    block: () -> Template
+): Template {
+    return try {
+        block()
+    } catch (error: Throwable) {
+        AppFileLog.e(CAR_LOG_TAG, "Echec du rendu de $where", error)
+        carErrorTemplate(carContext, where, error)
+    }
+}
+
+internal fun carErrorTemplate(carContext: CarContext, where: String, error: Throwable): Template {
+    val detail = buildString {
+        append(error.javaClass.simpleName)
+        error.message?.takeIf { it.isNotBlank() }?.let { append(" : ").append(it) }
+    }.take(CAR_ERROR_DETAIL_MAX_CHARS)
+    return MessageTemplate.Builder(carContext.getString(R.string.car_error_detail, where, detail))
+        .setTitle(carContext.getString(R.string.car_error_title))
+        .setHeaderAction(Action.APP_ICON)
+        .build()
+}
 
 internal fun formatCarDistance(distanceMeters: Float): String {
     return if (distanceMeters >= 1000f) {

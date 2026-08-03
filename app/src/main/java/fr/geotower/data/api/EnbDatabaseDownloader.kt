@@ -46,7 +46,7 @@ object EnbDatabaseDownloader {
             return 0.0
         }
         return try {
-            val sizeBytes = readVerifiedEnbDatabaseInfo()?.sizeBytes ?: 0L
+            val sizeBytes = readVerifiedEnbDatabaseInfo()?.value?.sizeBytes ?: 0L
             if (sizeBytes > 0L) sizeBytes / (1024.0 * 1024.0) else 0.0
         } catch (e: Exception) {
             0.0
@@ -59,7 +59,7 @@ object EnbDatabaseDownloader {
         }
         return withContext(Dispatchers.IO) {
             try {
-                readVerifiedEnbDatabaseInfo()?.version
+                readVerifiedEnbDatabaseInfo()?.value?.version
             } catch (e: Exception) {
                 null
             }
@@ -74,12 +74,13 @@ object EnbDatabaseDownloader {
             return false
         }
         return withContext(Dispatchers.IO) {
-            val remoteInfo = readVerifiedEnbDatabaseInfo()
-            if (remoteInfo == null) {
+            val served = readVerifiedEnbDatabaseInfo()
+            if (served == null) {
                 AppLogger.w(TAG, "Remote eNB database is unavailable or incompatible")
                 return@withContext false
             }
 
+            val remoteInfo = served.value
             val expectedSizeBytes = remoteInfo.sizeBytes
             val expectedSha256 = remoteInfo.sha256
             val maxAllowedBytes = maxAllowedEnbDatabaseDownloadBytes(expectedSizeBytes)
@@ -94,8 +95,10 @@ object EnbDatabaseDownloader {
             try {
                 if (tempFile.exists()) tempFile.delete()
 
+                // Épinglé au serveur du manifeste : voir DatabaseDownloader (SHA-256 par serveur).
                 val request = Request.Builder()
-                    .url(remoteInfo.url)
+                    .url(ApiEndpoints.urlOnHost(remoteInfo.url, served.host))
+                    .header(ApiEndpoints.PIN_HOST_HEADER, served.host)
                     .header("Accept-Encoding", "identity")
                     .build()
                 val response = downloadClient.newCall(request).execute()
@@ -186,23 +189,26 @@ object EnbDatabaseDownloader {
             RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.ENB_DATABASE)
     }
 
-    private fun readVerifiedEnbDatabaseInfo(): DownloadManifestDatabase? {
+    private fun readVerifiedEnbDatabaseInfo(): ServedFrom<DownloadManifestDatabase>? {
         if (AppConfig.blockCommunityAndUpdates()) return null
-        return readVerifiedDownloadManifest()
-            ?.enbDatabase
-            ?.takeIf { database ->
-                isOfficialEnbDatabaseDownloadUrl(database.url) &&
-                    isValidRemoteEnbDatabaseInfo(
-                        filename = database.filename,
-                        sizeBytes = database.sizeBytes,
-                        sha256 = database.sha256,
-                        schemaVersion = database.schemaVersion,
-                        countryCode = database.countryCode
-                    )
-            }
+        val served = readVerifiedDownloadManifest() ?: return null
+        val database = served.value.enbDatabase ?: return null
+        if (
+            !isOfficialEnbDatabaseDownloadUrl(database.url) ||
+            !isValidRemoteEnbDatabaseInfo(
+                filename = database.filename,
+                sizeBytes = database.sizeBytes,
+                sha256 = database.sha256,
+                schemaVersion = database.schemaVersion,
+                countryCode = database.countryCode
+            )
+        ) {
+            return null
+        }
+        return ServedFrom(database, served.host)
     }
 
-    private fun readVerifiedDownloadManifest(): DownloadManifest? {
+    private fun readVerifiedDownloadManifest(): ServedFrom<DownloadManifest>? {
         val request = Request.Builder()
             .url(DOWNLOAD_MANIFEST_URL)
             .header("Accept-Encoding", "identity")
@@ -212,7 +218,10 @@ object EnbDatabaseDownloader {
             RetrofitClient.currentClient.newCall(request).execute().use { response ->
                 if (!response.isSuccessful) return null
                 val body = response.body?.string() ?: return null
-                DownloadManifestVerifier.verifyAndParse(body)
+                val manifest = DownloadManifestVerifier.verifyAndParse(body) ?: return null
+                // `response.request` porte l'URL réellement partie sur le réseau : c'est l'hôte
+                // choisi par l'intercepteur de bascule, donc le serveur qui engage ce manifeste.
+                ServedFrom(manifest, response.request.url.host)
             }
         } catch (e: Exception) {
             null
@@ -223,7 +232,7 @@ object EnbDatabaseDownloader {
         val uri = runCatching { URI(url) }.getOrNull() ?: return false
         return uri.scheme.equals("https", ignoreCase = true) &&
             uri.userInfo == null &&
-            uri.host.equals("api.geotower.fr", ignoreCase = true) &&
+            ApiEndpoints.isOfficialApiHost(uri.host) &&
             uri.path == "/api/v2/download/enb_db"
     }
 
