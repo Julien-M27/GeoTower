@@ -37,7 +37,9 @@ class TypedPreferencesTest {
             listOf("operator", "network_ids", "map", "support_details", "elevation_profile", "open_map", "ids")
         )
 
-        assertEquals(1, normalized.indexOf("network_ids"))
+        // Placement relatif, pas un index : l'arrivée d'un bloc en amont (« cap », « hauteur »)
+        // décale la liste sans pour autant déplacer les identifiants réseau vers leur ancre.
+        assertTrue(normalized.indexOf("network_ids") < normalized.indexOf("map"))
         assertEquals(1, normalized.count { it == "network_ids" })
     }
 
@@ -51,6 +53,10 @@ class TypedPreferencesTest {
         assertEquals(
             listOf(
                 "operator",
+                // Ordre hérité sans « cap et hauteur » : les deux blocs issus de sa scission
+                // reprennent sa place d'origine, juste après le bandeau opérateur.
+                "bearing",
+                "height",
                 "map",
                 "support_details",
                 // Ordre hérité sans bloc « ids » : les identifiants réseau se rangent juste après
@@ -66,6 +72,36 @@ class TypedPreferencesTest {
             ),
             SitePagePrefs.order(prefs)
         )
+    }
+
+    @Test
+    fun sitePageOrderSplitsLegacyBearingHeightWhereItWas() {
+        // « Cap et hauteur » était un seul bloc : les deux prennent sa place exacte, sinon ils
+        // atterriraient en fin de page chez ceux qui avaient déjà rangé la leur.
+        val normalized = SitePagePrefs.normalizeOrder(
+            listOf("operator", "map", SitePagePrefs.LEGACY_BEARING_HEIGHT, "support_details", "ids", "links")
+        )
+
+        assertFalse(normalized.contains(SitePagePrefs.LEGACY_BEARING_HEIGHT))
+        assertEquals(2, normalized.indexOf("bearing"))
+        assertEquals(3, normalized.indexOf("height"))
+        assertEquals(1, normalized.count { it == "bearing" })
+        assertEquals(1, normalized.count { it == "height" })
+    }
+
+    @Test
+    fun sitePageBearingAndHeightInheritLegacyBlockVisibility() {
+        val prefs = FakeSharedPreferences(SitePagePrefs.bearingHeight.key to false)
+
+        // Masquer « Cap et hauteur » masquait les deux : la scission ne doit pas les rallumer.
+        assertFalse(SitePagePrefs.read(prefs, SitePagePrefs.bearing))
+        assertFalse(SitePagePrefs.read(prefs, SitePagePrefs.height))
+
+        // Dès qu'une moitié est réglée, elle vit sa vie sans l'autre.
+        prefs.edit().putBoolean(SitePagePrefs.height.key, true).apply()
+
+        assertFalse(SitePagePrefs.read(prefs, SitePagePrefs.bearing))
+        assertTrue(SitePagePrefs.read(prefs, SitePagePrefs.height))
     }
 
     @Test

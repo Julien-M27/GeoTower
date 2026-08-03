@@ -1140,7 +1140,8 @@
     <string name="appstrings_show_status_option">Status anzeigen</string>
     <string name="appstrings_site_address_option">Adresse und Koordinaten</string>
     <string name="appstrings_site_anfr_label">ANFR-Standort</string>
-    <string name="appstrings_site_bearing_height_option">Richtung und Höhe</string>
+    <string name="appstrings_site_bearing_option">Richtung</string>
+    <string name="appstrings_site_height_option">Höhe</string>
     <string name="appstrings_site_dates_option">Aktivierungsdaten</string>
     <string name="appstrings_site_detail_title">Standortdetail</string>
     <string name="appstrings_site_display_title">Standortanzeige</string>
@@ -2468,4 +2469,8 @@
     <string name="appstrings_release_v202_nonbreaking_frequencies">Frequenzen werden nicht mehr am Zeilenende umbrochen</string>
     <string name="appstrings_release_v202_embedded_blocks_panel">Neues Feld „Antennendetails (Betreiberabschnitte)“, erreichbar über die Mastseite oder die Einstellungen</string>
     <string name="appstrings_release_v202_share_spectrum">Die Teilen-Bilder übernehmen die Unterscheidung zwischen Spektrum und Bandbreite</string>
+
+    <!-- Versionshinweise 2.0.3 -->
+    <string name="appstrings_release_v203_bearing_height_split">Ausrichtung und Höhe sind jetzt zwei getrennte Blöcke, die sich einzeln ein- und ausblenden und verschieben lassen</string>
+    <string name="appstrings_release_v203_bearing_height_migration">Deine Sichtbarkeitseinstellungen und die Reihenfolge deiner Seiten werden automatisch übernommen</string>
 </resources>

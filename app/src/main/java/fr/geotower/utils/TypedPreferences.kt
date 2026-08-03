@@ -111,7 +111,8 @@ object SitePagePrefs {
      */
     val embeddedHiddenByDefault = setOf(
         "status",
-        "bearing_height",
+        "bearing",
+        "height",
         "dates",
         "network_ids",
         "speedtest",
@@ -120,10 +121,18 @@ object SitePagePrefs {
         "throughput_calculator"
     )
     const val DEFAULT_ORDER =
-        "operator,bearing_height,map,support_details,elevation_profile,theoretical_coverage,throughput_calculator,open_map,photos,speedtest,nav,share,panel_heights,ids,network_ids,dates,address,status,freqs,links"
+        "operator,bearing,height,map,support_details,elevation_profile,theoretical_coverage,throughput_calculator,open_map,photos,speedtest,nav,share,panel_heights,ids,network_ids,dates,address,status,freqs,links"
+
+    /** Bloc « Cap et hauteur » d'avant la scission : ne sert plus qu'à reprendre l'ancien réglage. */
+    const val LEGACY_BEARING_HEIGHT = "bearing_height"
 
     val defaultOrder = DEFAULT_ORDER.split(",")
     val operator = BooleanPreference("page_site_operator", true)
+    // Le cap et la hauteur se réglaient d'un seul interrupteur : deux blocs distincts désormais,
+    // pour pouvoir garder la hauteur sans le cap (ou l'inverse) et les placer séparément.
+    val bearing = BooleanPreference("page_site_bearing", true)
+    val height = BooleanPreference("page_site_height", true)
+    /** Ancien interrupteur commun : plus jamais écrit, seulement relu par [read] et [readEmbedded]. */
     val bearingHeight = BooleanPreference("page_site_bearing_height", true)
     val map = BooleanPreference("page_site_map", true)
     val supportDetails = BooleanPreference("page_site_support_details", true)
@@ -142,13 +151,32 @@ object SitePagePrefs {
     val freqs = BooleanPreference("page_site_freqs", true)
     val links = BooleanPreference("page_site_links", true)
 
+    /**
+     * Ancienne clé d'un bloc issu d'une scission. Tant que la nouvelle n'a pas été écrite, chaque
+     * moitié reprend le choix fait sur l'ancienne : sans ça, la mise à jour rallumerait le cap et la
+     * hauteur chez ceux qui avaient masqué « Cap et hauteur ».
+     */
+    private val legacyPrefKeys: Map<String, String> by lazy {
+        mapOf(
+            bearing.key to bearingHeight.key,
+            height.key to bearingHeight.key
+        )
+    }
+
+    /** Visibilité d'un bloc sur la fiche site autonome, ancien réglage repris si besoin. */
+    fun read(prefs: SharedPreferences, pref: BooleanPreference): Boolean {
+        val legacyKey = legacyPrefKeys[pref.key] ?: return pref.read(prefs)
+        return prefs.getBoolean(pref.key, prefs.getBoolean(legacyKey, pref.defaultValue))
+    }
+
     /** Clé de visibilité d'un bloc dans une section opérateur du mode simplifié. */
     fun embeddedKey(prefKey: String): String = prefKey + EMBEDDED_SUFFIX
 
     /**
      * Visibilité d'un bloc dans une section opérateur, clé encore absente comprise : les blocs de
      * [embeddedHiddenByDefault] démarrent masqués, les autres reprennent le choix déjà fait sur la
-     * fiche site autonome ([standaloneValue]).
+     * fiche site autonome ([standaloneValue]). Un bloc issu d'une scission repasse d'abord par
+     * l'ancienne clé, ici aussi.
      *
      * Vit ici plutôt que dans l'écran : la fiche site n'est plus la seule à lire ces clés depuis que
      * le panneau des sections opérateur s'ouvre aussi depuis la fiche du pylône et les réglages.
@@ -159,7 +187,9 @@ object SitePagePrefs {
         prefKey: String,
         standaloneValue: Boolean
     ): Boolean {
-        val fallback = if (blockId in embeddedHiddenByDefault) false else standaloneValue
+        val default = if (blockId in embeddedHiddenByDefault) false else standaloneValue
+        val legacyKey = legacyPrefKeys[prefKey]
+        val fallback = if (legacyKey != null) prefs.getBoolean(embeddedKey(legacyKey), default) else default
         return prefs.getBoolean(embeddedKey(prefKey), fallback)
     }
 
@@ -173,6 +203,13 @@ object SitePagePrefs {
 
     fun normalizeOrder(order: List<String>): List<String> {
         val mutableOrder = order.filter { it.isNotBlank() }.toMutableList()
+        // Scission de « Cap et hauteur » : un ordre déjà enregistré porte l'ancien identifiant. Les
+        // deux blocs prennent sa place exacte, sinon ils atterriraient en fin de page.
+        val legacyIndex = mutableOrder.indexOf(LEGACY_BEARING_HEIGHT)
+        if (legacyIndex >= 0) {
+            mutableOrder.removeAt(legacyIndex)
+            mutableOrder.addAll(legacyIndex, listOf("bearing", "height").filterNot { mutableOrder.contains(it) })
+        }
         if (!mutableOrder.contains("speedtest")) {
             val photosIndex = mutableOrder.indexOf("photos")
             if (photosIndex >= 0) mutableOrder.add(photosIndex + 1, "speedtest") else mutableOrder.add("speedtest")
@@ -226,6 +263,15 @@ object SitePagePrefs {
                 supportDetailsIndex >= 0 -> mutableOrder.add(supportDetailsIndex + 1, "network_ids")
                 else -> mutableOrder.add("network_ids")
             }
+        }
+        // Filet pour un ordre qui ne porterait ni l'ancien bloc ni les nouveaux : à leur place
+        // d'origine, juste après le bandeau opérateur, et la hauteur collée au cap.
+        if (!mutableOrder.contains("bearing")) {
+            val operatorIndex = mutableOrder.indexOf("operator")
+            if (operatorIndex >= 0) mutableOrder.add(operatorIndex + 1, "bearing") else mutableOrder.add(0, "bearing")
+        }
+        if (!mutableOrder.contains("height")) {
+            mutableOrder.add(mutableOrder.indexOf("bearing") + 1, "height")
         }
         return mutableOrder
     }

@@ -1140,7 +1140,8 @@
     <string name="appstrings_show_status_option">Show status</string>
     <string name="appstrings_site_address_option">Address &amp; Coordinates</string>
     <string name="appstrings_site_anfr_label">ANFR site</string>
-    <string name="appstrings_site_bearing_height_option">Bearing and Height</string>
+    <string name="appstrings_site_bearing_option">Bearing</string>
+    <string name="appstrings_site_height_option">Height</string>
     <string name="appstrings_site_dates_option">Activation dates</string>
     <string name="appstrings_site_detail_title">Site Detail</string>
     <string name="appstrings_site_display_title">Site display</string>
@@ -2468,4 +2469,8 @@
     <string name="appstrings_release_v202_nonbreaking_frequencies">Frequencies are no longer split across two lines</string>
     <string name="appstrings_release_v202_embedded_blocks_panel">New “Antenna detail (operator sections)” panel, reachable from the mast page or from Settings</string>
     <string name="appstrings_release_v202_share_spectrum">Share images now reflect the spectrum / bandwidth distinction</string>
+
+    <!-- Release notes 2.0.3 -->
+    <string name="appstrings_release_v203_bearing_height_split">Bearing and height are now two separate blocks, to show, hide and move independently</string>
+    <string name="appstrings_release_v203_bearing_height_migration">Your visibility settings and page order are carried over automatically</string>
 </resources>

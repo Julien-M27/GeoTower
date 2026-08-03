@@ -663,7 +663,8 @@ fun SettingsScreen(
         mutableStateOf(SitePagePrefs.order(prefs))
     }
     var pageSiteOperator by remember { mutableStateOf(SitePagePrefs.operator.read(prefs)) }
-    var pageSiteBearingHeight by remember { mutableStateOf(SitePagePrefs.bearingHeight.read(prefs)) }
+    var pageSiteBearing by remember { mutableStateOf(SitePagePrefs.read(prefs, SitePagePrefs.bearing)) }
+    var pageSiteHeight by remember { mutableStateOf(SitePagePrefs.read(prefs, SitePagePrefs.height)) }
     var pageSiteMap by remember { mutableStateOf(SitePagePrefs.map.read(prefs)) }
     var pageSiteSupportDetails by remember { mutableStateOf(SitePagePrefs.supportDetails.read(prefs)) }
     var pageSitePanelHeights by remember { mutableStateOf(SitePagePrefs.panelHeights.read(prefs)) }
@@ -2065,7 +2066,8 @@ fun SettingsScreen(
             SiteSettingsSheet(
                 siteOrder = pageSiteOrder, onOrderChange = { pageSiteOrder = it; prefs.edit().putString(SitePagePrefs.ORDER, it.joinToString(",")).apply() },
                 showOperator = pageSiteOperator, onOperatorChange = { pageSiteOperator = it; prefs.edit().putBoolean(SitePagePrefs.operator.key, it).apply() },
-                showBearingHeight = pageSiteBearingHeight, onBearingHeightChange = { pageSiteBearingHeight = it; prefs.edit().putBoolean(SitePagePrefs.bearingHeight.key, it).apply() },
+                showBearing = pageSiteBearing, onBearingChange = { pageSiteBearing = it; prefs.edit().putBoolean(SitePagePrefs.bearing.key, it).apply() },
+                showHeight = pageSiteHeight, onHeightChange = { pageSiteHeight = it; prefs.edit().putBoolean(SitePagePrefs.height.key, it).apply() },
                 showMap = pageSiteMap, onMapChange = { pageSiteMap = it; prefs.edit().putBoolean(SitePagePrefs.map.key, it).apply() },
                 showSupportDetails = pageSiteSupportDetails, onSupportDetailsChange = { pageSiteSupportDetails = it; prefs.edit().putBoolean(SitePagePrefs.supportDetails.key, it).apply() },
                 showPhotos = AppConfig.siteShowPhotos.value, onPhotosChange = ::updateSharedPhotosVisibility,

@@ -1140,7 +1140,8 @@
     <string name="appstrings_show_status_option">Mostrar status</string>
     <string name="appstrings_site_address_option">Endereço e Coordonadas</string>
     <string name="appstrings_site_anfr_label">Site ANFR</string>
-    <string name="appstrings_site_bearing_height_option">Rumo e Altura</string>
+    <string name="appstrings_site_bearing_option">Rumo</string>
+    <string name="appstrings_site_height_option">Altura</string>
     <string name="appstrings_site_dates_option">Datas de ativação</string>
     <string name="appstrings_site_detail_title">Detalhes do site</string>
     <string name="appstrings_site_display_title">Exibição dos sites</string>
@@ -2468,4 +2469,8 @@
     <string name="appstrings_release_v202_nonbreaking_frequencies">As frequências deixam de ser cortadas no fim da linha</string>
     <string name="appstrings_release_v202_embedded_blocks_panel">Novo painel «Detalhe da antena (secções por operadora)», acessível a partir da ficha do poste ou das definições</string>
     <string name="appstrings_release_v202_share_spectrum">As imagens de partilha refletem a distinção entre espetro e largura de banda</string>
+
+    <!-- Notas da versão 2.0.3 -->
+    <string name="appstrings_release_v203_bearing_height_split">A direção e a altura formam agora dois blocos distintos, para mostrar, ocultar e mover separadamente</string>
+    <string name="appstrings_release_v203_bearing_height_migration">As suas definições de visibilidade e a ordem das páginas são mantidas automaticamente</string>
 </resources>

@@ -95,6 +95,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -142,6 +143,7 @@ import fr.geotower.ui.components.MiniMapViewMode
 import fr.geotower.ui.components.RadioShareMenu
 import fr.geotower.ui.components.RadioUsageIcon
 import fr.geotower.ui.components.PageScrollEdgeButtons
+import fr.geotower.ui.components.customizableBlock
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.ui.components.rememberSafeClick
@@ -688,7 +690,8 @@ fun SiteDetailScreen(
         mutableStateOf(SitePagePrefs.order(prefs))
     }
     var showOperator by remember(blocksRevision) { mutableStateOf(readBlockVisibility("operator", SitePagePrefs.operator.key, SitePagePrefs.operator.read(prefs))) }
-    var showBearingHeight by remember(blocksRevision) { mutableStateOf(readBlockVisibility("bearing_height", SitePagePrefs.bearingHeight.key, SitePagePrefs.bearingHeight.read(prefs))) }
+    var showBearing by remember(blocksRevision) { mutableStateOf(readBlockVisibility("bearing", SitePagePrefs.bearing.key, SitePagePrefs.read(prefs, SitePagePrefs.bearing))) }
+    var showHeight by remember(blocksRevision) { mutableStateOf(readBlockVisibility("height", SitePagePrefs.height.key, SitePagePrefs.read(prefs, SitePagePrefs.height))) }
     var showMap by remember(blocksRevision) { mutableStateOf(readBlockVisibility("map", SitePagePrefs.map.key, SitePagePrefs.map.read(prefs))) }
     var showSupportDetails by remember(blocksRevision) { mutableStateOf(readBlockVisibility("support_details", SitePagePrefs.supportDetails.key, SitePagePrefs.supportDetails.read(prefs))) }
     var showPanelHeights by remember(blocksRevision) { mutableStateOf(readBlockVisibility("panel_heights", SitePagePrefs.panelHeights.key, SitePagePrefs.panelHeights.read(prefs))) }
@@ -1399,10 +1402,18 @@ fun SiteDetailScreen(
                     }
                 }
 
+                // Le cap et la hauteur restent sur une même ligne tant qu'ils se suivent et sont
+                // tous deux affichés : la carte du cap rend alors les deux (voir le bloc « bearing »).
+                val bearingHeightPaired = showBearing && showHeight &&
+                    pageSiteOrder.indexOf("height") == pageSiteOrder.indexOf("bearing") + 1
+
                 pageSiteOrder.forEach { block ->
                     // Inséré : on saute les blocs déjà rendus une fois par la fiche support.
                     if (embedded && block in EMBEDDED_HIDDEN_BLOCKS) return@forEach
-                    fr.geotower.ui.components.CustomizableBlock(block, onCustomizeBlock) {
+                    // Appariés, les deux cartes portent chacune leur propre appui long : le bloc
+                    // porteur n'en pose pas un troisième par-dessus, qui viserait le cap partout.
+                    val blockCustomize = if (block == "bearing" && bearingHeightPaired) null else onCustomizeBlock
+                    fr.geotower.ui.components.CustomizableBlock(block, blockCustomize) {
                     when (block) {
                         "status" -> if (showStatus) {
                             val hsEntity = hsDataMap.values.firstOrNull()
@@ -1553,29 +1564,50 @@ fun SiteDetailScreen(
                                 }
                             }
                         }
-                        "bearing_height" -> {
-                            if (showBearingHeight) {
-                                Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
-                                    val rotation = bearingStr.replace("°", "").toFloatOrNull() ?: 0f
-                                    Card(modifier = Modifier.weight(1f).fillMaxHeight(), shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
-                                        Column(modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
-                                            Text(txtBearingLabel.replace(" : ", ""), style = sizing.textStyle(MaterialTheme.typography.labelMedium), textAlign = TextAlign.Center)
-                                            Spacer(Modifier.height(sizing.spacing(8.dp)))
-                                            Icon(Icons.Default.Navigation, null, Modifier.size(sizing.component(40.dp)).rotate(rotation), tint = MaterialTheme.colorScheme.primary)
-                                            Spacer(Modifier.height(sizing.spacing(8.dp)))
-                                            Text(bearingStr, fontWeight = FontWeight.Bold)
-                                        }
+                        // Deux blocs séparés, mais côte à côte tant qu'ils se suivent : c'est la mise
+                        // en page d'origine, et deux cartes pleine largeur mangeraient le double de
+                        // hauteur pour deux chiffres. Séparés dans l'ordre, chacun prend la largeur.
+                        "bearing" -> {
+                            if (showBearing) {
+                                if (bearingHeightPaired) {
+                                    Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Max), horizontalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
+                                        SiteBearingCard(
+                                            bearingStr = bearingStr,
+                                            label = txtBearingLabel.replace(" : ", ""),
+                                            blockShape = blockShape,
+                                            cardBgColor = cardBgColor,
+                                            modifier = Modifier.weight(1f).fillMaxHeight()
+                                                .customizableBlock("bearing", onCustomizeBlock)
+                                        )
+                                        SiteHeightCard(
+                                            heightText = formatSiteHeightMeters(physique?.hauteur),
+                                            label = txtSupportHeight.replace(" : ", ""),
+                                            blockShape = blockShape,
+                                            cardBgColor = cardBgColor,
+                                            modifier = Modifier.weight(1f).fillMaxHeight()
+                                                .customizableBlock("height", onCustomizeBlock)
+                                        )
                                     }
-                                    Card(modifier = Modifier.weight(1f).fillMaxHeight(), shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
-                                        Column(modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
-                                            Text(txtSupportHeight.replace(" : ", ""), style = sizing.textStyle(MaterialTheme.typography.labelMedium), textAlign = TextAlign.Center)
-                                            Spacer(Modifier.height(sizing.spacing(8.dp)))
-                                            Icon(Icons.Default.VerticalAlignTop, null, Modifier.size(sizing.component(40.dp)), tint = MaterialTheme.colorScheme.primary)
-                                            Spacer(Modifier.height(sizing.spacing(8.dp)))
-                                            Text(formatSiteHeightMeters(physique?.hauteur), fontWeight = FontWeight.Bold)
-                                        }
-                                    }
+                                } else {
+                                    SiteBearingCard(
+                                        bearingStr = bearingStr,
+                                        label = txtBearingLabel.replace(" : ", ""),
+                                        blockShape = blockShape,
+                                        cardBgColor = cardBgColor,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
                                 }
+                            }
+                        }
+                        "height" -> {
+                            if (showHeight && !bearingHeightPaired) {
+                                SiteHeightCard(
+                                    heightText = formatSiteHeightMeters(physique?.hauteur),
+                                    label = txtSupportHeight.replace(" : ", ""),
+                                    blockShape = blockShape,
+                                    cardBgColor = cardBgColor,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
                             }
                         }
                         "map" -> {
@@ -1860,10 +1892,15 @@ fun SiteDetailScreen(
                         showOperator = it
                         writeBlockVisibility(SitePagePrefs.operator.key, it)
                     },
-                    showBearingHeight = showBearingHeight,
-                    onBearingHeightChange = {
-                        showBearingHeight = it
-                        writeBlockVisibility(SitePagePrefs.bearingHeight.key, it)
+                    showBearing = showBearing,
+                    onBearingChange = {
+                        showBearing = it
+                        writeBlockVisibility(SitePagePrefs.bearing.key, it)
+                    },
+                    showHeight = showHeight,
+                    onHeightChange = {
+                        showHeight = it
+                        writeBlockVisibility(SitePagePrefs.height.key, it)
                     },
                     showMap = showMap,
                     onMapChange = {
@@ -3035,6 +3072,51 @@ private fun formatSiteHeightMeters(heightMeters: Double?): String {
         "${(heightMeters * 3.28084).roundToInt()} ft"
     } else {
         if (heightMeters % 1.0 == 0.0) "${heightMeters.toInt()} m" else String.format(Locale.US, "%.1f m", heightMeters)
+    }
+}
+
+/**
+ * Cartes « Cap » et « Hauteur » de la fiche site. Ce sont deux blocs réglables séparément : la mise
+ * en page (côte à côte ou pleine largeur) est décidée par l'appelant, pas par la carte.
+ */
+@Composable
+private fun SiteBearingCard(
+    bearingStr: String,
+    label: String,
+    blockShape: Shape,
+    cardBgColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val rotation = bearingStr.replace("°", "").toFloatOrNull() ?: 0f
+    Card(modifier = modifier, shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = sizing.textStyle(MaterialTheme.typography.labelMedium), textAlign = TextAlign.Center)
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
+            Icon(Icons.Default.Navigation, null, Modifier.size(sizing.component(40.dp)).rotate(rotation), tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
+            Text(bearingStr, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun SiteHeightCard(
+    heightText: String,
+    label: String,
+    blockShape: Shape,
+    cardBgColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Card(modifier = modifier, shape = blockShape, colors = CardDefaults.cardColors(containerColor = cardBgColor)) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp)).fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.SpaceBetween) {
+            Text(label, style = sizing.textStyle(MaterialTheme.typography.labelMedium), textAlign = TextAlign.Center)
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
+            Icon(Icons.Default.VerticalAlignTop, null, Modifier.size(sizing.component(40.dp)), tint = MaterialTheme.colorScheme.primary)
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
+            Text(heightText, fontWeight = FontWeight.Bold)
+        }
     }
 }
 

@@ -1140,7 +1140,8 @@
     <string name="appstrings_show_status_option">Afficher le statut</string>
     <string name="appstrings_site_address_option">Adresse et Coordonnées</string>
     <string name="appstrings_site_anfr_label">Site ANFR</string>
-    <string name="appstrings_site_bearing_height_option">Cap et Hauteur</string>
+    <string name="appstrings_site_bearing_option">Cap</string>
+    <string name="appstrings_site_height_option">Hauteur</string>
     <string name="appstrings_site_dates_option">Dates d\'activation</string>
     <string name="appstrings_site_detail_title">Détail du site</string>
     <string name="appstrings_site_display_title">Affichage des sites</string>
@@ -2470,4 +2471,8 @@
     <string name="appstrings_release_v202_nonbreaking_frequencies">Les fréquences ne sont plus coupées en fin de ligne</string>
     <string name="appstrings_release_v202_embedded_blocks_panel">Nouveau panneau « Détail de l\'antenne (sections opérateur) », ouvrable depuis la fiche du pylône ou les réglages</string>
     <string name="appstrings_release_v202_share_spectrum">Les images de partage reprennent la distinction spectre / largeur de bande</string>
+
+    <!-- Notes de version 2.0.3 -->
+    <string name="appstrings_release_v203_bearing_height_split">Le cap et la hauteur forment désormais deux blocs distincts, à afficher, masquer et déplacer séparément</string>
+    <string name="appstrings_release_v203_bearing_height_migration">Vos réglages de visibilité et l\'ordre de vos pages sont repris automatiquement</string>
 </resources>

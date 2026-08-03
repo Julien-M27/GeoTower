@@ -1140,7 +1140,8 @@
     <string name="appstrings_show_status_option">Mostra stato</string>
     <string name="appstrings_site_address_option">Indirizzo e coordinate</string>
     <string name="appstrings_site_anfr_label">Sito ANFR</string>
-    <string name="appstrings_site_bearing_height_option">Direzione e altezza</string>
+    <string name="appstrings_site_bearing_option">Direzione</string>
+    <string name="appstrings_site_height_option">Altezza</string>
     <string name="appstrings_site_dates_option">Date di attivazione</string>
     <string name="appstrings_site_detail_title">Dettaglio sito</string>
     <string name="appstrings_site_display_title">Visualizzazione siti</string>
@@ -2468,4 +2469,8 @@
     <string name="appstrings_release_v202_nonbreaking_frequencies">Le frequenze non vengono più spezzate a fine riga</string>
     <string name="appstrings_release_v202_embedded_blocks_panel">Nuovo pannello «Dettaglio dell\'antenna (sezioni operatore)», raggiungibile dalla scheda del traliccio o dalle impostazioni</string>
     <string name="appstrings_release_v202_share_spectrum">Le immagini di condivisione riprendono la distinzione tra spettro e larghezza di banda</string>
+
+    <!-- Note di versione 2.0.3 -->
+    <string name="appstrings_release_v203_bearing_height_split">Direzione e altezza sono ora due blocchi distinti, da mostrare, nascondere e spostare separatamente</string>
+    <string name="appstrings_release_v203_bearing_height_migration">Le tue impostazioni di visibilità e l\'ordine delle pagine vengono ripresi automaticamente</string>
 </resources>

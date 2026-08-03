@@ -80,7 +80,8 @@ fun EmbeddedSiteBlocksSettingsSheet(
     }
 
     var showOperator by remember { mutableStateOf(read("operator", SitePagePrefs.operator.key, SitePagePrefs.operator.read(prefs))) }
-    var showBearingHeight by remember { mutableStateOf(read("bearing_height", SitePagePrefs.bearingHeight.key, SitePagePrefs.bearingHeight.read(prefs))) }
+    var showBearing by remember { mutableStateOf(read("bearing", SitePagePrefs.bearing.key, SitePagePrefs.read(prefs, SitePagePrefs.bearing))) }
+    var showHeight by remember { mutableStateOf(read("height", SitePagePrefs.height.key, SitePagePrefs.read(prefs, SitePagePrefs.height))) }
     var showMap by remember { mutableStateOf(read("map", SitePagePrefs.map.key, SitePagePrefs.map.read(prefs))) }
     var showSupportDetails by remember { mutableStateOf(read("support_details", SitePagePrefs.supportDetails.key, SitePagePrefs.supportDetails.read(prefs))) }
     var showPanelHeights by remember { mutableStateOf(read("panel_heights", SitePagePrefs.panelHeights.key, SitePagePrefs.panelHeights.read(prefs))) }
@@ -113,8 +114,10 @@ fun EmbeddedSiteBlocksSettingsSheet(
             },
             showOperator = showOperator,
             onOperatorChange = { showOperator = it; write(SitePagePrefs.operator.key, it) },
-            showBearingHeight = showBearingHeight,
-            onBearingHeightChange = { showBearingHeight = it; write(SitePagePrefs.bearingHeight.key, it) },
+            showBearing = showBearing,
+            onBearingChange = { showBearing = it; write(SitePagePrefs.bearing.key, it) },
+            showHeight = showHeight,
+            onHeightChange = { showHeight = it; write(SitePagePrefs.height.key, it) },
             showMap = showMap,
             onMapChange = { showMap = it; write(SitePagePrefs.map.key, it) },
             showSupportDetails = showSupportDetails,

@@ -26,47 +26,12 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_spectrums)) {
-        item(stringResource(R.string.appstrings_release_v202_bandwidth_vs_spectrum))
-        item(stringResource(R.string.appstrings_release_v202_spectrum_column))
-        item(stringResource(R.string.appstrings_release_v202_bandwidth_warning))
-        item(stringResource(R.string.appstrings_release_v202_nonbreaking_frequencies))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_image_sharing)) {
-        item(stringResource(R.string.appstrings_release_v202_share_spectrum))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_global)) {
-        item(stringResource(R.string.appstrings_release_v20_play_store))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_online_data)) {
-        item(stringResource(R.string.appstrings_release_v20_api_mirror))
-        item(stringResource(R.string.appstrings_release_v20_api_choice))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_outages)) {
-        item(stringResource(R.string.appstrings_release_v20_outage_card))
-        item(stringResource(R.string.appstrings_release_v20_outage_local_copy))
-        item(stringResource(R.string.appstrings_release_v20_outage_errors))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_database)) {
-        item(stringResource(R.string.appstrings_release_v20_db_generating_banner))
+    section(stringResource(R.string.appstrings_release_section_site_detail)) {
+        item(stringResource(R.string.appstrings_release_v203_bearing_height_split))
     }
 
     section(stringResource(R.string.appstrings_release_section_settings)) {
-        item(stringResource(R.string.appstrings_release_v202_embedded_blocks_panel))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_diagnostic)) {
-        item(stringResource(R.string.appstrings_release_v20_debug_log))
-        item(stringResource(R.string.appstrings_release_v20_diagnostic_server))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_location)) {
-        item(stringResource(R.string.appstrings_release_v20_bg_location_disclosure))
+        item(stringResource(R.string.appstrings_release_v203_bearing_height_migration))
     }
 }
 

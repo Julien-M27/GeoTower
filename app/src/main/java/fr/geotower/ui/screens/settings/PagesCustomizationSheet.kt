@@ -58,15 +58,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
@@ -103,6 +108,8 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.ui.components.GeoTowerFadingEdgeHeight
+import fr.geotower.ui.components.isGeoTowerFadingEdgeActive
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.rememberReorderableDragState
@@ -1911,6 +1918,41 @@ data class ConfigurableBlock(
     val onSettingsClick: (() -> Unit)? = null
 )
 
+/**
+ * Défilement d'une feuille de réglages, tel que [ReorderableBlockList] en a besoin pour amener la
+ * ligne visée par un appui long aussi haut que possible.
+ *
+ * [viewportModifier] se pose AVANT `verticalScroll` : ce nœud-là est le viewport, il ne bouge pas
+ * avec le contenu, et sa position racine sert de référence à tous les calculs.
+ */
+@Stable
+private class SettingsSheetScroll(val state: ScrollState) {
+    var viewportTop by mutableFloatStateOf(Float.NaN)
+        private set
+
+    val viewportModifier: Modifier = Modifier.onGloballyPositioned { viewportTop = it.positionInRoot().y }
+
+    /**
+     * Pose l'élément dont le haut est en [anchorRootY] (coordonnées racine) juste sous la bande
+     * estompée, ou aussi haut que le contenu restant le permet. Rend `false` tant que les mesures
+     * manquent ou qu'il n'y a rien à faire défiler : à l'appelant de se rabattre sur autre chose.
+     */
+    suspend fun alignToTop(anchorRootY: Float, fadeInsetPx: Float): Boolean {
+        if (anchorRootY.isNaN() || viewportTop.isNaN() || state.maxValue <= 0) return false
+        val target = (state.value + (anchorRootY - viewportTop - fadeInsetPx))
+            .roundToInt()
+            .coerceIn(0, state.maxValue)
+        state.animateScrollTo(target)
+        return true
+    }
+}
+
+@Composable
+private fun rememberSettingsSheetScroll(): SettingsSheetScroll {
+    val state = rememberScrollState()
+    return remember(state) { SettingsSheetScroll(state) }
+}
+
 @Composable
 private fun ReorderableBlockList(
     order: List<String>,
@@ -1922,7 +1964,8 @@ private fun ReorderableBlockList(
     useOneUi: Boolean,
     cardHeight: Dp = 64.dp,
     spacing: Dp = 12.dp,
-    highlightBlockId: String? = null
+    highlightBlockId: String? = null,
+    sheetScroll: SettingsSheetScroll? = null
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val scaledCardHeight = sizing.component(cardHeight)
@@ -1931,15 +1974,42 @@ private fun ReorderableBlockList(
     val reorderState = rememberReorderableDragState(currentOrder, scaledCardHeight, scaledSpacing, onOrderChange)
     val blocksById = blocks.associateBy { it.id }
 
-    // Ligne désignée par un appui long sur la page : amenée à l'écran puis teintée le temps que
-    // l'œil la trouve, avant de redevenir une ligne comme les autres.
+    // Ligne désignée par un appui long sur la page : remontée aussi haut que la feuille le permet
+    // puis teintée le temps que l'œil la trouve, avant de redevenir une ligne comme les autres.
     val highlightRequester = remember { BringIntoViewRequester() }
     var highlighted by remember(highlightBlockId) { mutableStateOf(highlightBlockId) }
+    // La position de la ligne n'est PAS lue en composition (elle change à chaque frame de
+    // défilement) : seul ce drapeau, qui ne bascule qu'une fois, sert de clé à l'effet.
+    var highlightTop by remember(highlightBlockId) { mutableFloatStateOf(Float.NaN) }
+    var highlightMeasured by remember(highlightBlockId) { mutableStateOf(false) }
+    var hasAlignedHighlight by remember(highlightBlockId) { mutableStateOf(false) }
+    // Le fondu du haut délave 80 dp (voir geoTowerFadingEdge) : viser le bord même du viewport
+    // poserait la ligne en plein dedans, on s'arrête donc SOUS la bande.
+    val fadeInsetPx = if (isGeoTowerFadingEdgeActive()) {
+        with(LocalDensity.current) { GeoTowerFadingEdgeHeight.toPx() }
+    } else {
+        0f
+    }
+
     LaunchedEffect(highlightBlockId) {
         if (highlightBlockId == null) return@LaunchedEffect
-        highlightRequester.bringIntoView()
         delay(2500)
         highlighted = null
+    }
+
+    // La feuille arrive en s'animant : on aligne dès que la ligne est mesurée, puis une seconde
+    // fois une fois l'animation posée. Un seul alignement par appui long, sinon toucher un
+    // interrupteur — qui change la hauteur du contenu — ramènerait la liste ici.
+    LaunchedEffect(highlightBlockId, sheetScroll?.state?.maxValue, highlightMeasured) {
+        if (highlightBlockId == null || hasAlignedHighlight) return@LaunchedEffect
+        // Pas de contexte de défilement, ou rien à faire défiler : au moins la rendre visible.
+        if (sheetScroll == null || !sheetScroll.alignToTop(highlightTop, fadeInsetPx)) {
+            highlightRequester.bringIntoView()
+            return@LaunchedEffect
+        }
+        delay(220)
+        sheetScroll.alignToTop(highlightTop, fadeInsetPx)
+        hasAlignedHighlight = true
     }
 
     Column(verticalArrangement = Arrangement.spacedBy(scaledSpacing)) {
@@ -1963,7 +2033,12 @@ private fun ReorderableBlockList(
                         onSettingsClick = block.onSettingsClick,
                         highlighted = highlighted == blockId,
                         anchorModifier = if (highlightBlockId == blockId) {
-                            Modifier.bringIntoViewRequester(highlightRequester)
+                            Modifier
+                                .bringIntoViewRequester(highlightRequester)
+                                .onGloballyPositioned {
+                                    highlightTop = it.positionInRoot().y
+                                    if (!highlightMeasured) highlightMeasured = true
+                                }
                         } else {
                             Modifier
                         }
@@ -1995,7 +2070,8 @@ fun ReorderableBlockSettingsSheet(
     val isOledMode by AppConfig.isOledMode
     val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
-    val scrollState = rememberScrollState()
+    val sheetScroll = rememberSettingsSheetScroll()
+    val scrollState = sheetScroll.state
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val shape = oneUiActionButtonShape(useOneUi)
     val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
@@ -2018,6 +2094,7 @@ fun ReorderableBlockSettingsSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .navigationBarsPadding()
+                .then(sheetScroll.viewportModifier)
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
                 .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
@@ -2039,7 +2116,8 @@ fun ReorderableBlockSettingsSheet(
                 border = border,
                 bubbleColor = bubbleColor,
                 useOneUi = useOneUi,
-                highlightBlockId = highlightBlockId
+                highlightBlockId = highlightBlockId,
+                sheetScroll = sheetScroll
             )
 
             Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
@@ -2114,7 +2192,10 @@ fun SupportSettingsSheet(
 fun SiteSettingsSheet(
     siteOrder: List<String>, onOrderChange: (List<String>) -> Unit,
     showOperator: Boolean, onOperatorChange: (Boolean) -> Unit,
-    showBearingHeight: Boolean, onBearingHeightChange: (Boolean) -> Unit,
+    // Le cap et la hauteur formaient un seul bloc « Cap et hauteur » : deux lignes depuis, réglables
+    // et déplaçables séparément (voir SitePagePrefs.LEGACY_BEARING_HEIGHT pour la reprise).
+    showBearing: Boolean, onBearingChange: (Boolean) -> Unit,
+    showHeight: Boolean, onHeightChange: (Boolean) -> Unit,
     showMap: Boolean, onMapChange: (Boolean) -> Unit,
     showSupportDetails: Boolean, onSupportDetailsChange: (Boolean) -> Unit,
     showPhotos: Boolean, onPhotosChange: (Boolean) -> Unit,
@@ -2154,7 +2235,8 @@ fun SiteSettingsSheet(
         order = siteOrder,
         blocks = listOf(
             ConfigurableBlock("operator", { stringResource(R.string.appstrings_site_operator_option) }, showOperator, onOperatorChange),
-            ConfigurableBlock("bearing_height", { stringResource(R.string.appstrings_site_bearing_height_option) }, showBearingHeight, onBearingHeightChange, isAvailable = AppConfig.hasCompass.value),
+            ConfigurableBlock("bearing", { stringResource(R.string.appstrings_site_bearing_option) }, showBearing, onBearingChange, isAvailable = AppConfig.hasCompass.value),
+            ConfigurableBlock("height", { stringResource(R.string.appstrings_site_height_option) }, showHeight, onHeightChange),
             ConfigurableBlock("map", { stringResource(R.string.appstrings_site_map_option) }, showMap, onMapChange, onSettingsClick = onOpenMiniMapSettings),
             ConfigurableBlock("support_details", { stringResource(R.string.appstrings_site_support_details_option) }, showSupportDetails, onSupportDetailsChange),
             ConfigurableBlock("photos", { stringResource(R.string.appstrings_site_photos_and_schemes_option) }, showPhotos, onPhotosChange, onSettingsClick = {
@@ -2186,7 +2268,8 @@ fun SiteSettingsSheet(
         onReset = {
             onOrderChange(SitePagePrefs.defaultOrder)
             onOperatorChange(true)
-            onBearingHeightChange(true)
+            onBearingChange(true)
+            onHeightChange(true)
             onMapChange(true)
             onSupportDetailsChange(true)
             onPhotosChange(true)
@@ -2561,7 +2644,8 @@ fun StatsSettingsSheet(
     val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
     val shape = oneUiActionButtonShape(useOneUi)
     val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
-    val scrollState = rememberScrollState()
+    val sheetScroll = rememberSettingsSheetScroll()
+    val scrollState = sheetScroll.state
     val sizing = LocalGeoTowerUiStyle.current.sizing
 
     var selectedFrequencyTech by remember { mutableStateOf<String?>(null) }
@@ -2685,6 +2769,7 @@ fun StatsSettingsSheet(
         Column(
             modifier = Modifier
                 .navigationBarsPadding()
+                .then(sheetScroll.viewportModifier)
                 .settingsPopupFadingEdge(scrollState)
                 .verticalScroll(scrollState)
                 .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
@@ -2752,7 +2837,8 @@ fun StatsSettingsSheet(
                     border = border,
                     bubbleColor = bubbleColor,
                     useOneUi = useOneUi,
-                    highlightBlockId = highlightBlockId
+                    highlightBlockId = highlightBlockId,
+                    sheetScroll = sheetScroll
                 )
 
                 Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))

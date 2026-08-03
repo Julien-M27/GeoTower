@@ -1140,7 +1140,8 @@
     <string name="appstrings_show_status_option">Mostrar estado</string>
     <string name="appstrings_site_address_option">Dirección y coordenadas</string>
     <string name="appstrings_site_anfr_label">Sitio ANFR</string>
-    <string name="appstrings_site_bearing_height_option">Rumbo y altura</string>
+    <string name="appstrings_site_bearing_option">Rumbo</string>
+    <string name="appstrings_site_height_option">Altura</string>
     <string name="appstrings_site_dates_option">Fechas de activación</string>
     <string name="appstrings_site_detail_title">Detalle del sitio</string>
     <string name="appstrings_site_display_title">Visualización de sitios</string>
@@ -2468,4 +2469,8 @@
     <string name="appstrings_release_v202_nonbreaking_frequencies">Las frecuencias ya no se cortan al final de la línea</string>
     <string name="appstrings_release_v202_embedded_blocks_panel">Nuevo panel «Detalle de la antena (secciones por operador)», accesible desde la ficha del soporte o desde los ajustes</string>
     <string name="appstrings_release_v202_share_spectrum">Las imágenes para compartir reflejan la distinción entre espectro y ancho de banda</string>
+
+    <!-- Notas de la versión 2.0.3 -->
+    <string name="appstrings_release_v203_bearing_height_split">El rumbo y la altura son ahora dos bloques distintos, que se muestran, ocultan y mueven por separado</string>
+    <string name="appstrings_release_v203_bearing_height_migration">Tus ajustes de visibilidad y el orden de tus páginas se conservan automáticamente</string>
 </resources>
