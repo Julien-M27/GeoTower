@@ -224,10 +224,15 @@ object AppConfig {
 
     var siteFreqGridDisplay = mutableStateOf(false)
 
-    // --- FILTRES : SPECTRE (DÉTAILS DU SITE) ---
-    var siteShowSpectrum = mutableStateOf(true) // Switch principal maître
-    var siteShowSpectrumBand = mutableStateOf(true)
-    var siteShowSpectrumTotal = mutableStateOf(true)
+    // --- FILTRES : LARGEUR DE BANDE ET SPECTRE (DÉTAILS DU SITE) ---
+    // Les clés de préférences gardent leur nom historique « site_show_spectrum* » : ces trois
+    // interrupteurs pilotent en réalité la largeur de bande (anciennement libellée « Spectre »).
+    var siteShowBandwidth = mutableStateOf(true) // Switch principal maître
+    var siteShowBandwidthPerRange = mutableStateOf(true)
+    var siteShowBandwidthTotal = mutableStateOf(true)
+
+    /** Spectre occupé (« 708-718 MHz ») : colonne du tableau des antennes et lignes de la fiche. */
+    var siteShowSpectrumRanges = mutableStateOf(true)
 
     // --- ORDRE DES TECHNOLOGIES ET FRÉQUENCES (SITE) ---
     var siteTechnoOrder = mutableStateOf(listOf("5G", "4G", "3G", "2G", "FH"))
@@ -516,10 +521,13 @@ object AppConfig {
         //AFFICHAGE DES FREQUENCES EN GRILLE
         siteFreqGridDisplay.value = prefs.getBoolean("site_freq_grid_display", false)
 
-        // --- CHARGEMENT SPECTRE ---
-        siteShowSpectrum.value = prefs.getBoolean("site_show_spectrum", true)
-        siteShowSpectrumBand.value = prefs.getBoolean("site_show_spectrum_band", true)
-        siteShowSpectrumTotal.value = prefs.getBoolean("site_show_spectrum_total", true)
+        // --- CHARGEMENT LARGEUR DE BANDE (clés historiques « site_show_spectrum* ») ---
+        siteShowBandwidth.value = prefs.getBoolean("site_show_spectrum", true)
+        siteShowBandwidthPerRange.value = prefs.getBoolean("site_show_spectrum_band", true)
+        siteShowBandwidthTotal.value = prefs.getBoolean("site_show_spectrum_total", true)
+
+        // --- CHARGEMENT SPECTRE (plages de fréquences) ---
+        siteShowSpectrumRanges.value = prefs.getBoolean("site_show_spectrum_ranges", true)
 
         // AFFICHAGE DU STATUT
         siteShowStatus.value = prefs.getBoolean("site_show_status", true)

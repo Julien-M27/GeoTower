@@ -282,6 +282,10 @@
     <string name="appstrings_azimuths_title">Azimute</string>
     <string name="appstrings_back">Zurück</string>
     <string name="appstrings_bands_not_specified">Bänder nicht angegeben</string>
+    <string name="appstrings_bandwidth_by_range">Bandbreite pro Frequenzbereich</string>
+    <string name="appstrings_bandwidth_title">Bandbreite</string>
+    <string name="appstrings_bandwidth_total">Gesamtbandbreite</string>
+    <string name="appstrings_bandwidth_total_warning">Die Gesamtbandbreite kann wegen wahrscheinlicher Meldefehler ungenau sein.</string>
     <string name="appstrings_bearing_label">Peilung von der Antenne gemessen:\u0020</string>
     <string name="appstrings_bg_location_perm_desc">"Immer" erlauben, damit das Widget aktualisiert wird</string>
     <string name="appstrings_bg_location_perm_title">Widget-Berechtigung</string>
@@ -306,9 +310,9 @@
     <string name="appstrings_closest_site">Nächster Standort</string>
     <string name="appstrings_col_azimuth">Azimut</string>
     <string name="appstrings_col_band">Band</string>
-    <string name="appstrings_col_freqs">Frequenzen</string>
     <string name="appstrings_col_height">Höhe</string>
     <string name="appstrings_col_service">In Betrieb</string>
+    <string name="appstrings_col_spectrum">Spektrum</string>
     <string name="appstrings_col_state">Status</string>
     <string name="appstrings_col_techno">Techno.</string>
     <string name="appstrings_color_palette_amber_desc">Bernstein-Systempalette Material 3</string>
@@ -665,6 +669,7 @@
     <string name="appstrings_page_map_settings">Antennenkarte</string>
     <string name="appstrings_page_nearby_settings">Antennen in der Nähe</string>
     <string name="appstrings_page_site_settings">Standortdetails</string>
+    <string name="appstrings_page_site_embedded_settings">Standortdetails (Betreiberabschnitte)</string>
     <string name="appstrings_page_support_settings">Supportdetails</string>
     <string name="appstrings_pages_customization_desc">Passe die Anzeige der verschiedenen App-Seiten an</string>
     <string name="appstrings_pages_customization_title">Seiten anpassen</string>
@@ -779,7 +784,6 @@
     <string name="appstrings_sites_in_service_label">In Betrieb</string>
     <string name="appstrings_sites_label">Standorte</string>
     <string name="appstrings_sites_out_of_service_label">Außer Betrieb</string>
-    <string name="appstrings_spectrum_by_band">Spektrum nach Frequenzband</string>
     <string name="appstrings_spectrum_title">Spektrum</string>
     <string name="appstrings_speed_label">Geschwindigkeit:\u0020</string>
     <string name="appstrings_speedtest_download">Download</string>
@@ -902,8 +906,6 @@
     <string name="appstrings_throughput_use_current_position">Meinen aktuellen Standort verwenden</string>
     <string name="appstrings_tools">Werkzeuge</string>
     <string name="appstrings_top">Oben</string>
-    <string name="appstrings_total_spectrum_warning">Das Gesamtspektrum kann wegen wahrscheinlicher Meldefehler ungenau sein.</string>
-    <string name="appstrings_totalspectrum">Gesamtspektrum</string>
     <string name="appstrings_track_global_active">Globale Verfolgung aktiv...</string>
     <string name="appstrings_unavailable">Nicht verfügbar</string>
     <string name="appstrings_understood">Verstanden</string>

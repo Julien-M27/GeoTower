@@ -282,6 +282,10 @@
     <string name="appstrings_azimuths_title">Azimutes</string>
     <string name="appstrings_back">Voltar</string>
     <string name="appstrings_bands_not_specified">Bandas não especificadas</string>
+    <string name="appstrings_bandwidth_by_range">Largura de banda por faixa de frequência</string>
+    <string name="appstrings_bandwidth_title">Largura de banda</string>
+    <string name="appstrings_bandwidth_total">Largura de banda total</string>
+    <string name="appstrings_bandwidth_total_warning">A largura de banda total pode estar incorreta devido a prováveis erros de declaração.</string>
     <string name="appstrings_bearing_label">Rumo medido a partir da antena :\u0020</string>
     <string name="appstrings_bg_location_perm_desc">Permita "Sempre" para o widget atualizar</string>
     <string name="appstrings_bg_location_perm_title">Permissão do Widget</string>
@@ -306,9 +310,9 @@
     <string name="appstrings_closest_site">Local mais prochain</string>
     <string name="appstrings_col_azimuth">Azimute</string>
     <string name="appstrings_col_band">Banda</string>
-    <string name="appstrings_col_freqs">Frequências</string>
     <string name="appstrings_col_height">Altura</string>
     <string name="appstrings_col_service">Em serviço</string>
+    <string name="appstrings_col_spectrum">Espectro</string>
     <string name="appstrings_col_state">Estado</string>
     <string name="appstrings_col_techno">Tecno.</string>
     <string name="appstrings_color_palette_amber_desc">Paleta de sistema âmbar Material 3</string>
@@ -665,6 +669,7 @@
     <string name="appstrings_page_map_settings">Mapa de antenas</string>
     <string name="appstrings_page_nearby_settings">Antenas próximas</string>
     <string name="appstrings_page_site_settings">Detalhes do site</string>
+    <string name="appstrings_page_site_embedded_settings">Detalhes do site (secções de operador)</string>
     <string name="appstrings_page_support_settings">Detalhes do suporte</string>
     <string name="appstrings_pages_customization_desc">Personalize a exibição das differentes páginas do aplicativo</string>
     <string name="appstrings_pages_customization_title">Personalização das páginas</string>
@@ -779,7 +784,6 @@
     <string name="appstrings_sites_in_service_label">Em serviço</string>
     <string name="appstrings_sites_label">Locais</string>
     <string name="appstrings_sites_out_of_service_label">Fora de Serviço</string>
-    <string name="appstrings_spectrum_by_band">Espectro por faixa de fréquence</string>
     <string name="appstrings_spectrum_title">Espectro</string>
     <string name="appstrings_speed_label">Velocidade :\u0020</string>
     <string name="appstrings_speedtest_download">Download</string>
@@ -902,8 +906,6 @@
     <string name="appstrings_throughput_use_current_position">Usar a minha posição atual</string>
     <string name="appstrings_tools">Ferramentas</string>
     <string name="appstrings_top">Topo</string>
-    <string name="appstrings_total_spectrum_warning">O espectro total pode estar incorreto devido a prováveis erros de declaração.</string>
-    <string name="appstrings_totalspectrum">Espectro total</string>
     <string name="appstrings_track_global_active">Acompanhamento global ativo...</string>
     <string name="appstrings_unavailable">Indisponível</string>
     <string name="appstrings_understood">Entendi</string>

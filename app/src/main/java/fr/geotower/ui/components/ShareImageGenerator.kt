@@ -2489,7 +2489,7 @@ private fun GeoTowerPdfAntennaHeader() {
             GeoTowerPdfHeaderCell(stringResource(R.string.appstrings_col_height), Modifier.weight(0.65f))
             GeoTowerPdfHeaderCell(stringResource(R.string.appstrings_col_panel_size), Modifier.weight(0.6f))
             GeoTowerPdfHeaderCell(stringResource(R.string.appstrings_col_band), Modifier.weight(1.1f))
-            GeoTowerPdfHeaderCell(stringResource(R.string.appstrings_col_freqs), Modifier.weight(1.45f))
+            GeoTowerPdfHeaderCell(stringResource(R.string.appstrings_col_spectrum), Modifier.weight(1.45f))
         }
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
     }
@@ -4536,31 +4536,40 @@ fun shareFullAntennaCapture(
                                                                         ":",
                                                                         ""
                                                                     ).trim()
-                                                                if (AppConfig.siteShowSpectrum.value && preciseFreqs.isNotBlank() && preciseFreqs != band.rawFreq.trim()) {
+                                                                if (preciseFreqs.isNotBlank() && preciseFreqs != band.rawFreq.trim()) {
                                                                     val spectrumDisplay = formatSpectrumDisplayDetails(preciseFreqs)
-                                                                    if (AppConfig.siteShowSpectrumBand.value) {
+                                                                    val showSpectrum = AppConfig.siteShowSpectrumRanges.value
+                                                                    val showBandwidthPerRange =
+                                                                        AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthPerRange.value
+                                                                    val showBandwidthTotal =
+                                                                        AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthTotal.value && spectrumDisplay.hasTotal
+                                                                    if (showSpectrum || showBandwidthPerRange) {
+                                                                        val detailTitle = stringResource(
+                                                                            if (showSpectrum) R.string.appstrings_spectrum_title
+                                                                            else R.string.appstrings_bandwidth_by_range
+                                                                        )
                                                                         Text(
-                                                                            text = "${stringResource(R.string.appstrings_spectrum_by_band)} :\n\n${spectrumDisplay.detailedFrequencies}",
+                                                                            text = "$detailTitle :\n\n${spectrumDisplay.detailedFrequencies(showSpectrum, showBandwidthPerRange)}",
                                                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                             fontSize = 12.sp,
                                                                             fontWeight = FontWeight.Normal,
                                                                             lineHeight = 16.sp
                                                                         )
                                                                     }
-                                                                    if (AppConfig.siteShowSpectrumTotal.value && spectrumDisplay.hasTotal) {
-                                                                        if (AppConfig.siteShowSpectrumBand.value) Spacer(
+                                                                    if (showBandwidthTotal) {
+                                                                        if (showSpectrum || showBandwidthPerRange) Spacer(
                                                                             modifier = Modifier.height(
                                                                                 2.dp
                                                                             )
                                                                         )
                                                                         Text(
-                                                                            text = "${stringResource(R.string.appstrings_totalspectrum)} : ${spectrumDisplay.totalBandwidth} ${spectrumDisplay.totalUnit}",
+                                                                            text = "${stringResource(R.string.appstrings_bandwidth_total)} : ${spectrumDisplay.totalBandwidth} ${spectrumDisplay.totalUnit}",
                                                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                             fontSize = 12.sp,
                                                                             fontWeight = FontWeight.Medium
                                                                         )
                                                                     }
-                                                                    if (AppConfig.siteShowSpectrumBand.value || (AppConfig.siteShowSpectrumTotal.value && spectrumDisplay.hasTotal)) {
+                                                                    if (showSpectrum || showBandwidthPerRange || showBandwidthTotal) {
                                                                         Spacer(
                                                                             modifier = Modifier.height(
                                                                                 4.dp
@@ -4926,29 +4935,38 @@ fun shareFullAntennaCapture(
                                                         val preciseFreqs =
                                                             band.rawFreq.substringAfter(":", "")
                                                                 .trim()
-                                                        if (AppConfig.siteShowSpectrum.value && preciseFreqs.isNotBlank() && preciseFreqs != band.rawFreq.trim()) {
+                                                        if (preciseFreqs.isNotBlank() && preciseFreqs != band.rawFreq.trim()) {
                                                             val spectrumDisplay = formatSpectrumDisplayDetails(preciseFreqs)
-                                                            if (AppConfig.siteShowSpectrumBand.value) {
+                                                            val showSpectrum = AppConfig.siteShowSpectrumRanges.value
+                                                            val showBandwidthPerRange =
+                                                                AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthPerRange.value
+                                                            val showBandwidthTotal =
+                                                                AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthTotal.value && spectrumDisplay.hasTotal
+                                                            if (showSpectrum || showBandwidthPerRange) {
+                                                                val detailTitle = stringResource(
+                                                                    if (showSpectrum) R.string.appstrings_spectrum_title
+                                                                    else R.string.appstrings_bandwidth_by_range
+                                                                )
                                                                 Text(
-                                                                    text = "${stringResource(R.string.appstrings_spectrum_by_band)} :\n\n${spectrumDisplay.detailedFrequencies}",
+                                                                    text = "$detailTitle :\n\n${spectrumDisplay.detailedFrequencies(showSpectrum, showBandwidthPerRange)}",
                                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                     fontSize = 12.sp,
                                                                     fontWeight = FontWeight.Normal,
                                                                     lineHeight = 16.sp
                                                                 )
                                                             }
-                                                            if (AppConfig.siteShowSpectrumTotal.value && spectrumDisplay.hasTotal) {
-                                                                if (AppConfig.siteShowSpectrumBand.value) Spacer(
+                                                            if (showBandwidthTotal) {
+                                                                if (showSpectrum || showBandwidthPerRange) Spacer(
                                                                     modifier = Modifier.height(2.dp)
                                                                 )
                                                                 Text(
-                                                                    text = "${stringResource(R.string.appstrings_totalspectrum)} : ${spectrumDisplay.totalBandwidth} ${spectrumDisplay.totalUnit}",
+                                                                    text = "${stringResource(R.string.appstrings_bandwidth_total)} : ${spectrumDisplay.totalBandwidth} ${spectrumDisplay.totalUnit}",
                                                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                                                     fontSize = 12.sp,
                                                                     fontWeight = FontWeight.Medium
                                                                 )
                                                             }
-                                                            if (AppConfig.siteShowSpectrumBand.value || (AppConfig.siteShowSpectrumTotal.value && spectrumDisplay.hasTotal)) {
+                                                            if (showSpectrum || showBandwidthPerRange || showBandwidthTotal) {
                                                                 Spacer(modifier = Modifier.height(4.dp))
                                                             }
                                                         }

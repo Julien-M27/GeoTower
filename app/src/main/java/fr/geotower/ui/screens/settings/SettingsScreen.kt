@@ -909,9 +909,9 @@ fun SettingsScreen(
             // --- Notifications et arrière-plan ---
             entry(context.getString(R.string.appstrings_app_notifications_title), "notifications app autoriser permission activer couper toutes", SECTION_BACKGROUND)
             entry(context.getString(R.string.appstrings_update_notif_setting_title), "notification mise a jour update base donnees alerte", SECTION_BACKGROUND)
-            entry(context.getString(R.string.appstrings_low_power_title), "faible consommation economie batterie eco energie basse performance low power mode", SECTION_BACKGROUND)
             entry(context.getString(R.string.appstrings_live_notification_title), "notification live suivi temps reel antenne direct", SECTION_BACKGROUND)
             entry(context.getString(R.string.appstrings_live_location_accuracy_title), "precision gps position live exactitude", SECTION_BACKGROUND)
+            entry(context.getString(R.string.appstrings_low_power_title), "faible consommation economie batterie eco energie basse performance low power mode", SECTION_BACKGROUND)
             entry(context.getString(R.string.appstrings_widget_refresh_title), "widget frequence rafraichissement synchronisation accueil", SECTION_BACKGROUND)
 
             // --- Système ---
@@ -2050,7 +2050,18 @@ fun SettingsScreen(
             )
         }
 
-        if (showSiteSettingsSheet) {
+        // En mode simplifié, la fiche site autonome n'est plus atteignable (site_detail est réécrite
+        // vers le pylône) : régler ses clés ne changerait rien à l'écran. Ce sont les sections
+        // opérateur dépliées qu'il faut piloter, et elles ont leurs propres clés.
+        if (showSiteSettingsSheet && AppConfig.simpleModeActive()) {
+            EmbeddedSiteBlocksSettingsSheet(
+                onDismiss = { showSiteSettingsSheet = false },
+                onBack = { safeClick { showSiteSettingsSheet = false; showPagesCustomizationSheet = true } },
+                sheetState = sheetState,
+                useOneUi = useOneUi,
+                bubbleColor = bubbleBaseColor
+            )
+        } else if (showSiteSettingsSheet) {
             SiteSettingsSheet(
                 siteOrder = pageSiteOrder, onOrderChange = { pageSiteOrder = it; prefs.edit().putString(SitePagePrefs.ORDER, it.joinToString(",")).apply() },
                 showOperator = pageSiteOperator, onOperatorChange = { pageSiteOperator = it; prefs.edit().putBoolean(SitePagePrefs.operator.key, it).apply() },
@@ -2995,87 +3006,9 @@ fun SectionNotifications(
         Spacer(Modifier.height(sizing.spacing(12.dp)))
     }
 
-    // --- MODE FAIBLE CONSOMMATION (Normal / Éco / Éco+) ---
-    val lowPowerLevel by AppConfig.lowPowerLevel
-    val lowPowerFollowSystem by AppConfig.lowPowerFollowSystem
-    // Niveau EFFECTIF (manuel, ou relevé par l'économie d'énergie système) → la sélection le reflète, réactif.
-    val effectiveLowPowerLevel = fr.geotower.utils.PowerProfile.level
-    fun applyLowPowerLevel(newLevel: Int) {
-        AppConfig.lowPowerLevel.intValue = newLevel
-        prefs.edit().putInt(AppConfig.PREF_LOW_POWER_LEVEL, newLevel).apply()
-        // Applique à chaud la priorité/intervalle GPS au service live s'il tourne.
-        LiveTrackingController.refreshLocationSettings(context)
-    }
-    Surface(
-        shape = shape,
-        border = border,
-        color = if (useOneUi) bubbleColor else Color.Transparent,
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Column(Modifier.fillMaxWidth().padding(sizing.spacing(16.dp))) {
-            Text(
-                stringResource(R.string.appstrings_low_power_title),
-                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
-                fontWeight = FontWeight.Bold
-            )
-            Text(
-                stringResource(R.string.appstrings_low_power_desc),
-                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(sizing.spacing(12.dp)))
-            NavigationModeOption(
-                title = stringResource(R.string.appstrings_low_power_level_normal),
-                desc = stringResource(R.string.appstrings_low_power_level_normal_desc),
-                isSelected = effectiveLowPowerLevel == 0,
-                useOneUi = useOneUi,
-                onClick = { applyLowPowerLevel(0) }
-            )
-            Spacer(Modifier.height(sizing.spacing(8.dp)))
-            NavigationModeOption(
-                title = stringResource(R.string.appstrings_low_power_level_eco),
-                desc = stringResource(R.string.appstrings_low_power_level_eco_desc),
-                isSelected = effectiveLowPowerLevel == 1,
-                useOneUi = useOneUi,
-                onClick = { applyLowPowerLevel(1) }
-            )
-            Spacer(Modifier.height(sizing.spacing(8.dp)))
-            NavigationModeOption(
-                title = stringResource(R.string.appstrings_low_power_level_ecoplus),
-                desc = stringResource(R.string.appstrings_low_power_level_ecoplus_desc),
-                isSelected = effectiveLowPowerLevel == 2,
-                useOneUi = useOneUi,
-                onClick = { applyLowPowerLevel(2) }
-            )
-            if (effectiveLowPowerLevel > lowPowerLevel) {
-                Spacer(Modifier.height(sizing.spacing(8.dp)))
-                Text(
-                    stringResource(R.string.appstrings_low_power_forced_by_system),
-                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-                    color = MaterialTheme.colorScheme.primary
-                )
-            }
-        }
-    }
-    Spacer(Modifier.height(sizing.spacing(12.dp)))
-
-    PreferenceSwitchCard(
-        title = stringResource(R.string.appstrings_low_power_follow_system_title),
-        desc = stringResource(R.string.appstrings_low_power_follow_system_desc),
-        checked = lowPowerFollowSystem,
-        onCheckedChange = { isChecked ->
-            AppConfig.lowPowerFollowSystem.value = isChecked
-            prefs.edit().putBoolean(AppConfig.PREF_LOW_POWER_FOLLOW_SYSTEM, isChecked).apply()
-            LiveTrackingController.refreshLocationSettings(context)
-        },
-        shape = shape,
-        border = border,
-        bubbleColor = bubbleColor,
-        useOneUi = useOneUi
-    )
-    Spacer(Modifier.height(sizing.spacing(12.dp)))
-
     // --- SUIVI LIVE (tracking seul) ---
+    // Placé juste sous les interrupteurs de notifications : c'est le réglage le plus consulté de la
+    // section, il ne doit pas se retrouver derrière le bloc « faible consommation ».
     // Ce réglage ne pilote que le service de suivi : les autres notifications de l'app dépendent de
     // l'interrupteur maître ci-dessus, et la permission POST_NOTIFICATIONS ne décide plus que de la
     // visibilité de la notification live — le suivi tourne sans elle.
@@ -3180,6 +3113,86 @@ fun SectionNotifications(
             footerText = stringResource(R.string.appstrings_live_location_accuracy_footer)
         )
     }
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
+
+    // --- MODE FAIBLE CONSOMMATION (Normal / Éco / Éco+) ---
+    val lowPowerLevel by AppConfig.lowPowerLevel
+    val lowPowerFollowSystem by AppConfig.lowPowerFollowSystem
+    // Niveau EFFECTIF (manuel, ou relevé par l'économie d'énergie système) → la sélection le reflète, réactif.
+    val effectiveLowPowerLevel = fr.geotower.utils.PowerProfile.level
+    fun applyLowPowerLevel(newLevel: Int) {
+        AppConfig.lowPowerLevel.intValue = newLevel
+        prefs.edit().putInt(AppConfig.PREF_LOW_POWER_LEVEL, newLevel).apply()
+        // Applique à chaud la priorité/intervalle GPS au service live s'il tourne.
+        LiveTrackingController.refreshLocationSettings(context)
+    }
+    Surface(
+        shape = shape,
+        border = border,
+        color = if (useOneUi) bubbleColor else Color.Transparent,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(Modifier.fillMaxWidth().padding(sizing.spacing(16.dp))) {
+            Text(
+                stringResource(R.string.appstrings_low_power_title),
+                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                stringResource(R.string.appstrings_low_power_desc),
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(sizing.spacing(12.dp)))
+            NavigationModeOption(
+                title = stringResource(R.string.appstrings_low_power_level_normal),
+                desc = stringResource(R.string.appstrings_low_power_level_normal_desc),
+                isSelected = effectiveLowPowerLevel == 0,
+                useOneUi = useOneUi,
+                onClick = { applyLowPowerLevel(0) }
+            )
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
+            NavigationModeOption(
+                title = stringResource(R.string.appstrings_low_power_level_eco),
+                desc = stringResource(R.string.appstrings_low_power_level_eco_desc),
+                isSelected = effectiveLowPowerLevel == 1,
+                useOneUi = useOneUi,
+                onClick = { applyLowPowerLevel(1) }
+            )
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
+            NavigationModeOption(
+                title = stringResource(R.string.appstrings_low_power_level_ecoplus),
+                desc = stringResource(R.string.appstrings_low_power_level_ecoplus_desc),
+                isSelected = effectiveLowPowerLevel == 2,
+                useOneUi = useOneUi,
+                onClick = { applyLowPowerLevel(2) }
+            )
+            if (effectiveLowPowerLevel > lowPowerLevel) {
+                Spacer(Modifier.height(sizing.spacing(8.dp)))
+                Text(
+                    stringResource(R.string.appstrings_low_power_forced_by_system),
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
+
+    PreferenceSwitchCard(
+        title = stringResource(R.string.appstrings_low_power_follow_system_title),
+        desc = stringResource(R.string.appstrings_low_power_follow_system_desc),
+        checked = lowPowerFollowSystem,
+        onCheckedChange = { isChecked ->
+            AppConfig.lowPowerFollowSystem.value = isChecked
+            prefs.edit().putBoolean(AppConfig.PREF_LOW_POWER_FOLLOW_SYSTEM, isChecked).apply()
+            LiveTrackingController.refreshLocationSettings(context)
+        },
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi
+    )
     Spacer(Modifier.height(sizing.spacing(12.dp)))
 
     // --- CURSEUR PARTAGÉ (Nettoyé des < 30 min) ---

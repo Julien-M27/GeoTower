@@ -39,10 +39,13 @@ import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.VerticalAlignTop
+import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -102,6 +105,7 @@ import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.settings.CommunityDataSettingsSheet
+import fr.geotower.ui.screens.settings.EmbeddedSiteBlocksSettingsSheet
 import fr.geotower.ui.screens.settings.MiniMapSettingsSheet
 import fr.geotower.ui.screens.settings.SitePhotosSettingsSheet
 import fr.geotower.ui.screens.settings.SupportSettingsSheet
@@ -214,6 +218,18 @@ fun SupportDetailScreen(
     var showSupportMiniMapSettingsSheet by remember { mutableStateOf(false) }
     var showSupportPhotosSettingsSheet by remember { mutableStateOf(false) }
     var showCommunityDataSettingsSheet by remember { mutableStateOf(false) }
+    // Mode simplifié : la page porte deux mises en page, celle du pylône et celle des sections
+    // opérateur dépliées. Un seul bouton ne peut pas désigner les deux — il ouvre donc un choix.
+    var showCustomizationTargetMenu by remember { mutableStateOf(false) }
+    var showEmbeddedSiteSettingsSheet by remember { mutableStateOf(false) }
+    val openPageCustomization: () -> Unit = {
+        settingsHighlightBlock = null
+        if (AppConfig.simpleModeActive()) {
+            showCustomizationTargetMenu = true
+        } else {
+            showSupportSettingsSheet = true
+        }
+    }
     val scrollState = rememberScrollState()
 
     LaunchedEffect(siteId, effectiveHighlightedOperatorKey, featureFlags, refreshTrigger) {
@@ -685,24 +701,48 @@ fun SupportDetailScreen(
                     actions = {
                         fr.geotower.ui.components.PageCustomizationHint(
                             page = fr.geotower.utils.PageScrollPrefs.SUPPORT,
-                            onOpenSettings = { safeClick { settingsHighlightBlock = null; showSupportSettingsSheet = true } }
+                            onOpenSettings = { safeClick { openPageCustomization() } }
                         ) {
-                            IconButton(
-                                onClick = { safeClick { settingsHighlightBlock = null; showSupportSettingsSheet = true } }
-                            ) {
-                                // En mode simplifié, une roue dentée se lit « réglages de l'app »
-                                // alors qu'elle ne règle que la mise en page de CETTE fiche. Des
-                                // blocs empilés le disent mieux. (Les blocs des opérateurs, eux,
-                                // se personnalisent depuis le pied de leur section dépliée.)
-                                Icon(
-                                    if (AppConfig.simpleModeActive()) {
-                                        Icons.Outlined.ViewAgenda
-                                    } else {
-                                        Icons.Default.Settings
-                                    },
-                                    contentDescription = stringResource(R.string.settings_pages_customization_title),
-                                    tint = MaterialTheme.colorScheme.onSurface
-                                )
+                            Box {
+                                IconButton(onClick = { safeClick { openPageCustomization() } }) {
+                                    // En mode simplifié, une roue dentée se lit « réglages de l'app »
+                                    // alors qu'elle ne règle que la mise en page de CETTE fiche. Des
+                                    // blocs empilés le disent mieux.
+                                    Icon(
+                                        if (AppConfig.simpleModeActive()) {
+                                            Icons.Outlined.ViewAgenda
+                                        } else {
+                                            Icons.Default.Settings
+                                        },
+                                        contentDescription = stringResource(R.string.settings_pages_customization_title),
+                                        tint = MaterialTheme.colorScheme.onSurface
+                                    )
+                                }
+                                DropdownMenu(
+                                    expanded = showCustomizationTargetMenu,
+                                    onDismissRequest = { showCustomizationTargetMenu = false },
+                                    // Le menu Material est presque carré (4 dp) : il détonne à côté
+                                    // des cartes et des feuilles de l'app, qui sont franchement
+                                    // arrondies. On lui donne la même rondeur qu'elles.
+                                    shape = uiStyle.cardShape
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.appstrings_page_support_settings)) },
+                                        leadingIcon = { Icon(Icons.Default.VerticalAlignTop, contentDescription = null) },
+                                        onClick = {
+                                            showCustomizationTargetMenu = false
+                                            showSupportSettingsSheet = true
+                                        }
+                                    )
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.appstrings_page_site_embedded_settings)) },
+                                        leadingIcon = { Icon(Icons.Default.WifiTethering, contentDescription = null) },
+                                        onClick = {
+                                            showCustomizationTargetMenu = false
+                                            showEmbeddedSiteSettingsSheet = true
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -1302,6 +1342,18 @@ fun SupportDetailScreen(
                 sheetState = pageSettingsSheetState,
                 useOneUi = uiStyle.useOneUi,
                 featureId = CommunityDataPreferences.FEATURE_PHOTOS
+            )
+        }
+
+        // Les blocs des sections opérateur dépliées : le même panneau que leur pied de section,
+        // atteignable sans avoir à en déplier une.
+        if (showEmbeddedSiteSettingsSheet) {
+            EmbeddedSiteBlocksSettingsSheet(
+                onDismiss = { showEmbeddedSiteSettingsSheet = false },
+                onBack = { showEmbeddedSiteSettingsSheet = false },
+                sheetState = pageSettingsSheetState,
+                useOneUi = uiStyle.useOneUi,
+                bubbleColor = uiStyle.bubbleColor
             )
         }
     }

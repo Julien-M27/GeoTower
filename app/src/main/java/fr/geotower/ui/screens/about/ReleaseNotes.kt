@@ -26,6 +26,17 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
+    section(stringResource(R.string.appstrings_release_section_spectrums)) {
+        item(stringResource(R.string.appstrings_release_v202_bandwidth_vs_spectrum))
+        item(stringResource(R.string.appstrings_release_v202_spectrum_column))
+        item(stringResource(R.string.appstrings_release_v202_bandwidth_warning))
+        item(stringResource(R.string.appstrings_release_v202_nonbreaking_frequencies))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_image_sharing)) {
+        item(stringResource(R.string.appstrings_release_v202_share_spectrum))
+    }
+
     section(stringResource(R.string.appstrings_release_section_global)) {
         item(stringResource(R.string.appstrings_release_v20_play_store))
     }
@@ -43,6 +54,10 @@ internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
 
     section(stringResource(R.string.appstrings_release_section_database)) {
         item(stringResource(R.string.appstrings_release_v20_db_generating_banner))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_settings)) {
+        item(stringResource(R.string.appstrings_release_v202_embedded_blocks_panel))
     }
 
     section(stringResource(R.string.appstrings_release_section_diagnostic)) {

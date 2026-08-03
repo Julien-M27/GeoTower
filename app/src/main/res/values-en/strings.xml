@@ -340,6 +340,10 @@
     <string name="appstrings_azimuths_title">Azimuths</string>
     <string name="appstrings_back">Back</string>
     <string name="appstrings_bands_not_specified">Bands not specified</string>
+    <string name="appstrings_bandwidth_by_range">Bandwidth by frequency range</string>
+    <string name="appstrings_bandwidth_title">Bandwidth</string>
+    <string name="appstrings_bandwidth_total">Total bandwidth</string>
+    <string name="appstrings_bandwidth_total_warning">The total bandwidth may be inaccurate due to likely declaration errors.</string>
     <string name="appstrings_bearing_label">Bearing measured from the antenna :\u0020</string>
     <string name="appstrings_bg_location_perm_desc">Allow "Always" for the widget to refresh</string>
     <string name="appstrings_battery_opt_title">Disable battery optimization</string>
@@ -366,10 +370,10 @@
     <string name="appstrings_closest_site">Closest site</string>
     <string name="appstrings_col_azimuth">Azimuth</string>
     <string name="appstrings_col_band">Band</string>
-    <string name="appstrings_col_freqs">Frequencies</string>
     <string name="appstrings_col_height">Height</string>
     <string name="appstrings_col_id">ID</string>
     <string name="appstrings_col_panel_size">Panel size</string>
+    <string name="appstrings_col_spectrum">Spectrum</string>
     <string name="appstrings_pdf_table_continued">%1$s (continued)</string>
     <string name="appstrings_pdf_page_indicator">Page %1$d / %2$d</string>
     <string name="appstrings_col_type">Type</string>
@@ -832,6 +836,7 @@
     <string name="appstrings_page_map_settings">Antennas map</string>
     <string name="appstrings_page_nearby_settings">Nearby antennas</string>
     <string name="appstrings_page_site_settings">Site details</string>
+    <string name="appstrings_page_site_embedded_settings">Site details (operator sections)</string>
     <string name="appstrings_page_speedtests_settings">Speedtests</string>
     <string name="appstrings_page_support_settings">Support details</string>
     <string name="appstrings_pages_customization_desc">Customize the display of the different pages of the application</string>
@@ -1165,7 +1170,6 @@
     <string name="appstrings_sites_in_service_label">In service</string>
     <string name="appstrings_sites_label">Sites</string>
     <string name="appstrings_sites_out_of_service_label">Down</string>
-    <string name="appstrings_spectrum_by_band">Spectrum by frequency band</string>
     <string name="appstrings_spectrum_title">Spectrum</string>
     <string name="appstrings_speed_label">Speed :\u0020</string>
     <string name="appstrings_speedtest_download">Download</string>
@@ -1330,8 +1334,6 @@
     <string name="appstrings_throughput_use_current_position">Use my current position</string>
     <string name="appstrings_tools">Tools</string>
     <string name="appstrings_top">Top</string>
-    <string name="appstrings_total_spectrum_warning">The total spectrum may be inaccurate due to likely declaration errors.</string>
-    <string name="appstrings_totalspectrum">Total spectrum</string>
     <string name="appstrings_track_global_active">Global tracking active...</string>
     <string name="appstrings_unavailable">Unavailable</string>
     <string name="appstrings_understood">Understood</string>
@@ -2458,4 +2460,12 @@
     <string name="appstrings_release_v20_debug_log">Debug log you can read, share and clear</string>
     <string name="appstrings_release_v20_diagnostic_server">New section showing which GeoTower server is responding</string>
     <string name="appstrings_release_v20_bg_location_disclosure">Explanation screen before the widget\'s background location request</string>
+
+    <!-- Release notes 2.0.2 -->
+    <string name="appstrings_release_v202_bandwidth_vs_spectrum">The occupied spectrum and the bandwidth are now two separate settings</string>
+    <string name="appstrings_release_v202_spectrum_column">New “Spectrum” column in the antenna table</string>
+    <string name="appstrings_release_v202_bandwidth_warning">Warning on the total bandwidth, since declarations may contain errors</string>
+    <string name="appstrings_release_v202_nonbreaking_frequencies">Frequencies are no longer split across two lines</string>
+    <string name="appstrings_release_v202_embedded_blocks_panel">New “Antenna detail (operator sections)” panel, reachable from the mast page or from Settings</string>
+    <string name="appstrings_release_v202_share_spectrum">Share images now reflect the spectrum / bandwidth distinction</string>
 </resources>

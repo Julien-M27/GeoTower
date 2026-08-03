@@ -142,6 +142,27 @@ object SitePagePrefs {
     val freqs = BooleanPreference("page_site_freqs", true)
     val links = BooleanPreference("page_site_links", true)
 
+    /** Clé de visibilité d'un bloc dans une section opérateur du mode simplifié. */
+    fun embeddedKey(prefKey: String): String = prefKey + EMBEDDED_SUFFIX
+
+    /**
+     * Visibilité d'un bloc dans une section opérateur, clé encore absente comprise : les blocs de
+     * [embeddedHiddenByDefault] démarrent masqués, les autres reprennent le choix déjà fait sur la
+     * fiche site autonome ([standaloneValue]).
+     *
+     * Vit ici plutôt que dans l'écran : la fiche site n'est plus la seule à lire ces clés depuis que
+     * le panneau des sections opérateur s'ouvre aussi depuis la fiche du pylône et les réglages.
+     */
+    fun readEmbedded(
+        prefs: SharedPreferences,
+        blockId: String,
+        prefKey: String,
+        standaloneValue: Boolean
+    ): Boolean {
+        val fallback = if (blockId in embeddedHiddenByDefault) false else standaloneValue
+        return prefs.getBoolean(embeddedKey(prefKey), fallback)
+    }
+
     fun order(prefs: SharedPreferences): List<String> {
         return normalizeOrder((prefs.getString(ORDER, DEFAULT_ORDER) ?: DEFAULT_ORDER).split(","))
     }

@@ -282,6 +282,10 @@
     <string name="appstrings_azimuths_title">Azimuths</string>
     <string name="appstrings_back">Back</string>
     <string name="appstrings_bands_not_specified">Bands not specified</string>
+    <string name="appstrings_bandwidth_by_range">Bandwidth by frequency range</string>
+    <string name="appstrings_bandwidth_title">Bandwidth</string>
+    <string name="appstrings_bandwidth_total">Total bandwidth</string>
+    <string name="appstrings_bandwidth_total_warning">The total bandwidth may be inaccurate due to likely declaration errors.</string>
     <string name="appstrings_bearing_label">Bearing measured from the antenna :\u0020</string>
     <string name="appstrings_bg_location_perm_desc">Allow "Always" for the widget to refresh</string>
     <string name="appstrings_bg_location_perm_title">Widget Permission</string>
@@ -306,9 +310,9 @@
     <string name="appstrings_closest_site">Closest site</string>
     <string name="appstrings_col_azimuth">Azimuth</string>
     <string name="appstrings_col_band">Band</string>
-    <string name="appstrings_col_freqs">Frequencies</string>
     <string name="appstrings_col_height">Height</string>
     <string name="appstrings_col_service">In service</string>
+    <string name="appstrings_col_spectrum">Spectrum</string>
     <string name="appstrings_col_state">State</string>
     <string name="appstrings_col_techno">Techno.</string>
     <string name="appstrings_color_palette_amber_desc">Material 3 amber system palette</string>
@@ -665,6 +669,7 @@
     <string name="appstrings_page_map_settings">Antennas map</string>
     <string name="appstrings_page_nearby_settings">Nearby antennas</string>
     <string name="appstrings_page_site_settings">Site details</string>
+    <string name="appstrings_page_site_embedded_settings">Site details (operator sections)</string>
     <string name="appstrings_page_support_settings">Support details</string>
     <string name="appstrings_pages_customization_desc">Customize the display of the different pages of the application</string>
     <string name="appstrings_pages_customization_title">Pages customization</string>
@@ -779,7 +784,6 @@
     <string name="appstrings_sites_in_service_label">In service</string>
     <string name="appstrings_sites_label">Sites</string>
     <string name="appstrings_sites_out_of_service_label">Out of Service</string>
-    <string name="appstrings_spectrum_by_band">Spectrum by frequency band</string>
     <string name="appstrings_spectrum_title">Spectrum</string>
     <string name="appstrings_speed_label">Speed :\u0020</string>
     <string name="appstrings_speedtest_download">Download</string>
@@ -902,8 +906,6 @@
     <string name="appstrings_throughput_use_current_position">Use my current position</string>
     <string name="appstrings_tools">Tools</string>
     <string name="appstrings_top">Top</string>
-    <string name="appstrings_total_spectrum_warning">The total spectrum may be inaccurate due to likely declaration errors.</string>
-    <string name="appstrings_totalspectrum">Total spectrum</string>
     <string name="appstrings_track_global_active">Global tracking active...</string>
     <string name="appstrings_unavailable">Unavailable</string>
     <string name="appstrings_understood">Understood</string>

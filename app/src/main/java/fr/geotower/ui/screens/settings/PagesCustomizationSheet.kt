@@ -385,7 +385,14 @@ fun PagesCustomizationSheet(
                 NavigationMenuItem(title = stringResource(R.string.appstrings_page_support_settings), icon = Icons.Default.VerticalAlignTop, isSelected = false, isDark = isDark) { onSupportClick() }
             }
             if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)) {
-                NavigationMenuItem(title = stringResource(R.string.appstrings_page_site_settings), icon = Icons.Default.WifiTethering, isSelected = false, isDark = isDark) { onSiteClick() }
+                // En mode simplifié la fiche site autonome n'est plus atteignable : ces blocs ne
+                // s'affichent que dépliés sous leur opérateur, et c'est ce que règle cette ligne.
+                val siteSettingsTitle = if (simpleMode) {
+                    stringResource(R.string.appstrings_page_site_embedded_settings)
+                } else {
+                    stringResource(R.string.appstrings_page_site_settings)
+                }
+                NavigationMenuItem(title = siteSettingsTitle, icon = Icons.Default.WifiTethering, isSelected = false, isDark = isDark) { onSiteClick() }
                 NavigationMenuItem(title = stringResource(R.string.appstrings_page_speedtests_settings), icon = Icons.Default.Speed, isSelected = false, isDark = isDark) { onSpeedtestsClick() }
             }
             if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THEORETICAL_COVERAGE)) {
@@ -2137,10 +2144,13 @@ fun SiteSettingsSheet(
     sheetState: SheetState,
     useOneUi: Boolean,
     bubbleColor: Color,
-    highlightBlockId: String? = null
+    highlightBlockId: String? = null,
+    // Les sections opérateur du mode simplifié réutilisent cette feuille avec leur propre titre :
+    // ce sont les mêmes blocs, mais réglés séparément (cf. EmbeddedSiteBlocksSettingsSheet).
+    title: String? = null
 ) {
     ReorderableBlockSettingsSheet(
-        title = stringResource(R.string.appstrings_page_site_settings),
+        title = title ?: stringResource(R.string.appstrings_page_site_settings),
         order = siteOrder,
         blocks = listOf(
             ConfigurableBlock("operator", { stringResource(R.string.appstrings_site_operator_option) }, showOperator, onOperatorChange),
@@ -3075,37 +3085,57 @@ fun SiteFreqFiltersSheet(
                 }
             }
 
+            // Spectre : les plages de fréquences (« 708-718 MHz »), colonne du tableau des
+            // antennes en grille et lignes de la fiche. Indépendant de la largeur de bande.
+            Card(
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp)),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+            ) {
+                Row(modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp)), verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.appstrings_spectrum_title), fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp), modifier = Modifier.weight(1f))
+                    val onSpectrumRangesChange = { newValue: Boolean ->
+                        saveBool("site_show_spectrum_ranges", AppConfig.siteShowSpectrumRanges, newValue)
+                    }
+                    fr.geotower.ui.components.GeoTowerSwitch(
+                        checked = AppConfig.siteShowSpectrumRanges.value,
+                        onCheckedChange = onSpectrumRangesChange,
+                        useOneUi = useOneUi,
+                        checkedColor = switchColor
+                    )
+                }
+            }
+
             Card(
                 modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp)),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
             ) {
                 Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(R.string.appstrings_spectrum_title), fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp), modifier = Modifier.weight(1f))
+                        Text(stringResource(R.string.appstrings_bandwidth_title), fontWeight = FontWeight.Bold, fontSize = sizing.text(16.sp), modifier = Modifier.weight(1f))
                         val onSpectrumChange = { newValue: Boolean ->
-                            saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, newValue)
-                            saveBool("site_show_spectrum_band", AppConfig.siteShowSpectrumBand, newValue)
-                            saveBool("site_show_spectrum_total", AppConfig.siteShowSpectrumTotal, newValue)
+                            saveBool("site_show_spectrum", AppConfig.siteShowBandwidth, newValue)
+                            saveBool("site_show_spectrum_band", AppConfig.siteShowBandwidthPerRange, newValue)
+                            saveBool("site_show_spectrum_total", AppConfig.siteShowBandwidthTotal, newValue)
                         }
                         fr.geotower.ui.components.GeoTowerSwitch(
-                            checked = AppConfig.siteShowSpectrum.value,
+                            checked = AppConfig.siteShowBandwidth.value,
                             onCheckedChange = onSpectrumChange,
                             useOneUi = useOneUi,
                             checkedColor = switchColor
                         )
                     }
-                    AnimatedVisibility(visible = AppConfig.siteShowSpectrum.value) {
+                    AnimatedVisibility(visible = AppConfig.siteShowBandwidth.value) {
                         Column {
                             HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(8.dp)), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(4.dp)), verticalAlignment = Alignment.CenterVertically) {
-                                Text(stringResource(R.string.appstrings_spectrum_by_band), modifier = Modifier.weight(1f), style = sizing.textStyle(MaterialTheme.typography.bodyMedium))
+                                Text(stringResource(R.string.appstrings_bandwidth_by_range), modifier = Modifier.weight(1f), style = sizing.textStyle(MaterialTheme.typography.bodyMedium))
                                 val onBandChange = { newValue: Boolean ->
-                                    saveBool("site_show_spectrum_band", AppConfig.siteShowSpectrumBand, newValue)
-                                    if (!newValue && !AppConfig.siteShowSpectrumTotal.value) saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, false)
-                                    else if (newValue && !AppConfig.siteShowSpectrum.value) saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, true)
+                                    saveBool("site_show_spectrum_band", AppConfig.siteShowBandwidthPerRange, newValue)
+                                    if (!newValue && !AppConfig.siteShowBandwidthTotal.value) saveBool("site_show_spectrum", AppConfig.siteShowBandwidth, false)
+                                    else if (newValue && !AppConfig.siteShowBandwidth.value) saveBool("site_show_spectrum", AppConfig.siteShowBandwidth, true)
                                 }
                                 fr.geotower.ui.components.GeoTowerSwitch(
-                                    checked = AppConfig.siteShowSpectrumBand.value,
+                                    checked = AppConfig.siteShowBandwidthPerRange.value,
                                     onCheckedChange = onBandChange,
                                     modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
                                     useOneUi = useOneUi,
@@ -3113,14 +3143,14 @@ fun SiteFreqFiltersSheet(
                                 )
                             }
                             Row(modifier = Modifier.fillMaxWidth().padding(vertical = sizing.spacing(4.dp)), verticalAlignment = Alignment.CenterVertically) {
-                                Text(stringResource(R.string.appstrings_totalspectrum), modifier = Modifier.weight(1f), style = sizing.textStyle(MaterialTheme.typography.bodyMedium))
+                                Text(stringResource(R.string.appstrings_bandwidth_total), modifier = Modifier.weight(1f), style = sizing.textStyle(MaterialTheme.typography.bodyMedium))
                                 val onTotalChange = { newValue: Boolean ->
-                                    saveBool("site_show_spectrum_total", AppConfig.siteShowSpectrumTotal, newValue)
-                                    if (!newValue && !AppConfig.siteShowSpectrumBand.value) saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, false)
-                                    else if (newValue && !AppConfig.siteShowSpectrum.value) saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, true)
+                                    saveBool("site_show_spectrum_total", AppConfig.siteShowBandwidthTotal, newValue)
+                                    if (!newValue && !AppConfig.siteShowBandwidthPerRange.value) saveBool("site_show_spectrum", AppConfig.siteShowBandwidth, false)
+                                    else if (newValue && !AppConfig.siteShowBandwidth.value) saveBool("site_show_spectrum", AppConfig.siteShowBandwidth, true)
                                 }
                                 fr.geotower.ui.components.GeoTowerSwitch(
-                                    checked = AppConfig.siteShowSpectrumTotal.value,
+                                    checked = AppConfig.siteShowBandwidthTotal.value,
                                     onCheckedChange = onTotalChange,
                                     modifier = Modifier.scale(if (useOneUi) 0.85f else 0.8f),
                                     useOneUi = useOneUi,
@@ -3168,9 +3198,10 @@ fun SiteFreqFiltersSheet(
                     saveBool("site_f3g_900", AppConfig.siteF3G_900, true)
                     saveBool("site_f2g_1800", AppConfig.siteF2G_1800, true)
                     saveBool("site_f2g_900", AppConfig.siteF2G_900, true)
-                    saveBool("site_show_spectrum", AppConfig.siteShowSpectrum, true)
-                    saveBool("site_show_spectrum_band", AppConfig.siteShowSpectrumBand, true)
-                    saveBool("site_show_spectrum_total", AppConfig.siteShowSpectrumTotal, true)
+                    saveBool("site_show_spectrum", AppConfig.siteShowBandwidth, true)
+                    saveBool("site_show_spectrum_band", AppConfig.siteShowBandwidthPerRange, true)
+                    saveBool("site_show_spectrum_total", AppConfig.siteShowBandwidthTotal, true)
+                    saveBool("site_show_spectrum_ranges", AppConfig.siteShowSpectrumRanges, true)
                 },
                 modifier = Modifier.align(Alignment.CenterHorizontally)
             ) {

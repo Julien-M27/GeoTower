@@ -262,14 +262,23 @@ fun SiteFrequenciesBlock(
                                     .filter { it.isNotBlank() }
                                     .joinToString("\n")
 
-                                // ✅ ÉTAPE 1 : On vérifie si le switch maître du spectre est activé
-                                if (AppConfig.siteShowSpectrum.value && preciseFreqs.isNotBlank() && preciseFreqs != band.rawFreq.trim()) {
+                                if (preciseFreqs.isNotBlank() && preciseFreqs != band.rawFreq.trim()) {
                                     val spectrumDisplay = formatSpectrumDisplayDetails(preciseFreqs)
+                                    // Le spectre (« 708-718 MHz ») et la largeur de bande (« 10 MHz »)
+                                    // ont chacun leur interrupteur : ils s'affichent séparément ou ensemble.
+                                    val showSpectrum = AppConfig.siteShowSpectrumRanges.value
+                                    val showBandwidthPerRange =
+                                        AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthPerRange.value
+                                    val showBandwidthTotal =
+                                        AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthTotal.value && spectrumDisplay.hasTotal
 
-                                    // ✅ ÉTAPE 2 : On affiche le détail par bande uniquement si son switch est actif
-                                    if (AppConfig.siteShowSpectrumBand.value) {
+                                    if (showSpectrum || showBandwidthPerRange) {
+                                        val detailTitle = stringResource(
+                                            if (showSpectrum) R.string.appstrings_spectrum_title
+                                            else R.string.appstrings_bandwidth_by_range
+                                        )
                                         Text(
-                                            text = "${stringResource(R.string.appstrings_spectrum_by_band)} :\n\n${spectrumDisplay.detailedFrequencies}",
+                                            text = "$detailTitle :\n\n${spectrumDisplay.detailedFrequencies(showSpectrum, showBandwidthPerRange)}",
                                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             fontSize = sizing.text(12.sp),
                                             fontWeight = FontWeight.Medium,
@@ -277,25 +286,24 @@ fun SiteFrequenciesBlock(
                                         )
                                     }
 
-                                    // ✅ ÉTAPE 3 : On affiche le spectre total uniquement si son switch est actif et qu'il y a une valeur
-                                    if (AppConfig.siteShowSpectrumTotal.value && spectrumDisplay.hasTotal) {
+                                    if (showBandwidthTotal) {
                                         // On ajoute un petit espace seulement si le texte du dessus est affiché
-                                        if (AppConfig.siteShowSpectrumBand.value) {
+                                        if (showSpectrum || showBandwidthPerRange) {
                                             Spacer(modifier = Modifier.height(sizing.spacing(2.dp)))
                                         }
 
-                                        Text(text = "${stringResource(R.string.appstrings_totalspectrum)} : ${spectrumDisplay.totalBandwidth} ${spectrumDisplay.totalUnit}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = sizing.text(12.sp), fontWeight = FontWeight.Medium)
+                                        Text(text = "${stringResource(R.string.appstrings_bandwidth_total)} : ${spectrumDisplay.totalBandwidth} ${spectrumDisplay.totalUnit}", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = sizing.text(12.sp), fontWeight = FontWeight.Medium)
                                         Spacer(modifier = Modifier.height(sizing.spacing(2.dp)))
                                         Text(
-                                            text = stringResource(R.string.appstrings_total_spectrum_warning),
+                                            text = stringResource(R.string.appstrings_bandwidth_total_warning),
                                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.78f),
                                             fontSize = sizing.text(11.sp),
                                             lineHeight = 13.sp
                                         )
                                     }
 
-                                    // Espacement final uniquement si l'un des deux éléments a été affiché
-                                    if (AppConfig.siteShowSpectrumBand.value || (AppConfig.siteShowSpectrumTotal.value && spectrumDisplay.hasTotal)) {
+                                    // Espacement final uniquement si l'un des éléments a été affiché
+                                    if (showSpectrum || showBandwidthPerRange || showBandwidthTotal) {
                                         Spacer(modifier = Modifier.height(sizing.spacing(4.dp)))
                                     }
                                 }
@@ -523,6 +531,12 @@ fun FrequenciesGridView(
     val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
     val headerBgColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.8f)
     val subHeaderBgColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+    // Dernière colonne du tableau des antennes : spectre et/ou largeur de bande, chacun
+    // désactivable dans Personnalisation des pages. Colonne masquée si les deux sont coupés.
+    val showSpectrum = AppConfig.siteShowSpectrumRanges.value
+    val showBandwidth =
+        AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthPerRange.value
+    val showSpectrumColumn = showSpectrum || showBandwidth
 
     // --- TABLEAU 1 : ÉMETTEURS (Techno / Date / État) ---
     Card(
@@ -652,6 +666,8 @@ fun FrequenciesGridView(
 
     parsedBands.forEach { band ->
         // ✅ NOUVEAU : Formatage propre "4G 700"
+        // Pas d'insécable ici : la colonne est trop étroite pour « 4G 2600 MHz » d'un bloc,
+        // le libellé serait coupé en plein mot (« 5G 2100 MH / z »).
         val technoName = displayFrequencyBandLabel(band)
         val bandEquivalent = null
 
@@ -660,24 +676,17 @@ fun FrequenciesGridView(
             .filter { it.isNotBlank() }
             .joinToString("\n")
 
-        // Normalisation des plages de fréquences pour un rendu compact.
-        val displayFreqs = if (freqs.isNotBlank()) {
-            Regex("""([0-9]+(?:[.,][0-9]+)?)\s*-\s*([0-9]+(?:[.,][0-9]+)?)\s*([a-zA-Z]*Hz)?""")
-                .replace(freqs) { match ->
-                    val unit = match.groupValues[3].takeIf { it.isNotBlank() }
-                    buildString {
-                        append(match.groupValues[1])
-                        append(" - ")
-                        append(match.groupValues[2])
-                        if (unit != null) append(" ").append(unit)
-                    }
-                }
-                .replace(Regex("""\s*,\s*"""), ", ")
-                .replace(Regex("""[ \t]+"""), " ")
-                .trim()
-        } else {
-            "-"
-        }
+        // Rendu compact de la cellule : « 708 - 718 MHz », « 708 - 718 MHz [10 MHz] » ou
+        // « 10 MHz », selon les interrupteurs Spectre et Largeur de bande.
+        val displayFreqs = formatSpectrumDisplayDetails(freqs)
+            .detailedFrequencies(
+                withSpectrum = showSpectrum,
+                withBandwidth = showBandwidth,
+                spaced = true
+            )
+            .replace(Regex("""[ \t]+"""), " ")
+            .trim()
+            .ifBlank { "-" }
 
         val isMutedByMapFilter = mapFrequencyFilter?.let { filter ->
             !filter.isFullyEnabled && !filter.matchesBand(band.gen, band.value)
@@ -762,14 +771,19 @@ fun FrequenciesGridView(
                     fontSize = sizing.text(12.sp),
                     textAlign = TextAlign.Center
                 )
-                VerticalDivider(color = borderColor)
-                Text(
-                    stringResource(R.string.appstrings_col_freqs),
-                    modifier = Modifier.weight(1.6f).padding(sizing.spacing(6.dp)),
-                    fontWeight = FontWeight.Bold,
-                    fontSize = sizing.text(12.sp),
-                    textAlign = TextAlign.Center
-                )
+                if (showSpectrumColumn) {
+                    VerticalDivider(color = borderColor)
+                    Text(
+                        stringResource(
+                            if (showSpectrum) R.string.appstrings_col_spectrum
+                            else R.string.appstrings_bandwidth_title
+                        ),
+                        modifier = Modifier.weight(1.6f).padding(sizing.spacing(6.dp)),
+                        fontWeight = FontWeight.Bold,
+                        fontSize = sizing.text(12.sp),
+                        textAlign = TextAlign.Center
+                    )
+                }
             }
             HorizontalDivider(color = borderColor)
 
@@ -834,7 +848,8 @@ fun FrequenciesGridView(
                     VerticalDivider(color = borderColor)
 
                     // 2. Colonne des hauteurs
-                    Column(modifier = Modifier.weight(3.6f)) { // 1.0 + 1.0 + 1.6 = 3.6
+                    // Hauteur + Bande (+ Spectre quand la colonne est affichée) : 1.0 + 1.0 (+ 1.6)
+                    Column(modifier = Modifier.weight(if (showSpectrumColumn) 3.6f else 2f)) {
                         sortedHauteurs.forEachIndexed { hauteurIndex, hauteurEntry ->
                             val hauteur = hauteurEntry.key
                             val rows = hauteurEntry.value
@@ -856,8 +871,8 @@ fun FrequenciesGridView(
                                 }
                                 VerticalDivider(color = borderColor)
 
-                                // 2B. Sous-tableau : Technologies et Fréquences
-                                Column(modifier = Modifier.weight(2.6f)) { // 1.0 + 1.6 = 2.6
+                                // 2B. Sous-tableau : Technologies et Spectre
+                                Column(modifier = Modifier.weight(if (showSpectrumColumn) 2.6f else 1f)) { // 1.0 (+ 1.6)
                                     rows.forEachIndexed { rowIndex, rowItem ->
                                         Row(
                                             modifier = Modifier.fillMaxWidth()
@@ -888,16 +903,18 @@ fun FrequenciesGridView(
                                                     )
                                                 }
                                             }
-                                            VerticalDivider(color = borderColor)
-                                            Text(
-                                                text = rowItem.freqs,
-                                                modifier = Modifier.weight(1.6f)
-                                                    .padding(vertical = sizing.spacing(8.dp), horizontal = sizing.spacing(4.dp)),
-                                                fontSize = sizing.text(11.sp),
-                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                textAlign = TextAlign.Center,
-                                                lineHeight = 16.sp
-                                            )
+                                            if (showSpectrumColumn) {
+                                                VerticalDivider(color = borderColor)
+                                                Text(
+                                                    text = rowItem.freqs,
+                                                    modifier = Modifier.weight(1.6f)
+                                                        .padding(vertical = sizing.spacing(8.dp), horizontal = sizing.spacing(4.dp)),
+                                                    fontSize = sizing.text(11.sp),
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                                    textAlign = TextAlign.Center,
+                                                    lineHeight = 16.sp
+                                                )
+                                            }
                                         }
                                         if (rowIndex < rows.lastIndex) HorizontalDivider(color = borderColor)
                                     }

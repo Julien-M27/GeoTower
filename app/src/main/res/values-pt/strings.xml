@@ -340,6 +340,10 @@
     <string name="appstrings_azimuths_title">Azimutes</string>
     <string name="appstrings_back">Voltar</string>
     <string name="appstrings_bands_not_specified">Bandas não especificadas</string>
+    <string name="appstrings_bandwidth_by_range">Largura de banda por faixa de frequência</string>
+    <string name="appstrings_bandwidth_title">Largura de banda</string>
+    <string name="appstrings_bandwidth_total">Largura de banda total</string>
+    <string name="appstrings_bandwidth_total_warning">A largura de banda total pode estar incorreta devido a prováveis erros de declaração.</string>
     <string name="appstrings_bearing_label">Rumo medido a partir da antena :\u0020</string>
     <string name="appstrings_bg_location_perm_desc">Permita "Sempre" para o widget atualizar</string>
     <string name="appstrings_battery_opt_title">Desativar a otimização de bateria</string>
@@ -366,10 +370,10 @@
     <string name="appstrings_closest_site">Local mais prochain</string>
     <string name="appstrings_col_azimuth">Azimute</string>
     <string name="appstrings_col_band">Banda</string>
-    <string name="appstrings_col_freqs">Frequências</string>
     <string name="appstrings_col_height">Altura</string>
     <string name="appstrings_col_id">ID</string>
     <string name="appstrings_col_panel_size">Tamanho painel</string>
+    <string name="appstrings_col_spectrum">Espectro</string>
     <string name="appstrings_pdf_table_continued">%1$s (continuação)</string>
     <string name="appstrings_pdf_page_indicator">Página %1$d / %2$d</string>
     <string name="appstrings_col_type">Tipo</string>
@@ -832,6 +836,7 @@
     <string name="appstrings_page_map_settings">Mapa de antenas</string>
     <string name="appstrings_page_nearby_settings">Antenas próximas</string>
     <string name="appstrings_page_site_settings">Detalhes do site</string>
+    <string name="appstrings_page_site_embedded_settings">Detalhes do site (secções de operador)</string>
     <string name="appstrings_page_speedtests_settings">Speedtests</string>
     <string name="appstrings_page_support_settings">Detalhes do suporte</string>
     <string name="appstrings_pages_customization_desc">Personalize a exibição das differentes páginas do aplicativo</string>
@@ -1165,7 +1170,6 @@
     <string name="appstrings_sites_in_service_label">Em serviço</string>
     <string name="appstrings_sites_label">Locais</string>
     <string name="appstrings_sites_out_of_service_label">Avariado</string>
-    <string name="appstrings_spectrum_by_band">Espectro por faixa de fréquence</string>
     <string name="appstrings_spectrum_title">Espectro</string>
     <string name="appstrings_speed_label">Velocidade :\u0020</string>
     <string name="appstrings_speedtest_download">Download</string>
@@ -1330,8 +1334,6 @@
     <string name="appstrings_throughput_use_current_position">Usar a minha posição atual</string>
     <string name="appstrings_tools">Ferramentas</string>
     <string name="appstrings_top">Topo</string>
-    <string name="appstrings_total_spectrum_warning">O espectro total pode estar incorreto devido a prováveis erros de declaração.</string>
-    <string name="appstrings_totalspectrum">Espectro total</string>
     <string name="appstrings_track_global_active">Acompanhamento global ativo...</string>
     <string name="appstrings_unavailable">Indisponível</string>
     <string name="appstrings_understood">Entendi</string>
@@ -2458,4 +2460,12 @@
     <string name="appstrings_release_v20_debug_log">Registo de depuração que pode consultar, partilhar e apagar</string>
     <string name="appstrings_release_v20_diagnostic_server">Nova secção que indica qual servidor GeoTower responde</string>
     <string name="appstrings_release_v20_bg_location_disclosure">Ecrã explicativo antes do pedido de localização em segundo plano do widget</string>
+
+    <!-- Notas da versão 2.0.2 -->
+    <string name="appstrings_release_v202_bandwidth_vs_spectrum">O espetro ocupado e a largura de banda são agora duas definições distintas</string>
+    <string name="appstrings_release_v202_spectrum_column">Nova coluna «Espetro» na tabela das antenas</string>
+    <string name="appstrings_release_v202_bandwidth_warning">Aviso sobre a largura de banda total, uma vez que as declarações podem conter erros</string>
+    <string name="appstrings_release_v202_nonbreaking_frequencies">As frequências deixam de ser cortadas no fim da linha</string>
+    <string name="appstrings_release_v202_embedded_blocks_panel">Novo painel «Detalhe da antena (secções por operadora)», acessível a partir da ficha do poste ou das definições</string>
+    <string name="appstrings_release_v202_share_spectrum">As imagens de partilha refletem a distinção entre espetro e largura de banda</string>
 </resources>

@@ -340,6 +340,10 @@
     <string name="appstrings_azimuths_title">Azimuts</string>
     <string name="appstrings_back">Retour</string>
     <string name="appstrings_bands_not_specified">Bandes non spécifiées</string>
+    <string name="appstrings_bandwidth_by_range">Largeur de bande par plage de fréquence</string>
+    <string name="appstrings_bandwidth_title">Largeur de bande</string>
+    <string name="appstrings_bandwidth_total">Largeur de bande totale</string>
+    <string name="appstrings_bandwidth_total_warning">La largeur de bande totale peut être erronée en raison de probables erreurs de déclaration.</string>
     <string name="appstrings_bearing_label">Cap mesuré depuis l’antenne :\u0020</string>
     <string name="appstrings_bg_location_perm_desc">Autorisez "Toujours" pour que le widget s\'actualise</string>
     <string name="appstrings_battery_opt_title">Désactiver l\'optimisation batterie</string>
@@ -366,10 +370,10 @@
     <string name="appstrings_closest_site">Site le plus proche</string>
     <string name="appstrings_col_azimuth">Azimut</string>
     <string name="appstrings_col_band">Bande</string>
-    <string name="appstrings_col_freqs">Fréquences</string>
     <string name="appstrings_col_height">Hauteur</string>
     <string name="appstrings_col_id">ID</string>
     <string name="appstrings_col_panel_size">Taille panneau</string>
+    <string name="appstrings_col_spectrum">Spectre</string>
     <string name="appstrings_pdf_table_continued">%1$s (suite)</string>
     <string name="appstrings_pdf_page_indicator">Page %1$d / %2$d</string>
     <string name="appstrings_col_type">Type</string>
@@ -832,6 +836,7 @@
     <string name="appstrings_page_map_settings">Carte des antennes</string>
     <string name="appstrings_page_nearby_settings">Antennes à proximité</string>
     <string name="appstrings_page_site_settings">Détail de l\'antenne (Site)</string>
+    <string name="appstrings_page_site_embedded_settings">Détail de l\'antenne (sections opérateur)</string>
     <string name="appstrings_page_speedtests_settings">Speedtests</string>
     <string name="appstrings_page_support_settings">Détail du pylône (Support)</string>
     <string name="appstrings_pages_customization_desc">Personnalisez l\'affichage des différentes pages de l\'application</string>
@@ -1165,7 +1170,6 @@
     <string name="appstrings_sites_in_service_label">En service</string>
     <string name="appstrings_sites_label">Sites</string>
     <string name="appstrings_sites_out_of_service_label">En Panne</string>
-    <string name="appstrings_spectrum_by_band">Spectre par plage de fréquence</string>
     <string name="appstrings_spectrum_title">Spectre</string>
     <string name="appstrings_speed_label">Vitesse :\u0020</string>
     <string name="appstrings_speedtest_download">Descendant</string>
@@ -1330,8 +1334,6 @@
     <string name="appstrings_throughput_use_current_position">Utiliser ma position actuelle</string>
     <string name="appstrings_tools">Outils</string>
     <string name="appstrings_top">Haut</string>
-    <string name="appstrings_total_spectrum_warning">Le spectre total peut être erroné en raison de probables erreurs de déclaration.</string>
-    <string name="appstrings_totalspectrum">Spectre total</string>
     <string name="appstrings_track_global_active">Suivi global en cours...</string>
     <string name="appstrings_unavailable">Indisponible</string>
     <string name="appstrings_understood">J\'ai compris</string>
@@ -2460,4 +2462,12 @@
     <string name="appstrings_release_v20_debug_log">Journal de débogage consultable, partageable et effaçable</string>
     <string name="appstrings_release_v20_diagnostic_server">Nouvelle section indiquant quel serveur GeoTower répond</string>
     <string name="appstrings_release_v20_bg_location_disclosure">Écran d\'explication avant la demande de localisation en arrière-plan du widget</string>
+
+    <!-- Notes de version 2.0.2 -->
+    <string name="appstrings_release_v202_bandwidth_vs_spectrum">Le spectre occupé et la largeur de bande sont désormais deux réglages distincts</string>
+    <string name="appstrings_release_v202_spectrum_column">Nouvelle colonne « Spectre » dans le tableau des antennes</string>
+    <string name="appstrings_release_v202_bandwidth_warning">Avertissement sur la largeur de bande totale, les déclarations pouvant comporter des erreurs</string>
+    <string name="appstrings_release_v202_nonbreaking_frequencies">Les fréquences ne sont plus coupées en fin de ligne</string>
+    <string name="appstrings_release_v202_embedded_blocks_panel">Nouveau panneau « Détail de l\'antenne (sections opérateur) », ouvrable depuis la fiche du pylône ou les réglages</string>
+    <string name="appstrings_release_v202_share_spectrum">Les images de partage reprennent la distinction spectre / largeur de bande</string>
 </resources>

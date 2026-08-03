@@ -148,6 +148,7 @@ import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.screens.settings.CommunityDataSettingsSheet
+import fr.geotower.ui.screens.settings.EmbeddedSiteBlocks
 import fr.geotower.ui.screens.settings.MiniMapSettingsSheet
 import fr.geotower.ui.screens.settings.SiteFreqFiltersSheet
 import fr.geotower.ui.screens.settings.SitePhotosSettingsSheet
@@ -605,7 +606,12 @@ fun SiteDetailScreen(
         speedtestSortDescending = SiteSpeedtestsPagePreferences.DEFAULT_SORT_DESCENDING
     }
 
-    var miniMapDefaultMode by remember {
+    // Inséré : les sections opérateur sont plusieurs et leur panneau s'ouvre aussi depuis la fiche
+    // du pylône et les réglages. Relire à chaque écriture est le prix d'un affichage cohérent — et
+    // il n'y a rien à relire tant que personne ne touche à un réglage.
+    val blocksRevision = if (embedded) EmbeddedSiteBlocks.revision.intValue else 0
+
+    var miniMapDefaultMode by remember(blocksRevision) {
         mutableStateOf(MiniMapViewMode.fromStorageKey(prefs.getString(SitePagePrefs.MINI_MAP_MODE, null)))
     }
 
@@ -662,36 +668,42 @@ fun SiteDetailScreen(
     // régler ne doit pas dérégler la fiche site autonome. Défaut d'une clé encore absente :
     // « masqué » pour les blocs de détail, sinon la valeur déjà choisie sur la fiche autonome.
     fun blockVisibilityKey(prefKey: String): String =
-        if (embedded) prefKey + SitePagePrefs.EMBEDDED_SUFFIX else prefKey
+        if (embedded) SitePagePrefs.embeddedKey(prefKey) else prefKey
 
     fun readBlockVisibility(blockId: String, prefKey: String, standaloneValue: Boolean): Boolean {
         if (!embedded) return standaloneValue
-        val fallback = if (blockId in SitePagePrefs.embeddedHiddenByDefault) false else standaloneValue
-        return prefs.getBoolean(prefKey + SitePagePrefs.EMBEDDED_SUFFIX, fallback)
+        return SitePagePrefs.readEmbedded(prefs, blockId, prefKey, standaloneValue)
+    }
+
+    fun writeBlockVisibility(prefKey: String, value: Boolean) {
+        prefs.edit().putBoolean(blockVisibilityKey(prefKey), value).apply()
+        // Les sections opérateur frères lisent les mêmes clés : sans ce signal, seule celle d'où
+        // vient le réglage bougerait.
+        if (embedded) EmbeddedSiteBlocks.bumpRevision()
     }
 
     // 🚨 MODIFICATION : L'ordre par défaut (photos, speedtest, nav, share...)
     // L'ORDRE reste commun aux deux modes : seule la visibilité diffère.
-    var pageSiteOrder by remember {
+    var pageSiteOrder by remember(blocksRevision) {
         mutableStateOf(SitePagePrefs.order(prefs))
     }
-    var showOperator by remember { mutableStateOf(readBlockVisibility("operator", SitePagePrefs.operator.key, SitePagePrefs.operator.read(prefs))) }
-    var showBearingHeight by remember { mutableStateOf(readBlockVisibility("bearing_height", SitePagePrefs.bearingHeight.key, SitePagePrefs.bearingHeight.read(prefs))) }
-    var showMap by remember { mutableStateOf(readBlockVisibility("map", SitePagePrefs.map.key, SitePagePrefs.map.read(prefs))) }
-    var showSupportDetails by remember { mutableStateOf(readBlockVisibility("support_details", SitePagePrefs.supportDetails.key, SitePagePrefs.supportDetails.read(prefs))) }
-    var showPanelHeights by remember { mutableStateOf(readBlockVisibility("panel_heights", SitePagePrefs.panelHeights.key, SitePagePrefs.panelHeights.read(prefs))) }
-    var showIds by remember { mutableStateOf(readBlockVisibility("ids", SitePagePrefs.ids.key, SitePagePrefs.ids.read(prefs))) }
-    var showNetworkIds by remember { mutableStateOf(readBlockVisibility("network_ids", SitePagePrefs.networkIds.key, SitePagePrefs.networkIds.read(prefs))) }
-    var showOpenMap by remember { mutableStateOf(readBlockVisibility("open_map", SitePagePrefs.openMap.key, SitePagePrefs.openMap.read(prefs))) }
-    var showElevationProfile by remember { mutableStateOf(readBlockVisibility("elevation_profile", SitePagePrefs.elevationProfile.key, SitePagePrefs.elevationProfile.read(prefs))) }
-    var showTheoreticalCoverage by remember { mutableStateOf(readBlockVisibility("theoretical_coverage", SitePagePrefs.theoreticalCoverage.key, SitePagePrefs.theoreticalCoverage.read(prefs))) }
-    var showThroughputCalculator by remember { mutableStateOf(readBlockVisibility("throughput_calculator", SitePagePrefs.throughputCalculator.key, SitePagePrefs.throughputCalculator.read(prefs))) }
-    var showNav by remember { mutableStateOf(readBlockVisibility("nav", SitePagePrefs.nav.key, SitePagePrefs.nav.read(prefs))) }
-    var showShare by remember { mutableStateOf(readBlockVisibility("share", SitePagePrefs.share.key, SitePagePrefs.share.read(prefs))) }
-    var showDates by remember { mutableStateOf(readBlockVisibility("dates", SitePagePrefs.dates.key, SitePagePrefs.dates.read(prefs))) }
-    var showAddress by remember { mutableStateOf(readBlockVisibility("address", SitePagePrefs.address.key, SitePagePrefs.address.read(prefs))) }
-    var showFreqs by remember { mutableStateOf(readBlockVisibility("freqs", SitePagePrefs.freqs.key, SitePagePrefs.freqs.read(prefs))) }
-    var showLinks by remember { mutableStateOf(readBlockVisibility("links", SitePagePrefs.links.key, SitePagePrefs.links.read(prefs))) }
+    var showOperator by remember(blocksRevision) { mutableStateOf(readBlockVisibility("operator", SitePagePrefs.operator.key, SitePagePrefs.operator.read(prefs))) }
+    var showBearingHeight by remember(blocksRevision) { mutableStateOf(readBlockVisibility("bearing_height", SitePagePrefs.bearingHeight.key, SitePagePrefs.bearingHeight.read(prefs))) }
+    var showMap by remember(blocksRevision) { mutableStateOf(readBlockVisibility("map", SitePagePrefs.map.key, SitePagePrefs.map.read(prefs))) }
+    var showSupportDetails by remember(blocksRevision) { mutableStateOf(readBlockVisibility("support_details", SitePagePrefs.supportDetails.key, SitePagePrefs.supportDetails.read(prefs))) }
+    var showPanelHeights by remember(blocksRevision) { mutableStateOf(readBlockVisibility("panel_heights", SitePagePrefs.panelHeights.key, SitePagePrefs.panelHeights.read(prefs))) }
+    var showIds by remember(blocksRevision) { mutableStateOf(readBlockVisibility("ids", SitePagePrefs.ids.key, SitePagePrefs.ids.read(prefs))) }
+    var showNetworkIds by remember(blocksRevision) { mutableStateOf(readBlockVisibility("network_ids", SitePagePrefs.networkIds.key, SitePagePrefs.networkIds.read(prefs))) }
+    var showOpenMap by remember(blocksRevision) { mutableStateOf(readBlockVisibility("open_map", SitePagePrefs.openMap.key, SitePagePrefs.openMap.read(prefs))) }
+    var showElevationProfile by remember(blocksRevision) { mutableStateOf(readBlockVisibility("elevation_profile", SitePagePrefs.elevationProfile.key, SitePagePrefs.elevationProfile.read(prefs))) }
+    var showTheoreticalCoverage by remember(blocksRevision) { mutableStateOf(readBlockVisibility("theoretical_coverage", SitePagePrefs.theoreticalCoverage.key, SitePagePrefs.theoreticalCoverage.read(prefs))) }
+    var showThroughputCalculator by remember(blocksRevision) { mutableStateOf(readBlockVisibility("throughput_calculator", SitePagePrefs.throughputCalculator.key, SitePagePrefs.throughputCalculator.read(prefs))) }
+    var showNav by remember(blocksRevision) { mutableStateOf(readBlockVisibility("nav", SitePagePrefs.nav.key, SitePagePrefs.nav.read(prefs))) }
+    var showShare by remember(blocksRevision) { mutableStateOf(readBlockVisibility("share", SitePagePrefs.share.key, SitePagePrefs.share.read(prefs))) }
+    var showDates by remember(blocksRevision) { mutableStateOf(readBlockVisibility("dates", SitePagePrefs.dates.key, SitePagePrefs.dates.read(prefs))) }
+    var showAddress by remember(blocksRevision) { mutableStateOf(readBlockVisibility("address", SitePagePrefs.address.key, SitePagePrefs.address.read(prefs))) }
+    var showFreqs by remember(blocksRevision) { mutableStateOf(readBlockVisibility("freqs", SitePagePrefs.freqs.key, SitePagePrefs.freqs.read(prefs))) }
+    var showLinks by remember(blocksRevision) { mutableStateOf(readBlockVisibility("links", SitePagePrefs.links.key, SitePagePrefs.links.read(prefs))) }
 
     // Photos, statut et speedtest sont portés par des états globaux d'AppConfig (partagés avec le
     // partage et le rapport PDF) : en mode inséré on leur superpose un état local, pour ne pas
@@ -699,9 +711,9 @@ fun SiteDetailScreen(
     val photosStandalone by AppConfig.siteShowPhotos
     val statusStandalone by AppConfig.siteShowStatus
     val speedtestStandalone by AppConfig.siteShowSpeedtest
-    var showPhotosEmbedded by remember { mutableStateOf(readBlockVisibility("photos", "site_show_photos", photosStandalone)) }
-    var showStatusEmbedded by remember { mutableStateOf(readBlockVisibility("status", "site_show_status", statusStandalone)) }
-    var showSpeedtestEmbedded by remember { mutableStateOf(readBlockVisibility("speedtest", "site_show_speedtest", speedtestStandalone)) }
+    var showPhotosEmbedded by remember(blocksRevision) { mutableStateOf(readBlockVisibility("photos", "site_show_photos", photosStandalone)) }
+    var showStatusEmbedded by remember(blocksRevision) { mutableStateOf(readBlockVisibility("status", "site_show_status", statusStandalone)) }
+    var showSpeedtestEmbedded by remember(blocksRevision) { mutableStateOf(readBlockVisibility("speedtest", "site_show_speedtest", speedtestStandalone)) }
     val showPhotos = if (embedded) showPhotosEmbedded else photosStandalone
     val showStatus = if (embedded) showStatusEmbedded else statusStandalone
     val showSpeedtest = if (embedded) showSpeedtestEmbedded else speedtestStandalone
@@ -1839,28 +1851,29 @@ fun SiteDetailScreen(
                     onOrderChange = {
                         pageSiteOrder = SitePagePrefs.normalizeOrder(it)
                         prefs.edit().putString(SitePagePrefs.ORDER, pageSiteOrder.joinToString(",")).apply()
+                        if (embedded) EmbeddedSiteBlocks.bumpRevision()
                     },
                     // Chaque interrupteur écrit sur la clé du mode courant (cf. blockVisibilityKey) :
                     // régler une section opérateur ne touche pas la fiche site autonome.
                     showOperator = showOperator,
                     onOperatorChange = {
                         showOperator = it
-                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.operator.key), it).apply()
+                        writeBlockVisibility(SitePagePrefs.operator.key, it)
                     },
                     showBearingHeight = showBearingHeight,
                     onBearingHeightChange = {
                         showBearingHeight = it
-                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.bearingHeight.key), it).apply()
+                        writeBlockVisibility(SitePagePrefs.bearingHeight.key, it)
                     },
                     showMap = showMap,
                     onMapChange = {
                         showMap = it
-                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.map.key), it).apply()
+                        writeBlockVisibility(SitePagePrefs.map.key, it)
                     },
                     showSupportDetails = showSupportDetails,
                     onSupportDetailsChange = {
                         showSupportDetails = it
-                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.supportDetails.key), it).apply()
+                        writeBlockVisibility(SitePagePrefs.supportDetails.key, it)
                     },
                     showPhotos = showPhotos,
                     onPhotosChange = {
@@ -1869,62 +1882,62 @@ fun SiteDetailScreen(
                         } else {
                             AppConfig.siteShowPhotos.value = it
                         }
-                        prefs.edit().putBoolean(blockVisibilityKey("site_show_photos"), it).apply()
+                        writeBlockVisibility("site_show_photos", it)
                     },
                     showPanelHeights = showPanelHeights,
                     onPanelHeightsChange = {
                         showPanelHeights = it
-                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.panelHeights.key), it).apply()
+                        writeBlockVisibility(SitePagePrefs.panelHeights.key, it)
                     },
                     showIds = showIds,
                     onIdsChange = {
                         showIds = it
-                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.ids.key), it).apply()
+                        writeBlockVisibility(SitePagePrefs.ids.key, it)
                     },
                     showNetworkIds = showNetworkIds,
                     onNetworkIdsChange = {
                         showNetworkIds = it
-                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.networkIds.key), it).apply()
+                        writeBlockVisibility(SitePagePrefs.networkIds.key, it)
                     },
                     showOpenMap = showOpenMap,
                     onOpenMapChange = {
                         showOpenMap = it
-                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.openMap.key), it).apply()
+                        writeBlockVisibility(SitePagePrefs.openMap.key, it)
                     },
                     showElevationProfile = showElevationProfile,
                     onElevationProfileChange = {
                         showElevationProfile = it
-                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.elevationProfile.key), it).apply()
+                        writeBlockVisibility(SitePagePrefs.elevationProfile.key, it)
                     },
                     showThroughputCalculator = showThroughputCalculator,
                     onThroughputCalculatorChange = {
                         showThroughputCalculator = it
-                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.throughputCalculator.key), it).apply()
+                        writeBlockVisibility(SitePagePrefs.throughputCalculator.key, it)
                     },
                     showTheoreticalCoverage = showTheoreticalCoverage,
                     onTheoreticalCoverageChange = {
                         showTheoreticalCoverage = it
-                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.theoreticalCoverage.key), it).apply()
+                        writeBlockVisibility(SitePagePrefs.theoreticalCoverage.key, it)
                     },
                     showNav = showNav,
                     onNavChange = {
                         showNav = it
-                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.nav.key), it).apply()
+                        writeBlockVisibility(SitePagePrefs.nav.key, it)
                     },
                     showShare = showShare,
                     onShareChange = {
                         showShare = it
-                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.share.key), it).apply()
+                        writeBlockVisibility(SitePagePrefs.share.key, it)
                     },
                     showDates = showDates,
                     onDatesChange = {
                         showDates = it
-                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.dates.key), it).apply()
+                        writeBlockVisibility(SitePagePrefs.dates.key, it)
                     },
                     showAddress = showAddress,
                     onAddressChange = {
                         showAddress = it
-                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.address.key), it).apply()
+                        writeBlockVisibility(SitePagePrefs.address.key, it)
                     },
                     showStatus = showStatus,
                     onStatusChange = {
@@ -1933,7 +1946,7 @@ fun SiteDetailScreen(
                         } else {
                             AppConfig.siteShowStatus.value = it
                         }
-                        prefs.edit().putBoolean(blockVisibilityKey("site_show_status"), it).apply()
+                        writeBlockVisibility("site_show_status", it)
                     },
                     showSpeedtest = showSpeedtest,
                     onSpeedtestChange = {
@@ -1942,17 +1955,17 @@ fun SiteDetailScreen(
                         } else {
                             AppConfig.siteShowSpeedtest.value = it
                         }
-                        prefs.edit().putBoolean(blockVisibilityKey("site_show_speedtest"), it).apply()
+                        writeBlockVisibility("site_show_speedtest", it)
                     },
                     showFreqs = showFreqs,
                     onFreqsChange = {
                         showFreqs = it
-                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.freqs.key), it).apply()
+                        writeBlockVisibility(SitePagePrefs.freqs.key, it)
                     },
                     showLinks = showLinks,
                     onLinksChange = {
                         showLinks = it
-                        prefs.edit().putBoolean(blockVisibilityKey(SitePagePrefs.links.key), it).apply()
+                        writeBlockVisibility(SitePagePrefs.links.key, it)
                     },
                     onOpenMiniMapSettings = {
                         showSiteSettingsSheet = false
@@ -1975,7 +1988,10 @@ fun SiteDetailScreen(
                     sheetState = pageSettingsSheetState,
                     useOneUi = uiStyle.useOneUi,
                     bubbleColor = uiStyle.bubbleColor,
-                    highlightBlockId = settingsHighlightBlock
+                    highlightBlockId = settingsHighlightBlock,
+                    // Inséré, le panneau ne règle que cette section-là : le dire dans le titre, sinon
+                    // il se confond avec celui de la fiche site autonome.
+                    title = if (embedded) stringResource(R.string.appstrings_page_site_embedded_settings) else null
                 )
             }
 
@@ -2046,6 +2062,7 @@ fun SiteDetailScreen(
                     onModeChange = {
                         miniMapDefaultMode = it
                         prefs.edit().putString(SitePagePrefs.MINI_MAP_MODE, it.storageKey).apply()
+                        if (embedded) EmbeddedSiteBlocks.bumpRevision()
                     },
                     onDismiss = { showSiteMiniMapSettingsSheet = false },
                     onBack = {
@@ -2084,7 +2101,7 @@ fun SiteDetailScreen(
                         } else {
                             AppConfig.siteShowPhotos.value = it
                         }
-                        prefs.edit().putBoolean(blockVisibilityKey("site_show_photos"), it).apply()
+                        writeBlockVisibility("site_show_photos", it)
                     },
                     onOpenCommunityDataSettings = {
                         communityDataSettingsFeatureId = CommunityDataPreferences.FEATURE_PHOTOS
