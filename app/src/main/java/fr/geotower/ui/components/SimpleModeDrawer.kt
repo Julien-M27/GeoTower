@@ -258,6 +258,9 @@ private fun SimpleModeDrawerContent(
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = availableHeight)
+                // Flou au défilement, comme tout conteneur défilant de l'app. Posé AVANT
+                // verticalScroll : il délave la bande haute/basse du hublot, pas le contenu.
+                .geoTowerFadingEdge(scrollState, requireScrollableContent = true)
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.Center
         ) {

@@ -123,6 +123,26 @@
     <string name="onboarding_database_success_desc">A base de dados offline foi instalada com sucesso. A aplicação está pronta a funcionar a toda a velocidade.</string>
     <string name="onboarding_theme_desc">Escolha o estilo que mais lhe convém.</string>
     <string name="onboarding_offline_desc">Transfira toda a base para usar a lista sem rede. Aviso: ficheiro grande.</string>
+    <string name="onboarding_offline_desc_local_build">O seu nível de processamento local gera a base neste aparelho: não há nada para transferir aqui.</string>
+    <string name="onboarding_database_enb_cut_by_level">A base eNB / gNB não é proposta: a autonomia máxima corta-a, pois não pode ser gerada no aparelho.</string>
+    <string name="settings_database_hidden_by_local_build">As transferências móvel e rádio estão ocultas aqui: o seu nível de processamento local gera essas bases no aparelho.</string>
+    <string name="settings_database_hidden_by_max_autonomy">Autonomia máxima: a base eNB / gNB é retirada daqui (não pode ser gerada no aparelho), tal como as transferências substituídas pela geração local. Uma base ainda instalada mantém o seu cartão, para a poder eliminar.</string>
+    <string name="onboarding_display_mode_title">Como quer usar o GeoTower?</string>
+    <string name="onboarding_display_mode_desc">Duas formas de percorrer a aplicação. Pode mudar a qualquer momento nas definições.</string>
+    <string name="onboarding_display_mode_simple_desc">Recomendado se as antenas são um tema novo para si: o mapa, o essencial, nada mais.</string>
+    <string name="onboarding_display_mode_full_title">Modo completo</string>
+    <string name="onboarding_display_mode_simple_tagline">O essencial, no mapa</string>
+    <string name="onboarding_display_mode_full_tagline">Todas as páginas e ferramentas</string>
+    <string name="onboarding_display_mode_full_desc">Início, todas as páginas e ferramentas, uma ficha por operador. Para quem já conhece o tema.</string>
+    <string name="onboarding_display_mode_details_title">O que muda o modo simplificado</string>
+    <string name="onboarding_display_mode_start_title">O modo simplificado começa no mapa</string>
+    <string name="onboarding_display_mode_start_desc">A aplicação abre diretamente no mapa, em vez de um início cheio de menus.</string>
+    <string name="onboarding_display_mode_menu_title">Um menu lateral em vez do início</string>
+    <string name="onboarding_display_mode_menu_desc">As outras páginas ficam à mão, num menu puxado a partir da margem do ecrã.</string>
+    <string name="onboarding_display_mode_reversible_title">Nada se perde</string>
+    <string name="onboarding_display_mode_reversible_desc">Voltar ao modo completo repõe todas as páginas e mantém as suas definições.</string>
+    <string name="onboarding_local_mode_desc">Onde preparar os dados do GeoTower: no seu servidor ou no seu aparelho?</string>
+    <string name="onboarding_local_mode_hint">Na dúvida, mantenha «Servidor»: nada para configurar, o passo seguinte transfere a base.</string>
     <string name="appearance_theme_system">Sistema</string>
     <string name="appearance_theme_light">Claro</string>
     <string name="appearance_theme_dark">Escuro</string>
@@ -141,7 +161,7 @@
     <string name="appearance_menu_size_large">Grande</string>
     <string name="mapping_provider_ign">IGN (Gov)</string>
     <string name="mapping_style_title">Estilo do mapa</string>
-    <string name="mapping_style_satellite">Sat</string>
+    <string name="mapping_style_satellite">Satélite</string>
     <string name="common_yes">Sim</string>
     <string name="common_no">Não</string>
     <string name="settings_reset">Redefinir configurações</string>
@@ -2320,13 +2340,12 @@
     <string name="appstrings_release_v1964_map_filters_defaults">Filtros de mapa predefinidos: configure-os em Personalização das páginas > Mapa de antenas > Filtros; o aviso «Filtros ativos» só aparece quando o mapa difere do seu valor predefinido</string>
     <string name="appstrings_release_v1964_db_timings">Tempos mostrados nas bases de dados: tempo decorrido durante a operação e depois «Gerado em…» ou «Transferido em…»</string>
     <!-- Origem das falhas (geração local) -->
-    <string name="outage_source_settings_title">Origem das falhas</string>
-    <string name="outage_source_mode_desc">Descarrega os ficheiros oficiais das operadoras e prepara as falhas neste dispositivo em vez de usar o servidor.</string>
-    <string name="outage_source_frequency_title">Frequência de atualização</string>
+    <string name="outage_local_settings_title">Recolha dos sites em falha no aparelho</string>
+    <string name="outage_source_frequency_title">Frequência de atualização dos sites em falha</string>
     <string name="outage_source_frequency_unit">%1$d h</string>
-    <string name="outage_source_frequency_footer">Duração da cache e período em segundo plano, se ativado.</string>
-    <string name="outage_source_background_title">Atualizar em segundo plano</string>
-    <string name="outage_source_background_desc">Atualiza periodicamente mesmo com a app fechada (consome bateria e dados).</string>
+    <string name="outage_source_frequency_footer">Validade dos sites em falha em cache e período em segundo plano, se ativado.</string>
+    <string name="outage_source_background_title">Atualizar os sites em falha em segundo plano</string>
+    <string name="outage_source_background_desc">Recolhe periodicamente os sites em falha mesmo com a app fechada (consome bateria e dados).</string>
     <string name="outage_source_generate_now">Atualizar agora</string>
     <string name="outage_source_generating">A atualizar…</string>
     <string name="outage_source_last_generated">Última atualização: %1$s</string>
@@ -2379,11 +2398,13 @@
     <string name="local_mode_level_data_title">Base de dados + falhas em local</string>
     <string name="local_mode_level_data_desc">Além disso, a base de dados é gerada no seu dispositivo (se compatível) em vez de ser transferida.</string>
     <string name="local_mode_level_full_title">Autonomia máxima</string>
-    <string name="local_mode_level_full_desc">Além disso, interrompe as fotos da comunidade e os seus envios, a verificação de atualizações e a API ao vivo. A configuração remota permanece ativa.</string>
+    <string name="local_mode_level_full_desc">Além disso, interrompe as fotos da comunidade e os seus envios, a verificação de atualizações, a API ao vivo e a base eNB / gNB, que não pode ser gerada no aparelho. A configuração remota permanece ativa.</string>
     <string name="local_mode_maps_note">Os mapas, a altimetria e a pesquisa de endereços continuam a usar os seus serviços online.</string>
-    <string name="local_mode_db_eligible">Este dispositivo pode gerar a base de dados localmente.</string>
     <string name="local_mode_db_ineligible">Este dispositivo não pode gerar a base de dados localmente (RAM/armazenamento): permanece transferida do servidor.</string>
-    <string name="local_mode_build_hint">A geração transfere várias centenas de MB e demora alguns minutos — recomendam-se Wi-Fi e carregador.</string>
+    <string name="local_mode_db_ineligible_title">Geração fora de alcance neste aparelho</string>
+    <string name="local_mode_db_ineligible_measured">São precisos %1$s de RAM e %2$s livres. Aqui: %3$s de RAM, %4$s livres.</string>
+    <string name="local_mode_max_partial_on_this_device">Neste aparelho, a autonomia máxima é parcial: fotos, verificação de atualizações, API em direto e base eNB / gNB são cortadas, mas as bases principais (móvel, rádio) continuam a vir do servidor GeoTower — caso contrário a aplicação ficaria sem dados nenhuns.</string>
+    <string name="enb_database_local_mode_unavailable">Autonomia máxima: esta base não pode ser gerada no aparelho, por isso não é transferida nem atualizada enquanto esse nível estiver ativo.</string>
     <string name="local_mode_download_disabled">Processamento local ativo — transferência do servidor desativada.</string>
 
     <!-- Aides au défilement (barre latérale + boutons haut/bas) -->
@@ -2536,4 +2557,12 @@
     <string name="appstrings_release_v205_db_rebuild_offer">Se a sua base foi gerada no dispositivo, a atualização passa a fazer-se regenerando-a em vez de a transferir</string>
     <string name="appstrings_release_v205_local_mode_db">Novo nível «Base em local» em Processamento local: apenas a base é gerada no dispositivo, o resto continua a passar pelo servidor</string>
     <string name="appstrings_release_v205_home_long_press">Os elementos do ecrã inicial e o botão de ajuda movem-se com uma pressão longa</string>
+
+    <!-- Notas da versão 2.0.6 -->
+    <string name="appstrings_release_v206_satellite">Nova camada de mapa por satélite, disponível tanto com o IGN como com o OpenStreetMap</string>
+    <string name="appstrings_release_v206_onboarding_display_mode">O tutorial pergunta agora como quer usar o GeoTower, em modo simplificado ou completo, e explica o que muda no modo simplificado</string>
+    <string name="appstrings_release_v206_onboarding_local_mode">Um passo do tutorial permite escolher onde os dados são preparados: no servidor ou no seu dispositivo</string>
+    <string name="appstrings_release_v206_local_mode_coherence">Os cartões de transferência das bases seguem o seu nível de processamento local: os substituídos pela geração no dispositivo são ocultados, com a devida explicação</string>
+    <string name="appstrings_release_v206_max_autonomy_partial">A autonomia máxima indica o que desativa realmente no seu dispositivo e porque as bases principais podem continuar a vir do servidor</string>
+    <string name="appstrings_release_v206_outage_controls">Definições dos sites em falha reorganizadas: frequência de atualização e atualização em segundo plano</string>
 </resources>

@@ -36,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import fr.geotower.R
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.PageScrollEdgeButtons
+import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.screens.about.PhotoUploadHistoryShortcut
@@ -101,6 +102,7 @@ fun HistoriesScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
+                    .geoTowerFadingEdge(scrollState, fadeHeight = sizing.component(72.dp))
                     .pageScrollbar(PageScrollPrefs.HISTORIES, scrollState)
                     .verticalScroll(scrollState)
                     .padding(

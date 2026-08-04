@@ -135,7 +135,13 @@ import fr.geotower.utils.LiveTrackingPrefs
 import fr.geotower.utils.MapDisplayPrefs
 import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.PreferenceStores
+import fr.geotower.data.build.LocalBuildCapability
+import fr.geotower.data.db.EnbDatabaseValidator
+import fr.geotower.data.db.GeoTowerDatabaseValidator
+import fr.geotower.data.db.RadioDatabaseValidator
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Edit
@@ -928,9 +934,11 @@ fun SettingsScreen(
             // locale selon le niveau de traitement local — les deux vocabulaires mènent donc ici.
             entry(context.getString(R.string.outage_download_title), "pannes sites hs telecharger actualiser generer copie hors ligne serveur coupures", SECTION_DATABASE)
             entry(context.getString(R.string.local_mode_settings_title), "traitement local autonomie serveur hors ligne generation", SECTION_DATABASE) { navController.navigate("local_mode") }
-            // Les pannes n'ont plus de page dédiée : leurs réglages vivent dans « Traitement local »
-            // (crans « pannes en local »). On garde l'entrée de recherche pour que les mots-clés mènent au bon endroit.
-            entry(context.getString(R.string.outage_source_settings_title), "coupures pannes source sites hs operateurs frequence arriere plan", SECTION_DATABASE) { navController.navigate("local_mode") }
+            // Les pannes n'ont pas de page dédiée : leurs réglages d'exécution (fréquence,
+            // arrière-plan, mise à jour immédiate) s'affichent DANS cette section, sous la carte
+            // des sites en panne, dès que le cran les récupère sur l'appareil. La recherche mène
+            // donc à la section, plus à la page « Traitement local » qui ne porte que le choix.
+            entry(context.getString(R.string.outage_local_settings_title), "coupures pannes source sites hs operateurs frequence arriere plan", SECTION_DATABASE)
 
             // --- Entrées directes (hors section) ---
             // Le mode simplifié vit en tête des réglages : le résultat referme la recherche (et la
@@ -3609,6 +3617,33 @@ fun SectionDatabase(
     // On génère la bordure si on n'est pas en OneUI
     val border = if (useOneUi) null else BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
 
+    // --- Ce que le cran de traitement local rend possible ici ---
+    // Mêmes prédicats que le réseau et que le tuto : la base est générée sur l'appareil
+    // (téléchargements mobile/radio sans objet), et le cran maximal coupe la base eNB/gNB pour
+    // tout le monde. Voir [AppConfig.blockServerDatabase].
+    val generatesInstead = AppConfig.dbForcedLocal()
+    val serverDataCutOff = AppConfig.blockCommunityAndUpdates()
+    val buildEligibility = remember { LocalBuildCapability.evaluate(context) }
+    // MAIS, contrairement au tuto, une carte n'est pas qu'une offre : c'est aussi l'inventaire de
+    // ce qui occupe le téléphone (version, date, nombre de lignes) et le SEUL endroit d'où
+    // supprimer la base. On ne masque donc que les cartes devenues de vraies impasses : rien à
+    // proposer ET rien d'installé. Une base présente garde sa carte, avec son bouton Supprimer.
+    // Défaut `true` : tant que le disque n'a pas répondu, on n'escamote rien.
+    var mobileInstalled by remember { mutableStateOf(true) }
+    var radioInstalled by remember { mutableStateOf(true) }
+    var enbInstalled by remember { mutableStateOf(true) }
+    val installedProbeKey = refreshState?.refreshKey ?: 0
+    LaunchedEffect(generatesInstead, serverDataCutOff, installedProbeKey) {
+        withContext(Dispatchers.IO) {
+            mobileInstalled = context.getDatabasePath(GeoTowerDatabaseValidator.DB_NAME).exists()
+            radioInstalled = context.getDatabasePath(RadioDatabaseValidator.DB_NAME).exists()
+            enbInstalled = context.getDatabasePath(EnbDatabaseValidator.DB_NAME).exists()
+        }
+    }
+    val showMobileCard = !generatesInstead || mobileInstalled
+    val showRadioCard = !generatesInstead || radioInstalled
+    val showEnbCard = !serverDataCutOff || enbInstalled
+
     // 🚀 LA CARTE DE LA BASE DE DONNÉES (Existante)
     Column(modifier = modifier.fillMaxWidth()) {
         // Page unique : la section n'est pas en haut du défilement, le tirage vers le bas ne peut
@@ -3632,44 +3667,66 @@ fun SectionDatabase(
             SectionTitle(stringResource(R.string.settings_section_database))
         }
 
-        Box(modifier = cardAnchor(ANCHOR_DB_MOBILE).fillMaxWidth()) {
-            fr.geotower.ui.components.DatabaseDownloadCard(
-                useOneUi = useOneUi,
-                shape = shape,
-                border = border,
-                bubbleColor = bubbleColor,
-                title = stringResource(R.string.settings_database_online_title),
-                refreshState = refreshState
-            )
+        if (showMobileCard) {
+            Box(modifier = cardAnchor(ANCHOR_DB_MOBILE).fillMaxWidth()) {
+                fr.geotower.ui.components.DatabaseDownloadCard(
+                    useOneUi = useOneUi,
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    title = stringResource(R.string.settings_database_online_title),
+                    refreshState = refreshState
+                )
+            }
+
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
         }
 
-        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+        if (showRadioCard) {
+            Box(modifier = cardAnchor(ANCHOR_DB_RADIO).fillMaxWidth()) {
+                fr.geotower.ui.components.RadioDatabaseDownloadCard(
+                    useOneUi = useOneUi,
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    refreshState = refreshState
+                )
+            }
 
-        Box(modifier = cardAnchor(ANCHOR_DB_RADIO).fillMaxWidth()) {
-            fr.geotower.ui.components.RadioDatabaseDownloadCard(
-                useOneUi = useOneUi,
-                shape = shape,
-                border = border,
-                bubbleColor = bubbleColor,
-                refreshState = refreshState
-            )
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
         }
-
-        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
         // Identifiants eNB/gNB : donnée du partenaire eNB-Analytics, pas de l'ANFR — d'où
         // l'attribution portée par la carte elle-même.
-        Box(modifier = cardAnchor(ANCHOR_DB_ENB).fillMaxWidth()) {
-            fr.geotower.ui.components.EnbDatabaseDownloadCard(
-                useOneUi = useOneUi,
-                shape = shape,
-                border = border,
-                bubbleColor = bubbleColor,
-                refreshState = refreshState
-            )
+        if (showEnbCard) {
+            Box(modifier = cardAnchor(ANCHOR_DB_ENB).fillMaxWidth()) {
+                fr.geotower.ui.components.EnbDatabaseDownloadCard(
+                    useOneUi = useOneUi,
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    refreshState = refreshState
+                )
+            }
+
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
         }
 
-        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+        // Ce que le cran a retiré de cette section : sans cette ligne, une carte manquante passe
+        // pour un bug — d'autant qu'ici, contrairement au tuto, l'utilisateur vient souvent
+        // chercher une carte précise.
+        if (!showMobileCard || !showRadioCard || !showEnbCard) {
+            Text(
+                text = if (showEnbCard) {
+                    stringResource(R.string.settings_database_hidden_by_local_build)
+                } else {
+                    stringResource(R.string.settings_database_hidden_by_max_autonomy)
+                },
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(12.dp))
+            )
+        }
 
         // Sites en panne : fichier national du serveur, conservé sur l'appareil pour l'afficher
         // hors ligne. Il vit ici, avec les autres données téléchargées, plutôt que dans l'écran
@@ -3686,16 +3743,29 @@ fun SectionDatabase(
             )
         }
 
+        // Réglages d'exécution des pannes récupérées sur l'appareil (fréquence, arrière-plan, mise
+        // à jour immédiate) : ils vivent SOUS la carte qu'ils pilotent, et non plus sur la page du
+        // cran de traitement local, qui ne porte que le choix.
+        if (AppConfig.outagesLocal()) {
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+            OutageLocalControls()
+        }
+
         Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
-        Box(modifier = cardAnchor(ANCHOR_DB_LOCAL_BUILD).fillMaxWidth()) {
-            fr.geotower.ui.components.LocalDbBuildCard(
-                useOneUi = useOneUi,
-                shape = shape,
-                border = border,
-                bubbleColor = bubbleColor,
-                refreshState = refreshState
-            )
+        // Génération locale : masquée sur un appareil qui ne peut pas la lancer (RAM/stockage).
+        // Une carte dont l'action ne s'activera jamais n'apprend rien ici ; l'explication chiffrée
+        // est sur la page « Traitement local », où le choix se fait (LocalBuildIneligibleCard).
+        if (buildEligibility.eligible) {
+            Box(modifier = cardAnchor(ANCHOR_DB_LOCAL_BUILD).fillMaxWidth()) {
+                fr.geotower.ui.components.LocalDbBuildCard(
+                    useOneUi = useOneUi,
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                    refreshState = refreshState
+                )
+            }
         }
 
         // Provenance des données : un SEUL écran décide d'où viennent la base ET les sites en panne

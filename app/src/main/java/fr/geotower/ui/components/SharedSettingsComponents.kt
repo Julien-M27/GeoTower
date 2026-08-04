@@ -95,7 +95,16 @@ fun CustomSliderCard(
     Surface(shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(sizing.spacing(16.dp)).alpha(if (enabled) 1f else 0.5f)) {
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
+                // `weight(1f, fill = false)` : un titre long se replie sur deux lignes au lieu de
+                // pousser la valeur hors du cadre — il n'en prend pas plus que nécessaire quand il
+                // est court.
+                Text(
+                    title,
+                    modifier = Modifier.weight(1f, fill = false),
+                    style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                    fontWeight = FontWeight.Bold
+                )
+                Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
                 Text(labels[currentIndex.toInt()], style = sizing.textStyle(MaterialTheme.typography.titleMedium), color = accentColor, fontWeight = FontWeight.Bold)
             }
             Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))

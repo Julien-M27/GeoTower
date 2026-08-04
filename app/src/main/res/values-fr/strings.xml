@@ -123,6 +123,26 @@
     <string name="onboarding_database_success_desc">La base de données hors ligne a été installée avec succès. L\'application est prête à fonctionner à pleine vitesse.</string>
     <string name="onboarding_theme_desc">Choisissez le style qui vous convient.</string>
     <string name="onboarding_offline_desc">Téléchargez toute la base pour utiliser la liste sans réseau. Attention : fichier volumineux.</string>
+    <string name="onboarding_offline_desc_local_build">Votre cran de traitement local génère la base sur cet appareil : rien à télécharger ici.</string>
+    <string name="onboarding_database_enb_cut_by_level">La base eNB / gNB n\'est pas proposée : l\'autonomie maximale la coupe, elle n\'est pas générable sur l\'appareil.</string>
+    <string name="settings_database_hidden_by_local_build">Les téléchargements mobile et radio sont masqués ici : votre cran de traitement local génère ces bases sur l\'appareil.</string>
+    <string name="settings_database_hidden_by_max_autonomy">Autonomie maximale : la base eNB / gNB est retirée d\'ici (elle n\'est pas générable sur l\'appareil), ainsi que, le cas échéant, les téléchargements remplacés par la génération locale. Une base encore installée garde sa carte, pour pouvoir la supprimer.</string>
+    <string name="onboarding_display_mode_title">Comment voulez-vous utiliser GeoTower ?</string>
+    <string name="onboarding_display_mode_desc">Deux façons de parcourir l\'application. Vous pouvez en changer à tout moment dans les réglages.</string>
+    <string name="onboarding_display_mode_simple_desc">Recommandé si les antennes sont un sujet nouveau pour vous : la carte, l\'essentiel, rien d\'autre.</string>
+    <string name="onboarding_display_mode_full_title">Mode complet</string>
+    <string name="onboarding_display_mode_simple_tagline">L\'essentiel, sur la carte</string>
+    <string name="onboarding_display_mode_full_tagline">Toutes les pages et tous les outils</string>
+    <string name="onboarding_display_mode_full_desc">Accueil, toutes les pages et tous les outils, une fiche par opérateur. Pour qui connaît déjà le sujet.</string>
+    <string name="onboarding_display_mode_details_title">Ce que change le mode simplifié</string>
+    <string name="onboarding_display_mode_start_title">Le mode simplifié démarre sur la carte</string>
+    <string name="onboarding_display_mode_start_desc">L\'application s\'ouvre directement sur la carte, au lieu d\'un accueil rempli de menus.</string>
+    <string name="onboarding_display_mode_menu_title">Un menu latéral à la place de l\'accueil</string>
+    <string name="onboarding_display_mode_menu_desc">Les autres pages restent à portée, dans un menu que l\'on tire depuis le bord de l\'écran.</string>
+    <string name="onboarding_display_mode_reversible_title">Rien n\'est perdu</string>
+    <string name="onboarding_display_mode_reversible_desc">Repasser en mode complet rétablit toutes les pages et conserve vos réglages.</string>
+    <string name="onboarding_local_mode_desc">Où préparer les données de GeoTower : sur son serveur, ou sur votre appareil ?</string>
+    <string name="onboarding_local_mode_hint">Dans le doute, gardez « Serveur » : rien à régler, l\'étape suivante télécharge la base.</string>
     <string name="appearance_theme_system">Système</string>
     <string name="appearance_theme_light">Clair</string>
     <string name="appearance_theme_dark">Sombre</string>
@@ -141,7 +161,7 @@
     <string name="appearance_menu_size_large">Grand</string>
     <string name="mapping_provider_ign">IGN (Gouv)</string>
     <string name="mapping_style_title">Style de carte</string>
-    <string name="mapping_style_satellite">Sat</string>
+    <string name="mapping_style_satellite">Satellite</string>
     <string name="common_yes">Oui</string>
     <string name="common_no">Non</string>
     <string name="settings_reset">Réinitialiser les paramètres</string>
@@ -2320,13 +2340,12 @@
     <string name="appstrings_release_v1964_map_filters_defaults">Filtres carte par défaut : réglez-les depuis Personnalisation des pages > Carte des antennes > Filtres ; le bandeau « Filtres actifs » ne s\'affiche alors que si la carte diffère de votre réglage par défaut</string>
     <string name="appstrings_release_v1964_db_timings">Durées affichées sur les bases de données : temps écoulé pendant l\'opération, puis « Généré en… » ou « Téléchargé en… »</string>
     <!-- Source des pannes (génération locale) -->
-    <string name="outage_source_settings_title">Source des pannes</string>
-    <string name="outage_source_mode_desc">Télécharge les fichiers officiels des opérateurs et prépare les pannes sur cet appareil, au lieu de passer par le serveur.</string>
-    <string name="outage_source_frequency_title">Fréquence de mise à jour</string>
+    <string name="outage_local_settings_title">Récupération des sites en panne sur l\'appareil</string>
+    <string name="outage_source_frequency_title">Fréquence de mise à jour des sites en panne</string>
     <string name="outage_source_frequency_unit">%1$d h</string>
-    <string name="outage_source_frequency_footer">Durée de validité du cache, et période en arrière-plan si activé.</string>
-    <string name="outage_source_background_title">Mettre à jour en arrière-plan</string>
-    <string name="outage_source_background_desc">Récupère périodiquement les pannes même quand l\'app est fermée (consomme batterie et données).</string>
+    <string name="outage_source_frequency_footer">Durée de validité des sites en panne en cache, et période en arrière-plan si activé.</string>
+    <string name="outage_source_background_title">Mettre à jour les sites en panne en arrière-plan</string>
+    <string name="outage_source_background_desc">Récupère périodiquement les sites en panne même quand l\'app est fermée (consomme batterie et données).</string>
     <string name="outage_source_generate_now">Mettre à jour maintenant</string>
     <string name="outage_source_generating">Mise à jour en cours…</string>
     <string name="outage_source_last_generated">Dernière mise à jour : %1$s</string>
@@ -2379,11 +2398,13 @@
     <string name="local_mode_level_data_title">Base + sites en local</string>
     <string name="local_mode_level_data_desc">En plus, la base est générée sur votre appareil (si compatible) au lieu d\'être téléchargée.</string>
     <string name="local_mode_level_full_title">Autonomie maximale</string>
-    <string name="local_mode_level_full_desc">En plus, coupe les photos communautaires et leur envoi, la vérification de mise à jour et l\'API live. La configuration à distance reste active.</string>
+    <string name="local_mode_level_full_desc">En plus, coupe les photos communautaires et leur envoi, la vérification de mise à jour, l\'API live et la base eNB / gNB, qui n\'est pas générable sur l\'appareil. La configuration à distance reste active.</string>
     <string name="local_mode_maps_note">Les cartes, l\'altimétrie et la recherche d\'adresse utilisent toujours leurs services en ligne.</string>
-    <string name="local_mode_db_eligible">Cet appareil peut générer la base localement.</string>
     <string name="local_mode_db_ineligible">Cet appareil ne peut pas générer la base localement (RAM/stockage) : elle reste téléchargée depuis le serveur.</string>
-    <string name="local_mode_build_hint">La génération télécharge plusieurs centaines de Mo et prend quelques minutes — Wi-Fi et chargeur conseillés.</string>
+    <string name="local_mode_db_ineligible_title">Génération hors de portée sur cet appareil</string>
+    <string name="local_mode_db_ineligible_measured">Il faut %1$s de RAM et %2$s libres. Ici : %3$s de RAM, %4$s libres.</string>
+    <string name="local_mode_max_partial_on_this_device">Sur cet appareil, l\'autonomie maximale est partielle : photos, vérification des mises à jour, API live et base eNB / gNB sont bien coupées, mais les bases principales (mobile, radio) continuent de venir du serveur GeoTower — sinon l\'application n\'aurait aucune donnée.</string>
+    <string name="enb_database_local_mode_unavailable">Autonomie maximale : cette base n\'est pas générable sur l\'appareil, elle n\'est donc ni téléchargée ni mise à jour tant que ce cran est actif.</string>
     <string name="local_mode_download_disabled">Traitement local actif — téléchargement serveur désactivé.</string>
 
     <!-- Aides au défilement (barre latérale + boutons haut/bas) -->
@@ -2538,4 +2559,12 @@
     <string name="appstrings_release_v205_db_rebuild_offer">Si votre base a été générée sur l\'appareil, sa mise à jour se fait en la régénérant plutôt qu\'en la téléchargeant</string>
     <string name="appstrings_release_v205_local_mode_db">Nouveau palier « Base en local » dans Traitement local : seule la base est générée sur l\'appareil, le reste continue de passer par le serveur</string>
     <string name="appstrings_release_v205_home_long_press">Les éléments de l\'accueil et le bouton d\'aide se déplacent par appui long</string>
+
+    <!-- Notes de version 2.0.6 -->
+    <string name="appstrings_release_v206_satellite">Nouveau fond de carte satellite, disponible aussi bien avec l\'IGN qu\'avec OpenStreetMap</string>
+    <string name="appstrings_release_v206_onboarding_display_mode">Le tutoriel demande maintenant comment vous voulez utiliser GeoTower, en mode simplifié ou en mode complet, et explique ce que change le mode simplifié</string>
+    <string name="appstrings_release_v206_onboarding_local_mode">Une étape du tutoriel propose de choisir où sont préparées les données : sur le serveur ou sur votre appareil</string>
+    <string name="appstrings_release_v206_local_mode_coherence">Les cartes de téléchargement des bases s\'adaptent à votre cran de traitement local : celles remplacées par la génération sur l\'appareil sont masquées, avec l\'explication</string>
+    <string name="appstrings_release_v206_max_autonomy_partial">L\'autonomie maximale indique ce qu\'elle coupe réellement sur votre appareil, et pourquoi les bases principales peuvent continuer de venir du serveur</string>
+    <string name="appstrings_release_v206_outage_controls">Réglages des sites en panne réorganisés : fréquence de mise à jour et récupération en arrière-plan</string>
 </resources>

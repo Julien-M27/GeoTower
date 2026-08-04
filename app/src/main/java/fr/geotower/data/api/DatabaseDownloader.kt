@@ -225,7 +225,10 @@ object DatabaseDownloader {
         // version distante reste lue EXPRÈS : c'est elle qui dit « l'ANFR a publié du neuf », donc
         // qu'il est temps de REGÉNÉRER. La couper laissait ces utilisateurs sans aucun signal de
         // mise à jour. Le téléchargement, lui, reste bloqué (cf. [downloadUpdate]).
-        if (AppConfig.blockCommunityAndUpdates()) return null
+        // ... et seulement si l'appareil peut se passer du serveur (cf. [AppConfig.blockServerDatabase]) :
+        // sur un appareil inéligible à la génération, couper ici ne donnerait pas de l'autonomie,
+        // mais une application sans la moindre donnée.
+        if (AppConfig.blockServerDatabase()) return null
         val served = readVerifiedDownloadManifest() ?: return null
         val database = served.value.database ?: return null
         if (

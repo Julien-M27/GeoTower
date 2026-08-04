@@ -190,6 +190,15 @@ object EnbDatabaseDownloader {
     }
 
     private fun readVerifiedEnbDatabaseInfo(): ServedFrom<DownloadManifestDatabase>? {
+        // Cran maximal : coupe pour TOUS, eligible ou non — contrairement aux bases mobile et
+        // radio, qui elles retombent sur le serveur quand l'appareil ne sait pas les generer
+        // (cf. [AppConfig.blockServerDatabase]).
+        //
+        // Regle : au cran maximal, un appareil dispose exactement de ce qu'un appareil eligible
+        // saurait construire. Le build local produit mobile + radio/TV + technique non-mobile ;
+        // la base eNB/gNB est un fichier partenaire, non reconstructible depuis les sources ANFR.
+        // La laisser passer ici donnait l'inversion absurde ou le telephone le PLUS capable perdait
+        // une base que le moins capable gardait.
         if (AppConfig.blockCommunityAndUpdates()) return null
         val served = readVerifiedDownloadManifest() ?: return null
         val database = served.value.enbDatabase ?: return null

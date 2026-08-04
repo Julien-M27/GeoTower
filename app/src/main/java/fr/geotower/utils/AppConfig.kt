@@ -412,6 +412,30 @@ object AppConfig {
     /** [LOCAL_MODE_MAX] : coupe SignalQuest (photos + envoi), la vérif de mise à jour et l'API live. */
     fun blockCommunityAndUpdates(): Boolean = effectiveLocalModeLevel() >= LOCAL_MODE_MAX
 
+    /**
+     * [LOCAL_MODE_MAX] coupe aussi le manifeste des bases **générables** (mobile, radio) —
+     * versions ET téléchargement — mais seulement si l'appareil sait justement les générer.
+     *
+     * Sans cette condition, un appareil inéligible (RAM/stockage) au cran maximal n'avait plus
+     * AUCUNE donnée : pas de génération locale (matériel insuffisant) et pas de téléchargement
+     * (manifeste coupé) — donc une application vide, ce que personne ne choisit sciemment en
+     * cochant « autonomie maximale ». Sur ces appareils, l'autonomie est appliquée à tout le reste
+     * (photos communautaires, mise à jour de l'app, API live) et les bases principales continuent
+     * d'être téléchargées. Les écrans le disent explicitement, la promesse du cran doit rester
+     * exacte.
+     *
+     * La règle est « au cran maximal, on dispose exactement de ce qu'un appareil éligible saurait
+     * construire » : ce prédicat ne vaut donc QUE pour les bases que le build local produit. La
+     * base eNB/gNB (fichier partenaire, non reconstructible) reste coupée pour tout le monde via
+     * [blockCommunityAndUpdates] — sinon le téléphone le plus capable en aurait moins que l'autre.
+     */
+    fun blockServerDatabase(): Boolean =
+        blocksServerDatabase(effectiveLocalModeLevel(), localBuildEligible.value)
+
+    /** Décision pure derrière [blockServerDatabase], isolée pour être testable sans Android. */
+    fun blocksServerDatabase(level: Int, localBuildEligible: Boolean): Boolean =
+        level >= LOCAL_MODE_MAX && localBuildEligible
+
     /** Applique un niveau : persiste, recalcule l'éligibilité et réconcilie la planif des pannes. */
     fun setLocalModeLevel(context: Context, level: Int) {
         val clamped = level.coerceIn(LOCAL_MODE_SERVER, LOCAL_MODE_MAX)

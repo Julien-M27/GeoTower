@@ -310,9 +310,14 @@ fun EnbDatabaseDownloadCard(
                     stringResource(R.string.enb_database_download_action)
                 }
 
+                // Message DEDIE, pas le « telechargement serveur desactive » des cartes mobile et
+                // radio : celles-la sont coupees parce que l'appareil les GENERE. Cette base-ci
+                // n'est pas generable (fichier partenaire), elle est simplement indisponible tant
+                // que le cran maximal est actif — le dire evite de laisser croire a une generation
+                // en coulisse. Coupe pour tous les appareils, eligibles ou non.
                 if (fr.geotower.utils.AppConfig.blockCommunityAndUpdates()) {
                     Text(
-                        text = stringResource(R.string.local_mode_download_disabled),
+                        text = stringResource(R.string.enb_database_local_mode_unavailable),
                         modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(8.dp)),
                         style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                         fontWeight = FontWeight.Bold,

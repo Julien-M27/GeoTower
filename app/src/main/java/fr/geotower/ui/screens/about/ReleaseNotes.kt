@@ -26,24 +26,22 @@ internal data class ReleaseNoteItem(
 
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_statistics)) {
-        item(stringResource(R.string.appstrings_release_v204_department_stats))
-        item(stringResource(R.string.appstrings_release_v204_department_operators))
-        item(stringResource(R.string.appstrings_release_v204_department_current))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_database)) {
-        item(stringResource(R.string.appstrings_release_v204_department_source))
-        item(stringResource(R.string.appstrings_release_v205_db_row_counts))
-        item(stringResource(R.string.appstrings_release_v205_db_rebuild_offer))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_settings)) {
-        item(stringResource(R.string.appstrings_release_v205_local_mode_db))
+    section(stringResource(R.string.appstrings_release_section_map)) {
+        item(stringResource(R.string.appstrings_release_v206_satellite))
     }
 
     section(stringResource(R.string.appstrings_release_section_home_onboarding)) {
-        item(stringResource(R.string.appstrings_release_v205_home_long_press))
+        item(stringResource(R.string.appstrings_release_v206_onboarding_display_mode))
+        item(stringResource(R.string.appstrings_release_v206_onboarding_local_mode))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_settings)) {
+        item(stringResource(R.string.appstrings_release_v206_local_mode_coherence))
+        item(stringResource(R.string.appstrings_release_v206_max_autonomy_partial))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_outages)) {
+        item(stringResource(R.string.appstrings_release_v206_outage_controls))
     }
 }
 

@@ -123,6 +123,26 @@
     <string name="onboarding_database_success_desc">Die Offline-Datenbank wurde erfolgreich installiert. Die App ist bereit, mit voller Geschwindigkeit zu laufen.</string>
     <string name="onboarding_theme_desc">Wähle den Stil, der zu dir passt.</string>
     <string name="onboarding_offline_desc">Lade die gesamte Datenbank herunter, um die Liste ohne Netzwerk zu nutzen. Warnung: große Datei.</string>
+    <string name="onboarding_offline_desc_local_build">Ihre Stufe der lokalen Verarbeitung erstellt die Datenbank auf diesem Gerät: Hier gibt es nichts herunterzuladen.</string>
+    <string name="onboarding_database_enb_cut_by_level">Die eNB-/gNB-Datenbank wird nicht angeboten: Die maximale Autonomie schaltet sie ab, da sie auf dem Gerät nicht erstellt werden kann.</string>
+    <string name="settings_database_hidden_by_local_build">Die Downloads für Mobilfunk und Rundfunk sind hier ausgeblendet: Ihre Stufe der lokalen Verarbeitung erstellt diese Datenbanken auf dem Gerät.</string>
+    <string name="settings_database_hidden_by_max_autonomy">Maximale Autonomie: Die eNB-/gNB-Datenbank wird hier entfernt (sie lässt sich auf dem Gerät nicht erstellen), ebenso alle Downloads, die durch die lokale Erstellung ersetzt werden. Eine noch installierte Datenbank behält ihre Karte, damit Sie sie löschen können.</string>
+    <string name="onboarding_display_mode_title">Wie möchten Sie GeoTower nutzen?</string>
+    <string name="onboarding_display_mode_desc">Zwei Arten, die App zu durchstöbern. Sie können jederzeit in den Einstellungen wechseln.</string>
+    <string name="onboarding_display_mode_simple_desc">Empfohlen, wenn Funkmasten ein neues Thema für Sie sind: die Karte, das Wesentliche, mehr nicht.</string>
+    <string name="onboarding_display_mode_full_title">Vollständiger Modus</string>
+    <string name="onboarding_display_mode_simple_tagline">Das Wesentliche, auf der Karte</string>
+    <string name="onboarding_display_mode_full_tagline">Alle Seiten und Werkzeuge</string>
+    <string name="onboarding_display_mode_full_desc">Startseite, alle Seiten und Werkzeuge, ein Blatt je Betreiber. Für alle, die sich schon auskennen.</string>
+    <string name="onboarding_display_mode_details_title">Was der vereinfachte Modus ändert</string>
+    <string name="onboarding_display_mode_start_title">Der vereinfachte Modus startet auf der Karte</string>
+    <string name="onboarding_display_mode_start_desc">Die App öffnet direkt die Karte statt einer Startseite voller Menüs.</string>
+    <string name="onboarding_display_mode_menu_title">Ein Seitenmenü statt der Startseite</string>
+    <string name="onboarding_display_mode_menu_desc">Die übrigen Seiten bleiben griffbereit, in einem Menü, das vom Bildschirmrand aufgezogen wird.</string>
+    <string name="onboarding_display_mode_reversible_title">Nichts geht verloren</string>
+    <string name="onboarding_display_mode_reversible_desc">Zurück im vollständigen Modus sind alle Seiten wieder da, Ihre Einstellungen bleiben erhalten.</string>
+    <string name="onboarding_local_mode_desc">Wo sollen die GeoTower-Daten aufbereitet werden: auf dem Server oder auf Ihrem Gerät?</string>
+    <string name="onboarding_local_mode_hint">Im Zweifel „Server“ lassen: nichts einzurichten, der nächste Schritt lädt die Datenbank herunter.</string>
     <string name="appearance_theme_system">System</string>
     <string name="appearance_theme_light">Hell</string>
     <string name="appearance_theme_dark">Dunkel</string>
@@ -141,7 +161,7 @@
     <string name="appearance_menu_size_large">Groß</string>
     <string name="mapping_provider_ign">IGN (Gov)</string>
     <string name="mapping_style_title">Kartenstil</string>
-    <string name="mapping_style_satellite">Sat</string>
+    <string name="mapping_style_satellite">Satellit</string>
     <string name="common_yes">Ja</string>
     <string name="common_no">Nein</string>
     <string name="settings_reset">Einstellungen zurücksetzen</string>
@@ -2320,13 +2340,12 @@
     <string name="appstrings_release_v1964_map_filters_defaults">Standard-Kartenfilter: über Seitenanpassung > Antennenkarte > Filter einstellen; das Banner „Aktive Filter“ erscheint dann nur, wenn die Karte von deinem Standard abweicht</string>
     <string name="appstrings_release_v1964_db_timings">Auf den Datenbanken angezeigte Zeiten: verstrichene Zeit während des Vorgangs, dann „Erstellt in…“ oder „Heruntergeladen in…“</string>
     <!-- Störungsquelle (lokale Erzeugung) -->
-    <string name="outage_source_settings_title">Störungsquelle</string>
-    <string name="outage_source_mode_desc">Lädt die offiziellen Betreiberdateien herunter und bereitet die Störungen auf diesem Gerät auf, statt den Server zu verwenden.</string>
-    <string name="outage_source_frequency_title">Aktualisierungsintervall</string>
+    <string name="outage_local_settings_title">Abruf der gestörten Standorte auf dem Gerät</string>
+    <string name="outage_source_frequency_title">Aktualisierungsintervall der gestörten Standorte</string>
     <string name="outage_source_frequency_unit">%1$d Std.</string>
-    <string name="outage_source_frequency_footer">Gültigkeitsdauer des Caches und Hintergrundintervall, falls aktiviert.</string>
-    <string name="outage_source_background_title">Im Hintergrund aktualisieren</string>
-    <string name="outage_source_background_desc">Aktualisiert regelmäßig, auch wenn die App geschlossen ist (verbraucht Akku und Daten).</string>
+    <string name="outage_source_frequency_footer">Gültigkeitsdauer der zwischengespeicherten gestörten Standorte und Hintergrundintervall, falls aktiviert.</string>
+    <string name="outage_source_background_title">Gestörte Standorte im Hintergrund aktualisieren</string>
+    <string name="outage_source_background_desc">Ruft gestörte Standorte regelmäßig ab, auch wenn die App geschlossen ist (verbraucht Akku und Daten).</string>
     <string name="outage_source_generate_now">Jetzt aktualisieren</string>
     <string name="outage_source_generating">Wird aktualisiert…</string>
     <string name="outage_source_last_generated">Zuletzt aktualisiert: %1$s</string>
@@ -2379,11 +2398,13 @@
     <string name="local_mode_level_data_title">Datenbank + Störungen lokal</string>
     <string name="local_mode_level_data_desc">Zusätzlich wird die Datenbank auf Ihrem Gerät erstellt (falls unterstützt), statt sie herunterzuladen.</string>
     <string name="local_mode_level_full_title">Maximale Autonomie</string>
-    <string name="local_mode_level_full_desc">Zusätzlich werden Community-Fotos und -Uploads, Update-Prüfung und die Live-API gestoppt. Die Fernkonfiguration bleibt aktiv.</string>
+    <string name="local_mode_level_full_desc">Zusätzlich werden Community-Fotos und -Uploads, Update-Prüfung, die Live-API und die eNB-/gNB-Datenbank gestoppt, die auf dem Gerät nicht erstellt werden kann. Die Fernkonfiguration bleibt aktiv.</string>
     <string name="local_mode_maps_note">Karten, Höhendaten und Adresssuche nutzen weiterhin ihre Online-Dienste.</string>
-    <string name="local_mode_db_eligible">Dieses Gerät kann die Datenbank lokal erstellen.</string>
     <string name="local_mode_db_ineligible">Dieses Gerät kann die Datenbank nicht lokal erstellen (RAM/Speicher): Sie bleibt vom Server heruntergeladen.</string>
-    <string name="local_mode_build_hint">Die Erstellung lädt mehrere hundert MB und dauert einige Minuten – WLAN und Ladegerät empfohlen.</string>
+    <string name="local_mode_db_ineligible_title">Erstellung auf diesem Gerät nicht möglich</string>
+    <string name="local_mode_db_ineligible_measured">Nötig sind %1$s RAM und %2$s frei. Hier: %3$s RAM, %4$s frei.</string>
+    <string name="local_mode_max_partial_on_this_device">Auf diesem Gerät ist die maximale Autonomie unvollständig: Fotos, Update-Prüfung, Live-API und die eNB-/gNB-Datenbank werden abgeschaltet, die Hauptdatenbanken (Mobilfunk, Rundfunk) kommen aber weiterhin vom GeoTower-Server — sonst hätte die App überhaupt keine Daten.</string>
+    <string name="enb_database_local_mode_unavailable">Maximale Autonomie: Diese Datenbank lässt sich auf dem Gerät nicht erstellen und wird daher weder heruntergeladen noch aktualisiert, solange diese Stufe aktiv ist.</string>
     <string name="local_mode_download_disabled">Lokale Verarbeitung aktiv – Server-Download deaktiviert.</string>
 
     <!-- Aides au défilement (barre latérale + boutons haut/bas) -->
@@ -2536,4 +2557,12 @@
     <string name="appstrings_release_v205_db_rebuild_offer">Wurde deine Datenbank auf dem Gerät erzeugt, erfolgt ihre Aktualisierung jetzt durch erneutes Erzeugen statt durch Herunterladen</string>
     <string name="appstrings_release_v205_local_mode_db">Neue Stufe „Datenbank lokal“ in der lokalen Verarbeitung: Nur die Datenbank entsteht auf dem Gerät, alles Übrige läuft weiter über den Server</string>
     <string name="appstrings_release_v205_home_long_press">Elemente der Startseite und die Hilfe-Schaltfläche lassen sich per langem Druck verschieben</string>
+
+    <!-- Versionshinweise 2.0.6 -->
+    <string name="appstrings_release_v206_satellite">Neue Satelliten-Kartenebene, verfügbar sowohl mit IGN als auch mit OpenStreetMap</string>
+    <string name="appstrings_release_v206_onboarding_display_mode">Das Tutorial fragt jetzt, wie du GeoTower nutzen möchtest – im vereinfachten oder im vollständigen Modus – und erklärt, was der vereinfachte Modus ändert</string>
+    <string name="appstrings_release_v206_onboarding_local_mode">Ein Tutorial-Schritt lässt dich wählen, wo die Daten aufbereitet werden: auf dem Server oder auf deinem Gerät</string>
+    <string name="appstrings_release_v206_local_mode_coherence">Die Download-Karten der Datenbanken richten sich nach deiner Stufe der lokalen Verarbeitung: Was durch die Erzeugung auf dem Gerät ersetzt wird, wird samt Erklärung ausgeblendet</string>
+    <string name="appstrings_release_v206_max_autonomy_partial">Die maximale Autonomie nennt jetzt, was sie auf deinem Gerät tatsächlich abschaltet und warum die Hauptdatenbanken weiterhin vom Server kommen können</string>
+    <string name="appstrings_release_v206_outage_controls">Einstellungen zu ausgefallenen Standorten neu geordnet: Aktualisierungsintervall und Aktualisierung im Hintergrund</string>
 </resources>

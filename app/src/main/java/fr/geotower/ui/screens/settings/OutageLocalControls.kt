@@ -24,16 +24,18 @@ import fr.geotower.ui.components.OutageLocalGenerationControls
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 
 /**
- * Bloc « Pannes réseau récupérées sur l'appareil », affiché dans [LocalModeScreen] dès les crans
- * « pannes en local ».
+ * Réglages d'exécution de la récupération des pannes sur l'appareil, affichés **sous la carte
+ * « Sites en panne »** (Réglages ▸ Base de données) dès que le cran de traitement local les
+ * récupère ici.
  *
- * Il ne porte PLUS le choix de la source — c'est le niveau de traitement local qui en décide
- * ([fr.geotower.utils.AppConfig.outagesLocal]) — seulement les réglages d'EXÉCUTION : fréquence
- * (durée de validité du cache et période en arrière-plan) et régénération en arrière-plan.
+ * Il ne porte NI le choix de la source — c'est le niveau de traitement local qui en décide
+ * ([fr.geotower.utils.AppConfig.outagesLocal]) — NI l'action : le bouton « Mettre à jour
+ * maintenant », le résumé de la dernière récupération et la répartition par opérateur
+ * ([OutageLocalGenerationControls]) sont portés par la carte, juste au-dessus. Les répéter ici
+ * affichait deux fois le même bouton et le même décompte à quelques centimètres d'écart.
  *
- * L'action elle-même (bouton, progression, échec, résumé de la dernière récupération) vit dans
- * [OutageLocalGenerationControls], partagé avec la carte « Sites en panne » des réglages : les deux
- * points d'entrée montrent donc rigoureusement le même état.
+ * Restent donc les seuls réglages : fréquence (durée de validité du cache, et période en
+ * arrière-plan) et récupération en arrière-plan.
  */
 @Composable
 fun OutageLocalControls(modifier: Modifier = Modifier) {
@@ -58,16 +60,13 @@ fun OutageLocalControls(modifier: Modifier = Modifier) {
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp)),
     ) {
+        // Titre des seuls RÉGLAGES : « Source des pannes » nommait un choix qui ne se fait plus
+        // ici (c'est le cran), et la carte au-dessus explique déjà d'où viennent les données.
         Text(
-            text = stringResource(R.string.outage_source_settings_title),
+            text = stringResource(R.string.outage_local_settings_title),
             style = sizing.textStyle(MaterialTheme.typography.titleMedium),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onSurface,
-        )
-        Text(
-            text = stringResource(R.string.outage_source_mode_desc),
-            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         CustomSliderCard(
@@ -95,7 +94,5 @@ fun OutageLocalControls(modifier: Modifier = Modifier) {
             },
             shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi,
         )
-
-        OutageLocalGenerationControls()
     }
 }

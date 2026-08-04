@@ -202,7 +202,8 @@ object RadioDatabaseDownloader {
         // Comme pour la base mobile : seul le cran « autonomie maximale » coupe le manifeste. Aux
         // crans « base en local », la version distante reste lue pour signaler qu'il y a du neuf à
         // régénérer ; c'est le téléchargement qui est bloqué (cf. [downloadUpdate]).
-        if (AppConfig.blockCommunityAndUpdates()) return null
+        // ... et seulement sur un appareil capable de générer la sienne (cf. [AppConfig.blockServerDatabase]).
+        if (AppConfig.blockServerDatabase()) return null
         val served = readVerifiedDownloadManifest() ?: return null
         val database = served.value.radioDatabase ?: return null
         if (

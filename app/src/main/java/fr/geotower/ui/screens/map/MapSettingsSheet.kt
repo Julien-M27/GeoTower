@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import fr.geotower.R
+import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.utils.AppConfig
@@ -71,6 +72,9 @@ fun MapSettingsSheet(
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = false)
     val sizing = LocalGeoTowerUiStyle.current.sizing
+    // Le même panneau s'affiche dans « Filtres par défaut », qui, lui, portait déjà le flou au
+    // défilement : sans état hissé ici, les deux vues du même contenu ne se ressemblaient pas.
+    val scrollState = rememberScrollState()
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
@@ -82,7 +86,8 @@ fun MapSettingsSheet(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = sizing.spacing(24.dp))
-                .verticalScroll(rememberScrollState())
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
                 .padding(bottom = sizing.spacing(64.dp))
         )
     }

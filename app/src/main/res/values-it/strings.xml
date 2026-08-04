@@ -123,6 +123,26 @@
     <string name="onboarding_database_success_desc">Il database offline è stato installato correttamente. L\'applicazione è pronta a funzionare alla massima velocità.</string>
     <string name="onboarding_theme_desc">Scegli lo stile più adatto a te.</string>
     <string name="onboarding_offline_desc">Scarica l\'intero database per usare l\'elenco senza rete. Attenzione: file grande.</string>
+    <string name="onboarding_offline_desc_local_build">Il tuo livello di elaborazione locale genera il database su questo dispositivo: qui non c\'è nulla da scaricare.</string>
+    <string name="onboarding_database_enb_cut_by_level">Il database eNB / gNB non viene proposto: l\'autonomia massima lo interrompe, non essendo generabile sul dispositivo.</string>
+    <string name="settings_database_hidden_by_local_build">Qui i download mobile e radio sono nascosti: il tuo livello di elaborazione locale genera quei database sul dispositivo.</string>
+    <string name="settings_database_hidden_by_max_autonomy">Autonomia massima: il database eNB / gNB viene tolto da qui (non è generabile sul dispositivo), insieme agli eventuali download sostituiti dalla generazione locale. Un database ancora installato mantiene la sua scheda, per poterlo eliminare.</string>
+    <string name="onboarding_display_mode_title">Come vuoi usare GeoTower?</string>
+    <string name="onboarding_display_mode_desc">Due modi di sfogliare l\'app. Puoi cambiarlo in qualsiasi momento nelle impostazioni.</string>
+    <string name="onboarding_display_mode_simple_desc">Consigliato se le antenne sono un argomento nuovo per te: la mappa, l\'essenziale, nient\'altro.</string>
+    <string name="onboarding_display_mode_full_title">Modalità completa</string>
+    <string name="onboarding_display_mode_simple_tagline">L\'essenziale, sulla mappa</string>
+    <string name="onboarding_display_mode_full_tagline">Tutte le pagine e gli strumenti</string>
+    <string name="onboarding_display_mode_full_desc">Schermata iniziale, tutte le pagine e gli strumenti, una scheda per operatore. Per chi conosce già l\'argomento.</string>
+    <string name="onboarding_display_mode_details_title">Che cosa cambia la modalità semplificata</string>
+    <string name="onboarding_display_mode_start_title">La modalità semplificata parte dalla mappa</string>
+    <string name="onboarding_display_mode_start_desc">L\'app si apre direttamente sulla mappa, invece di una schermata iniziale piena di menu.</string>
+    <string name="onboarding_display_mode_menu_title">Un menu laterale al posto della schermata iniziale</string>
+    <string name="onboarding_display_mode_menu_desc">Le altre pagine restano a portata di mano, in un menu che si tira dal bordo dello schermo.</string>
+    <string name="onboarding_display_mode_reversible_title">Non si perde nulla</string>
+    <string name="onboarding_display_mode_reversible_desc">Tornare alla modalità completa ripristina tutte le pagine e conserva le tue impostazioni.</string>
+    <string name="onboarding_local_mode_desc">Dove preparare i dati di GeoTower: sul suo server o sul tuo dispositivo?</string>
+    <string name="onboarding_local_mode_hint">Nel dubbio, lascia «Server»: nulla da configurare, il passaggio successivo scarica il database.</string>
     <string name="appearance_theme_system">Sistema</string>
     <string name="appearance_theme_light">Chiaro</string>
     <string name="appearance_theme_dark">Scuro</string>
@@ -141,7 +161,7 @@
     <string name="appearance_menu_size_large">Grande</string>
     <string name="mapping_provider_ign">IGN (Gov)</string>
     <string name="mapping_style_title">Stile mappa</string>
-    <string name="mapping_style_satellite">Sat</string>
+    <string name="mapping_style_satellite">Satellite</string>
     <string name="common_yes">Sì</string>
     <string name="common_no">No</string>
     <string name="settings_reset">Reimposta impostazioni</string>
@@ -2320,13 +2340,12 @@
     <string name="appstrings_release_v1964_map_filters_defaults">Filtri mappa predefiniti: impostali da Personalizzazione delle pagine > Mappa delle antenne > Filtri; il banner «Filtri attivi» compare solo quando la mappa differisce dal tuo valore predefinito</string>
     <string name="appstrings_release_v1964_db_timings">Tempi mostrati sui database: tempo trascorso durante l\'operazione, poi «Generato in…» o «Scaricato in…»</string>
     <!-- Origine dei guasti (generazione locale) -->
-    <string name="outage_source_settings_title">Origine dei guasti</string>
-    <string name="outage_source_mode_desc">Scarica i file ufficiali degli operatori e prepara i guasti su questo dispositivo invece di usare il server.</string>
-    <string name="outage_source_frequency_title">Frequenza di aggiornamento</string>
+    <string name="outage_local_settings_title">Recupero dei siti guasti sul dispositivo</string>
+    <string name="outage_source_frequency_title">Frequenza di aggiornamento dei siti guasti</string>
     <string name="outage_source_frequency_unit">%1$d h</string>
-    <string name="outage_source_frequency_footer">Durata della cache e periodo in background se attivo.</string>
-    <string name="outage_source_background_title">Aggiorna in background</string>
-    <string name="outage_source_background_desc">Si aggiorna periodicamente anche ad app chiusa (consuma batteria e dati).</string>
+    <string name="outage_source_frequency_footer">Validità dei siti guasti in cache e periodo in background se attivo.</string>
+    <string name="outage_source_background_title">Aggiorna i siti guasti in background</string>
+    <string name="outage_source_background_desc">Recupera periodicamente i siti guasti anche ad app chiusa (consuma batteria e dati).</string>
     <string name="outage_source_generate_now">Aggiorna ora</string>
     <string name="outage_source_generating">Aggiornamento in corso…</string>
     <string name="outage_source_last_generated">Ultimo aggiornamento: %1$s</string>
@@ -2379,11 +2398,13 @@
     <string name="local_mode_level_data_title">Database + guasti in locale</string>
     <string name="local_mode_level_data_desc">Inoltre, il database viene generato sul dispositivo (se compatibile) invece di essere scaricato.</string>
     <string name="local_mode_level_full_title">Autonomia massima</string>
-    <string name="local_mode_level_full_desc">Inoltre, interrompe le foto della community e il loro invio, il controllo aggiornamenti e l\'API live. La configurazione remota resta attiva.</string>
+    <string name="local_mode_level_full_desc">Inoltre, interrompe le foto della community e il loro invio, il controllo aggiornamenti, l\'API live e il database eNB / gNB, che non è generabile sul dispositivo. La configurazione remota resta attiva.</string>
     <string name="local_mode_maps_note">Mappe, altimetria e ricerca indirizzi usano ancora i loro servizi online.</string>
-    <string name="local_mode_db_eligible">Questo dispositivo può generare il database in locale.</string>
     <string name="local_mode_db_ineligible">Questo dispositivo non può generare il database in locale (RAM/spazio): resta scaricato dal server.</string>
-    <string name="local_mode_build_hint">La generazione scarica diverse centinaia di MB e richiede qualche minuto — consigliati Wi-Fi e caricabatterie.</string>
+    <string name="local_mode_db_ineligible_title">Generazione fuori portata su questo dispositivo</string>
+    <string name="local_mode_db_ineligible_measured">Servono %1$s di RAM e %2$s liberi. Qui: %3$s di RAM, %4$s liberi.</string>
+    <string name="local_mode_max_partial_on_this_device">Su questo dispositivo l\'autonomia massima è parziale: foto, controllo aggiornamenti, API live e database eNB / gNB vengono interrotti, ma i database principali (mobile, radio) continuano ad arrivare dal server GeoTower — altrimenti l\'app resterebbe senza alcun dato.</string>
+    <string name="enb_database_local_mode_unavailable">Autonomia massima: questo database non è generabile sul dispositivo, quindi non viene né scaricato né aggiornato finché quel livello è attivo.</string>
     <string name="local_mode_download_disabled">Elaborazione locale attiva — download dal server disattivato.</string>
 
     <!-- Aides au défilement (barre latérale + boutons haut/bas) -->
@@ -2536,4 +2557,12 @@
     <string name="appstrings_release_v205_db_rebuild_offer">Se il tuo database è stato generato sul dispositivo, l\'aggiornamento avviene rigenerandolo invece di scaricarlo</string>
     <string name="appstrings_release_v205_local_mode_db">Nuovo livello «Database in locale» in Elaborazione locale: solo il database viene generato sul dispositivo, il resto continua a passare dal server</string>
     <string name="appstrings_release_v205_home_long_press">Gli elementi della schermata iniziale e il pulsante di aiuto si spostano con una pressione prolungata</string>
+
+    <!-- Note di versione 2.0.6 -->
+    <string name="appstrings_release_v206_satellite">Nuovo livello cartografico satellitare, disponibile sia con IGN sia con OpenStreetMap</string>
+    <string name="appstrings_release_v206_onboarding_display_mode">Il tutorial chiede ora come vuoi usare GeoTower, in modalità semplificata o completa, e spiega cosa cambia la modalità semplificata</string>
+    <string name="appstrings_release_v206_onboarding_local_mode">Un passaggio del tutorial permette di scegliere dove vengono preparati i dati: sul server o sul tuo dispositivo</string>
+    <string name="appstrings_release_v206_local_mode_coherence">Le schede di download dei database seguono il tuo livello di elaborazione locale: quelle sostituite dalla generazione sul dispositivo vengono nascoste, con la relativa spiegazione</string>
+    <string name="appstrings_release_v206_max_autonomy_partial">L\'autonomia massima indica cosa disattiva davvero sul tuo dispositivo e perché i database principali possono continuare ad arrivare dal server</string>
+    <string name="appstrings_release_v206_outage_controls">Impostazioni dei siti guasti riorganizzate: frequenza di aggiornamento e aggiornamento in background</string>
 </resources>

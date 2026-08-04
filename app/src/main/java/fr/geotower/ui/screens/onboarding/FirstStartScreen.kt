@@ -15,8 +15,10 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,12 +35,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Smartphone
+import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Tune
+import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -81,8 +88,9 @@ import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.workers.DatabaseDownloadWorker
 import fr.geotower.data.workers.LocalDbBuildWorker
 import fr.geotower.ui.components.SafeClick
-import fr.geotower.ui.components.colorPaletteFadingEdge
+import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.components.rememberSafeClick
+import fr.geotower.ui.screens.settings.LocalModeLevelControls
 import fr.geotower.ui.screens.settings.PreferenceProfilesSheet
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.services.LiveTrackingController
@@ -95,6 +103,59 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.compose.runtime.collectAsState
 
+/**
+ * Étapes du premier lancement, dans leur ordre d'affichage.
+ *
+ * Tout le fichier raisonne désormais sur `steps[page]` et jamais sur un numéro de page : ajouter
+ * une étape obligeait auparavant à retrouver les `page == 4`, `currentStep == 6` et `totalSteps - 1`
+ * disséminés dans le pager, le bouton principal et les pop-ups — un oubli suffisait à faire finir
+ * le tuto au milieu.
+ *
+ * L'ordre suit le coût du choix pour l'utilisateur : ce qui décide de la forme de l'app
+ * ([DisplayMode]) et ce qui est bloquant ([Location], [Notifications]) d'abord, la décoration
+ * ensuite, les données enfin — [LocalMode] juste avant [Database], puisque le cran choisi décide
+ * de ce que cette page-là propose.
+ */
+private enum class OnboardingStep {
+    Welcome,
+    DisplayMode,
+    Location,
+    Notifications,
+    LiveTracking,
+    Appearance,
+    Mapping,
+    LocalMode,
+    Database,
+    Preferences,
+}
+
+/**
+ * Liste des étapes réellement affichées, figée au premier affichage.
+ *
+ * Deux étapes dépendent d'un kill-switch distant : une page dont les choix ne feraient rien vaut
+ * moins que pas de page du tout. Le `remember` est volontaire — les drapeaux se rafraîchissent en
+ * tâche de fond, et le nombre de pages ne doit pas changer sous les doigts de l'utilisateur.
+ */
+@Composable
+private fun rememberOnboardingSteps(): List<OnboardingStep> = remember {
+    buildList {
+        add(OnboardingStep.Welcome)
+        if (RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIMPLE_MODE_ENABLED)) {
+            add(OnboardingStep.DisplayMode)
+        }
+        add(OnboardingStep.Location)
+        add(OnboardingStep.Notifications)
+        add(OnboardingStep.LiveTracking)
+        add(OnboardingStep.Appearance)
+        add(OnboardingStep.Mapping)
+        if (RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.LOCAL_MODE_ENABLED)) {
+            add(OnboardingStep.LocalMode)
+        }
+        add(OnboardingStep.Database)
+        add(OnboardingStep.Preferences)
+    }
+}
+
 @Composable
 fun FirstStartScreen(
     repository: AnfrRepository,
@@ -102,13 +163,14 @@ fun FirstStartScreen(
 ) {
     val safeClick = rememberSafeClick()
 
-    val totalSteps = 8
+    val steps = rememberOnboardingSteps()
+    val totalSteps = steps.size
 
     // 1. La mémoire : Quelle est la page maximale atteinte ?
     var maxUnlockedStep by remember { mutableIntStateOf(0) }
 
     // 2. Le Pager : Il s'adapte au nombre de pages débloquées.
-    val pagerState = rememberPagerState(pageCount = { maxUnlockedStep + 1 })
+    val pagerState = rememberPagerState(pageCount = { (maxUnlockedStep + 1).coerceAtMost(totalSteps) })
 
     // 3. Un CoroutineScope pour animer le Pager lors du clic sur le bouton
     val coroutineScope = rememberCoroutineScope()
@@ -269,15 +331,27 @@ fun FirstStartScreen(
                     verticalAlignment = Alignment.Top
                 ) { page ->
                     val pageScrollState = rememberScrollState()
+                    val step = steps[page]
                     Column(
                         modifier = Modifier
                             .fillMaxSize()
-                            .then(if (page == 4) Modifier.colorPaletteFadingEdge(pageScrollState) else Modifier)
+                            // Flou au défilement sur TOUTES les pages : c'est la convention de
+                            // l'app pour un conteneur défilant, et le tuto n'y dérogeait que par
+                            // accident — seule la page apparence l'avait, parce qu'elle avait
+                            // grandi la première (palette de couleurs). Posé AVANT verticalScroll
+                            // pour délaver la bande haute/basse du hublot, pas le contenu défilé.
+                            // `requireScrollableContent` laisse intactes les pages qui tiennent à
+                            // l'écran : rien à délaver quand rien ne dépasse.
+                            .geoTowerFadingEdge(
+                                pageScrollState,
+                                fadeHeight = sizing.component(72.dp),
+                                requireScrollableContent = true
+                            )
                             .verticalScroll(pageScrollState),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        when (page) {
-                            0 -> StepWelcomeDesign(
+                        when (step) {
+                            OnboardingStep.Welcome -> StepWelcomeDesign(
                                 useOneUi = useOneUi,
                                 cardShape = cardShape,
                                 cardBorder = cardBorder,
@@ -285,22 +359,23 @@ fun FirstStartScreen(
                                 onOpenLanguageSheet = { showLanguageSheet = true },
                                 onSafeClick = safeClick
                             )
-                            1 -> StepLocationPermissionDesign()
-                            2 -> StepNotificationsPermissionDesign()
+                            OnboardingStep.DisplayMode -> StepDisplayModeDesign(useOneUi = useOneUi)
+                            OnboardingStep.Location -> StepLocationPermissionDesign()
+                            OnboardingStep.Notifications -> StepNotificationsPermissionDesign()
                             // Le suivi live ne nécessite ni opérateur ni permission de notification :
                             // il vient après l'étape des notifications, mais n'en dépend pas.
-                            3 -> StepLiveTrackingDesign(
+                            OnboardingStep.LiveTracking -> StepLiveTrackingDesign(
                                 shape = cardShape,
                                 border = cardBorder,
                                 bubbleColor = bubbleColor,
                                 useOneUi = useOneUi,
-                                defaultOperator = defaultOperator,
-                                onOpenOperatorSheet = { showOperatorSheet = true }
+                                defaultOperator = defaultOperator
                             )
-                            4 -> StepThemeDesign(useOneUi, cardShape, cardBorder, bubbleColor, onSafeClick = safeClick)
-                            5 -> StepMapDesign(useOneUi, bubbleColor, onSafeClick = safeClick)
-                            6 -> StepDatabaseDesign(useOneUi, cardShape, cardBorder, bubbleColor, onSafeClick = safeClick)
-                            7 -> StepPreferencesDesign(
+                            OnboardingStep.Appearance -> StepThemeDesign(useOneUi, cardShape, cardBorder, bubbleColor, onSafeClick = safeClick)
+                            OnboardingStep.Mapping -> StepMapDesign(useOneUi, bubbleColor, onSafeClick = safeClick)
+                            OnboardingStep.LocalMode -> StepLocalModeDesign(useOneUi = useOneUi)
+                            OnboardingStep.Database -> StepDatabaseDesign(useOneUi, cardShape, cardBorder, bubbleColor, onSafeClick = safeClick)
+                            OnboardingStep.Preferences -> StepPreferencesDesign(
                                 useOneUi = useOneUi,
                                 cardShape = cardShape,
                                 cardBorder = cardBorder,
@@ -326,43 +401,34 @@ fun FirstStartScreen(
                     ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
             val isNotificationStepReady = hasNotificationPermission || isNotificationPermissionHandled
 
-            val buttonText = when(currentStep) {
-                0 -> stringResource(R.string.onboarding_start_configuration)
-                1 -> if (isLocationStepReady) stringResource(R.string.common_next) else stringResource(R.string.common_authorize)
-                2 -> if (isNotificationStepReady) stringResource(R.string.common_next) else stringResource(R.string.common_authorize)
-                totalSteps - 1 -> stringResource(R.string.onboarding_lets_go)
+            val currentStepKind = steps[currentStep]
+            val isLastStep = currentStep == steps.lastIndex
+            // Une étape de permission « pas encore réglée » : le bouton demande l'autorisation au
+            // lieu d'avancer. Les deux seules du parcours, d'où ce raccourci commun.
+            val awaitsLocation = currentStepKind == OnboardingStep.Location && !isLocationStepReady
+            val awaitsNotifications = currentStepKind == OnboardingStep.Notifications && !isNotificationStepReady
+
+            val buttonText = when {
+                currentStep == 0 -> stringResource(R.string.onboarding_start_configuration)
+                awaitsLocation || awaitsNotifications -> stringResource(R.string.common_authorize)
+                isLastStep -> stringResource(R.string.onboarding_lets_go)
                 else -> stringResource(R.string.common_next)
             }
             Button(
                 onClick = {
-                    safeClick("onboarding_primary_$currentStep") {
-                        when(currentStep) {
-                            0 -> {
-                                goToNextStep()
-                            }
+                    safeClick("onboarding_primary_${currentStepKind.name}") {
+                        when {
+                            awaitsLocation -> locationPermissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                )
+                            )
 
-                            1 -> {
-                                if (isLocationStepReady) {
-                                    goToNextStep()
-                                } else {
-                                    locationPermissionLauncher.launch(
-                                        arrayOf(
-                                            Manifest.permission.ACCESS_FINE_LOCATION,
-                                            Manifest.permission.ACCESS_COARSE_LOCATION
-                                        )
-                                    )
-                                }
-                            }
+                            awaitsNotifications ->
+                                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
 
-                            2 -> {
-                                if (isNotificationStepReady) {
-                                    goToNextStep()
-                                } else {
-                                    notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                                }
-                            }
-
-                            totalSteps - 1 -> {
+                            isLastStep -> {
                                 // FIN DE L'ONBOARDING : Vérification de l'opérateur
                                 if (defaultOperator == "Aucun") {
                                     showWarningDialog = true
@@ -372,7 +438,7 @@ fun FirstStartScreen(
                             }
 
                             else -> {
-                                if (currentStep == 6 && AppConfig.localDatabaseState.value == null) {
+                                if (currentStepKind == OnboardingStep.Database && AppConfig.localDatabaseState.value == null) {
                                     coroutineScope.launch {
                                         val dbState = withContext(Dispatchers.IO) {
                                             GeoTowerDatabaseValidator.getInstalledDatabaseStatus(context).state
@@ -396,7 +462,7 @@ fun FirstStartScreen(
             ) {
                 Text(text = buttonText, fontSize = sizing.text(18.sp))
                 Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
-                if (currentStep == totalSteps - 1) {
+                if (isLastStep) {
                     Icon(Icons.Default.Check, contentDescription = null)
                 } else if (currentStep > 0) {
                     Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
@@ -498,11 +564,11 @@ fun FirstStartScreen(
                         fr.geotower.AppGlobalState.showDbSuccessPopup.value = false
 
                         // On n'avance automatiquement que si l'utilisateur est encore sur l'étape de
-                        // téléchargement (6). Le téléchargement tourne en arrière-plan : s'il se termine
+                        // téléchargement. Le téléchargement tourne en arrière-plan : s'il se termine
                         // alors que l'utilisateur a déjà glissé plus loin (ex. dernière étape), appeler
                         // goToNextStep() finirait l'onboarding et renverrait vers l'accueil sans attendre.
                         // Dans ce cas on se contente de fermer le pop-up.
-                        if (currentStep == 6) {
+                        if (steps.getOrNull(currentStep) == OnboardingStep.Database) {
                             goToNextStep()
                         }
                     },
@@ -571,7 +637,7 @@ fun FirstStartScreen(
 }
 
 // ==========================================
-// --- ÉTAPE 4 : PRÉFÉRENCES (DESIGN PARAMÈTRES) ---
+// --- ÉTAPE PRÉFÉRENCES (DESIGN PARAMÈTRES) ---
 // ==========================================
 @Composable
 fun StepPreferencesDesign(
@@ -584,11 +650,9 @@ fun StepPreferencesDesign(
     onOpenPreferenceProfilesSheet: () -> Unit,
     onSafeClick: SafeClick
 ) {
-    val context = LocalContext.current
-    val prefs = context.getSharedPreferences("GeoTowerPrefs", Context.MODE_PRIVATE)
     val sizing = LocalGeoTowerUiStyle.current.sizing
 
-    var defaultOperator by AppConfig.defaultOperator
+    val defaultOperator by AppConfig.defaultOperator
 
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
@@ -644,28 +708,249 @@ fun StepPreferencesDesign(
                 }
             }
         }
+        // Le mode simplifié était un interrupteur de plus en bas de cette page, alors qu'il décide
+        // de la forme de toute l'app : il a désormais sa propre étape ([StepDisplayModeDesign]),
+        // juste après l'accueil.
+    }
+}
 
-        // --- CARTE MODE SIMPLIFIÉ ---
-        // Proposé dès le tuto : c'est le moment où le choix coûte le moins cher à l'utilisateur.
-        if (RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIMPLE_MODE_ENABLED)) {
-            val simpleMode by AppConfig.simpleMode
-            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
-            Surface(color = if (useOneUi) bubbleColor else Color.Transparent, border = cardBorder, shape = cardShape, modifier = Modifier.fillMaxWidth()) {
-                Row(modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp)), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(stringResource(R.string.settings_simple_mode_title), style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
-                        Text(stringResource(R.string.settings_simple_mode_desc), style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    }
-                    Spacer(Modifier.width(sizing.spacing(12.dp)))
-                    fr.geotower.ui.components.GeoTowerSwitch(
-                        checked = simpleMode,
-                        onCheckedChange = { AppConfig.setSimpleMode(context, it) },
-                        useOneUi = useOneUi,
-                        checkedColor = MaterialTheme.colorScheme.primary
-                    )
-                }
+// ==========================================
+// --- ÉTAPE MODE D'AFFICHAGE (SIMPLIFIÉ / COMPLET) ---
+// ==========================================
+/**
+ * Étape « comment voulez-vous utiliser GeoTower ? », posée juste après l'accueil.
+ *
+ * Le mode simplifié n'est pas un réglage de confort : il change la racine de la navigation (carte
+ * au lancement), remplace l'accueil par un tiroir latéral et fusionne les fiches. Le proposer comme
+ * un interrupteur discret en fin de tuto revenait à le réserver à ceux qui n'en ont pas besoin —
+ * ceux qui découvrent le domaine ne descendaient jamais jusque-là.
+ *
+ * D'où deux cartes côte à côte ([DisplayModeCard]) : une comparaison, pas un interrupteur à
+ * subir. La description longue du mode retenu s'affiche dessous et change au toucher, et le bloc
+ * de détails rappelle ensuite ce que le mode simplifié modifie concrètement — dont le fait qu'on
+ * peut en changer plus tard.
+ */
+@Composable
+fun StepDisplayModeDesign(useOneUi: Boolean) {
+    val context = LocalContext.current
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val simpleMode by AppConfig.simpleMode
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+        Icon(Icons.Outlined.ViewAgenda, null, modifier = Modifier.size(sizing.component(80.dp)), tint = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+
+        Text(stringResource(R.string.onboarding_display_mode_title), style = sizing.textStyle(MaterialTheme.typography.headlineMedium), fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+        Text(
+            text = stringResource(R.string.onboarding_display_mode_desc),
+            textAlign = TextAlign.Center,
+            style = sizing.textStyle(MaterialTheme.typography.bodyLarge),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+
+        // Les deux modes côte à côte, visibles sans défiler : la comparaison se fait d'un coup
+        // d'œil, et l'écran annonce d'emblée qu'il y a deux chemins. `IntrinsicSize.Min` aligne
+        // leurs hauteurs — deux cartes de tailles différentes désigneraient un gagnant.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(IntrinsicSize.Min),
+            horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
+        ) {
+            DisplayModeCard(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Default.Map,
+                title = stringResource(R.string.settings_simple_mode_title),
+                tagline = stringResource(R.string.onboarding_display_mode_simple_tagline),
+                isSelected = simpleMode,
+                useOneUi = useOneUi,
+                onClick = { AppConfig.setSimpleMode(context, true) }
+            )
+            DisplayModeCard(
+                modifier = Modifier.weight(1f),
+                icon = Icons.Outlined.Dashboard,
+                title = stringResource(R.string.onboarding_display_mode_full_title),
+                tagline = stringResource(R.string.onboarding_display_mode_full_tagline),
+                isSelected = !simpleMode,
+                useOneUi = useOneUi,
+                onClick = { AppConfig.setSimpleMode(context, false) }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+
+        // La phrase complète du mode retenu, sous les deux cartes : une carte étroite ne peut
+        // porter qu'une accroche, et taper sur l'autre mode doit expliquer, pas seulement cocher.
+        Text(
+            text = if (simpleMode) {
+                stringResource(R.string.onboarding_display_mode_simple_desc)
+            } else {
+                stringResource(R.string.onboarding_display_mode_full_desc)
+            },
+            textAlign = TextAlign.Center,
+            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+
+        Text(
+            text = stringResource(R.string.onboarding_display_mode_details_title),
+            textAlign = TextAlign.Center,
+            style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.fillMaxWidth()
+        )
+
+        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
+        ) {
+            PermissionDetailItem(
+                icon = Icons.Default.Map,
+                title = stringResource(R.string.onboarding_display_mode_start_title),
+                description = stringResource(R.string.onboarding_display_mode_start_desc)
+            )
+            PermissionDetailItem(
+                icon = Icons.Default.Menu,
+                title = stringResource(R.string.onboarding_display_mode_menu_title),
+                description = stringResource(R.string.onboarding_display_mode_menu_desc)
+            )
+            PermissionDetailItem(
+                icon = Icons.Default.Check,
+                title = stringResource(R.string.onboarding_display_mode_reversible_title),
+                description = stringResource(R.string.onboarding_display_mode_reversible_desc)
+            )
+        }
+    }
+}
+
+/**
+ * Une des deux cartes « mode d'affichage », prévue pour vivre à côté de sa jumelle : contenu
+ * centré, hauteur imposée par la [Row] parente, et un état sélectionné qui se voit sans lire
+ * (fond, contour, pastille cochée) — pas seulement une nuance de gris.
+ */
+@Composable
+private fun DisplayModeCard(
+    modifier: Modifier,
+    icon: ImageVector,
+    title: String,
+    tagline: String,
+    isSelected: Boolean,
+    useOneUi: Boolean,
+    onClick: () -> Unit
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val shape = RoundedCornerShape(sizing.component(if (useOneUi) 22.dp else 12.dp))
+    val contentColor = if (isSelected) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+
+    Surface(
+        onClick = onClick,
+        modifier = modifier.fillMaxHeight(),
+        shape = shape,
+        color = if (isSelected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f),
+        border = BorderStroke(
+            width = if (isSelected) 2.dp else 1.dp,
+            color = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(sizing.spacing(16.dp)),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = if (isSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(sizing.component(36.dp))
+            )
+            Spacer(Modifier.height(sizing.spacing(8.dp)))
+            Text(
+                text = title,
+                textAlign = TextAlign.Center,
+                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                fontWeight = FontWeight.Bold,
+                color = contentColor
+            )
+            Spacer(Modifier.height(sizing.spacing(4.dp)))
+            Text(
+                text = tagline,
+                textAlign = TextAlign.Center,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                color = if (isSelected) contentColor.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (isSelected) {
+                Spacer(Modifier.height(sizing.spacing(8.dp)))
+                Icon(
+                    imageVector = Icons.Default.CheckCircle,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(sizing.component(20.dp))
+                )
             }
         }
+    }
+}
+
+// ==========================================
+// --- ÉTAPE TRAITEMENT LOCAL DES DONNÉES ---
+// ==========================================
+/**
+ * Étape « traitement local des données », posée juste AVANT la base de données.
+ *
+ * L'ordre n'est pas cosmétique : le cran choisi ici décide de ce que la page suivante propose
+ * (télécharger la base ou la générer sur l'appareil, cf. [AppConfig.dbForcedLocal]). Placée après,
+ * elle aurait contredit un téléchargement déjà lancé.
+ *
+ * La liste des crans vient de [LocalModeLevelControls], le panneau que les Réglages utilisent :
+ * même vocabulaire, mêmes garde-fous (kill-switch distant, appareil inéligible).
+ */
+@Composable
+fun StepLocalModeDesign(useOneUi: Boolean) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+
+    Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+        Icon(Icons.Outlined.Storage, null, modifier = Modifier.size(sizing.component(80.dp)), tint = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+
+        Text(stringResource(R.string.local_mode_settings_title), style = sizing.textStyle(MaterialTheme.typography.headlineMedium), fontWeight = FontWeight.Bold, textAlign = TextAlign.Center)
+        Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
+        Text(
+            text = stringResource(R.string.onboarding_local_mode_desc),
+            textAlign = TextAlign.Center,
+            style = sizing.textStyle(MaterialTheme.typography.bodyLarge),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+
+        // Rassurer avant la liste : au premier lancement, « Serveur » est un choix, pas un défaut
+        // subi — et c'est celui qui ne demande rien.
+        Text(
+            text = stringResource(R.string.onboarding_local_mode_hint),
+            textAlign = TextAlign.Center,
+            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+            fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.primary
+        )
+
+        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+
+        LocalModeLevelControls(useOneUi = useOneUi, showIntro = false)
     }
 }
 
@@ -875,8 +1160,9 @@ fun StepLiveTrackingDesign(
     border: BorderStroke?,
     bubbleColor: Color,
     useOneUi: Boolean,
-    defaultOperator: String,
-    onOpenOperatorSheet: () -> Unit
+    // L'opérateur ne se choisit PAS ici (la feuille de sélection appartient à l'étape des
+    // préférences) : il n'est lu que pour dire ce que le suivi va viser.
+    defaultOperator: String
 ) {
     val context = LocalContext.current
     val liveTrackingEnabled by AppConfig.enableLiveTracking
@@ -1128,6 +1414,21 @@ fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderSt
     // Génération locale : réservée aux appareils éligibles (RAM/stockage). Dès le 1er lancement, un
     // message « non disponible sur cet appareil » n'apporterait rien : on masque la carte.
     val buildEligibility = remember { LocalBuildCapability.evaluate(context) }
+    // ... et réservée au cran de traitement local qui la prévoit, choisi à l'étape précédente —
+    // comme dans les Réglages. Sans cette condition, la page proposerait de générer la base juste
+    // après que l'utilisateur a répondu « Serveur », et les deux cartes se contrediraient.
+    val buildsDbLocally = AppConfig.levelBuildsDbLocally(AppConfig.effectiveLocalModeLevel())
+    // Cette page ne montre QUE ce que le cran choisi juste avant rend possible. C'est un parcours
+    // guidé, pas le tableau de bord des Réglages : une carte dont le bouton est mort n'y est pas
+    // une information, c'est une impasse. Deux conséquences, qui se composent :
+    //  - la base est générée ici (cran « base en local » + appareil éligible) → les cartes de
+    //    téléchargement mobile et radio n'ont plus rien à proposer ;
+    //  - cran maximal → la base eNB/gNB est coupée pour tout le monde (elle n'est pas générable,
+    //    cf. [AppConfig.blockServerDatabase]), sa carte n'a plus lieu d'être.
+    // Un appareil INÉLIGIBLE au cran maximal garde donc mobile + radio (téléchargées, sinon
+    // l'application n'aurait aucune donnée) et perd la eNB : exactement ce que la page affiche.
+    val generatesInstead = AppConfig.dbForcedLocal()
+    val serverDataCutOff = AppConfig.blockCommunityAndUpdates()
     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
         Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
         Icon(
@@ -1140,44 +1441,62 @@ fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderSt
 
         Text(stringResource(R.string.settings_section_database), style = sizing.textStyle(MaterialTheme.typography.headlineMedium), fontWeight = FontWeight.Bold)
         Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
-        Text(stringResource(R.string.onboarding_offline_desc), textAlign = TextAlign.Center, style = sizing.textStyle(MaterialTheme.typography.bodyLarge), color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(
+            // « Téléchargez toute la base… » n'a plus de sens quand l'appareil la construit :
+            // la page dirait le contraire de ce qu'elle propose.
+            text = if (generatesInstead) {
+                stringResource(R.string.onboarding_offline_desc_local_build)
+            } else {
+                stringResource(R.string.onboarding_offline_desc)
+            },
+            textAlign = TextAlign.Center,
+            style = sizing.textStyle(MaterialTheme.typography.bodyLarge),
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
         Spacer(modifier = Modifier.height(sizing.spacing(32.dp)))
 
-        // 🚀 APPEL DU NOUVEAU COMPOSANT PARTAGÉ
-        fr.geotower.ui.components.DatabaseDownloadCard(
-            useOneUi = useOneUi,
-            shape = cardShape,
-            border = cardBorder,
-            bubbleColor = bubbleColor,
-            title = stringResource(R.string.settings_section_database),
-            onSafeClick = onSafeClick
-        )
+        if (!generatesInstead) {
+            // 🚀 APPEL DU NOUVEAU COMPOSANT PARTAGÉ
+            fr.geotower.ui.components.DatabaseDownloadCard(
+                useOneUi = useOneUi,
+                shape = cardShape,
+                border = cardBorder,
+                bubbleColor = bubbleColor,
+                title = stringResource(R.string.settings_section_database),
+                onSafeClick = onSafeClick
+            )
 
-        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
-        fr.geotower.ui.components.RadioDatabaseDownloadCard(
-            useOneUi = useOneUi,
-            shape = cardShape,
-            border = cardBorder,
-            bubbleColor = bubbleColor,
-            onSafeClick = onSafeClick
-        )
-
-        Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+            fr.geotower.ui.components.RadioDatabaseDownloadCard(
+                useOneUi = useOneUi,
+                shape = cardShape,
+                border = cardBorder,
+                bubbleColor = bubbleColor,
+                onSafeClick = onSafeClick
+            )
+        }
 
         // Identifiants eNB/gNB : donnée du partenaire eNB-Analytics (pas de l'ANFR), d'où
-        // l'attribution cliquable portée par la carte elle-même.
-        fr.geotower.ui.components.EnbDatabaseDownloadCard(
-            useOneUi = useOneUi,
-            shape = cardShape,
-            border = cardBorder,
-            bubbleColor = bubbleColor,
-            onSafeClick = onSafeClick
-        )
+        // l'attribution cliquable portée par la carte elle-même. Absente au cran maximal, qui la
+        // coupe pour tous les appareils. Chaque bloc porte l'espace qui le PRÉCÈDE : selon le cran,
+        // n'importe lequel peut être le premier de la page.
+        if (!serverDataCutOff) {
+            if (!generatesInstead) Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+            fr.geotower.ui.components.EnbDatabaseDownloadCard(
+                useOneUi = useOneUi,
+                shape = cardShape,
+                border = cardBorder,
+                bubbleColor = bubbleColor,
+                onSafeClick = onSafeClick
+            )
+        }
 
-        if (buildEligibility.eligible) {
-            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+        if (buildEligibility.eligible && buildsDbLocally) {
+            if (!generatesInstead || !serverDataCutOff) {
+                Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+            }
 
             fr.geotower.ui.components.LocalDbBuildCard(
                 useOneUi = useOneUi,
@@ -1185,6 +1504,18 @@ fun StepDatabaseDesign(useOneUi: Boolean, cardShape: Shape, cardBorder: BorderSt
                 border = cardBorder,
                 bubbleColor = bubbleColor,
                 onSafeClick = onSafeClick
+            )
+        }
+
+        // Une carte qui disparaît sans un mot ressemble à un bug. Le cran précédent l'annonce
+        // déjà dans sa description ; ici on le rappelle là où le manque se voit.
+        if (serverDataCutOff) {
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+            Text(
+                text = stringResource(R.string.onboarding_database_enb_cut_by_level),
+                textAlign = TextAlign.Center,
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }

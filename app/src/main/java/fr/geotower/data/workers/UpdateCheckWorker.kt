@@ -33,11 +33,13 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
 
         val canCheckApp = RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.APP_UPDATE_CHECK) &&
             RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.APP_UPDATE_CHECK)
-        // « Autonomie maximale » : aucune version distante ne sera servie. Sans cette garde, le
-        // worker prenait le null pour une panne réseau et repartait en Result.retry() en boucle.
+        // « Autonomie maximale » sur un appareil qui génère ses bases : aucune version distante ne
+        // sera servie. Sans cette garde, le worker prenait le null pour une panne réseau et
+        // repartait en Result.retry() en boucle. Sur un appareil inéligible à la génération, le
+        // manifeste reste lu (la base vient forcément du serveur) : la vérification a un sens.
         val canCheckDatabase = RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_UPDATE_CHECK) &&
             RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_UPDATE_CHECK) &&
-            !fr.geotower.utils.AppConfig.blockCommunityAndUpdates()
+            !fr.geotower.utils.AppConfig.blockServerDatabase()
 
         if (canCheckApp) {
             AppUpdateNotifier.checkAndNotify(context)

@@ -124,6 +124,12 @@ fun Modifier.settingsPopupFadingEdge(scrollState: ScrollState): Modifier {
     return geoTowerFadingEdge(scrollState, requireScrollableContent = true)
 }
 
+/**
+ * Fondu de la page qui porte la palette de couleurs (Réglages ▸ Apparence).
+ *
+ * Le premier lancement ne l'utilise plus : il applique [geoTowerFadingEdge] à toutes ses pages,
+ * comme n'importe quel conteneur défilant de l'app.
+ */
 fun Modifier.colorPaletteFadingEdge(scrollState: ScrollState): Modifier {
     return geoTowerFadingEdge(scrollState)
 }

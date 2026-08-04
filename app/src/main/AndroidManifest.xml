@@ -34,6 +34,9 @@
         android:required="false" />
 
     <queries>
+        <!-- Hôte Android Auto : la visibilité du paquet est nécessaire pour lire sa version dans
+             le journal de diagnostic, la liaison seule ne la garantit pas au moment d'onCreate. -->
+        <package android:name="com.google.android.projection.gearhead" />
         <package android:name="fr.enb_analytics.enb4g" />
         <package android:name="com.sfrmap.android" />
         <!-- CellularFR masqué — voir CellularFrApi.ENABLED -->

@@ -46,4 +46,27 @@ class LocalModeLevelScaleTest {
         assertFalse(AppConfig.levelBuildsDbLocally(AppConfig.LOCAL_MODE_SERVER))
         assertFalse(AppConfig.levelFetchesOutagesLocally(AppConfig.LOCAL_MODE_SERVER))
     }
+
+    /**
+     * Le cran maximal ne doit jamais laisser un appareil sans aucune donnee : s'il ne sait pas
+     * generer sa base (RAM/stockage), le serveur reste sa seule source et le manifeste doit
+     * continuer d'etre lu. Couper les deux revenait a livrer une application vide.
+     */
+    @Test
+    fun maxAutonomyKeepsServerDatabaseWhenDeviceCannotBuild() {
+        assertTrue(AppConfig.blocksServerDatabase(AppConfig.LOCAL_MODE_MAX, localBuildEligible = true))
+        assertFalse(AppConfig.blocksServerDatabase(AppConfig.LOCAL_MODE_MAX, localBuildEligible = false))
+
+        // En dessous du cran maximal, le manifeste reste lu quoi qu'il arrive : c'est lui qui
+        // signale « du neuf a telecharger » — ou « du neuf a regenerer » aux crans « base en local ».
+        listOf(
+            AppConfig.LOCAL_MODE_SERVER,
+            AppConfig.LOCAL_MODE_DB,
+            AppConfig.LOCAL_MODE_OUTAGES,
+            AppConfig.LOCAL_MODE_BOTH,
+        ).forEach { level ->
+            assertFalse(AppConfig.blocksServerDatabase(level, localBuildEligible = true))
+            assertFalse(AppConfig.blocksServerDatabase(level, localBuildEligible = false))
+        }
+    }
 }
