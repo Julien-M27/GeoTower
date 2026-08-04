@@ -49,7 +49,8 @@ object PageCustomizationPrefs {
         PageScrollPrefs.SPEEDTESTS,
         PageScrollPrefs.COVERAGE,
         PageScrollPrefs.ELEVATION_PROFILE,
-        PageScrollPrefs.THROUGHPUT_CALCULATOR
+        PageScrollPrefs.THROUGHPUT_CALCULATOR,
+        PageScrollPrefs.DEPARTMENT_STATS
     )
 
     val hintsEnabled = mutableStateOf(true)

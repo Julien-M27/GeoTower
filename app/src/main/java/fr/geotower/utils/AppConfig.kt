@@ -41,8 +41,23 @@ object AppConfig {
     // réglage des utilisateurs. Elle ne pilote que le service de suivi, pas le droit de notifier.
     const val PREF_ENABLE_LIVE_TRACKING = "enable_live_notifications"
 
-    // Mode « traitement local » : 0 Serveur / 1 Sites HS / 2 Base+sites / 3 Autonomie max.
+    // Mode « traitement local » : voir les 5 crans LOCAL_MODE_* plus bas.
     const val PREF_LOCAL_MODE_LEVEL = "local_mode_level"
+    // Drapeau de migration de l'échelle : les 4 crans d'origine sont passés à 5 (insertion de
+    // « base en local, pannes serveur » en 1). Sans lui, un ancien niveau serait mal relu.
+    const val PREF_LOCAL_MODE_SCALE_V2 = "local_mode_level_scale_v2"
+
+    /**
+     * Crans du traitement local. Les deux traitements (base, sites en panne) sont indépendants :
+     * l'échelle les combine au lieu de les empiler, sinon générer sa base imposerait de récupérer
+     * aussi les pannes sur l'appareil (et l'état « base ici, pannes serveur » n'était affichable
+     * nulle part — il retombait sur « Serveur », qui prétendait le contraire).
+     */
+    const val LOCAL_MODE_SERVER = 0
+    const val LOCAL_MODE_DB = 1
+    const val LOCAL_MODE_OUTAGES = 2
+    const val LOCAL_MODE_BOTH = 3
+    const val LOCAL_MODE_MAX = 4
 
     // Mode simplifié : carte au lancement, tiroir latéral à la place de l'accueil, fiche
     // support et fiches opérateurs fusionnées. Un seul interrupteur pilote l'ensemble.
@@ -275,6 +290,21 @@ object AppConfig {
     val showMapPage = mutableStateOf(true)
     val showCompassPage = mutableStateOf(true)
     val showStatsPage = mutableStateOf(true)
+
+    // Ordre des éléments de l'accueil (boutons + logo), miroir observable de `pages_order`.
+    // Deux endroits l'écrivent — « Personnalisation des pages » et l'appui long sur la page
+    // elle-même — et chacun doit voir tout de suite ce que l'autre a fait.
+    val pagesOrder = mutableStateOf(HomePrefs.normalizeOrder(HomePrefs.DEFAULT_PAGES_ORDER.split(",")))
+
+    // Déplacement des éléments de l'accueil par appui long, directement sur la page.
+    const val PREF_HOME_LONG_PRESS_REORDER = "home_long_press_reorder"
+    val homeLongPressReorder = mutableStateOf(true)
+
+    // Coin du bouton « Aides ». Miroité pour la même raison que l'ordre : l'appui long le déplace
+    // depuis la page, les quatre choix des réglages doivent suivre, et inversement.
+    const val PREF_HOME_HELP_POSITION = "home_help_position"
+    const val DEFAULT_HOME_HELP_POSITION = "bottom_end"
+    val homeHelpPosition = mutableStateOf(DEFAULT_HOME_HELP_POSITION)
     var statsDisplayMode = mutableStateOf(StatsDisplayMode.Both)
 
     // --- Capteurs matériels ---
@@ -356,24 +386,35 @@ object AppConfig {
         }
 
     /**
-     * Niveau ≥ 1 : les sites en panne sont récupérés/localisés sur l'appareil.
+     * Le cran [level] emporte-t-il la génération locale de la base ? Vrai pour [LOCAL_MODE_DB]
+     * (base seule) et à partir de [LOCAL_MODE_BOTH]. Indépendant de l'éligibilité de l'appareil :
+     * les écrans s'en servent pour afficher leurs réglages même sur un appareil non éligible.
+     */
+    fun levelBuildsDbLocally(level: Int): Boolean = level == LOCAL_MODE_DB || level >= LOCAL_MODE_BOTH
+
+    /** Le cran [level] emporte-t-il la récupération des pannes sur l'appareil ? */
+    fun levelFetchesOutagesLocally(level: Int): Boolean = level >= LOCAL_MODE_OUTAGES
+
+    /**
+     * Les sites en panne sont récupérés/localisés sur l'appareil.
      *
      * SEULE vérité sur la source des pannes : il n'existe plus de réglage concurrent. Tout ce qui
      * décide « local ou serveur » (repository, planification en fond, worker, écrans) doit passer
      * par ici, sinon on retombe sur l'incohérence d'avant (un planificateur qui lance un worker
      * qui refuse de travailler).
      */
-    fun outagesLocal(): Boolean = effectiveLocalModeLevel() >= 1
+    fun outagesLocal(): Boolean = levelFetchesOutagesLocally(effectiveLocalModeLevel())
 
-    /** Niveau ≥ 2 ET appareil éligible : la base est générée localement (bloque le téléchargement serveur). */
-    fun dbForcedLocal(): Boolean = effectiveLocalModeLevel() >= 2 && localBuildEligible.value
+    /** Cran « base en local » ET appareil éligible : la base est générée ici (bloque le téléchargement serveur). */
+    fun dbForcedLocal(): Boolean =
+        levelBuildsDbLocally(effectiveLocalModeLevel()) && localBuildEligible.value
 
-    /** Niveau ≥ 3 : coupe SignalQuest (photos + envoi), la vérif de mise à jour et l'API live. */
-    fun blockCommunityAndUpdates(): Boolean = effectiveLocalModeLevel() >= 3
+    /** [LOCAL_MODE_MAX] : coupe SignalQuest (photos + envoi), la vérif de mise à jour et l'API live. */
+    fun blockCommunityAndUpdates(): Boolean = effectiveLocalModeLevel() >= LOCAL_MODE_MAX
 
     /** Applique un niveau : persiste, recalcule l'éligibilité et réconcilie la planif des pannes. */
     fun setLocalModeLevel(context: Context, level: Int) {
-        val clamped = level.coerceIn(0, 3)
+        val clamped = level.coerceIn(LOCAL_MODE_SERVER, LOCAL_MODE_MAX)
         localModeLevel.intValue = clamped
         context.applicationContext
             .getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
@@ -385,10 +426,46 @@ object AppConfig {
     }
 
     /**
+     * Migration ponctuelle : l'échelle est passée de 4 à 5 crans. L'ancien 1 (« sites en panne en
+     * local ») valait ce qui est aujourd'hui [LOCAL_MODE_OUTAGES] ; tout ce qui était ≥ 1 glisse
+     * donc d'un cran, la place libérée en 1 revenant à la base seule. Sans ce décalage, un ancien
+     * « autonomie maximale » se réveillerait en « base + pannes », photos et mises à jour
+     * rallumées dans son dos.
+     *
+     * Idempotent (drapeau [PREF_LOCAL_MODE_SCALE_V2]), à appeler AVANT toute lecture du niveau et
+     * AVANT [migrateLegacyOutageSourcePref], qui raisonne, lui, sur la nouvelle échelle.
+     */
+    fun migrateLocalModeLevelScale(context: Context) {
+        val prefs = context.applicationContext
+            .getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+        if (prefs.getBoolean(PREF_LOCAL_MODE_SCALE_V2, false)) return
+        prefs.edit()
+            .putInt(
+                PREF_LOCAL_MODE_LEVEL,
+                migratedLocalModeLevel(prefs.getInt(PREF_LOCAL_MODE_LEVEL, LOCAL_MODE_SERVER)),
+            )
+            .putBoolean(PREF_LOCAL_MODE_SCALE_V2, true)
+            .apply()
+    }
+
+    /**
+     * Décalage pur de l'échelle, extrait pour être testable : tout ancien cran ≥ 1 glisse d'un
+     * rang (1 pannes → [LOCAL_MODE_OUTAGES], 2 base + pannes → [LOCAL_MODE_BOTH], 3 autonomie max
+     * → [LOCAL_MODE_MAX]), le 0 ne bouge pas.
+     */
+    fun migratedLocalModeLevel(legacyLevel: Int): Int =
+        if (legacyLevel <= LOCAL_MODE_SERVER) {
+            LOCAL_MODE_SERVER
+        } else {
+            (legacyLevel + 1).coerceAtMost(LOCAL_MODE_MAX)
+        }
+
+    /**
      * Migration ponctuelle : l'ancien interrupteur « Récupérer les pannes sur l'appareil »
      * (clé `outages_source` du store "settings") a été absorbé par le niveau de traitement local.
-     * Un ancien « local » devient le niveau 1, puis la clé est supprimée pour ne plus jamais être
-     * relue. Idempotent, et à appeler AVANT la lecture de [PREF_LOCAL_MODE_LEVEL].
+     * Un ancien « local » devient [LOCAL_MODE_OUTAGES] — ou [LOCAL_MODE_BOTH] si la base est déjà
+     * en local — puis la clé est supprimée pour ne plus jamais être relue. Idempotent, et à
+     * appeler AVANT la lecture de [PREF_LOCAL_MODE_LEVEL].
      */
     fun migrateLegacyOutageSourcePref(context: Context) {
         val appContext = context.applicationContext
@@ -398,11 +475,13 @@ object AppConfig {
         outagePrefs.edit().remove(OutageLocalConfig.LEGACY_KEY_SOURCE).apply()
         if (legacy != OutageLocalConfig.LEGACY_SOURCE_LOCAL) return
 
-        // On ne rétrograde jamais un utilisateur déjà en niveau 2 ou 3.
+        // On ne rétrograde jamais un utilisateur qui récupère déjà ses pannes ici, et on ne lui
+        // retire pas sa base locale au passage.
         val appPrefs = appContext.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
-        if (appPrefs.getInt(PREF_LOCAL_MODE_LEVEL, 0) < 1) {
-            appPrefs.edit().putInt(PREF_LOCAL_MODE_LEVEL, 1).apply()
-        }
+        val current = appPrefs.getInt(PREF_LOCAL_MODE_LEVEL, LOCAL_MODE_SERVER)
+        if (levelFetchesOutagesLocally(current)) return
+        val target = if (levelBuildsDbLocally(current)) LOCAL_MODE_BOTH else LOCAL_MODE_OUTAGES
+        appPrefs.edit().putInt(PREF_LOCAL_MODE_LEVEL, target).apply()
     }
 
     // --- Mode simplifié : état effectif + application ---
@@ -442,6 +521,24 @@ object AppConfig {
     /** Route d'accueil : le mode simplifié n'a pas de page d'accueil, la carte en tient lieu. */
     fun homeRoute(): String = if (simpleModeActive()) "map" else "home"
 
+    /** Nouvel ordre des éléments de l'accueil (réglages ou appui long sur la page). */
+    fun setPagesOrder(prefs: SharedPreferences, order: List<String>) {
+        val normalized = HomePrefs.normalizeOrder(order)
+        pagesOrder.value = normalized
+        prefs.edit().putString(HomePrefs.PAGES_ORDER, normalized.joinToString(",")).apply()
+    }
+
+    fun setHomeLongPressReorder(prefs: SharedPreferences, enabled: Boolean) {
+        homeLongPressReorder.value = enabled
+        prefs.edit().putBoolean(PREF_HOME_LONG_PRESS_REORDER, enabled).apply()
+    }
+
+    /** Nouveau coin du bouton « Aides » (réglages ou glissé sur la page). */
+    fun setHomeHelpPosition(prefs: SharedPreferences, position: String) {
+        homeHelpPosition.value = position
+        prefs.edit().putString(PREF_HOME_HELP_POSITION, position).apply()
+    }
+
     // --- FONCTION POUR CHARGER LA MÉMOIRE AU DÉMARRAGE ---
     fun loadSavedFilters(prefs: android.content.SharedPreferences) {
 
@@ -473,8 +570,9 @@ object AppConfig {
         lowPowerLevel.intValue = prefs.getInt(PREF_LOW_POWER_LEVEL, 0)
         lowPowerFollowSystem.value = prefs.getBoolean(PREF_LOW_POWER_FOLLOW_SYSTEM, false)
 
-        // Mode « traitement local » (niveau 0..3).
-        localModeLevel.intValue = prefs.getInt(PREF_LOCAL_MODE_LEVEL, 0).coerceIn(0, 3)
+        // Mode « traitement local » (crans LOCAL_MODE_*, échelle migrée au démarrage du process).
+        localModeLevel.intValue = prefs.getInt(PREF_LOCAL_MODE_LEVEL, LOCAL_MODE_SERVER)
+            .coerceIn(LOCAL_MODE_SERVER, LOCAL_MODE_MAX)
 
         // Mode simplifié (carte au lancement, tiroir latéral, fiches fusionnées).
         simpleMode.value = prefs.getBoolean(PREF_SIMPLE_MODE, false)
@@ -488,6 +586,12 @@ object AppConfig {
 
         loadMapDisplayPreferences(prefs)
         statsDisplayMode.value = StatsPreferences.displayMode(prefs)
+
+        // Accueil : ordre des éléments et déplacement par appui long sur la page.
+        pagesOrder.value = HomePrefs.normalizedPageOrder(prefs)
+        homeLongPressReorder.value = prefs.getBoolean(PREF_HOME_LONG_PRESS_REORDER, true)
+        homeHelpPosition.value = prefs.getString(PREF_HOME_HELP_POSITION, DEFAULT_HOME_HELP_POSITION)
+            ?: DEFAULT_HOME_HELP_POSITION
 
         // Barre latérale de défilement, activable page par page.
         PageScrollPrefs.load(prefs)

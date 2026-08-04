@@ -124,6 +124,7 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.data.api.ApiEndpoints
 import fr.geotower.data.workers.DownloadNotificationCenter
 import fr.geotower.data.workers.UpdateCheckScheduler
+import fr.geotower.ui.screens.stats.DEPARTMENT_STATS_ROUTE
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLocale
 import fr.geotower.utils.AppLogoDrawingResources
@@ -139,6 +140,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Language
+import androidx.compose.material.icons.filled.BarChart
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Share
@@ -635,6 +637,8 @@ fun SettingsScreen(
     var showMapCompass by remember { mutableStateOf(prefs.getBoolean("show_map_compass", true)) }
 
     var showStatsSettingsSheet by remember { mutableStateOf(false) }
+    var showDepartmentStatsSettingsSheet by remember { mutableStateOf(false) }
+    var showAboutPageSettingsSheet by remember { mutableStateOf(false) }
     var showCompassSettingsSheet by remember { mutableStateOf(false) }
     var compassOrder by remember { mutableStateOf(prefs.getString("compass_order", "location,gps,accuracy")!!.split(",")) }
     var showCompassLocation by remember { mutableStateOf(prefs.getBoolean("show_compass_location", true)) }
@@ -711,13 +715,9 @@ fun SettingsScreen(
     // La sauvegarde de la page de démarrage
     var startupPage by remember { mutableStateOf(HomePrefs.startupPage(prefs)) }
     var showHomeSettingsSheet by remember { mutableStateOf(false) }
-    var pagesOrder by remember {
-        mutableStateOf(
-            (prefs.getString(HomePrefs.PAGES_ORDER, HomePrefs.DEFAULT_PAGES_ORDER) ?: HomePrefs.DEFAULT_PAGES_ORDER)
-                .let { if (!it.contains("settings")) "$it,settings" else it }
-                .split(",")
-        )
-    }
+    // Ordre partagé avec la page d'accueil, qui se réordonne aussi par appui long : chacun doit
+    // voir tout de suite ce que l'autre a déplacé, d'où l'état commun plutôt qu'une copie locale.
+    val pagesOrder by AppConfig.pagesOrder
     var showNearbySettingsSheet by remember { mutableStateOf(false) }
     var pageSpeedtestsFilterMajorEnb by remember { mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.FILTER_MAJOR_ENB, SiteSpeedtestsPagePreferences.DEFAULT_FILTER_MAJOR_ENB)) }
     var pageSpeedtestsIncludeMissingEnb by remember { mutableStateOf(prefs.getBoolean(SiteSpeedtestsPagePreferences.INCLUDE_MISSING_ENB, SiteSpeedtestsPagePreferences.DEFAULT_INCLUDE_MISSING_ENB)) }
@@ -929,7 +929,7 @@ fun SettingsScreen(
             entry(context.getString(R.string.outage_download_title), "pannes sites hs telecharger actualiser generer copie hors ligne serveur coupures", SECTION_DATABASE)
             entry(context.getString(R.string.local_mode_settings_title), "traitement local autonomie serveur hors ligne generation", SECTION_DATABASE) { navController.navigate("local_mode") }
             // Les pannes n'ont plus de page dédiée : leurs réglages vivent dans « Traitement local »
-            // (niveau ≥ 1). On garde l'entrée de recherche pour que les mots-clés continuent de mener au bon endroit.
+            // (crans « pannes en local »). On garde l'entrée de recherche pour que les mots-clés mènent au bon endroit.
             entry(context.getString(R.string.outage_source_settings_title), "coupures pannes source sites hs operateurs frequence arriere plan", SECTION_DATABASE) { navController.navigate("local_mode") }
 
             // --- Entrées directes (hors section) ---
@@ -957,6 +957,11 @@ fun SettingsScreen(
                 "historique partages partage export pdf sites supports genere",
                 Icons.Default.History
             ) { navController.navigate("share_history") }
+            directEntry(
+                context.getString(R.string.department_stats_title),
+                "statistiques departement departements supports stations antennes densite habitants km2 population",
+                Icons.Default.BarChart
+            ) { navController.navigate(DEPARTMENT_STATS_ROUTE) }
             directEntry(
                 context.getString(R.string.preference_profiles_title),
                 "profil profils profiles preferences sauvegarde configuration",
@@ -1655,6 +1660,8 @@ fun SettingsScreen(
                 onMapClick = { safeClick { showPagesCustomizationSheet = false; showMapSettingsSheet = true } },
                 onCompassClick = { safeClick { showPagesCustomizationSheet = false; showCompassSettingsSheet = true } },
                 onStatsClick = { safeClick { showPagesCustomizationSheet = false; showStatsSettingsSheet = true } },
+                onDepartmentStatsClick = { safeClick { showPagesCustomizationSheet = false; showDepartmentStatsSettingsSheet = true } },
+                onAboutClick = { safeClick { showPagesCustomizationSheet = false; showAboutPageSettingsSheet = true } },
                 onSupportClick = { safeClick { showPagesCustomizationSheet = false; showSupportSettingsSheet = true } },
                 onSiteClick = { safeClick { showPagesCustomizationSheet = false; showSiteSettingsSheet = true } },
                 onSpeedtestsClick = { safeClick { showPagesCustomizationSheet = false; showSpeedtestsSettingsSheet = true } },
@@ -1846,10 +1853,7 @@ fun SettingsScreen(
         if (showHomeSettingsSheet) {
             HomeSettingsSheet(
                 pagesOrder = pagesOrder,
-                onOrderChange = { newOrder ->
-                    pagesOrder = newOrder
-                    prefs.edit().putString(HomePrefs.PAGES_ORDER, newOrder.joinToString(",")).apply()
-                },
+                onOrderChange = { newOrder -> AppConfig.setPagesOrder(prefs, newOrder) },
                 showNearby = showNearbyPage,
                 onNearbyChange = {
                     showNearbyPage = it; prefs.edit().putBoolean("show_nearby_page", it).apply()
@@ -2018,6 +2022,27 @@ fun SettingsScreen(
             StatsSettingsSheet(
                 onDismiss = { showStatsSettingsSheet = false },
                 onBack = { safeClick { showStatsSettingsSheet = false; showPagesCustomizationSheet = true } },
+                sheetState = sheetState,
+                useOneUi = useOneUi,
+                bubbleColor = bubbleBaseColor
+            )
+        }
+
+        if (showDepartmentStatsSettingsSheet) {
+            DepartmentStatsSettingsSheet(
+                onDismiss = { showDepartmentStatsSettingsSheet = false },
+                onBack = { safeClick { showDepartmentStatsSettingsSheet = false; showPagesCustomizationSheet = true } },
+                sheetState = sheetState,
+                useOneUi = useOneUi,
+                bubbleColor = bubbleBaseColor
+            )
+        }
+
+        // --- SOUS-MENU : PAGE À PROPOS ---
+        if (showAboutPageSettingsSheet) {
+            AboutPageSettingsSheet(
+                onDismiss = { showAboutPageSettingsSheet = false },
+                onBack = { safeClick { showAboutPageSettingsSheet = false; showPagesCustomizationSheet = true } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -4061,9 +4086,14 @@ internal fun NavigationModeOption(
     useOneUi: Boolean,
     // ✅ NOUVEAU PARAMÈTRE : trailingIcon
     trailingIcon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    // Option fermée sur cet appareil : ni cliquable, ni pastille réactive, et l'ensemble estompé.
+    // Elle reste AFFICHÉE (et cochée si c'est le choix en cours) : la masquer laisserait croire
+    // qu'elle n'existe pas, alors qu'elle est seulement hors de portée du matériel.
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
+    val optionClick = if (enabled) onClick else ({ })
     val bgColor = when {
         isSelected -> MaterialTheme.colorScheme.primaryContainer
         useOneUi -> MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
@@ -4075,14 +4105,17 @@ internal fun NavigationModeOption(
     val selectedDescColor = if (useOneUi) MaterialTheme.colorScheme.primary.copy(alpha = 0.8f) else MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.8f)
 
     Surface(
-        onClick = onClick,
+        onClick = optionClick,
+        enabled = enabled,
         modifier = Modifier.fillMaxWidth(),
         shape = optionShape,
         color = bgColor,
         border = border
     ) {
         Row(
-            modifier = Modifier.padding(sizing.spacing(16.dp)),
+            modifier = Modifier
+                .alpha(if (enabled) 1f else 0.38f)
+                .padding(sizing.spacing(16.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
@@ -4104,11 +4137,12 @@ internal fun NavigationModeOption(
             }
 
             if (useOneUi) {
-                fr.geotower.ui.components.OneUiRadioButton(isSelected, onClick)
+                fr.geotower.ui.components.OneUiRadioButton(isSelected, optionClick)
             } else {
                 RadioButton(
                     selected = isSelected,
-                    onClick = onClick,
+                    onClick = optionClick,
+                    enabled = enabled,
                     colors = RadioButtonDefaults.colors(selectedColor = MaterialTheme.colorScheme.primary)
                 )
             }

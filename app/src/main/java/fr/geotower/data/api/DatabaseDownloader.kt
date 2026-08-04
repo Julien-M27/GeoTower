@@ -65,6 +65,13 @@ object DatabaseDownloader {
         if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD)) {
             return false
         }
+        // Crans « base en local » : la version distante est lisible, le fichier non — l'appareil
+        // construit la sienne. Garde portée ici depuis [readVerifiedDatabaseInfo], qui sert aussi
+        // aux lectures de version/taille.
+        if (AppConfig.dbForcedLocal()) {
+            AppLogger.w(TAG, "Database download skipped: local build enforced")
+            return false
+        }
         return withContext(Dispatchers.IO) {
             val served = readVerifiedDatabaseInfo()
             if (served == null) {
@@ -214,8 +221,11 @@ object DatabaseDownloader {
         }
 
     private fun readVerifiedDatabaseInfo(): ServedFrom<DownloadManifestDatabase>? {
-        // Mode « traitement local » (niveau ≥ 2, appareil éligible) : aucun accès au manifeste serveur.
-        if (AppConfig.dbForcedLocal()) return null
+        // Seul le cran « autonomie maximale » coupe le manifeste. Aux crans « base en local », la
+        // version distante reste lue EXPRÈS : c'est elle qui dit « l'ANFR a publié du neuf », donc
+        // qu'il est temps de REGÉNÉRER. La couper laissait ces utilisateurs sans aucun signal de
+        // mise à jour. Le téléchargement, lui, reste bloqué (cf. [downloadUpdate]).
+        if (AppConfig.blockCommunityAndUpdates()) return null
         val served = readVerifiedDownloadManifest() ?: return null
         val database = served.value.database ?: return null
         if (

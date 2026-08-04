@@ -39,6 +39,20 @@ class GeoTowerDbSchemaTest {
         "radio_stat_weekly" to listOf(
             "week_key", "week_start", "source_date", "operator_name", "category",
             "item_key", "label", "total_count", "active_count"
+        ),
+        "dept_stat_current" to listOf(
+            "dept_code", "dept_name", "region_code", "area_km2", "population", "population_year",
+            "supports", "supports_active", "stations", "stations_active",
+            "antennas", "antennas_active", "antennas_fh",
+            "stations_per_support", "antennas_per_station",
+            "supports_per_km2", "stations_per_km2", "antennas_per_km2",
+            "supports_per_1k_hab", "stations_per_1k_hab", "antennas_per_1k_hab",
+            "hab_per_support", "hab_per_station", "hab_per_antenna"
+        ),
+        "dept_stat_operator_tech" to listOf(
+            "dept_code", "operator_name", "tech",
+            "supports", "supports_active", "stations", "stations_active",
+            "antennas", "antennas_active"
         )
     )
 
@@ -74,8 +88,8 @@ class GeoTowerDbSchemaTest {
 
     @Test
     fun schemaContainsExpectedStatementCount() {
-        // 14 tables metier/reference + source_versions + 2 tables de stats.
-        assertEquals(16, GeoTowerDbSchema.CREATE_TABLE_STATEMENTS.size)
+        // 14 tables metier/reference + source_versions + 2 tables de stats + 2 tables de stats departementales.
+        assertEquals(18, GeoTowerDbSchema.CREATE_TABLE_STATEMENTS.size)
         assertTrue(
             GeoTowerDbSchema.CREATE_TABLE_STATEMENTS.any { it.contains("source_versions") }
         )

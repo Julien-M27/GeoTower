@@ -1,9 +1,11 @@
 package fr.geotower.ui.components
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
@@ -28,9 +30,17 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.lerp
 import fr.geotower.utils.AppConfig
+import kotlin.math.PI
+import kotlin.math.sin
+
+/** Glissement de la pastille : depart doux, arrivee amortie, sans rebond. */
+private val SwitchGlideEasing = CubicBezierEasing(0.32f, 0f, 0.16f, 1f)
+private const val SWITCH_GLIDE_MILLIS = 280
 
 @Composable
 fun GeoTowerSwitch(
@@ -68,49 +78,58 @@ private fun GeoTowerMaterialSwitch(
     enabled: Boolean = true,
     activeTrackColor: Color = MaterialTheme.colorScheme.primary
 ) {
-    val checkedTrackAlpha = if (isSystemInDarkTheme()) 0.32f else 0.18f
     val outlineColor = MaterialTheme.colorScheme.outline
     val onSurfaceColor = MaterialTheme.colorScheme.onSurface
 
-    val trackColor by animateColorAsState(
-        targetValue = when {
-            checked && enabled -> activeTrackColor.copy(alpha = checkedTrackAlpha)
-            checked -> activeTrackColor.copy(alpha = checkedTrackAlpha * 0.6f)
-            else -> Color.Transparent
-        },
-        animationSpec = tween(durationMillis = 180, easing = LinearOutSlowInEasing),
-        label = "materialTrackColor"
+    // Une seule progression pilote tout (glissement, taille, couleurs, contour) : les
+    // proprietes ne peuvent pas se desynchroniser en cours de route.
+    // 1 = actif, rendu One UI (piste pleine, pastille blanche, sans contour).
+    // 0 = eteint, rendu Material (piste vide, contour, petite pastille).
+    val progress by animateFloatAsState(
+        targetValue = if (checked) 1f else 0f,
+        animationSpec = tween(durationMillis = SWITCH_GLIDE_MILLIS, easing = SwitchGlideEasing),
+        label = "materialSwitchProgress"
     )
-    val borderColor by animateColorAsState(
-        targetValue = when {
-            checked && enabled -> activeTrackColor.copy(alpha = 0.58f)
-            checked -> activeTrackColor.copy(alpha = 0.24f)
-            enabled -> outlineColor.copy(alpha = 0.7f)
-            else -> outlineColor.copy(alpha = 0.24f)
-        },
+    val enabledProgress by animateFloatAsState(
+        targetValue = if (enabled) 1f else 0f,
         animationSpec = tween(durationMillis = 180, easing = LinearOutSlowInEasing),
-        label = "materialBorderColor"
+        label = "materialSwitchEnabled"
     )
-    val thumbColor by animateColorAsState(
-        targetValue = when {
-            checked && enabled -> activeTrackColor
-            checked -> activeTrackColor.copy(alpha = 0.38f)
-            enabled -> outlineColor
-            else -> onSurfaceColor.copy(alpha = 0.38f)
-        },
-        animationSpec = tween(durationMillis = 180, easing = LinearOutSlowInEasing),
-        label = "materialThumbColor"
+
+    val trackColor = lerp(
+        activeTrackColor.copy(alpha = 0f),
+        lerp(activeTrackColor.copy(alpha = 0.38f), activeTrackColor, enabledProgress),
+        progress
+    )
+    val borderColor = lerp(
+        lerp(outlineColor.copy(alpha = 0.24f), outlineColor.copy(alpha = 0.7f), enabledProgress),
+        Color.Transparent,
+        progress
+    )
+    val thumbColor = lerp(
+        lerp(onSurfaceColor.copy(alpha = 0.38f), outlineColor, enabledProgress),
+        lerp(Color.White.copy(alpha = 0.7f), Color.White, enabledProgress),
+        progress
     )
 
     val trackWidth = 52.dp
     val trackHeight = 32.dp
-    val thumbSize = 16.dp
-    val padding = (trackHeight - thumbSize) / 2
-    val thumbOffset by animateDpAsState(
-        targetValue = if (checked) trackWidth - thumbSize - padding else padding,
-        animationSpec = spring(dampingRatio = 0.7f, stiffness = Spring.StiffnessMediumLow),
-        label = "materialThumbOffset"
-    )
+    val checkedThumbSize = 24.dp
+    val uncheckedThumbSize = 16.dp
+    val checkedPadding = (trackHeight - checkedThumbSize) / 2
+    val uncheckedPadding = (trackHeight - uncheckedThumbSize) / 2
+
+    val borderWidth = lerp(2.dp, 0.dp, progress)
+    val thumbHeight = lerp(uncheckedThumbSize, checkedThumbSize, progress)
+    val thumbElevation = lerp(0.dp, 1.dp, progress)
+    // Etirement en pilule au milieu du trajet, nul aux deux extremites : c'est ce qui
+    // donne la sensation de glissement plutot que de saut.
+    val stretch = 3.dp * sin(progress * PI).toFloat()
+    val thumbOffset = lerp(
+        uncheckedPadding,
+        trackWidth - checkedThumbSize - checkedPadding,
+        progress
+    ) - stretch / 2
 
     Box(
         modifier = modifier
@@ -126,13 +145,15 @@ private fun GeoTowerMaterialSwitch(
             )
             .clip(CircleShape)
             .background(trackColor)
-            .border(2.dp, borderColor, CircleShape),
+            .border(borderWidth, borderColor, CircleShape),
         contentAlignment = Alignment.CenterStart
     ) {
         Box(
             modifier = Modifier
                 .offset(x = thumbOffset)
-                .size(thumbSize)
+                .width(thumbHeight + stretch)
+                .height(thumbHeight)
+                .shadow(thumbElevation, CircleShape)
                 .clip(CircleShape)
                 .background(thumbColor)
         )

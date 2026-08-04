@@ -12,7 +12,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -23,26 +27,33 @@ import fr.geotower.R
 import fr.geotower.data.AnfrRepository
 import fr.geotower.data.build.LocalBuildCapability
 import fr.geotower.data.config.RemoteFeatureFlags
+import fr.geotower.data.db.LocalDbProvenance
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.LocalDbBuildCard
 import fr.geotower.ui.components.geoTowerFadingEdge
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Page « Traitement local des données » (ouverte depuis Réglages ▸ au-dessus de la source des pannes).
  *
- * Propose 4 niveaux cumulatifs (0 Serveur / 1 Sites en panne en local / 2 Base + sites en local /
- * 3 Autonomie maximale) qui décident de ce qui est traité sur l'appareil plutôt que fourni par le
- * backend GeoTower. Le rafraîchissement des feature-flags reste actif à tous les niveaux (contrôle
- * distant), et un kill-switch distant ([RemoteFeatureFlags.Features.LOCAL_MODE_ENABLED]) peut forcer
- * le niveau effectif à 0. Les services tiers (carto, altimétrie, recherche) ne sont jamais touchés.
+ * Propose 5 crans (0 Serveur / 1 Base en local / 2 Sites en panne en local / 3 Base + sites en
+ * local / 4 Autonomie maximale) qui décident de ce qui est traité sur l'appareil plutôt que fourni
+ * par le backend GeoTower. Les deux traitements sont **indépendants** : l'échelle les combine au
+ * lieu de les empiler, parce que générer sa base n'oblige à rien côté pannes — et parce que cet
+ * état-là (base ici, pannes serveur) n'avait aucune case et retombait sur « Serveur », qui
+ * affirmait exactement le contraire. Le rafraîchissement des feature-flags reste actif à tous les
+ * crans (contrôle distant), et un kill-switch distant
+ * ([RemoteFeatureFlags.Features.LOCAL_MODE_ENABLED]) peut forcer le niveau effectif à 0. Les
+ * services tiers (carto, altimétrie, recherche) ne sont jamais touchés.
  *
- * Chaque palier affiche SES réglages juste sous la liste, au lieu de les disperser dans d'autres
- * pages : niveau ≥ 1 → [OutageLocalControls] (fréquence, arrière-plan, mise à jour immédiate des
- * pannes), niveau ≥ 2 → [LocalDbBuildCard] (génération de la base). Le niveau est ainsi la seule
- * vérité, et l'ancienne page « Source des pannes » n'existe plus.
+ * Chaque cran affiche SES réglages juste sous la liste, au lieu de les disperser dans d'autres
+ * pages : pannes en local → [OutageLocalControls] (fréquence, arrière-plan, mise à jour immédiate),
+ * base en local → [LocalDbBuildCard] (génération de la base). Le niveau est ainsi la seule vérité,
+ * et l'ancienne page « Source des pannes » n'existe plus.
  */
 @Composable
 fun LocalModeScreen(
@@ -64,7 +75,23 @@ fun LocalModeScreen(
     val level = AppConfig.localModeLevel.intValue
     val remoteEnabled = RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.LOCAL_MODE_ENABLED)
     val eligibility = remember { LocalBuildCapability.evaluate(context) }
+    // Un appareil qui ne peut pas générer la base (RAM/stockage) ne doit pas pouvoir choisir un
+    // cran dont c'est le seul apport : « Base en local » ne ferait rien du tout, et « Base + sites »
+    // se comporterait exactement comme « Sites en panne en local » sous un nom qui promet plus.
+    // « Autonomie maximale » reste ouvert : ses coupures, elles, s'appliquent de toute façon.
+    val canPickDbLevels = eligibility.eligible
     val scrollState = rememberScrollState()
+
+    // Provenance réelle de la base installée. La génération est aussi accessible depuis Réglages ▸
+    // Base de données et la première ouverture : un utilisateur peut donc tourner sur une base
+    // générée ici alors que son cran dit « Serveur ». On le lui signale plutôt que de le laisser
+    // devant une page qui affirme le contraire de ce qu'il vit.
+    var dbLocallyBuilt by remember { mutableStateOf(false) }
+    LaunchedEffect(level) {
+        dbLocallyBuilt = withContext(Dispatchers.IO) {
+            LocalDbProvenance.readMobile(context).locallyBuilt
+        }
+    }
 
     Scaffold(
         containerColor = uiStyle.backgroundColor,
@@ -102,34 +129,64 @@ fun LocalModeScreen(
                 )
             }
 
+            // Écart entre l'état réel et le cran choisi : la base tourne en local sans que le cran
+            // le dise. Simple constat, aucune bascule automatique — le cran reste un choix.
+            if (dbLocallyBuilt && !AppConfig.levelBuildsDbLocally(level)) {
+                Text(
+                    text = stringResource(R.string.local_mode_db_actually_local),
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+
             NavigationModeOption(
                 title = stringResource(R.string.local_mode_level_off_title),
                 desc = stringResource(R.string.local_mode_level_off_desc),
-                isSelected = level == 0,
+                isSelected = level == AppConfig.LOCAL_MODE_SERVER,
                 useOneUi = useOneUi,
-                onClick = { AppConfig.setLocalModeLevel(context, 0) },
+                onClick = { AppConfig.setLocalModeLevel(context, AppConfig.LOCAL_MODE_SERVER) },
+            )
+            NavigationModeOption(
+                title = stringResource(R.string.local_mode_level_db_title),
+                desc = stringResource(R.string.local_mode_level_db_desc),
+                isSelected = level == AppConfig.LOCAL_MODE_DB,
+                useOneUi = useOneUi,
+                enabled = canPickDbLevels,
+                onClick = { AppConfig.setLocalModeLevel(context, AppConfig.LOCAL_MODE_DB) },
             )
             NavigationModeOption(
                 title = stringResource(R.string.local_mode_level_outages_title),
                 desc = stringResource(R.string.local_mode_level_outages_desc),
-                isSelected = level == 1,
+                isSelected = level == AppConfig.LOCAL_MODE_OUTAGES,
                 useOneUi = useOneUi,
-                onClick = { AppConfig.setLocalModeLevel(context, 1) },
+                onClick = { AppConfig.setLocalModeLevel(context, AppConfig.LOCAL_MODE_OUTAGES) },
             )
             NavigationModeOption(
                 title = stringResource(R.string.local_mode_level_data_title),
                 desc = stringResource(R.string.local_mode_level_data_desc),
-                isSelected = level == 2,
+                isSelected = level == AppConfig.LOCAL_MODE_BOTH,
                 useOneUi = useOneUi,
-                onClick = { AppConfig.setLocalModeLevel(context, 2) },
+                enabled = canPickDbLevels,
+                onClick = { AppConfig.setLocalModeLevel(context, AppConfig.LOCAL_MODE_BOTH) },
             )
             NavigationModeOption(
                 title = stringResource(R.string.local_mode_level_full_title),
                 desc = stringResource(R.string.local_mode_level_full_desc),
-                isSelected = level == 3,
+                isSelected = level == AppConfig.LOCAL_MODE_MAX,
                 useOneUi = useOneUi,
-                onClick = { AppConfig.setLocalModeLevel(context, 3) },
+                onClick = { AppConfig.setLocalModeLevel(context, AppConfig.LOCAL_MODE_MAX) },
             )
+
+            // Deux options grisées sans un mot d'explication seraient pires que pas d'options.
+            if (!canPickDbLevels) {
+                Text(
+                    text = stringResource(R.string.local_mode_db_ineligible),
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
 
             Text(
                 text = stringResource(R.string.local_mode_maps_note),
@@ -137,44 +194,40 @@ fun LocalModeScreen(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
 
-            // Niveau ≥ 1 : les pannes sont récupérées ici, donc leurs réglages s'affichent ici.
-            if (level >= 1) {
-                HorizontalDivider(
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                )
-                OutageLocalControls()
-            }
-
-            // Niveau ≥ 2 : la base doit être générée sur l'appareil (si éligible) au lieu d'être téléchargée.
-            if (level >= 2) {
+            // Crans « base en local » : la base est générée sur l'appareil au lieu d'être
+            // téléchargée. Affiché avant les pannes, comme dans la liste ci-dessus. Le cas
+            // inéligible est déjà expliqué sous la liste (et ne reste atteignable qu'au cran
+            // maximal, ou par un cran choisi avant que le stockage ne tombe sous le seuil).
+            if (AppConfig.levelBuildsDbLocally(level) && eligibility.eligible) {
                 HorizontalDivider(
                     color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
                 )
                 Text(
-                    text = stringResource(
-                        if (eligibility.eligible) R.string.local_mode_db_eligible else R.string.local_mode_db_ineligible,
-                    ),
+                    text = stringResource(R.string.local_mode_db_eligible),
                     style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
                     fontWeight = FontWeight.Bold,
-                    color = if (eligibility.eligible) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurfaceVariant
-                    },
+                    color = MaterialTheme.colorScheme.primary,
                 )
-                if (eligibility.eligible) {
-                    Text(
-                        text = stringResource(R.string.local_mode_build_hint),
-                        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    LocalDbBuildCard(
-                        useOneUi = useOneUi,
-                        shape = shape,
-                        border = border,
-                        bubbleColor = bubbleColor,
-                    )
-                }
+                Text(
+                    text = stringResource(R.string.local_mode_build_hint),
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                LocalDbBuildCard(
+                    useOneUi = useOneUi,
+                    shape = shape,
+                    border = border,
+                    bubbleColor = bubbleColor,
+                )
+            }
+
+            // Crans « pannes en local » : les sites en panne sont récupérés ici, donc leurs
+            // réglages (fréquence, arrière-plan, mise à jour immédiate) s'affichent ici.
+            if (AppConfig.levelFetchesOutagesLocally(level)) {
+                HorizontalDivider(
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                )
+                OutageLocalControls()
             }
         }
     }

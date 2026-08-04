@@ -79,7 +79,7 @@ object AppUpdateState {
      *
      * Nécessaire parce que le worker quotidien n'est pas planifié quand les notifications de mise à
      * jour sont coupées. [AppUpdateChecker.getLatestRelease] rend déjà la main sans réseau quand la
-     * vérification est désactivée (kill-switch distant ou traitement local niveau 3).
+     * vérification est désactivée (kill-switch distant ou traitement local « autonomie maximale »).
      */
     suspend fun refreshIfStale(context: Context) {
         val appContext = context.applicationContext

@@ -688,19 +688,35 @@ def run_build(
     print(f"Dossier sources FR: {france_sources_dir}")
     print(f"Fichiers hebdo detectes: {len(csv_paths)}")
 
+    # Import differe : fr_dept_stats reutilise les helpers de parsing de ce module,
+    # un import en tete de fichier creerait un cycle.
+    from fr_dept_stats import (
+        ensure_dept_stat_tables,
+        load_department_reference,
+        populate_department_stats,
+        update_source_versions as update_dept_source_versions,
+    )
+
     conn = sqlite3.connect(db_path)
     try:
         ensure_stats_tables(conn)
+        ensure_dept_stat_tables(conn)
         ensure_arcep_site_columns(conn)
         require_exploitant_schema(conn)
         current_rows = populate_current_stats(conn)
         weekly_rows = populate_weekly_stats(conn, csv_paths)
+        dept_stats = populate_department_stats(conn, load_department_reference())
+        update_dept_source_versions(conn)
         update_metadata(conn)
         update_room_identity_hash(conn)
         conn.commit()
         update_version_json(imports_dir)
         print(f"Stats courantes: {current_rows} lignes")
         print(f"Stats hebdo: {weekly_rows} lignes")
+        print(
+            f"Stats departements: {dept_stats.department_rows} departements, "
+            f"{dept_stats.operator_tech_rows} lignes operateur/techno"
+        )
         print(f"Schema DB mis a jour: {SCHEMA_VERSION}")
     finally:
         conn.close()

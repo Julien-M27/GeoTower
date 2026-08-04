@@ -286,11 +286,16 @@ fun anfrSourcesFrom(weeklyCsv: File, monthlyZip: AnfrMonthlyZip): AnfrSources = 
 )
 
 /** Charge les referentiels `id -> libelle` du ZIP mensuel ; `communes` vient de geo.api.gouv.fr (Slice 3). */
-fun anfrReferencesFrom(monthlyZip: AnfrMonthlyZip, communes: Map<String, String> = emptyMap()): AnfrReferences =
+fun anfrReferencesFrom(
+    monthlyZip: AnfrMonthlyZip,
+    communes: Map<String, String> = emptyMap(),
+    departments: Map<String, DepartmentReferenceRow> = emptyMap(),
+): AnfrReferences =
     AnfrReferences(
         nature = monthlyZip.reference("nat_id", "nat_lb_nom", "SUP_NATURE.txt"),
         proprietaire = monthlyZip.reference("tpo_id", "tpo_lb", "SUP_PROPRIETAIRE.txt"),
         exploitant = monthlyZip.reference("adm_id", "adm_lb_nom", "SUP_EXPLOITANT.txt"),
         typeAntenne = monthlyZip.reference("tae_id", "tae_lb", "SUP_TYPE_ANTENNE.txt"),
         communes = communes,
+        departments = departments,
     )

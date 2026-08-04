@@ -32,6 +32,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** Repli si l'hôte ne répond pas : valeur d'Android Auto (`content_limit_list` de car-app). */
+private const val DEFAULT_LIST_CONTENT_LIMIT = 6
+
 class CarNearbySitesScreen(
     carContext: CarContext,
     private val repository: AnfrRepository
@@ -115,16 +118,18 @@ class CarNearbySitesScreen(
 
     private fun loadedTemplate(sites: List<CarSiteListItem>): Template {
         val screenManager = carContext.getCarService(ScreenManager::class.java)
-        // Trace volontaire : l'hôte refuse un ListTemplate qui dépasse sa limite de contenu
-        // (6 lignes sur Android Auto). Le journal dira si c'est bien ce qui casse cet écran.
+        // L'hôte REFUSE un ListTemplate qui dépasse sa limite de contenu (6 lignes sur Android
+        // Auto) et affiche alors son écran d'erreur générique. Cette limite dépend de l'hôte et de
+        // l'état de conduite : elle se lit à l'exécution, elle ne peut pas être codée en dur.
         val hostLimit = runCatching {
             carContext.getCarService(ConstraintManager::class.java)
                 .getContentLimit(ConstraintManager.CONTENT_LIMIT_TYPE_LIST)
-        }.getOrElse { -1 }
-        carLog("Sites proches : ${sites.size} ligne(s) construites, limite de l'hôte = $hostLimit")
+        }.getOrElse { DEFAULT_LIST_CONTENT_LIMIT }.coerceAtLeast(1)
+        val shownSites = sites.take(hostLimit)
+        carLog("Sites proches : ${sites.size} trouvé(s), ${shownSites.size} affiché(s) (limite hôte = $hostLimit)")
         val itemListBuilder = ItemList.Builder()
 
-        sites.forEach { site ->
+        shownSites.forEach { site ->
             itemListBuilder.addItem(
                 Row.Builder()
                     .setTitle(site.title)

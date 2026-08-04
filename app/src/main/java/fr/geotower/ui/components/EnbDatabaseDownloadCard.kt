@@ -68,7 +68,7 @@ import java.io.File
  *
  * Plus simple que [RadioDatabaseDownloadCard] : la donnee vient du partenaire eNB-Analytics, il
  * n'existe donc **aucun chemin de generation locale** et donc aucune notion de provenance a
- * afficher. En mode « traitement local » niveau 3, la base se fige (plus de verification).
+ * afficher. En « traitement local » au cran maximal, la base se fige (plus de verification).
  */
 @OptIn(ExperimentalMaterial3ExpressiveApi::class)
 @Composable

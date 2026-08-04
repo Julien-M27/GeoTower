@@ -182,6 +182,8 @@
     <string name="database_download_progress">Téléchargement : %1$d %%</string>
     <string name="database_cancel_download">Annuler le téléchargement</string>
     <string name="database_up_to_date">À jour</string>
+    <string name="database_antenna_count">Antennes : %1$s</string>
+    <string name="radio_database_site_count">Sites radio : %1$s</string>
     <string name="enb_database_title">Identifiants eNB / gNB</string>
     <string name="appstrings_site_network_ids_title">Identifiants réseau</string>
     <string name="appstrings_site_network_ids_option">Identifiants réseau (eNB / gNB)</string>
@@ -193,6 +195,8 @@
     <string name="enb_database_source_attribution">Source : eNB Analytics</string>
     <string name="database_download_antennas">Télécharger les antennes</string>
     <string name="database_replace_generated_with_online">Remplacer la base générée sur le téléphone par celle en ligne</string>
+    <string name="database_rebuild_available_hint">Une base plus récente est en ligne. Ici, la mise à jour passe par une régénération sur l\'appareil.</string>
+    <string name="database_rebuild_action">Régénérer la base sur l\'appareil</string>
     <string name="database_replace_generated_radio_with_online">Remplacer les données radio générées sur le téléphone par celles en ligne</string>
     <string name="database_delete_data">Supprimer les données</string>
     <string name="database_delete_warning_title">Attention</string>
@@ -216,6 +220,7 @@
     <string name="notification_db_updates_channel_name">Mises à jour base de données</string>
     <string name="notification_db_update_available_title">Nouvelle base de données</string>
     <string name="notification_db_update_available_desc">Une mise à jour des antennes est disponible. Touchez pour ouvrir la section de téléchargement.</string>
+    <string name="notification_db_update_available_desc_rebuild">Une mise à jour des antennes est disponible. Touchez pour régénérer votre base sur l\'appareil.</string>
     <string name="notification_app_updates_channel_name">Mises à jour GeoTower</string>
     <string name="notification_app_update_available_title">Nouvelle version GeoTower</string>
     <string name="notification_app_update_available_desc">GeoTower %1$s est disponible. Touchez pour ouvrir le téléchargement.</string>
@@ -355,6 +360,7 @@
     <string name="appstrings_btn_authorize">Autoriser</string>
     <string name="appstrings_btn_continue">Continuer</string>
     <string name="appstrings_btn_download_banner">Télécharger</string>
+    <string name="appstrings_btn_rebuild_banner">Régénérer</string>
     <string name="appstrings_btn_lets_go">C\'est parti !</string>
     <string name="appstrings_btn_next">Suivant</string>
     <string name="appstrings_btn_start_configuration">Commencer la configuration ➜</string>
@@ -581,6 +587,7 @@
     <string name="appstrings_home_help_settings">Aides</string>
     <string name="appstrings_home_quit_app">Quitter sans notification live</string>
     <string name="appstrings_home_logo_setting_title">Logo de la page d\'accueil</string>
+    <string name="appstrings_home_long_press_reorder">Déplacer par appui long</string>
     <string name="appstrings_id_copied">Numéro d\'identification copié</string>
     <string name="appstrings_id_number">Numéro d\'identification :\u0020</string>
     <string name="appstrings_id_support_copy">ID Support</string>
@@ -1356,6 +1363,7 @@
     <string name="appstrings_generating_db_banner_desc">La base est construite sur l\'appareil : aucun téléchargement n\'est nécessaire.</string>
     <string name="appstrings_db_generation_in_progress">Génération en cours…</string>
     <string name="appstrings_update_db_banner_title">Mise à jour disponible</string>
+    <string name="appstrings_update_db_banner_desc_rebuild">Sur cet appareil, la base se met à jour en la régénérant.</string>
     <string name="appstrings_update_notif_setting_desc">Être alerté quand une nouvelle base de données ou une nouvelle APK est disponible</string>
     <string name="appstrings_update_notif_setting_title">Notifications de mise à jour</string>
     <string name="appstrings_upload_confirm_title">Confirmation d\'envoi</string>
@@ -2363,6 +2371,9 @@
     <string name="local_mode_remote_disabled">Le traitement local est actuellement désactivé à distance.</string>
     <string name="local_mode_level_off_title">Serveur (par défaut)</string>
     <string name="local_mode_level_off_desc">Tout est téléchargé et fourni par le serveur GeoTower.</string>
+    <string name="local_mode_level_db_title">Base en local</string>
+    <string name="local_mode_level_db_desc">La base est générée sur votre appareil (si compatible) au lieu d\'être téléchargée. Les sites en panne et le reste restent sur le serveur.</string>
+    <string name="local_mode_db_actually_local">Votre base a été générée sur cet appareil : le niveau ci-dessous ne le dit pas. Choisissez « Base en local » pour que ce soit la règle.</string>
     <string name="local_mode_level_outages_title">Sites en panne en local</string>
     <string name="local_mode_level_outages_desc">Les sites en panne sont récupérés auprès des opérateurs et localisés sur votre appareil. La base et le reste restent sur le serveur.</string>
     <string name="local_mode_level_data_title">Base + sites en local</string>
@@ -2475,4 +2486,56 @@
     <!-- Notes de version 2.0.3 -->
     <string name="appstrings_release_v203_bearing_height_split">Le cap et la hauteur forment désormais deux blocs distincts, à afficher, masquer et déplacer séparément</string>
     <string name="appstrings_release_v203_bearing_height_migration">Vos réglages de visibilité et l\'ordre de vos pages sont repris automatiquement</string>
+
+    <!-- Statistiques par département (tables dept_stat_* de la base hors ligne) -->
+    <string name="department_stats_title">Statistiques par département</string>
+    <string name="department_stats_entry_title">Par département</string>
+    <string name="department_stats_entry_description">Supports, stations et antennes de chaque département</string>
+    <string name="department_stats_search_hint">Numéro ou nom du département</string>
+    <string name="department_stats_current">Votre département</string>
+    <string name="department_stats_unavailable">Les statistiques par département arriveront avec la prochaine base téléchargée. Une base générée sur l\'appareil ne les contient pas.</string>
+    <string name="department_stats_no_result">Aucun département ne correspond à votre recherche.</string>
+    <string name="department_stats_summary">%1$s supports · %2$s stations · %3$s panneaux</string>
+    <string name="department_stats_authorisations_title">Statistiques sur les autorisations</string>
+    <string name="department_stats_mode_all">Autorisations</string>
+    <string name="department_stats_mode_active">En service</string>
+    <string name="department_stats_supports">Supports</string>
+    <string name="department_stats_stations">Stations</string>
+    <string name="department_stats_antennas">Antennes (panneaux)</string>
+    <string name="department_stats_stations_per_support">Stations par support</string>
+    <string name="department_stats_antennas_per_station">Antennes par station</string>
+    <string name="department_stats_supports_per_km2">Supports par km²</string>
+    <string name="department_stats_stations_per_km2">Stations par km²</string>
+    <string name="department_stats_antennas_per_km2">Antennes par km²</string>
+    <string name="department_stats_supports_per_1k">Supports pour mille habitants</string>
+    <string name="department_stats_stations_per_1k">Stations pour mille habitants</string>
+    <string name="department_stats_antennas_per_1k">Antennes pour mille habitants</string>
+    <string name="department_stats_hab_per_support">Habitants par support</string>
+    <string name="department_stats_hab_per_station">Habitants par station</string>
+    <string name="department_stats_hab_per_antenna">Habitants par antenne</string>
+    <string name="department_stats_reference">%1$s — %2$s km² / %3$s habitants (%4$s)</string>
+    <string name="department_stats_reference_no_year">%1$s — %2$s km² / %3$s habitants</string>
+    <string name="department_stats_missing_reference">Superficie et population indisponibles pour ce territoire.</string>
+    <string name="department_stats_matrix_title">Par opérateur et par technologie</string>
+    <string name="department_stats_matrix_operator">Opérateur</string>
+    <string name="department_stats_matrix_total">Total</string>
+    <string name="department_stats_matrix_panels">Panneaux</string>
+    <string name="department_stats_matrix_legend">Nombre de stations déclarant chaque technologie. Total = somme des colonnes, donc une station qui porte la 4G et la 5G compte deux fois. Panneaux = antennes physiques déclarées, faisceaux hertziens exclus.</string>
+    <string name="department_stats_fh">Faisceaux hertziens : %1$s paraboles, hors statistiques</string>
+    <string name="department_stats_list_options_title">Options de la liste</string>
+    <string name="department_stats_option_search">Champ de recherche</string>
+    <string name="department_stats_option_current">Votre département en tête</string>
+    <string name="department_stats_option_summary">Résumé sous chaque département</string>
+
+    <!-- Release notes 2.0.4 -->
+    <string name="appstrings_release_v204_department_stats">Nouvelle page « Par département » dans les Statistiques : supports, stations et antennes de chaque département, avec les densités par km² et pour mille habitants</string>
+    <string name="appstrings_release_v204_department_operators">Tableau par opérateur et par technologie, avec le nombre de stations 2G/3G/4G/5G et le nombre de panneaux physiques déclarés</string>
+    <string name="appstrings_release_v204_department_current">Le département de votre dernière position est épinglé en tête de liste ; tirez vers le bas pour le mettre à jour. La page se personnalise comme les autres.</string>
+    <string name="appstrings_release_v204_department_source">Les statistiques par département arrivent avec la base téléchargée, et une base générée sur l\'appareil les calcule aussi</string>
+
+    <!-- Notes de version 2.0.5 -->
+    <string name="appstrings_release_v205_db_row_counts">Les cartes des bases affichent le nombre d\'antennes et de sites radio qu\'elles contiennent</string>
+    <string name="appstrings_release_v205_db_rebuild_offer">Si votre base a été générée sur l\'appareil, sa mise à jour se fait en la régénérant plutôt qu\'en la téléchargeant</string>
+    <string name="appstrings_release_v205_local_mode_db">Nouveau palier « Base en local » dans Traitement local : seule la base est générée sur l\'appareil, le reste continue de passer par le serveur</string>
+    <string name="appstrings_release_v205_home_long_press">Les éléments de l\'accueil et le bouton d\'aide se déplacent par appui long</string>
 </resources>

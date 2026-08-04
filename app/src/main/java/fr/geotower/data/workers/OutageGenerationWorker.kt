@@ -199,7 +199,7 @@ class OutageGenerationWorker(
     }
 
     private fun settingsPendingIntent(): PendingIntent {
-        // La récupération des pannes se pilote depuis « Traitement local » (niveau ≥ 1) : on ouvre
+        // La récupération des pannes se pilote depuis « Traitement local » (crans « pannes en local ») : on ouvre
         // cette page, pas la racine des réglages.
         val intent = Intent(context, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP

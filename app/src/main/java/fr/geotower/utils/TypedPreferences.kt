@@ -494,6 +494,15 @@ object HomePrefs {
     val showCompassPage = BooleanPreference("show_compass_page", true)
     val showStatsPage = BooleanPreference("show_stats_page", true)
 
+    /**
+     * Lien « À propos » de l'accueil. C'est un élément de [PAGES_ORDER] comme les autres : il garde
+     * son apparence de lien discret, mais se déplace et se masque comme un bouton du menu.
+     */
+    val showAboutLink = BooleanPreference("show_home_about", true)
+
+    /** Éléments arrivés après coup : absents des ordres déjà enregistrés, ils prennent la fin. */
+    private val lateElements = listOf("settings", "logo", "about")
+
     fun startupPage(prefs: SharedPreferences): String {
         return prefs.getString(STARTUP_PAGE, DEFAULT_STARTUP_PAGE) ?: DEFAULT_STARTUP_PAGE
     }
@@ -502,6 +511,74 @@ object HomePrefs {
         return (prefs.getString(PAGES_ORDER, DEFAULT_PAGES_ORDER) ?: DEFAULT_PAGES_ORDER)
             .split(",")
             .filter { it.isNotBlank() }
+    }
+
+    /** Ordre complet des éléments de l'accueil, tel que la page et les réglages doivent le voir. */
+    fun normalizeOrder(order: List<String>): List<String> {
+        val normalized = order.filter { it.isNotBlank() }.distinct().toMutableList()
+        lateElements.forEach { if (!normalized.contains(it)) normalized.add(it) }
+        return normalized
+    }
+
+    fun normalizedPageOrder(prefs: SharedPreferences): List<String> = normalizeOrder(pageOrder(prefs))
+
+    /**
+     * Réinjecte l'ordre des éléments **visibles** dans l'ordre complet.
+     *
+     * L'accueil ne montre que les éléments activés (et la boussole seulement si l'appareil en a
+     * une) : les déplacer sur la page ne dit donc rien des autres. Chaque élément masqué reste
+     * accroché au voisin visible qui le précédait, pour retrouver sa place le jour où il réapparaît
+     * — l'envoyer en fin de liste serait une surprise au moment de le réactiver.
+     */
+    fun reorderVisible(fullOrder: List<String>, visibleOrder: List<String>): List<String> {
+        val visible = visibleOrder.toSet()
+        val leading = mutableListOf<String>()
+        val trailing = mutableMapOf<String, MutableList<String>>()
+        var anchor: String? = null
+        fullOrder.filter { it.isNotBlank() }.distinct().forEach { id ->
+            if (id in visible) {
+                anchor = id
+            } else {
+                val current = anchor
+                if (current == null) leading.add(id) else trailing.getOrPut(current) { mutableListOf() }.add(id)
+            }
+        }
+
+        val merged = mutableListOf<String>()
+        merged.addAll(leading)
+        visibleOrder.forEach { id ->
+            merged.add(id)
+            trailing[id]?.let { merged.addAll(it) }
+        }
+        return normalizeOrder(merged)
+    }
+}
+
+/**
+ * Parties de la page « À propos », activables une par une depuis « Personnalisation des pages ».
+ *
+ * Ce sont exactement les six entrées du menu latéral de la page : masquer une partie la retire donc
+ * aussi de ce menu, sinon on proposerait d'aller à une section qui n'existe plus. Tout est affiché
+ * par défaut — le réglage sert à retirer ce dont on ne veut pas, pas à découvrir la page.
+ */
+object AboutPagePrefs {
+    val presentation = BooleanPreference("page_about_presentation", true)
+    val news = BooleanPreference("page_about_news", true)
+    val privacy = BooleanPreference("page_about_privacy", true)
+    val sources = BooleanPreference("page_about_sources", true)
+    val versions = BooleanPreference("page_about_versions", true)
+    val development = BooleanPreference("page_about_development", true)
+
+    /** Les six parties, dans l'ordre de la page : l'indice est celui utilisé par l'écran. */
+    val sections = listOf(presentation, news, privacy, sources, versions, development)
+
+    /** Indices des parties affichées, dans l'ordre de la page. Vide si tout est masqué. */
+    fun visibleSections(prefs: SharedPreferences): List<Int> =
+        sections.indices.filter { sections[it].read(prefs) }
+
+    fun putDefaults(editor: SharedPreferences.Editor): SharedPreferences.Editor {
+        sections.forEach { editor.putBoolean(it.key, it.defaultValue) }
+        return editor
     }
 }
 

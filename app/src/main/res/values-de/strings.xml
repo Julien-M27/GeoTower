@@ -182,6 +182,8 @@
     <string name="database_download_progress">Download: %1$d%%</string>
     <string name="database_cancel_download">Download abbrechen</string>
     <string name="database_up_to_date">Aktuell</string>
+    <string name="database_antenna_count">Antennen: %1$s</string>
+    <string name="radio_database_site_count">Rundfunkstandorte: %1$s</string>
     <string name="enb_database_title">eNB-/gNB-Kennungen</string>
     <string name="appstrings_site_network_ids_title">Netzkennungen</string>
     <string name="appstrings_site_network_ids_option">Netzkennungen (eNB / gNB)</string>
@@ -193,6 +195,8 @@
     <string name="enb_database_source_attribution">Quelle: eNB Analytics</string>
     <string name="database_download_antennas">Antennen herunterladen</string>
     <string name="database_replace_generated_with_online">Auf dem Telefon erstellte Datenbank durch die Online-Version ersetzen</string>
+    <string name="database_rebuild_available_hint">Online gibt es eine neuere Datenbank. Auf diesem Gerät bedeutet aktualisieren: lokal neu erstellen.</string>
+    <string name="database_rebuild_action">Datenbank auf dem Gerät neu erstellen</string>
     <string name="database_replace_generated_radio_with_online">Auf dem Telefon erstellte Funkdaten durch die Online-Version ersetzen</string>
     <string name="database_delete_data">Daten löschen</string>
     <string name="database_delete_warning_title">Warnung</string>
@@ -216,6 +220,7 @@
     <string name="notification_db_updates_channel_name">Datenbankaktualisierungen</string>
     <string name="notification_db_update_available_title">Neue Datenbank</string>
     <string name="notification_db_update_available_desc">Ein Antennenupdate ist verfügbar. Tippe, um den Downloadbereich zu öffnen.</string>
+    <string name="notification_db_update_available_desc_rebuild">Ein Antennenupdate ist verfügbar. Tippe, um deine Datenbank auf dem Gerät neu zu erstellen.</string>
     <string name="notification_app_updates_channel_name">GeoTower-Updates</string>
     <string name="notification_app_update_available_title">Neue GeoTower-Version</string>
     <string name="notification_app_update_available_desc">GeoTower %1$s ist verfügbar. Tippe, um den Download zu öffnen.</string>
@@ -355,6 +360,7 @@
     <string name="appstrings_btn_authorize">Autorisieren</string>
     <string name="appstrings_btn_continue">Fortfahren</string>
     <string name="appstrings_btn_download_banner">Download</string>
+    <string name="appstrings_btn_rebuild_banner">Neu erstellen</string>
     <string name="appstrings_btn_lets_go">Los geht\'s!</string>
     <string name="appstrings_btn_next">Weiter</string>
     <string name="appstrings_btn_start_configuration">Einrichtung starten ➜</string>
@@ -581,6 +587,7 @@
     <string name="appstrings_home_help_settings">Hilfe</string>
     <string name="appstrings_home_quit_app">Beenden ohne Live-Benachrichtigung</string>
     <string name="appstrings_home_logo_setting_title">Logo der Startseite</string>
+    <string name="appstrings_home_long_press_reorder">Per langem Drücken verschieben</string>
     <string name="appstrings_id_copied">Identifikationsnummer kopiert</string>
     <string name="appstrings_id_number">Identifikationsnummer:\u0020</string>
     <string name="appstrings_id_support_copy">Support-ID</string>
@@ -1356,6 +1363,7 @@
     <string name="appstrings_generating_db_banner_desc">Die Datenbank wird auf dem Gerät erstellt: kein Download nötig.</string>
     <string name="appstrings_db_generation_in_progress">Wird erstellt…</string>
     <string name="appstrings_update_db_banner_title">Update verfügbar</string>
+    <string name="appstrings_update_db_banner_desc_rebuild">Auf diesem Gerät wird die Datenbank durch Neuerstellen aktualisiert.</string>
     <string name="appstrings_update_notif_setting_desc">Benachrichtigen, wenn eine neue Datenbank oder APK verfügbar ist</string>
     <string name="appstrings_update_notif_setting_title">Update-Benachrichtigungen</string>
     <string name="appstrings_upload_confirm_title">Upload-Bestätigung</string>
@@ -2363,6 +2371,9 @@
     <string name="local_mode_remote_disabled">Die lokale Verarbeitung ist derzeit aus der Ferne deaktiviert.</string>
     <string name="local_mode_level_off_title">Server (Standard)</string>
     <string name="local_mode_level_off_desc">Alles wird vom GeoTower-Server heruntergeladen und bereitgestellt.</string>
+    <string name="local_mode_level_db_title">Datenbank lokal</string>
+    <string name="local_mode_level_db_desc">Die Datenbank wird auf Ihrem Gerät erstellt (sofern kompatibel), statt heruntergeladen zu werden. Störungsstandorte und der Rest bleiben auf dem Server.</string>
+    <string name="local_mode_db_actually_local">Ihre Datenbank wurde auf diesem Gerät erstellt — die Stufe unten sagt das nicht. Wählen Sie „Datenbank lokal“, damit es die Regel wird.</string>
     <string name="local_mode_level_outages_title">Störungen lokal</string>
     <string name="local_mode_level_outages_desc">Störungsstandorte werden von den Betreibern abgerufen und auf Ihrem Gerät verortet. Datenbank und Rest bleiben auf dem Server.</string>
     <string name="local_mode_level_data_title">Datenbank + Störungen lokal</string>
@@ -2473,4 +2484,56 @@
     <!-- Versionshinweise 2.0.3 -->
     <string name="appstrings_release_v203_bearing_height_split">Ausrichtung und Höhe sind jetzt zwei getrennte Blöcke, die sich einzeln ein- und ausblenden und verschieben lassen</string>
     <string name="appstrings_release_v203_bearing_height_migration">Deine Sichtbarkeitseinstellungen und die Reihenfolge deiner Seiten werden automatisch übernommen</string>
+
+    <!-- Statistiken nach Departement (Tabellen dept_stat_* der Offline-Datenbank) -->
+    <string name="department_stats_title">Statistiken nach Departement</string>
+    <string name="department_stats_entry_title">Nach Departement</string>
+    <string name="department_stats_entry_description">Masten, Stationen und Antennen jedes Departements</string>
+    <string name="department_stats_search_hint">Nummer oder Name des Departements</string>
+    <string name="department_stats_current">Dein Departement</string>
+    <string name="department_stats_unavailable">Die Statistiken nach Departement kommen mit der nächsten heruntergeladenen Datenbank. Eine auf dem Gerät erzeugte Datenbank enthält sie nicht.</string>
+    <string name="department_stats_no_result">Kein Departement passt zu deiner Suche.</string>
+    <string name="department_stats_summary">%1$s Masten · %2$s Stationen · %3$s Paneele</string>
+    <string name="department_stats_authorisations_title">Statistik der Genehmigungen</string>
+    <string name="department_stats_mode_all">Genehmigungen</string>
+    <string name="department_stats_mode_active">In Betrieb</string>
+    <string name="department_stats_supports">Masten</string>
+    <string name="department_stats_stations">Stationen</string>
+    <string name="department_stats_antennas">Antennen (Paneele)</string>
+    <string name="department_stats_stations_per_support">Stationen pro Mast</string>
+    <string name="department_stats_antennas_per_station">Antennen pro Station</string>
+    <string name="department_stats_supports_per_km2">Masten pro km²</string>
+    <string name="department_stats_stations_per_km2">Stationen pro km²</string>
+    <string name="department_stats_antennas_per_km2">Antennen pro km²</string>
+    <string name="department_stats_supports_per_1k">Masten pro tausend Einwohner</string>
+    <string name="department_stats_stations_per_1k">Stationen pro tausend Einwohner</string>
+    <string name="department_stats_antennas_per_1k">Antennen pro tausend Einwohner</string>
+    <string name="department_stats_hab_per_support">Einwohner pro Mast</string>
+    <string name="department_stats_hab_per_station">Einwohner pro Station</string>
+    <string name="department_stats_hab_per_antenna">Einwohner pro Antenne</string>
+    <string name="department_stats_reference">%1$s — %2$s km² / %3$s Einwohner (%4$s)</string>
+    <string name="department_stats_reference_no_year">%1$s — %2$s km² / %3$s Einwohner</string>
+    <string name="department_stats_missing_reference">Fläche und Einwohnerzahl sind für dieses Gebiet nicht verfügbar.</string>
+    <string name="department_stats_matrix_title">Nach Betreiber und Technologie</string>
+    <string name="department_stats_matrix_operator">Betreiber</string>
+    <string name="department_stats_matrix_total">Gesamt</string>
+    <string name="department_stats_matrix_panels">Paneele</string>
+    <string name="department_stats_matrix_legend">Anzahl der Stationen, die jede Technologie melden. Gesamt = Summe der Spalten, eine Station mit 4G und 5G zählt also doppelt. Paneele = gemeldete physische Antennen, ohne Richtfunk.</string>
+    <string name="department_stats_fh">Richtfunk: %1$s Schüsseln, außerhalb der Statistik</string>
+    <string name="department_stats_list_options_title">Optionen der Liste</string>
+    <string name="department_stats_option_search">Suchfeld</string>
+    <string name="department_stats_option_current">Dein Departement oben</string>
+    <string name="department_stats_option_summary">Zusammenfassung unter jedem Departement</string>
+
+    <!-- Release notes 2.0.4 -->
+    <string name="appstrings_release_v204_department_stats">Neue Seite „Nach Departement“ in den Statistiken: Masten, Stationen und Antennen jedes Departements, mit Dichten pro km² und pro tausend Einwohner</string>
+    <string name="appstrings_release_v204_department_operators">Tabelle nach Betreiber und Technologie, mit der Anzahl der 2G/3G/4G/5G-Stationen und der gemeldeten physischen Paneele</string>
+    <string name="appstrings_release_v204_department_current">Das Departement deiner letzten Position steht oben in der Liste; zum Aktualisieren nach unten ziehen. Die Seite lässt sich wie die anderen anpassen.</string>
+    <string name="appstrings_release_v204_department_source">Die Statistiken nach Departement kommen mit der heruntergeladenen Datenbank, und eine auf dem Gerät erzeugte Datenbank berechnet sie ebenfalls</string>
+
+    <!-- Versionshinweise 2.0.5 -->
+    <string name="appstrings_release_v205_db_row_counts">Die Datenbankkarten zeigen, wie viele Antennen und Radiostandorte sie enthalten</string>
+    <string name="appstrings_release_v205_db_rebuild_offer">Wurde deine Datenbank auf dem Gerät erzeugt, erfolgt ihre Aktualisierung jetzt durch erneutes Erzeugen statt durch Herunterladen</string>
+    <string name="appstrings_release_v205_local_mode_db">Neue Stufe „Datenbank lokal“ in der lokalen Verarbeitung: Nur die Datenbank entsteht auf dem Gerät, alles Übrige läuft weiter über den Server</string>
+    <string name="appstrings_release_v205_home_long_press">Elemente der Startseite und die Hilfe-Schaltfläche lassen sich per langem Druck verschieben</string>
 </resources>

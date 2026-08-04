@@ -83,6 +83,7 @@ import fr.geotower.data.outages.OutageLocalConfig
 import fr.geotower.data.outages.OutageServerInfo
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
+import fr.geotower.utils.AboutPagePrefs
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppIconManager
 import fr.geotower.utils.AppLogoDrawingResources
@@ -103,6 +104,7 @@ import fr.geotower.ui.components.pageScrollbar
 import fr.geotower.ui.components.rememberLocalDbBuildStatus
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.utils.PageScrollPrefs
+import fr.geotower.utils.PreferenceStores
 import fr.geotower.ui.navigation.ROOT_FALLBACK_ROUTE
 import fr.geotower.ui.navigation.rememberSafeBackNavigation
 import kotlin.math.roundToInt
@@ -110,6 +112,12 @@ import androidx.compose.ui.res.stringResource
 import fr.geotower.R
 
 private const val TAG_ABOUT = "GeoTower"
+
+// Les parties de la page sont désignées par leur indice dans AboutPagePrefs.sections : c'est aussi
+// celui de leur ancre de défilement et de leur entrée de menu. Deux d'entre elles sont nommées, le
+// suivi du défilement les traitant à part (voir AboutScreen).
+private const val VERSIONS_SECTION = 4
+private const val DEVELOPMENT_SECTION = 5
 
 @Composable
 fun AboutScreen(navController: NavController) {
@@ -125,7 +133,7 @@ fun AboutScreen(navController: NavController) {
     val configuration = LocalConfiguration.current
     val scope = rememberCoroutineScope()
     val scrollState = rememberScrollState()
-    val sectionBringIntoViewRequesters = remember { List(6) { BringIntoViewRequester() } }
+    val sectionBringIntoViewRequesters = remember { List(AboutPagePrefs.sections.size) { BringIntoViewRequester() } }
     val sectionContentPositions = remember { mutableStateMapOf<Int, Float>() }
     val sectionContentHeights = remember { mutableStateMapOf<Int, Float>() }
     var scrollViewportTop by remember { mutableFloatStateOf(0f) }
@@ -176,7 +184,12 @@ fun AboutScreen(navController: NavController) {
     val displayLogoResId = AppLogoDrawingResources.resolve(appLogoDrawingChoice, logoResId, isDark)
     val isWideScreen = minOf(configuration.screenWidthDp, configuration.screenHeightDp) >= 600
 
-    var activeSectionIndex by remember { mutableIntStateOf(0) }
+    // Parties retirées depuis « Personnalisation des pages » : elles quittent la page ET son menu
+    // latéral, sinon on proposerait d'aller à une section qui n'existe plus.
+    val prefs = remember(context) { context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE) }
+    val visibleSections = remember(prefs) { AboutPagePrefs.visibleSections(prefs) }
+
+    var activeSectionIndex by remember { mutableIntStateOf(visibleSections.firstOrNull() ?: 0) }
 
     val menuItems = listOf(
         Triple(stringResource(R.string.appstrings_about_presentation), Icons.Outlined.Info, 0),
@@ -185,7 +198,7 @@ fun AboutScreen(navController: NavController) {
         Triple(stringResource(R.string.appstrings_about_sources), Icons.Outlined.Folder, 3),
         Triple(stringResource(R.string.appstrings_about_versions_title), Icons.Outlined.Storage, 4),
         Triple(stringResource(R.string.appstrings_about_dev), Icons.Default.EditNote, 5)
-    )
+    ).filter { it.third in visibleSections }
 
     suspend fun alignAnchorToViewportTop(anchorContentY: Float?) {
         if (anchorContentY == null || anchorContentY.isNaN() || scrollState.maxValue <= 0) return
@@ -205,11 +218,20 @@ fun AboutScreen(navController: NavController) {
             }
     }
 
+    // La section active doit rester atteignable : masquer celle qui l'était renvoie sur la première
+    // partie encore affichée.
+    LaunchedEffect(visibleSections) {
+        if (activeSectionIndex !in visibleSections) {
+            activeSectionIndex = visibleSections.firstOrNull() ?: 0
+        }
+    }
+
     // --- LOGIQUE DE SYNCHRONISATION FLUIDE ---
     if (navMode == 0) {
-        LaunchedEffect(scrollState.value, sectionContentSnapshot, sectionHeightSnapshot, scrollViewportHeight) {
+        LaunchedEffect(scrollState.value, sectionContentSnapshot, sectionHeightSnapshot, scrollViewportHeight, visibleSections) {
+            if (visibleSections.isEmpty()) return@LaunchedEffect
             val sortedSections = sectionContentSnapshot
-                .filterKeys { it in menuItems.indices }
+                .filterKeys { it in visibleSections }
                 .toList()
                 .sortedBy { it.second }
 
@@ -219,8 +241,10 @@ fun AboutScreen(navController: NavController) {
                 val viewportEnd = viewportStart + viewportHeight
                 val focusStart = viewportStart + viewportHeight * 0.18f
                 val focusEnd = viewportStart + viewportHeight * 0.82f
-                val versionsIndex = menuItems[4].third
-                val developmentIndex = menuItems.last().third
+                // -1 quand la partie est masquée : aucune position ne porte cet indice, les deux
+                // cas particuliers ci-dessous s'éteignent d'eux-mêmes.
+                val versionsIndex = if (VERSIONS_SECTION in visibleSections) VERSIONS_SECTION else -1
+                val developmentIndex = visibleSections.last()
 
                 fun isSectionFullyVisible(index: Int): Boolean {
                     val sectionStart = sectionContentSnapshot[index]
@@ -265,7 +289,7 @@ fun AboutScreen(navController: NavController) {
                 }
             } else {
                 sectionContentSnapshot
-                    .filterKeys { it in menuItems.indices }
+                    .filterKeys { it in visibleSections }
                     .minByOrNull { it.value }
                     ?.key
                     ?.let { activeSectionIndex = it }
@@ -463,17 +487,13 @@ fun AboutScreen(navController: NavController) {
                         if (navMode == 0 || !isExpanded) {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                 AllAboutContent(
-                                    appTitle,
-                                    appVersion,
-                                    displayLogoResId,
-                                    cardShape,
-                                    bubbleBaseColor,
-                                    sectionAnchorModifiers[0],
-                                    sectionAnchorModifiers[1],
-                                    sectionAnchorModifiers[2],
-                                    sectionAnchorModifiers[3],
-                                    sectionAnchorModifiers[4],
-                                    sectionAnchorModifiers[5],
+                                    appTitle = appTitle,
+                                    appVersion = appVersion,
+                                    logoResId = displayLogoResId,
+                                    cardShape = cardShape,
+                                    bubbleColor = bubbleBaseColor,
+                                    visibleSections = visibleSections,
+                                    sectionModifiers = sectionAnchorModifiers,
                                     onOpenHistories = {
                                         navController.navigate("histories")
                                     },
@@ -488,26 +508,18 @@ fun AboutScreen(navController: NavController) {
                             }
                         } else {
                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                when(activeSectionIndex) {
-                                    0 -> SectionPresentation(appTitle, appVersion, displayLogoResId)
-                                    1 -> SectionNouveautes(appVersion, cardShape, bubbleBaseColor)
-                                    2 -> SectionConfidentialite(
-                                        cardShape,
-                                        bubbleBaseColor,
-                                        onOpenHistories = {
-                                            navController.navigate("histories")
-                                        },
-                                        onOpenTerms = {
-                                            navController.navigate("terms")
-                                        }
+                                if (activeSectionIndex in visibleSections) {
+                                    AboutSectionContent(
+                                        section = activeSectionIndex,
+                                        appTitle = appTitle,
+                                        appVersion = appVersion,
+                                        logoResId = displayLogoResId,
+                                        cardShape = cardShape,
+                                        bubbleColor = bubbleBaseColor,
+                                        onOpenHistories = { navController.navigate("histories") },
+                                        onOpenDiagnostic = { navController.navigate("diagnostic") },
+                                        onOpenTerms = { navController.navigate("terms") }
                                     )
-                                    3 -> SectionSources(cardShape, bubbleBaseColor)
-                                    4 -> SectionVersions(
-                                        cardShape,
-                                        bubbleBaseColor,
-                                        onOpenDiagnostic = { navController.navigate("diagnostic") }
-                                    )
-                                    5 -> SectionDeveloppement()
                                 }
                             }
                         }
@@ -566,6 +578,12 @@ fun AboutTopBar(onBack: () -> Unit) {
 // CONTENU DES SECTIONS À PROPOS
 // ============================================================
 
+/**
+ * Toutes les parties de la page à la suite, dans l'ordre de lecture.
+ *
+ * [visibleSections] porte les indices retenus : une partie masquée n'émet rien, et l'espacement qui
+ * la précédait disparaît avec elle — sinon la page garderait des trous là où il n'y a plus rien.
+ */
 @Composable
 fun AllAboutContent(
     appTitle: String,
@@ -573,61 +591,58 @@ fun AllAboutContent(
     logoResId: Int,
     cardShape: Shape,
     bubbleColor: Color,
-    presentationModifier: Modifier = Modifier,
-    newsModifier: Modifier = Modifier,
-    privacyModifier: Modifier = Modifier,
-    sourcesModifier: Modifier = Modifier,
-    versionsModifier: Modifier = Modifier,
-    developmentModifier: Modifier = Modifier,
+    visibleSections: List<Int> = AboutPagePrefs.sections.indices.toList(),
+    sectionModifiers: List<Modifier> = List(AboutPagePrefs.sections.size) { Modifier },
     onOpenHistories: () -> Unit = {},
     onOpenDiagnostic: () -> Unit = {},
     onOpenTerms: () -> Unit = {}
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
-    Column(
-        modifier = presentationModifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        SectionPresentation(appTitle, appVersion, logoResId)
+    visibleSections.forEachIndexed { position, section ->
+        if (position > 0) {
+            // Le développement reste collé aux versions : c'est une signature, pas une section de
+            // plus. Toutes les autres gardent leur respiration de 48.dp.
+            Spacer(modifier = Modifier.height(sizing.spacing(if (section == DEVELOPMENT_SECTION) 16.dp else 48.dp)))
+        }
+        Column(
+            modifier = sectionModifiers[section].fillMaxWidth(),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            AboutSectionContent(
+                section = section,
+                appTitle = appTitle,
+                appVersion = appVersion,
+                logoResId = logoResId,
+                cardShape = cardShape,
+                bubbleColor = bubbleColor,
+                onOpenHistories = onOpenHistories,
+                onOpenDiagnostic = onOpenDiagnostic,
+                onOpenTerms = onOpenTerms
+            )
+        }
     }
-    Spacer(modifier = Modifier.height(sizing.spacing(48.dp)))
-    Column(
-        modifier = newsModifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        SectionNouveautes(appVersion, cardShape, bubbleColor)
-    }
-    Spacer(modifier = Modifier.height(sizing.spacing(48.dp)))
+}
 
-    // --- NOUVEAU ---
-    Column(
-        modifier = privacyModifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        SectionConfidentialite(cardShape, bubbleColor, onOpenHistories, onOpenTerms)
-    }
-    Spacer(modifier = Modifier.height(sizing.spacing(48.dp)))
-    // ---------------
-
-    Column(
-        modifier = sourcesModifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        SectionSources(cardShape, bubbleColor)
-    }
-    Spacer(modifier = Modifier.height(sizing.spacing(48.dp)))
-    Column(
-        modifier = versionsModifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        SectionVersions(cardShape, bubbleColor, onOpenDiagnostic)
-    }
-    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
-    Column(
-        modifier = developmentModifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        SectionDeveloppement()
+/** Une partie de la page « À propos », désignée par son indice dans [AboutPagePrefs.sections]. */
+@Composable
+private fun AboutSectionContent(
+    section: Int,
+    appTitle: String,
+    appVersion: String,
+    logoResId: Int,
+    cardShape: Shape,
+    bubbleColor: Color,
+    onOpenHistories: () -> Unit,
+    onOpenDiagnostic: () -> Unit,
+    onOpenTerms: () -> Unit
+) {
+    when (section) {
+        0 -> SectionPresentation(appTitle, appVersion, logoResId)
+        1 -> SectionNouveautes(appVersion, cardShape, bubbleColor)
+        2 -> SectionConfidentialite(cardShape, bubbleColor, onOpenHistories, onOpenTerms)
+        3 -> SectionSources(cardShape, bubbleColor)
+        VERSIONS_SECTION -> SectionVersions(cardShape, bubbleColor, onOpenDiagnostic)
+        DEVELOPMENT_SECTION -> SectionDeveloppement()
     }
 }
 
@@ -1121,7 +1136,7 @@ private data class SitesHsState(
 
 /**
  * Lit l'état des sites HS (prefs uniquement, donc rejouable à volonté). Les horodatages sont rendus
- * exclusifs par la source réellement active (mode traitement local, niveau ≥ 1) : afficher l'heure
+ * exclusifs par la source réellement active (traitement local, crans « pannes en local ») : afficher l'heure
  * de la génération locale sur une donnée serveur - ou l'inverse - annoncerait une fraîcheur fausse.
  */
 private fun readSitesHsState(context: Context): SitesHsState {

@@ -26,6 +26,12 @@ from fr_anfr_stats import (
     populate_current_stats,
     populate_weekly_stats,
 )
+from fr_dept_stats import (
+    ensure_dept_stat_tables,
+    load_department_reference,
+    populate_department_stats,
+    update_source_versions as update_dept_source_versions,
+)
 
 
 DATA_DIR = "/opt/geotower/data/imports/"
@@ -702,6 +708,7 @@ def create_schema(cur):
     cur.execute("CREATE TABLE IF NOT EXISTS `metadata` (`version` TEXT NOT NULL, `schema_version` INTEGER NOT NULL, `country_code` TEXT NOT NULL, `country_name` TEXT, `source` TEXT NOT NULL, `date_maj_anfr` TEXT, `zip_version` TEXT, PRIMARY KEY(`version`))")
     cur.execute("CREATE TABLE IF NOT EXISTS `source_versions` (`source_key` TEXT NOT NULL, `source_value` TEXT NOT NULL, PRIMARY KEY(`source_key`))")
     ensure_stats_tables(cur.connection)
+    ensure_dept_stat_tables(cur.connection)
 
 
 def write_version_json(db_version, date_maj_anfr, zip_filename, quarterly_version):
@@ -1065,6 +1072,9 @@ def run_build():
     inserted_support = execute_many_in_batches(cur, "INSERT INTO support VALUES (?, ?, ?, ?, ?)", support_by_key.values())
     inserted_antenne = execute_many_in_batches(cur, "INSERT INTO antenne VALUES (?, ?, ?, ?, ?, ?, ?)", antenne_by_id.values())
     print(f"Supports inseres: {inserted_support} | Antennes inserees: {inserted_antenne}")
+    # Ces deux dictionnaires ne servent plus, et ils pesent lourd (une entree par antenne).
+    # Les stats par departement qui suivent relisent la base : autant leur laisser la place.
+    del support_by_key, antenne_by_id, aer_systems
     cur.executemany("INSERT INTO ref_operateur VALUES (?, ?)", operateur_ids.rows())
     cur.executemany("INSERT INTO ref_nature VALUES (?, ?)", ref_nature_data)
     cur.executemany("INSERT INTO ref_proprietaire VALUES (?, ?)", ref_proprio_data)
@@ -1092,6 +1102,11 @@ def run_build():
     current_stats_rows = populate_current_stats(conn)
     weekly_stats_rows = populate_weekly_stats(conn, weekly_csv_paths)
 
+    print("Statistiques par departement...")
+    dept_reference = load_department_reference(Path(REF_DIR))
+    dept_stats = populate_department_stats(conn, dept_reference)
+    update_dept_source_versions(conn)
+
     cur.execute("CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)")
     cur.execute(
         "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, ?)",
@@ -1114,6 +1129,10 @@ def run_build():
 
     print(f"Version DB: {db_version} | ANFR: {date_maj_anfr} | ZIP: {zip_filename} | Trimestriel: {quarterly_version or 'Inconnu'}")
     print(f"Stats courantes: {current_stats_rows} lignes | Stats hebdo: {weekly_stats_rows} lignes")
+    print(
+        f"Stats departements: {dept_stats.department_rows} departements | "
+        f"{dept_stats.operator_tech_rows} lignes operateur/techno"
+    )
     print(f"Dossier sources FR: {france_sources_dir}")
     print(f"Termine: {DB_FILE} ({os.path.getsize(DB_FILE) / (1024 * 1024):.2f} Mo)")
     return

@@ -69,6 +69,10 @@ import fr.geotower.ui.screens.emitters.SiteSpeedtestsScreen
 import fr.geotower.ui.screens.emitters.SiteDetailToolWrapperScreen
 import fr.geotower.ui.screens.emitters.RadioSiteDetailScreen
 import fr.geotower.ui.screens.emitters.ThroughputCalculatorScreen
+import fr.geotower.ui.screens.stats.DEPARTMENT_STATS_ROUTE
+import fr.geotower.ui.screens.stats.DEPARTMENT_STAT_DETAIL_ROUTE
+import fr.geotower.ui.screens.stats.DepartmentStatDetailScreen
+import fr.geotower.ui.screens.stats.DepartmentStatsScreen
 import fr.geotower.ui.screens.stats.FrequencyStatsDetailScreen
 import fr.geotower.ui.screens.stats.StatisticsScreen
 import fr.geotower.ui.screens.about.AboutScreen
@@ -757,6 +761,35 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
+                            // Statistiques par département (tables dept_stat_* de la base)
+                            composable(DEPARTMENT_STATS_ROUTE) {
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
+                                        DepartmentStatsScreen(navController = navController, repository = repository)
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
+                                }
+                            }
+
+                            composable(
+                                route = DEPARTMENT_STAT_DETAIL_ROUTE,
+                                arguments = listOf(navArgument("deptCode") { type = NavType.StringType })
+                            ) { backStackEntry ->
+                                val deptCode = backStackEntry.arguments?.getString("deptCode").orEmpty()
+                                Box(modifier = Modifier.padding(innerPadding)) {
+                                    if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
+                                        DepartmentStatDetailScreen(
+                                            navController = navController,
+                                            repository = repository,
+                                            deptCode = deptCode
+                                        )
+                                    } else {
+                                        DisabledFeatureRoute(navController, txtUnavailable)
+                                    }
+                                }
+                            }
+
                             // Paramètres
                             composable(
                                 route = "settings?section={section}&target_map={targetMapFilename}",
@@ -854,8 +887,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
 
-                            // Traitement local des données (niveaux 0..3), ouvert depuis Réglages.
-                            // Les réglages des pannes y vivent désormais (niveau ≥ 1) : le lien
+                            // Traitement local des données (5 crans), ouvert depuis Réglages.
+                            // Les réglages des pannes y vivent désormais : le lien
                             // profond historique `geotower://outage_source`, encore porté par les
                             // notifications de récupération déjà postées, atterrit donc ici.
                             composable(

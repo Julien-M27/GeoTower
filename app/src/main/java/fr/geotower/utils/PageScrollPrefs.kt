@@ -39,6 +39,7 @@ object PageScrollPrefs {
     const val HISTORIES = "histories"
     const val PHOTO_UPLOAD_HISTORY = "photo_upload_history"
     const val SHARE_HISTORY = "share_history"
+    const val DEPARTMENT_STATS = "department_stats"
 
     /** Les trois aides réglables indépendamment (l'ordre est celui affiché dans les réglages). */
     enum class Aid(val keyPrefix: String) {
@@ -63,7 +64,9 @@ object PageScrollPrefs {
         SPEEDTESTS,
         COVERAGE,
         ELEVATION_PROFILE,
-        THROUGHPUT_CALCULATOR
+        THROUGHPUT_CALCULATOR,
+        ABOUT,
+        DEPARTMENT_STATS
     )
 
     /**
@@ -72,7 +75,6 @@ object PageScrollPrefs {
      */
     val otherPages = listOf(
         SETTINGS,
-        ABOUT,
         HELP,
         DIAGNOSTIC,
         TERMS,

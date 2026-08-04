@@ -85,6 +85,16 @@ def _site_id_candidates(value: str) -> List[str]:
     return list(dict.fromkeys([trimmed, compact, trimmed.zfill(10)]))
 
 
+def _normalized_department_code(value: str) -> str:
+    """'2a' -> '2A', '72' -> '72', '987' -> '987'. Chaine vide si ce n'est pas un code plausible."""
+    code = (value or "").strip().upper()
+    if code in ("2A", "2B"):
+        return code
+    if code.isdigit() and len(code) in (2, 3):
+        return code
+    return ""
+
+
 def _placeholders(values: List[str]) -> str:
     return ",".join("?" for _ in values)
 
@@ -388,6 +398,79 @@ async def get_live_fr_weekly_stats(operator: List[str] = Query(default=[])):
         return {
             "country_code": "FR",
             "operators": operators,
+            "rows": [_row_to_dict(row) for row in rows],
+        }
+
+
+@router.get("/stats/departments", summary="Stats FR par departement")
+async def get_live_fr_department_stats():
+    _ensure_live_enabled(FEATURE_LIVE_API_FR_STATS)
+    with _db_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                dept_code,
+                dept_name,
+                area_km2,
+                population,
+                population_year,
+                supports,
+                supports_active,
+                stations,
+                stations_active,
+                antennas,
+                antennas_active,
+                antennas_fh,
+                stations_per_support,
+                antennas_per_station,
+                supports_per_km2,
+                stations_per_km2,
+                antennas_per_km2,
+                supports_per_1k_hab,
+                stations_per_1k_hab,
+                antennas_per_1k_hab,
+                hab_per_support,
+                hab_per_station,
+                hab_per_antenna
+            FROM dept_stat_current
+            ORDER BY dept_code
+            """
+        ).fetchall()
+        return {
+            "country_code": "FR",
+            "rows": [_row_to_dict(row) for row in rows],
+        }
+
+
+@router.get("/stats/departments/{dept_code}", summary="Stats FR d'un departement par operateur")
+async def get_live_fr_department_operator_stats(dept_code: str):
+    _ensure_live_enabled(FEATURE_LIVE_API_FR_STATS)
+    normalized = _normalized_department_code(dept_code)
+    if not normalized:
+        return {"country_code": "FR", "dept_code": "", "rows": []}
+
+    with _db_connection() as conn:
+        rows = conn.execute(
+            """
+            SELECT
+                dept_code,
+                operator_name,
+                tech,
+                supports,
+                supports_active,
+                stations,
+                stations_active,
+                antennas,
+                antennas_active
+            FROM dept_stat_operator_tech
+            WHERE dept_code = ?
+            ORDER BY operator_name, tech
+            """,
+            (normalized,),
+        ).fetchall()
+        return {
+            "country_code": "FR",
+            "dept_code": normalized,
             "rows": [_row_to_dict(row) for row in rows],
         }
 

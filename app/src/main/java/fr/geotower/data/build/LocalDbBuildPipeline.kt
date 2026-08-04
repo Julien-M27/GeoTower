@@ -113,11 +113,30 @@ class LocalDbBuildPipeline(
             // Le ZIP de references est optionnel (le builder a des valeurs par defaut).
             monthly.refUrl?.let { runCatching { downloader.downloadToFile(it, refZip, MAX_REF_ZIP_BYTES) } }
 
-            val communes = runCatching {
-                RawSourceDownloader.parseCommunesJson(
-                    downloader.fetchText(OfficialSources.COMMUNES_URL, MAX_JSON_BYTES),
-                )
-            }.getOrDefault(emptyMap())
+            // Un seul telechargement des communes : le meme JSON sert aux noms (`ref_commune`) et a
+            // l'agregation superficie/population des stats departementales.
+            val communesJson = runCatching {
+                downloader.fetchText(OfficialSources.COMMUNES_URL, MAX_JSON_BYTES)
+            }.getOrDefault("")
+            val communes = RawSourceDownloader.parseCommunesJson(communesJson)
+            val departments = if (communesJson.isEmpty()) {
+                emptyMap()
+            } else {
+                runCatching {
+                    RawSourceDownloader.parseDepartmentReference(
+                        departementsJson = downloader.fetchText(OfficialSources.DEPARTEMENTS_URL, MAX_JSON_BYTES),
+                        communesJson = communesJson,
+                        populationYear = DepartmentStatsBuilder.POPULATION_YEAR,
+                    )
+                }.onFailure {
+                    AppLogger.w("GeoTowerDb", "Referentiel departements indisponible (non-fatal)", it)
+                }.getOrDefault(emptyMap())
+            }.let { metropoleAndDrom ->
+                // Les COM ne sont dans aucune des deux listes globales : un appel chacune. On ne
+                // tente ces douze requetes que si l'API a deja repondu, pour ne pas enchainer
+                // autant de delais d'attente quand geo.api.gouv.fr est injoignable.
+                if (metropoleAndDrom.isEmpty()) metropoleAndDrom else metropoleAndDrom + overseasDepartments(downloader, metropoleAndDrom.keys)
+            }
 
             // Observatoire (~500 Mo) = source MOBILE uniquement -> telecharge SEULEMENT si le pack mobile
             // est demande. Pour un build « non-mobile seul », ces ~500 Mo sont economises.
@@ -171,9 +190,9 @@ class LocalDbBuildPipeline(
                 val refSource = if (refZip.exists()) AnfrMonthlyZip(refZip) else null
                 try {
                     val references = if (refSource != null) {
-                        anfrReferencesFrom(refSource, communes)
+                        anfrReferencesFrom(refSource, communes, departments)
                     } else {
-                        AnfrReferences(communes = communes)
+                        AnfrReferences(communes = communes, departments = departments)
                     }
                     // Les fichiers SUP alimentent les deux bases ; l'observatoire (weekly) n'existe que pour le mobile.
                     val sources = AnfrSources(
@@ -318,6 +337,32 @@ class LocalDbBuildPipeline(
             files.asSequence().flatMap { file -> csvRows { file.inputStream() }.asSequence() }.iterator()
         }
         return RawSourceDownloader.parseArcepSites(rows)
+    }
+
+    /**
+     * Superficie, population et nom des collectivites d'outre-mer, une requete de nom et une de
+     * communes par territoire. Chaque COM est independante : celle qui echoue est simplement
+     * absente du referentiel (compteurs ANFR sans ratios), les autres restent completes.
+     */
+    private fun overseasDepartments(
+        downloader: RawSourceDownloader,
+        alreadyKnown: Set<String>,
+    ): Map<String, DepartmentReferenceRow> {
+        val result = LinkedHashMap<String, DepartmentReferenceRow>()
+        for (code in OfficialSources.OVERSEAS_DEPARTMENT_CODES) {
+            if (code in alreadyKnown) continue
+            runCatching {
+                RawSourceDownloader.parseSingleDepartmentReference(
+                    departementJson = downloader.fetchText(OfficialSources.departementUrl(code), MAX_JSON_BYTES),
+                    communesJson = downloader.fetchText(OfficialSources.departementCommunesUrl(code), MAX_JSON_BYTES),
+                    code = code,
+                    populationYear = DepartmentStatsBuilder.POPULATION_YEAR,
+                )
+            }.onFailure {
+                AppLogger.w("GeoTowerDb", "Referentiel COM $code indisponible (non-fatal)", it)
+            }.getOrNull()?.let { result[code] = it }
+        }
+        return result
     }
 
     /**

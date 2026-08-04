@@ -24,7 +24,8 @@ import fr.geotower.ui.components.OutageLocalGenerationControls
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 
 /**
- * Bloc « Pannes réseau récupérées sur l'appareil », affiché dans [LocalModeScreen] dès le niveau 1.
+ * Bloc « Pannes réseau récupérées sur l'appareil », affiché dans [LocalModeScreen] dès les crans
+ * « pannes en local ».
  *
  * Il ne porte PLUS le choix de la source — c'est le niveau de traitement local qui en décide
  * ([fr.geotower.utils.AppConfig.outagesLocal]) — seulement les réglages d'EXÉCUTION : fréquence

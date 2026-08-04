@@ -9,7 +9,7 @@ import fr.geotower.data.models.SiteHsEntity
  * partagées "settings" (même store que `last_hs_update`).
  *
  * Le CHOIX de la source ne vit plus ici : il est porté par le niveau de « Traitement local »
- * ([fr.geotower.utils.AppConfig.outagesLocal], niveau ≥ 1), seule vérité de l'app. Cette classe ne
+ * ([fr.geotower.utils.AppConfig.outagesLocal], crans « pannes en local »), seule vérité de l'app. Cette classe ne
  * garde que les réglages d'exécution (fréquence, arrière-plan) et le résumé de la dernière
  * récupération. L'ancienne clé `outages_source` est migrée au démarrage puis supprimée
  * (cf. `AppConfig.migrateLegacyOutageSourcePref`).

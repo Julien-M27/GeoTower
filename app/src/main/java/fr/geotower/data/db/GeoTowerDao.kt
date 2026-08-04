@@ -3,6 +3,8 @@ package fr.geotower.data.db
 import androidx.room.Dao
 import androidx.room.ColumnInfo
 import androidx.room.Query
+import androidx.room.RawQuery
+import androidx.sqlite.db.SupportSQLiteQuery
 import fr.geotower.data.models.AntenneDbEntity
 import fr.geotower.data.models.CoverageSiteLocationEntity
 import fr.geotower.data.models.DbCluster
@@ -40,6 +42,56 @@ data class WeeklyRadioStatRow(
     @ColumnInfo(name = "label") val label: String?,
     @ColumnInfo(name = "total_count") val totalCount: Int,
     @ColumnInfo(name = "active_count") val activeCount: Int
+)
+
+/**
+ * Une ligne de `dept_stat_current` : les compteurs ANFR du departement, ses donnees de cadrage
+ * (superficie, population) et les ratios deja calcules par le serveur.
+ *
+ * `antennas` = panneaux physiques declares, hors faisceaux hertziens ; `stations` = stations ANFR.
+ * Voir docs/spec-serveur-stats-departements-2026-08-04.md.
+ */
+data class DepartmentStatRow(
+    @ColumnInfo(name = "dept_code") val deptCode: String,
+    @ColumnInfo(name = "dept_name") val deptName: String?,
+    @ColumnInfo(name = "area_km2") val areaKm2: Double?,
+    @ColumnInfo(name = "population") val population: Int?,
+    @ColumnInfo(name = "population_year") val populationYear: String?,
+    @ColumnInfo(name = "supports") val supports: Int,
+    @ColumnInfo(name = "supports_active") val supportsActive: Int,
+    @ColumnInfo(name = "stations") val stations: Int,
+    @ColumnInfo(name = "stations_active") val stationsActive: Int,
+    @ColumnInfo(name = "antennas") val antennas: Int,
+    @ColumnInfo(name = "antennas_active") val antennasActive: Int,
+    @ColumnInfo(name = "antennas_fh") val antennasFh: Int,
+    @ColumnInfo(name = "stations_per_support") val stationsPerSupport: Double?,
+    @ColumnInfo(name = "antennas_per_station") val antennasPerStation: Double?,
+    @ColumnInfo(name = "supports_per_km2") val supportsPerKm2: Double?,
+    @ColumnInfo(name = "stations_per_km2") val stationsPerKm2: Double?,
+    @ColumnInfo(name = "antennas_per_km2") val antennasPerKm2: Double?,
+    @ColumnInfo(name = "supports_per_1k_hab") val supportsPer1kHab: Double?,
+    @ColumnInfo(name = "stations_per_1k_hab") val stationsPer1kHab: Double?,
+    @ColumnInfo(name = "antennas_per_1k_hab") val antennasPer1kHab: Double?,
+    @ColumnInfo(name = "hab_per_support") val habPerSupport: Double?,
+    @ColumnInfo(name = "hab_per_station") val habPerStation: Double?,
+    @ColumnInfo(name = "hab_per_antenna") val habPerAntenna: Double?
+)
+
+/**
+ * Une ligne de `dept_stat_operator_tech`. `tech` vaut 2G/3G/4G/5G ou `ALL`, `operatorName` porte
+ * le libelle ANFR en majuscules ou `ALL`. Attention : sur les lignes `ALL`, les antennes sont
+ * comptees en distinct, ce n'est donc PAS la somme des colonnes par technologie.
+ */
+data class DepartmentOperatorTechRow(
+    @ColumnInfo(name = "dept_code") val deptCode: String,
+    @ColumnInfo(name = "operator_name") val operatorName: String,
+    @ColumnInfo(name = "tech") val tech: String,
+    @ColumnInfo(name = "supports") val supports: Int,
+    @ColumnInfo(name = "supports_active") val supportsActive: Int,
+    @ColumnInfo(name = "stations") val stations: Int,
+    @ColumnInfo(name = "stations_active") val stationsActive: Int,
+    @ColumnInfo(name = "antennas") val antennas: Int,
+    @ColumnInfo(name = "antennas_active") val antennasActive: Int
 )
 
 @Dao
@@ -1358,4 +1410,52 @@ interface GeoTowerDao {
         LIMIT 60
     """)
     suspend fun getFavoriteScopeSiteRows(scopeId: String): List<FavoriteScopeSiteRow>
+
+    /**
+     * Codes INSEE des stations les plus proches d'un point, du plus proche au plus lointain, pour
+     * deviner le departement courant. La boite est passee par l'appelant : sans station dedans, la
+     * liste est vide plutot que d'elargir la recherche a la France entiere.
+     *
+     * `lonScale` vaut cos(latitude) : sans lui, un degre de longitude (~73 km chez nous) pesant
+     * autant qu'un degre de latitude (~111 km), la station « la plus proche » pouvait etre celle
+     * d'a cote, de l'autre cote d'une limite departementale. L'appelant vote ensuite sur ces
+     * quelques stations pour qu'une seule mal placee ne fasse pas basculer le resultat.
+     */
+    @Query("""
+        SELECT code_insee
+        FROM localisation
+        WHERE latitude BETWEEN :minLat AND :maxLat
+        AND longitude BETWEEN :minLon AND :maxLon
+        AND code_insee IS NOT NULL
+        ORDER BY (
+            (latitude - :lat) * (latitude - :lat) +
+            (longitude - :lon) * (longitude - :lon) * :lonScale * :lonScale
+        )
+        LIMIT :limit
+    """)
+    suspend fun getNearestCodesInsee(
+        lat: Double,
+        lon: Double,
+        lonScale: Double,
+        minLat: Double,
+        maxLat: Double,
+        minLon: Double,
+        maxLon: Double,
+        limit: Int
+    ): List<String>
+
+    /**
+     * Stats par departement. Ces deux tables sont ajoutees par le serveur (fr_dept_stats.py) et
+     * volontairement absentes du schema Room : les declarer en entites changerait l'identity_hash
+     * de la base preconstruite, donc imposerait un bump de schema et un retelechargement complet.
+     *
+     * D'ou [RawQuery], que Room ne verifie pas a la compilation. Si la table n'existe pas - base
+     * telechargee avant cette fonctionnalite, ou base generee sur l'appareil, qui cree les tables
+     * mais ne les remplit pas - la requete leve et l'appelant retombe sur une liste vide.
+     */
+    @RawQuery
+    suspend fun getDepartmentStatsRaw(query: SupportSQLiteQuery): List<DepartmentStatRow>
+
+    @RawQuery
+    suspend fun getDepartmentOperatorTechStatsRaw(query: SupportSQLiteQuery): List<DepartmentOperatorTechRow>
 }

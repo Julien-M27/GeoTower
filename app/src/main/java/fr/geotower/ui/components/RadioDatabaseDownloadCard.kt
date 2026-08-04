@@ -236,7 +236,7 @@ fun RadioDatabaseDownloadCard(
             localRowCount?.takeIf { it > 0 }?.let { count ->
                 Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
                 Text(
-                    text = "Sites radio : ${"%,d".format(count)}",
+                    text = stringResource(R.string.radio_database_site_count, "%,d".format(count)),
                     modifier = Modifier.fillMaxWidth(),
                     fontSize = sizing.text(12.sp),
                     fontWeight = FontWeight.Medium,
@@ -288,7 +288,11 @@ fun RadioDatabaseDownloadCard(
             } else {
                 val isUpToDate = DatabaseVersionPolicy.isLocalCurrentOrNewer(remoteVersionRaw, localVersionRaw)
                 val isSearching = localVersion == txtSearching || remoteVersion == txtSearching
-                val canDownload = remoteVersionRaw != null && canStartDownload
+                // Comme la carte mobile : la version distante reste lisible quand la génération
+                // locale est imposée, le téléchargement non — le bouton doit le refuser lui-même.
+                val canDownload = remoteVersionRaw != null &&
+                    canStartDownload &&
+                    !fr.geotower.utils.AppConfig.dbForcedLocal()
                 // Base radio générée sur l'appareil : jamais « à jour » vis-à-vis de l'en ligne, on propose de la remplacer.
                 // Provenance non encore vérifiée (null) → comportement « téléchargée » (bouton de toute façon en attente).
                 val locallyGenerated = isLocallyGenerated == true

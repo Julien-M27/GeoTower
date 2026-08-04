@@ -14,7 +14,7 @@ SOURCE_DB_FILENAME = "geotower_fr.db"
 LIVE_DB_FILENAME = "geotower_live_fr.db"
 LIVE_VERSION_FILENAME = "version_live_fr.json"
 LIVE_SCHEMA_VERSION = 1
-LIVE_BUILD_PROGRESS_STEPS = 18
+LIVE_BUILD_PROGRESS_STEPS = 20
 TECH_5G = 1 << 3
 BAND_5G_700 = 1 << 10
 BAND_5G_2100 = 1 << 11
@@ -143,6 +143,11 @@ def validate_source_schema(conn: sqlite3.Connection) -> None:
         "ref_commune",
         "radio_stat_current",
         "radio_stat_weekly",
+        # Stats par departement : ecrites par fr_dept_stats.py, toujours creees par
+        # create_schema(). Si elles manquent, la base source est anterieure a cette
+        # fonctionnalite : rejouer `python3 fr_dept_stats.py` avant de generer la base live.
+        "dept_stat_current",
+        "dept_stat_operator_tech",
         "metadata",
     }
     missing = sorted(table for table in required_tables if not table_exists(conn, table))
@@ -251,6 +256,47 @@ def create_live_schema(conn: sqlite3.Connection) -> None:
             total_count INTEGER NOT NULL,
             active_count INTEGER NOT NULL,
             PRIMARY KEY(week_key, operator_name, category, item_key)
+        );
+
+        CREATE TABLE dept_stat_current (
+            dept_code TEXT NOT NULL,
+            dept_name TEXT,
+            region_code TEXT,
+            area_km2 REAL,
+            population INTEGER,
+            population_year TEXT,
+            supports INTEGER NOT NULL,
+            supports_active INTEGER NOT NULL,
+            stations INTEGER NOT NULL,
+            stations_active INTEGER NOT NULL,
+            antennas INTEGER NOT NULL,
+            antennas_active INTEGER NOT NULL,
+            antennas_fh INTEGER NOT NULL,
+            stations_per_support REAL,
+            antennas_per_station REAL,
+            supports_per_km2 REAL,
+            stations_per_km2 REAL,
+            antennas_per_km2 REAL,
+            supports_per_1k_hab REAL,
+            stations_per_1k_hab REAL,
+            antennas_per_1k_hab REAL,
+            hab_per_support REAL,
+            hab_per_station REAL,
+            hab_per_antenna REAL,
+            PRIMARY KEY(dept_code)
+        );
+
+        CREATE TABLE dept_stat_operator_tech (
+            dept_code TEXT NOT NULL,
+            operator_name TEXT NOT NULL,
+            tech TEXT NOT NULL,
+            supports INTEGER NOT NULL,
+            supports_active INTEGER NOT NULL,
+            stations INTEGER NOT NULL,
+            stations_active INTEGER NOT NULL,
+            antennas INTEGER NOT NULL,
+            antennas_active INTEGER NOT NULL,
+            PRIMARY KEY(dept_code, operator_name, tech)
         );
 
         CREATE VIRTUAL TABLE site_rtree USING rtree(
@@ -573,6 +619,82 @@ def populate_live_tables(
             active_count
         FROM src.radio_stat_weekly;
 
+        INSERT INTO dept_stat_current (
+            dept_code,
+            dept_name,
+            region_code,
+            area_km2,
+            population,
+            population_year,
+            supports,
+            supports_active,
+            stations,
+            stations_active,
+            antennas,
+            antennas_active,
+            antennas_fh,
+            stations_per_support,
+            antennas_per_station,
+            supports_per_km2,
+            stations_per_km2,
+            antennas_per_km2,
+            supports_per_1k_hab,
+            stations_per_1k_hab,
+            antennas_per_1k_hab,
+            hab_per_support,
+            hab_per_station,
+            hab_per_antenna
+        )
+        SELECT
+            dept_code,
+            dept_name,
+            region_code,
+            area_km2,
+            population,
+            population_year,
+            supports,
+            supports_active,
+            stations,
+            stations_active,
+            antennas,
+            antennas_active,
+            antennas_fh,
+            stations_per_support,
+            antennas_per_station,
+            supports_per_km2,
+            stations_per_km2,
+            antennas_per_km2,
+            supports_per_1k_hab,
+            stations_per_1k_hab,
+            antennas_per_1k_hab,
+            hab_per_support,
+            hab_per_station,
+            hab_per_antenna
+        FROM src.dept_stat_current;
+
+        INSERT INTO dept_stat_operator_tech (
+            dept_code,
+            operator_name,
+            tech,
+            supports,
+            supports_active,
+            stations,
+            stations_active,
+            antennas,
+            antennas_active
+        )
+        SELECT
+            dept_code,
+            operator_name,
+            tech,
+            supports,
+            supports_active,
+            stations,
+            stations_active,
+            antennas,
+            antennas_active
+        FROM src.dept_stat_operator_tech;
+
         DROP TABLE IF EXISTS live_support_antenna_lines;
         """
     execute_progress_script(
@@ -590,6 +712,8 @@ def populate_live_tables(
             "Remplissage site_search_fts",
             "Copie radio_stat_current",
             "Copie radio_stat_weekly",
+            "Copie dept_stat_current",
+            "Copie dept_stat_operator_tech",
             "Nettoyage pre-agregation support",
         ],
         start_step=start_step,

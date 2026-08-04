@@ -58,6 +58,11 @@ object RadioDatabaseDownloader {
         if (!RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD)) {
             return false
         }
+        // Crans « base en local » : version lisible, fichier non (cf. DatabaseDownloader).
+        if (AppConfig.dbForcedLocal()) {
+            AppLogger.w(TAG, "Radio database download skipped: local build enforced")
+            return false
+        }
         return withContext(Dispatchers.IO) {
             val served = readVerifiedRadioDatabaseInfo()
             if (served == null) {
@@ -194,8 +199,10 @@ object RadioDatabaseDownloader {
         }
 
     private fun readVerifiedRadioDatabaseInfo(): ServedFrom<DownloadManifestDatabase>? {
-        // Mode « traitement local » (niveau ≥ 2, appareil éligible) : aucun accès au manifeste serveur.
-        if (AppConfig.dbForcedLocal()) return null
+        // Comme pour la base mobile : seul le cran « autonomie maximale » coupe le manifeste. Aux
+        // crans « base en local », la version distante reste lue pour signaler qu'il y a du neuf à
+        // régénérer ; c'est le téléchargement qui est bloqué (cf. [downloadUpdate]).
+        if (AppConfig.blockCommunityAndUpdates()) return null
         val served = readVerifiedDownloadManifest() ?: return null
         val database = served.value.radioDatabase ?: return null
         if (

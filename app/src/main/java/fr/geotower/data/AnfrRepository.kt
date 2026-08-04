@@ -5,7 +5,10 @@ import android.os.Handler
 import android.os.Looper
 import fr.geotower.data.api.AnfrService
 import fr.geotower.data.api.LiveSitesClient
+import androidx.sqlite.db.SimpleSQLiteQuery
 import fr.geotower.data.db.AppDatabase
+import fr.geotower.data.db.DepartmentOperatorTechRow
+import fr.geotower.data.db.DepartmentStatRow
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.db.GeoTowerDao
 import fr.geotower.data.db.InvalidGeoTowerDatabaseException
@@ -39,7 +42,10 @@ import fr.geotower.data.outages.OutageServerInfo
 import fr.geotower.data.outages.ServerOutageCache
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.DepartmentCodes
 import fr.geotower.utils.FrequencyFilterSelection
+import fr.geotower.data.models.toDepartmentOperatorTechRow
+import fr.geotower.data.models.toDepartmentStatRow
 import fr.geotower.data.models.toLocalisationEntity
 import fr.geotower.data.models.toPhysiqueEntity
 import fr.geotower.data.models.toRadioStatRow
@@ -59,6 +65,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.cos
 
 data class ActiveSupportRadioCounts(
     val techCounts: Map<String, Int>,
@@ -1375,6 +1382,125 @@ class AnfrRepository(
         }
     }
 
+    private suspend fun getLiveDepartmentStats(): List<DepartmentStatRow> {
+        return try {
+            val response = LiveSitesClient.api.getDepartmentStats()
+            if (!response.isSuccessful) {
+                AppLogger.w(TAG_DB, "Live department stats failed: ${response.code()}")
+                emptyList()
+            } else {
+                response.body()?.rows?.mapNotNull { it.toDepartmentStatRow() }.orEmpty()
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG_DB, "Live department stats unavailable", e)
+            emptyList()
+        }
+    }
+
+    private suspend fun getLiveDepartmentOperatorTechStats(deptCode: String): List<DepartmentOperatorTechRow> {
+        return try {
+            val response = LiveSitesClient.api.getDepartmentOperatorTechStats(deptCode)
+            if (!response.isSuccessful) {
+                AppLogger.w(TAG_DB, "Live department operator stats failed: ${response.code()}")
+                emptyList()
+            } else {
+                response.body()?.rows?.mapNotNull { it.toDepartmentOperatorTechRow() }.orEmpty()
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            AppLogger.w(TAG_DB, "Live department operator stats unavailable", e)
+            emptyList()
+        }
+    }
+
+    /**
+     * Statistiques par département, pré-calculées par le serveur.
+     *
+     * Renvoie une liste vide — et non une erreur — quand les tables sont absentes : c'est le cas
+     * d'une base générée sur l'appareil, qui crée les tables mais ne les remplit pas, comme d'une
+     * base téléchargée avant cette fonctionnalité. L'écran affiche alors « indisponible ».
+     */
+    suspend fun getDepartmentStats(): List<DepartmentStatRow> {
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_STATS)) {
+            return getLiveDepartmentStats()
+        }
+
+        return queryLocalDatabase(emptyList()) {
+            getDepartmentStatsRaw(
+                SimpleSQLiteQuery(
+                    """
+                    SELECT dept_code, dept_name, area_km2, population, population_year,
+                        supports, supports_active, stations, stations_active,
+                        antennas, antennas_active, antennas_fh,
+                        stations_per_support, antennas_per_station,
+                        supports_per_km2, stations_per_km2, antennas_per_km2,
+                        supports_per_1k_hab, stations_per_1k_hab, antennas_per_1k_hab,
+                        hab_per_support, hab_per_station, hab_per_antenna
+                    FROM dept_stat_current
+                    ORDER BY dept_code
+                    """.trimIndent()
+                )
+            )
+        }
+    }
+
+    suspend fun getDepartmentOperatorTechStats(deptCode: String): List<DepartmentOperatorTechRow> {
+        val normalizedCode = deptCode.trim().uppercase(Locale.ROOT)
+        if (normalizedCode.isEmpty()) return emptyList()
+
+        if (shouldUseLiveApiFallback(RemoteFeatureFlags.Features.LIVE_API_FR_STATS)) {
+            return getLiveDepartmentOperatorTechStats(normalizedCode)
+        }
+
+        return queryLocalDatabase(emptyList()) {
+            getDepartmentOperatorTechStatsRaw(
+                SimpleSQLiteQuery(
+                    """
+                    SELECT dept_code, operator_name, tech,
+                        supports, supports_active, stations, stations_active, antennas, antennas_active
+                    FROM dept_stat_operator_tech
+                    WHERE dept_code = ?
+                    ORDER BY operator_name, tech
+                    """.trimIndent(),
+                    arrayOf<Any>(normalizedCode)
+                )
+            )
+        }
+    }
+
+    /**
+     * Département d'un point, deviné par les stations les plus proches — la base ne porte aucun
+     * contour administratif, seules les antennes situent le terrain.
+     *
+     * Boîte de ±0,25° (~25 km) : au-delà, mieux vaut ne rien proposer que de désigner un
+     * département voisin au hasard. Le résultat est le département **majoritaire** parmi les
+     * stations les plus proches : à quelques kilomètres d'une limite, une station isolée de
+     * l'autre côté ne doit pas emporter la décision. À égalité, le département de la station la
+     * plus proche gagne.
+     */
+    suspend fun getDepartmentCodeNear(latitude: Double, longitude: Double): String? {
+        val longitudeScale = cos(Math.toRadians(latitude)).coerceAtLeast(MIN_LONGITUDE_SCALE)
+        val codes = queryLocalDatabase(emptyList<String>()) {
+            getNearestCodesInsee(
+                lat = latitude,
+                lon = longitude,
+                lonScale = longitudeScale,
+                minLat = latitude - NEAREST_DEPARTMENT_DEGREES,
+                maxLat = latitude + NEAREST_DEPARTMENT_DEGREES,
+                minLon = longitude - NEAREST_DEPARTMENT_DEGREES,
+                maxLon = longitude + NEAREST_DEPARTMENT_DEGREES,
+                limit = NEAREST_DEPARTMENT_SAMPLE
+            )
+        }.mapNotNull { DepartmentCodes.fromInsee(it) }
+
+        if (codes.isEmpty()) return null
+        val counts = codes.groupingBy { it }.eachCount()
+        return codes.distinct().maxByOrNull { code -> counts[code] ?: 0 }
+    }
+
     // =================================================================
     // 3. PANNES RÉSEAU (Nouveau système GeoJSON GeoTower)
     // =================================================================
@@ -1426,7 +1552,7 @@ class AnfrRepository(
 
     private suspend fun loadSitesHs(forceRefresh: Boolean): List<SiteHsEntity> {
         // Source « traitée localement » : télécharge les CSV opérateurs + géocode via la base ANFR.
-        // Activée par le mode « traitement local » (niveau ≥ 1), seul réglage qui en décide.
+        // Activée par le mode « traitement local » (crans « pannes en local »), seul réglage qui en décide.
         if (AppConfig.outagesLocal()) {
             return localOutageProvider.getSites()
         }
@@ -1608,7 +1734,7 @@ class AnfrRepository(
     suspend fun downloadServerSitesHs(): List<SiteHsEntity> {
         val sites = downloadServerSitesHsFile()
         // Le cache mémoire ne porte les pannes serveur que si c'est bien la source active : au
-        // niveau ≥ 1 du traitement local, il contient les pannes produites sur l'appareil.
+        // cran « pannes en local » du traitement local, il contient les pannes produites sur l'appareil.
         if (!AppConfig.outagesLocal()) {
             sitesHsCache = null
             if (sites.isNotEmpty()) storeSitesHsCache(SOURCE_KEY_REMOTE, sites)
@@ -1668,6 +1794,15 @@ class AnfrRepository(
 
         @Volatile
         var sitesHsCache: CachedSitesHs? = null
+
+        /** Demi-côté de la boîte de recherche du département courant, en degrés (~25 km). */
+        const val NEAREST_DEPARTMENT_DEGREES = 0.25
+
+        /** Stations examinées pour le vote majoritaire du département. */
+        const val NEAREST_DEPARTMENT_SAMPLE = 15
+
+        /** Garde-fou du facteur cos(latitude), pour ne jamais annuler l'écart en longitude. */
+        const val MIN_LONGITUDE_SCALE = 0.1
 
         const val SQLITE_IN_CLAUSE_BATCH_SIZE = 900
         const val LIVE_DETAIL_LOOKUP_LIMIT = 120

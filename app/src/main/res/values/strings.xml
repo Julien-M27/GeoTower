@@ -257,6 +257,8 @@
     <string name="database_download_progress">Downloading: %1$d%%</string>
     <string name="database_cancel_download">Cancel download</string>
     <string name="database_up_to_date">Up to date</string>
+    <string name="database_antenna_count">Antennas: %1$s</string>
+    <string name="radio_database_site_count">Radio sites: %1$s</string>
     <string name="enb_database_title">eNB / gNB identifiers</string>
     <string name="appstrings_site_network_ids_title">Network identifiers</string>
     <string name="appstrings_site_network_ids_option">Network identifiers (eNB / gNB)</string>
@@ -268,6 +270,8 @@
     <string name="enb_database_source_attribution">Source: eNB Analytics</string>
     <string name="database_download_antennas">Download antennas</string>
     <string name="database_replace_generated_with_online">Replace phone-generated database with the online one</string>
+    <string name="database_rebuild_available_hint">A newer database is online. On this device, updating means rebuilding it locally.</string>
+    <string name="database_rebuild_action">Rebuild the database on this device</string>
     <string name="database_replace_generated_radio_with_online">Replace phone-generated radio data with the online one</string>
     <string name="database_delete_data">Delete data</string>
     <string name="database_delete_warning_title">Warning</string>
@@ -291,6 +295,7 @@
     <string name="notification_db_updates_channel_name">Database updates</string>
     <string name="notification_db_update_available_title">New database</string>
     <string name="notification_db_update_available_desc">An antenna update is available. Tap to open the download section.</string>
+    <string name="notification_db_update_available_desc_rebuild">An antenna update is available. Tap to rebuild your database on this device.</string>
     <string name="notification_app_updates_channel_name">GeoTower updates</string>
     <string name="notification_app_update_available_title">New GeoTower version</string>
     <string name="notification_app_update_available_desc">GeoTower %1$s is available. Tap to open the download.</string>
@@ -432,6 +437,7 @@
     <string name="appstrings_btn_authorize">Authorize</string>
     <string name="appstrings_btn_continue">Continue</string>
     <string name="appstrings_btn_download_banner">Download</string>
+    <string name="appstrings_btn_rebuild_banner">Rebuild</string>
     <string name="appstrings_btn_lets_go">Let\'s go!</string>
     <string name="appstrings_btn_next">Next</string>
     <string name="appstrings_btn_start_configuration">Start setup ➜</string>
@@ -658,6 +664,7 @@
     <string name="appstrings_home_help_settings">Help</string>
     <string name="appstrings_home_quit_app">Quit without live notification</string>
     <string name="appstrings_home_logo_setting_title">Home page logo</string>
+    <string name="appstrings_home_long_press_reorder">Move with a long press</string>
     <string name="appstrings_id_copied">Identification number copied</string>
     <string name="appstrings_id_number">Identification number :\u0020</string>
     <string name="appstrings_id_support_copy">Support ID</string>
@@ -1438,6 +1445,7 @@
     <string name="appstrings_generating_db_banner_desc">The database is being built on this device: no download needed.</string>
     <string name="appstrings_db_generation_in_progress">Building…</string>
     <string name="appstrings_update_db_banner_title">Update available</string>
+    <string name="appstrings_update_db_banner_desc_rebuild">On this device, the database updates by rebuilding it.</string>
     <string name="appstrings_update_notif_setting_desc">Get alerted when a new database or APK is available</string>
     <string name="appstrings_update_notif_setting_title">Update notifications</string>
     <string name="appstrings_upload_confirm_title">Upload Confirmation</string>
@@ -2383,6 +2391,9 @@
     <string name="local_mode_remote_disabled">Local processing is currently disabled remotely.</string>
     <string name="local_mode_level_off_title">Server (default)</string>
     <string name="local_mode_level_off_desc">Everything is downloaded from and provided by the GeoTower server.</string>
+    <string name="local_mode_level_db_title">Database on-device</string>
+    <string name="local_mode_level_db_desc">The database is built on your device (if compatible) instead of being downloaded. Outage sites and everything else stay on the server.</string>
+    <string name="local_mode_db_actually_local">Your database was built on this device — the level below does not say so. Pick “Database on-device” to make it the rule.</string>
     <string name="local_mode_level_outages_title">Outages on-device</string>
     <string name="local_mode_level_outages_desc">Outage sites are retrieved from operators and located on your device. The database and everything else stay on the server.</string>
     <string name="local_mode_level_data_title">Database + outages on-device</string>
@@ -2495,4 +2506,56 @@
     <!-- Release notes 2.0.3 -->
     <string name="appstrings_release_v203_bearing_height_split">Bearing and height are now two separate blocks, to show, hide and move independently</string>
     <string name="appstrings_release_v203_bearing_height_migration">Your visibility settings and page order are carried over automatically</string>
+
+    <!-- Statistics by department (dept_stat_* tables of the offline database) -->
+    <string name="department_stats_title">Statistics by department</string>
+    <string name="department_stats_entry_title">By department</string>
+    <string name="department_stats_entry_description">Supports, stations and antennas of each department</string>
+    <string name="department_stats_search_hint">Department number or name</string>
+    <string name="department_stats_current">Your department</string>
+    <string name="department_stats_unavailable">Statistics by department will arrive with the next downloaded database. A database generated on the device does not carry them.</string>
+    <string name="department_stats_no_result">No department matches your search.</string>
+    <string name="department_stats_summary">%1$s supports · %2$s stations · %3$s panels</string>
+    <string name="department_stats_authorisations_title">Authorisation statistics</string>
+    <string name="department_stats_mode_all">Authorisations</string>
+    <string name="department_stats_mode_active">In service</string>
+    <string name="department_stats_supports">Supports</string>
+    <string name="department_stats_stations">Stations</string>
+    <string name="department_stats_antennas">Antennas (panels)</string>
+    <string name="department_stats_stations_per_support">Stations per support</string>
+    <string name="department_stats_antennas_per_station">Antennas per station</string>
+    <string name="department_stats_supports_per_km2">Supports per km²</string>
+    <string name="department_stats_stations_per_km2">Stations per km²</string>
+    <string name="department_stats_antennas_per_km2">Antennas per km²</string>
+    <string name="department_stats_supports_per_1k">Supports per thousand inhabitants</string>
+    <string name="department_stats_stations_per_1k">Stations per thousand inhabitants</string>
+    <string name="department_stats_antennas_per_1k">Antennas per thousand inhabitants</string>
+    <string name="department_stats_hab_per_support">Inhabitants per support</string>
+    <string name="department_stats_hab_per_station">Inhabitants per station</string>
+    <string name="department_stats_hab_per_antenna">Inhabitants per antenna</string>
+    <string name="department_stats_reference">%1$s — %2$s km² / %3$s inhabitants (%4$s)</string>
+    <string name="department_stats_reference_no_year">%1$s — %2$s km² / %3$s inhabitants</string>
+    <string name="department_stats_missing_reference">Area and population are not available for this territory.</string>
+    <string name="department_stats_matrix_title">By operator and technology</string>
+    <string name="department_stats_matrix_operator">Operator</string>
+    <string name="department_stats_matrix_total">Total</string>
+    <string name="department_stats_matrix_panels">Panels</string>
+    <string name="department_stats_matrix_legend">Number of stations declaring each technology. Total = sum of the columns, so a station carrying both 4G and 5G counts twice. Panels = physical antennas declared, microwave links excluded.</string>
+    <string name="department_stats_fh">Microwave links: %1$s dishes, outside the statistics</string>
+    <string name="department_stats_list_options_title">Department list options</string>
+    <string name="department_stats_option_search">Search field</string>
+    <string name="department_stats_option_current">Your department, pinned</string>
+    <string name="department_stats_option_summary">Summary under each department</string>
+
+    <!-- Release notes 2.0.4 -->
+    <string name="appstrings_release_v204_department_stats">New "By department" page in Statistics: supports, stations and antennas of each department, with densities per km² and per thousand inhabitants</string>
+    <string name="appstrings_release_v204_department_operators">Table by operator and technology, with the number of 2G/3G/4G/5G stations and the number of physical panels declared</string>
+    <string name="appstrings_release_v204_department_current">The department of your last position is pinned at the top of the list; pull down to update it. The page is customisable like the others.</string>
+    <string name="appstrings_release_v204_department_source">Statistics by department arrive with the downloaded database, and a database generated on the device computes them too</string>
+
+    <!-- Release notes 2.0.5 -->
+    <string name="appstrings_release_v205_db_row_counts">Database cards show how many antennas and radio sites they contain</string>
+    <string name="appstrings_release_v205_db_rebuild_offer">If your database was generated on the device, updating it now means regenerating it rather than downloading it</string>
+    <string name="appstrings_release_v205_local_mode_db">New “Local database” level in Local processing: only the database is built on the device, everything else still goes through the server</string>
+    <string name="appstrings_release_v205_home_long_press">Home screen items and the help button can be moved with a long press</string>
 </resources>

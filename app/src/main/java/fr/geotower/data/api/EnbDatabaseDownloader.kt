@@ -26,7 +26,7 @@ import java.util.concurrent.TimeUnit
  * SHA-256, validation structurelle) avant d'etre installe atomiquement.
  *
  * Contrairement a la base mobile et a la base radio, il n'existe **aucun chemin de generation
- * locale** : la source est le partenaire. En mode « traitement local » niveau 3 la base se fige
+ * locale** : la source est le partenaire. En « traitement local » cran maximal, la base se fige
  * simplement (plus de verification de mise a jour).
  */
 object EnbDatabaseDownloader {
@@ -181,7 +181,7 @@ object EnbDatabaseDownloader {
 
     /**
      * Verification de mise a jour possible ? Deux drapeaux distants (le generique et le
-     * kill-switch partenaire) et, localement, le mode « traitement local » niveau 3 qui coupe
+     * kill-switch partenaire) et, localement, le « traitement local » au cran maximal, qui coupe
      * toute verification de mise a jour.
      */
     private fun isEnbDatabaseUpdateCheckEnabled(): Boolean {

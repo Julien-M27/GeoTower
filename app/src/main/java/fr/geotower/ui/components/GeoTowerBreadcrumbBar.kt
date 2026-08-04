@@ -235,6 +235,7 @@ private fun rememberGeoTowerBreadcrumbLabels(): GeoTowerBreadcrumbLabels {
         uploadHistory = stringResource(R.string.appstrings_upload_history_title),
         shareHistory = stringResource(R.string.share_history_title),
         histories = stringResource(R.string.histories_title),
+        departmentStats = stringResource(R.string.department_stats_title),
         radio = stringResource(R.string.appstrings_radio_share_radio_title)
     )
 }
@@ -256,6 +257,7 @@ private data class GeoTowerBreadcrumbLabels(
     val uploadHistory: String,
     val shareHistory: String,
     val histories: String,
+    val departmentStats: String,
     val radio: String
 )
 
@@ -272,6 +274,13 @@ private fun NavBackStackEntry.toGeoTowerBreadcrumbItem(
         "emitters" -> GeoTowerBreadcrumbItem(labels.emitters, Icons.Default.MyLocation, onClick, "emitters")
         "compass" -> GeoTowerBreadcrumbItem(labels.compass, Icons.Default.Explore, onClick, "compass")
         "stats" -> GeoTowerBreadcrumbItem(labels.stats, Icons.Default.BarChart, onClick, "stats")
+        "stats/departments" -> GeoTowerBreadcrumbItem(labels.departmentStats, Icons.Default.BarChart, onClick, "stats/departments")
+        "stats/departments/{deptCode}" -> GeoTowerBreadcrumbItem(
+            arguments?.getString("deptCode")?.takeIf { it.isNotBlank() } ?: labels.departmentStats,
+            Icons.Default.BarChart,
+            onClick,
+            "stats/departments/detail"
+        )
         "settings?section={section}&target_map={targetMapFilename}" -> GeoTowerBreadcrumbItem(labels.settings, Icons.Default.Settings, onClick, "settings")
         "about" -> GeoTowerBreadcrumbItem(labels.about, Icons.Default.Home, onClick, "about")
         "diagnostic" -> GeoTowerBreadcrumbItem(labels.diagnostic, Icons.Default.Info, onClick, "diagnostic")

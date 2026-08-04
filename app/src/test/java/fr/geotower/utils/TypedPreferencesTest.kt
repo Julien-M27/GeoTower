@@ -138,6 +138,30 @@ class TypedPreferencesTest {
     }
 
     @Test
+    fun homePageOrderAppendsElementsAddedAfterTheStoredOrder() {
+        val prefs = FakeSharedPreferences(HomePrefs.PAGES_ORDER to "nearby,map,compass,stats")
+
+        // « settings », « logo » puis « about » sont arrivés après : un ordre déjà enregistré ne les
+        // contient pas, et sans reprise l'accueil perdrait purement et simplement ces éléments.
+        assertEquals(
+            listOf("nearby", "map", "compass", "stats", "settings", "logo", "about"),
+            HomePrefs.normalizedPageOrder(prefs)
+        )
+    }
+
+    @Test
+    fun homePageOrderKeepsHiddenElementsNextToTheirVisibleNeighbour() {
+        // L'accueil ne montre que les éléments activés : déplacer le logo en tête ne dit rien de la
+        // boussole masquée, qui doit rester là où elle était pour le jour où on la réactive.
+        val merged = HomePrefs.reorderVisible(
+            fullOrder = listOf("nearby", "map", "compass", "stats", "settings", "logo", "about"),
+            visibleOrder = listOf("logo", "nearby", "map", "stats", "settings", "about")
+        )
+
+        assertEquals(listOf("logo", "nearby", "map", "compass", "stats", "settings", "about"), merged)
+    }
+
+    @Test
     fun homeAndWidgetPrefsKeepDefaultsWhenLegacyValuesAreAbsent() {
         val prefs = FakeSharedPreferences()
 

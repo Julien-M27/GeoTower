@@ -124,7 +124,9 @@ object PreferenceProfileManager {
         "nearby_order",
         "compass_order",
         "home_logo_choice",
+        AppConfig.PREF_HOME_HELP_POSITION,
         "pages_order",
+        AppConfig.PREF_HOME_LONG_PRESS_REORDER,
         "startup_page",
         "external_links_order",
         "page_site_external_links_order",
@@ -228,6 +230,8 @@ object PreferenceProfileManager {
         "live_tracking_location_update_interval_seconds" to "Notifications",
         "startup_page" to "Pages",
         "pages_order" to "Pages",
+        AppConfig.PREF_HOME_LONG_PRESS_REORDER to "Pages",
+        AppConfig.PREF_HOME_HELP_POSITION to "Pages",
         "external_links_order" to "Liens externes",
         "page_site_external_links_order" to "Liens externes",
         "link_cartoradio" to "Liens externes",
@@ -265,6 +269,8 @@ object PreferenceProfileManager {
         "live_tracking_location_update_interval_seconds" to "Rafraîchissement live",
         "startup_page" to "Page de démarrage",
         "pages_order" to "Ordre des pages",
+        AppConfig.PREF_HOME_LONG_PRESS_REORDER to "Déplacer par appui long (accueil)",
+        AppConfig.PREF_HOME_HELP_POSITION to "Position du bouton Aides",
         "external_links_order" to "Ordre des liens externes",
         "page_site_external_links_order" to "Ordre des liens externes",
         "link_cartoradio" to "Cartoradio",
@@ -567,6 +573,7 @@ object PreferenceProfileManager {
         AppConfig.uiScalePercent.intValue = AppConfig.readUiScalePercent(prefs)
         AppConfig.loadSavedFilters(prefs)
         // Un profil écrase toutes les clés : les états miroités en mémoire doivent être relus.
+        // (l'ordre de l'accueil et ses réglages repassent par loadSavedFilters, juste au-dessus)
         PageCustomizationPrefs.load(prefs)
 
         UpdateCheckScheduler.onNotificationsPreferenceChanged(context, AppConfig.enableUpdateNotifications.value)

@@ -18,6 +18,10 @@ class AnfrSources(
 /**
  * Referentiels `id -> libelle` (issus du ZIP mensuel) et communes `code_insee -> nom`
  * (issues de geo.api.gouv.fr). Cles sous forme de chaine, comme le builder serveur.
+ *
+ * [departments] porte la superficie et la population par departement, pour les ratios des stats
+ * departementales. Vide si geo.api.gouv.fr n'a pas repondu : les compteurs sont alors ecrits
+ * sans les ratios plutot que de faire echouer le build.
  */
 class AnfrReferences(
     val nature: Map<String, String> = emptyMap(),
@@ -25,6 +29,7 @@ class AnfrReferences(
     val exploitant: Map<String, String> = emptyMap(),
     val typeAntenne: Map<String, String> = emptyMap(),
     val communes: Map<String, String> = emptyMap(),
+    val departments: Map<String, DepartmentReferenceRow> = emptyMap(),
 )
 
 /** Metadonnee ARCEP rattachee a une cle (id_anfr, operateur en majuscules). */

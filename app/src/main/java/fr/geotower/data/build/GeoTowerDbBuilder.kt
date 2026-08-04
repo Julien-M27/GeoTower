@@ -401,6 +401,9 @@ object GeoTowerDbBuilder {
         onProgress(BuildPhase.COMPUTING_STATS, 0L)
         // 13/ Stats courantes (radio_stat_current), exigees non vides par le validateur.
         AnfrStatsBuilder.populateCurrentStats(db)
+        // 13bis/ Stats par departement. Sans referentiel joignable, les compteurs sont ecrits
+        // quand meme et seuls les ratios de densite/population restent vides.
+        DepartmentStatsBuilder.populateDepartmentStats(db, references.departments)
 
         onProgress(BuildPhase.FINALIZING, 0L)
         // 14/ Nettoyage du staging (libere le disque avant finalisation).

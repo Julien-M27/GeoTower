@@ -84,7 +84,7 @@ private data class ServerOutageSummary(
  * Elle suit la source RÉELLEMENT active plutôt que d'en imposer une :
  *  - traitement local au niveau 0 → carte de **téléchargement** du fichier national du serveur,
  *    conservé sur l'appareil pour l'afficher au lancement et hors ligne ;
- *  - traitement local au niveau ≥ 1 → carte de **génération**, avec exactement les mêmes commandes
+ *  - traitement local aux crans « pannes en local » → carte de **génération**, mêmes commandes
  *    que l'écran Traitement local ([OutageLocalGenerationControls]).
  *
  * Avant, la variante locale se contentait de griser un bouton de téléchargement inutile : l'unique

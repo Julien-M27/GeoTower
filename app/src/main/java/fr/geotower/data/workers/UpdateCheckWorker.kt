@@ -12,6 +12,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import fr.geotower.R
 import fr.geotower.data.api.DatabaseDownloader
+import fr.geotower.data.build.LocalDbRebuildOffer
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.DatabaseVersionPolicy
 import fr.geotower.data.db.GeoTowerDatabaseValidator
@@ -32,8 +33,11 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
 
         val canCheckApp = RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.APP_UPDATE_CHECK) &&
             RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.APP_UPDATE_CHECK)
+        // « Autonomie maximale » : aucune version distante ne sera servie. Sans cette garde, le
+        // worker prenait le null pour une panne réseau et repartait en Result.retry() en boucle.
         val canCheckDatabase = RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_UPDATE_CHECK) &&
-            RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_UPDATE_CHECK)
+            RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_UPDATE_CHECK) &&
+            !fr.geotower.utils.AppConfig.blockCommunityAndUpdates()
 
         if (canCheckApp) {
             AppUpdateNotifier.checkAndNotify(context)
@@ -72,7 +76,9 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
         val lastNotified = prefs.getString("last_notified_db_version", "")
 
         if (DatabaseVersionPolicy.shouldNotify(remoteVersion, localVersion, lastNotified)) {
-            showNotification()
+            // Base générée sur l'appareil : on annonce la mise à jour, mais on l'oriente vers une
+            // régénération locale plutôt que vers le téléchargement de la base du serveur.
+            showNotification(rebuild = LocalDbRebuildOffer.forMobile(context))
             // On sauvegarde qu'on l'a prévenu pour cette version
             prefs.edit().putString("last_notified_db_version", remoteVersion).apply()
         }
@@ -81,7 +87,7 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
         return Result.success()
     }
 
-    private fun showNotification() {
+    private fun showNotification(rebuild: Boolean) {
         if (!fr.geotower.utils.AppNotifications.canPost(context)) return
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
@@ -90,8 +96,11 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
             notificationManager.createNotificationChannel(channel)
         }
 
-        // La mise à jour annoncée est celle de la base mobile : on ouvre sur SA carte.
-        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("geotower://settings?section=db_mobile")).apply {
+        // La mise à jour annoncée est celle de la base mobile : on ouvre sur SA carte — ou sur la
+        // carte de génération locale pour qui génère sa base sur l'appareil, puisque c'est là que
+        // se joue SA mise à jour.
+        val section = if (rebuild) "db_local_build" else "db_mobile"
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("geotower://settings?section=$section")).apply {
             setPackage(context.packageName)
             flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
@@ -104,7 +113,12 @@ class UpdateCheckWorker(private val context: Context, params: WorkerParameters) 
 
         val notification = NotificationCompat.Builder(context, UPDATE_ALERTS_CHANNEL_ID)
             .setContentTitle(context.getString(R.string.notification_db_update_available_title))
-            .setContentText(context.getString(R.string.notification_db_update_available_desc))
+            .setContentText(
+                context.getString(
+                    if (rebuild) R.string.notification_db_update_available_desc_rebuild
+                    else R.string.notification_db_update_available_desc
+                )
+            )
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .let { NotificationIconResources.applyTo(it, context) }

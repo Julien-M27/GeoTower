@@ -32,9 +32,11 @@ import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.NearMe
+import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.VerticalAlignTop
@@ -120,6 +122,9 @@ import kotlin.math.roundToInt
 import androidx.compose.runtime.mutableIntStateOf
 import fr.geotower.ui.screens.emitters.loadElevationProfileIncludeObstacles
 import fr.geotower.ui.screens.emitters.saveElevationProfileIncludeObstacles
+import fr.geotower.utils.AboutPagePrefs
+import fr.geotower.utils.DepartmentStatsPreferences
+import fr.geotower.utils.HomePrefs
 import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.PreferenceStores
 import fr.geotower.utils.StatsDisplayMode
@@ -318,6 +323,8 @@ fun PagesCustomizationSheet(
     onMapClick: () -> Unit,
     onCompassClick: () -> Unit,
     onStatsClick: () -> Unit,
+    onDepartmentStatsClick: () -> Unit,
+    onAboutClick: () -> Unit,
     // --- NOUVEAUX PARAMÈTRES ---
     onSupportClick: () -> Unit,
     onSiteClick: () -> Unit,
@@ -385,6 +392,12 @@ fun PagesCustomizationSheet(
             }
             if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
                 NavigationMenuItem(title = stringResource(R.string.appstrings_stats_title), icon = Icons.Default.BarChart, isSelected = false, isDark = isDark) { onStatsClick() }
+                NavigationMenuItem(title = stringResource(R.string.department_stats_title), icon = Icons.Default.PieChart, isSelected = false, isDark = isDark) { onDepartmentStatsClick() }
+            }
+            // Juste après les pages du menu d'accueil : « À propos » en fait partie depuis qu'il en
+            // est un élément déplaçable.
+            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ABOUT)) {
+                NavigationMenuItem(title = stringResource(R.string.appstrings_about), icon = Icons.Default.Info, isSelected = false, isDark = isDark) { onAboutClick() }
             }
 
             // --- NOUVELLES SECTIONS ---
@@ -573,7 +586,10 @@ fun HomeSettingsSheet(
     val prefs = context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
     var showLogo by remember { mutableStateOf(prefs.getBoolean("show_home_logo", true)) }
     var showHelpButton by remember { mutableStateOf(prefs.getBoolean("show_home_help", true)) }
-    var helpButtonPosition by remember { mutableStateOf(prefs.getString("home_help_position", "bottom_end") ?: "bottom_end") }
+    var showAboutLink by remember { mutableStateOf(HomePrefs.showAboutLink.read(prefs)) }
+    val longPressReorder by AppConfig.homeLongPressReorder
+    // Partagé avec l'accueil, qui déplace aussi ce bouton par appui long : l'un doit voir l'autre.
+    val helpButtonPosition by AppConfig.homeHelpPosition
     var showLogoSettings by remember { mutableStateOf(false) }
     var logoSelectorResetKey by remember { mutableStateOf(0) }
     var showHelpPositionSettings by remember { mutableStateOf(false) }
@@ -590,6 +606,7 @@ fun HomeSettingsSheet(
                 "map" -> featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)
                 "compass" -> featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)
                 "stats" -> featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)
+                "about" -> featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ABOUT)
                 else -> true
             }
         }
@@ -654,8 +671,7 @@ fun HomeSettingsSheet(
 
                 Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
                     val savePosition = { position: String ->
-                        helpButtonPosition = position
-                        prefs.edit().putString("home_help_position", position).apply()
+                        AppConfig.setHomeHelpPosition(prefs, position)
                     }
 
                     SettingsRadioItem(stringResource(R.string.appstrings_position_top_left), helpButtonPosition == "top_start", useOneUi, bubbleColor) { savePosition("top_start") }
@@ -710,10 +726,33 @@ fun HomeSettingsSheet(
 
                             // --- NOUVEAU : AJOUT DE LA CARTE PARAMÈTRES ---
                             "settings" -> DraggableSwitchCard(stringResource(R.string.appstrings_settings_title), true, {}, shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight, hideSwitch = true)
+
+                            // Le lien « À propos » : un élément du menu comme les autres, même s'il
+                            // reste rendu en lien discret sur la page (voir HomeAboutLink).
+                            "about" -> DraggableSwitchCard(
+                                stringResource(R.string.nav_about), showAboutLink,
+                                {
+                                    showAboutLink = it
+                                    HomePrefs.showAboutLink.write(prefs.edit(), it).apply()
+                                },
+                                shape, border, bubbleColor, useOneUi, dragModifier, isDragged, dragOffset, cardHeight
+                            )
                         }
                     }
                 }
                     HorizontalDivider(modifier = Modifier.padding(vertical = sizing.spacing(8.dp)), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    // Le même déplacement, mais sur la page d'accueil elle-même : l'appui long y
+                    // saisit l'élément. Réglable ici parce que le geste peut gêner qui ne le
+                    // cherche pas — l'ordre reste modifiable au-dessus dans tous les cas.
+                    SimpleSwitchCard(
+                        title = stringResource(R.string.appstrings_home_long_press_reorder),
+                        showMapLocation = longPressReorder,
+                        onLocationChange = { AppConfig.setHomeLongPressReorder(prefs, it) },
+                        shape = shape,
+                        border = border,
+                        bubbleColor = bubbleColor,
+                        useOneUi = useOneUi
+                    )
                     ConfigurableSwitchCard(
                         title = stringResource(R.string.appstrings_home_help_settings),
                         checked = showHelpButton,
@@ -733,9 +772,9 @@ fun HomeSettingsSheet(
             Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
             TextButton(onClick = {
                 val defaultHomeOrder = if (AppConfig.hasCompass.value) {
-                    listOf("nearby", "map", "compass", "stats", "settings", "logo") // Logo à la fin
+                    listOf("nearby", "map", "compass", "stats", "settings", "logo", "about") // Logo puis « À propos » à la fin
                 } else {
-                    listOf("nearby", "map", "stats", "settings", "logo") // Logo à la fin
+                    listOf("nearby", "map", "stats", "settings", "logo", "about") // Logo puis « À propos » à la fin
                 }
 
                 onOrderChange(defaultHomeOrder)
@@ -747,13 +786,16 @@ fun HomeSettingsSheet(
                 // Réinitialise le logo
                 showLogo = true
                 showHelpButton = true
-                helpButtonPosition = "bottom_end"
-                prefs.edit()
-                    .putBoolean("show_home_logo", true)
-                    .putBoolean("show_home_help", true)
-                    .putString("home_help_position", "bottom_end")
-                    .putString("home_logo_choice", "app")
-                    .apply()
+                showAboutLink = HomePrefs.showAboutLink.defaultValue
+                AppConfig.setHomeLongPressReorder(prefs, true)
+                AppConfig.setHomeHelpPosition(prefs, AppConfig.DEFAULT_HOME_HELP_POSITION)
+                HomePrefs.showAboutLink.write(
+                    prefs.edit()
+                        .putBoolean("show_home_logo", true)
+                        .putBoolean("show_home_help", true)
+                        .putString("home_logo_choice", "app"),
+                    HomePrefs.showAboutLink.defaultValue
+                ).apply()
             }) {
                 Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(sizing.spacing(8.dp)))
@@ -763,6 +805,108 @@ fun HomeSettingsSheet(
         }
     }
 }
+}
+
+// === LE SOUS-MENU POUR LA PAGE À PROPOS ===
+/**
+ * Les six parties de la page « À propos », à afficher ou masquer une par une.
+ *
+ * Pas de glisser-déposer ici : l'ordre des parties est aussi celui du menu latéral de la page sur
+ * grand écran, et il suit le fil de lecture (ce qu'est l'app, ce qui a changé, ce qu'elle fait de
+ * vos données, d'où viennent les données, ce qui est installé, qui la développe).
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AboutPageSettingsSheet(
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    bubbleColor: Color
+) {
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val scrollState = rememberScrollState()
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val context = LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE) }
+
+    // Une entrée par partie : le libellé est celui du menu de la page, pour qu'on reconnaisse tout
+    // de suite ce qu'on éteint.
+    val sectionTitles = listOf(
+        R.string.appstrings_about_presentation,
+        R.string.appstrings_about_new,
+        R.string.appstrings_privacy_category,
+        R.string.appstrings_about_sources,
+        R.string.appstrings_about_versions_title,
+        R.string.appstrings_about_dev
+    )
+    var sectionsVisible by remember {
+        mutableStateOf(AboutPagePrefs.sections.map { it.read(prefs) })
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        BackHandler(onBack = onBack)
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(24.dp)), verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                Text(
+                    text = stringResource(R.string.appstrings_about),
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
+            }
+
+            val shape = oneUiActionButtonShape(useOneUi)
+            val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+
+            Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))) {
+                AboutPagePrefs.sections.forEachIndexed { index, section ->
+                    SimpleSwitchCard(
+                        title = stringResource(sectionTitles[index]),
+                        showMapLocation = sectionsVisible[index],
+                        onLocationChange = { enabled ->
+                            sectionsVisible = sectionsVisible.toMutableList().also { it[index] = enabled }
+                            section.write(prefs.edit(), enabled).apply()
+                        },
+                        shape = shape,
+                        border = border,
+                        bubbleColor = bubbleColor,
+                        useOneUi = useOneUi
+                    )
+                }
+                PageScrollAidsCards(PageScrollPrefs.ABOUT, shape, border, bubbleColor, useOneUi, spacing = 0.dp)
+            }
+
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+            TextButton(
+                onClick = {
+                    AboutPagePrefs.putDefaults(prefs.edit()).apply()
+                    sectionsVisible = AboutPagePrefs.sections.map { it.defaultValue }
+                    PageScrollPrefs.Aid.entries.forEach { aid ->
+                        PageScrollPrefs.set(prefs, aid, PageScrollPrefs.ABOUT, PageScrollPrefs.defaultEnabled(aid, PageScrollPrefs.ABOUT))
+                    }
+                }
+            ) {
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
+                Text(stringResource(R.string.appstrings_reset_to_default), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+            }
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
+        }
+    }
 }
 
 // === COMPOSANT UTILITAIRE POUR TOUS LES GLISSER-DÉPOSER ===
@@ -1419,7 +1563,7 @@ fun ScrollAidSwitchRows(
 /**
  * Interrupteurs globaux : chacun est coché quand TOUTES les pages ont l'aide correspondante.
  * Les basculer écrit toutes les pages d'un coup, y compris celles qui n'ont pas de réglage
- * dédié ici (Réglages, À propos, Aide, Diagnostic, CGU, Photos favorites).
+ * dédié ici (Réglages, Aide, Diagnostic, CGU, Photos favorites).
  */
 @Composable
 fun AllPagesScrollAidsCard(
@@ -2623,6 +2767,208 @@ private fun statsDisplayModeTitle(mode: StatsDisplayMode): String {
         StatsDisplayMode.Sites -> stringResource(R.string.appstrings_sites_label)
         StatsDisplayMode.Active -> stringResource(R.string.appstrings_active_sites_label)
         StatsDisplayMode.Both -> stringResource(R.string.appstrings_active_declared_sites_label)
+    }
+}
+
+@Composable
+private fun departmentStatsBlockTitle(blockId: String): String = when (blockId) {
+    DepartmentStatsPreferences.BLOCK_AUTHORISATIONS -> stringResource(R.string.department_stats_authorisations_title)
+    DepartmentStatsPreferences.BLOCK_OPERATORS -> stringResource(R.string.department_stats_matrix_title)
+    else -> blockId
+}
+
+/**
+ * Réglages de la page « Statistiques par département » : les deux blocs de la fiche se réordonnent
+ * et se masquent, les trois options d'affichage pilotent la liste, et les aides au défilement
+ * suivent le même mécanisme que les autres pages.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun DepartmentStatsSettingsSheet(
+    onDismiss: () -> Unit,
+    onBack: () -> Unit,
+    sheetState: SheetState,
+    useOneUi: Boolean,
+    bubbleColor: Color,
+    highlightBlockId: String? = null
+) {
+    val context = LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE) }
+    val themeMode by AppConfig.themeMode
+    val isOledMode by AppConfig.isOledMode
+    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
+    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
+    val shape = oneUiActionButtonShape(useOneUi)
+    val border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null
+    val sheetScroll = rememberSettingsSheetScroll()
+    val scrollState = sheetScroll.state
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+
+    var blockOrder by remember { mutableStateOf(DepartmentStatsPreferences.blockOrder(prefs)) }
+    val blockVisibility = remember {
+        mutableStateMapOf<String, Boolean>().apply {
+            DepartmentStatsPreferences.defaultBlockOrder.forEach { blockId ->
+                put(blockId, DepartmentStatsPreferences.isBlockVisible(prefs, blockId))
+            }
+        }
+    }
+    val listOptions = remember {
+        mutableStateMapOf<String, Boolean>().apply {
+            DepartmentStatsPreferences.listOptionKeys.forEach { key ->
+                put(key, DepartmentStatsPreferences.isOptionEnabled(prefs, key))
+            }
+        }
+    }
+
+    fun saveOrder(newOrder: List<String>) {
+        val normalized = DepartmentStatsPreferences.normalizeBlockOrder(newOrder)
+        blockOrder = normalized
+        prefs.edit().putString(DepartmentStatsPreferences.PREF_ORDER, normalized.joinToString(",")).apply()
+    }
+
+    fun saveBlockVisibility(blockId: String, visible: Boolean) {
+        blockVisibility[blockId] = visible
+        prefs.edit().putBoolean(DepartmentStatsPreferences.blockVisiblePrefKey(blockId), visible).apply()
+    }
+
+    fun saveOption(key: String, enabled: Boolean) {
+        listOptions[key] = enabled
+        DepartmentStatsPreferences.setOptionEnabled(prefs, key, enabled)
+    }
+
+    fun resetSettings() {
+        val editor = prefs.edit()
+        blockOrder = DepartmentStatsPreferences.defaultBlockOrder
+        editor.putString(
+            DepartmentStatsPreferences.PREF_ORDER,
+            DepartmentStatsPreferences.defaultBlockOrder.joinToString(",")
+        )
+        DepartmentStatsPreferences.defaultBlockOrder.forEach { blockId ->
+            blockVisibility[blockId] = true
+            editor.putBoolean(DepartmentStatsPreferences.blockVisiblePrefKey(blockId), true)
+        }
+        DepartmentStatsPreferences.listOptionKeys.forEach { key ->
+            listOptions[key] = true
+            editor.putBoolean(key, true)
+        }
+        editor.apply()
+        PageScrollPrefs.Aid.entries.forEach { aid ->
+            PageScrollPrefs.set(
+                prefs,
+                aid,
+                PageScrollPrefs.DEPARTMENT_STATS,
+                PageScrollPrefs.defaultEnabled(aid, PageScrollPrefs.DEPARTMENT_STATS)
+            )
+        }
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
+        BackHandler(onBack = onBack)
+        Column(
+            modifier = Modifier
+                .navigationBarsPadding()
+                .then(sheetScroll.viewportModifier)
+                .settingsPopupFadingEdge(scrollState)
+                .verticalScroll(scrollState)
+                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(24.dp), end = sizing.spacing(24.dp)),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(4.dp)),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
+                Text(
+                    text = stringResource(R.string.department_stats_title),
+                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f),
+                    textAlign = TextAlign.Center
+                )
+                Spacer(Modifier.width(sizing.spacing(48.dp)))
+            }
+            Text(
+                text = stringResource(R.string.appstrings_drag_to_reorder_hint),
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = sizing.spacing(16.dp)),
+                textAlign = TextAlign.Center
+            )
+
+            ReorderableBlockList(
+                order = blockOrder,
+                blocks = DepartmentStatsPreferences.defaultBlockOrder.map { blockId ->
+                    ConfigurableBlock(
+                        id = blockId,
+                        title = { departmentStatsBlockTitle(blockId) },
+                        visible = blockVisibility[blockId] ?: true,
+                        onVisibilityChange = { saveBlockVisibility(blockId, it) }
+                    )
+                },
+                onOrderChange = ::saveOrder,
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                useOneUi = useOneUi,
+                highlightBlockId = highlightBlockId,
+                sheetScroll = sheetScroll
+            )
+
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+            Text(
+                text = stringResource(R.string.department_stats_list_options_title),
+                style = sizing.textStyle(MaterialTheme.typography.titleMedium),
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(10.dp))
+            )
+
+            SimpleSwitchCard(
+                title = stringResource(R.string.department_stats_option_search),
+                showMapLocation = listOptions[DepartmentStatsPreferences.PREF_SHOW_SEARCH] ?: true,
+                onLocationChange = { saveOption(DepartmentStatsPreferences.PREF_SHOW_SEARCH, it) },
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                useOneUi = useOneUi
+            )
+            Spacer(Modifier.height(sizing.spacing(12.dp)))
+            SimpleSwitchCard(
+                title = stringResource(R.string.department_stats_option_current),
+                showMapLocation = listOptions[DepartmentStatsPreferences.PREF_SHOW_CURRENT] ?: true,
+                onLocationChange = { saveOption(DepartmentStatsPreferences.PREF_SHOW_CURRENT, it) },
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                useOneUi = useOneUi
+            )
+            Spacer(Modifier.height(sizing.spacing(12.dp)))
+            SimpleSwitchCard(
+                title = stringResource(R.string.department_stats_option_summary),
+                showMapLocation = listOptions[DepartmentStatsPreferences.PREF_SHOW_SUMMARY] ?: true,
+                onLocationChange = { saveOption(DepartmentStatsPreferences.PREF_SHOW_SUMMARY, it) },
+                shape = shape,
+                border = border,
+                bubbleColor = bubbleColor,
+                useOneUi = useOneUi
+            )
+
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+            PageScrollAidsCards(PageScrollPrefs.DEPARTMENT_STATS, shape, border, bubbleColor, useOneUi)
+
+            Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
+            TextButton(onClick = ::resetSettings) {
+                Icon(Icons.Default.Refresh, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(sizing.spacing(8.dp)))
+                Text(
+                    stringResource(R.string.appstrings_reset_to_default),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+            Spacer(modifier = Modifier.height(sizing.spacing(32.dp)).navigationBarsPadding())
+        }
     }
 }
 

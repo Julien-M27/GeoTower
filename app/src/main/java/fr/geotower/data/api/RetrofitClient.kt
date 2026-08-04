@@ -81,7 +81,7 @@ object RetrofitClient {
     }
 
     /**
-     * Prédicat injecté par l'app : true ⇒ le mode « traitement local » (niveau 3) bloque les
+     * Prédicat injecté par l'app : true ⇒ le « traitement local » (cran maximal) bloque les
      * endpoints communautaires / mise à jour / live du client partagé. Laisse passer DB, flags et
      * pannes. Injecté (pas d'import AppConfig) pour garder la couche réseau découplée.
      */

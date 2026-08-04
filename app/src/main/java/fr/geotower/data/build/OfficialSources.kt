@@ -64,8 +64,28 @@ object OfficialSources {
         return if (isAllowedHost(url)) url else null
     }
 
-    /** Referentiel des communes (INSEE -> nom), JSON. */
-    const val COMMUNES_URL = "https://geo.api.gouv.fr/communes?fields=nom,code&format=json"
+    /**
+     * Referentiel des communes, JSON. Sert deux fois : `code_insee -> nom` pour `ref_commune`, et
+     * l'agregation superficie/population par departement (stats departementales). Un seul appel,
+     * donc quelques champs de plus plutot qu'un second telechargement de 35 000 communes.
+     */
+    const val COMMUNES_URL =
+        "https://geo.api.gouv.fr/communes?fields=nom,code,codeDepartement,population,surface&format=json"
+
+    /** Noms et regions des departements (les COM n'y figurent pas). */
+    const val DEPARTEMENTS_URL = "https://geo.api.gouv.fr/departements?fields=nom,code,codeRegion&format=json"
+
+    /**
+     * Collectivites d'outre-mer : absentes de `/departements` comme de `/communes`, mais chacune
+     * repond sur son propre chemin. Meme liste que `EXTRA_DEPARTMENT_CODES` cote serveur.
+     */
+    val OVERSEAS_DEPARTMENT_CODES = listOf("975", "977", "978", "984", "986", "987", "988")
+
+    fun departementUrl(code: String): String =
+        "https://geo.api.gouv.fr/departements/$code?fields=nom,code,codeRegion&format=json"
+
+    fun departementCommunesUrl(code: String): String =
+        "https://geo.api.gouv.fr/departements/$code/communes?fields=code,population,surface&format=json"
 
     /** Base du repertoire ARCEP des fichiers "sites" trimestriels (enrichissement optionnel). */
     const val ARCEP_SITES_BASE_URL = "https://data.arcep.fr/mobile/sites/"

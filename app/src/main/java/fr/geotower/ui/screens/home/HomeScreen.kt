@@ -41,7 +41,6 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularWavyProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
-import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -55,7 +54,10 @@ import androidx.core.app.ActivityCompat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -68,6 +70,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
 import androidx.compose.ui.unit.dp
 import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.unit.sp
@@ -75,6 +79,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.navigation.NavController
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppIconManager
+import fr.geotower.utils.HomePrefs
 import fr.geotower.utils.LocationReadiness
 import fr.geotower.utils.locationReadiness
 import fr.geotower.utils.openAppLocationSettings
@@ -101,8 +106,10 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import fr.geotower.data.build.LocalDbRebuildOffer
 import fr.geotower.data.workers.AppUpdateNotifier
 import fr.geotower.data.workers.DatabaseDownloadWorker
+import fr.geotower.data.workers.LocalDbBuildWorker
 import fr.geotower.data.api.ServerStatus
 import fr.geotower.ui.components.LocationUnavailableBanner
 import fr.geotower.ui.components.PageScrollEdgeButtons
@@ -259,15 +266,22 @@ fun HomeScreen(navController: NavController) {
     var isDownloadStarting by remember { mutableStateOf(false) }
     val isDownloading = isSyncing || isDownloadStarting
 
+    // Même latch, côté génération locale : le bandeau bascule sur « génération en cours » dès le
+    // clic sur « Régénérer », sans attendre que WorkManager passe le worker à ENQUEUED.
+    var isRebuildStarting by remember { mutableStateOf(false) }
+
     // Génération locale en cours : la base mobile est construite dans un fichier à part et n'est
     // installée qu'à la toute fin. Pendant ce temps elle est bel et bien absente du disque — le
     // bandeau doit dire « génération en cours », surtout pas « base manquante ».
     val localBuild = rememberLocalDbBuildStatus()
-    val isGeneratingDb = localBuild.mobileRunning
+    val isGeneratingDb = localBuild.mobileRunning || isRebuildStarting
 
     val localDbState by AppConfig.localDatabaseState
     var wasSyncing by remember { mutableStateOf(isSyncing) }
     var isUpdateAvailable by remember { mutableStateOf(false) }
+    // La base installée a été GÉNÉRÉE sur l'appareil : une nouvelle version se propose alors en
+    // régénération, pas en téléchargement (vérifié en même temps que la version distante).
+    var isRebuildOffer by remember { mutableStateOf(false) }
     val isDbChecked = localDbState != null
     val isDbMissing = localDbState == GeoTowerDatabaseValidator.LocalDatabaseState.MISSING
     val isDbInvalid = localDbState == GeoTowerDatabaseValidator.LocalDatabaseState.INVALID
@@ -293,6 +307,11 @@ fun HomeScreen(navController: NavController) {
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
+    }
+
+    LaunchedEffect(localBuild.mobileRunning) {
+        // Idem côté génération : le worker tourne, le latch a fait son office.
+        if (localBuild.mobileRunning) isRebuildStarting = false
     }
 
     LaunchedEffect(isSyncing) {
@@ -321,8 +340,12 @@ fun HomeScreen(navController: NavController) {
 
                         val localVersion = GeoTowerDatabaseValidator.getInstalledDatabaseVersion(context)
                         val hasRemoteUpdate = DatabaseVersionPolicy.isRemoteNewer(remoteVersion, localVersion)
+                        // Base générée sur l'appareil : la nouvelle version se propose en
+                        // régénération, la même donnée ANFR étant à portée de build local.
+                        val rebuildOffer = hasRemoteUpdate && LocalDbRebuildOffer.forMobile(context)
 
                         kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Main) {
+                            isRebuildOffer = rebuildOffer
                             if (hasRemoteUpdate) {
                                 isUpdateAvailable = true
                                 fr.geotower.utils.AppConfig.isDbUpdateAvailable.value = true
@@ -422,19 +445,35 @@ fun HomeScreen(navController: NavController) {
             // grand écran) comme le font déjà le hors-ligne et le bandeau base de données.
             val hideHomeLogo = isDbBannerVisible || isServerUnreachable
 
+            // Une base générée sur l'appareil se met à jour en la régénérant : le bandeau propose
+            // « Régénérer » au lieu de « Télécharger ». Seulement quand la base installée est
+            // valide (mise à jour disponible) — manquante ou invalide, on repart du téléchargement.
+            val isRebuildBanner = isRebuildOffer && isUpdateAvailable && !isDbMissing && !isDbInvalid
+
             DatabaseWarningBanner(
                 isMissing = isDbMissing,
                 isInvalid = isDbInvalid,
                 isUpdateAvailable = isUpdateAvailable,
                 isDownloading = isDownloading,
                 isGenerating = isGeneratingDb,
+                isRebuildOffer = isRebuildBanner,
                 downloadProgress = if (isGeneratingDb) localBuild.progress else downloadProgress,
                 onDownloadClick = {
-                    // On cache le bandeau et on lance le téléchargement manuel
+                    // On cache le bandeau et on lance le téléchargement (ou la régénération) manuel
                     isUpdateAvailable = false
                     AppConfig.isDbUpdateAvailable.value = false
 
-                    if (canStartDatabaseDownload &&
+                    if (isRebuildBanner) {
+                        // Régénération de la SEULE base annoncée par le bandeau (la base mobile) :
+                        // les packs radio se pilotent depuis la carte de génération des réglages.
+                        isRebuildStarting = true
+                        LocalDbBuildWorker.enqueue(
+                            workManager,
+                            mobile = true,
+                            radioBroadcast = false,
+                            nonMobileTech = false
+                        )
+                    } else if (canStartDatabaseDownload &&
                         RemoteFeatureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.DATABASE_DOWNLOAD) &&
                         RemoteFeatureFlags.isActionEnabled(RemoteFeatureFlags.Actions.START_DATABASE_DOWNLOAD) &&
                         RemoteFeatureFlags.isWorkerEnabled(RemoteFeatureFlags.Workers.DATABASE_DOWNLOAD)
@@ -463,23 +502,33 @@ fun HomeScreen(navController: NavController) {
                 // Hauteur minimale pour forcer l'espace entre le titre, les boutons et le "À propos"
                 val minHeight = maxHeight
                 val showHelpButton = prefs.getBoolean("show_home_help", true)
-                val helpButtonPosition = prefs.getString("home_help_position", "bottom_end") ?: "bottom_end"
-                val helpButtonAlignment = when (helpButtonPosition) {
-                    "top_start" -> Alignment.TopStart
-                    "top_end" -> Alignment.TopEnd
-                    "bottom_start" -> Alignment.BottomStart
-                    else -> Alignment.BottomEnd
-                }
+                // Le lien « À propos » est un élément du menu (voir MenuButtonsList) sauf en
+                // paysage, où il garde sa place sous le titre : la disposition n'y a pas de pied de
+                // page. Le réglage vaut pour les deux.
+                val showAboutLink = HomePrefs.showAboutLink.read(prefs) &&
+                    featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ABOUT)
+                val helpButtonPosition by AppConfig.homeHelpPosition
+                val helpButtonAlignment = homeHelpAlignment(helpButtonPosition)
                 val isHelpButtonAtBottom = helpButtonPosition.startsWith("bottom")
-                val showBottomHelpButton = showHelpButton && isHelpButtonAtBottom
-                val isBottomHelpButtonStart = helpButtonPosition == "bottom_start"
-                val helpButtonPadding = when {
-                    isHelpButtonAtBottom -> PaddingValues(start = sizing.spacing(20.dp), top = sizing.spacing(20.dp), end = sizing.spacing(20.dp), bottom = sizing.spacing(2.dp))
-                    helpButtonPosition == "top_end" -> PaddingValues(start = sizing.spacing(20.dp), top = sizing.spacing(72.dp), end = sizing.spacing(20.dp), bottom = sizing.spacing(20.dp))
-                    else -> PaddingValues(20.dp)
+                // Le même écart que les cibles du glissé (voir HomeHelpCornerTargets) : le bouton
+                // atterrit exactement là où la pastille l'annonçait.
+                val helpButtonPadding = homeHelpCornerPadding(helpButtonPosition, sizing)
+                // Le bouton « Aides » se déplace aussi par appui long, entre ses quatre coins. Pas
+                // en paysage : cette disposition a son propre bouton d'aide, sous le titre.
+                val helpDragState = rememberHomeHelpDragState { corner ->
+                    AppConfig.setHomeHelpPosition(prefs, corner)
                 }
+                val canDragHelpButton = AppConfig.homeLongPressReorder.value && !isLandscape
 
-                Box(modifier = Modifier.fillMaxSize()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .onGloballyPositioned { helpDragState.onContentPositioned(it) }
+                ) {
+                    // Les quatre cibles en premier : elles se dessinent sous le reste de la page,
+                    // donc sous le bouton qu'on déplace au-dessus d'elles.
+                    HomeHelpCornerTargets(helpDragState)
+
                     // Une seule disposition est composée à la fois ; les trois états sont
                     // déclarés ici pour que la pastille « haut / bas » sache laquelle piloter.
                     val menuScrollState = rememberScrollState()
@@ -533,6 +582,7 @@ fun HomeScreen(navController: NavController) {
                                 LandscapeHomeInfoActions(
                                     navController = navController,
                                     version = appVersion,
+                                    showAboutLink = showAboutLink,
                                     showHelpButton = showHelpButton,
                                     onHelpClick = { safeClick { navController.navigate("help") { launchSingleTop = true } } }
                                 )
@@ -561,7 +611,9 @@ fun HomeScreen(navController: NavController) {
                                         logoResId = displayLogoResId,
                                         isExpanded = true,
                                         isGrid = true,
-                                        compact = true
+                                        compact = true,
+                                        // Le lien « À propos » est déjà sous le titre, à gauche.
+                                        includeAbout = false
                                     )
 
                                 }
@@ -631,15 +683,7 @@ fun HomeScreen(navController: NavController) {
                             Spacer(modifier = Modifier.weight(1f))
 
                             Spacer(modifier = Modifier.height(sizing.spacing(if (isCompactExpanded) 16.dp else 32.dp)))
-                            AboutSection(
-                                navController = navController,
-                                version = appVersion,
-                                paleColor = paleColor,
-                                showBottomHelpButton = showBottomHelpButton,
-                                alignHelpStart = isBottomHelpButtonStart,
-                                helpContentColor = onPaleColor,
-                                onHelpClick = { safeClick { navController.navigate("help") { launchSingleTop = true } } }
-                            )
+                            AboutSection(version = appVersion)
                         }
                     } else {
                         // --- DISPOSITION SMARTPHONE ---
@@ -671,32 +715,28 @@ fun HomeScreen(navController: NavController) {
 
                             Spacer(modifier = Modifier.weight(1f))
 
-                            AboutSection(
-                                navController = navController,
-                                version = appVersion,
-                                paleColor = paleColor,
-                                showBottomHelpButton = showBottomHelpButton,
-                                alignHelpStart = isBottomHelpButtonStart,
-                                helpContentColor = onPaleColor,
-                                onHelpClick = { safeClick { navController.navigate("help") { launchSingleTop = true } } }
-                            )
+                            AboutSection(version = appVersion)
                             Spacer(modifier = Modifier.height(sizing.spacing(24.dp)))
                         }
                     }
 
-                    if (showHelpButton && !isHelpButtonAtBottom) {
-                        FloatingActionButton(
-                            onClick = { safeClick { navController.navigate("help") { launchSingleTop = true } } },
+                    // Les quatre coins sont posés sur la page, y compris ceux du bas : dans le pied
+                    // de page ils suivaient le défilement et se retrouvaient à moitié sous le bord
+                    // bas dès que l'accueil dépassait d'un cheveu la hauteur de l'écran.
+                    // En paysage, seuls les coins du haut : cette disposition a déjà son bouton
+                    // d'aide sous le titre, et son pied de page tient sur une ligne.
+                    if (showHelpButton && !(isLandscape && isHelpButtonAtBottom)) {
+                        HomeHelpFab(
+                            state = helpDragState,
+                            draggable = canDragHelpButton,
                             containerColor = paleColor,
                             contentColor = onPaleColor,
+                            onClick = { safeClick { navController.navigate("help") { launchSingleTop = true } } },
                             modifier = Modifier
                                 .align(helpButtonAlignment)
                                 .padding(helpButtonPadding)
-                                .then(if (isHelpButtonAtBottom) Modifier else Modifier.navigationBarsPadding())
                                 .zIndex(2f)
-                        ) {
-                            Icon(Icons.AutoMirrored.Filled.Help, contentDescription = stringResource(R.string.appstrings_home_help_settings))
-                        }
+                        )
                     }
 
                     PageScrollEdgeButtons(
@@ -843,6 +883,7 @@ private fun HomeAnnouncementBanner(
 private fun LandscapeHomeInfoActions(
     navController: NavController,
     version: String,
+    showAboutLink: Boolean,
     showHelpButton: Boolean,
     onHelpClick: () -> Unit
 ) {
@@ -852,14 +893,16 @@ private fun LandscapeHomeInfoActions(
             horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            TextButton(onClick = { navController.navigate("about") }) {
-                Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(sizing.component(18.dp)))
-                Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
-                Text(
-                    text = stringResource(R.string.nav_about),
-                    fontWeight = FontWeight.SemiBold,
-                    fontSize = sizing.text(14.sp)
-                )
+            if (showAboutLink) {
+                TextButton(onClick = { navController.navigate("about") }) {
+                    Icon(Icons.Default.Info, contentDescription = null, modifier = Modifier.size(sizing.component(18.dp)))
+                    Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                    Text(
+                        text = stringResource(R.string.nav_about),
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = sizing.text(14.sp)
+                    )
+                }
             }
 
             if (showHelpButton) {
@@ -895,7 +938,9 @@ fun MenuButtonsList(
     logoResId: Int,
     isExpanded: Boolean,
     isGrid: Boolean = false,
-    compact: Boolean = false
+    compact: Boolean = false,
+    // Faux en paysage seulement : cette disposition garde le lien « À propos » sous le titre.
+    includeAbout: Boolean = true
 ) {
     val sizing = LocalGeoTowerUiSizing.current
     val context = LocalContext.current
@@ -907,51 +952,48 @@ fun MenuButtonsList(
     val showMap = AppConfig.showMapPage.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)
     val showCompass = AppConfig.showCompassPage.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)
     val showStats = AppConfig.showStatsPage.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)
+    val showAbout = includeAbout && HomePrefs.showAboutLink.read(prefs) &&
+        featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ABOUT)
 
-    var savedOrderString = prefs.getString("pages_order", "nearby,map,compass,stats,settings,logo") ?: "nearby,map,compass,stats,settings,logo"
-    if (!savedOrderString.contains("logo")) {
-        savedOrderString = "$savedOrderString,logo"
-        prefs.edit().putString("pages_order", savedOrderString).apply()
-    }
-    val pagesOrder = savedOrderString.split(",")
+    val pagesOrder by AppConfig.pagesOrder
     val nearAntennasLabel = stringResource(R.string.nav_near_antennas)
     val mapLabel = stringResource(R.string.nav_map)
     val compassLabel = stringResource(R.string.nav_compass)
     val statsLabel = stringResource(R.string.nav_statistics)
     val settingsLabel = stringResource(R.string.nav_settings)
 
-    val buttons = mutableListOf<@Composable () -> Unit>()
+    val buttons = mutableListOf<HomeMenuEntry>()
 
     pagesOrder.forEach { pageId ->
         when (pageId) {
             "logo" -> {
                 if (showLogo && isOnline && !isExpanded) {
-                    buttons.add {
+                    buttons.add(HomeMenuEntry(pageId) {
                         DrawableImage(
                             resId = logoResId,
                             modifier = Modifier.padding(vertical = sizing.spacing(8.dp)).size(sizing.component(150.dp)).clip(RoundedCornerShape(24.dp))
                         )
-                    }
+                    })
                 }
             }
             "nearby" -> {
                 if (showNearby) {
-                    buttons.add { MenuButton(nearAntennasLabel, Icons.Default.MyLocation, paleColor, onPaleColor, useOneUi, isGrid, compact = compact) { navController.navigate("emitters") } }
+                    buttons.add(HomeMenuEntry(pageId) { MenuButton(nearAntennasLabel, Icons.Default.MyLocation, paleColor, onPaleColor, useOneUi, isGrid, compact = compact) { navController.navigate("emitters") } })
                 }
             }
             "map" -> {
                 if (showMap) {
-                    buttons.add { MenuButton(mapLabel, Icons.Default.Map, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, isGrid, compact = compact) { navController.navigate("map") } }
+                    buttons.add(HomeMenuEntry(pageId) { MenuButton(mapLabel, Icons.Default.Map, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, isGrid, compact = compact) { navController.navigate("map") } })
                 }
             }
             "compass" -> {
                 if (showCompass && AppConfig.hasCompass.value) {
-                    buttons.add { MenuButton(compassLabel, Icons.Default.Explore, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, isGrid, compact = compact) { navController.navigate("compass") } }
+                    buttons.add(HomeMenuEntry(pageId) { MenuButton(compassLabel, Icons.Default.Explore, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, isGrid, compact = compact) { navController.navigate("compass") } })
                 }
             }
             "stats" -> {
                 if (showStats) {
-                    buttons.add {
+                    buttons.add(HomeMenuEntry(pageId) {
                         MenuButton(
                             text = statsLabel,
                             icon = Icons.Default.BarChart,
@@ -962,100 +1004,155 @@ fun MenuButtonsList(
                             compact = compact,
                             onClick = { navController.navigate("stats") }
                         )
-                    }
+                    })
                 }
             }
             "settings" -> {
                 // ✅ PARAMÈTRES RESTE TOUJOURS CLIQUABLE (enabled = true)
-                buttons.add { MenuButton(settingsLabel, Icons.Default.Settings, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, isGrid, compact = compact, enabled = true) { navController.navigate("settings") } }
+                buttons.add(HomeMenuEntry(pageId) { MenuButton(settingsLabel, Icons.Default.Settings, buttonBgColor, MaterialTheme.colorScheme.onSurfaceVariant, useOneUi, isGrid, compact = compact, enabled = true) { navController.navigate("settings") } })
+            }
+            "about" -> {
+                // Élément du menu comme les autres — il se déplace et se masque — mais rendu en
+                // lien discret : c'est l'apparence qu'il a toujours eue en pied d'accueil.
+                if (showAbout) {
+                    buttons.add(HomeMenuEntry(pageId) {
+                        HomeAboutLink(fillWidth = isGrid) { navController.navigate("about") }
+                    })
+                }
             }
         }
     }
 
+    // Appui long = déplacement, sur la page elle-même. Les emplacements possibles sont ceux des
+    // éléments affichés : ce qui est masqué (page désactivée, boussole absente) reste accroché à son
+    // voisin et n'apparaît pas comme un trou où déposer (voir HomePrefs.reorderVisible).
+    val reorderEnabled = AppConfig.homeLongPressReorder.value && buttons.size > 1
+    val reorderState = rememberHomeMenuReorderState(buttons.map { it.id }) { visibleOrder ->
+        AppConfig.setPagesOrder(prefs, HomePrefs.reorderVisible(pagesOrder, visibleOrder))
+    }
+
+    val spacing = if (compact) 10.dp else 16.dp
+
+    // `key` par identifiant, dans les deux dispositions : sans lui, Compose réutilise les
+    // composables par position et l'élément saisi changerait d'identité au premier déplacement —
+    // son détecteur de geste serait relancé et le glissé s'arrêterait net.
     if (isGrid) {
-        Column(verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 16.dp), modifier = Modifier.widthIn(max = 800.dp)) {
-            for (i in buttons.indices step 2) {
-                if (i + 1 < buttons.size) {
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 16.dp)) {
-                        Box(modifier = Modifier.weight(1f)) { buttons[i]() }
-                        Box(modifier = Modifier.weight(1f)) { buttons[i+1]() }
-                    }
-                } else {
-                    Box(modifier = Modifier.fillMaxWidth()) { buttons[i]() }
+        HomeMenuGrid(spacing = spacing, modifier = Modifier.widthIn(max = 800.dp)) {
+            buttons.forEach { entry ->
+                key(entry.id) {
+                    HomeMenuSlot(reorderState, entry.id, reorderEnabled) { entry.content() }
                 }
             }
         }
     } else {
-        Column(verticalArrangement = Arrangement.spacedBy(if (compact) 10.dp else 16.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            buttons.forEach { it() }
+        Column(verticalArrangement = Arrangement.spacedBy(spacing), horizontalAlignment = Alignment.CenterHorizontally) {
+            buttons.forEach { entry ->
+                key(entry.id) {
+                    HomeMenuSlot(reorderState, entry.id, reorderEnabled) { entry.content() }
+                }
+            }
         }
     }
 }
 
+/** Un élément de l'accueil : son identifiant dans `pages_order` et ce qu'il affiche. */
+private data class HomeMenuEntry(
+    val id: String,
+    val content: @Composable () -> Unit
+)
+
+/**
+ * La grille des boutons : deux par rangée, un élément seul en fin de liste prenant toute la largeur.
+ *
+ * C'est une mise en page à plat plutôt qu'une colonne de rangées, et c'est ce qui rend le
+ * déplacement possible : tous les éléments sont frères, donc Compose peut déplacer celui qu'on
+ * glisse d'une rangée à l'autre sans le détruire, et le `zIndex` de l'élément saisi le fait bien
+ * passer au-dessus de tous les autres — entre rangées sœurs, il ne serait monté qu'au-dessus de ses
+ * voisins immédiats.
+ */
 @Composable
-fun AboutSection(
-    navController: NavController,
-    version: String,
-    paleColor: Color,
-    showBottomHelpButton: Boolean = false,
-    alignHelpStart: Boolean = false,
-    helpContentColor: Color = Color.Unspecified,
-    onHelpClick: (() -> Unit)? = null
+private fun HomeMenuGrid(
+    spacing: Dp,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit
 ) {
-    val sizing = LocalGeoTowerUiSizing.current
-    val helpContent = if (helpContentColor == Color.Unspecified) {
-        MaterialTheme.colorScheme.onPrimaryContainer
-    } else {
-        helpContentColor
+    Layout(content = content, modifier = modifier) { measurables, constraints ->
+        val gap = spacing.roundToPx()
+        // L'accueil ne défile qu'en hauteur : la largeur est bornée partout où la grille sert.
+        // Si elle ne l'était pas, on ne pourrait pas la partager en deux — repli sur une colonne.
+        val bounded = constraints.hasBoundedWidth
+        val gridWidth = if (bounded) constraints.maxWidth else 0
+        val cellWidth = ((gridWidth - gap) / 2).coerceAtLeast(0)
+
+        val placeables = measurables.mapIndexed { index, measurable ->
+            val alone = !bounded || (index == measurables.lastIndex && index % 2 == 0)
+            val itemWidth = if (alone) gridWidth else cellWidth
+            measurable.measure(
+                if (bounded) {
+                    constraints.copy(minWidth = itemWidth, maxWidth = itemWidth, minHeight = 0)
+                } else {
+                    constraints.copy(minWidth = 0, minHeight = 0)
+                }
+            )
+        }
+
+        val rows = if (bounded) placeables.chunked(2) else placeables.map { listOf(it) }
+        val height = rows.sumOf { row -> row.maxOf { it.height } } +
+            gap * (rows.size - 1).coerceAtLeast(0)
+        val width = if (bounded) gridWidth else (placeables.maxOfOrNull { it.width } ?: 0)
+
+        layout(constraints.constrainWidth(width), constraints.constrainHeight(height)) {
+            var y = 0
+            rows.forEach { row ->
+                var x = 0
+                row.forEach { placeable ->
+                    placeable.placeRelative(x, y)
+                    x += placeable.width + gap
+                }
+                y += row.maxOf { it.height } + gap
+            }
+        }
     }
+}
+
+/**
+ * Le lien « À propos » de l'accueil.
+ *
+ * C'est un élément de `pages_order` comme les boutons du menu — il se déplace et se masque de la
+ * même façon — mais il garde son apparence de lien discret : il n'ouvre pas une page d'usage
+ * courant, et le transformer en gros bouton changerait l'allure de l'accueil pour tout le monde.
+ */
+@Composable
+private fun HomeAboutLink(fillWidth: Boolean, onClick: () -> Unit) {
+    val sizing = LocalGeoTowerUiSizing.current
+    TextButton(
+        onClick = onClick,
+        // En grille, la cellule impose sa largeur : sans ça le lien serait collé à gauche.
+        modifier = if (fillWidth) Modifier.fillMaxWidth() else Modifier
+    ) {
+        // Utilise primary pour l'icône au lieu de paleColor
+        Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+        Text(text = stringResource(R.string.nav_about), color = MaterialTheme.colorScheme.onSurface, fontSize = sizing.text(18.sp))
+    }
+}
+
+/**
+ * Pied de page de l'accueil.
+ *
+ * Il ne porte plus que le numéro de version : « À propos » a rejoint le menu (voir [HomeAboutLink])
+ * et le bouton « Aides » est posé sur la page, aux quatre coins, quelle que soit sa position (voir
+ * [HomeHelpFab]). Tant qu'il vivait ici, il descendait avec le pied de page : sur un écran où
+ * l'accueil déborde d'un cheveu, il partait sous le pli et n'apparaissait qu'à moitié.
+ */
+@Composable
+fun AboutSection(version: String) {
+    val sizing = LocalGeoTowerUiSizing.current
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .heightIn(min = 76.dp),
+        modifier = Modifier.fillMaxWidth(),
         contentAlignment = Alignment.TopCenter
     ) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            TextButton(onClick = { navController.navigate("about") }) {
-                // Utilise primary pour l'icône au lieu de paleColor
-                Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
-                Text(text = stringResource(R.string.nav_about), color = MaterialTheme.colorScheme.onSurface, fontSize = sizing.text(18.sp))
-            }
-            Text(text = version, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), style = sizing.textStyle(MaterialTheme.typography.labelSmall))
-        }
-
-        // En bas à gauche : le bouton Aides s'il est configuré à gauche
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(top = sizing.spacing(12.dp)),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(sizing.spacing(12.dp))
-        ) {
-            if (showBottomHelpButton && onHelpClick != null && alignHelpStart) {
-                FloatingActionButton(
-                    onClick = onHelpClick,
-                    containerColor = paleColor,
-                    contentColor = helpContent
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.Help, contentDescription = stringResource(R.string.appstrings_home_help_settings))
-                }
-            }
-        }
-
-        // En bas à droite : le bouton Aides s'il est positionné à droite
-        if (showBottomHelpButton && onHelpClick != null && !alignHelpStart) {
-            FloatingActionButton(
-                onClick = onHelpClick,
-                containerColor = paleColor,
-                contentColor = helpContent,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = sizing.spacing(12.dp))
-            ) {
-                Icon(Icons.AutoMirrored.Filled.Help, contentDescription = stringResource(R.string.appstrings_home_help_settings))
-            }
-        }
+        Text(text = version, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f), style = sizing.textStyle(MaterialTheme.typography.labelSmall))
     }
 }
 
@@ -1147,6 +1244,9 @@ fun DatabaseWarningBanner(
     // Génération locale de la base en cours : prime sur « manquante » / « invalide », puisque la
     // base absente est précisément celle en train d'être construite sur l'appareil.
     isGenerating: Boolean,
+    // La base installée a été générée sur l'appareil : la mise à jour se propose en « Régénérer »
+    // plutôt qu'en « Télécharger » (le bouton lance alors la génération locale).
+    isRebuildOffer: Boolean = false,
     downloadProgress: Int, // ✅ NOUVEAU PARAMÈTRE (progression du téléchargement OU de la génération)
     onDownloadClick: () -> Unit
 ) {
@@ -1171,7 +1271,9 @@ fun DatabaseWarningBanner(
             androidx.compose.material3.MaterialTheme.colorScheme.onPrimaryContainer
         }
         val icon = when {
-            isGenerating -> Icons.Default.Memory
+            // La régénération proposée porte la même icône que la génération elle-même : rien ne
+            // sera téléchargé depuis le serveur.
+            isGenerating || isRebuildOffer -> Icons.Default.Memory
             isProblem -> Icons.Default.Error
             else -> Icons.Default.CloudDownload
         }
@@ -1210,6 +1312,12 @@ fun DatabaseWarningBanner(
                     if (isGenerating) {
                         androidx.compose.material3.Text(
                             text = stringResource(R.string.appstrings_generating_db_banner_desc),
+                            color = contentColor,
+                            style = androidx.compose.material3.MaterialTheme.typography.bodySmall
+                        )
+                    } else if (isRebuildOffer && !isDownloading) {
+                        androidx.compose.material3.Text(
+                            text = stringResource(R.string.appstrings_update_db_banner_desc_rebuild),
                             color = contentColor,
                             style = androidx.compose.material3.MaterialTheme.typography.bodySmall
                         )
@@ -1258,7 +1366,10 @@ fun DatabaseWarningBanner(
                         modifier = androidx.compose.ui.Modifier.height(sizing.component(36.dp))
                     ) {
                         androidx.compose.material3.Text(
-                            text = stringResource(R.string.appstrings_btn_download_banner),
+                            text = stringResource(
+                                if (isRebuildOffer) R.string.appstrings_btn_rebuild_banner
+                                else R.string.appstrings_btn_download_banner
+                            ),
                             fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
                             fontSize = sizing.text(12.sp)
                         )

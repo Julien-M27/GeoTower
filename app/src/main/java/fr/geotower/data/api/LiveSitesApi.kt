@@ -2,6 +2,8 @@ package fr.geotower.data.api
 
 import fr.geotower.data.models.LiveSiteResponseDto
 import fr.geotower.data.models.LiveSitesListResponseDto
+import fr.geotower.data.models.LiveDepartmentOperatorStatsResponseDto
+import fr.geotower.data.models.LiveDepartmentStatsResponseDto
 import fr.geotower.data.models.LiveRadioStatsResponseDto
 import fr.geotower.data.models.LiveWeeklyRadioStatsResponseDto
 import retrofit2.Response
@@ -47,6 +49,14 @@ interface LiveSitesApiService {
     suspend fun getWeeklyRadioStats(
         @Query("operator") operators: List<String>
     ): Response<LiveWeeklyRadioStatsResponseDto>
+
+    @GET("api/v2/live/fr/stats/departments")
+    suspend fun getDepartmentStats(): Response<LiveDepartmentStatsResponseDto>
+
+    @GET("api/v2/live/fr/stats/departments/{deptCode}")
+    suspend fun getDepartmentOperatorTechStats(
+        @Path("deptCode") deptCode: String
+    ): Response<LiveDepartmentOperatorStatsResponseDto>
 }
 
 object LiveSitesClient {

@@ -2,6 +2,7 @@ package fr.geotower.data.build
 
 import com.google.gson.JsonElement
 import com.google.gson.JsonParser
+import fr.geotower.utils.DepartmentCodes
 import java.io.File
 import java.io.IOException
 import java.io.InputStream
@@ -115,6 +116,110 @@ class RawSourceDownloader(private val client: OkHttpClient = defaultClient()) {
         }
 
         /**
+         * Referentiel departemental : noms depuis `/departements`, superficie et population
+         * agregees depuis les communes — meme methode que `fetch_reference_from_api`
+         * (docs/server/fr_dept_stats.py), y compris la surface en hectares a diviser par 100.
+         *
+         * Les COM (975, 977, 978, 986, 987, 988) ne sont ni dans `/departements` ni dans
+         * `/communes` : elles n'auront ni nom ni ratios, seulement leurs compteurs ANFR. Le
+         * serveur, lui, les interroge une par une ; sur l'appareil, ce serait 12 appels reseau
+         * de plus dans un build deja long, pour six territoires.
+         */
+        fun parseDepartmentReference(
+            departementsJson: String,
+            communesJson: String,
+            populationYear: String? = null,
+        ): Map<String, DepartmentReferenceRow> {
+            val surfaceHectares = HashMap<String, Double>()
+            val population = HashMap<String, Int>()
+            val communeCount = HashMap<String, Int>()
+
+            val communes = try {
+                JsonParser.parseString(communesJson).asJsonArray
+            } catch (_: Exception) {
+                null
+            }
+            communes?.forEach { element ->
+                val obj = element.takeIf { it.isJsonObject }?.asJsonObject ?: return@forEach
+                val code = AnfrParsing.cleanText(obj.get("codeDepartement").stringOrNull())
+                    .ifEmpty { DepartmentCodes.fromInsee(obj.get("code").stringOrNull()).orEmpty() }
+                if (code.isEmpty()) return@forEach
+                surfaceHectares[code] = (surfaceHectares[code] ?: 0.0) + (obj.get("surface").doubleOrNull() ?: 0.0)
+                population[code] = (population[code] ?: 0) + (obj.get("population").intOrNull() ?: 0)
+                communeCount[code] = (communeCount[code] ?: 0) + 1
+            }
+
+            val departements = try {
+                JsonParser.parseString(departementsJson).asJsonArray
+            } catch (_: Exception) {
+                return emptyMap()
+            }
+            val result = LinkedHashMap<String, DepartmentReferenceRow>()
+            for (element in departements) {
+                val obj = element.takeIf { it.isJsonObject }?.asJsonObject ?: continue
+                val code = AnfrParsing.cleanText(obj.get("code").stringOrNull()).uppercase()
+                if (code.isEmpty()) continue
+                val hasCommunes = (communeCount[code] ?: 0) > 0
+                result[code] = DepartmentReferenceRow(
+                    code = code,
+                    name = AnfrParsing.cleanText(obj.get("nom").stringOrNull()).ifEmpty { null },
+                    regionCode = AnfrParsing.cleanText(obj.get("codeRegion").stringOrNull()).ifEmpty { null },
+                    areaKm2 = if (hasCommunes) Math.round((surfaceHectares[code] ?: 0.0) / 100.0 * 1000.0) / 1000.0 else null,
+                    // Population nulle plutot que zero : certaines communes (TAAF) n'ont pas de
+                    // champ `population`, et « 0 habitant » s'afficherait comme une vraie valeur.
+                    population = population[code]?.takeIf { hasCommunes && it > 0 },
+                    populationYear = populationYear,
+                )
+            }
+            return result
+        }
+
+        /**
+         * Un departement interroge seul : `/departements/{code}` renvoie un objet (pas un tableau)
+         * et ses communes viennent d'un second appel. Sert aux COM, absentes des listes globales.
+         */
+        fun parseSingleDepartmentReference(
+            departementJson: String,
+            communesJson: String,
+            code: String,
+            populationYear: String? = null,
+        ): DepartmentReferenceRow? {
+            val normalized = code.trim().uppercase()
+            if (normalized.isEmpty()) return null
+            val obj = try {
+                JsonParser.parseString(departementJson).asJsonObject
+            } catch (_: Exception) {
+                return null
+            }
+
+            var surfaceHectares = 0.0
+            var population = 0
+            var communeCount = 0
+            val communes = try {
+                JsonParser.parseString(communesJson).asJsonArray
+            } catch (_: Exception) {
+                null
+            }
+            communes?.forEach { element ->
+                val commune = element.takeIf { it.isJsonObject }?.asJsonObject ?: return@forEach
+                surfaceHectares += commune.get("surface").doubleOrNull() ?: 0.0
+                population += commune.get("population").intOrNull() ?: 0
+                communeCount++
+            }
+
+            val name = AnfrParsing.cleanText(obj.get("nom").stringOrNull()).ifEmpty { null }
+            if (name == null && communeCount == 0) return null
+            return DepartmentReferenceRow(
+                code = normalized,
+                name = name,
+                regionCode = AnfrParsing.cleanText(obj.get("codeRegion").stringOrNull()).ifEmpty { null },
+                areaKm2 = if (communeCount > 0) Math.round(surfaceHectares / 100.0 * 1000.0) / 1000.0 else null,
+                population = population.takeIf { communeCount > 0 && it > 0 },
+                populationYear = populationYear,
+            )
+        }
+
+        /**
          * ARCEP "sites" -> `(id_anfr, operateur majuscules) -> (nidt, is_zb)`. Port de
          * `load_arcep_site_metadata` : fusion sur nidt (garde le premier non vide) et is_zb (OU logique).
          */
@@ -160,5 +265,11 @@ class RawSourceDownloader(private val client: OkHttpClient = defaultClient()) {
 
         private fun JsonElement?.stringOrNull(): String? =
             this?.takeIf { it.isJsonPrimitive }?.asString
+
+        private fun JsonElement?.doubleOrNull(): Double? =
+            this?.takeIf { it.isJsonPrimitive }?.let { runCatching { it.asDouble }.getOrNull() }
+
+        private fun JsonElement?.intOrNull(): Int? =
+            this?.takeIf { it.isJsonPrimitive }?.let { runCatching { it.asInt }.getOrNull() }
     }
 }

@@ -604,6 +604,12 @@ fun StatisticsScreen(navController: NavController, repository: AnfrRepository) {
             }
 
             Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+            DepartmentStatsEntryCard(
+                bgColor = cardBgColor,
+                onClick = { navController.navigate(DEPARTMENT_STATS_ROUTE) }
+            )
+
+            Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
             fr.geotower.ui.components.PageCustomizationFooter(
                 onClick = {
                     settingsHighlightBlock = null

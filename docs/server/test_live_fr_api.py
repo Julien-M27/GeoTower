@@ -113,6 +113,44 @@ def create_source_db(path: Path) -> None:
             active_count INTEGER NOT NULL,
             PRIMARY KEY(week_key, operator_name, category, item_key)
         );
+        CREATE TABLE dept_stat_current (
+            dept_code TEXT NOT NULL PRIMARY KEY,
+            dept_name TEXT,
+            region_code TEXT,
+            area_km2 REAL,
+            population INTEGER,
+            population_year TEXT,
+            supports INTEGER NOT NULL,
+            supports_active INTEGER NOT NULL,
+            stations INTEGER NOT NULL,
+            stations_active INTEGER NOT NULL,
+            antennas INTEGER NOT NULL,
+            antennas_active INTEGER NOT NULL,
+            antennas_fh INTEGER NOT NULL,
+            stations_per_support REAL,
+            antennas_per_station REAL,
+            supports_per_km2 REAL,
+            stations_per_km2 REAL,
+            antennas_per_km2 REAL,
+            supports_per_1k_hab REAL,
+            stations_per_1k_hab REAL,
+            antennas_per_1k_hab REAL,
+            hab_per_support REAL,
+            hab_per_station REAL,
+            hab_per_antenna REAL
+        );
+        CREATE TABLE dept_stat_operator_tech (
+            dept_code TEXT NOT NULL,
+            operator_name TEXT NOT NULL,
+            tech TEXT NOT NULL,
+            supports INTEGER NOT NULL,
+            supports_active INTEGER NOT NULL,
+            stations INTEGER NOT NULL,
+            stations_active INTEGER NOT NULL,
+            antennas INTEGER NOT NULL,
+            antennas_active INTEGER NOT NULL,
+            PRIMARY KEY(dept_code, operator_name, tech)
+        );
         CREATE TABLE metadata (
             version TEXT NOT NULL PRIMARY KEY,
             schema_version INTEGER NOT NULL,
@@ -160,6 +198,15 @@ def create_source_db(path: Path) -> None:
         INSERT INTO radio_stat_current VALUES ('ORANGE', 'band', '5G|3500', '3500 MHz', 1, 1);
         INSERT INTO radio_stat_weekly VALUES ('2026-W23', '2026-06-01', '2026-06-07', 'ORANGE', 'support', 'ALL', 'Supports', 1, 1);
         INSERT INTO radio_stat_weekly VALUES ('2026-W23', '2026-06-01', '2026-06-07', 'ORANGE', 'tech', '5G', '5G', 1, 1);
+        INSERT INTO dept_stat_current VALUES (
+            '75', 'Paris', '11', 105.4, 2133111, '2022',
+            1, 1, 1, 1, 1, 1, 0,
+            1.0, 1.0, 0.009, 0.009, 0.009, 0.469, 0.469, 0.469,
+            2133111.0, 2133111.0, 2133111.0
+        );
+        INSERT INTO dept_stat_operator_tech VALUES ('75', 'ORANGE', '5G', 1, 1, 1, 1, 1, 1);
+        INSERT INTO dept_stat_operator_tech VALUES ('75', 'ORANGE', 'ALL', 1, 1, 1, 1, 1, 1);
+        INSERT INTO dept_stat_operator_tech VALUES ('75', 'ALL', 'ALL', 1, 1, 1, 1, 1, 1);
         INSERT INTO metadata VALUES ('20260607_1200', 7, 'FR', 'France', 'ANFR', '2026-06-07', 'anfr.zip');
         """
     )
@@ -209,6 +256,9 @@ class LiveFrApiTest(unittest.TestCase):
             site = asyncio.run(live_fr_api.get_live_fr_site("123"))
             current_stats = asyncio.run(live_fr_api.get_live_fr_current_stats(operator=["orange"]))
             weekly_stats = asyncio.run(live_fr_api.get_live_fr_weekly_stats(operator=["ORANGE"]))
+            department_stats = asyncio.run(live_fr_api.get_live_fr_department_stats())
+            department_operators = asyncio.run(live_fr_api.get_live_fr_department_operator_stats("75"))
+            unknown_department = asyncio.run(live_fr_api.get_live_fr_department_operator_stats("zz"))
         finally:
             live_fr_api.LIVE_DB_PATH = old_live_path
 
@@ -221,6 +271,13 @@ class LiveFrApiTest(unittest.TestCase):
         self.assertEqual(3, len(current_stats["rows"]))
         self.assertEqual(1, current_stats["rows"][0]["total_count"])
         self.assertEqual("2026-W23", weekly_stats["rows"][0]["week_key"])
+        self.assertEqual(1, len(department_stats["rows"]))
+        self.assertEqual("Paris", department_stats["rows"][0]["dept_name"])
+        self.assertEqual(2133111, department_stats["rows"][0]["population"])
+        self.assertEqual(3, len(department_operators["rows"]))
+        self.assertEqual("75", department_operators["dept_code"])
+        # Un code de departement invalide ne descend pas jusqu'a SQLite.
+        self.assertEqual([], unknown_department["rows"])
 
 
 if __name__ == "__main__":

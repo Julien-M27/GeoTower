@@ -52,13 +52,17 @@ class GeoTowerApp : Application() {
         fr.geotower.utils.AppConfig.lowPowerLevel.intValue = ecoPrefs.getInt(fr.geotower.utils.AppConfig.PREF_LOW_POWER_LEVEL, 0)
         fr.geotower.utils.AppConfig.lowPowerFollowSystem.value = ecoPrefs.getBoolean(fr.geotower.utils.AppConfig.PREF_LOW_POWER_FOLLOW_SYSTEM, false)
         // Mode « traitement local » chargé tôt (avant tout worker) + éligibilité de génération DB.
-        // La migration de l'ancien interrupteur « pannes en local » doit précéder la lecture.
+        // Les deux migrations doivent précéder la lecture, et dans cet ordre : le décalage de
+        // l'échelle (4 → 5 crans) raisonne sur l'ancienne, l'absorption de l'interrupteur
+        // « pannes en local » sur la nouvelle.
+        fr.geotower.utils.AppConfig.migrateLocalModeLevelScale(applicationContext)
         fr.geotower.utils.AppConfig.migrateLegacyOutageSourcePref(applicationContext)
         fr.geotower.utils.AppConfig.localModeLevel.intValue =
-            ecoPrefs.getInt(fr.geotower.utils.AppConfig.PREF_LOCAL_MODE_LEVEL, 0).coerceIn(0, 3)
+            ecoPrefs.getInt(fr.geotower.utils.AppConfig.PREF_LOCAL_MODE_LEVEL, fr.geotower.utils.AppConfig.LOCAL_MODE_SERVER)
+                .coerceIn(fr.geotower.utils.AppConfig.LOCAL_MODE_SERVER, fr.geotower.utils.AppConfig.LOCAL_MODE_MAX)
         fr.geotower.utils.AppConfig.localBuildEligible.value =
             fr.geotower.data.build.LocalBuildCapability.evaluate(applicationContext).eligible
-        // Niveau 3 (« autonomie maximale ») : bloque les endpoints communautaires/MAJ/live du client partagé.
+        // Dernier cran (« autonomie maximale ») : bloque les endpoints communautaires/MAJ/live du client partagé.
         RetrofitClient.communityEndpointBlocker = { fr.geotower.utils.AppConfig.blockCommunityAndUpdates() }
         appScope.launch {
             RemoteFeatureFlags.refreshIfNeeded(applicationContext, force = true)

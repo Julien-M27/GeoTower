@@ -2,8 +2,9 @@ package fr.geotower.data.build
 
 /**
  * Schema exact de `geotower_fr.db` reproduit a l'identique depuis le builder serveur
- * (`create_schema` de docs/server/build_fr_anfr_db.py et `ensure_stats_tables` de
- * docs/server/fr_anfr_stats.py), plus les estampilles Room.
+ * (`create_schema` de docs/server/build_fr_anfr_db.py, `ensure_stats_tables` de
+ * docs/server/fr_anfr_stats.py et `ensure_dept_stat_tables` de docs/server/fr_dept_stats.py),
+ * plus les estampilles Room.
  *
  * La DDL est reproduite verbatim pour que la base construite localement soit acceptee
  * a la fois par [fr.geotower.data.db.GeoTowerDatabaseValidator] (structure) et par Room
@@ -40,7 +41,13 @@ object GeoTowerDbSchema {
         "CREATE TABLE IF NOT EXISTS `metadata` (`version` TEXT NOT NULL, `schema_version` INTEGER NOT NULL, `country_code` TEXT NOT NULL, `country_name` TEXT, `source` TEXT NOT NULL, `date_maj_anfr` TEXT, `zip_version` TEXT, PRIMARY KEY(`version`))",
         "CREATE TABLE IF NOT EXISTS `source_versions` (`source_key` TEXT NOT NULL, `source_value` TEXT NOT NULL, PRIMARY KEY(`source_key`))",
         "CREATE TABLE IF NOT EXISTS radio_stat_current (operator_name TEXT NOT NULL, category TEXT NOT NULL, item_key TEXT NOT NULL, label TEXT, total_count INTEGER NOT NULL, active_count INTEGER NOT NULL, PRIMARY KEY (operator_name, category, item_key))",
-        "CREATE TABLE IF NOT EXISTS radio_stat_weekly (week_key TEXT NOT NULL, week_start TEXT, source_date TEXT, operator_name TEXT NOT NULL, category TEXT NOT NULL, item_key TEXT NOT NULL, label TEXT, total_count INTEGER NOT NULL, active_count INTEGER NOT NULL, PRIMARY KEY (week_key, operator_name, category, item_key))"
+        "CREATE TABLE IF NOT EXISTS radio_stat_weekly (week_key TEXT NOT NULL, week_start TEXT, source_date TEXT, operator_name TEXT NOT NULL, category TEXT NOT NULL, item_key TEXT NOT NULL, label TEXT, total_count INTEGER NOT NULL, active_count INTEGER NOT NULL, PRIMARY KEY (week_key, operator_name, category, item_key))",
+        // Stats par departement (docs/server/fr_dept_stats.py). Le builder embarque cree les
+        // tables pour que le schema reste identique a celui du serveur, mais ne les remplit
+        // pas : superficie et population viennent d'un referentiel en ligne. Une base generee
+        // sur l'appareil a donc ces deux tables vides, et l'app doit le supporter.
+        "CREATE TABLE IF NOT EXISTS dept_stat_current (dept_code TEXT NOT NULL, dept_name TEXT, region_code TEXT, area_km2 REAL, population INTEGER, population_year TEXT, supports INTEGER NOT NULL, supports_active INTEGER NOT NULL, stations INTEGER NOT NULL, stations_active INTEGER NOT NULL, antennas INTEGER NOT NULL, antennas_active INTEGER NOT NULL, antennas_fh INTEGER NOT NULL, stations_per_support REAL, antennas_per_station REAL, supports_per_km2 REAL, stations_per_km2 REAL, antennas_per_km2 REAL, supports_per_1k_hab REAL, stations_per_1k_hab REAL, antennas_per_1k_hab REAL, hab_per_support REAL, hab_per_station REAL, hab_per_antenna REAL, PRIMARY KEY (dept_code))",
+        "CREATE TABLE IF NOT EXISTS dept_stat_operator_tech (dept_code TEXT NOT NULL, operator_name TEXT NOT NULL, tech TEXT NOT NULL, supports INTEGER NOT NULL, supports_active INTEGER NOT NULL, stations INTEGER NOT NULL, stations_active INTEGER NOT NULL, antennas INTEGER NOT NULL, antennas_active INTEGER NOT NULL, PRIMARY KEY (dept_code, operator_name, tech))"
     )
 
     /** Table technique de Room portant l'identity_hash. */
