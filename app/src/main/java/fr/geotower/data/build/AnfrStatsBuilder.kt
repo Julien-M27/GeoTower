@@ -113,11 +113,69 @@ object AnfrStatsBuilder {
     private val activeStatusCache = HashMap<String, Boolean>()
     private val overseasOperatorCache = HashMap<String, String>()
 
+    /**
+     * Table de staging des couples (operateur x categorie x item x support). Le comptage distinct
+     * est delegue a SQLite au lieu d'etre fait en RAM.
+     *
+     * MEMOIRE (mesure sur Galaxy A52s, 2026-08-06) : la version precedente gardait deux
+     * `HashMap<Triple, MutableSet<String>>` ou chaque support etait insere dans 5 a 20 ensembles,
+     * soit 1 a 3 millions d'entrees vivantes **en meme temps**. C'etait le pic memoire de toute la
+     * generation : 199 Mo de tas sur un plafond de 256, atteints pendant COMPUTING_STATS, une phase
+     * qui ne represente pourtant que 10 % de la duree. Meme methode que
+     * [DepartmentStatsBuilder] : une ligne par couple sur disque, agregats en SQL.
+     */
+    const val STAGING_TABLE = "stg_stat_pair"
+
+    private fun createStaging(prefix: String) = "CREATE TABLE IF NOT EXISTS $prefix$STAGING_TABLE (" +
+        "operator_name TEXT NOT NULL, category TEXT NOT NULL, item_key TEXT NOT NULL, " +
+        "support_key TEXT NOT NULL, in_total INTEGER NOT NULL, in_active INTEGER NOT NULL)"
+
+    /**
+     * Scan **ordonne** des couples, dedoublonnes en flux cote Kotlin (cf. [countGroups]).
+     *
+     * PERF (regression mesuree puis corrigee, 2026-08-06) : la premiere version demandait
+     * `COUNT(DISTINCT ...) GROUP BY ...` a SQLite. Sur un build mobile seul, ce n'etait payable
+     * (+26 s) ; sur un build complet, ou quatre bases sont ouvertes en meme temps (mobile + son
+     * staging, radio + le sien) et se disputent le cache de pages, les tables temporaires que
+     * SQLite alloue pour chaque `DISTINCT` faisaient passer la phase de **2 min 23 s a 12 min 45 s**.
+     *
+     * L'ordre du scan vient de l'index couvrant cree apres le chargement : aucun tri, aucune table
+     * temporaire, memoire constante. Les lignes d'un meme couple etant adjacentes, le dedoublonnage
+     * se fait en comparant a la precedente — exactement ce que faisaient les ensembles d'origine.
+     */
+    private val AGGREGATE_QUERY = """
+        SELECT operator_name, category, item_key, support_key, in_total, in_active
+        FROM $STAGING_TABLE
+        ORDER BY operator_name, category, item_key, support_key
+    """.trimIndent()
+
+    /** Insertion par lots (borne la RAM a un lot), meme patron que les autres builders. */
+    private class BatchInserter(
+        private val db: SqlDatabase,
+        private val sql: String,
+        private val batchSize: Int = 5000,
+    ) {
+        private val buffer = ArrayList<List<Any?>>(batchSize)
+
+        fun add(row: List<Any?>) {
+            buffer.add(row)
+            if (buffer.size >= batchSize) flush()
+        }
+
+        fun flush() {
+            if (buffer.isNotEmpty()) {
+                db.insertBatch(sql, buffer)
+                buffer.clear()
+            }
+        }
+    }
+
     fun populateCurrentStats(db: SqlDatabase): Int {
         activeStatusCache.clear()
         overseasOperatorCache.clear()
-        val totals = HashMap<Triple<String, String, String>, MutableSet<String>>()
-        val actives = HashMap<Triple<String, String, String>, MutableSet<String>>()
+        db.execSql("DROP TABLE IF EXISTS ${db.staging(STAGING_TABLE)}")
+        db.execSql(createStaging(db.stagingPrefix))
+        val pairs = BatchInserter(db, "INSERT INTO $STAGING_TABLE VALUES (?, ?, ?, ?, ?, ?)")
 
         db.query(CURRENT_STATS_QUERY) { row ->
             val idAnfr = row.getString("id_anfr").orEmpty()
@@ -148,10 +206,21 @@ object AnfrStatsBuilder {
                 else -> emptySet()
             }
 
-            addSupport(totals, actives, operatorName, supportKey, techKeys, bandKeys, activeTech, activeBand, isActiveSupport)
+            addSupport(pairs, operatorName, supportKey, techKeys, bandKeys, activeTech, activeBand, isActiveSupport)
         }
+        pairs.flush()
+        // Index cree APRES le chargement en masse, et **couvrant** : le scan ordonne se fait
+        // entierement dans l'index (aucun acces au rowid pour lire les deux drapeaux), donc sans
+        // tri ni table temporaire.
+        db.execSql(
+            "CREATE INDEX IF NOT EXISTS ${db.stagingPrefix}ix_$STAGING_TABLE " +
+                "ON $STAGING_TABLE(operator_name, category, item_key, support_key, in_total, in_active)",
+        )
 
-        val rows = statsRows(totals, actives)
+        // Les agregats (quelques dizaines de lignes) sont collectes avant de liberer le staging.
+        val rows = countGroups(db)
+        db.execSql("DROP TABLE IF EXISTS ${db.staging(STAGING_TABLE)}")
+
         db.execSql("DELETE FROM radio_stat_current")
         db.insertBatch(
             "INSERT INTO radio_stat_current (operator_name, category, item_key, label, total_count, active_count) " +
@@ -161,9 +230,72 @@ object AnfrStatsBuilder {
         return rows.size
     }
 
+    /**
+     * Compte, en un seul scan ordonne et a memoire constante, les supports **distincts** de chaque
+     * couple (operateur, categorie, item).
+     *
+     * Les lignes arrivant triees, celles d'un meme support sont adjacentes : leurs drapeaux sont
+     * fusionnes par OU (un support compte comme actif des qu'une de ses stations l'est, comme le
+     * faisaient les ensembles d'origine), puis le support n'est compte qu'une fois.
+     */
+    private fun countGroups(db: SqlDatabase): List<List<Any?>> {
+        val rows = ArrayList<List<Any?>>()
+        var operator: String? = null
+        var category = ""
+        var itemKey = ""
+        var supportKey: String? = null
+        var inTotal = false
+        var inActive = false
+        var total = 0
+        var active = 0
+
+        fun closeSupport() {
+            if (supportKey != null) {
+                if (inTotal) total++
+                if (inActive) active++
+            }
+            supportKey = null
+            inTotal = false
+            inActive = false
+        }
+
+        fun closeGroup() {
+            closeSupport()
+            operator?.let {
+                rows.add(listOf(it, category, itemKey, labelFor(category, itemKey), total, minOf(active, total)))
+            }
+            total = 0
+            active = 0
+        }
+
+        db.query(AGGREGATE_QUERY) { row ->
+            val rowOperator = row.getString("operator_name").orEmpty()
+            val rowCategory = row.getString("category").orEmpty()
+            val rowItem = row.getString("item_key").orEmpty()
+            val rowSupport = row.getString("support_key").orEmpty()
+            if (rowOperator != operator || rowCategory != category || rowItem != itemKey) {
+                closeGroup()
+                operator = rowOperator
+                category = rowCategory
+                itemKey = rowItem
+            } else if (rowSupport != supportKey) {
+                closeSupport()
+            }
+            supportKey = rowSupport
+            inTotal = inTotal || row.getInt("in_total") == 1
+            inActive = inActive || row.getInt("in_active") == 1
+        }
+        closeGroup()
+        return rows
+    }
+
+    /**
+     * Emet les couples du support courant. Une cle declaree ET active donne UNE ligne portant les
+     * deux drapeaux ; une cle active absente des masques (venue du blob de details) donne une ligne
+     * `in_total = 0`, ce qui reproduit exactement les deux ensembles independants de la version RAM.
+     */
     private fun addSupport(
-        totals: HashMap<Triple<String, String, String>, MutableSet<String>>,
-        actives: HashMap<Triple<String, String, String>, MutableSet<String>>,
+        pairs: BatchInserter,
         operatorName: String,
         supportKey: String,
         techKeys: Set<String>,
@@ -172,39 +304,38 @@ object AnfrStatsBuilder {
         activeBandKeys: Set<String>,
         isActiveSupport: Boolean,
     ) {
-        addKey(totals, operatorName, CATEGORY_SUPPORT, ITEM_ALL, supportKey)
-        if (isActiveSupport) addKey(actives, operatorName, CATEGORY_SUPPORT, ITEM_ALL, supportKey)
-        techKeys.forEach { addKey(totals, operatorName, CATEGORY_TECH, it, supportKey) }
-        bandKeys.forEach { addKey(totals, operatorName, CATEGORY_BAND, it, supportKey) }
-        activeTechKeys.forEach { addKey(actives, operatorName, CATEGORY_TECH, it, supportKey) }
-        activeBandKeys.forEach { addKey(actives, operatorName, CATEGORY_BAND, it, supportKey) }
+        if (operatorName.isEmpty() || supportKey.isEmpty()) return
+        add(pairs, operatorName, CATEGORY_SUPPORT, ITEM_ALL, supportKey, inTotal = true, inActive = isActiveSupport)
+        techKeys.forEach {
+            add(pairs, operatorName, CATEGORY_TECH, it, supportKey, inTotal = true, inActive = it in activeTechKeys)
+        }
+        bandKeys.forEach {
+            add(pairs, operatorName, CATEGORY_BAND, it, supportKey, inTotal = true, inActive = it in activeBandKeys)
+        }
+        activeTechKeys.forEach {
+            if (it !in techKeys) {
+                add(pairs, operatorName, CATEGORY_TECH, it, supportKey, inTotal = false, inActive = true)
+            }
+        }
+        activeBandKeys.forEach {
+            if (it !in bandKeys) {
+                add(pairs, operatorName, CATEGORY_BAND, it, supportKey, inTotal = false, inActive = true)
+            }
+        }
     }
 
-    private fun addKey(
-        target: HashMap<Triple<String, String, String>, MutableSet<String>>,
+    private fun add(
+        pairs: BatchInserter,
         operatorName: String,
         category: String,
         itemKey: String,
         supportKey: String,
+        inTotal: Boolean,
+        inActive: Boolean,
     ) {
-        if (operatorName.isNotEmpty() && supportKey.isNotEmpty()) {
-            target.getOrPut(Triple(operatorName, category, itemKey)) { HashSet() }.add(supportKey)
-        }
-    }
-
-    private fun statsRows(
-        totals: Map<Triple<String, String, String>, Set<String>>,
-        actives: Map<Triple<String, String, String>, Set<String>>,
-    ): List<List<Any?>> {
-        val keys = (totals.keys + actives.keys).toSortedSet(
-            compareBy({ it.first }, { it.second }, { it.third }),
+        pairs.add(
+            listOf(operatorName, category, itemKey, supportKey, if (inTotal) 1 else 0, if (inActive) 1 else 0),
         )
-        return keys.map { key ->
-            val (operatorName, category, itemKey) = key
-            val totalCount = totals[key]?.size ?: 0
-            val activeCount = minOf(actives[key]?.size ?: 0, totalCount)
-            listOf(operatorName, category, itemKey, labelFor(category, itemKey), totalCount, activeCount)
-        }
     }
 
     private fun labelFor(category: String, itemKey: String): String = when (category) {

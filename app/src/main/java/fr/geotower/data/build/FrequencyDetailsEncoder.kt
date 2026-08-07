@@ -1,7 +1,6 @@
 package fr.geotower.data.build
 
 import java.io.ByteArrayOutputStream
-import java.util.Base64
 import java.util.zip.Deflater
 import java.util.zip.DeflaterOutputStream
 
@@ -35,7 +34,53 @@ object FrequencyDetailsEncoder {
         } finally {
             deflater.end()
         }
-        val encoded = COMPRESSED_PREFIX + Base64.getEncoder().encodeToString(output.toByteArray())
+        val encoded = COMPRESSED_PREFIX + base64(output.toByteArray())
         return if (encoded.length < value.length) encoded else value
     }
+
+    /**
+     * Base64 standard (alphabet `+/`, avec remplissage `=`, sans retour a la ligne), ecrit a la
+     * main comme le decodeur de [fr.geotower.data.models.FrequencyDetailsCodec].
+     *
+     * POURQUOI PAS `java.util.Base64` : elle exige l'API 26 alors que le `minSdk` de l'app est 24.
+     * Sur Android 7.0 / 7.1 la generation locale plantait donc en `NoClassDefFoundError` des la
+     * premiere station compressee. Et pas `android.util.Base64` non plus : le builder est prouve
+     * par des tests JVM (parite avec le builder serveur), ou les classes Android ne sont que des
+     * souches. Sortie identique a l'octet pres a celle de `java.util.Base64` — c'est ce que
+     * verifient le round-trip de `FrequencyDetailsEncoderTest` et les instantanes de
+     * `BuilderOutputSnapshotTest`, dont les blobs `Z1:` sont figes.
+     */
+    private fun base64(bytes: ByteArray): String {
+        val out = StringBuilder((bytes.size + 2) / 3 * 4)
+        var index = 0
+        while (index + 2 < bytes.size) {
+            val chunk = ((bytes[index].toInt() and 0xFF) shl 16) or
+                ((bytes[index + 1].toInt() and 0xFF) shl 8) or
+                (bytes[index + 2].toInt() and 0xFF)
+            out.append(ALPHABET[(chunk ushr 18) and 0x3F])
+            out.append(ALPHABET[(chunk ushr 12) and 0x3F])
+            out.append(ALPHABET[(chunk ushr 6) and 0x3F])
+            out.append(ALPHABET[chunk and 0x3F])
+            index += 3
+        }
+        when (bytes.size - index) {
+            1 -> {
+                val chunk = (bytes[index].toInt() and 0xFF) shl 16
+                out.append(ALPHABET[(chunk ushr 18) and 0x3F])
+                out.append(ALPHABET[(chunk ushr 12) and 0x3F])
+                out.append("==")
+            }
+            2 -> {
+                val chunk = ((bytes[index].toInt() and 0xFF) shl 16) or
+                    ((bytes[index + 1].toInt() and 0xFF) shl 8)
+                out.append(ALPHABET[(chunk ushr 18) and 0x3F])
+                out.append(ALPHABET[(chunk ushr 12) and 0x3F])
+                out.append(ALPHABET[(chunk ushr 6) and 0x3F])
+                out.append('=')
+            }
+        }
+        return out.toString()
+    }
+
+    private const val ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 }

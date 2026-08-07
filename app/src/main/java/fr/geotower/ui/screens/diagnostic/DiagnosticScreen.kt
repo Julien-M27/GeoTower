@@ -102,6 +102,7 @@ import fr.geotower.data.api.ApiEndpoints
 import fr.geotower.data.api.ApiServer
 import fr.geotower.data.api.ServerReachability
 import fr.geotower.data.api.ServerStatus
+import fr.geotower.data.build.LocalBuildReportStore
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.db.GeoTowerDatabaseValidator
 import fr.geotower.data.db.LocalDbBuildStatus
@@ -842,7 +843,9 @@ private suspend fun buildDiagnosticState(
     ServerReachability.refresh()
     val apiServerItem = buildApiServerItem(context)
     val environmentItem = buildEnvironmentItem(context, generatedAt)
-    val items = listOf(
+    // Absent tant qu'aucune generation locale n'a ete mesuree sur cet appareil.
+    val localBuildMetricsItem = buildLocalBuildMetricsItem(context)
+    val items = listOfNotNull(
         antennaItem,
         radioItem,
         mapsItem,
@@ -850,6 +853,7 @@ private suspend fun buildDiagnosticState(
         notificationsItem,
         apiServerItem,
         storageItem,
+        localBuildMetricsItem,
         environmentItem
     )
     val globalSeverity = when {
@@ -1249,6 +1253,29 @@ private fun buildEnvironmentItem(context: Context, generatedAt: String): Diagnos
         id = "environment",
         title = context.getString(R.string.appstrings_diagnostic_section_environment),
         summary = context.getString(R.string.appstrings_diagnostic_summary_environment, versionName, androidVersion),
+        severity = DiagnosticSeverity.Info,
+        details = details
+    )
+}
+
+/**
+ * Mesures de la derniere generation locale (durees par phase, pics de tas Java / memoire native /
+ * stockage, tailles produites), enregistrees par `LocalDbBuildPipeline`.
+ *
+ * C'est ce qui permet de savoir si la generation peut etre ouverte a un appareil donne : le
+ * plafond reel n'est pas la RAM totale mais le tas Java du process. Absent tant qu'aucune
+ * generation n'a tourne.
+ */
+private fun buildLocalBuildMetricsItem(context: Context): DiagnosticItem? {
+    val details = LocalBuildReportStore.read(context)
+    if (details.isEmpty()) return null
+    val measuredAt = LocalBuildReportStore.readTimestamp(context)
+        ?.let { SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(it)) }
+        ?: context.getString(R.string.appstrings_diagnostic_value_unknown)
+    return DiagnosticItem(
+        id = "local_build_metrics",
+        title = context.getString(R.string.appstrings_diagnostic_section_local_build),
+        summary = context.getString(R.string.appstrings_diagnostic_summary_local_build, measuredAt),
         severity = DiagnosticSeverity.Info,
         details = details
     )

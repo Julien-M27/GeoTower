@@ -2145,6 +2145,8 @@
     <string name="appstrings_diagnostic_summary_notifications_info">GeoTower-Benachrichtigungseinstellungen sind deaktiviert.</string>
     <string name="appstrings_diagnostic_summary_storage">Bekannte GeoTower-Daten: %1$s</string>
     <string name="appstrings_diagnostic_summary_environment">GeoTower %1$s auf Android %2$s</string>
+    <string name="appstrings_diagnostic_section_local_build">Lokale Erzeugung (Messwerte)</string>
+    <string name="appstrings_diagnostic_summary_local_build">Letzte Erzeugung gemessen am %1$s</string>
     <string name="appstrings_diagnostic_detail_file_present">Datei erkannt: %1$s</string>
     <string name="appstrings_diagnostic_detail_file_missing">Datei fehlt: %1$s</string>
     <string name="appstrings_diagnostic_detail_size">Größe: %1$s</string>

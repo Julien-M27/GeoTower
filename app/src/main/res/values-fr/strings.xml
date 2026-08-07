@@ -2145,6 +2145,8 @@
     <string name="appstrings_diagnostic_summary_notifications_info">Les préférences de notification GeoTower sont désactivées.</string>
     <string name="appstrings_diagnostic_summary_storage">Données GeoTower connues : %1$s</string>
     <string name="appstrings_diagnostic_summary_environment">GeoTower %1$s sur Android %2$s</string>
+    <string name="appstrings_diagnostic_section_local_build">Génération locale (mesures)</string>
+    <string name="appstrings_diagnostic_summary_local_build">Dernière génération mesurée le %1$s</string>
     <string name="appstrings_diagnostic_detail_file_present">Fichier détecté : %1$s</string>
     <string name="appstrings_diagnostic_detail_file_missing">Fichier absent : %1$s</string>
     <string name="appstrings_diagnostic_detail_size">Taille : %1$s</string>

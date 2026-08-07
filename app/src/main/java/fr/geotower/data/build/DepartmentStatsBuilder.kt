@@ -63,8 +63,8 @@ object DepartmentStatsBuilder {
         LEFT JOIN ref_statut st ON t.statut_id = st.id
     """.trimIndent()
 
-    private val CREATE_STAGING = """
-        CREATE TABLE IF NOT EXISTS $STAGING_TABLE (
+    private fun createStaging(prefix: String) = """
+        CREATE TABLE IF NOT EXISTS $prefix$STAGING_TABLE (
             id_anfr TEXT NOT NULL,
             dept TEXT NOT NULL,
             operator TEXT NOT NULL,
@@ -194,8 +194,8 @@ object DepartmentStatsBuilder {
         reference: Map<String, DepartmentReferenceRow> = emptyMap(),
         populationYear: String? = null,
     ): Int {
-        db.execSql("DROP TABLE IF EXISTS $STAGING_TABLE")
-        db.execSql(CREATE_STAGING)
+        db.execSql("DROP TABLE IF EXISTS ${db.staging(STAGING_TABLE)}")
+        db.execSql(createStaging(db.stagingPrefix))
         db.execSql("DELETE FROM dept_stat_current")
         db.execSql("DELETE FROM dept_stat_operator_tech")
 
@@ -218,7 +218,7 @@ object DepartmentStatsBuilder {
             rows,
         )
 
-        db.execSql("DROP TABLE IF EXISTS $STAGING_TABLE")
+        db.execSql("DROP TABLE IF EXISTS ${db.staging(STAGING_TABLE)}")
         return rows.size
     }
 

@@ -101,7 +101,7 @@ object RadioDbBuilder {
         db.execSql("PRAGMA synchronous = OFF")
         db.execSql("PRAGMA temp_store = FILE")
         RadioDbSchema.CREATE_TABLE_STATEMENTS.forEach { db.execSql(it) }
-        RadioDbSchema.STAGING_STATEMENTS.forEach { db.execSql(it) }
+        RadioDbSchema.stagingStatements(db.stagingPrefix).forEach { db.execSql(it) }
     }
 
     /**
@@ -200,7 +200,7 @@ object RadioDbBuilder {
             db.execSql(
                 "INSERT INTO stg_r_single (sta, sup) SELECT sta, sup FROM stg_r_support GROUP BY sta HAVING COUNT(*) = 1",
             )
-            db.execSql("CREATE INDEX ix_stg_r_bande_emr ON stg_r_bande(emr)")
+            db.execSql("CREATE INDEX ${db.stagingPrefix}ix_stg_r_bande_emr ON stg_r_bande(emr)")
         }
     }
 
@@ -380,12 +380,17 @@ object RadioDbBuilder {
             ),
         )
 
-        // 11/ Purge du staging + index + compactage : le fichier installe ne garde que les tables finales.
+        // 11/ Purge du staging + index : le fichier installe ne garde que les tables finales.
         onProgress(98, 0L)
-        RadioDbSchema.STAGING_TABLES.forEach { db.execSql("DROP TABLE IF EXISTS $it") }
+        RadioDbSchema.STAGING_TABLES.forEach { db.execSql("DROP TABLE IF EXISTS ${db.staging(it)}") }
         RadioDbSchema.CREATE_INDEX_STATEMENTS.forEach { db.execSql(it) }
         db.execSql("PRAGMA journal_mode = DELETE")
-        db.execSql("VACUUM")
+        // Le VACUUM ne sert qu'a rendre les pages qu'un staging loge DANS ce fichier a occupees :
+        // SQLite ne les libere pas au DROP. Quand le staging vit dans une base annexe attachee, ce
+        // fichier n'a jamais rien contenu d'autre que ses tables finales -> compacter serait
+        // reecrire integralement une base deja compacte, pour rien (et c'est plusieurs minutes sur
+        // un telephone, cf. RADIO_BUILDING).
+        if (db.stagingPrefix.isEmpty()) db.execSql("VACUUM")
         onProgress(100, 0L)
 
         return RadioBuildResult(siteInserter.total, detailInserter.total)

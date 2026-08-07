@@ -13,7 +13,26 @@ import android.database.sqlite.SQLiteStatement
  * A utiliser sur une base ouverte hors Room (le fichier temporaire du build local), puis
  * remise a `installValidatedDatabase` comme un telechargement.
  */
-class AndroidSqlDatabase(private val db: SQLiteDatabase) : SqlDatabase {
+class AndroidSqlDatabase(
+    private val db: SQLiteDatabase,
+    override val stagingPrefix: String = "",
+) : SqlDatabase {
+
+    /**
+     * Attache `file` comme base de staging sous l'alias [STAGING_SCHEMA] et retourne une vue de
+     * cette base dont la DDL de staging vise le fichier annexe.
+     *
+     * L'attachement est propre a une **connexion** SQLite. Ce n'est sur que parce que le build
+     * tourne hors WAL (`journal_mode = OFF`) : le pool de connexions d'Android est alors reduit a
+     * une seule connexion, partagee par toutes les requetes. Si le journal repassait en WAL, une
+     * requete pourrait atterrir sur une connexion sans l'attachement et echouer en « no such
+     * table ».
+     */
+    fun withStagingFile(file: java.io.File): AndroidSqlDatabase {
+        // Le chemin vient de `getDatabasePath`/`filesDir` : pas de guillemet simple a echapper.
+        db.execSQL("ATTACH DATABASE '${file.absolutePath}' AS $STAGING_SCHEMA")
+        return AndroidSqlDatabase(db, "$STAGING_SCHEMA.")
+    }
 
     override fun execSql(sql: String) {
         val trimmed = sql.trimStart()
@@ -93,8 +112,12 @@ class AndroidSqlDatabase(private val db: SQLiteDatabase) : SqlDatabase {
         }
     }
 
-    private companion object {
-        val USER_VERSION_REGEX = Regex("""PRAGMA\s+user_version\s*=\s*(\d+)""", RegexOption.IGNORE_CASE)
+    companion object {
+        /** Alias SQLite de la base de staging attachee. */
+        const val STAGING_SCHEMA = "stg"
+
+        private val USER_VERSION_REGEX =
+            Regex("""PRAGMA\s+user_version\s*=\s*(\d+)""", RegexOption.IGNORE_CASE)
     }
 
     private class CursorRow(private val cursor: Cursor) : SqlRow {

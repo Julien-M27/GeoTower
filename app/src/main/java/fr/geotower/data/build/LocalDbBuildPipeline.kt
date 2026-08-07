@@ -50,13 +50,50 @@ class LocalDbBuildPipeline(
         val allowedServiceMask: Int
             get() = (if (radioBroadcast) RadioServiceMasks.BROADCAST else 0) or
                 (if (nonMobileTech) RadioServiceMasks.NON_BROADCAST else 0)
+
+        /** Libelle court des packs demandes, pour le rapport de mesures. */
+        val label: String
+            get() = listOfNotNull(
+                "mobile".takeIf { mobile },
+                "radio/TV".takeIf { radioBroadcast },
+                "non-mobile".takeIf { nonMobileTech },
+            ).joinToString("+").ifEmpty { "aucun" }
     }
 
+    /**
+     * Lance la generation et **mesure** ce qu'elle coute a l'appareil (duree par phase, pics de tas
+     * Java / memoire native / stockage, taille des sources et des bases produites). Le rapport est
+     * conserve par [LocalBuildReportStore] et affiche dans l'ecran Diagnostic : c'est la seule
+     * facon de savoir sur quels appareils la generation peut etre ouverte, et ce que chaque
+     * optimisation fait vraiment gagner.
+     */
     suspend fun run(
         context: Context,
         packs: Packs,
         onProgress: (phase: BuildPhase, percent: Int, detail: String?) -> Unit,
+    ): Result {
+        val metrics = LocalBuildMetrics()
+        val device = BuildDeviceProfiles.read(context)
+        val result = runMeasured(context, packs, metrics, onProgress)
+        runCatching {
+            LocalBuildReportStore.save(context, metrics.report(device, packs.label, result.success, result.reason))
+        }.onFailure { AppLogger.w("GeoTowerDb", "Rapport de mesures non enregistre", it) }
+        return result
+    }
+
+    private suspend fun runMeasured(
+        context: Context,
+        packs: Packs,
+        metrics: LocalBuildMetrics,
+        onProgress: (phase: BuildPhase, percent: Int, detail: String?) -> Unit,
     ): Result = withContext(Dispatchers.IO) {
+        // Chaque progression alimente aussi les mesures : `processed` (lignes de la sous-etape) sert
+        // a cumuler le debit par phase, il reste a 0 pour les phases reseau.
+        fun emit(phase: BuildPhase, percent: Int, detail: String?, processed: Long = 0L) {
+            metrics.onProgress(phase, processed)
+            onProgress(phase, percent, detail)
+        }
+
         val eligibility = LocalBuildCapability.evaluate(context)
         if (!eligibility.eligible) return@withContext Result(false, eligibility.reason)
         if (!packs.mobile && !packs.anyRadio) return@withContext Result(false, "Aucune donnée sélectionnée")
@@ -67,6 +104,12 @@ class LocalDbBuildPipeline(
         val refZip = File(workDir, "sup_ref.zip")
         val observatoireCsv = File(workDir, "observatoire.csv")
         val arcepDir = File(workDir, "arcep").apply { mkdirs() }
+        // Staging dans des fichiers ANNEXES : les bases produites ne contiennent alors jamais que
+        // leurs tables finales (SQLite ne rend pas les pages d'un DROP sans VACUUM), et le staging
+        // se rend au systeme en supprimant un fichier. Un par base : l'attachement est propre a une
+        // connexion, et mobile et radio en ont chacune une.
+        val stagingFile = File(workDir, "staging_mobile.db")
+        val radioStagingFile = File(workDir, "staging_radio.db")
         val builtFile = context.getDatabasePath("${GeoTowerDatabaseValidator.DB_NAME}.localbuild")
         val builtRadioFile = context.getDatabasePath("${RadioDatabaseValidator.DB_NAME}.localbuild")
         var radioDb: AndroidSqlDatabase? = null
@@ -74,9 +117,12 @@ class LocalDbBuildPipeline(
         // avec le pack mobile, best-effort — un echec laisse ces champs a null/0 sans casser le build.
         val arcepFiles = ArrayList<File>()
         var arcepQuarter: String? = null
+        // Echantillonne memoire et stockage pendant toute la generation (arrete dans le `finally`).
+        val recorder = LocalBuildMetricsRecorder(metrics, workDir, listOf(builtFile, builtRadioFile))
+            .also { it.start() }
 
         try {
-            onProgress(BuildPhase.RESOLVING, 0, null)
+            emit(BuildPhase.RESOLVING, 0, null)
             val datasetJson = downloader.fetchText(OfficialSources.MONTHLY_SUP_DATASET_API_URL, MAX_JSON_BYTES)
             val monthly = OfficialSources.selectMonthlySupZipUrls(datasetJson)
                 ?: return@withContext Result(false, "ZIP mensuel ANFR introuvable sur data.gouv")
@@ -87,7 +133,7 @@ class LocalDbBuildPipeline(
             val monthlyFileVersion = monthly.dataUrl.substringAfterLast('/').substringBefore('?')
                 .ifBlank { dataZip.name }
 
-            onProgress(BuildPhase.DOWNLOADING, 5, null)
+            emit(BuildPhase.DOWNLOADING, 5, null)
             var lastPct = -1
             var zipError: String? = "ZIP mensuel non telecharge"
             var attempt = 0
@@ -99,7 +145,7 @@ class LocalDbBuildPipeline(
                         val pct = if (total > 0) (5 + copied * 30 / total).toInt().coerceIn(5, 35) else 20
                         if (pct != lastPct) {
                             lastPct = pct
-                            onProgress(BuildPhase.DOWNLOADING, pct, "$mb Mo (essai $attempt)")
+                            emit(BuildPhase.DOWNLOADING, pct, "$mb Mo (essai $attempt)")
                         }
                     }
                     zipError = verifyMonthlyZip(dataZip)
@@ -109,9 +155,11 @@ class LocalDbBuildPipeline(
                 }
             }
             if (zipError != null) return@withContext Result(false, zipError)
+            metrics.noteFile("sup_data.zip", dataZip.length())
 
             // Le ZIP de references est optionnel (le builder a des valeurs par defaut).
             monthly.refUrl?.let { runCatching { downloader.downloadToFile(it, refZip, MAX_REF_ZIP_BYTES) } }
+            metrics.noteFile("sup_ref.zip", refZip.length())
 
             // Un seul telechargement des communes : le meme JSON sert aux noms (`ref_commune`) et a
             // l'agregation superficie/population des stats departementales.
@@ -141,7 +189,7 @@ class LocalDbBuildPipeline(
             // Observatoire (~500 Mo) = source MOBILE uniquement -> telecharge SEULEMENT si le pack mobile
             // est demande. Pour un build « non-mobile seul », ces ~500 Mo sont economises.
             if (packs.mobile) {
-                onProgress(BuildPhase.READING_STATIONS, 36, null)
+                emit(BuildPhase.READING_STATIONS, 36, null)
                 val exportHtml = downloader.fetchText(OfficialSources.OBSERVATOIRE_EXPORT_PAGE_URL, MAX_JSON_BYTES)
                 val observatoireUrl = OfficialSources.resolveObservatoireCsvUrl(exportHtml)
                     ?: return@withContext Result(false, "URL de l'observatoire ANFR introuvable (page d'export)")
@@ -159,7 +207,7 @@ class LocalDbBuildPipeline(
                             val pct = if (total > 0) (36 + copied * 8 / total).toInt().coerceIn(36, 44) else 40
                             if (pct != obsPct) {
                                 obsPct = pct
-                                onProgress(BuildPhase.READING_STATIONS, pct, "$mb Mo (essai $obsAttempt)")
+                                emit(BuildPhase.READING_STATIONS, pct, "$mb Mo (essai $obsAttempt)")
                             }
                         }
                         obsError = if (observatoireCsv.length() > 1000L) null else "Observatoire vide"
@@ -169,12 +217,13 @@ class LocalDbBuildPipeline(
                     }
                 }
                 if (obsError != null) return@withContext Result(false, obsError)
+                metrics.noteFile("observatoire.csv", observatoireCsv.length())
 
                 // ARCEP trimestriel : resout le listing "last/" (trimestre courant) et telecharge les
                 // CSV de sites (Metropole + Outremer). Entierement best-effort : source d'enrichissement
                 // OPTIONNELLE (arcep_nidt/is_zb), un echec ne doit jamais interrompre la generation.
                 runCatching {
-                    onProgress(BuildPhase.READING_STATIONS, 44, "ARCEP")
+                    emit(BuildPhase.READING_STATIONS, 44, "ARCEP")
                     val listingHtml = downloader.fetchText(OfficialSources.ARCEP_SITES_LAST_URL, MAX_JSON_BYTES)
                     OfficialSources.resolveArcepSitesCsvUrls(listingHtml).forEachIndexed { index, url ->
                         arcepQuarter = arcepQuarter ?: OfficialSources.extractQuarter(url.substringAfterLast('/'))
@@ -184,6 +233,7 @@ class LocalDbBuildPipeline(
                             .onFailure { AppLogger.w("GeoTowerDb", "ARCEP CSV download failed (non-fatal): $url", it) }
                     }
                 }.onFailure { AppLogger.w("GeoTowerDb", "ARCEP resolve failed (non-fatal)", it) }
+                metrics.noteFile("arcep (${arcepFiles.size} CSV)", arcepFiles.sumOf { it.length() })
             }
 
             AnfrMonthlyZip(dataZip).use { data ->
@@ -217,33 +267,46 @@ class LocalDbBuildPipeline(
                         if (wantRadio) {
                             if (builtRadioFile.exists()) builtRadioFile.delete()
                             builtRadioFile.parentFile?.mkdirs()
-                            radioDb = AndroidSqlDatabase(SQLiteDatabase.openOrCreateDatabase(builtRadioFile, null)).also {
-                                it.applyBuildPragmas(eligibility.totalRamBytes)
-                                RadioDbBuilder.prepareSchema(it)
-                            }
+                            radioDb = AndroidSqlDatabase(SQLiteDatabase.openOrCreateDatabase(builtRadioFile, null))
+                                .also { it.applyBuildPragmas(eligibility.totalRamBytes) }
+                                .withStagingFile(radioStagingFile)
+                                .also {
+                                    it.applyStagingPragmas(eligibility.totalRamBytes)
+                                    RadioDbBuilder.prepareSchema(it)
+                                }
                         }
                         val radioSink: SupRowSink =
                             radioDb?.let { RadioDbBuilder.RadioStagingSink(it, references.typeAntenne) } ?: SupRowSink.None
                         var buildPercent = 45
-                        // Metadonnees ARCEP (arcep_nidt/is_zb) fusionnees depuis les CSV telecharges.
+                        // Metadonnees ARCEP (arcep_nidt/is_zb) fusionnees depuis les CSV telecharges. Les
+                        // fichiers ne servent plus apres : ~19 Mo rendus avant la partie lourde du build.
                         val arcep = parseArcepFiles(arcepFiles)
+                        arcepDir.deleteRecursively()
                         val db = AndroidSqlDatabase(SQLiteDatabase.openOrCreateDatabase(builtFile, null))
                         db.applyBuildPragmas(eligibility.totalRamBytes)
+                        val staged = db.withStagingFile(stagingFile)
+                        staged.applyStagingPragmas(eligibility.totalRamBytes)
                         try {
                             GeoTowerDbBuilder.build(
-                                db, sources, references, arcep,
+                                staged, sources, references, arcep,
                                 BuildConfig(version = buildVersion(), zipVersion = monthlyFileVersion, quarterlyVersion = arcepQuarter),
                                 onProgress = { phase, processed ->
                                     buildPercent = maxOf(buildPercent, percentFor(phase))
-                                    onProgress(phase, buildPercent, detailFor(context, processed))
+                                    emit(phase, buildPercent, detailFor(context, processed), processed)
                                 },
                                 supSink = radioSink,
+                                // L'observatoire (~173 Mo) n'est lu QUE par la premiere phase : le rendre
+                                // des sa derniere ligne retire autant du pic de stockage, qui tombe bien
+                                // plus tard (calcul des masques).
+                                onWeeklyConsumed = { observatoireCsv.delete() },
                             )
                         } finally {
                             db.close()
+                            stagingFile.delete()
                         }
 
-                        onProgress(BuildPhase.INSTALLING, 94, null)
+                        emit(BuildPhase.INSTALLING, 94, null)
+                        metrics.noteFile("${GeoTowerDatabaseValidator.DB_NAME} (produite)", builtFile.length())
                         // Valide d'abord pour remonter la cause EXACTE (ex. « Table vide: support ») dans l'UI.
                         val validation = GeoTowerDatabaseValidator.validateDatabaseFile(builtFile)
                         if (!validation.isValid) {
@@ -261,10 +324,13 @@ class LocalDbBuildPipeline(
                                 RadioDbBuilder.buildFromStaging(
                                     rdb, references,
                                     RadioBuildConfig(version = radioVersion, zipVersion = monthlyFileVersion),
-                                    { percent, processed -> onProgress(BuildPhase.RADIO_BUILDING, percent, detailFor(context, processed)) },
+                                    { percent, processed ->
+                                        emit(BuildPhase.RADIO_BUILDING, percent, detailFor(context, processed), processed)
+                                    },
                                     packs.allowedServiceMask,
                                 )
                                 rdb.close()
+                                metrics.noteFile("${RadioDatabaseValidator.DB_NAME} (produite)", builtRadioFile.length())
                                 val radioValidation = RadioDatabaseValidator.validateDatabaseFile(builtRadioFile)
                                 if (radioValidation.isValid) {
                                     // Provenance : memorise la version installee pour la distinguer d'un telechargement.
@@ -281,20 +347,24 @@ class LocalDbBuildPipeline(
                         // lui-meme les SUP dans son staging puis emet, filtre par categorie(s) choisie(s). ===
                         if (builtRadioFile.exists()) builtRadioFile.delete()
                         builtRadioFile.parentFile?.mkdirs()
-                        val rdb = AndroidSqlDatabase(SQLiteDatabase.openOrCreateDatabase(builtRadioFile, null)).also {
-                            it.applyBuildPragmas(eligibility.totalRamBytes)
-                        }
+                        val rdb = AndroidSqlDatabase(SQLiteDatabase.openOrCreateDatabase(builtRadioFile, null))
+                            .also { it.applyBuildPragmas(eligibility.totalRamBytes) }
+                            .withStagingFile(radioStagingFile)
+                            .also { it.applyStagingPragmas(eligibility.totalRamBytes) }
                         radioDb = rdb
                         val radioVersion = buildVersion()
                         RadioDbBuilder.build(
                             rdb, sources, references,
                             RadioBuildConfig(version = radioVersion, zipVersion = monthlyFileVersion),
-                            { percent, processed -> onProgress(BuildPhase.RADIO_BUILDING, percent, detailFor(context, processed)) },
+                            { percent, processed ->
+                                emit(BuildPhase.RADIO_BUILDING, percent, detailFor(context, processed), processed)
+                            },
                             packs.allowedServiceMask,
                         )
                         rdb.close()
 
-                        onProgress(BuildPhase.INSTALLING, 94, null)
+                        emit(BuildPhase.INSTALLING, 94, null)
+                        metrics.noteFile("${RadioDatabaseValidator.DB_NAME} (produite)", builtRadioFile.length())
                         val radioValidation = RadioDatabaseValidator.validateDatabaseFile(builtRadioFile)
                         if (!radioValidation.isValid) {
                             return@withContext Result(false, "Validation radio : ${radioValidation.reason ?: "base invalide"}")
@@ -310,17 +380,21 @@ class LocalDbBuildPipeline(
                 }
             }
 
-            onProgress(BuildPhase.DONE, 100, null)
+            emit(BuildPhase.DONE, 100, null)
             Result(true)
         } catch (e: Exception) {
             if (builtFile.exists()) builtFile.delete()
             Result(false, e.message ?: "Échec de la génération locale")
         } finally {
+            // Avant tout nettoyage : le pic de stockage doit etre mesure sources encore presentes.
+            recorder.stop()
             runCatching { radioDb?.close() }
             dataZip.delete()
             refZip.delete()
             observatoireCsv.delete()
             arcepDir.deleteRecursively()
+            stagingFile.delete()
+            radioStagingFile.delete()
             if (builtRadioFile.exists()) builtRadioFile.delete()
         }
     }
@@ -375,6 +449,19 @@ class LocalDbBuildPipeline(
     private fun AndroidSqlDatabase.applyBuildPragmas(totalRamBytes: Long) {
         execSql("PRAGMA cache_size = -${cacheSizeKib(totalRamBytes)}")
         execSql("PRAGMA mmap_size = 268435456")
+    }
+
+    /**
+     * Memes reglages pour la base de staging attachee. Chaque base d'une connexion a son propre
+     * pager, donc son propre cache : sans ces PRAGMA qualifies, c'est le fichier qui encaisse tout
+     * le travail du build qui se retrouverait avec le cache par defaut de 2 Mo.
+     */
+    private fun AndroidSqlDatabase.applyStagingPragmas(totalRamBytes: Long) {
+        val schema = AndroidSqlDatabase.STAGING_SCHEMA
+        execSql("PRAGMA $schema.journal_mode = OFF")
+        execSql("PRAGMA $schema.synchronous = OFF")
+        execSql("PRAGMA $schema.cache_size = -${cacheSizeKib(totalRamBytes)}")
+        execSql("PRAGMA $schema.mmap_size = 268435456")
     }
 
     /** Taille du cache SQLite en Kio : 1/48e de la RAM, borne a [64 Mo, 160 Mo]. */

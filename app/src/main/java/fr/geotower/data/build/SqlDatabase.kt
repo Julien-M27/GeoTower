@@ -11,6 +11,25 @@ import java.io.Closeable
  */
 interface SqlDatabase : Closeable {
 
+    /**
+     * Prefixe de schema des tables de staging : `""` quand elles vivent dans le fichier final,
+     * `"stg."` quand une base annexe est ATTACHee (cf. [staging]).
+     *
+     * Le staging dans un fichier separe evite que les pages qu'il a occupees restent a jamais dans
+     * la base installee (SQLite ne rend pas les pages liberees sans VACUUM) et permet de le rendre
+     * au systeme en supprimant un fichier.
+     *
+     * Seule la **DDL** du staging (CREATE TABLE / CREATE INDEX / DROP TABLE) est qualifiee. Les
+     * lectures et ecritures restent volontairement non qualifiees : SQLite resout un nom non
+     * qualifie dans `temp`, puis `main`, puis les bases attachees dans leur ordre d'attachement, et
+     * `main` ne contient jamais de table `stg_*`. Cela evite d'interpoler un prefixe dans chaque
+     * requete du builder — donc d'y introduire des fautes de frappe silencieuses.
+     */
+    val stagingPrefix: String get() = ""
+
+    /** Nom qualifie d'une table de staging, pour la DDL uniquement. */
+    fun staging(table: String): String = stagingPrefix + table
+
     /** Execute une instruction unique (DDL, PRAGMA, INSERT fixe). */
     fun execSql(sql: String)
 

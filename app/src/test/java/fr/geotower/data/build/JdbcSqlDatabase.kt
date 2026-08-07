@@ -8,8 +8,15 @@ import java.sql.DriverManager
  * une implementation `android.database.sqlite` fournira le meme contrat (Slice 3). Le SQL
  * emis par [GeoTowerDbBuilder] etant brut, les deux backends sont interchangeables.
  */
-class JdbcSqlDatabase(path: String) : SqlDatabase {
+class JdbcSqlDatabase(path: String, stagingPath: String? = null) : SqlDatabase {
     private val connection: Connection = DriverManager.getConnection("jdbc:sqlite:$path")
+
+    /** Non vide quand une base de staging est attachee : la DDL des `stg_*` la vise alors. */
+    override val stagingPrefix: String = if (stagingPath != null) "$STAGING_SCHEMA." else ""
+
+    init {
+        if (stagingPath != null) execSql("ATTACH DATABASE '$stagingPath' AS $STAGING_SCHEMA")
+    }
 
     override fun execSql(sql: String) {
         connection.createStatement().use { it.execute(sql) }
@@ -55,5 +62,10 @@ class JdbcSqlDatabase(path: String) : SqlDatabase {
 
     override fun close() {
         connection.close()
+    }
+
+    private companion object {
+        /** Meme alias que sur l'appareil (`AndroidSqlDatabase.STAGING_SCHEMA`). */
+        const val STAGING_SCHEMA = "stg"
     }
 }

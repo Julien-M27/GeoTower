@@ -67,6 +67,12 @@ object GeoTowerDbBuilder {
         config: BuildConfig,
         onProgress: (phase: BuildPhase, processed: Long) -> Unit = { _, _ -> },
         supSink: SupRowSink = SupRowSink.None,
+        /**
+         * Appele des que le CSV hebdomadaire a ete lu en entier (etape 1) : il n'est plus jamais
+         * relu ensuite. Sert a rendre les ~173 Mo de l'observatoire au systeme avant les etapes
+         * lourdes, ou se situe le pic de stockage.
+         */
+        onWeeklyConsumed: () -> Unit = {},
     ): BuildResult {
         val operateurIds = IdRegistry()
         val systemeIds = IdRegistry()
@@ -88,7 +94,7 @@ object GeoTowerDbBuilder {
         db.execSql("PRAGMA temp_store = FILE")
         GeoTowerDbSchema.CREATE_TABLE_STATEMENTS.forEach { db.execSql(it) }
         db.execSql(GeoTowerDbSchema.CREATE_ROOM_MASTER_TABLE)
-        STAGING_STATEMENTS.forEach { db.execSql(it) }
+        stagingStatements(db.stagingPrefix).forEach { db.execSql(it) }
         onProgress(BuildPhase.READING_STATIONS, 0L)
 
         // 1/ CSV hebdomadaire : construit l'accumulateur station (RAM) + statuts par systeme (disque).
@@ -122,6 +128,7 @@ object GeoTowerDbBuilder {
             if (++weeklyRows % EMIT_EVERY == 0L) onProgress(BuildPhase.READING_STATIONS, weeklyRows)
         }
         sysInserter.flush()
+        onWeeklyConsumed()
 
         onProgress(BuildPhase.READING_SUPPORTS, 0L)
         // 2/ SUP_STATION : dates + exploitant.
@@ -155,7 +162,7 @@ object GeoTowerDbBuilder {
         }
         bandeInserter.flush()
         // Index cree APRES le chargement (perf) : requis par buildEmrFreqs (ORDER BY emr_id) et le scan masques.
-        db.execSql("CREATE INDEX ix_stg_bande_emr ON stg_bande(emr_id)")
+        db.execSql("CREATE INDEX ${db.stagingPrefix}ix_stg_bande_emr ON stg_bande(emr_id)")
         buildEmrFreqs(db)
 
         // 4/ SUP_EMETTEUR -> staging (filtre aux stations connues), enregistre les systemes.
@@ -175,12 +182,12 @@ object GeoTowerDbBuilder {
         }
         emetteurInserter.flush()
         // Index crees APRES le chargement (perf) : requis par le scan masques, applyDetails et applyAzimuts.
-        db.execSql("CREATE INDEX ix_stg_emetteur_emr ON stg_emetteur(emr_id)")
-        db.execSql("CREATE INDEX ix_stg_emetteur_aer ON stg_emetteur(aer_id)")
+        db.execSql("CREATE INDEX ${db.stagingPrefix}ix_stg_emetteur_emr ON stg_emetteur(emr_id)")
+        db.execSql("CREATE INDEX ${db.stagingPrefix}ix_stg_emetteur_aer ON stg_emetteur(aer_id)")
         // Index COUVRANT : applyDetails scanne `e` ordonne par id_anfr en lisant systeme/emr_id/aer_id
         // directement dans l'index (aucun acces rowid), et le GROUP BY id_anfr se fait EN FLUX sur cet
         // ordre (pas de tri temporaire). Le prefixe id_anfr couvre aussi les autres usages de l'index.
-        db.execSql("CREATE INDEX ix_stg_emetteur_id ON stg_emetteur(id_anfr, systeme, emr_id, aer_id)")
+        db.execSql("CREATE INDEX ${db.stagingPrefix}ix_stg_emetteur_id ON stg_emetteur(id_anfr, systeme, emr_id, aer_id)")
         db.execSql(
             "INSERT OR REPLACE INTO stg_fh_aer SELECT DISTINCT aer_id FROM stg_emetteur " +
                 "WHERE aer_id IS NOT NULL AND aer_id != '' AND UPPER(systeme) LIKE '%FH%'",
@@ -217,7 +224,7 @@ object GeoTowerDbBuilder {
         // stg_bande n'est plus utile apres le calcul des masques (les frequences pre-formatees
         // sont deja dans stg_emr_freqs) : on la supprime tot pour liberer du disque (SUP_BANDE
         // ~200 Mo decompresse). Les pages liberees seront reutilisees par les inserts suivants.
-        db.execSql("DROP TABLE IF EXISTS stg_bande")
+        db.execSql("DROP TABLE IF EXISTS ${db.staging("stg_bande")}")
 
         onProgress(BuildPhase.READING_SUPPORTS, 0L)
         // 6/ SUP_ANTENNE -> staging (physique pre-formatee), puis marquage FH.
@@ -261,13 +268,13 @@ object GeoTowerDbBuilder {
         db.execSql("UPDATE stg_antenne_sta SET is_fh = 1 WHERE aer_id IN (SELECT aer_id FROM stg_fh_aer)")
         // Index COUVRANT cree APRES le chargement (perf) : applyAzimuts scanne (id_anfr, azimut, is_fh)
         // en flux, sans tri temporaire malgre le ORDER BY id_anfr.
-        db.execSql("CREATE INDEX ix_stg_antenne_sta ON stg_antenne_sta(id_anfr, azimut, is_fh)")
+        db.execSql("CREATE INDEX ${db.stagingPrefix}ix_stg_antenne_sta ON stg_antenne_sta(id_anfr, azimut, is_fh)")
 
         onProgress(BuildPhase.COMPUTING_ANTENNAS, 0L)
         // 7/ Azimuts (mobile / FH) par station : scan ordonne -> accumulateur RAM.
         applyAzimuts(db, stations)
         // Le lien station <-> azimut ne sert plus : on libere le disque avant la suite du build.
-        db.execSql("DROP TABLE IF EXISTS stg_antenne_sta")
+        db.execSql("DROP TABLE IF EXISTS ${db.staging("stg_antenne_sta")}")
 
         onProgress(BuildPhase.READING_SUPPORTS, 0L)
         // 8/ SUP_SUPPORT -> staging + adresses/communes sur l'accumulateur station.
@@ -339,7 +346,7 @@ object GeoTowerDbBuilder {
         // Ces tables de staging ne servent plus a l'emission finale (SUP_EMETTEUR ~120 Mo) :
         // on libere avant d'ecrire les tables definitives.
         listOf("stg_emetteur", "stg_emr_freqs", "stg_sysstatus", "stg_fh_aer").forEach {
-            db.execSql("DROP TABLE IF EXISTS $it")
+            db.execSql("DROP TABLE IF EXISTS ${db.staging(it)}")
         }
 
         onProgress(BuildPhase.INSERTING, 0L)
@@ -407,7 +414,7 @@ object GeoTowerDbBuilder {
 
         onProgress(BuildPhase.FINALIZING, 0L)
         // 14/ Nettoyage du staging (libere le disque avant finalisation).
-        STAGING_TABLES.forEach { db.execSql("DROP TABLE IF EXISTS $it") }
+        STAGING_TABLES.forEach { db.execSql("DROP TABLE IF EXISTS ${db.staging(it)}") }
 
         db.execSql(GeoTowerDbSchema.INSERT_ROOM_IDENTITY)
         // Room lit PRAGMA user_version a l'ouverture : a poser en tout dernier.
@@ -544,18 +551,21 @@ object GeoTowerDbBuilder {
     // masse de chaque table (cf. build()). Inserer des millions de lignes dans une table deja indexee
     // maintient le B-tree a chaque ligne (anti-pattern) ; construire l'index une fois, apres, est bien
     // plus rapide. Les cles PRIMARY KEY restent (necessaires aux INSERT OR REPLACE).
-    private val STAGING_STATEMENTS = listOf(
-        "CREATE TABLE stg_bande (emr_id TEXT, f_deb REAL, f_fin REAL, unite TEXT, f_deb_raw TEXT, f_fin_raw TEXT)",
-        "CREATE TABLE stg_emr_freqs (emr_id TEXT PRIMARY KEY, freqs_text TEXT)",
-        "CREATE TABLE stg_emetteur (id_anfr TEXT, emr_id TEXT, aer_id TEXT, systeme TEXT)",
-        "CREATE TABLE stg_fh_aer (aer_id TEXT PRIMARY KEY)",
-        "CREATE TABLE stg_antenne (aer_id TEXT PRIMARY KEY, id_anfr TEXT, sup_id TEXT, tae_id INTEGER, azimut INTEGER, hauteur_bas REAL, is_fh INTEGER, physique TEXT)",
+    //
+    // `prefix` place ces tables dans la base de staging attachee quand il y en a une
+    // (cf. [SqlDatabase.stagingPrefix]) ; vide, elles vivent dans le fichier final comme avant.
+    private fun stagingStatements(prefix: String) = listOf(
+        "CREATE TABLE ${prefix}stg_bande (emr_id TEXT, f_deb REAL, f_fin REAL, unite TEXT, f_deb_raw TEXT, f_fin_raw TEXT)",
+        "CREATE TABLE ${prefix}stg_emr_freqs (emr_id TEXT PRIMARY KEY, freqs_text TEXT)",
+        "CREATE TABLE ${prefix}stg_emetteur (id_anfr TEXT, emr_id TEXT, aer_id TEXT, systeme TEXT)",
+        "CREATE TABLE ${prefix}stg_fh_aer (aer_id TEXT PRIMARY KEY)",
+        "CREATE TABLE ${prefix}stg_antenne (aer_id TEXT PRIMARY KEY, id_anfr TEXT, sup_id TEXT, tae_id INTEGER, azimut INTEGER, hauteur_bas REAL, is_fh INTEGER, physique TEXT)",
         // Sans cle primaire : un aer_id mutualise DOIT y apparaitre une fois par station (cf. build()).
-        "CREATE TABLE stg_antenne_sta (id_anfr TEXT, aer_id TEXT, azimut INTEGER, is_fh INTEGER)",
-        "CREATE TABLE stg_support (id_anfr TEXT, sup_id TEXT, nat_id INTEGER, tpo_id INTEGER, hauteur REAL, PRIMARY KEY(id_anfr, sup_id))",
-        "CREATE TABLE stg_sysstatus (id_anfr TEXT, systeme_upper TEXT, statut TEXT, emr_dt TEXT, PRIMARY KEY(id_anfr, systeme_upper))",
-        "CREATE TABLE stg_station_final (id_anfr TEXT PRIMARY KEY, operateur_id INTEGER, operator_label TEXT, latitude REAL, longitude REAL, statut_id INTEGER, statut_label TEXT, adm_id INTEGER, date_imp TEXT, date_ser TEXT, date_mod TEXT, adresse TEXT, code_insee TEXT, tech_mask INTEGER, band_mask INTEGER, has_active INTEGER, azimuts TEXT, azimuts_fh TEXT)",
-        "CREATE TABLE stg_arcep (id_anfr TEXT, operator_upper TEXT, nidt TEXT, is_zb INTEGER, PRIMARY KEY(id_anfr, operator_upper))",
-        "CREATE TABLE stg_details (id_anfr TEXT PRIMARY KEY, details TEXT)",
+        "CREATE TABLE ${prefix}stg_antenne_sta (id_anfr TEXT, aer_id TEXT, azimut INTEGER, is_fh INTEGER)",
+        "CREATE TABLE ${prefix}stg_support (id_anfr TEXT, sup_id TEXT, nat_id INTEGER, tpo_id INTEGER, hauteur REAL, PRIMARY KEY(id_anfr, sup_id))",
+        "CREATE TABLE ${prefix}stg_sysstatus (id_anfr TEXT, systeme_upper TEXT, statut TEXT, emr_dt TEXT, PRIMARY KEY(id_anfr, systeme_upper))",
+        "CREATE TABLE ${prefix}stg_station_final (id_anfr TEXT PRIMARY KEY, operateur_id INTEGER, operator_label TEXT, latitude REAL, longitude REAL, statut_id INTEGER, statut_label TEXT, adm_id INTEGER, date_imp TEXT, date_ser TEXT, date_mod TEXT, adresse TEXT, code_insee TEXT, tech_mask INTEGER, band_mask INTEGER, has_active INTEGER, azimuts TEXT, azimuts_fh TEXT)",
+        "CREATE TABLE ${prefix}stg_arcep (id_anfr TEXT, operator_upper TEXT, nidt TEXT, is_zb INTEGER, PRIMARY KEY(id_anfr, operator_upper))",
+        "CREATE TABLE ${prefix}stg_details (id_anfr TEXT PRIMARY KEY, details TEXT)",
     )
 }

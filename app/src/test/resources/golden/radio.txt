@@ -1,0 +1,48 @@
+user_version=0
+
+# schema
+index idx_non_mobile_site_actor :: CREATE INDEX idx_non_mobile_site_actor ON non_mobile_site(adm_id)
+index idx_non_mobile_site_lat_lon :: CREATE INDEX idx_non_mobile_site_lat_lon ON non_mobile_site(lat_e6, lon_e6)
+index idx_non_mobile_site_service :: CREATE INDEX idx_non_mobile_site_service ON non_mobile_site(service_mask)
+table metadata :: CREATE TABLE metadata (version TEXT NOT NULL PRIMARY KEY, schema_version INTEGER NOT NULL, country_code TEXT NOT NULL, country_name TEXT, source TEXT NOT NULL, date_maj_anfr TEXT, zip_version TEXT, row_count INTEGER NOT NULL) WITHOUT ROWID
+table non_mobile_detail :: CREATE TABLE non_mobile_detail (sta_nm_anfr TEXT NOT NULL, sup_id TEXT NOT NULL, detail_z TEXT NOT NULL, PRIMARY KEY (sta_nm_anfr, sup_id)) WITHOUT ROWID
+table non_mobile_site :: CREATE TABLE non_mobile_site (sta_nm_anfr TEXT NOT NULL, sup_id TEXT NOT NULL, adm_id INTEGER, lat_e6 INTEGER NOT NULL, lon_e6 INTEGER NOT NULL, nat_id INTEGER, tpo_id INTEGER, height_dm INTEGER, code_insee TEXT, service_mask INTEGER NOT NULL, system_mask INTEGER NOT NULL, emitter_count INTEGER NOT NULL, antenna_count INTEGER NOT NULL, freq_range_count INTEGER NOT NULL, min_freq_khz INTEGER, max_freq_khz INTEGER, PRIMARY KEY (sta_nm_anfr, sup_id)) WITHOUT ROWID
+table ref_actor :: CREATE TABLE ref_actor (adm_id INTEGER NOT NULL PRIMARY KEY, label TEXT NOT NULL) WITHOUT ROWID
+table ref_nature :: CREATE TABLE ref_nature (nat_id INTEGER NOT NULL PRIMARY KEY, label TEXT NOT NULL) WITHOUT ROWID
+table ref_owner :: CREATE TABLE ref_owner (tpo_id INTEGER NOT NULL PRIMARY KEY, label TEXT NOT NULL) WITHOUT ROWID
+table ref_type_antenne :: CREATE TABLE ref_type_antenne (tae_id INTEGER NOT NULL PRIMARY KEY, label TEXT NOT NULL) WITHOUT ROWID
+
+# table metadata (1 lignes)
+version=20260601_1200|schema_version=1|country_code=FR|country_name=France|source=ANFR_RADIO|date_maj_anfr=2026-06-01|zip_version=20260601-export-etalab-data.zip|row_count=5
+
+# table non_mobile_detail (5 lignes)
+sta_nm_anfr=0000000010|sup_id=S20|detail_z=Acteur: TDF\nFamilles: Radio/TV\nSystemes: RDF T-DAB x1\nSupport: Pylone; proprietaire Operateur; hauteur_dm=2000\nAdresse: Emetteur Nord, 75001\nFrequences: 174-230 MHz\nAntennes: Antenne broadcast: 45 deg (120m)
+sta_nm_anfr=0000000011|sup_id=S21|detail_z=Acteur: SNCF RESEAU\nFamilles: Ferroviaire\nSystemes: GSM R x1\nSupport: Pylone; proprietaire Operateur; hauteur_dm=300\nFrequences: 921-925 MHz\nAntennes: Antenne broadcast: 0 deg (50m)
+sta_nm_anfr=0000000012|sup_id=S22|detail_z=Acteur: MIN DEFENSE\nFamilles: Radar\nSystemes: RDR x1\nSupport: Pylone; proprietaire Operateur; hauteur_dm=400\nFrequences: 2700-2900 MHz\nAntennes: Antenne broadcast: 180 deg (60m)
+sta_nm_anfr=0000000013|sup_id=S23|detail_z=Acteur: Orange\nFamilles: Radio/TV\nSystemes: FM x1\nSupport: Pylone; proprietaire Collectivite; hauteur_dm=100\nFrequences: 87.5-108 MHz\nAntennes: Antenne broadcast: 270 deg (80m)
+sta_nm_anfr=0000000999|sup_id=S99|detail_z=Acteur: Exploitant inconnu\nFamilles: Reseaux prives\nSystemes: LTE 800 x1\nSupport: Pylone; proprietaire Operateur; hauteur_dm=100\nAntennes: Panneau: 10 deg (10m)
+
+# table non_mobile_site (5 lignes)
+sta_nm_anfr=0000000010|sup_id=S20|adm_id=20|lat_e6=48866667|lon_e6=2333333|nat_id=23|tpo_id=1|height_dm=2000|code_insee=75056|service_mask=1|system_mask=4|emitter_count=1|antenna_count=1|freq_range_count=1|min_freq_khz=174000|max_freq_khz=230000
+sta_nm_anfr=0000000011|sup_id=S21|adm_id=21|lat_e6=43616667|lon_e6=1450000|nat_id=23|tpo_id=1|height_dm=300|code_insee=31555|service_mask=4|system_mask=32|emitter_count=1|antenna_count=1|freq_range_count=1|min_freq_khz=921000|max_freq_khz=925000
+sta_nm_anfr=0000000012|sup_id=S22|adm_id=22|lat_e6=48016667|lon_e6=-4500000|nat_id=23|tpo_id=1|height_dm=400|code_insee=29042|service_mask=64|system_mask=8192|emitter_count=1|antenna_count=1|freq_range_count=1|min_freq_khz=2700000|max_freq_khz=2900000
+sta_nm_anfr=0000000013|sup_id=S23|adm_id=5|lat_e6=48883333|lon_e6=2316667|nat_id=23|tpo_id=2|height_dm=100|code_insee=75056|service_mask=1|system_mask=1|emitter_count=1|antenna_count=1|freq_range_count=1|min_freq_khz=87500|max_freq_khz=108000
+sta_nm_anfr=0000000999|sup_id=S99|adm_id=9|lat_e6=48000000|lon_e6=2000000|nat_id=23|tpo_id=1|height_dm=100|code_insee=75056|service_mask=2|system_mask=32768|emitter_count=1|antenna_count=1|freq_range_count=0|min_freq_khz=<null>|max_freq_khz=<null>
+
+# table ref_actor (5 lignes)
+adm_id=20|label=TDF
+adm_id=21|label=SNCF RESEAU
+adm_id=22|label=MIN DEFENSE
+adm_id=5|label=Orange
+adm_id=9|label=Exploitant inconnu
+
+# table ref_nature (1 lignes)
+nat_id=23|label=Pylone
+
+# table ref_owner (2 lignes)
+tpo_id=1|label=Operateur
+tpo_id=2|label=Collectivite
+
+# table ref_type_antenne (2 lignes)
+tae_id=10|label=Antenne broadcast
+tae_id=16|label=Panneau
