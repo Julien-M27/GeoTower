@@ -2,8 +2,10 @@ package fr.geotower.data.outages
 
 import fr.geotower.data.models.SiteHsEntity
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -47,6 +49,39 @@ class OutageLocalCacheTest {
         } finally {
             file.delete()
         }
+    }
+
+    /**
+     * Régression 2.0.11 : R8 renommait les champs de [CachedOutages], donc un fichier écrit par une
+     * version antérieure n'a plus les bonnes clés. Gson n'échoue pas pour autant — il instancie sans
+     * constructeur et laisse `sites` à `null` malgré son type non-nullable. À traiter comme absent.
+     */
+    @Test
+    fun loadIgnoresCacheWrittenWithOtherFieldNames() {
+        val file = File.createTempFile("outage_legacy", ".json")
+        try {
+            file.writeText("""{"a":123,"b":"2026-07-13","c":[{"a":"0751234567","b":"SFR"}]}""")
+            assertNull(OutageLocalCache(file).load())
+        } finally {
+            file.delete()
+        }
+    }
+
+    /**
+     * Régression 2.0.11 : sans le type des éléments, Gson remplissait la liste de `LinkedTreeMap`.
+     * La liste passait le typage Kotlin et cassait chez l'appelant (`ClassCastException` sur la carte).
+     */
+    @Test
+    fun sitesFilledWithUntypedMapsAreRejected() {
+        @Suppress("UNCHECKED_CAST")
+        val decoded = listOf(mapOf("idAnfr" to "0751234567")) as List<SiteHsEntity>
+        assertFalse(cachedOutageSitesAreUsable(decoded))
+    }
+
+    @Test
+    fun emptySitesAreUsableButMissingOnesAreNot() {
+        assertTrue(cachedOutageSitesAreUsable(emptyList())) // aucune panne : réponse valide
+        assertFalse(cachedOutageSitesAreUsable(null))
     }
 
     @Test

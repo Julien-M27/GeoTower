@@ -2567,4 +2567,5 @@
     <string name="appstrings_release_v206_local_mode_coherence">The database download cards follow your local processing level: those replaced by on-device generation are hidden, with an explanation</string>
     <string name="appstrings_release_v206_max_autonomy_partial">Maximum autonomy now states what it actually turns off on your device, and why the main databases may still come from the server</string>
     <string name="appstrings_release_v206_outage_controls">Outage settings reorganised: update frequency and background refresh</string>
+    <string name="appstrings_release_v2012_startup_crash">Fixed an unexpected shutdown that could close the app on startup, or when opening the map or a site</string>
 </resources>

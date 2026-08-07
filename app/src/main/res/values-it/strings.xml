@@ -2567,4 +2567,5 @@
     <string name="appstrings_release_v206_local_mode_coherence">Le schede di download dei database seguono il tuo livello di elaborazione locale: quelle sostituite dalla generazione sul dispositivo vengono nascoste, con la relativa spiegazione</string>
     <string name="appstrings_release_v206_max_autonomy_partial">L\'autonomia massima indica cosa disattiva davvero sul tuo dispositivo e perché i database principali possono continuare ad arrivare dal server</string>
     <string name="appstrings_release_v206_outage_controls">Impostazioni dei siti guasti riorganizzate: frequenza di aggiornamento e aggiornamento in background</string>
+    <string name="appstrings_release_v2012_startup_crash">Corretta una chiusura imprevista dell\'applicazione, sia all\'avvio sia all\'apertura della mappa o di una scheda</string>
 </resources>

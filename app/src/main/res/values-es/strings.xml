@@ -2567,4 +2567,5 @@
     <string name="appstrings_release_v206_local_mode_coherence">Las tarjetas de descarga de las bases se adaptan a tu nivel de procesamiento local: las sustituidas por la generación en el dispositivo se ocultan, con su explicación</string>
     <string name="appstrings_release_v206_max_autonomy_partial">La autonomía máxima indica qué desactiva realmente en tu dispositivo y por qué las bases principales pueden seguir viniendo del servidor</string>
     <string name="appstrings_release_v206_outage_controls">Ajustes de los sitios caídos reorganizados: frecuencia de actualización y actualización en segundo plano</string>
+    <string name="appstrings_release_v2012_startup_crash">Corregido un cierre inesperado de la aplicación, tanto al iniciarla como al abrir el mapa o una ficha</string>
 </resources>

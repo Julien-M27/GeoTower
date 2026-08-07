@@ -23,8 +23,21 @@
 -keepattributes Signature,*Annotation*,InnerClasses,EnclosingMethod
 
 # Retrofit/Gson DTOs depend on reflective field access and generic signatures.
+#
+# Any class Gson reads back and that holds a COLLECTION field must be listed here. Without a keep
+# rule, R8 (full mode) rewrites the declared type of such a field -- `List<SiteHsEntity>` became a
+# raw `ArrayList` in 2.0.11 -- so Gson loses the element type, fills the list with LinkedTreeMap,
+# and the first read crashes with a ClassCastException.
+#
+# Deliberately NOT listed, because keeping a class also freezes its field names and would make the
+# files already on devices unreadable once: ShareHistoryEntry, ExternalPhotoUploadHistoryEntry and
+# WidgetSiteData. They are flat (no collection field) and therefore safe as they stand -- but add a
+# List/Map/Set field to any of them and it MUST be kept here, along with a migration for the entries
+# users would otherwise lose.
 -keep class fr.geotower.data.api.** { *; }
 -keep class fr.geotower.data.models.** { *; }
+-keep class fr.geotower.data.outages.CachedOutages { *; }
+-keep class fr.geotower.data.outages.CachedServerOutages { *; }
 -keep class fr.geotower.data.config.RemoteHomeAnnouncement* { *; }
 -keep class fr.geotower.data.config.RemoteFeatureFlagConfig { *; }
 -keep class fr.geotower.data.upload.SignalQuestUploadManifest { *; }

@@ -33,7 +33,13 @@ class ServerOutageCache(private val file: File) {
     private val gson = Gson()
 
     fun load(): CachedServerOutages? = try {
-        if (!file.exists()) null else gson.fromJson(file.readText(), CachedServerOutages::class.java)
+        if (!file.exists()) {
+            null
+        } else {
+            // Même filet que le cache local : voir [cachedOutageSitesAreUsable].
+            gson.fromJson(file.readText(), CachedServerOutages::class.java)
+                ?.takeIf { cachedOutageSitesAreUsable(it.sites) }
+        }
     } catch (_: Exception) {
         null // cache corrompu/illisible : traité comme absent
     }

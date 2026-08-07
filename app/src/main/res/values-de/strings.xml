@@ -2567,4 +2567,5 @@
     <string name="appstrings_release_v206_local_mode_coherence">Die Download-Karten der Datenbanken richten sich nach deiner Stufe der lokalen Verarbeitung: Was durch die Erzeugung auf dem Gerät ersetzt wird, wird samt Erklärung ausgeblendet</string>
     <string name="appstrings_release_v206_max_autonomy_partial">Die maximale Autonomie nennt jetzt, was sie auf deinem Gerät tatsächlich abschaltet und warum die Hauptdatenbanken weiterhin vom Server kommen können</string>
     <string name="appstrings_release_v206_outage_controls">Einstellungen zu ausgefallenen Standorten neu geordnet: Aktualisierungsintervall und Aktualisierung im Hintergrund</string>
+    <string name="appstrings_release_v2012_startup_crash">Ein unerwartetes Beenden der App wurde behoben, sowohl beim Start als auch beim Öffnen der Karte oder eines Standorts</string>
 </resources>

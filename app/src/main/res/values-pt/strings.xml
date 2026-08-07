@@ -2567,4 +2567,5 @@
     <string name="appstrings_release_v206_local_mode_coherence">Os cartões de transferência das bases seguem o seu nível de processamento local: os substituídos pela geração no dispositivo são ocultados, com a devida explicação</string>
     <string name="appstrings_release_v206_max_autonomy_partial">A autonomia máxima indica o que desativa realmente no seu dispositivo e porque as bases principais podem continuar a vir do servidor</string>
     <string name="appstrings_release_v206_outage_controls">Definições dos sites em falha reorganizadas: frequência de atualização e atualização em segundo plano</string>
+    <string name="appstrings_release_v2012_startup_crash">Corrigido um encerramento inesperado da aplicação, tanto no arranque como ao abrir o mapa ou uma ficha</string>
 </resources>

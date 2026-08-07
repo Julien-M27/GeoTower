@@ -2569,4 +2569,5 @@
     <string name="appstrings_release_v206_local_mode_coherence">Les cartes de téléchargement des bases s\'adaptent à votre cran de traitement local : celles remplacées par la génération sur l\'appareil sont masquées, avec l\'explication</string>
     <string name="appstrings_release_v206_max_autonomy_partial">L\'autonomie maximale indique ce qu\'elle coupe réellement sur votre appareil, et pourquoi les bases principales peuvent continuer de venir du serveur</string>
     <string name="appstrings_release_v206_outage_controls">Réglages des sites en panne réorganisés : fréquence de mise à jour et récupération en arrière-plan</string>
+    <string name="appstrings_release_v2012_startup_crash">Correction d\'une fermeture inattendue de l\'application, au démarrage comme à l\'ouverture de la carte ou d\'une fiche</string>
 </resources>

@@ -13,6 +13,31 @@ data class CachedOutages(
 )
 
 /**
+ * Un fichier de pannes relu est-il réellement exploitable ?
+ *
+ * Gson construit l'objet **sans passer par le constructeur Kotlin** : rien ne garantit que `sites`
+ * soit rempli, malgré son type non-nullable. Deux façons de récupérer un cache inutilisable, toutes
+ * deux vécues en 2.0.11 :
+ *
+ * - le fichier a été écrit par une version où R8 renommait les champs de la classe (`sites` → `d`),
+ *   les clés ne correspondent plus et `sites` revient `null` — la panne n'éclate alors que bien plus
+ *   loin, chez l'appelant ;
+ * - privé de la signature générique du champ (R8 remplaçait `List<SiteHsEntity>` par un `ArrayList`
+ *   brut), Gson ignore le type des éléments et remplit la liste de `LinkedTreeMap` : le premier
+ *   parcours de la carte cassait sur un `ClassCastException`, application fermée.
+ *
+ * Les règles `-keep` de `proguard-rules.pro` traitent la cause ; ce contrôle reste le filet, parce
+ * qu'un cache ignoré (donc regénéré) coûte infiniment moins cher qu'une application qui se ferme.
+ */
+internal fun cachedOutageSitesAreUsable(sites: List<SiteHsEntity>?): Boolean {
+    // Volontairement vu comme `List<*>` : lire un élément via le type déclaré insérerait le cast
+    // qu'on cherche justement à éviter ici.
+    val raw: List<*> = sites ?: return false
+    val first = raw.firstOrNull() ?: return true // liste vide : cache valide, il n'y a aucune panne
+    return first is SiteHsEntity
+}
+
+/**
  * Cache disque (JSON) du résultat de la génération locale, pour éviter de re-télécharger/re-géocoder
  * à chaque appel. Écriture atomique via un fichier temporaire.
  */
@@ -23,7 +48,12 @@ class OutageLocalCache(private val file: File) {
     private val gson = Gson()
 
     fun load(): CachedOutages? = try {
-        if (!file.exists()) null else gson.fromJson(file.readText(), CachedOutages::class.java)
+        if (!file.exists()) {
+            null
+        } else {
+            gson.fromJson(file.readText(), CachedOutages::class.java)
+                ?.takeIf { cachedOutageSitesAreUsable(it.sites) }
+        }
     } catch (_: Exception) {
         null // cache corrompu/illisible : traité comme absent
     }
