@@ -120,7 +120,6 @@ object PreferenceProfileManager {
         AppNotifications.PREF_ENABLED,
         "enable_update_notifications",
         "enable_live_notifications",
-        "nearby_search_radius",
         "nearby_order",
         "compass_order",
         "home_logo_choice",

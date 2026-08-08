@@ -708,7 +708,7 @@
     <string name="appstrings_map_desc">Quale provider di mappe preferisci?</string>
     <string name="appstrings_map_ign">IGN (Gov)</string>
     <string name="appstrings_map_ign_layer">IGN (Gov)</string>
-    <string name="appstrings_map_light">Leggero</string>
+    <string name="appstrings_map_light">Chiaro</string>
     <string name="appstrings_map_location_marker_option">Punto GPS</string>
     <string name="appstrings_map_location_option">Pulsante localizzazione</string>
     <string name="appstrings_map_location_section_title">Localizzazione</string>
@@ -857,6 +857,7 @@
     <string name="appstrings_outage_global_end">Fine globale</string>
     <string name="appstrings_outage_global_start">Inizio globale</string>
     <string name="appstrings_outage_incident_section">Guasto dichiarato</string>
+    <string name="appstrings_outage_none_declared">Nessun guasto dichiarato per questo operatore</string>
     <string name="appstrings_outage_operator">Operatore</string>
     <string name="appstrings_outage_own_site">Sito proprio</string>
     <string name="appstrings_outage_raw_status_title">Stati grezzi</string>
@@ -1073,7 +1074,6 @@
     <string name="appstrings_search">Cerca</string>
     <string name="appstrings_search_city_or_id">Città, indirizzo, ID sito...</string>
     <string name="appstrings_search_gps">Ricerca posizione GPS...</string>
-    <string name="appstrings_search_radius_title">Raggio di ricerca</string>
     <string name="appstrings_searching">Ricerca...</string>
     <string name="appstrings_select">Seleziona</string>
     <string name="appstrings_select_all">Seleziona tutto</string>
@@ -1317,7 +1317,7 @@
     <string name="appstrings_technologies_title">Tecnologie</string>
     <string name="appstrings_theme_dark">Scuro</string>
     <string name="appstrings_theme_desc">Scegli lo stile più adatto a te.</string>
-    <string name="appstrings_theme_light">Leggero</string>
+    <string name="appstrings_theme_light">Chiaro</string>
     <string name="appstrings_throughput4g_download_label">Download 4G</string>
     <string name="appstrings_throughput4g_upload_label">Upload 4G</string>
     <string name="appstrings_throughput5g_download_label">Download 5G</string>
@@ -2461,8 +2461,8 @@
 
     <!-- Historique des sites/supports partagés ou exportés -->
     <string name="share_history_title">Cronologia delle condivisioni</string>
-    <string name="share_history_desc">Siti e supporti che hai condiviso o esportato</string>
-    <string name="share_history_empty">Nessuna condivisione registrata. I siti e i supporti che condividi o esporti in PDF compariranno qui.</string>
+    <string name="share_history_desc">Siti, supporti e mappe che hai condiviso o esportato</string>
+    <string name="share_history_empty">Nessuna condivisione registrata. I siti, i supporti e le mappe che condividi o esporti in PDF compariranno qui.</string>
     <string name="share_history_clear">Cancella la cronologia</string>
     <string name="share_history_clear_title">Cancellare la cronologia delle condivisioni?</string>
     <string name="share_history_clear_desc">Tutte le condivisioni registrate saranno eliminate da questo dispositivo.</string>
@@ -2470,12 +2470,16 @@
     <string name="share_history_kind_mobile_support">Supporto (traliccio)</string>
     <string name="share_history_kind_radio_site">Sito radio</string>
     <string name="share_history_kind_radio_support">Supporto radio</string>
+    <string name="share_history_kind_map">Mappa delle antenne</string>
     <string name="share_history_dest_share">Immagine condivisa</string>
     <string name="share_history_dest_clipboard">Immagine copiata</string>
     <string name="share_history_dest_pdf">PDF condiviso</string>
     <string name="share_history_dest_pdf_download">PDF scaricato</string>
     <string name="share_history_station_ref">Stazione %1$s</string>
     <string name="share_history_support_ref">Supporto %1$s</string>
+    <string name="share_history_map_ref">Zoom %1$s</string>
+    <string name="share_history_theme_dark">Tema scuro</string>
+    <string name="share_history_theme_light">Tema chiaro</string>
     <string name="share_history_open_unavailable">Nessuna scheda da aprire per questa voce.</string>
     <string name="histories_title">Cronologie</string>
     <string name="histories_desc">Invii di foto e condivisioni registrati su questo dispositivo.</string>
@@ -2488,6 +2492,7 @@
     <string name="upload_history_option_thumbnails">Miniature delle foto</string>
     <string name="share_history_option_counter">Contatore in cima all\'elenco</string>
     <string name="share_history_option_address">Indirizzo del sito</string>
+    <string name="share_history_option_contents">Contenuto della condivisione</string>
     <string name="page_customization_hint_title">Questa pagina è regolabile</string>
     <string name="page_customization_hint_body">Nascondi o riordina i blocchi di questa pagina da questa icona a ingranaggio. Una pressione prolungata su un blocco apre direttamente la sua impostazione.</string>
     <string name="page_customization_hint_dismiss">Più tardi</string>
@@ -2606,4 +2611,12 @@
     <string name="appstrings_release_v2014_local_build_cost">Lo spazio necessario viene indicato prima di iniziare e un dispositivo sotto la stima può comunque tentare</string>
     <string name="appstrings_release_v2014_local_build_announced">Il database generato sul dispositivo riprende anche i sistemi annunciati dalla pubblicazione settimanale dell\'ANFR</string>
     <string name="appstrings_release_v2014_local_build_speed">Generazione locale più rapida e meno esigente in memoria</string>
+
+    <!-- Note di versione 2.0.15 -->
+    <string name="appstrings_release_v2015_share_history_map">La mappa delle antenne e la copertura teorica vengono ora registrate nella cronologia delle condivisioni</string>
+    <string name="appstrings_release_v2015_share_history_reopen">Riaprire una mappa condivisa ne ripristina inquadratura e zoom, senza spostare il tuo indicatore di sito</string>
+    <string name="appstrings_release_v2015_map_attribution">I crediti della mappa indicano la fonte effettivamente mostrata: ortofoto IGN o immagini Esri nella vista satellitare, e OpenStreetMap per i livelli basati sui suoi dati</string>
+    <string name="appstrings_release_v2015_nearby_no_radius">Niente più raggio di ricerca nei siti vicini: l\'elenco mantiene i più vicini, qualunque sia la distanza</string>
+    <string name="appstrings_release_v2015_low_power_follow">Il risparmio energetico di Android viene seguito per impostazione predefinita; se avevi deselezionato l\'interruttore, la tua scelta viene mantenuta</string>
+    <string name="appstrings_release_v2015_outage_none_declared">La scheda indica esplicitamente quando non risulta alcun guasto per un operatore</string>
 </resources>

@@ -63,6 +63,36 @@ object MapUtils {
         }
     }
 
+    /**
+     * Crédits du fond de carte affiché (coin bas gauche de la carte, et image partagée).
+     *
+     * Le texte doit nommer la source des tuiles RÉELLEMENT affichées : elle dépend du fond
+     * (`provider`) mais aussi du style (`ignStyle == 2` = satellite → orthophotos IGN sur le
+     * fond IGN, imagerie Esri sur le fond OSM). Les fonds 2 et 3 servent des tuiles bâties
+     * sur des données OpenStreetMap : on cite OSM en plus du fournisseur de tuiles.
+     *
+     * Volontairement court (le bandeau tient sur une ligne) : le détail complet des licences
+     * est derrière le lien, c'est `url()` qui porte la mention légale exhaustive.
+     */
+    object MapAttribution {
+        /** `provider` : 0 IGN, 1 OSM, 2 CARTO, 3 OpenTopoMap, 4 hors-ligne (données OSM). */
+        fun text(provider: Int, ignStyle: Int): String = when {
+            provider == 0 -> "© IGN"
+            provider == 1 && ignStyle == 2 -> "© Esri"
+            provider == 2 -> "© CARTO, OSM"
+            provider == 3 -> "© OpenTopoMap, OSM"
+            else -> "© OpenStreetMap"
+        }
+
+        fun url(provider: Int, ignStyle: Int): String = when {
+            provider == 0 -> "https://geoservices.ign.fr/"
+            provider == 1 && ignStyle == 2 -> "https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9"
+            provider == 2 -> "https://carto.com/attributions"
+            provider == 3 -> "https://opentopomap.org/about"
+            else -> "https://www.openstreetmap.org/copyright"
+        }
+    }
+
     val markerIconCache = android.util.LruCache<String, BitmapDrawable>(500)
     val clusterIconCache = android.util.LruCache<String, BitmapDrawable>(200)
     val radioIconCache = android.util.LruCache<String, BitmapDrawable>(300)

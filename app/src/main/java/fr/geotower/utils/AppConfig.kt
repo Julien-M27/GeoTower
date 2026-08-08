@@ -38,6 +38,9 @@ object AppConfig {
     const val DEFAULT_SHOW_AZIMUTH_CONES = false
     const val PREF_LOW_POWER_LEVEL = "low_power_level"
     const val PREF_LOW_POWER_FOLLOW_SYSTEM = "low_power_follow_system"
+    // Activé par défaut : sans réglage explicite, l'app s'aligne sur l'économie d'énergie d'Android.
+    // Les utilisateurs ayant décoché l'interrupteur gardent leur choix (la clé est alors écrite).
+    const val DEFAULT_LOW_POWER_FOLLOW_SYSTEM = true
 
     // Suivi live : clé historique (« notifications live ») gardée pour ne pas réinitialiser le
     // réglage des utilisateurs. Elle ne pilote que le service de suivi, pas le droit de notifier.
@@ -106,7 +109,7 @@ object AppConfig {
     // 0 = Normal, 1 = Éco (équilibré), 2 = Éco+ (agressif). Le niveau effectif est calculé par PowerProfile.
     var lowPowerLevel = mutableIntStateOf(0)
     // Aligne le niveau sur l'économie d'énergie d'Android (force au moins Éco quand le système est en éco).
-    var lowPowerFollowSystem = mutableStateOf(false)
+    var lowPowerFollowSystem = mutableStateOf(DEFAULT_LOW_POWER_FOLLOW_SYSTEM)
 
     // --- Mode « traitement local » (autonomie serveur) ---
     // Niveau choisi : 0 Serveur / 1 Sites HS local / 2 Base+sites local / 3 Autonomie max.
@@ -598,7 +601,8 @@ object AppConfig {
 
         // Mode faible consommation (0 Normal / 1 Éco / 2 Éco+)
         lowPowerLevel.intValue = prefs.getInt(PREF_LOW_POWER_LEVEL, 0)
-        lowPowerFollowSystem.value = prefs.getBoolean(PREF_LOW_POWER_FOLLOW_SYSTEM, false)
+        lowPowerFollowSystem.value =
+            prefs.getBoolean(PREF_LOW_POWER_FOLLOW_SYSTEM, DEFAULT_LOW_POWER_FOLLOW_SYSTEM)
 
         // Mode « traitement local » (crans LOCAL_MODE_*, échelle migrée au démarrage du process).
         localModeLevel.intValue = prefs.getInt(PREF_LOCAL_MODE_LEVEL, LOCAL_MODE_SERVER)

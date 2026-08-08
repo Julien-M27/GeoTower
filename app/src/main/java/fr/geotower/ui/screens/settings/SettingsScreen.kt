@@ -752,7 +752,6 @@ fun SettingsScreen(
     var showSearchBar by remember { mutableStateOf(prefs.getBoolean("show_search_bar", true)) }
     var showSearchSuggestions by remember { mutableStateOf(prefs.getBoolean("show_search_suggestions", true)) }
     var showNearbySites by remember { mutableStateOf(prefs.getBoolean("show_nearby_sites", true)) }
-    var nearbySearchRadius by remember { mutableIntStateOf(prefs.getInt("nearby_search_radius", 5)) } // Par défaut 5 km
 
     LaunchedEffect(Unit) {
         AppConfig.uiScalePercent.intValue = AppConfig.readUiScalePercent(prefs)
@@ -1036,16 +1035,13 @@ fun SettingsScreen(
                 "photos favorites galerie images preferees",
                 Icons.Default.PhotoLibrary
             ) { navController.navigate("photos_favorites") }
+            // Les deux journaux locaux sont derrière un bouton commun : la recherche garde leurs
+            // deux vocabulaires, mais mène à la page qui les regroupe.
             directEntry(
-                context.getString(R.string.appstrings_upload_history_title),
-                "historique envoi photos signalquest upload",
+                context.getString(R.string.histories_title),
+                "historiques historique envoi photos signalquest upload partages partage export pdf sites supports genere",
                 Icons.Default.History
-            ) { navController.navigate("photo_upload_history") }
-            directEntry(
-                context.getString(R.string.share_history_title),
-                "historique partages partage export pdf sites supports genere",
-                Icons.Default.History
-            ) { navController.navigate("share_history") }
+            ) { navController.navigate("histories") }
             directEntry(
                 context.getString(R.string.department_stats_title),
                 "statistiques departement departements supports stations antennes densite habitants km2 population",
@@ -1275,12 +1271,8 @@ fun SettingsScreen(
                             safeClick { navController.navigate("photos_favorites") }
                         }
                         Spacer(Modifier.height(sizing.spacing(8.dp)))
-                        NavigationMenuItem(stringResource(R.string.appstrings_upload_history_title), Icons.Default.History, false, isDark) {
-                            safeClick { navController.navigate("photo_upload_history") }
-                        }
-                        Spacer(Modifier.height(sizing.spacing(8.dp)))
-                        NavigationMenuItem(stringResource(R.string.share_history_title), Icons.Default.Share, false, isDark) {
-                            safeClick { navController.navigate("share_history") }
+                        NavigationMenuItem(stringResource(R.string.histories_title), Icons.Default.History, false, isDark) {
+                            safeClick { navController.navigate("histories") }
                         }
                         Spacer(Modifier.height(sizing.spacing(8.dp)))
                         NavigationMenuItem(stringResource(R.string.preference_profiles_title), Icons.Outlined.Bookmarks, false, isDark) {
@@ -1476,8 +1468,7 @@ fun SettingsScreen(
                                     onSectionClick = { openSection(it) },
                                     onShowAll = { if (useWideSections) setNavMode(0) else setSettingsSectionsMode(false) },
                                     onPhotosFavorites = { navController.navigate("photos_favorites") },
-                                    onPhotoUploadHistory = { navController.navigate("photo_upload_history") },
-                                    onShareHistory = { navController.navigate("share_history") },
+                                    onHistories = { navController.navigate("histories") },
                                     onPreferenceProfiles = { showPreferenceProfilesSheet = true },
                                     shape = cardShape,
                                     border = cardBorder,
@@ -1540,8 +1531,7 @@ fun SettingsScreen(
                                     onTargetMapPositioned = { top, height -> offlineMapsTargetBounds = SettingsSectionBounds(top = top, height = height) },
                                     onOpenDiagnostic = { navController.navigate("diagnostic") },
                                     onPhotosFavorites = { navController.navigate("photos_favorites") },
-                                    onPhotoUploadHistory = { navController.navigate("photo_upload_history") },
-                                    onShareHistory = { navController.navigate("share_history") },
+                                    onHistories = { navController.navigate("histories") },
                                     onLocalMode = { navController.navigate("local_mode") },
                                     databaseCardModifiers = databaseCardAnchorModifiers,
                                     databaseRefreshState = databaseRefreshState
@@ -1959,10 +1949,6 @@ fun SettingsScreen(
                 showSites = showNearbySites,
                 onSitesChange = {
                     showNearbySites = it; prefs.edit().putBoolean("show_nearby_sites", it).apply()
-                },
-                searchRadius = nearbySearchRadius,
-                onRadiusChange = {
-                    nearbySearchRadius = it; prefs.edit().putInt("nearby_search_radius", it).apply()
                 },
                 onDismiss = { showNearbySettingsSheet = false },
                 onBack = { safeClick { showNearbySettingsSheet = false } },
@@ -2626,8 +2612,7 @@ fun AllSettingsContent(
     onTargetMapPositioned: (Float, Int) -> Unit = { _, _ -> },
     onOpenDiagnostic: () -> Unit = {},
     onPhotosFavorites: () -> Unit = {},
-    onPhotoUploadHistory: () -> Unit = {},
-    onShareHistory: () -> Unit = {},
+    onHistories: () -> Unit = {},
     onLocalMode: () -> Unit = {},
     databaseCardModifiers: Map<String, Modifier> = emptyMap(),
     databaseRefreshState: DatabaseRefreshState? = null
@@ -2686,8 +2671,7 @@ fun AllSettingsContent(
     Spacer(Modifier.height(sizing.spacing(32.dp)))
     SettingsDirectEntries(
         onPhotosFavorites = onPhotosFavorites,
-        onPhotoUploadHistory = onPhotoUploadHistory,
-        onShareHistory = onShareHistory,
+        onHistories = onHistories,
         onPreferenceProfiles = onPreferenceProfiles,
         shape = shape,
         border = border,
@@ -4375,8 +4359,7 @@ fun IconSheet(
 @Composable
 private fun SettingsDirectEntries(
     onPhotosFavorites: () -> Unit,
-    onPhotoUploadHistory: () -> Unit,
-    onShareHistory: () -> Unit,
+    onHistories: () -> Unit,
     onPreferenceProfiles: () -> Unit,
     shape: Shape,
     border: BorderStroke?,
@@ -4398,28 +4381,18 @@ private fun SettingsDirectEntries(
             icon = Icons.Default.PhotoLibrary
         )
         Spacer(Modifier.height(sizing.spacing(12.dp)))
+        // Un seul bouton pour les deux journaux locaux (envois de photos et partages) : la page
+        // « Historiques » les propose côte à côte.
         PreferenceActionCard(
-            title = stringResource(R.string.appstrings_upload_history_title),
-            desc = stringResource(R.string.upload_history_card_desc),
-            onClick = onPhotoUploadHistory,
+            title = stringResource(R.string.histories_title),
+            desc = stringResource(R.string.histories_desc),
+            onClick = onHistories,
             shape = shape,
             border = border,
             bubbleColor = bubbleColor,
             useOneUi = useOneUi,
             safeClick = safeClick,
             icon = Icons.Default.History
-        )
-        Spacer(Modifier.height(sizing.spacing(12.dp)))
-        PreferenceActionCard(
-            title = stringResource(R.string.share_history_title),
-            desc = stringResource(R.string.share_history_desc),
-            onClick = onShareHistory,
-            shape = shape,
-            border = border,
-            bubbleColor = bubbleColor,
-            useOneUi = useOneUi,
-            safeClick = safeClick,
-            icon = Icons.Default.Share
         )
         Spacer(Modifier.height(sizing.spacing(12.dp)))
         PreferenceActionCard(
@@ -4445,8 +4418,7 @@ private fun SettingsSectionsHome(
     onSectionClick: (Int) -> Unit,
     onShowAll: () -> Unit,
     onPhotosFavorites: () -> Unit,
-    onPhotoUploadHistory: () -> Unit,
-    onShareHistory: () -> Unit,
+    onHistories: () -> Unit,
     onPreferenceProfiles: () -> Unit,
     shape: Shape,
     border: BorderStroke?,
@@ -4483,8 +4455,7 @@ private fun SettingsSectionsHome(
         Spacer(Modifier.height(sizing.spacing(12.dp)))
         SettingsDirectEntries(
             onPhotosFavorites = onPhotosFavorites,
-            onPhotoUploadHistory = onPhotoUploadHistory,
-            onShareHistory = onShareHistory,
+            onHistories = onHistories,
             onPreferenceProfiles = onPreferenceProfiles,
             shape = shape,
             border = border,

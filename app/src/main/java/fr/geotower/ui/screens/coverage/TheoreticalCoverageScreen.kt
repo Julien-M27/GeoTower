@@ -81,6 +81,7 @@ import fr.geotower.data.coverage.SiteCoverage
 import fr.geotower.data.coverage.SiteEmitterResolver
 import fr.geotower.data.coverage.ViewshedParams
 import fr.geotower.data.models.LocalisationEntity
+import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.ui.components.GeoTowerBackTopBar
 import fr.geotower.ui.components.SharedMiniMapCard
 import fr.geotower.ui.components.TheoreticalCoverageShareGenerator
@@ -226,6 +227,21 @@ fun TheoreticalCoverageScreen(
         val mv = mapRef ?: return
         val cov = coverage ?: return
         if (mv.width <= 0 || mv.height <= 0) return
+        // Même sorte que la fiche site (le clic dans l'historique rouvre la station) ; c'est le
+        // contenu qui dit qu'il s'agissait de la couverture théorique.
+        ShareHistoryStore.record(
+            context = context,
+            kind = ShareHistoryStore.KIND_MOBILE_SITE,
+            destination = ShareHistoryStore.DEST_SHARE,
+            stationId = cov.idAnfr,
+            label = cov.operator ?: site?.operateur,
+            latitude = site?.latitude,
+            longitude = site?.longitude,
+            contents = ShareHistoryStore.contentsOf(
+                true to ShareHistoryStore.CONTENT_COVERAGE,
+                (includeObstacles && !fr.geotower.utils.PowerProfile.coverageQualityPreview) to ShareHistoryStore.CONTENT_OBSTACLES
+            )
+        )
         // Capture de la MapView sur le thread principal (obligatoire : c'est une View), puis composition
         // de l'image + compression PNG + écriture disque sur IO (lourd), enfin le chooser de retour sur Main.
         scope.launch {

@@ -857,6 +857,7 @@
     <string name="appstrings_outage_global_end">Fin globale</string>
     <string name="appstrings_outage_global_start">Début global</string>
     <string name="appstrings_outage_incident_section">Panne déclarée</string>
+    <string name="appstrings_outage_none_declared">Aucune panne déclarée pour cet opérateur</string>
     <string name="appstrings_outage_operator">Opérateur</string>
     <string name="appstrings_outage_own_site">Site propre</string>
     <string name="appstrings_outage_raw_status_title">États bruts</string>
@@ -1073,7 +1074,6 @@
     <string name="appstrings_search">Rechercher</string>
     <string name="appstrings_search_city_or_id">Ville, adresse, ID de site...</string>
     <string name="appstrings_search_gps">Recherche position GPS...</string>
-    <string name="appstrings_search_radius_title">Rayon de recherche</string>
     <string name="appstrings_searching">Recherche...</string>
     <string name="appstrings_select">Sélectionner</string>
     <string name="appstrings_select_all">Tout sélectionner</string>
@@ -2461,8 +2461,8 @@
 
     <!-- Historique des sites/supports partagés ou exportés -->
     <string name="share_history_title">Historique des partages</string>
-    <string name="share_history_desc">Sites et supports que vous avez partagés ou exportés</string>
-    <string name="share_history_empty">Aucun partage enregistré. Les sites et supports que vous partagez ou exportez en PDF apparaîtront ici.</string>
+    <string name="share_history_desc">Sites, supports et cartes que vous avez partagés ou exportés</string>
+    <string name="share_history_empty">Aucun partage enregistré. Les sites, supports et cartes que vous partagez ou exportez en PDF apparaîtront ici.</string>
     <string name="share_history_clear">Effacer l\'historique</string>
     <string name="share_history_clear_title">Effacer l\'historique des partages ?</string>
     <string name="share_history_clear_desc">Tous les partages enregistrés seront supprimés de cet appareil.</string>
@@ -2470,12 +2470,16 @@
     <string name="share_history_kind_mobile_support">Support (pylône)</string>
     <string name="share_history_kind_radio_site">Site radio</string>
     <string name="share_history_kind_radio_support">Support radio</string>
+    <string name="share_history_kind_map">Carte des antennes</string>
     <string name="share_history_dest_share">Image partagée</string>
     <string name="share_history_dest_clipboard">Image copiée</string>
     <string name="share_history_dest_pdf">PDF partagé</string>
     <string name="share_history_dest_pdf_download">PDF téléchargé</string>
     <string name="share_history_station_ref">Station %1$s</string>
     <string name="share_history_support_ref">Support %1$s</string>
+    <string name="share_history_map_ref">Zoom %1$s</string>
+    <string name="share_history_theme_dark">Thème sombre</string>
+    <string name="share_history_theme_light">Thème clair</string>
     <string name="share_history_open_unavailable">Aucune fiche à ouvrir pour cette entrée.</string>
     <string name="histories_title">Historiques</string>
     <string name="histories_desc">Envois de photos et partages enregistrés sur cet appareil.</string>
@@ -2488,6 +2492,7 @@
     <string name="upload_history_option_thumbnails">Miniatures des photos</string>
     <string name="share_history_option_counter">Compteur en tête de liste</string>
     <string name="share_history_option_address">Adresse du site</string>
+    <string name="share_history_option_contents">Contenu du partage</string>
     <string name="page_customization_hint_title">Cette page est réglable</string>
     <string name="page_customization_hint_body">Masquez ou réordonnez les blocs de cette page depuis cette roue dentée. Un appui long sur un bloc ouvre directement son réglage.</string>
     <string name="page_customization_hint_dismiss">Plus tard</string>
@@ -2608,4 +2613,12 @@
     <string name="appstrings_release_v2014_local_build_cost">L\'espace nécessaire est annoncé avant de lancer, et un appareil en dessous de l\'estimation peut quand même tenter sa chance</string>
     <string name="appstrings_release_v2014_local_build_announced">La base générée sur l\'appareil reprend à son tour les systèmes annoncés par la publication hebdomadaire de l\'ANFR</string>
     <string name="appstrings_release_v2014_local_build_speed">Génération locale plus rapide et moins gourmande en mémoire</string>
+
+    <!-- Notes de version 2.0.15 -->
+    <string name="appstrings_release_v2015_share_history_map">La carte des antennes et la couverture théorique sont désormais enregistrées dans l\'historique des partages</string>
+    <string name="appstrings_release_v2015_share_history_reopen">Rouvrir un partage de carte repose son cadrage et son zoom, sans déplacer votre repère de site</string>
+    <string name="appstrings_release_v2015_map_attribution">Les crédits du fond de carte nomment la source réellement affichée : orthophotos IGN ou imagerie Esri en satellite, et OpenStreetMap pour les fonds bâtis sur ses données</string>
+    <string name="appstrings_release_v2015_nearby_no_radius">Plus de rayon de recherche dans les sites à proximité : la liste garde les plus proches, quelle que soit la distance</string>
+    <string name="appstrings_release_v2015_low_power_follow">L\'économie d\'énergie d\'Android est suivie par défaut ; si vous aviez décoché l\'interrupteur, votre choix est conservé</string>
+    <string name="appstrings_release_v2015_outage_none_declared">La fiche indique explicitement quand aucune panne n\'est déclarée pour un opérateur</string>
 </resources>

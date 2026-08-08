@@ -31,28 +31,25 @@ internal data class ReleaseNoteItem(
  */
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
+    section(stringResource(R.string.appstrings_release_section_share_export)) {
+        item(stringResource(R.string.appstrings_release_v2015_share_history_map))
+        item(stringResource(R.string.appstrings_release_v2015_share_history_reopen))
+    }
+
     section(stringResource(R.string.appstrings_release_section_map)) {
-        item(stringResource(R.string.appstrings_release_v2014_smooth_location))
+        item(stringResource(R.string.appstrings_release_v2015_map_attribution))
     }
 
-    section(stringResource(R.string.appstrings_release_section_site_detail)) {
-        item(stringResource(R.string.appstrings_release_v2014_announced_bands))
-        item(stringResource(R.string.appstrings_release_v2014_azimuth_placeholder))
+    section(stringResource(R.string.appstrings_release_section_nearby)) {
+        item(stringResource(R.string.appstrings_release_v2015_nearby_no_radius))
     }
 
-    section(stringResource(R.string.appstrings_release_section_settings)) {
-        item(stringResource(R.string.appstrings_release_v2014_pages_section))
-        item(stringResource(R.string.appstrings_release_v2014_pages_search))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_database)) {
-        item(stringResource(R.string.appstrings_release_v2014_local_build_budgets))
-        item(stringResource(R.string.appstrings_release_v2014_local_build_cost))
-        item(stringResource(R.string.appstrings_release_v2014_local_build_announced))
+    section(stringResource(R.string.appstrings_release_section_hs_sites)) {
+        item(stringResource(R.string.appstrings_release_v2015_outage_none_declared))
     }
 
     section(stringResource(R.string.appstrings_release_section_performance)) {
-        item(stringResource(R.string.appstrings_release_v2014_local_build_speed))
+        item(stringResource(R.string.appstrings_release_v2015_low_power_follow))
     }
 }
 

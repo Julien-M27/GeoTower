@@ -49,8 +49,10 @@ import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.findViewTreeSavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
+import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.AppLogger
+import fr.geotower.utils.MapUtils
 import fr.geotower.utils.SharePrefs
 import java.io.File
 import java.io.FileOutputStream
@@ -388,7 +390,13 @@ fun MapShareMenu(
     currentLat: Double,
     azimuth: Float,
     measureOverlay: org.osmdroid.views.overlay.FolderOverlay? = null, // ✅ AJOUT : Le calque des mesures
-    timeSliderDateLabel: String? = null
+    timeSliderDateLabel: String? = null,
+    /**
+     * Repeint le repère « ma position » sur le canvas de la capture. Non nul uniquement quand le
+     * rendu fluide est actif : dans ce mode le calque osmdroid ne dessine plus rien (le repère est
+     * peint au-dessus de la carte), donc map.draw() rendrait une image sans point de localisation.
+     */
+    drawLocationMarker: ((Canvas) -> Unit)? = null
 ) {
     val context = LocalContext.current
     val currentView = LocalView.current
@@ -447,13 +455,12 @@ fun MapShareMenu(
     val txtAttributionOption = stringResource(R.string.appstrings_share_map_attribution_option)
     val txtQrCode = stringResource(R.string.brand_qr_code)
 
-    val txtAttributionDesc = when(AppConfig.mapProvider.intValue) {
-        0 -> stringResource(R.string.appstrings_src_ign_desc)
-        1 -> stringResource(R.string.appstrings_src_osm_desc)
-        2 -> "© MapLibre"
-        3 -> "© OpenTopoMap"
-        else -> stringResource(R.string.appstrings_src_osm_desc)
-    }
+    // Mêmes crédits que le coin bas gauche de la carte : une seule source de vérité,
+    // sinon l'image partagée finit par citer un fournisseur qui n'a pas servi les tuiles.
+    val txtAttributionDesc = MapUtils.MapAttribution.text(
+        AppConfig.mapProvider.intValue,
+        AppConfig.ignStyle.intValue
+    )
 
     // Le bouton doit rester géométriquement identique aux autres boutons de la carte
     // (boussole, position, zoom), qui dérivent tous de MapControlButtonDiameter = 54.dp.
@@ -545,6 +552,29 @@ fun MapShareMenu(
             fun startMapImageExport(destination: MapShareDestination) {
                 showSelectionSheet = false
 
+                // Le cadrage est lu au clic, avant que la capture ne déplace quoi que ce soit :
+                // c'est lui qui permettra de rouvrir la carte au même endroit depuis l'historique.
+                ShareHistoryStore.record(
+                    context = context,
+                    kind = ShareHistoryStore.KIND_MAP,
+                    destination = when (destination) {
+                        MapShareDestination.Clipboard -> ShareHistoryStore.DEST_CLIPBOARD
+                        MapShareDestination.Share -> ShareHistoryStore.DEST_SHARE
+                    },
+                    latitude = globalMapRef?.mapCenter?.latitude,
+                    longitude = globalMapRef?.mapCenter?.longitude,
+                    contents = ShareHistoryStore.contentsOf(
+                        incAzimuths to ShareHistoryStore.CONTENT_AZIMUTHS,
+                        incSpeedometer to ShareHistoryStore.CONTENT_SPEEDOMETER,
+                        incScale to ShareHistoryStore.CONTENT_SCALE,
+                        incAttribution to ShareHistoryStore.CONTENT_ATTRIBUTION,
+                        incQrCode to ShareHistoryStore.CONTENT_QR_CODE,
+                        incConfidential to ShareHistoryStore.CONTENT_CONFIDENTIAL
+                    ),
+                    darkTheme = selectedShareTheme,
+                    mapZoom = globalMapRef?.zoomLevelDouble
+                )
+
                 val originalStates = mutableMapOf<org.osmdroid.views.overlay.Overlay, Boolean>()
                 val originalAzimuthState = AppConfig.showAzimuths.value
                 if (!incAzimuths) {
@@ -568,7 +598,12 @@ fun MapShareMenu(
                     val mapBmp = try {
                         globalMapRef?.let { map ->
                             val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888)
-                            map.draw(Canvas(bmp))
+                            val mapCanvas = Canvas(bmp)
+                            map.draw(mapCanvas)
+                            // Le repère de position est peint par-dessus la carte en rendu fluide :
+                            // il faut le rejouer ici, avec le même respect du mode confidentiel que
+                            // le calque osmdroid désactivé juste au-dessus.
+                            if (!incConfidential) drawLocationMarker?.invoke(mapCanvas)
                             bmp
                         }
                     } catch (e: Exception) { null }

@@ -46,8 +46,8 @@ import fr.geotower.utils.PageScrollPrefs
 
 /**
  * Point d'entrée unique vers les journaux locaux de l'application : photos envoyées et sites ou
- * supports partagés. Les deux restent accessibles séparément depuis les Réglages ; cette page
- * existe pour qu'« À propos » n'ait qu'un seul bouton à proposer.
+ * supports partagés. « À propos » comme les Réglages n'ont qu'un seul bouton « Historiques » à
+ * proposer ; les deux pages ne sont plus listées séparément.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

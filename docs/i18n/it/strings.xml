@@ -712,7 +712,6 @@
     <string name="appstrings_search">Cerca</string>
     <string name="appstrings_search_city_or_id">Città, indirizzo, ID sito...</string>
     <string name="appstrings_search_gps">Ricerca posizione GPS...</string>
-    <string name="appstrings_search_radius_title">Raggio di ricerca</string>
     <string name="appstrings_searching">Ricerca...</string>
     <string name="appstrings_select">Seleziona</string>
     <string name="appstrings_select_all">Seleziona tutto</string>

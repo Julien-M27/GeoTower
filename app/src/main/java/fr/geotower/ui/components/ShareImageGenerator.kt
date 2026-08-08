@@ -862,7 +862,18 @@ fun RadioShareMenu(
                         address = marker.addressSummary,
                         latitude = marker.latitude,
                         longitude = marker.longitude,
-                        itemCount = if (isSupportShare) markers.count { !it.isCluster } else 1
+                        itemCount = if (isSupportShare) markers.count { !it.isCluster } else 1,
+                        // Les blocs radio portent déjà les mêmes identifiants que les codes de
+                        // contenu ; on les relit dans l'ordre du menu pour un affichage stable.
+                        contents = ShareHistoryStore.contentsOf(
+                            *shareOrder
+                                .filter { it != RADIO_SHARE_HEADER && it in selectedBlockIds }
+                                .map { true to it }
+                                .toTypedArray(),
+                            incQrCode to ShareHistoryStore.CONTENT_QR_CODE,
+                            incConfidential to ShareHistoryStore.CONTENT_CONFIDENTIAL
+                        ),
+                        darkTheme = selectedShareTheme
                     )
                     currentView.postDelayed({
                         if (isSupportShare) {
@@ -6219,17 +6230,6 @@ fun AntennaShareMenu(
                 isGeneratingShare = true
                 generationMessage = txtShareImageGenerationInProgress
                 showSelectionSheet = false
-                ShareHistoryStore.record(
-                    context = context,
-                    kind = ShareHistoryStore.KIND_MOBILE_SITE,
-                    destination = destination.historyKey(),
-                    supportId = physique?.idSupport,
-                    stationId = info.idAnfr,
-                    label = info.operateur,
-                    address = technique?.adresse,
-                    latitude = info.latitude,
-                    longitude = info.longitude
-                )
                 val isPdfDestination = destination.isPdfExport()
                 val shareOnlyElevationProfile = !isPdfDestination && isOnlyElevationProfileSelected(
                     shareOrder = shareOrder,
@@ -6244,6 +6244,41 @@ fun AntennaShareMenu(
                     incFreqs = incFreqs,
                     incSpeedtest = incSpeedtest,
                     incThroughput = incThroughput
+                )
+                // Enregistré au clic, une fois le contenu connu : un partage « profil d'élévation
+                // seul » ne doit pas se relire comme une fiche complète dans l'historique.
+                ShareHistoryStore.record(
+                    context = context,
+                    kind = ShareHistoryStore.KIND_MOBILE_SITE,
+                    destination = destination.historyKey(),
+                    supportId = physique?.idSupport,
+                    stationId = info.idAnfr,
+                    label = info.operateur,
+                    address = technique?.adresse,
+                    latitude = info.latitude,
+                    longitude = info.longitude,
+                    contents = if (shareOnlyElevationProfile) {
+                        ShareHistoryStore.CONTENT_ELEVATION_PROFILE
+                    } else {
+                        ShareHistoryStore.contentsOf(
+                            (incMap && shareOrder.contains("map")) to ShareHistoryStore.CONTENT_MAP,
+                            (incElevationProfile && shareOrder.contains("elevation_profile")) to ShareHistoryStore.CONTENT_ELEVATION_PROFILE,
+                            (incSupport && shareOrder.contains("support")) to ShareHistoryStore.CONTENT_SUPPORT,
+                            (incPhotos && hasSharePhotos && shareOrder.contains("photos")) to ShareHistoryStore.CONTENT_PHOTOS,
+                            (incIds && shareOrder.contains("ids")) to ShareHistoryStore.CONTENT_IDS,
+                            (incDates && shareOrder.contains("dates")) to ShareHistoryStore.CONTENT_DATES,
+                            (incAddress && shareOrder.contains("address")) to ShareHistoryStore.CONTENT_ADDRESS,
+                            (incSpeedtest && shareOrder.contains("speedtest")) to ShareHistoryStore.CONTENT_SPEEDTEST,
+                            (incThroughput && shareOrder.contains("throughput")) to ShareHistoryStore.CONTENT_THROUGHPUT,
+                            (AppConfig.shareSiteStatus.value && shareOrder.contains("status")) to ShareHistoryStore.CONTENT_STATUS,
+                            (incFreqs && shareOrder.contains("freq")) to ShareHistoryStore.CONTENT_FREQ,
+                            incHeights to ShareHistoryStore.CONTENT_HEIGHTS,
+                            incQrCode to ShareHistoryStore.CONTENT_QR_CODE,
+                            incConfidential to ShareHistoryStore.CONTENT_CONFIDENTIAL,
+                            (incSplitImage && !isPdfDestination) to ShareHistoryStore.CONTENT_SPLIT_IMAGE
+                        )
+                    },
+                    darkTheme = selectedShareTheme
                 )
                 val elevationProfileTexts = ElevationProfileShareTexts(
                     title = txtElevationProfileTitle,
@@ -6550,12 +6585,24 @@ fun SupportShareMenu(
             address = techniquesMap[anchor.idAnfr]?.adresse,
             latitude = anchor.latitude,
             longitude = anchor.longitude,
-            itemCount = antennas.size
+            itemCount = antennas.size,
+            contents = ShareHistoryStore.contentsOf(
+                (incMap && shareOrder.contains("map")) to ShareHistoryStore.CONTENT_MAP,
+                (incSupport && shareOrder.contains("support")) to ShareHistoryStore.CONTENT_SUPPORT,
+                (incPhotos && hasSharePhotos && shareOrder.contains("photos")) to ShareHistoryStore.CONTENT_PHOTOS,
+                (incOperators && shareOrder.contains("operators")) to ShareHistoryStore.CONTENT_OPERATORS,
+                (incRadioEntries && hasRadioEntries && shareOrder.contains(SUPPORT_SHARE_RADIO_ENTRIES)) to ShareHistoryStore.CONTENT_RADIO_ENTRIES,
+                // Le speedtest n'existe que dans le rapport PDF, pas dans l'image.
+                (incReportSpeedtest && destination.isPdfExport()) to ShareHistoryStore.CONTENT_SPEEDTEST,
+                incQrCode to ShareHistoryStore.CONTENT_QR_CODE,
+                incConfidential to ShareHistoryStore.CONTENT_CONFIDENTIAL
+            ),
+            darkTheme = selectedShareTheme
         )
     }
 
     fun startSupportPdfExport(destination: ShareImageDestination) {
-        val anchor = antennas.firstOrNull() ?: return
+        if (antennas.isEmpty()) return
         if (isGeneratingShare) return
         isGeneratingShare = true
         generationMessage = txtShareImagePreparingInProgress
@@ -6563,7 +6610,10 @@ fun SupportShareMenu(
         recordSupportShare(destination)
         // La collecte des speedtests précède le rendu : on signale la génération dès maintenant.
         PdfReportNotifier.showPreparing(context, supportReportLabel)
-        globalMapRef?.let { map -> map.controller.setZoom(17.5); map.controller.setCenter(org.osmdroid.util.GeoPoint(anchor.latitude, anchor.longitude)) }
+        // Pas de recadrage avant la capture : le rapport reprend la mini-carte telle qu'elle est
+        // affichée. Forcer un centrage sur le support au zoom 17.5 chassait le repère de position
+        // hors du cadre en mode « ma position → antenne », et laissait la carte de la fiche zoomée
+        // après coup. Le partage d'une fiche d'antenne ne recadre pas non plus.
         scope.launch {
             val sharePhotoBitmaps = if (incPhotos && hasSharePhotos && shareOrder.contains("photos")) {
                 loadSharePhotoBitmaps(visibleSharePhotos)
@@ -6758,7 +6808,8 @@ fun SupportShareMenu(
                 generationMessage = txtShareImagePreparingInProgress
                 showSelectionSheet = false
                 recordSupportShare(destination)
-                globalMapRef?.let { map -> map.controller.setZoom(17.5); map.controller.setCenter(org.osmdroid.util.GeoPoint(mainInfo.latitude, mainInfo.longitude)) }
+                // Même règle que l'export PDF ci-dessus : on capture le cadrage affiché, sans quoi
+                // le repère de position disparaîtrait de l'image alors qu'il est visible à l'écran.
                 scope.launch {
                     val sharePhotoBitmaps = if (incPhotos && hasSharePhotos && shareOrder.contains("photos")) {
                         loadSharePhotoBitmaps(visibleSharePhotos)
@@ -6933,6 +6984,21 @@ fun ThroughputShareMenu(
                     if (isGeneratingShare) return
                     isGeneratingShare = true
                     showSheet = false
+                    // Le débit théorique vise bien une station : même sorte que la fiche site, et
+                    // c'est le contenu qui distingue les deux dans l'historique.
+                    ShareHistoryStore.record(
+                        context = context,
+                        kind = ShareHistoryStore.KIND_MOBILE_SITE,
+                        destination = destination.historyKey(),
+                        supportId = physique?.idSupport,
+                        stationId = info.idAnfr,
+                        label = info.operateur,
+                        address = technique?.adresse,
+                        latitude = info.latitude,
+                        longitude = info.longitude,
+                        contents = ShareHistoryStore.CONTENT_THROUGHPUT,
+                        darkTheme = selectedShareTheme
+                    )
                     currentView.postDelayed({
                         shareThroughputCapture(
                             context = context,

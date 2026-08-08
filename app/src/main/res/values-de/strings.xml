@@ -708,7 +708,7 @@
     <string name="appstrings_map_desc">Welchen Kartenanbieter bevorzugst du?</string>
     <string name="appstrings_map_ign">IGN (Behörde)</string>
     <string name="appstrings_map_ign_layer">IGN (Behörde)</string>
-    <string name="appstrings_map_light">Gering</string>
+    <string name="appstrings_map_light">Hell</string>
     <string name="appstrings_map_location_marker_option">GPS-Punkt</string>
     <string name="appstrings_map_location_option">Standort-Schaltfläche</string>
     <string name="appstrings_map_location_section_title">Standort</string>
@@ -857,6 +857,7 @@
     <string name="appstrings_outage_global_end">Globales Ende</string>
     <string name="appstrings_outage_global_start">Globaler Beginn</string>
     <string name="appstrings_outage_incident_section">Gemeldete Störung</string>
+    <string name="appstrings_outage_none_declared">Für diesen Betreiber wurde keine Störung gemeldet</string>
     <string name="appstrings_outage_operator">Betreiber</string>
     <string name="appstrings_outage_own_site">Eigener Standort</string>
     <string name="appstrings_outage_raw_status_title">Rohstatus</string>
@@ -1073,7 +1074,6 @@
     <string name="appstrings_search">Suchen</string>
     <string name="appstrings_search_city_or_id">Stadt, Adresse, Standort-ID...</string>
     <string name="appstrings_search_gps">GPS-Position wird gesucht...</string>
-    <string name="appstrings_search_radius_title">Suchradius</string>
     <string name="appstrings_searching">Suche läuft...</string>
     <string name="appstrings_select">Auswählen</string>
     <string name="appstrings_select_all">Alle auswählen</string>
@@ -1317,7 +1317,7 @@
     <string name="appstrings_technologies_title">Technologien</string>
     <string name="appstrings_theme_dark">Dunkel</string>
     <string name="appstrings_theme_desc">Wähle den Stil, der zu dir passt.</string>
-    <string name="appstrings_theme_light">Gering</string>
+    <string name="appstrings_theme_light">Hell</string>
     <string name="appstrings_throughput4g_download_label">4G-Download</string>
     <string name="appstrings_throughput4g_upload_label">4G-Upload</string>
     <string name="appstrings_throughput5g_download_label">5G-Download</string>
@@ -2461,8 +2461,8 @@
 
     <!-- Historique des sites/supports partagés ou exportés -->
     <string name="share_history_title">Freigabeverlauf</string>
-    <string name="share_history_desc">Standorte und Masten, die Sie geteilt oder exportiert haben</string>
-    <string name="share_history_empty">Noch keine Freigabe gespeichert. Geteilte oder als PDF exportierte Standorte und Masten erscheinen hier.</string>
+    <string name="share_history_desc">Standorte, Masten und Karten, die Sie geteilt oder exportiert haben</string>
+    <string name="share_history_empty">Noch keine Freigabe gespeichert. Geteilte oder als PDF exportierte Standorte, Masten und Karten erscheinen hier.</string>
     <string name="share_history_clear">Verlauf löschen</string>
     <string name="share_history_clear_title">Freigabeverlauf löschen?</string>
     <string name="share_history_clear_desc">Alle gespeicherten Freigaben werden von diesem Gerät gelöscht.</string>
@@ -2470,12 +2470,16 @@
     <string name="share_history_kind_mobile_support">Mast</string>
     <string name="share_history_kind_radio_site">Rundfunkstandort</string>
     <string name="share_history_kind_radio_support">Rundfunkmast</string>
+    <string name="share_history_kind_map">Antennenkarte</string>
     <string name="share_history_dest_share">Bild geteilt</string>
     <string name="share_history_dest_clipboard">Bild kopiert</string>
     <string name="share_history_dest_pdf">PDF geteilt</string>
     <string name="share_history_dest_pdf_download">PDF heruntergeladen</string>
     <string name="share_history_station_ref">Station %1$s</string>
     <string name="share_history_support_ref">Mast %1$s</string>
+    <string name="share_history_map_ref">Zoom %1$s</string>
+    <string name="share_history_theme_dark">Dunkles Design</string>
+    <string name="share_history_theme_light">Helles Design</string>
     <string name="share_history_open_unavailable">Kein Eintrag zum Öffnen vorhanden.</string>
     <string name="histories_title">Verläufe</string>
     <string name="histories_desc">Auf diesem Gerät gespeicherte Foto-Uploads und Freigaben.</string>
@@ -2488,6 +2492,7 @@
     <string name="upload_history_option_thumbnails">Foto-Miniaturansichten</string>
     <string name="share_history_option_counter">Zähler am Anfang der Liste</string>
     <string name="share_history_option_address">Adresse des Standorts</string>
+    <string name="share_history_option_contents">Inhalt der Freigabe</string>
     <string name="page_customization_hint_title">Diese Seite ist anpassbar</string>
     <string name="page_customization_hint_body">Über dieses Zahnrad kannst du die Blöcke dieser Seite ausblenden oder neu anordnen. Ein langer Druck auf einen Block öffnet direkt dessen Einstellung.</string>
     <string name="page_customization_hint_dismiss">Später</string>
@@ -2606,4 +2611,12 @@
     <string name="appstrings_release_v2014_local_build_cost">Der benötigte Speicherplatz wird vor dem Start angezeigt, und ein Gerät unterhalb der Schätzung darf es trotzdem versuchen</string>
     <string name="appstrings_release_v2014_local_build_announced">Die auf dem Gerät erzeugte Datenbank enthält nun ebenfalls die in der wöchentlichen ANFR-Veröffentlichung angekündigten Systeme</string>
     <string name="appstrings_release_v2014_local_build_speed">Die lokale Erzeugung ist schneller und braucht weniger Speicher</string>
+
+    <!-- Versionshinweise 2.0.15 -->
+    <string name="appstrings_release_v2015_share_history_map">Die Antennenkarte und die theoretische Abdeckung werden jetzt im Teilen-Verlauf festgehalten</string>
+    <string name="appstrings_release_v2015_share_history_reopen">Beim erneuten Öffnen einer geteilten Karte werden Ausschnitt und Zoom wiederhergestellt, ohne deine Standortmarkierung zu verschieben</string>
+    <string name="appstrings_release_v2015_map_attribution">Die Kartenhinweise nennen die tatsächlich angezeigte Quelle: IGN-Orthofotos oder Esri-Bilder in der Satellitenansicht und OpenStreetMap bei Ebenen auf Basis seiner Daten</string>
+    <string name="appstrings_release_v2015_nearby_no_radius">Kein Suchradius mehr bei Standorten in der Nähe: Die Liste behält die nächstgelegenen, unabhängig von der Entfernung</string>
+    <string name="appstrings_release_v2015_low_power_follow">Der Energiesparmodus von Android wird jetzt standardmäßig übernommen; hattest du den Schalter abgewählt, bleibt deine Wahl erhalten</string>
+    <string name="appstrings_release_v2015_outage_none_declared">Die Standortseite sagt jetzt ausdrücklich, wenn für einen Betreiber keine Störung gemeldet ist</string>
 </resources>

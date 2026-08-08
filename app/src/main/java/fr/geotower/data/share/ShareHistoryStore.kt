@@ -6,9 +6,9 @@ import java.io.File
 import java.util.UUID
 
 /**
- * Une entrée = un partage (ou une génération PDF) d'un site ou d'un support. On ne garde que des
- * données brutes (identifiants, opérateur, adresse) : les libellés sont construits à l'affichage,
- * sinon un changement de langue figerait l'historique dans l'ancienne.
+ * Une entrée = un partage (ou une génération PDF) d'un site, d'un support ou de la carte. On ne
+ * garde que des données brutes (identifiants, opérateur, adresse, codes de blocs) : les libellés
+ * sont construits à l'affichage, sinon un changement de langue figerait l'historique dans l'ancienne.
  */
 data class ShareHistoryEntry(
     val id: String,
@@ -27,7 +27,18 @@ data class ShareHistoryEntry(
     val longitude: Double? = null,
     /** Nombre de stations incluses dans le partage : 1 pour un site, N pour un support. */
     val itemCount: Int = 1,
-    val createdAtMillis: Long = 0L
+    val createdAtMillis: Long = 0L,
+    // Champs ajoutés après coup : ils DOIVENT rester nuls par défaut et scalaires, et être ajoutés à
+    // la fin. Gson n'applique pas les valeurs par défaut de Kotlin, donc une entrée écrite par une
+    // version précédente les relit à `null` -- un type non nullable planterait à la première lecture.
+    // Scalaires : un champ collection imposerait une règle `-keep` (voir proguard-rules.pro), qui
+    // figerait les noms de champs et rendrait illisibles les fichiers déjà sur les téléphones.
+    /** Codes des blocs inclus, séparés par des virgules. Voir [ShareHistoryStore.CONTENT_MAP]. */
+    val contents: String? = null,
+    /** Thème choisi au moment du partage : `true` = sombre. */
+    val darkTheme: Boolean? = null,
+    /** Niveau de zoom, pour les partages de carte uniquement. */
+    val mapZoom: Double? = null
 )
 
 /**
@@ -41,10 +52,66 @@ object ShareHistoryStore {
     const val KIND_RADIO_SITE = "radio_site"
     const val KIND_RADIO_SUPPORT = "radio_support"
 
+    /** Partage de la carte des antennes : ni station ni support, on rouvre la carte sur le cadrage. */
+    const val KIND_MAP = "map"
+
     const val DEST_SHARE = "share"
     const val DEST_CLIPBOARD = "clipboard"
     const val DEST_PDF = "pdf"
     const val DEST_PDF_DOWNLOAD = "pdf_download"
+
+    // Codes des blocs inclus dans l'image partagée. Ils reprennent tels quels les identifiants de
+    // blocs des menus de partage (`shareOrder`), pour qu'un code ne veuille jamais dire deux choses.
+    const val CONTENT_MAP = "map"
+    const val CONTENT_ELEVATION_PROFILE = "elevation_profile"
+    const val CONTENT_SUPPORT = "support"
+    const val CONTENT_PHOTOS = "photos"
+    const val CONTENT_IDS = "ids"
+    const val CONTENT_DATES = "dates"
+    const val CONTENT_ADDRESS = "address"
+    const val CONTENT_SPEEDTEST = "speedtest"
+    const val CONTENT_THROUGHPUT = "throughput"
+    const val CONTENT_FREQ = "freq"
+    const val CONTENT_STATUS = "status"
+    const val CONTENT_HEIGHTS = "heights"
+    const val CONTENT_OPERATORS = "operators"
+    const val CONTENT_RADIO_ENTRIES = "radio_entries"
+    const val CONTENT_QR_CODE = "qr"
+    const val CONTENT_CONFIDENTIAL = "confidential"
+    const val CONTENT_SPLIT_IMAGE = "split"
+    const val CONTENT_AZIMUTHS = "azimuths"
+    const val CONTENT_SPEEDOMETER = "speedometer"
+    const val CONTENT_SCALE = "scale"
+    const val CONTENT_ATTRIBUTION = "attribution"
+    const val CONTENT_COVERAGE = "coverage"
+    const val CONTENT_OBSTACLES = "obstacles"
+
+    // Blocs propres aux partages radio (mêmes identifiants que RADIO_SHARE_* côté menu).
+    const val CONTENT_SUMMARY = "summary"
+    const val CONTENT_SOURCE = "source"
+    const val CONTENT_BEARING_HEIGHT = "bearing_height"
+    const val CONTENT_RADIO_FREQ = "radio"
+    const val CONTENT_PROGRAMS = "programs"
+    const val CONTENT_EXTRA = "extra"
+    const val CONTENT_SUPPORT_ENTRIES = "support_entries"
+
+    /**
+     * Assemble la liste des blocs cochés : `contentsOf(incMap to CONTENT_MAP, ...)`. Renvoie `null`
+     * quand rien n'est coché, pour ne pas distinguer « aucun bloc » d'une entrée d'avant ce champ.
+     */
+    fun contentsOf(vararg blocks: Pair<Boolean, String>): String? {
+        return blocks.filter { it.first }
+            .joinToString(",") { it.second }
+            .takeIf { it.isNotBlank() }
+    }
+
+    /** Découpe le champ stocké ; tolère les codes inconnus, qui seront simplement ignorés à l'affichage. */
+    fun contentCodes(contents: String?): List<String> {
+        return contents.orEmpty()
+            .split(',')
+            .map { it.trim() }
+            .filter { it.isNotBlank() }
+    }
 
     private const val HISTORY_FILE_NAME = "share_history.json"
     private const val MAX_ENTRIES = 300
@@ -63,6 +130,9 @@ object ShareHistoryStore {
         latitude: Double? = null,
         longitude: Double? = null,
         itemCount: Int = 1,
+        contents: String? = null,
+        darkTheme: Boolean? = null,
+        mapZoom: Double? = null,
         createdAtMillis: Long = System.currentTimeMillis()
     ) {
         val entry = ShareHistoryEntry(
@@ -76,7 +146,10 @@ object ShareHistoryStore {
             latitude = latitude,
             longitude = longitude,
             itemCount = itemCount.coerceAtLeast(1),
-            createdAtMillis = createdAtMillis
+            createdAtMillis = createdAtMillis,
+            contents = contents?.takeIf { it.isNotBlank() },
+            darkTheme = darkTheme,
+            mapZoom = mapZoom?.takeIf { !it.isNaN() && !it.isInfinite() }
         )
 
         val nextEntries = (readInternal(context.applicationContext) + entry)

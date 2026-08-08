@@ -857,6 +857,7 @@
     <string name="appstrings_outage_global_end">Global end</string>
     <string name="appstrings_outage_global_start">Global start</string>
     <string name="appstrings_outage_incident_section">Declared outage</string>
+    <string name="appstrings_outage_none_declared">No outage reported for this operator</string>
     <string name="appstrings_outage_operator">Operator</string>
     <string name="appstrings_outage_own_site">Own site</string>
     <string name="appstrings_outage_raw_status_title">Raw statuses</string>
@@ -1073,7 +1074,6 @@
     <string name="appstrings_search">Search</string>
     <string name="appstrings_search_city_or_id">City, address, site ID...</string>
     <string name="appstrings_search_gps">Searching for GPS position...</string>
-    <string name="appstrings_search_radius_title">Search radius</string>
     <string name="appstrings_searching">Searching...</string>
     <string name="appstrings_select">Select</string>
     <string name="appstrings_select_all">Select all</string>
@@ -2461,8 +2461,8 @@
 
     <!-- Historique des sites/supports partagés ou exportés -->
     <string name="share_history_title">Share history</string>
-    <string name="share_history_desc">Sites and supports you have shared or exported</string>
-    <string name="share_history_empty">No share recorded yet. Sites and supports you share or export as PDF will appear here.</string>
+    <string name="share_history_desc">Sites, supports and maps you have shared or exported</string>
+    <string name="share_history_empty">No share recorded yet. Sites, supports and maps you share or export as PDF will appear here.</string>
     <string name="share_history_clear">Clear history</string>
     <string name="share_history_clear_title">Clear share history?</string>
     <string name="share_history_clear_desc">All recorded shares will be deleted from this device.</string>
@@ -2470,12 +2470,16 @@
     <string name="share_history_kind_mobile_support">Support (mast)</string>
     <string name="share_history_kind_radio_site">Radio site</string>
     <string name="share_history_kind_radio_support">Radio support</string>
+    <string name="share_history_kind_map">Antenna map</string>
     <string name="share_history_dest_share">Image shared</string>
     <string name="share_history_dest_clipboard">Image copied</string>
     <string name="share_history_dest_pdf">PDF shared</string>
     <string name="share_history_dest_pdf_download">PDF downloaded</string>
     <string name="share_history_station_ref">Station %1$s</string>
     <string name="share_history_support_ref">Support %1$s</string>
+    <string name="share_history_map_ref">Zoom %1$s</string>
+    <string name="share_history_theme_dark">Dark theme</string>
+    <string name="share_history_theme_light">Light theme</string>
     <string name="share_history_open_unavailable">No record to open for this entry.</string>
     <string name="histories_title">History</string>
     <string name="histories_desc">Photo uploads and shares recorded on this device.</string>
@@ -2488,6 +2492,7 @@
     <string name="upload_history_option_thumbnails">Photo thumbnails</string>
     <string name="share_history_option_counter">Counter at the top of the list</string>
     <string name="share_history_option_address">Site address</string>
+    <string name="share_history_option_contents">Share content</string>
     <string name="page_customization_hint_title">This page is adjustable</string>
     <string name="page_customization_hint_body">Hide or reorder this page\'s blocks from this gear icon. A long press on a block opens its setting directly.</string>
     <string name="page_customization_hint_dismiss">Later</string>
@@ -2606,4 +2611,12 @@
     <string name="appstrings_release_v2014_local_build_cost">The disk space required is shown before you start, and a device below the estimate can still give it a try</string>
     <string name="appstrings_release_v2014_local_build_announced">The locally generated database now also carries the systems announced by the weekly ANFR release</string>
     <string name="appstrings_release_v2014_local_build_speed">Local generation is faster and uses less memory</string>
+
+    <!-- Release notes 2.0.15 -->
+    <string name="appstrings_release_v2015_share_history_map">The antenna map and the theoretical coverage are now recorded in the share history</string>
+    <string name="appstrings_release_v2015_share_history_reopen">Reopening a shared map restores its framing and zoom, without moving your site marker</string>
+    <string name="appstrings_release_v2015_map_attribution">Map credits now name the source actually displayed: IGN orthophotos or Esri imagery in satellite view, and OpenStreetMap for layers built on its data</string>
+    <string name="appstrings_release_v2015_nearby_no_radius">No more search radius in nearby sites: the list keeps the closest ones, whatever the distance</string>
+    <string name="appstrings_release_v2015_low_power_follow">Android battery saver is now followed by default; if you had unchecked the switch, your choice is kept</string>
+    <string name="appstrings_release_v2015_outage_none_declared">Site pages now state explicitly when no outage is declared for an operator</string>
 </resources>

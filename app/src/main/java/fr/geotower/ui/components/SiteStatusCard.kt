@@ -270,11 +270,16 @@ fun SiteStatusCard(
             Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
 
             // --- SECTION 3 : PIED DE PAGE ---
+            // La date de la donnée n'accompagne QUE les pannes réellement déclarées : un site en
+            // service n'est porté par aucun enregistrement, et une panne déduite (zone blanche) est
+            // fabriquée côté app. Dans ces deux cas la date n'est pas « inconnue », elle n'existe
+            // pas — l'annoncer comme manquante laisserait croire à un téléchargement raté.
             val sourceDate = formatOutageStatusDate(outageDetails?.sourceLastUpdate)
-            val footerText = if (sourceDate != null) {
-                "${stringResource(R.string.appstrings_outage_source_date)} $sourceDate"
-            } else {
-                stringResource(R.string.appstrings_outage_source_date_unknown)
+            val hasDeclaredOutage = outageDetails != null && !isPotentialOutage
+            val footerText = when {
+                sourceDate != null -> "${stringResource(R.string.appstrings_outage_source_date)} $sourceDate"
+                hasDeclaredOutage -> stringResource(R.string.appstrings_outage_source_date_unknown)
+                else -> stringResource(R.string.appstrings_outage_none_declared)
             }
             Text(
                 text = footerText,

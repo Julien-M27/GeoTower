@@ -1301,6 +1301,12 @@ fun MapScreen(
     // projection de l'image courante (cf. la couche fluide, plus bas).
     var smoothFrameTick by remember { mutableIntStateOf(0) }
     val smoothLocationEnabled = PowerProfile.smoothLocation && canUseMapLocation
+    // Pinceau partagé par la couche fluide (à l'écran) et par la capture de partage : quand le
+    // lissage est actif, le calque osmdroid se tait, donc un map.draw() ne contient PAS le repère.
+    // Sans ce second usage, l'image partagée ou copiée sortirait sans point de localisation.
+    val locationMarkerPainter = remember(safePrimaryColor) {
+        LocationMarkerPainter(context.resources.displayMetrics.density, safePrimaryColor)
+    }
     var isToolboxExpanded by rememberSaveable { mutableStateOf(false) }
     var isTimeSliderVisible by rememberSaveable { mutableStateOf(false) }
     var timeSliderThreshold by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -2956,9 +2962,7 @@ fun MapScreen(
         // calque imposerait de réinvalider toute la carte — donc de redessiner les milliers de
         // marqueurs d'antennes — à chaque image, alors que cette couche ne repeint qu'un rond.
         if (smoothLocationEnabled) {
-            val markerPainter = remember(safePrimaryColor) {
-                LocationMarkerPainter(context.resources.displayMetrics.density, safePrimaryColor)
-            }
+            val markerPainter = locationMarkerPainter
             val drawPixel = remember { android.graphics.Point() }
             val drawPoint = remember { GeoPoint(0.0, 0.0) }
 
@@ -3276,6 +3280,33 @@ fun MapScreen(
             val isMi = fr.geotower.utils.AppConfig.distanceUnit.intValue == 1
             val speedText = if (isMi) "${(currentSpeedKmH / 1.60934).toInt()} mph" else "$currentSpeedKmH km/h"
 
+            // En rendu fluide le repère de position vit dans une couche Compose au-dessus de la
+            // MapView : la capture, qui ne dessine que la MapView, doit donc le repeindre elle-même
+            // avec la même projection, sinon l'image partagée n'a pas de point de localisation.
+            val drawLocationMarker: ((android.graphics.Canvas) -> Unit)? =
+                if (smoothLocationEnabled && showLocationMarker) {
+                    { canvas ->
+                        val map = mapViewRef
+                        val position = smoothEngine.sample(SystemClock.elapsedRealtime())
+                        if (map != null && position != null) {
+                            val pixel = android.graphics.Point()
+                            map.projection.toPixels(
+                                GeoPoint(position.latitude, position.longitude),
+                                pixel
+                            )
+                            locationMarkerPainter.draw(
+                                canvas = canvas,
+                                x = pixel.x.toFloat(),
+                                y = pixel.y.toFloat(),
+                                rotationDegrees = if (PowerProfile.mapCompassRotation) azimuth else 0f,
+                                showDirection = AppConfig.hasCompass.value
+                            )
+                        }
+                    }
+                } else {
+                    null
+                }
+
             fr.geotower.ui.components.MapShareMenu(
                 useOneUi = fr.geotower.utils.AppConfig.useOneUiDesign,
                 globalMapRef = mapViewRef,
@@ -3284,7 +3315,8 @@ fun MapScreen(
                 currentLat = currentLat,
                 azimuth = azimuth,
                 measureOverlay = measureOverlay,
-                timeSliderDateLabel = if (isTimeSliderVisible) timeSliderThreshold?.let { timeSliderMonthLabel(it) } else null
+                timeSliderDateLabel = if (isTimeSliderVisible) timeSliderThreshold?.let { timeSliderMonthLabel(it) } else null,
+                drawLocationMarker = drawLocationMarker
             )
         }
 
@@ -3871,21 +3903,10 @@ fun MapScreen(
             }
 
             if (showAttribution) {
-                val isEsriSatellite = mapProvider == 1 && ignStyle == 2
-                val attributionText = when {
-                    mapProvider == 0 -> "Leaflet | © IGN"
-                    isEsriSatellite -> "Leaflet | © Esri, Maxar"
-                    mapProvider == 2 -> "Leaflet | © CartoDB, OSM"
-                    mapProvider == 3 -> "Leaflet | © OpenTopoMap"
-                    else -> "Leaflet | © OSM"
-                }
-                val attributionUrl = when {
-                    mapProvider == 0 -> "https://geoservices.ign.fr/"
-                    isEsriSatellite -> "https://www.arcgis.com/home/item.html?id=10df2279f9684e4a9f6a7f08febac2a9"
-                    mapProvider == 2 -> "https://carto.com/attributions"
-                    mapProvider == 3 -> "https://opentopomap.org/about"
-                    else -> "https://www.openstreetmap.org/copyright"
-                }
+                // On crédite le fond RÉELLEMENT affiché (effectiveProvider) : la bascule
+                // silencieuse en hors-ligne change les tuiles sans toucher à mapProvider.
+                val attributionText = MapUtils.MapAttribution.text(effectiveProvider, ignStyle)
+                val attributionUrl = MapUtils.MapAttribution.url(effectiveProvider, ignStyle)
 
                 Surface(
                     color = Color.White.copy(alpha = 0.8f),
@@ -3900,7 +3921,9 @@ fun MapScreen(
                             .padding(horizontal = sizing.spacing(6.dp), vertical = sizing.spacing(4.dp)),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (mapProvider == 0) {
+                        // Drapeau uniquement pour l'IGN (service public français) : les autres
+                        // fonds sont internationaux et n'ont pas de pays à afficher.
+                        if (effectiveProvider == 0) {
                             Row(modifier = Modifier.size(width = sizing.component(14.dp), height = sizing.component(10.dp))) {
                                 Box(
                                     modifier = Modifier.weight(1f).fillMaxHeight()
@@ -3915,20 +3938,9 @@ fun MapScreen(
                                         .background(Color(0xFFED2939))
                                 )
                             }
-                        } else {
-                            Column(modifier = Modifier.size(width = sizing.component(14.dp), height = sizing.component(10.dp))) {
-                                Box(
-                                    modifier = Modifier.weight(1f).fillMaxWidth()
-                                        .background(Color(0xFF005BBC))
-                                )
-                                Box(
-                                    modifier = Modifier.weight(1f).fillMaxWidth()
-                                        .background(Color(0xFFFFD600))
-                                )
-                            }
-                        }
 
-                        Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                            Spacer(modifier = Modifier.width(sizing.spacing(6.dp)))
+                        }
 
                         Text(
                             text = attributionText,

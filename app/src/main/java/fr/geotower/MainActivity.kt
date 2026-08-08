@@ -924,16 +924,35 @@ class MainActivity : ComponentActivity() {
                                     ShareHistoryScreen(
                                         onNavigateBack = { navController.popBackStack() },
                                         onOpenEntry = { entry ->
+                                            val isMapEntry = entry.kind == ShareHistoryStore.KIND_MAP
                                             // La fiche affiche la distance depuis le dernier point cliqué :
-                                            // on le repositionne sur l'élément rouvert.
-                                            if (entry.latitude != null && entry.longitude != null) {
+                                            // on le repositionne sur l'élément rouvert. Une carte, elle,
+                                            // ne vise aucun site : elle ne doit pas déplacer ce repère.
+                                            if (!isMapEntry && entry.latitude != null && entry.longitude != null) {
                                                 getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
                                                     .edit()
                                                     .putFloat("clicked_lat", entry.latitude.toFloat())
                                                     .putFloat("clicked_lon", entry.longitude.toFloat())
                                                     .apply()
                                             }
+                                            // Même mécanique que le lien profond `geotower://map` de
+                                            // l'image partagée : on repose le cadrage puis on ouvre la carte.
+                                            if (isMapEntry && entry.latitude != null && entry.longitude != null) {
+                                                val editor = getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+                                                    .edit()
+                                                    .putFloat("last_map_lat", entry.latitude.toFloat())
+                                                    .putFloat("last_map_lon", entry.longitude.toFloat())
+                                                entry.mapZoom?.let { zoom ->
+                                                    editor.putFloat(
+                                                        "last_map_zoom",
+                                                        zoom.coerceIn(MAP_DEEP_LINK_MIN_ZOOM, MAP_DEEP_LINK_MAX_ZOOM).toFloat()
+                                                    )
+                                                }
+                                                editor.apply()
+                                            }
                                             val route = when (entry.kind) {
+                                                ShareHistoryStore.KIND_MAP ->
+                                                    "map".takeIf { entry.latitude != null && entry.longitude != null }
                                                 ShareHistoryStore.KIND_MOBILE_SITE ->
                                                     entry.stationId.takeIf { it.isNotBlank() }
                                                         ?.let { "site_detail/${Uri.encode(it)}" }

@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Radio
 import androidx.compose.material.icons.filled.SettingsInputAntenna
@@ -88,6 +89,7 @@ import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.PageScrollPrefs
 import fr.geotower.utils.PreferenceStores
+import java.util.Locale
 
 /** Raccourci vers l'historique des partages, avec son compteur : pendant de PhotoUploadHistoryShortcut. */
 @Composable
@@ -166,6 +168,7 @@ fun ShareHistoryScreen(
     val settingsSheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showCounter by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.SHARE_COUNTER)) }
     var showAddress by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.SHARE_ADDRESS)) }
+    var showContents by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.SHARE_CONTENTS)) }
     var showDateBar by remember { mutableStateOf(HistoryPagePreferences.read(prefs, HistoryPagePreferences.SHARE_DATE_BAR)) }
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
     var historyItems by remember { mutableStateOf<List<ShareHistoryEntry>>(emptyList()) }
@@ -327,6 +330,7 @@ fun ShareHistoryScreen(
                             ShareHistoryRow(
                                 item = item,
                                 showAddress = showAddress,
+                                showContents = showContents,
                                 isSelected = isSelected,
                                 isSelectionMode = isSelectionMode,
                                 onOpen = {
@@ -456,6 +460,14 @@ fun ShareHistoryScreen(
                     }
                 ),
                 HistoryPageOption(
+                    title = stringResource(R.string.share_history_option_contents),
+                    checked = showContents,
+                    onCheckedChange = {
+                        showContents = it
+                        HistoryPagePreferences.write(prefs, HistoryPagePreferences.SHARE_CONTENTS, it)
+                    }
+                ),
+                HistoryPageOption(
                     title = stringResource(R.string.history_option_date_bar),
                     checked = showDateBar,
                     onCheckedChange = {
@@ -467,9 +479,11 @@ fun ShareHistoryScreen(
             onReset = {
                 showCounter = HistoryPagePreferences.DEFAULT_ENABLED
                 showAddress = HistoryPagePreferences.DEFAULT_ENABLED
+                showContents = HistoryPagePreferences.DEFAULT_ENABLED
                 showDateBar = HistoryPagePreferences.DEFAULT_ENABLED
                 HistoryPagePreferences.write(prefs, HistoryPagePreferences.SHARE_COUNTER, HistoryPagePreferences.DEFAULT_ENABLED)
                 HistoryPagePreferences.write(prefs, HistoryPagePreferences.SHARE_ADDRESS, HistoryPagePreferences.DEFAULT_ENABLED)
+                HistoryPagePreferences.write(prefs, HistoryPagePreferences.SHARE_CONTENTS, HistoryPagePreferences.DEFAULT_ENABLED)
                 HistoryPagePreferences.write(prefs, HistoryPagePreferences.SHARE_DATE_BAR, HistoryPagePreferences.DEFAULT_ENABLED)
             },
             onDismiss = { showSettingsSheet = false },
@@ -512,6 +526,7 @@ fun ShareHistoryScreen(
 private fun ShareHistoryRow(
     item: ShareHistoryEntry,
     showAddress: Boolean,
+    showContents: Boolean,
     isSelected: Boolean,
     isSelectionMode: Boolean,
     onOpen: () -> Unit,
@@ -524,6 +539,7 @@ private fun ShareHistoryRow(
         item.label.takeIf { it.isNotBlank() },
         item.address.takeIf { showAddress && it.isNotBlank() }
     ).joinToString(" - ")
+    val contents = if (showContents) shareHistoryContents(item) else ""
 
     Row(
         modifier = Modifier
@@ -580,6 +596,15 @@ private fun ShareHistoryRow(
                     style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            if (contents.isNotBlank()) {
+                Text(
+                    text = contents,
+                    style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f),
+                    maxLines = 3,
                     overflow = TextOverflow.Ellipsis
                 )
             }
@@ -641,6 +666,17 @@ private fun ShareHistorySelectionIndicator(isSelected: Boolean) {
 private fun shareHistoryReference(item: ShareHistoryEntry): String {
     val parts = mutableListOf<String>()
     when (item.kind) {
+        ShareHistoryStore.KIND_MAP -> {
+            // Une carte n'a ni station ni support : son repère, c'est son cadrage.
+            val lat = item.latitude
+            val lon = item.longitude
+            if (lat != null && lon != null) {
+                parts += String.format(Locale.US, "%.5f, %.5f", lat, lon)
+            }
+            item.mapZoom?.let {
+                parts += stringResource(R.string.share_history_map_ref, String.format(Locale.US, "%.1f", it))
+            }
+        }
         ShareHistoryStore.KIND_MOBILE_SUPPORT, ShareHistoryStore.KIND_RADIO_SUPPORT -> {
             item.supportId.takeIf { it.isNotBlank() }?.let {
                 parts += stringResource(R.string.share_history_support_ref, it)
@@ -666,6 +702,7 @@ private fun shareHistoryKindLabel(kind: String): String = when (kind) {
     ShareHistoryStore.KIND_MOBILE_SUPPORT -> stringResource(R.string.share_history_kind_mobile_support)
     ShareHistoryStore.KIND_RADIO_SITE -> stringResource(R.string.share_history_kind_radio_site)
     ShareHistoryStore.KIND_RADIO_SUPPORT -> stringResource(R.string.share_history_kind_radio_support)
+    ShareHistoryStore.KIND_MAP -> stringResource(R.string.share_history_kind_map)
     else -> stringResource(R.string.share_history_kind_mobile_site)
 }
 
@@ -673,7 +710,62 @@ private fun shareHistoryKindIcon(kind: String): ImageVector = when (kind) {
     ShareHistoryStore.KIND_MOBILE_SUPPORT -> Icons.Default.VerticalAlignTop
     ShareHistoryStore.KIND_RADIO_SITE -> Icons.Default.Radio
     ShareHistoryStore.KIND_RADIO_SUPPORT -> Icons.Default.SettingsInputAntenna
+    ShareHistoryStore.KIND_MAP -> Icons.Default.Map
     else -> Icons.Default.Tag
+}
+
+/**
+ * Contenu du partage : les blocs cochés dans le menu, avec les libellés de ce menu (jamais une
+ * traduction parallèle). Un code inconnu -- entrée écrite par une version plus récente, bloc retiré
+ * depuis -- est simplement ignoré plutôt que d'afficher un identifiant technique.
+ */
+@Composable
+private fun shareHistoryContents(item: ShareHistoryEntry): String {
+    val labels = ShareHistoryStore.contentCodes(item.contents).mapNotNull { code ->
+        when (code) {
+            ShareHistoryStore.CONTENT_MAP -> stringResource(R.string.appstrings_share_map_option)
+            ShareHistoryStore.CONTENT_ELEVATION_PROFILE -> stringResource(R.string.appstrings_share_elevation_profile_option)
+            ShareHistoryStore.CONTENT_SUPPORT -> stringResource(R.string.appstrings_share_support_option)
+            ShareHistoryStore.CONTENT_PHOTOS -> stringResource(R.string.appstrings_share_photos_option)
+            ShareHistoryStore.CONTENT_IDS -> stringResource(R.string.appstrings_share_ids_option)
+            ShareHistoryStore.CONTENT_DATES -> stringResource(R.string.appstrings_share_dates_option)
+            ShareHistoryStore.CONTENT_ADDRESS -> stringResource(R.string.appstrings_share_address_option)
+            ShareHistoryStore.CONTENT_SPEEDTEST -> stringResource(R.string.appstrings_share_speedtest_option)
+            ShareHistoryStore.CONTENT_THROUGHPUT -> stringResource(R.string.appstrings_share_throughput_option)
+            ShareHistoryStore.CONTENT_FREQ -> stringResource(R.string.appstrings_share_freq_option)
+            ShareHistoryStore.CONTENT_STATUS -> stringResource(R.string.appstrings_share_status_option)
+            ShareHistoryStore.CONTENT_HEIGHTS -> stringResource(R.string.appstrings_panel_heights_title)
+            ShareHistoryStore.CONTENT_OPERATORS -> stringResource(R.string.appstrings_operators_title)
+            ShareHistoryStore.CONTENT_RADIO_ENTRIES -> stringResource(R.string.appstrings_radio_share_block_support_entries)
+            ShareHistoryStore.CONTENT_QR_CODE -> stringResource(R.string.brand_qr_code)
+            ShareHistoryStore.CONTENT_CONFIDENTIAL -> stringResource(R.string.appstrings_share_confidential_option)
+            ShareHistoryStore.CONTENT_SPLIT_IMAGE -> stringResource(R.string.appstrings_split_share_image)
+            ShareHistoryStore.CONTENT_AZIMUTHS -> stringResource(R.string.appstrings_share_map_azimuths_option)
+            ShareHistoryStore.CONTENT_SPEEDOMETER -> stringResource(R.string.appstrings_share_map_speedometer_option)
+            ShareHistoryStore.CONTENT_SCALE -> stringResource(R.string.appstrings_share_map_scale_option)
+            ShareHistoryStore.CONTENT_ATTRIBUTION -> stringResource(R.string.appstrings_share_map_attribution_option)
+            ShareHistoryStore.CONTENT_COVERAGE -> stringResource(R.string.appstrings_coverage_button)
+            ShareHistoryStore.CONTENT_OBSTACLES -> stringResource(R.string.appstrings_coverage_obstacles)
+            ShareHistoryStore.CONTENT_SUMMARY -> stringResource(R.string.appstrings_radio_share_block_summary)
+            ShareHistoryStore.CONTENT_SOURCE -> stringResource(R.string.appstrings_radio_share_block_source)
+            ShareHistoryStore.CONTENT_BEARING_HEIGHT -> stringResource(R.string.appstrings_radio_share_block_bearing_height)
+            ShareHistoryStore.CONTENT_RADIO_FREQ -> stringResource(R.string.appstrings_radio_share_block_radio_freqs)
+            ShareHistoryStore.CONTENT_PROGRAMS -> stringResource(R.string.appstrings_radio_share_block_programs)
+            ShareHistoryStore.CONTENT_EXTRA -> stringResource(R.string.appstrings_radio_share_block_extra)
+            ShareHistoryStore.CONTENT_SUPPORT_ENTRIES -> stringResource(R.string.appstrings_radio_share_block_support_entries)
+            else -> null
+        }
+    }
+    // Le thème ferme la liste, nommé en entier : « Sombre » seul, en bout de blocs, ne dirait pas
+    // de quoi -- et les libellés du menu de partage sont ici hors de leur contexte.
+    val theme = item.darkTheme?.let { dark ->
+        if (dark) {
+            stringResource(R.string.share_history_theme_dark)
+        } else {
+            stringResource(R.string.share_history_theme_light)
+        }
+    }
+    return (labels + listOfNotNull(theme)).joinToString(" · ")
 }
 
 @Composable

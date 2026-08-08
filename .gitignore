@@ -25,3 +25,5 @@ geotower-release
 /app/release/
 # Journaux de build laisses par les executions de test.
 /build-*.log
+# Rapports d'erreur du compilateur Kotlin (locaux a la machine, aucun interet en historique).
+.kotlin/

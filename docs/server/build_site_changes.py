@@ -1123,7 +1123,9 @@ def run(args) -> int:
     sources_dir = layout.sources
     incoming_dir = layout.incoming
     state_path = layout.state
-    normalize_sources(sources_dir)
+    if not args.dry_run:
+        # Compresser supprime les .csv d'origine : jamais en simulation.
+        normalize_sources(sources_dir)
 
     state = load_state(state_path)
     current_state = state.get("current") or {}
@@ -1229,7 +1231,9 @@ def parse_args(argv=None):
     parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="calcule et affiche le diff sans rien ecrire ni faire tourner la paire",
+        help="calcule et affiche le diff sans produire de fichier de sortie ni "
+        "faire tourner la reference (des copies de travail peuvent apparaitre "
+        "dans sources/incoming/)",
     )
     parser.add_argument(
         "--force",
