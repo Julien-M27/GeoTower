@@ -31,25 +31,13 @@ internal data class ReleaseNoteItem(
  */
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_share_export)) {
-        item(stringResource(R.string.appstrings_release_v2015_share_history_map))
-        item(stringResource(R.string.appstrings_release_v2015_share_history_reopen))
+    section(stringResource(R.string.appstrings_release_section_image_sharing)) {
+        item(stringResource(R.string.appstrings_release_v2016_share_frequency_pages))
+        item(stringResource(R.string.appstrings_release_v2016_share_many_bands_hint))
     }
 
-    section(stringResource(R.string.appstrings_release_section_map)) {
-        item(stringResource(R.string.appstrings_release_v2015_map_attribution))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_nearby)) {
-        item(stringResource(R.string.appstrings_release_v2015_nearby_no_radius))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_hs_sites)) {
-        item(stringResource(R.string.appstrings_release_v2015_outage_none_declared))
-    }
-
-    section(stringResource(R.string.appstrings_release_section_performance)) {
-        item(stringResource(R.string.appstrings_release_v2015_low_power_follow))
+    section(stringResource(R.string.appstrings_release_section_signalquest)) {
+        item(stringResource(R.string.appstrings_release_v2016_photo_orientation))
     }
 }
 

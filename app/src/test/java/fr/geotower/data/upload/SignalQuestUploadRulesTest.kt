@@ -1,5 +1,6 @@
 package fr.geotower.data.upload
 
+import androidx.exifinterface.media.ExifInterface
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -38,6 +39,23 @@ class SignalQuestUploadRulesTest {
         assertEquals(2, SignalQuestUploadRules.calculateInSampleSize(12000, 9000))
         // 10000 x 8000 = 80 Mpx > 50 Mpx (limite pixels serveur) -> facteur 2.
         assertEquals(2, SignalQuestUploadRules.calculateInSampleSize(10000, 8000))
+    }
+
+    @Test
+    fun bakesOrientationForEveryNonUprightPhoto() {
+        // Photo deja droite : elle peut partir telle quelle, sans reencodage.
+        assertFalse(SignalQuestUploadRules.needsOrientationBaking(ExifInterface.ORIENTATION_NORMAL))
+        assertFalse(SignalQuestUploadRules.needsOrientationBaking(ExifInterface.ORIENTATION_UNDEFINED))
+
+        // Cas d'un portrait pris au telephone (ORIENTATION_ROTATE_90) et des miroirs : la rotation
+        // doit etre gravee dans les pixels, sinon SignalQuest affiche la photo couchee.
+        assertTrue(SignalQuestUploadRules.needsOrientationBaking(ExifInterface.ORIENTATION_ROTATE_90))
+        assertTrue(SignalQuestUploadRules.needsOrientationBaking(ExifInterface.ORIENTATION_ROTATE_180))
+        assertTrue(SignalQuestUploadRules.needsOrientationBaking(ExifInterface.ORIENTATION_ROTATE_270))
+        assertTrue(SignalQuestUploadRules.needsOrientationBaking(ExifInterface.ORIENTATION_FLIP_HORIZONTAL))
+        assertTrue(SignalQuestUploadRules.needsOrientationBaking(ExifInterface.ORIENTATION_FLIP_VERTICAL))
+        assertTrue(SignalQuestUploadRules.needsOrientationBaking(ExifInterface.ORIENTATION_TRANSPOSE))
+        assertTrue(SignalQuestUploadRules.needsOrientationBaking(ExifInterface.ORIENTATION_TRANSVERSE))
     }
 
     @Test

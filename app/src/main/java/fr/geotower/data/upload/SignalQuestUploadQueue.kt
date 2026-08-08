@@ -61,6 +61,14 @@ object SignalQuestUploadRules {
         return sizeBytes != null && sizeBytes in 1..MAX_SOURCE_BYTES
     }
 
+    // Une photo dont l'orientation ne vit que dans l'EXIF part couchee des que le destinataire
+    // reencode l'image sans lire le tag (c'est le cas de SignalQuest). Ces photos-la doivent donc
+    // etre pivotees dans les pixels avant l'envoi, meme quand on conserve les metadonnees.
+    fun needsOrientationBaking(exifOrientation: Int): Boolean {
+        return exifOrientation != ExifInterface.ORIENTATION_NORMAL &&
+            exifOrientation != ExifInterface.ORIENTATION_UNDEFINED
+    }
+
     // Plus petit facteur (puissance de 2) qui ramene l'image sous les limites serveur en
     // dimension ET en nombre de pixels. Retourne 1 quand la photo tient deja : pas de downscale.
     fun calculateInSampleSize(
@@ -195,6 +203,15 @@ object SignalQuestUploadQueue {
         exifAttributeTags.filterNot { tag -> tag in nonTransferableExifTags }.toSet()
     }
     private val nonTransferableExifTags = setOf(
+        // Orientation et dimensions sont reecrites d'apres l'image reellement encodee : la photo
+        // envoyee est deja droite (et parfois redimensionnee), recopier celles de la source la
+        // ferait pivoter une seconde fois.
+        ExifInterface.TAG_ORIENTATION,
+        ExifInterface.TAG_THUMBNAIL_ORIENTATION,
+        ExifInterface.TAG_IMAGE_WIDTH,
+        ExifInterface.TAG_IMAGE_LENGTH,
+        ExifInterface.TAG_PIXEL_X_DIMENSION,
+        ExifInterface.TAG_PIXEL_Y_DIMENSION,
         ExifInterface.TAG_STRIP_OFFSETS,
         ExifInterface.TAG_STRIP_BYTE_COUNTS,
         ExifInterface.TAG_JPEG_INTERCHANGE_FORMAT,
@@ -420,6 +437,9 @@ object SignalQuestUploadQueue {
         return runCatching {
             readExifAttributes(source)
                 .takeIf { it.isNotEmpty() }
+                // Les pixels envoyes sont toujours droits : annoncer l'orientation d'origine
+                // inviterait le destinataire a pivoter la photo une seconde fois.
+                ?.plus(ExifInterface.TAG_ORIENTATION to ExifInterface.ORIENTATION_NORMAL.toString())
                 ?.let { attributes -> gson.toJson(attributes) }
         }.getOrNull()
     }
@@ -441,9 +461,16 @@ object SignalQuestUploadQueue {
             throw SignalQuestInvalidPhotoException(context.getString(R.string.signalquest_unreadable_image))
         }
 
+        val sourceOrientation = readExifOrientation(source)
+
         // Chemin sans aucune perte : JPEG d'origine qui tient deja sous la limite serveur et dont
-        // on conserve les metadonnees (l'orientation EXIF reste donc correcte cote serveur).
-        if (!manifest.stripExifBeforeUpload && canUploadOriginalJpeg(uploadFile, source, bounds)) {
+        // on conserve les metadonnees. Reserve aux photos deja droites : si l'orientation vit dans
+        // l'EXIF, elle disparait au reencodage du destinataire et la photo s'affiche couchee.
+        if (
+            !manifest.stripExifBeforeUpload &&
+            !SignalQuestUploadRules.needsOrientationBaking(sourceOrientation) &&
+            canUploadOriginalJpeg(uploadFile, source, bounds)
+        ) {
             return source
         }
 
@@ -463,15 +490,13 @@ object SignalQuestUploadQueue {
                 ?: throw SignalQuestInvalidPhotoException(context.getString(R.string.signalquest_unreadable_image))
             bitmap = working
 
-            // En mode strip EXIF on grave l'orientation dans les pixels (l'EXIF est supprime).
-            // Sinon l'orientation reste portee par l'EXIF recopie plus bas.
-            if (manifest.stripExifBeforeUpload) {
-                val oriented = applyExifOrientation(source, working)
-                if (oriented !== working) {
-                    working.recycle()
-                    working = oriented
-                    bitmap = oriented
-                }
+            // L'orientation est toujours gravee dans les pixels, EXIF conserve ou non : le tag ne
+            // survit pas au traitement du destinataire, la photo partirait couchee.
+            val oriented = applyExifOrientation(sourceOrientation, working)
+            if (oriented !== working) {
+                working.recycle()
+                working = oriented
+                bitmap = oriented
             }
 
             val clamped = scaleToMaxDimension(working, SignalQuestUploadRules.MAX_DIMENSION_PX)
@@ -481,9 +506,10 @@ object SignalQuestUploadQueue {
                 bitmap = clamped
             }
 
-            encodeWithinBudget(context, working, preparedFile) {
+            val encoded = working
+            encodeWithinBudget(context, encoded, preparedFile) {
                 if (!manifest.stripExifBeforeUpload) {
-                    copyExifAttributes(source, preparedFile)
+                    copyExifAttributes(source, preparedFile, encoded.width, encoded.height)
                 }
             }
             return preparedFile
@@ -716,14 +742,16 @@ object SignalQuestUploadQueue {
             bounds.outWidth.toLong() * bounds.outHeight.toLong() <= SignalQuestUploadRules.MAX_OUTPUT_PIXELS
     }
 
-    private fun applyExifOrientation(source: File, bitmap: Bitmap): Bitmap {
-        val orientation = runCatching {
+    private fun readExifOrientation(source: File): Int {
+        return runCatching {
             ExifInterface(source.absolutePath).getAttributeInt(
                 ExifInterface.TAG_ORIENTATION,
                 ExifInterface.ORIENTATION_NORMAL
             )
         }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
+    }
 
+    private fun applyExifOrientation(orientation: Int, bitmap: Bitmap): Bitmap {
         val matrix = Matrix()
         when (orientation) {
             ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
@@ -806,7 +834,7 @@ object SignalQuestUploadQueue {
     }
 
     @Throws(IOException::class)
-    private fun copyExifAttributes(source: File, target: File) {
+    private fun copyExifAttributes(source: File, target: File, targetWidth: Int, targetHeight: Int) {
         val targetExif = ExifInterface(target.absolutePath)
         var hasCopiedAttribute = false
 
@@ -817,9 +845,16 @@ object SignalQuestUploadQueue {
                 hasCopiedAttribute = true
             }
 
-        if (hasCopiedAttribute) {
-            targetExif.saveAttributes()
-        }
+        if (!hasCopiedAttribute) return
+
+        // Le fichier ecrit contient des pixels deja droits, aux dimensions de l'image encodee :
+        // on decrit celle-ci, pas la source.
+        targetExif.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
+        targetExif.setAttribute(ExifInterface.TAG_IMAGE_WIDTH, targetWidth.toString())
+        targetExif.setAttribute(ExifInterface.TAG_IMAGE_LENGTH, targetHeight.toString())
+        targetExif.setAttribute(ExifInterface.TAG_PIXEL_X_DIMENSION, targetWidth.toString())
+        targetExif.setAttribute(ExifInterface.TAG_PIXEL_Y_DIMENSION, targetHeight.toString())
+        targetExif.saveAttributes()
     }
 
     private fun readExifAttributes(source: File): Map<String, String> {

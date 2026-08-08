@@ -1256,7 +1256,10 @@
     <string name="appstrings_speedtests_sort_max">Velocidad máxima</string>
     <string name="appstrings_speedtests_sort_title">Ordenación</string>
     <string name="appstrings_split_share_image">Dividir imagen compartida</string>
-    <string name="appstrings_split_share_image_desc">Separa las frecuencias en una segunda imagen</string>
+    <string name="appstrings_split_share_image_desc">Separa las frecuencias en sus propias imágenes</string>
+    <string name="appstrings_share_freq_page_indicator">Página %1$d/%2$d</string>
+    <string name="appstrings_share_many_bands_pdf_title">Muchos datos de radio</string>
+    <string name="appstrings_share_many_bands_pdf_desc">Esta estación se comparte en %1$d imágenes. El informe PDF lo mantiene todo en un único archivo legible.</string>
     <string name="appstrings_share_photos_option">Fotos comunitarias</string>
     <string name="appstrings_src_antennas">Datos de antenas</string>
     <string name="appstrings_src_antennas_desc">Agencia Nacional de Frecuencias (ANFR).\nDatos de Cartoradio (Open Data).</string>
@@ -2619,4 +2622,9 @@
     <string name="appstrings_release_v2015_nearby_no_radius">Se acabó el radio de búsqueda en los sitios cercanos: la lista conserva los más próximos, sea cual sea la distancia</string>
     <string name="appstrings_release_v2015_low_power_follow">El ahorro de energía de Android se sigue de forma predeterminada; si habías desmarcado el interruptor, se mantiene tu elección</string>
     <string name="appstrings_release_v2015_outage_none_declared">La ficha indica explícitamente cuándo no hay ninguna avería declarada para un operador</string>
+
+    <!-- Notas de la versión 2.0.16 -->
+    <string name="appstrings_release_v2016_share_frequency_pages">Una estación cargada se comparte ahora en tantas imágenes numeradas como haga falta, en lugar de dos</string>
+    <string name="appstrings_release_v2016_share_many_bands_hint">Cuando las imágenes se multiplican, la aplicación sugiere el informe PDF, que lo mantiene todo en un único archivo legible</string>
+    <string name="appstrings_release_v2016_photo_orientation">Las fotos enviadas salen siempre derechas: la rotación se aplica a los píxeles, en vez de depender de unos metadatos que el destinatario ignora</string>
 </resources>

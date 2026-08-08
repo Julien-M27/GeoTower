@@ -123,6 +123,10 @@ import fr.geotower.R
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 
 private const val TAG_SHARE_IMAGE = "GeoTower"
+/** Largeur d'une image de partage de station : la vue est composée en colonnes de cette largeur. */
+private const val SITE_SHARE_COLUMN_WIDTH_DP = 400
+/** À partir de ce nombre d'images de fréquences, le menu de partage propose le rapport PDF. */
+private const val SITE_SHARE_PDF_HINT_MIN_PAGES = 3
 private const val SHARE_PHOTO_MAX_COUNT = 3
 private const val SHARE_PHOTO_MAX_BYTES = 12L * 1024L * 1024L
 /** Au-delà, le rapport PDF est généré sans les speedtests plutôt que de faire attendre l'utilisateur. */
@@ -2056,6 +2060,299 @@ private fun ShareSiteFrequenciesBlock(
     )
 }
 
+/** Bandes publiables d'une station dans le partage, dans l'ordre où la carte les dessine. */
+private fun shareSiteFrequencyBands(
+    info: LocalisationEntity,
+    technique: TechniqueEntity?,
+    txtUnknown: String,
+    txtAzimuthNotSpecified: String
+): List<FreqBand> {
+    val rawFreqs = technique?.detailsFrequences ?: info.frequences
+    return parseAndSortFrequencies(rawFreqs, txtUnknown, txtAzimuthNotSpecified)
+        .filter { pdfShouldDisplayFrequencyBand(it) }
+}
+
+/**
+ * Carte « Fréquences » du partage d'une station : une entrée par bande, avec son spectre, sa
+ * date et ses panneaux. Les images paginées n'en publient chacune qu'une tranche, d'où
+ * [pageLabel] (« 2/3 ») qui dit au lecteur dans quel ordre les remettre.
+ */
+@Composable
+private fun ShareSiteFrequencyDetailCard(
+    bands: List<FreqBand>,
+    txtFrequenciesTitle: String,
+    txtBandsNotSpecified: String,
+    txtInService: String,
+    txtTechnically: String,
+    txtProjectApproved: String,
+    txtUnknownStatus: String,
+    txtActivatedOn: String,
+    txtDateNotSpecifiedAnfr: String,
+    pageLabel: String? = null
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+                Icon(
+                    Icons.Default.WifiTethering,
+                    null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(txtFrequenciesTitle, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                if (pageLabel != null) {
+                    Spacer(modifier = Modifier.weight(1f))
+                    Text(
+                        pageLabel,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp
+                    )
+                }
+            }
+            HorizontalDivider(
+                modifier = Modifier.padding(vertical = 12.dp),
+                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+            )
+
+            if (bands.isEmpty()) {
+                Text(txtBandsNotSpecified, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                return@Column
+            }
+
+            bands.forEachIndexed { bandIndex, band ->
+                if (bandIndex > 0) HorizontalDivider(
+                    modifier = Modifier.padding(vertical = 12.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f)
+                )
+                val (statusColor, statusText) = when {
+                    band.status.contains("En service", true) -> Pair(Color(0xFF4CAF50), txtInService)
+                    band.status.contains("Techniquement", true) -> Pair(Color(0xFF4CAF50), txtTechnically)
+                    band.status.contains("Approuvé", true) -> Pair(Color(0xFF2196F3), txtProjectApproved)
+                    else -> Pair(Color.Gray, txtUnknownStatus)
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = band.rawFreq.substringBefore(":").trim(),
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.onSurface,
+                        fontSize = 14.sp,
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = statusText,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontWeight = FontWeight.Normal,
+                            fontSize = 12.sp
+                        )
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Icon(
+                            Icons.Default.Circle,
+                            null,
+                            tint = statusColor,
+                            modifier = Modifier.size(10.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Column(modifier = Modifier.padding(start = 8.dp)) {
+                    val preciseFreqs = band.rawFreq.substringAfter(":", "").trim()
+                    if (preciseFreqs.isNotBlank() && preciseFreqs != band.rawFreq.trim()) {
+                        val spectrumDisplay = formatSpectrumDisplayDetails(preciseFreqs)
+                        val showSpectrum = AppConfig.siteShowSpectrumRanges.value
+                        val showBandwidthPerRange =
+                            AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthPerRange.value
+                        val showBandwidthTotal =
+                            AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthTotal.value && spectrumDisplay.hasTotal
+                        if (showSpectrum || showBandwidthPerRange) {
+                            val detailTitle = stringResource(
+                                if (showSpectrum) R.string.appstrings_spectrum_title
+                                else R.string.appstrings_bandwidth_by_range
+                            )
+                            Text(
+                                text = "$detailTitle :\n\n${spectrumDisplay.detailedFrequencies(showSpectrum, showBandwidthPerRange)}",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Normal,
+                                lineHeight = 16.sp
+                            )
+                        }
+                        if (showBandwidthTotal) {
+                            if (showSpectrum || showBandwidthPerRange) {
+                                Spacer(modifier = Modifier.height(2.dp))
+                            }
+                            Text(
+                                text = "${stringResource(R.string.appstrings_bandwidth_total)} : ${spectrumDisplay.totalBandwidth} ${spectrumDisplay.totalUnit}",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Medium
+                            )
+                        }
+                        if (showSpectrum || showBandwidthPerRange || showBandwidthTotal) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                        }
+                    }
+                    val dateFormatted = formatDateToFrench(band.date)
+                    if (dateFormatted.isNotBlank() && dateFormatted != "-") {
+                        Text(
+                            "$txtActivatedOn$dateFormatted",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                    } else {
+                        Text(
+                            txtDateNotSpecifiedAnfr,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 12.sp
+                        )
+                    }
+                    if (band.physDetails.isNotEmpty()) {
+                        Spacer(modifier = Modifier.height(6.dp))
+                        band.physDetails.forEach { physDetail ->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.padding(top = 4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Explore,
+                                    null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(14.dp)
+                                )
+                                Spacer(modifier = Modifier.width(6.dp))
+                                val panelDimension = extractFrequencyPanelDimension(physDetail)
+                                val detailWithoutDimension = removePanelDimensionTag(physDetail)
+                                val typePart = detailWithoutDimension.substringBefore(" : ").trim()
+                                val restPart = detailWithoutDimension.substringAfter(" : ", "").trim()
+                                val translatedType = appendPanelDimensionToType(
+                                    AnfrDisplayText.antennaType(typePart),
+                                    panelDimension
+                                )
+                                Text(
+                                    text = if (restPart.isNotEmpty()) "$translatedType : $restPart" else translatedType,
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 12.sp
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Nombre d'images de fréquences que produirait le partage avec les réglages en cours. */
+@Composable
+private fun rememberShareFrequencyPageCount(
+    info: LocalisationEntity,
+    technique: TechniqueEntity?,
+    incFreqs: Boolean,
+    incSplitImage: Boolean,
+    incIds: Boolean,
+    shareOrder: List<String>
+): Int {
+    val txtUnknown = stringResource(R.string.appstrings_unknown)
+    val txtAzimuthNotSpecified = stringResource(R.string.appstrings_azimuth_not_specified)
+    val useGrid = AppConfig.siteFreqGridDisplay.value
+    val showSpectrumRanges = AppConfig.siteShowSpectrumRanges.value
+    val showBandwidthPerRange =
+        AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthPerRange.value
+    val showBandwidthTotal =
+        AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthTotal.value
+    return remember(
+        info.idAnfr,
+        technique?.detailsFrequences,
+        incFreqs,
+        incSplitImage,
+        incIds,
+        shareOrder,
+        useGrid,
+        showSpectrumRanges,
+        showBandwidthPerRange,
+        showBandwidthTotal
+    ) {
+        if (!incFreqs || !incSplitImage || !shareOrder.contains("freq") || useGrid) {
+            0
+        } else {
+            val bands = shareSiteFrequencyBands(info, technique, txtUnknown, txtAzimuthNotSpecified)
+            planSiteShareFrequencyPages(
+                bandHeightsDp = bands.map { band ->
+                    siteShareBandHeightDp(
+                        band = band,
+                        showSpectrumRanges = showSpectrumRanges,
+                        showBandwidthPerRange = showBandwidthPerRange,
+                        showBandwidthTotal = showBandwidthTotal
+                    )
+                },
+                firstPageSpaceDp = siteShareFirstPageSpaceDp(incIds && shareOrder.contains("ids")),
+                nextPageSpaceDp = siteShareNextPageSpaceDp()
+            ).size
+        }
+    }
+}
+
+/** Invite à l'export PDF quand le partage en images d'une station en produirait trop. */
+@Composable
+private fun SharePdfSuggestionCard(
+    imageCount: Int,
+    useOneUi: Boolean,
+    onExportPdf: () -> Unit
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val shape = if (useOneUi) {
+        RoundedCornerShape(sizing.component(22.dp))
+    } else {
+        RoundedCornerShape(sizing.component(12.dp))
+    }
+    Surface(
+        shape = shape,
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(sizing.spacing(16.dp))) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(
+                    Icons.Default.PictureAsPdf,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(sizing.component(20.dp))
+                )
+                Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
+                Text(
+                    stringResource(R.string.appstrings_share_many_bands_pdf_title),
+                    style = sizing.textStyle(MaterialTheme.typography.titleSmall),
+                    fontWeight = FontWeight.Bold
+                )
+            }
+            Spacer(modifier = Modifier.height(sizing.spacing(6.dp)))
+            Text(
+                stringResource(R.string.appstrings_share_many_bands_pdf_desc, imageCount),
+                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            TextButton(onClick = onExportPdf, modifier = Modifier.align(Alignment.End)) {
+                Text(
+                    stringResource(R.string.appstrings_radio_share_export_pdf),
+                    style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun GeoTowerPdfAntennaReportContent(
     context: Context,
@@ -3730,6 +4027,44 @@ fun shareFullAntennaCapture(
         return
     }
 
+    // Bandes et découpage sont calculés hors composition : la capture a besoin du nombre
+    // d'images pour mesurer la vue puis la découper colonne par colonne.
+    val useGridFrequencies = AppConfig.siteFreqGridDisplay.value
+    val shareBands = if (incFreqs && !useGridFrequencies) {
+        shareSiteFrequencyBands(
+            info = info,
+            technique = technique,
+            txtUnknown = context.getString(R.string.appstrings_unknown),
+            txtAzimuthNotSpecified = context.getString(R.string.appstrings_azimuth_not_specified)
+        )
+    } else {
+        emptyList()
+    }
+    val freqPages: List<SiteShareFreqPage> = when {
+        // Partage non scindé : tout reste sur l'image principale, comme avant.
+        !incSplitImage || !incFreqs || !shareOrder.contains("freq") -> emptyList()
+        // La vue tableau garde son image unique : ses lignes sont regroupées par azimut.
+        useGridFrequencies -> listOf(SiteShareFreqPage(0, 0))
+        else -> planSiteShareFrequencyPages(
+            bandHeightsDp = shareBands.map { band ->
+                siteShareBandHeightDp(
+                    band = band,
+                    showSpectrumRanges = AppConfig.siteShowSpectrumRanges.value,
+                    showBandwidthPerRange = AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthPerRange.value,
+                    showBandwidthTotal = AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthTotal.value
+                )
+            },
+            firstPageSpaceDp = siteShareFirstPageSpaceDp(incIds && shareOrder.contains("ids")),
+            nextPageSpaceDp = siteShareNextPageSpaceDp()
+        )
+    }
+    if (freqPages.size >= SITE_SHARE_MAX_FREQ_PAGES) {
+        AppLogger.w(
+            TAG_SHARE_IMAGE,
+            "Site share: ${shareBands.size} bands packed into ${freqPages.size} images, the last one exceeds the height budget"
+        )
+    }
+
     val composeView = ComposeView(context).apply {
         setViewTreeLifecycleOwner(currentView.findViewTreeLifecycleOwner())
         setViewTreeSavedStateRegistryOwner(currentView.findViewTreeSavedStateRegistryOwner())
@@ -3750,14 +4085,11 @@ fun shareFullAntennaCapture(
                         if (heights.isNotEmpty()) heights.joinToString(" - ") { formatSharePanelHeightMeters(it.toDouble(), distanceUnit) } else ""
                     }
 
-                    // ✅ DÉTECTION DU MODE SCINDÉ
-                    val isSplit = incSplitImage && incFreqs
-
-                    // On génère le QR Code une seule fois pour l'utiliser sur les deux images
+                    // On génère le QR Code une seule fois pour l'utiliser sur toutes les images
                     val qrUri = "geotower://site/${info.idAnfr}"
                     val qrBitmap = remember(qrUri) { generateQrCodeBitmap(qrUri, 200) }
 
-                    // ✅ ROW GLOBALE (800dp de large au total si split)
+                    // ✅ ROW GLOBALE : 400 dp par image, découpée à la capture
                     Row(modifier = Modifier.wrapContentSize()) {
 
                         // ==========================================
@@ -3893,7 +4225,7 @@ fun shareFullAntennaCapture(
 
                             // 🚨 ON FILTRE L'ORDRE POUR L'IMAGE 1 : Pas de bloc "freq" ni "ids" si l'image est scindée
                             val orderImage1 =
-                                if (isSplit) shareOrder.filter { it != "freq" && it != "ids" } else shareOrder
+                                if (freqPages.isNotEmpty()) shareOrder.filter { it != "freq" && it != "ids" } else shareOrder
 
                             orderImage1.forEach { block ->
                                 when (block) {
@@ -4396,277 +4728,26 @@ fun shareFullAntennaCapture(
                                     }
 
                                     "freq" -> {
-                                        // Géré dans l'image 2 si scindé, sinon affiché ici (code d'origine)
+                                        // Sur un partage scindé, « freq » est retiré de l'ordre de
+                                        // cette image : les bandes partent sur leurs propres images.
                                         if (incFreqs) {
                                             if (AppConfig.siteFreqGridDisplay.value) {
                                                 ShareSiteFrequenciesBlock(
                                                     info = info,
                                                     technique = technique
                                                 )
-                                                return@forEach
-                                            }
-
-                                            val rawFreqs =
-                                                technique?.detailsFrequences ?: info.frequences
-                                            val parsedBands = parseAndSortFrequencies(
-                                                rawFreqs,
-                                                stringResource(R.string.appstrings_unknown),
-                                                stringResource(R.string.appstrings_azimuth_not_specified)
-                                            ).filter { band ->
-                                                when (band.gen) {
-                                                    5 -> AppConfig.siteShowTechno5G.value && when (band.value) {
-                                                        700 -> AppConfig.siteF5G_700.value; 1400 -> AppConfig.siteF5G_1400.value; 2100 -> AppConfig.siteF5G_2100.value; 3500 -> AppConfig.siteF5G_3500.value; 4200 -> AppConfig.siteF5G_4200.value; 26000 -> AppConfig.siteF5G_26000.value; else -> true
-                                                    }
-
-                                                    4 -> AppConfig.siteShowTechno4G.value && when (band.value) {
-                                                        700 -> AppConfig.siteF4G_700.value; 800 -> AppConfig.siteF4G_800.value; 900 -> AppConfig.siteF4G_900.value; 1800 -> AppConfig.siteF4G_1800.value; 2100 -> AppConfig.siteF4G_2100.value; 2600 -> AppConfig.siteF4G_2600.value; else -> true
-                                                    }
-
-                                                    3 -> AppConfig.siteShowTechno3G.value && when (band.value) {
-                                                        900 -> AppConfig.siteF3G_900.value; 2100 -> AppConfig.siteF3G_2100.value; else -> true
-                                                    }
-
-                                                    2 -> AppConfig.siteShowTechno2G.value && when (band.value) {
-                                                        900 -> AppConfig.siteF2G_900.value; 1800 -> AppConfig.siteF2G_1800.value; else -> true
-                                                    }
-
-                                                    else -> AppConfig.siteShowTechnoFH.value
-                                                }
-                                            }
-
-                                            Card(
-                                                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                                                modifier = Modifier.fillMaxWidth()
-                                            ) {
-                                                Column(
-                                                    modifier = Modifier.padding(16.dp)
-                                                        .fillMaxWidth()
-                                                ) {
-                                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                                        Icon(
-                                                            Icons.Default.WifiTethering,
-                                                            null,
-                                                            tint = MaterialTheme.colorScheme.primary,
-                                                            modifier = Modifier.size(20.dp)
-                                                        )
-                                                        Spacer(modifier = Modifier.width(8.dp))
-                                                        Text(
-                                                            txtFrequenciesTitle,
-                                                            fontWeight = FontWeight.Bold,
-                                                            fontSize = 16.sp
-                                                        )
-                                                    }
-                                                    HorizontalDivider(
-                                                        modifier = Modifier.padding(
-                                                            vertical = 12.dp
-                                                        ),
-                                                        color = MaterialTheme.colorScheme.outlineVariant.copy(
-                                                            alpha = 0.5f
-                                                        )
-                                                    )
-
-                                                    if (parsedBands.isEmpty()) {
-                                                        Text(
-                                                            txtBandsNotSpecified,
-                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                                                        )
-                                                    } else {
-                                                        parsedBands.forEachIndexed { bandIndex, band ->
-                                                            if (bandIndex > 0) HorizontalDivider(
-                                                                modifier = Modifier.padding(vertical = 12.dp),
-                                                                color = MaterialTheme.colorScheme.outlineVariant.copy(
-                                                                    alpha = 0.3f
-                                                                )
-                                                            )
-                                                            val (statusColor, statusText) = when {
-                                                                band.status.contains(
-                                                                    "En service",
-                                                                    true
-                                                                ) -> Pair(
-                                                                    Color(0xFF4CAF50),
-                                                                    txtInService
-                                                                )
-
-                                                                band.status.contains(
-                                                                    "Techniquement",
-                                                                    true
-                                                                ) -> Pair(
-                                                                    Color(0xFF4CAF50),
-                                                                    txtTechnically
-                                                                )
-
-                                                                band.status.contains(
-                                                                    "Approuvé",
-                                                                    true
-                                                                ) -> Pair(
-                                                                    Color(0xFF2196F3),
-                                                                    txtProjectApproved
-                                                                )
-
-                                                                else -> Pair(
-                                                                    Color.Gray,
-                                                                    txtUnknownStatus
-                                                                )
-                                                            }
-                                                            Row(
-                                                                modifier = Modifier.fillMaxWidth(),
-                                                                verticalAlignment = Alignment.CenterVertically
-                                                            ) {
-                                                                Text(
-                                                                    text = band.rawFreq.substringBefore(
-                                                                        ":"
-                                                                    ).trim(),
-                                                                    fontWeight = FontWeight.SemiBold,
-                                                                    color = MaterialTheme.colorScheme.onSurface,
-                                                                    fontSize = 14.sp,
-                                                                    modifier = Modifier.weight(1f)
-                                                                )
-                                                                Spacer(modifier = Modifier.width(6.dp))
-                                                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                                                    Text(
-                                                                        text = statusText,
-                                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                        fontWeight = FontWeight.Normal,
-                                                                        fontSize = 12.sp
-                                                                    ); Spacer(
-                                                                    modifier = Modifier.width(
-                                                                        6.dp
-                                                                    )
-                                                                ); Icon(
-                                                                    Icons.Default.Circle,
-                                                                    null,
-                                                                    tint = statusColor,
-                                                                    modifier = Modifier.size(10.dp)
-                                                                )
-                                                                }
-                                                            }
-                                                            Spacer(modifier = Modifier.height(4.dp))
-                                                            Column(modifier = Modifier.padding(start = 8.dp)) {
-                                                                val preciseFreqs =
-                                                                    band.rawFreq.substringAfter(
-                                                                        ":",
-                                                                        ""
-                                                                    ).trim()
-                                                                if (preciseFreqs.isNotBlank() && preciseFreqs != band.rawFreq.trim()) {
-                                                                    val spectrumDisplay = formatSpectrumDisplayDetails(preciseFreqs)
-                                                                    val showSpectrum = AppConfig.siteShowSpectrumRanges.value
-                                                                    val showBandwidthPerRange =
-                                                                        AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthPerRange.value
-                                                                    val showBandwidthTotal =
-                                                                        AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthTotal.value && spectrumDisplay.hasTotal
-                                                                    if (showSpectrum || showBandwidthPerRange) {
-                                                                        val detailTitle = stringResource(
-                                                                            if (showSpectrum) R.string.appstrings_spectrum_title
-                                                                            else R.string.appstrings_bandwidth_by_range
-                                                                        )
-                                                                        Text(
-                                                                            text = "$detailTitle :\n\n${spectrumDisplay.detailedFrequencies(showSpectrum, showBandwidthPerRange)}",
-                                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                            fontSize = 12.sp,
-                                                                            fontWeight = FontWeight.Normal,
-                                                                            lineHeight = 16.sp
-                                                                        )
-                                                                    }
-                                                                    if (showBandwidthTotal) {
-                                                                        if (showSpectrum || showBandwidthPerRange) Spacer(
-                                                                            modifier = Modifier.height(
-                                                                                2.dp
-                                                                            )
-                                                                        )
-                                                                        Text(
-                                                                            text = "${stringResource(R.string.appstrings_bandwidth_total)} : ${spectrumDisplay.totalBandwidth} ${spectrumDisplay.totalUnit}",
-                                                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                            fontSize = 12.sp,
-                                                                            fontWeight = FontWeight.Medium
-                                                                        )
-                                                                    }
-                                                                    if (showSpectrum || showBandwidthPerRange || showBandwidthTotal) {
-                                                                        Spacer(
-                                                                            modifier = Modifier.height(
-                                                                                4.dp
-                                                                            )
-                                                                        )
-                                                                    }
-                                                                }
-                                                                val dateFormatted =
-                                                                    formatDateToFrench(band.date)
-                                                                if (dateFormatted.isNotBlank() && dateFormatted != "-") {
-                                                                    Text(
-                                                                        "$txtActivatedOn$dateFormatted",
-                                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                        fontSize = 12.sp
-                                                                    )
-                                                                } else {
-                                                                    Text(
-                                                                        txtDateNotSpecifiedAnfr,
-                                                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                        fontSize = 12.sp
-                                                                    )
-                                                                }
-                                                                if (band.physDetails.isNotEmpty()) {
-                                                                    Spacer(
-                                                                        modifier = Modifier.height(
-                                                                            6.dp
-                                                                        )
-                                                                    )
-                                                                    band.physDetails.forEach { physDetail ->
-                                                                        Row(
-                                                                            verticalAlignment = Alignment.CenterVertically,
-                                                                            modifier = Modifier.padding(
-                                                                                top = 4.dp
-                                                                            )
-                                                                        ) {
-                                                                            Icon(
-                                                                                Icons.Default.Explore,
-                                                                                null,
-                                                                                tint = MaterialTheme.colorScheme.primary,
-                                                                                modifier = Modifier.size(
-                                                                                    14.dp
-                                                                                )
-                                                                            ); Spacer(
-                                                                            modifier = Modifier.width(
-                                                                                6.dp
-                                                                            )
-                                                                        )
-                                                                            val panelDimension =
-                                                                                extractFrequencyPanelDimension(
-                                                                                    physDetail
-                                                                                )
-                                                                            val detailWithoutDimension =
-                                                                                removePanelDimensionTag(
-                                                                                    physDetail
-                                                                                )
-                                                                            val typePart =
-                                                                                detailWithoutDimension.substringBefore(
-                                                                                    " : "
-                                                                                ).trim()
-                                                                            val restPart =
-                                                                                detailWithoutDimension.substringAfter(
-                                                                                    " : ",
-                                                                                    ""
-                                                                                ).trim()
-                                                                            val translatedType =
-                                                                                appendPanelDimensionToType(
-                                                                                    AnfrDisplayText.antennaType(
-                                                                                        typePart
-                                                                                    ),
-                                                                                    panelDimension
-                                                                                )
-                                                                            val finalPhysText =
-                                                                                if (restPart.isNotEmpty()) "$translatedType : $restPart" else translatedType
-                                                                            Text(
-                                                                                text = finalPhysText,
-                                                                                color = MaterialTheme.colorScheme.onSurface,
-                                                                                fontWeight = FontWeight.Medium,
-                                                                                fontSize = 12.sp
-                                                                            )
-                                                                        }
-                                                                    }
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
+                                            } else {
+                                                ShareSiteFrequencyDetailCard(
+                                                    bands = shareBands,
+                                                    txtFrequenciesTitle = txtFrequenciesTitle,
+                                                    txtBandsNotSpecified = txtBandsNotSpecified,
+                                                    txtInService = txtInService,
+                                                    txtTechnically = txtTechnically,
+                                                    txtProjectApproved = txtProjectApproved,
+                                                    txtUnknownStatus = txtUnknownStatus,
+                                                    txtActivatedOn = txtActivatedOn,
+                                                    txtDateNotSpecifiedAnfr = txtDateNotSpecifiedAnfr
+                                                )
                                             }
                                         }
                                     }
@@ -4710,9 +4791,12 @@ fun shareFullAntennaCapture(
                         }
 
                         // ==========================================
-                        // 📸 IMAGE 2 : Identifiants & Fréquences (Uniquement si Split)
+                        // 📸 IMAGES SUIVANTES : Identifiants & Fréquences (partage scindé)
+                        // Une image par tranche de bandes : au-delà d'un certain rapport
+                        // hauteur/largeur, les messageries redimensionnent et le texte devient
+                        // illisible (cf. planSiteShareFrequencyPages).
                         // ==========================================
-                        if (isSplit) {
+                        freqPages.forEachIndexed { pageIndex, freqPage ->
                             Column(
                                 modifier = Modifier
                                     .width(400.dp)
@@ -4776,7 +4860,9 @@ fun shareFullAntennaCapture(
                                     }
                                 }
 
-                                if (incIds && shareOrder.contains("ids")) {
+                                // Les identifiants ouvrent la série : les répéter sur chaque image
+                                // coûterait une bande de fréquences par page.
+                                if (pageIndex == 0 && incIds && shareOrder.contains("ids")) {
                                     Card(
                                         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
                                         modifier = Modifier.fillMaxWidth()
@@ -4822,236 +4908,34 @@ fun shareFullAntennaCapture(
 
                                 if (incFreqs && shareOrder.contains("freq")) {
                                     if (AppConfig.siteFreqGridDisplay.value) {
+                                        // La vue tableau n'est pas découpée : ses deux tableaux se
+                                        // regroupent par azimut, une tranche par image casserait
+                                        // le regroupement.
                                         ShareSiteFrequenciesBlock(
                                             info = info,
                                             technique = technique
                                         )
                                     } else {
-                                    val rawFreqs = technique?.detailsFrequences ?: info.frequences
-                                    val parsedBands = parseAndSortFrequencies(
-                                        rawFreqs,
-                                        stringResource(R.string.appstrings_unknown),
-                                        stringResource(R.string.appstrings_azimuth_not_specified)
-                                    ).filter { band ->
-                                        when (band.gen) {
-                                            5 -> AppConfig.siteShowTechno5G.value && when (band.value) {
-                                                700 -> AppConfig.siteF5G_700.value; 1400 -> AppConfig.siteF5G_1400.value; 2100 -> AppConfig.siteF5G_2100.value; 3500 -> AppConfig.siteF5G_3500.value; 4200 -> AppConfig.siteF5G_4200.value; 26000 -> AppConfig.siteF5G_26000.value; else -> true
-                                            }
-
-                                            4 -> AppConfig.siteShowTechno4G.value && when (band.value) {
-                                                700 -> AppConfig.siteF4G_700.value; 800 -> AppConfig.siteF4G_800.value; 900 -> AppConfig.siteF4G_900.value; 1800 -> AppConfig.siteF4G_1800.value; 2100 -> AppConfig.siteF4G_2100.value; 2600 -> AppConfig.siteF4G_2600.value; else -> true
-                                            }
-
-                                            3 -> AppConfig.siteShowTechno3G.value && when (band.value) {
-                                                900 -> AppConfig.siteF3G_900.value; 2100 -> AppConfig.siteF3G_2100.value; else -> true
-                                            }
-
-                                            2 -> AppConfig.siteShowTechno2G.value && when (band.value) {
-                                                900 -> AppConfig.siteF2G_900.value; 1800 -> AppConfig.siteF2G_1800.value; else -> true
-                                            }
-
-                                            else -> AppConfig.siteShowTechnoFH.value
-                                        }
-                                    }
-
-                                    Card(
-                                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Column(modifier = Modifier.padding(16.dp).fillMaxWidth()) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Icon(
-                                                    Icons.Default.WifiTethering,
-                                                    null,
-                                                    tint = MaterialTheme.colorScheme.primary,
-                                                    modifier = Modifier.size(20.dp)
-                                                ); Spacer(modifier = Modifier.width(8.dp)); Text(
-                                                txtFrequenciesTitle,
-                                                fontWeight = FontWeight.Bold,
-                                                fontSize = 16.sp
-                                            )
-                                            }
-                                            HorizontalDivider(
-                                                modifier = Modifier.padding(vertical = 12.dp),
-                                                color = MaterialTheme.colorScheme.outlineVariant.copy(
-                                                    alpha = 0.5f
-                                                )
-                                            )
-
-                                            if (parsedBands.isEmpty()) {
-                                                Text(
-                                                    txtBandsNotSpecified,
-                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        ShareSiteFrequencyDetailCard(
+                                            bands = shareBands.subList(freqPage.from, freqPage.to),
+                                            txtFrequenciesTitle = txtFrequenciesTitle,
+                                            txtBandsNotSpecified = txtBandsNotSpecified,
+                                            txtInService = txtInService,
+                                            txtTechnically = txtTechnically,
+                                            txtProjectApproved = txtProjectApproved,
+                                            txtUnknownStatus = txtUnknownStatus,
+                                            txtActivatedOn = txtActivatedOn,
+                                            txtDateNotSpecifiedAnfr = txtDateNotSpecifiedAnfr,
+                                            pageLabel = if (freqPages.size > 1) {
+                                                stringResource(
+                                                    R.string.appstrings_share_freq_page_indicator,
+                                                    pageIndex + 1,
+                                                    freqPages.size
                                                 )
                                             } else {
-                                                parsedBands.forEachIndexed { bandIndex, band ->
-                                                    if (bandIndex > 0) HorizontalDivider(
-                                                        modifier = Modifier.padding(
-                                                            vertical = 12.dp
-                                                        ),
-                                                        color = MaterialTheme.colorScheme.outlineVariant.copy(
-                                                            alpha = 0.3f
-                                                        )
-                                                    )
-                                                    val (statusColor, statusText) = when {
-                                                        band.status.contains(
-                                                            "En service",
-                                                            true
-                                                        ) -> Pair(Color(0xFF4CAF50), txtInService)
-
-                                                        band.status.contains(
-                                                            "Techniquement",
-                                                            true
-                                                        ) -> Pair(Color(0xFF4CAF50), txtTechnically)
-
-                                                        band.status.contains(
-                                                            "Approuvé",
-                                                            true
-                                                        ) -> Pair(
-                                                            Color(0xFF2196F3),
-                                                            txtProjectApproved
-                                                        )
-
-                                                        else -> Pair(Color.Gray, txtUnknownStatus)
-                                                    }
-                                                    Row(
-                                                        modifier = Modifier.fillMaxWidth(),
-                                                        verticalAlignment = Alignment.CenterVertically
-                                                    ) {
-                                                        Text(
-                                                            text = band.rawFreq.substringBefore(":")
-                                                                .trim(),
-                                                            fontWeight = FontWeight.SemiBold,
-                                                            color = MaterialTheme.colorScheme.onSurface,
-                                                            fontSize = 14.sp,
-                                                            modifier = Modifier.weight(1f)
-                                                        )
-                                                        Spacer(modifier = Modifier.width(6.dp))
-                                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                                            Text(
-                                                                text = statusText,
-                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                fontWeight = FontWeight.Normal,
-                                                                fontSize = 12.sp
-                                                            ); Spacer(modifier = Modifier.width(6.dp)); Icon(
-                                                            Icons.Default.Circle,
-                                                            null,
-                                                            tint = statusColor,
-                                                            modifier = Modifier.size(10.dp)
-                                                        )
-                                                        }
-                                                    }
-                                                    Spacer(modifier = Modifier.height(4.dp))
-                                                    Column(modifier = Modifier.padding(start = 8.dp)) {
-                                                        val preciseFreqs =
-                                                            band.rawFreq.substringAfter(":", "")
-                                                                .trim()
-                                                        if (preciseFreqs.isNotBlank() && preciseFreqs != band.rawFreq.trim()) {
-                                                            val spectrumDisplay = formatSpectrumDisplayDetails(preciseFreqs)
-                                                            val showSpectrum = AppConfig.siteShowSpectrumRanges.value
-                                                            val showBandwidthPerRange =
-                                                                AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthPerRange.value
-                                                            val showBandwidthTotal =
-                                                                AppConfig.siteShowBandwidth.value && AppConfig.siteShowBandwidthTotal.value && spectrumDisplay.hasTotal
-                                                            if (showSpectrum || showBandwidthPerRange) {
-                                                                val detailTitle = stringResource(
-                                                                    if (showSpectrum) R.string.appstrings_spectrum_title
-                                                                    else R.string.appstrings_bandwidth_by_range
-                                                                )
-                                                                Text(
-                                                                    text = "$detailTitle :\n\n${spectrumDisplay.detailedFrequencies(showSpectrum, showBandwidthPerRange)}",
-                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                    fontSize = 12.sp,
-                                                                    fontWeight = FontWeight.Normal,
-                                                                    lineHeight = 16.sp
-                                                                )
-                                                            }
-                                                            if (showBandwidthTotal) {
-                                                                if (showSpectrum || showBandwidthPerRange) Spacer(
-                                                                    modifier = Modifier.height(2.dp)
-                                                                )
-                                                                Text(
-                                                                    text = "${stringResource(R.string.appstrings_bandwidth_total)} : ${spectrumDisplay.totalBandwidth} ${spectrumDisplay.totalUnit}",
-                                                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                    fontSize = 12.sp,
-                                                                    fontWeight = FontWeight.Medium
-                                                                )
-                                                            }
-                                                            if (showSpectrum || showBandwidthPerRange || showBandwidthTotal) {
-                                                                Spacer(modifier = Modifier.height(4.dp))
-                                                            }
-                                                        }
-                                                        val dateFormatted =
-                                                            formatDateToFrench(band.date)
-                                                        if (dateFormatted.isNotBlank() && dateFormatted != "-") {
-                                                            Text(
-                                                                "$txtActivatedOn$dateFormatted",
-                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                fontSize = 12.sp
-                                                            )
-                                                        } else {
-                                                            Text(
-                                                                txtDateNotSpecifiedAnfr,
-                                                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                                                fontSize = 12.sp
-                                                            )
-                                                        }
-                                                        if (band.physDetails.isNotEmpty()) {
-                                                            Spacer(modifier = Modifier.height(6.dp))
-                                                            band.physDetails.forEach { physDetail ->
-                                                                Row(
-                                                                    verticalAlignment = Alignment.CenterVertically,
-                                                                    modifier = Modifier.padding(top = 4.dp)
-                                                                ) {
-                                                                    Icon(
-                                                                        Icons.Default.Explore,
-                                                                        null,
-                                                                        tint = MaterialTheme.colorScheme.primary,
-                                                                        modifier = Modifier.size(14.dp)
-                                                                    ); Spacer(
-                                                                    modifier = Modifier.width(
-                                                                        6.dp
-                                                                    )
-                                                                )
-                                                                    val panelDimension =
-                                                                        extractFrequencyPanelDimension(
-                                                                            physDetail
-                                                                        )
-                                                                    val detailWithoutDimension =
-                                                                        removePanelDimensionTag(
-                                                                            physDetail
-                                                                        )
-                                                                    val typePart =
-                                                                        detailWithoutDimension.substringBefore(" : ")
-                                                                            .trim()
-                                                                    val restPart =
-                                                                        detailWithoutDimension.substringAfter(
-                                                                            " : ",
-                                                                            ""
-                                                                        ).trim()
-                                                                    val translatedType =
-                                                                        appendPanelDimensionToType(
-                                                                            AnfrDisplayText.antennaType(
-                                                                                typePart
-                                                                            ),
-                                                                            panelDimension
-                                                                        )
-                                                                    val finalPhysText =
-                                                                        if (restPart.isNotEmpty()) "$translatedType : $restPart" else translatedType
-                                                                    Text(
-                                                                        text = finalPhysText,
-                                                                        color = MaterialTheme.colorScheme.onSurface,
-                                                                        fontWeight = FontWeight.Medium,
-                                                                        fontSize = 12.sp
-                                                                    )
-                                                                }
-                                                            }
-                                                        }
-                                                    }
-                                                }
+                                                null
                                             }
-                                        }
-                                    }
+                                        )
                                     }
                                 }
 
@@ -5105,9 +4989,9 @@ fun shareFullAntennaCapture(
             (composeView.parent as ViewGroup).removeView(composeView)
         }
 
-        // ✅ CORRECTION : On s'assure que la vue fait 800dp de large si elle est scindée
-        val isSplit = incSplitImage && incFreqs
-        val expectedWidthDp = if (isSplit) 800 else 400
+        // ✅ La vue fait 400 dp par image : une colonne pour le contenu principal, puis une
+        // colonne par tranche de fréquences.
+        val expectedWidthDp = SITE_SHARE_COLUMN_WIDTH_DP * (1 + freqPages.size)
         rootView.addView(composeView, ViewGroup.LayoutParams(expectedWidthDp.dpToPx(context), ViewGroup.LayoutParams.WRAP_CONTENT))
 
     } catch (e: Exception) {
@@ -5118,46 +5002,43 @@ fun shareFullAntennaCapture(
 
     composeView.postDelayed({
         try {
-            val isSplit = incSplitImage && incFreqs
-            // Si on split, la largeur demandée est de 800dp (400 x 2)
-            val expectedWidthDp = if (isSplit) 800 else 400
+            val columnCount = 1 + freqPages.size
+            val expectedWidthDp = SITE_SHARE_COLUMN_WIDTH_DP * columnCount
             val widthSpec = View.MeasureSpec.makeMeasureSpec(expectedWidthDp.dpToPx(context), View.MeasureSpec.EXACTLY)
             val heightSpec = View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED)
             composeView.measure(widthSpec, heightSpec)
             composeView.layout(0, 0, composeView.measuredWidth, composeView.measuredHeight)
 
             if (composeView.measuredWidth > 0 && composeView.measuredHeight > 0) {
-                val fullBitmap = Bitmap.createBitmap(composeView.measuredWidth, composeView.measuredHeight, Bitmap.Config.ARGB_8888)
-                val canvas = Canvas(fullBitmap)
-                composeView.draw(canvas)
-
-                rootView.removeView(composeView)
                 val imagesDir = File(context.cacheDir, "images")
                 imagesDir.mkdirs()
 
                 val urisToShare = java.util.ArrayList<Uri>()
 
-                if (isSplit) {
-                    val halfWidth = fullBitmap.width / 2
-                    val bmp1 = Bitmap.createBitmap(fullBitmap, 0, 0, halfWidth, fullBitmap.height)
-                        .trimTransparentBottom()
-                    val bmp2 = Bitmap.createBitmap(fullBitmap, halfWidth, 0, halfWidth, fullBitmap.height)
-                        .trimTransparentBottom()
+                // Une image par colonne, dessinée à part : allouer la planche entière
+                // (400 dp × nombre d'images) coûterait des dizaines de Mo sur une station chargée.
+                val columnWidth = composeView.measuredWidth / columnCount
+                for (columnIndex in 0 until columnCount) {
+                    val columnBitmap = Bitmap.createBitmap(columnWidth, composeView.measuredHeight, Bitmap.Config.ARGB_8888)
+                    val canvas = Canvas(columnBitmap)
+                    canvas.translate(-(columnIndex * columnWidth).toFloat(), 0f)
+                    composeView.draw(canvas)
+                    // Les colonnes n'ont pas la même hauteur : le vide sous la plus courte est
+                    // transparent (le fond est peint par chaque colonne, pas par la Row).
+                    val trimmed = columnBitmap.trimTransparentBottom()
 
-                    val file1 = File(imagesDir, "Geotower_site_${info.idAnfr}_part1.png")
-                    val file2 = File(imagesDir, "Geotower_site_${info.idAnfr}_part2.png")
+                    val file = File(
+                        imagesDir,
+                        if (columnCount == 1) "Geotower_site_${info.idAnfr}.png"
+                        else "Geotower_site_${info.idAnfr}_part${columnIndex + 1}.png"
+                    )
+                    FileOutputStream(file).use { trimmed.compress(Bitmap.CompressFormat.PNG, 100, it) }
+                    if (trimmed !== columnBitmap) columnBitmap.recycle()
+                    trimmed.recycle()
 
-                    FileOutputStream(file1).use { bmp1.compress(Bitmap.CompressFormat.PNG, 100, it) }
-                    FileOutputStream(file2).use { bmp2.compress(Bitmap.CompressFormat.PNG, 100, it) }
-
-                    urisToShare.add(FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file1))
-                    urisToShare.add(FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file2))
-                } else {
-                    // Image unique classique
-                    val file = File(imagesDir, "Geotower_site_${info.idAnfr}.png")
-                    FileOutputStream(file).use { fullBitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
                     urisToShare.add(FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file))
                 }
+                rootView.removeView(composeView)
 
                 elevationProfileBitmap?.let { profileBitmap ->
                     val profileFile = File(imagesDir, "Geotower_site_${info.idAnfr}_profil_altimetrique.png")
@@ -6075,6 +5956,175 @@ fun AntennaShareMenu(
         ShareGenerationDialog(generationMessage.ifBlank { txtShareImageGenerationInProgress })
     }
 
+    fun startAntennaImageExport(destination: ShareImageDestination) {
+        if (isGeneratingShare) return
+        isGeneratingShare = true
+        generationMessage = txtShareImageGenerationInProgress
+        showSelectionSheet = false
+        val isPdfDestination = destination.isPdfExport()
+        val shareOnlyElevationProfile = !isPdfDestination && isOnlyElevationProfileSelected(
+            shareOrder = shareOrder,
+            incElevationProfile = incElevationProfile,
+            incMap = incMap,
+            incSupport = incSupport,
+            incIds = incIds,
+            incDates = incDates,
+            incAddress = incAddress,
+            incPhotos = incPhotos,
+            hasPhotos = hasSharePhotos,
+            incFreqs = incFreqs,
+            incSpeedtest = incSpeedtest,
+            incThroughput = incThroughput
+        )
+        // Enregistré au clic, une fois le contenu connu : un partage « profil d'élévation
+        // seul » ne doit pas se relire comme une fiche complète dans l'historique.
+        ShareHistoryStore.record(
+            context = context,
+            kind = ShareHistoryStore.KIND_MOBILE_SITE,
+            destination = destination.historyKey(),
+            supportId = physique?.idSupport,
+            stationId = info.idAnfr,
+            label = info.operateur,
+            address = technique?.adresse,
+            latitude = info.latitude,
+            longitude = info.longitude,
+            contents = if (shareOnlyElevationProfile) {
+                ShareHistoryStore.CONTENT_ELEVATION_PROFILE
+            } else {
+                ShareHistoryStore.contentsOf(
+                    (incMap && shareOrder.contains("map")) to ShareHistoryStore.CONTENT_MAP,
+                    (incElevationProfile && shareOrder.contains("elevation_profile")) to ShareHistoryStore.CONTENT_ELEVATION_PROFILE,
+                    (incSupport && shareOrder.contains("support")) to ShareHistoryStore.CONTENT_SUPPORT,
+                    (incPhotos && hasSharePhotos && shareOrder.contains("photos")) to ShareHistoryStore.CONTENT_PHOTOS,
+                    (incIds && shareOrder.contains("ids")) to ShareHistoryStore.CONTENT_IDS,
+                    (incDates && shareOrder.contains("dates")) to ShareHistoryStore.CONTENT_DATES,
+                    (incAddress && shareOrder.contains("address")) to ShareHistoryStore.CONTENT_ADDRESS,
+                    (incSpeedtest && shareOrder.contains("speedtest")) to ShareHistoryStore.CONTENT_SPEEDTEST,
+                    (incThroughput && shareOrder.contains("throughput")) to ShareHistoryStore.CONTENT_THROUGHPUT,
+                    (AppConfig.shareSiteStatus.value && shareOrder.contains("status")) to ShareHistoryStore.CONTENT_STATUS,
+                    (incFreqs && shareOrder.contains("freq")) to ShareHistoryStore.CONTENT_FREQ,
+                    incHeights to ShareHistoryStore.CONTENT_HEIGHTS,
+                    incQrCode to ShareHistoryStore.CONTENT_QR_CODE,
+                    incConfidential to ShareHistoryStore.CONTENT_CONFIDENTIAL,
+                    (incSplitImage && !isPdfDestination) to ShareHistoryStore.CONTENT_SPLIT_IMAGE
+                )
+            },
+            darkTheme = selectedShareTheme
+        )
+        val elevationProfileTexts = ElevationProfileShareTexts(
+            title = txtElevationProfileTitle,
+            distance = txtElevationProfileDistance,
+            supportHeight = txtElevationProfileSupportHeight,
+            supportHeightDetail = txtElevationProfileSupportHeightDetail,
+            startAltitude = txtElevationProfileStartAltitude,
+            startAltitudeDetail = txtElevationProfileStartAltitudeDetail,
+            siteAltitude = txtElevationProfileSiteAltitude,
+            siteAltitudeDetail = txtElevationProfileSiteAltitudeDetail,
+            frequency = txtElevationProfileFrequency,
+            directLine = txtElevationProfileDirectLineLabel,
+            fresnelZone = txtElevationProfileFresnelLabel,
+            lineClear = txtElevationProfileLineClear,
+            lineBlocked = txtElevationProfileLineBlocked,
+            fresnelClear = txtElevationProfileFresnelClear,
+            fresnelBlocked = txtElevationProfileFresnelBlocked,
+            fresnelExplanation = txtElevationProfileFresnelExplanation,
+            ignSource = txtElevationProfileIgnSource,
+            generatedBy = txtGeneratedBy,
+            unknown = txtUnknown
+        )
+
+        scope.launch {
+            val elevationProfileBitmap = if (
+                !isPdfDestination &&
+                incElevationProfile &&
+                shareOrder.contains("elevation_profile") &&
+                !incConfidential
+            ) {
+                generationMessage = txtElevationProfileLoading
+                runCatching {
+                    val userLocation = withContext(Dispatchers.IO) {
+                        getElevationProfileLastKnownLocation(context)
+                    } ?: return@runCatching null
+                    val rawElevationProfileFrequencies = technique?.detailsFrequences?.takeIf { it.isNotBlank() } ?: info.frequences
+                    val frequency = extractElevationProfileFrequencies(rawElevationProfileFrequencies).firstOrNull() ?: DEFAULT_ELEVATION_PROFILE_FREQUENCY_MHZ
+                    val antennaHeight = extractElevationProfileAntennaHeightsByFrequency(rawElevationProfileFrequencies)[frequency]
+                    val profile = withContext(Dispatchers.IO) {
+                        fetchIgnElevationProfileData(
+                            fromLatitude = userLocation.latitude,
+                            fromLongitude = userLocation.longitude,
+                            toLatitude = info.latitude,
+                            toLongitude = info.longitude,
+                            includeObstacles = loadElevationProfileIncludeObstacles(context)
+                        )
+                    }
+                    createElevationProfileShareBitmap(
+                        context = context,
+                        info = info,
+                        profile = profile,
+                        supportHeightMeters = antennaHeight ?: physique?.hauteur,
+                        frequencyMHz = frequency,
+                        forceDarkTheme = selectedShareTheme,
+                        texts = elevationProfileTexts,
+                        operatorTechnologies = technique?.technologies?.takeIf { it.isNotBlank() } ?: info.frequences
+                    )
+                }.getOrNull()
+            } else {
+                null
+            }
+
+            if (shareOnlyElevationProfile && elevationProfileBitmap == null) {
+                Toast.makeText(context, txtShareElevationProfileOnlyUnavailable, Toast.LENGTH_SHORT).show()
+                isGeneratingShare = false
+                return@launch
+            }
+
+            val sharePhotoBitmaps = if (incPhotos && hasSharePhotos && shareOrder.contains("photos")) {
+                loadSharePhotoBitmaps(visibleSharePhotos)
+            } else {
+                emptyList()
+            }
+
+            generationMessage = txtShareImagePreparingInProgress
+            currentView.postDelayed({
+                try {
+                    if (shareOnlyElevationProfile && elevationProfileBitmap != null) {
+                        shareElevationProfileBitmapOnly(
+                            context = context,
+                            info = info,
+                            bitmap = elevationProfileBitmap,
+                            txtShareSiteVia = txtShareSiteVia,
+                            destination = destination,
+                            txtCopiedToClipboard = txtPhotoCopiedToClipboard
+                        )
+                        isGeneratingShare = false
+                    } else {
+                        val mapBmp = if (incMap) { globalMapRef?.let { map -> try { val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888); map.draw(Canvas(bmp)); bmp } catch (e: Exception) { null } } } else null
+                        shareFullAntennaCapture(
+                            context, currentView, info,
+                            physique, technique,
+                            hsDataMap,
+                            speedtestData,
+                            distanceStr, bearingStr, selectedShareTheme,
+                            txtSiteDetailsTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtGeneratedBy, txtShareSiteVia, txtimplementation, txtLastModification, txtIdentifiers, txtIdNumber, txtFrequenciesTitle, txtBandsNotSpecified, txtInService, txtTechnically, txtUnknownStatus, txtAnfrStationNumber, txtDates, txtError, txtProjectApproved, txtActivatedOn, txtDateNotSpecifiedAnfr, txtPanelHeightsTitle, txtAzimuths, txtIdSupportLabel, txtSupportDetailsTitle, txtSupportNature, txtOwner, txtExploitant, txtAntennaType,
+                            mapBmp, txtInitError, sharePhotoBitmaps, txtCommunityPhotosTitle,
+                            incPhotos,
+                            incMap, incSupport, incHeights, incIds, incDates, incAddress, incFreqs, incSpeedtest, incThroughput, incConfidential, incQrCode,
+                            incSplitImage,
+                            shareOrder,
+                            elevationProfileBitmap = elevationProfileBitmap,
+                            destination = destination,
+                            txtCopiedToClipboard = txtPhotoCopiedToClipboard,
+                            onComplete = { isGeneratingShare = false }
+                        )
+                    }
+                } catch (e: Exception) {
+                    AppLogger.w(TAG_SHARE_IMAGE, "Site share generation failed", e)
+                    isGeneratingShare = false
+                }
+            }, 300)
+        }
+    }
+
     if (showShareSheet) {
         ModalBottomSheet(onDismissRequest = { showShareSheet = false }, sheetState = sheetState, containerColor = sheetBgColor) {
             Column(modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(16.dp), end = sizing.spacing(16.dp))) {
@@ -6103,6 +6153,25 @@ fun AntennaShareMenu(
                     IconButton(onClick = { safeClick { showSelectionSheet = false; showShareSheet = true } }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null, modifier = Modifier.size(sizing.component(24.dp))) }
                     Text(text = txtImageContent, style = sizing.textStyle(MaterialTheme.typography.titleLarge), fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f), textAlign = TextAlign.Center)
                     Spacer(modifier = Modifier.width(sizing.spacing(48.dp)))
+                }
+
+                // Une station très chargée sort trop d'images pour rester confortable à envoyer :
+                // le rapport PDF, lui, est paginé et tient dans un seul fichier.
+                val freqPageCount = rememberShareFrequencyPageCount(
+                    info = info,
+                    technique = technique,
+                    incFreqs = incFreqs,
+                    incSplitImage = incSplitImage,
+                    incIds = incIds,
+                    shareOrder = shareOrder
+                )
+                if (freqPageCount >= SITE_SHARE_PDF_HINT_MIN_PAGES) {
+                    SharePdfSuggestionCard(
+                        imageCount = freqPageCount + 1,
+                        useOneUi = useOneUi,
+                        onExportPdf = { safeClick { startAntennaImageExport(ShareImageDestination.Pdf) } }
+                    )
+                    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                 }
 
                 val itemHeight = sizing.component(48.dp)
@@ -6222,175 +6291,6 @@ fun AntennaShareMenu(
                             useOneUi = useOneUi
                         )
                     }
-                }
-            }
-
-            fun startAntennaImageExport(destination: ShareImageDestination) {
-                if (isGeneratingShare) return
-                isGeneratingShare = true
-                generationMessage = txtShareImageGenerationInProgress
-                showSelectionSheet = false
-                val isPdfDestination = destination.isPdfExport()
-                val shareOnlyElevationProfile = !isPdfDestination && isOnlyElevationProfileSelected(
-                    shareOrder = shareOrder,
-                    incElevationProfile = incElevationProfile,
-                    incMap = incMap,
-                    incSupport = incSupport,
-                    incIds = incIds,
-                    incDates = incDates,
-                    incAddress = incAddress,
-                    incPhotos = incPhotos,
-                    hasPhotos = hasSharePhotos,
-                    incFreqs = incFreqs,
-                    incSpeedtest = incSpeedtest,
-                    incThroughput = incThroughput
-                )
-                // Enregistré au clic, une fois le contenu connu : un partage « profil d'élévation
-                // seul » ne doit pas se relire comme une fiche complète dans l'historique.
-                ShareHistoryStore.record(
-                    context = context,
-                    kind = ShareHistoryStore.KIND_MOBILE_SITE,
-                    destination = destination.historyKey(),
-                    supportId = physique?.idSupport,
-                    stationId = info.idAnfr,
-                    label = info.operateur,
-                    address = technique?.adresse,
-                    latitude = info.latitude,
-                    longitude = info.longitude,
-                    contents = if (shareOnlyElevationProfile) {
-                        ShareHistoryStore.CONTENT_ELEVATION_PROFILE
-                    } else {
-                        ShareHistoryStore.contentsOf(
-                            (incMap && shareOrder.contains("map")) to ShareHistoryStore.CONTENT_MAP,
-                            (incElevationProfile && shareOrder.contains("elevation_profile")) to ShareHistoryStore.CONTENT_ELEVATION_PROFILE,
-                            (incSupport && shareOrder.contains("support")) to ShareHistoryStore.CONTENT_SUPPORT,
-                            (incPhotos && hasSharePhotos && shareOrder.contains("photos")) to ShareHistoryStore.CONTENT_PHOTOS,
-                            (incIds && shareOrder.contains("ids")) to ShareHistoryStore.CONTENT_IDS,
-                            (incDates && shareOrder.contains("dates")) to ShareHistoryStore.CONTENT_DATES,
-                            (incAddress && shareOrder.contains("address")) to ShareHistoryStore.CONTENT_ADDRESS,
-                            (incSpeedtest && shareOrder.contains("speedtest")) to ShareHistoryStore.CONTENT_SPEEDTEST,
-                            (incThroughput && shareOrder.contains("throughput")) to ShareHistoryStore.CONTENT_THROUGHPUT,
-                            (AppConfig.shareSiteStatus.value && shareOrder.contains("status")) to ShareHistoryStore.CONTENT_STATUS,
-                            (incFreqs && shareOrder.contains("freq")) to ShareHistoryStore.CONTENT_FREQ,
-                            incHeights to ShareHistoryStore.CONTENT_HEIGHTS,
-                            incQrCode to ShareHistoryStore.CONTENT_QR_CODE,
-                            incConfidential to ShareHistoryStore.CONTENT_CONFIDENTIAL,
-                            (incSplitImage && !isPdfDestination) to ShareHistoryStore.CONTENT_SPLIT_IMAGE
-                        )
-                    },
-                    darkTheme = selectedShareTheme
-                )
-                val elevationProfileTexts = ElevationProfileShareTexts(
-                    title = txtElevationProfileTitle,
-                    distance = txtElevationProfileDistance,
-                    supportHeight = txtElevationProfileSupportHeight,
-                    supportHeightDetail = txtElevationProfileSupportHeightDetail,
-                    startAltitude = txtElevationProfileStartAltitude,
-                    startAltitudeDetail = txtElevationProfileStartAltitudeDetail,
-                    siteAltitude = txtElevationProfileSiteAltitude,
-                    siteAltitudeDetail = txtElevationProfileSiteAltitudeDetail,
-                    frequency = txtElevationProfileFrequency,
-                    directLine = txtElevationProfileDirectLineLabel,
-                    fresnelZone = txtElevationProfileFresnelLabel,
-                    lineClear = txtElevationProfileLineClear,
-                    lineBlocked = txtElevationProfileLineBlocked,
-                    fresnelClear = txtElevationProfileFresnelClear,
-                    fresnelBlocked = txtElevationProfileFresnelBlocked,
-                    fresnelExplanation = txtElevationProfileFresnelExplanation,
-                    ignSource = txtElevationProfileIgnSource,
-                    generatedBy = txtGeneratedBy,
-                    unknown = txtUnknown
-                )
-
-                scope.launch {
-                    val elevationProfileBitmap = if (
-                        !isPdfDestination &&
-                        incElevationProfile &&
-                        shareOrder.contains("elevation_profile") &&
-                        !incConfidential
-                    ) {
-                        generationMessage = txtElevationProfileLoading
-                        runCatching {
-                            val userLocation = withContext(Dispatchers.IO) {
-                                getElevationProfileLastKnownLocation(context)
-                            } ?: return@runCatching null
-                            val rawElevationProfileFrequencies = technique?.detailsFrequences?.takeIf { it.isNotBlank() } ?: info.frequences
-                            val frequency = extractElevationProfileFrequencies(rawElevationProfileFrequencies).firstOrNull() ?: DEFAULT_ELEVATION_PROFILE_FREQUENCY_MHZ
-                            val antennaHeight = extractElevationProfileAntennaHeightsByFrequency(rawElevationProfileFrequencies)[frequency]
-                            val profile = withContext(Dispatchers.IO) {
-                                fetchIgnElevationProfileData(
-                                    fromLatitude = userLocation.latitude,
-                                    fromLongitude = userLocation.longitude,
-                                    toLatitude = info.latitude,
-                                    toLongitude = info.longitude,
-                                    includeObstacles = loadElevationProfileIncludeObstacles(context)
-                                )
-                            }
-                            createElevationProfileShareBitmap(
-                                context = context,
-                                info = info,
-                                profile = profile,
-                                supportHeightMeters = antennaHeight ?: physique?.hauteur,
-                                frequencyMHz = frequency,
-                                forceDarkTheme = selectedShareTheme,
-                                texts = elevationProfileTexts,
-                                operatorTechnologies = technique?.technologies?.takeIf { it.isNotBlank() } ?: info.frequences
-                            )
-                        }.getOrNull()
-                    } else {
-                        null
-                    }
-
-                    if (shareOnlyElevationProfile && elevationProfileBitmap == null) {
-                        Toast.makeText(context, txtShareElevationProfileOnlyUnavailable, Toast.LENGTH_SHORT).show()
-                        isGeneratingShare = false
-                        return@launch
-                    }
-
-                    val sharePhotoBitmaps = if (incPhotos && hasSharePhotos && shareOrder.contains("photos")) {
-                        loadSharePhotoBitmaps(visibleSharePhotos)
-                    } else {
-                        emptyList()
-                    }
-
-                    generationMessage = txtShareImagePreparingInProgress
-                    currentView.postDelayed({
-                        try {
-                            if (shareOnlyElevationProfile && elevationProfileBitmap != null) {
-                                shareElevationProfileBitmapOnly(
-                                    context = context,
-                                    info = info,
-                                    bitmap = elevationProfileBitmap,
-                                    txtShareSiteVia = txtShareSiteVia,
-                                    destination = destination,
-                                    txtCopiedToClipboard = txtPhotoCopiedToClipboard
-                                )
-                                isGeneratingShare = false
-                            } else {
-                                val mapBmp = if (incMap) { globalMapRef?.let { map -> try { val bmp = Bitmap.createBitmap(map.width, map.height, Bitmap.Config.ARGB_8888); map.draw(Canvas(bmp)); bmp } catch (e: Exception) { null } } } else null
-                                shareFullAntennaCapture(
-                                    context, currentView, info,
-                                    physique, technique,
-                                    hsDataMap,
-                                    speedtestData,
-                                    distanceStr, bearingStr, selectedShareTheme,
-                                    txtSiteDetailsTitle, txtAddressLabel, txtNotSpecified, txtGpsLabel, txtSupportHeight, txtDistanceLabel, txtFromMyPosition, txtBearingLabel, txtGeneratedBy, txtShareSiteVia, txtimplementation, txtLastModification, txtIdentifiers, txtIdNumber, txtFrequenciesTitle, txtBandsNotSpecified, txtInService, txtTechnically, txtUnknownStatus, txtAnfrStationNumber, txtDates, txtError, txtProjectApproved, txtActivatedOn, txtDateNotSpecifiedAnfr, txtPanelHeightsTitle, txtAzimuths, txtIdSupportLabel, txtSupportDetailsTitle, txtSupportNature, txtOwner, txtExploitant, txtAntennaType,
-                                    mapBmp, txtInitError, sharePhotoBitmaps, txtCommunityPhotosTitle,
-                                    incPhotos,
-                                    incMap, incSupport, incHeights, incIds, incDates, incAddress, incFreqs, incSpeedtest, incThroughput, incConfidential, incQrCode,
-                                    incSplitImage,
-                                    shareOrder,
-                                    elevationProfileBitmap = elevationProfileBitmap,
-                                    destination = destination,
-                                    txtCopiedToClipboard = txtPhotoCopiedToClipboard,
-                                    onComplete = { isGeneratingShare = false }
-                                )
-                            }
-                        } catch (e: Exception) {
-                            AppLogger.w(TAG_SHARE_IMAGE, "Site share generation failed", e)
-                            isGeneratingShare = false
-                        }
-                    }, 300)
                 }
             }
 

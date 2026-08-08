@@ -1256,7 +1256,10 @@
     <string name="appstrings_speedtests_sort_max">Débito máximo</string>
     <string name="appstrings_speedtests_sort_title">Ordenação</string>
     <string name="appstrings_split_share_image">Dividir a imagem de partilha</string>
-    <string name="appstrings_split_share_image_desc">Separa as frequências numa 2ª imagem</string>
+    <string name="appstrings_split_share_image_desc">Separa as frequências em imagens próprias</string>
+    <string name="appstrings_share_freq_page_indicator">Página %1$d/%2$d</string>
+    <string name="appstrings_share_many_bands_pdf_title">Muitos dados de rádio</string>
+    <string name="appstrings_share_many_bands_pdf_desc">Esta estação é partilhada em %1$d imagens. O relatório PDF mantém tudo num único ficheiro legível.</string>
     <string name="appstrings_share_photos_option">Fotos da comunidade</string>
     <string name="appstrings_src_antennas">Dados de Antenas</string>
     <string name="appstrings_src_antennas_desc">Agência Nacional de Frequências (ANFR).\nDados do Cartoradio (Open Data).</string>
@@ -2619,4 +2622,9 @@
     <string name="appstrings_release_v2015_nearby_no_radius">Deixa de haver raio de pesquisa nos sites próximos: a lista mantém os mais próximos, seja qual for a distância</string>
     <string name="appstrings_release_v2015_low_power_follow">A poupança de energia do Android passa a ser seguida por predefinição; se tinha desmarcado o interruptor, a sua escolha é mantida</string>
     <string name="appstrings_release_v2015_outage_none_declared">A ficha indica explicitamente quando não há qualquer falha declarada para uma operadora</string>
+
+    <!-- Notas da versão 2.0.16 -->
+    <string name="appstrings_release_v2016_share_frequency_pages">Uma estação muito carregada passa a ser partilhada em tantas imagens numeradas quantas forem necessárias, em vez de duas</string>
+    <string name="appstrings_release_v2016_share_many_bands_hint">Quando as imagens se multiplicam, a aplicação sugere o relatório PDF, que mantém tudo num único ficheiro legível</string>
+    <string name="appstrings_release_v2016_photo_orientation">As fotos enviadas saem sempre direitas: a rotação é gravada nos píxeis, em vez de depender de metadados que o destinatário ignora</string>
 </resources>

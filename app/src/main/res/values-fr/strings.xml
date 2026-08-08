@@ -1256,7 +1256,10 @@
     <string name="appstrings_speedtests_sort_max">Débit max</string>
     <string name="appstrings_speedtests_sort_title">Tri</string>
     <string name="appstrings_split_share_image">Scinder l\'image de partage</string>
-    <string name="appstrings_split_share_image_desc">Sépare les fréquences sur une 2ème image</string>
+    <string name="appstrings_split_share_image_desc">Sépare les fréquences sur leurs propres images</string>
+    <string name="appstrings_share_freq_page_indicator">Page %1$d/%2$d</string>
+    <string name="appstrings_share_many_bands_pdf_title">Beaucoup de données radio</string>
+    <string name="appstrings_share_many_bands_pdf_desc">Cette station se partage en %1$d images. Le rapport PDF garde tout dans un seul fichier lisible.</string>
     <string name="appstrings_share_photos_option">Photos communautaires</string>
     <string name="appstrings_src_antennas">Données Antennes</string>
     <string name="appstrings_src_antennas_desc">Agence Nationale des Fréquences (ANFR).\nDonnées issues de Cartoradio (Open Data).</string>
@@ -2621,4 +2624,9 @@
     <string name="appstrings_release_v2015_nearby_no_radius">Plus de rayon de recherche dans les sites à proximité : la liste garde les plus proches, quelle que soit la distance</string>
     <string name="appstrings_release_v2015_low_power_follow">L\'économie d\'énergie d\'Android est suivie par défaut ; si vous aviez décoché l\'interrupteur, votre choix est conservé</string>
     <string name="appstrings_release_v2015_outage_none_declared">La fiche indique explicitement quand aucune panne n\'est déclarée pour un opérateur</string>
+
+    <!-- Notes de version 2.0.16 -->
+    <string name="appstrings_release_v2016_share_frequency_pages">Une station chargée se partage désormais sur autant d\'images numérotées que nécessaire, au lieu de deux</string>
+    <string name="appstrings_release_v2016_share_many_bands_hint">Quand les images se multiplient, l\'application suggère le rapport PDF, qui garde tout dans un seul fichier lisible</string>
+    <string name="appstrings_release_v2016_photo_orientation">Les photos envoyées partent toujours droites : la rotation est appliquée aux pixels, au lieu de dépendre d\'une métadonnée que le destinataire ignore</string>
 </resources>

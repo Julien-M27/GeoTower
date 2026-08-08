@@ -1172,7 +1172,10 @@
     <string name="appstrings_share_elevation_profile_only_unavailable">Elevation profile unavailable for sharing.</string>
     <string name="appstrings_share_elevation_profile_option">Elevation profile (separate image)</string>
     <string name="appstrings_share_freq_option">Frequencies</string>
+    <string name="appstrings_share_freq_page_indicator">Page %1$d/%2$d</string>
     <string name="appstrings_share_ids_option">Antenna identifiers</string>
+    <string name="appstrings_share_many_bands_pdf_desc">This station is shared as %1$d images. The PDF report keeps everything in a single readable file.</string>
+    <string name="appstrings_share_many_bands_pdf_title">A lot of radio data</string>
     <string name="appstrings_share_image_generation_in_progress">Generating share images...</string>
     <string name="appstrings_share_image_preparing_in_progress">Preparing the main image...</string>
     <string name="appstrings_share_map_attribution_option">Credits (Attribution)</string>
@@ -1338,7 +1341,7 @@
     <string name="appstrings_speedtests_sort_max">Max throughput</string>
     <string name="appstrings_speedtests_sort_title">Sort</string>
     <string name="appstrings_split_share_image">Split share image</string>
-    <string name="appstrings_split_share_image_desc">Separates frequencies on a 2nd image</string>
+    <string name="appstrings_split_share_image_desc">Frequencies go on their own images</string>
     <string name="appstrings_share_photos_option">Community photos</string>
     <string name="appstrings_src_antennas">Antenna Data</string>
     <string name="appstrings_src_antennas_desc">National Frequency Agency (ANFR).\nData from Cartoradio (Open Data).</string>
@@ -2641,4 +2644,9 @@
     <string name="appstrings_release_v2015_nearby_no_radius">No more search radius in nearby sites: the list keeps the closest ones, whatever the distance</string>
     <string name="appstrings_release_v2015_low_power_follow">Android battery saver is now followed by default; if you had unchecked the switch, your choice is kept</string>
     <string name="appstrings_release_v2015_outage_none_declared">Site pages now state explicitly when no outage is declared for an operator</string>
+
+    <!-- Release notes 2.0.16 -->
+    <string name="appstrings_release_v2016_share_frequency_pages">A busy station is now shared across as many numbered images as needed, instead of two</string>
+    <string name="appstrings_release_v2016_share_many_bands_hint">When the images pile up, the app suggests the PDF report, which keeps everything in a single readable file</string>
+    <string name="appstrings_release_v2016_photo_orientation">Uploaded photos always come out upright: the rotation is baked into the pixels, instead of relying on metadata the recipient ignores</string>
 </resources>

@@ -27,3 +27,24 @@ geotower-release
 /build-*.log
 # Rapports d'erreur du compilateur Kotlin (locaux a la machine, aucun interet en historique).
 .kotlin/
+
+# Documentation projet et code serveur : hors du depot public.
+#
+# docs/server/ est la source complete de api.geotower.fr (routes, quotas, schema HMAC des jetons
+# d'envoi, gardes anti-abus). Aucun secret n'y figure - tout est lu dans l'environnement - mais la
+# logique decrit la surface d'attaque du serveur et n'a rien a faire sur un depot public. Elle vit
+# desormais dans un depot prive separe.
+#
+# Ce motif ne DESUIVI rien : il empeche seulement de reversionner le dossier par inadvertance.
+# Le retrait du suivi a ete fait par le commit « Delete docs directory » (9fe194e).
+# Pour reversionner une partie precise, ajouter une exception, par exemple :
+#   !docs/branding/
+docs/
+
+# Artefacts Python des scripts serveur. 25 fichiers .pyc avaient fini dans l'historique : ils
+# exposent le bytecode des modules sans rien apporter, et changent a chaque execution.
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/

@@ -1256,7 +1256,10 @@
     <string name="appstrings_speedtests_sort_max">Maximaler Durchsatz</string>
     <string name="appstrings_speedtests_sort_title">Sortierung</string>
     <string name="appstrings_split_share_image">Teilen-Bild aufteilen</string>
-    <string name="appstrings_split_share_image_desc">Trennt Frequenzen auf ein zweites Bild</string>
+    <string name="appstrings_split_share_image_desc">Trennt Frequenzen auf eigene Bilder</string>
+    <string name="appstrings_share_freq_page_indicator">Seite %1$d/%2$d</string>
+    <string name="appstrings_share_many_bands_pdf_title">Viele Funkdaten</string>
+    <string name="appstrings_share_many_bands_pdf_desc">Diese Station wird als %1$d Bilder geteilt. Der PDF-Bericht behält alles in einer einzigen lesbaren Datei.</string>
     <string name="appstrings_share_photos_option">Community-Fotos</string>
     <string name="appstrings_src_antennas">Antennendaten</string>
     <string name="appstrings_src_antennas_desc">Nationale Frequenzagentur (ANFR).\nDaten von Cartoradio (Open Data).</string>
@@ -2619,4 +2622,9 @@
     <string name="appstrings_release_v2015_nearby_no_radius">Kein Suchradius mehr bei Standorten in der Nähe: Die Liste behält die nächstgelegenen, unabhängig von der Entfernung</string>
     <string name="appstrings_release_v2015_low_power_follow">Der Energiesparmodus von Android wird jetzt standardmäßig übernommen; hattest du den Schalter abgewählt, bleibt deine Wahl erhalten</string>
     <string name="appstrings_release_v2015_outage_none_declared">Die Standortseite sagt jetzt ausdrücklich, wenn für einen Betreiber keine Störung gemeldet ist</string>
+
+    <!-- Versionshinweise 2.0.16 -->
+    <string name="appstrings_release_v2016_share_frequency_pages">Ein voll belegter Standort wird jetzt auf so viele nummerierte Bilder verteilt wie nötig, statt auf zwei</string>
+    <string name="appstrings_release_v2016_share_many_bands_hint">Werden es zu viele Bilder, schlägt die App den PDF-Bericht vor, der alles in einer lesbaren Datei behält</string>
+    <string name="appstrings_release_v2016_photo_orientation">Gesendete Fotos stehen jetzt immer aufrecht: Die Drehung steckt in den Pixeln, statt von Metadaten abzuhängen, die der Empfänger ignoriert</string>
 </resources>
