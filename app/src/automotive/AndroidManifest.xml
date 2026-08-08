@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Variante Android Automotive OS : l'app est installee DANS la voiture et s'affiche sur son ecran.
+
+  Rien de l'UI telephone n'est expose ici. MainActivity reste presente (liens geotower:// et partage
+  d'images) mais sans filtre LAUNCHER : le lanceur de la voiture ne montre que CarAppActivity, qui
+  rend les templates a la taille de l'ecran. Sans cette variante, le lanceur tombait sur les alias
+  d'icone du telephone et affichait l'UI Compose telle quelle — mal placee et trop petite.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <queries>
+        <!-- Hote de templates du vehicule : sa version est tracee au demarrage du CarAppService, et
+             la visibilite du paquet n'est pas acquise par la simple liaison. Pendant AAOS de
+             l'entree gearhead declaree dans src/main. -->
+        <package android:name="com.google.android.apps.automotive.templates.host" />
+    </queries>
+
+    <!-- required=true : cet artefact ne s'installe QUE sur un vehicule. Le telephone a le sien. -->
+    <uses-feature
+        android:name="android.hardware.type.automotive"
+        android:required="true" />
+
+    <!-- La voiture n'a ni telephonie ni ecran tactile garanti : sans ces declarations, Play
+         restreindrait la distribution aux vehicules qui les possedent. -->
+    <uses-feature
+        android:name="android.hardware.touchscreen"
+        android:required="false" />
+
+    <application>
+
+        <!-- Pendant AAOS du meta-data com.google.android.gms.car.application (Android Auto) :
+             meme descripteur, cle differente. Les deux hotes lisent <uses name="template"/>. -->
+        <meta-data
+            android:name="com.android.automotive"
+            android:resource="@xml/automotive_app_desc" />
+
+        <!-- Point d'entree de la voiture. L'activite est fournie par androidx.car.app:app-automotive
+             et se contente d'heberger le rendu des templates du CarAppService ; c'est pour cela
+             qu'elle n'a pas de theme GeoTower, le contenu est dessine par l'hote.
+             distractionOptimized : sans ce drapeau, le systeme bloque l'app des que le vehicule
+             roule. Les templates sont concus pour ca, contrairement a l'UI telephone. -->
+        <activity
+            android:name="androidx.car.app.activity.CarAppActivity"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:icon="@mipmap/ic_launcher_geotower"
+            android:launchMode="singleTask"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <meta-data
+                android:name="distractionOptimized"
+                android:value="true" />
+        </activity>
+
+    </application>
+</manifest>

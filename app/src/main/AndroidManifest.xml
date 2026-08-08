@@ -66,6 +66,15 @@
             android:name="com.google.android.gms.car.application"
             android:resource="@xml/automotive_app_desc" />
 
+        <!-- Doit rester au niveau <application> : AppInfo.create(), premier appel de l'hôte après
+             le bind du CarAppService, lit cette clé dans ApplicationInfo.metaData. Posée sur le
+             <service>, elle atterrit dans ServiceInfo.metaData, invisible d'ici : la poignée de
+             main échoue sur une IllegalArgumentException et l'hôte se déconnecte sans rien
+             afficher. Couvert par CarAppHandshakeTest. -->
+        <meta-data
+            android:name="androidx.car.app.minCarApiLevel"
+            android:value="1" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -124,47 +133,9 @@
 
         </activity>
 
-        <activity-alias
-            android:name="fr.geotower.MainActivityDefault"
-            android:enabled="true"
-            android:exported="true"
-            android:icon="@mipmap/ic_launcher_geotower"
-            android:roundIcon="@mipmap/ic_launcher_geotower_round"
-            android:label="@string/app_name"
-            android:targetActivity="fr.geotower.MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name="fr.geotower.MainActivityAlt"
-            android:enabled="false"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:icon="@mipmap/ic_launcher_georadio"
-            android:roundIcon="@mipmap/ic_launcher_georadio_round"
-            android:targetActivity="fr.geotower.MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
-
-        <activity-alias
-            android:name="fr.geotower.MainActivityAlt2"
-            android:enabled="false"
-            android:exported="true"
-            android:label="@string/app_name"
-            android:icon="@mipmap/ic_launcher_funny"
-            android:roundIcon="@mipmap/ic_launcher_funny_round"
-            android:targetActivity="fr.geotower.MainActivity">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity-alias>
+        <!-- Les alias de lanceur (icone au choix de l'utilisateur) vivent dans src/mobile : sur
+             Android Automotive OS, le lanceur de la voiture ne doit proposer que CarAppActivity,
+             jamais l'UI telephone — c'est elle qui s'affichait mal placee et trop petite. -->
 
         <receiver
             android:name=".widget.AntennaWidgetReceiver"
@@ -231,9 +202,6 @@
                 <action android:name="androidx.car.app.CarAppService" />
                 <category android:name="androidx.car.app.category.POI" />
             </intent-filter>
-            <meta-data
-                android:name="androidx.car.app.minCarApiLevel"
-                android:value="1" />
         </service>
     </application>
 </manifest>
