@@ -54,6 +54,9 @@ from pathlib import Path
 IMPORTS_DIR = Path("/opt/geotower/data/imports")
 HISTORY_DIR = Path("/opt/geotower/data/history")
 
+# Sous-dossier ou le build de base cherche ses sources (cf. fr_anfr_stats.py).
+FRANCE_SOURCES_DIRNAME = "france_sources"
+
 SOURCES_DIRNAME = "sources"
 INCOMING_DIRNAME = "incoming"
 WEEKS_DIRNAME = "weeks"
@@ -101,6 +104,15 @@ COLUMN_ALIASES = {
     "status": ("statut", "status"),
 }
 REQUIRED_ROLES = ("station", "operator", "system")
+
+# Colonnes d'EXPORT, pas de donnee site : l'ANFR les reecrit a chaque
+# publication. Mesure du 2026-08-07 sur deux paliers reels : `date_maj` change
+# sur 100 % des lignes survivantes, `id` sur 99 %. Les comparer ferait apparaitre
+# le parc entier (138 000 stations) comme modifie chaque semaine, noierait les
+# quelques milliers de vrais changements et rendrait la timeline par site
+# inutilisable. Elles restent presentes dans les lignes `add`/`del`, qui sont des
+# instantanes complets.
+VOLATILE_COLUMNS = {"id", "date_maj"}
 
 # Codes du fichier carte. Aucune phrase : l'app fabrique le texte localise.
 CODE_SITE_ADDED = "SITE_ADDED"
@@ -322,6 +334,9 @@ class Publication:
             i_station = self.columns["station"]
             i_operator = self.columns["operator"]
             i_system = self.columns["system"]
+            volatile = {
+                index for index, name in enumerate(header) if name in VOLATILE_COLUMNS
+            }
             keys = self.keys
             for row in reader:
                 station = norm(cell(row, i_station))
@@ -331,7 +346,16 @@ class Publication:
                 operator = norm(cell(row, i_operator))
                 system = norm(cell(row, i_system))
                 key = hash((station, operator, system)) & HASH_MASK
-                digest = hash(tuple(norm(value) for value in row)) & HASH_MASK
+                # Empreinte SANS les colonnes d'export, sinon toutes les cles
+                # seraient "changees" et la troisieme passe relirait le fichier
+                # entier en clair.
+                digest = hash(
+                    tuple(
+                        norm(value)
+                        for index, value in enumerate(row)
+                        if index not in volatile
+                    )
+                ) & HASH_MASK
                 previous = keys.get(key)
                 # Somme, pas XOR : deux lignes identiques ne doivent pas
                 # s'annuler mutuellement.
@@ -384,7 +408,13 @@ def changed_keys(previous: Publication, current: Publication):
 
 
 def row_signature(row):
-    return tuple(sorted((name, norm(value)) for name, value in row.items()))
+    return tuple(
+        sorted(
+            (name, norm(value))
+            for name, value in row.items()
+            if name not in VOLATILE_COLUMNS
+        )
+    )
 
 
 def diff_one_key(old_rows, new_rows):
@@ -403,7 +433,7 @@ def diff_one_key(old_rows, new_rows):
     if len(old_rows) == 1 and len(new_rows) == 1:
         before, after = old_rows[0], new_rows[0]
         fields = {}
-        for column in sorted(set(before) | set(after)):
+        for column in sorted((set(before) | set(after)) - VOLATILE_COLUMNS):
             old_value = before.get(column, "")
             new_value = after.get(column, "")
             if norm(old_value) != norm(new_value):
@@ -774,6 +804,56 @@ def next_local(directories, reference_date: str):
     return min(dated, key=lambda item: (item[0], item[1].name))[1]
 
 
+def publish_to_imports(gz_path: Path, imports_dir: Path) -> None:
+    """Depose la publication decompressee la ou le build de base la cherche.
+
+    Le script telecharge de toute facon le CSV pour son propre diff : autant
+    qu'il serve aussi a la reconstruction de `geotower_fr.db`, ce qui evite un
+    depot manuel. Fait seulement APRES un palier reussi : une publication
+    refusee par les garde-fous ne doit jamais alimenter le build.
+    """
+    destination_dir = imports_dir / FRANCE_SOURCES_DIRNAME
+    destination_dir.mkdir(parents=True, exist_ok=True)
+    destination = destination_dir / gz_path.name[: -len(".gz")]
+    if destination.is_file():
+        log(f"deja present pour le build : {destination.name}")
+        return
+    temporary = Path(str(destination) + ".part")
+    with gzip.open(gz_path, "rb") as reader, open(temporary, "wb") as writer:
+        shutil.copyfileobj(reader, writer, length=4 * 1024 * 1024)
+    os.replace(temporary, destination)
+    log(f"depose pour le build : {destination}")
+
+    # Aucune suppression automatique ici : c'est le dossier du build, pas le
+    # notre. On se contente de signaler l'accumulation (~180 Mo par fichier).
+    existing = sorted(destination_dir.glob("*observatoireod*.csv"))
+    if len(existing) > 2:
+        log(
+            f"ATTENTION : {len(existing)} CSV observatoire dans {destination_dir} "
+            "(~180 Mo chacun), a faire le menage"
+        )
+
+
+def normalize_sources(sources_dir: Path) -> None:
+    """Compresse les CSV bruts deposes a la main dans sources/.
+
+    On peut donc y copier les publications telles quelles, sans les gzipper au
+    prealable : le script s'en charge au premier passage (180 Mo -> ~40 Mo) et
+    supprime l'original. Tout le reste du code ne voit que des .csv.gz.
+    """
+    for path in sorted(sources_dir.glob("*.csv")):
+        destination = Path(str(path) + ".gz")
+        if destination.is_file():
+            log(f"deja compresse, original supprime : {path.name}")
+            path.unlink()
+            continue
+        log(f"compression de {path.name}")
+        temporary = Path(str(destination) + ".part")
+        archive_source(path, temporary)
+        os.replace(temporary, destination)
+        path.unlink()
+
+
 def adopt_reference(sources_dir: Path, bootstrap_from):
     """Reference initiale : celle designee par --bootstrap-from, sinon la plus
     ANCIENNE deja presente dans sources/ — les plus recentes doivent rester
@@ -884,9 +964,18 @@ def acquire(search_dirs, incoming_dir: Path, reference_date: str, allow_download
 # --- Programme principal ----------------------------------------------------
 
 
-def prune_sources(sources_dir: Path, keep_names) -> None:
+def prune_sources(sources_dir: Path, keep_from_date: str) -> None:
+    """Supprime les publications ANTERIEURES a `keep_from_date` (la date de la
+    publication precedente), donc tout sauf la paire courante.
+
+    Jamais par liste de noms a garder : une publication PLUS RECENTE peut etre en
+    attente de traitement, et sa suppression serait definitive.
+    """
+    if not keep_from_date:
+        return
     for path in sorted(sources_dir.glob("*.csv.gz")):
-        if path.name not in keep_names:
+        data_date = extract_data_date(path.name)
+        if data_date and data_date < keep_from_date:
             log(f"publication trop ancienne, supprimee : {path.name}")
             path.unlink(missing_ok=True)
 
@@ -1020,7 +1109,9 @@ def process_step(args, layout: Layout, reference_path: Path, reference_date: str
             "last_output": {"weeks": weeks_path.name, "map": map_path.name},
         },
     )
-    prune_sources(layout.sources, {final_path.name, reference_path.name})
+    prune_sources(layout.sources, previous.data_date)
+    if args.publish_imports:
+        publish_to_imports(final_path, Path(args.imports_dir))
     log(f"palier termine en {(datetime.now() - started).total_seconds():.1f}s")
     return 0
 
@@ -1032,6 +1123,7 @@ def run(args) -> int:
     sources_dir = layout.sources
     incoming_dir = layout.incoming
     state_path = layout.state
+    normalize_sources(sources_dir)
 
     state = load_state(state_path)
     current_state = state.get("current") or {}
@@ -1064,132 +1156,65 @@ def run(args) -> int:
                 f"{adopted.rows} lignes, {len(adopted.stations)} stations"
             )
 
-    acquired = acquire(
-        [imports_dir, sources_dir], incoming_dir, reference_date, not args.no_download
-    )
-    if acquired is None:
-        log(f"rien de neuf (reference {pretty_date(reference_date)}) : aucun fichier ecrit")
-        return 0
-    incoming_path, incoming_date = acquired
-
-    if reference_date and incoming_date and incoming_date <= reference_date:
-        log(
-            f"publication {pretty_date(incoming_date)} pas plus recente que la "
-            f"reference {pretty_date(reference_date)} : ignoree"
+    # Un palier par tour : plusieurs publications peuvent etre en attente
+    # (rattrapage d'anciennes copies, cron arrete). Chacune donne son propre
+    # fichier de changements, dans l'ordre chronologique.
+    steps = 0
+    while True:
+        acquired = acquire(
+            [imports_dir, sources_dir], incoming_dir, reference_date, not args.no_download
         )
-        return 0
+        if acquired is None:
+            if steps:
+                log(f"{steps} palier(s) traite(s), plus rien a diffuser")
+            else:
+                log(
+                    f"rien de neuf (reference {pretty_date(reference_date)}) : "
+                    "aucun fichier ecrit"
+                )
+            return 0
+        incoming_path, incoming_date = acquired
 
-    if not reference_name:
-        destination = sources_dir / incoming_path.name
-        os.replace(incoming_path, destination)
-        publication = Publication(destination, incoming_date)
-        publication.scan()
-        state = {
-            "current": describe(publication),
-            "previous": None,
-            "updated_at": datetime.now(timezone.utc).isoformat(),
-        }
-        if not args.dry_run:
-            save_state(state_path, state)
-        log(
-            f"premiere execution : reference posee sur {pretty_date(incoming_date)} "
-            f"({publication.rows} lignes). Le premier diff sortira a la publication suivante."
+        # Toute premiere execution : rien a comparer, on pose la reference.
+        if not reference_name:
+            destination = sources_dir / incoming_path.name
+            os.replace(incoming_path, destination)
+            publication = Publication(destination, incoming_date)
+            publication.scan()
+            if not args.dry_run:
+                save_state(
+                    state_path,
+                    {
+                        "current": describe(publication),
+                        "previous": None,
+                        "updated_at": datetime.now(timezone.utc).isoformat(),
+                    },
+                )
+            reference_name = destination.name
+            reference_date = incoming_date
+            log(
+                f"premiere execution : reference posee sur {pretty_date(incoming_date)} "
+                f"({publication.rows} lignes, {len(publication.stations)} stations)"
+            )
+            if args.dry_run:
+                return 0
+            continue
+
+        reference_path = sources_dir / reference_name
+        if not reference_path.is_file():
+            log(f"ERREUR : la reference {reference_name} est absente de {sources_dir}")
+            return 2
+
+        code = process_step(
+            args, layout, reference_path, reference_date, incoming_path, incoming_date
         )
-        return 0
-
-    reference_path = sources_dir / reference_name
-    if not reference_path.is_file():
-        log(f"ERREUR : la reference {reference_name} est absente de {sources_dir}")
-        return 2
-
-    started = datetime.now()
-    previous = Publication(reference_path, reference_date)
-    previous.scan()
-    log(f"reference {pretty_date(previous.data_date)} : {previous.rows} lignes, {len(previous.stations)} stations")
-
-    current = Publication(incoming_path, incoming_date)
-    current.scan()
-    log(f"nouvelle  {pretty_date(current.data_date)} : {current.rows} lignes, {len(current.stations)} stations")
-
-    # --- Garde-fous ---
-    problems = []
-    if current.rows < MIN_ROWS:
-        problems.append(f"seulement {current.rows} lignes exploitables (< {MIN_ROWS})")
-    lost = len(previous.stations - current.stations)
-    ratio = lost / len(previous.stations) if previous.stations else 0.0
-    if ratio > MAX_STATION_LOSS_RATIO:
-        problems.append(
-            f"{lost} stations disparues ({ratio * 100:.1f} % > "
-            f"{MAX_STATION_LOSS_RATIO * 100:.0f} %)"
-        )
-    if problems and not args.force:
-        for problem in problems:
-            log(f"REFUS : {problem}")
-        log(
-            "aucun fichier ecrit, reference inchangee. Verifier la publication "
-            "ANFR, puis relancer avec --force si la baisse est reelle."
-        )
-        return 3
-    for problem in problems:
-        log(f"AVERTISSEMENT (--force) : {problem}")
-
-    gap = days_between(previous.data_date, current.data_date)
-    if gap is not None and gap > GAP_WARN_DAYS:
-        log(f"AVERTISSEMENT : {gap} jours entre les deux publications (une a pu etre manquee)")
-
-    stations, stats = build_diff(previous, current)
-    points = build_map_points(stations)
-    summarize(stats, stations, points)
-
-    header_object = {
-        "type": "header",
-        "from": pretty_date(previous.data_date),
-        "to": pretty_date(current.data_date),
-        "gap_days": gap,
-        "rows_before": previous.rows,
-        "rows_after": current.rows,
-        "stations_before": len(previous.stations),
-        "stations_after": len(current.stations),
-        "stations_changed": len(stations),
-        "rows_added": stats["rows_added"],
-        "rows_removed": stats["rows_removed"],
-        "rows_updated": stats["rows_updated"],
-        "fields_changed": stats["fields"],
-        "source_before": previous.path.name,
-        "source_after": current.path.name,
-    }
-    map_meta = {
-        "from": header_object["from"],
-        "to": header_object["to"],
-        "points_count": len(points),
-    }
-
-    if args.dry_run:
-        log("--dry-run : aucun fichier ecrit, aucune rotation")
-        return 0
-
-    label = pretty_date(current.data_date)
-    weeks_path = weeks_dir / f"{label}.jsonl.gz"
-    map_path = map_dir / f"{label}.map.json.gz"
-    write_weeks_file(weeks_path, header_object, stations)
-    write_map_file(map_path, map_meta, points)
-    log(f"ecrit : {weeks_path} ({weeks_path.stat().st_size} octets)")
-    log(f"ecrit : {map_path} ({map_path.stat().st_size} octets)")
-
-    # --- Rotation, state.json en DERNIER ---
-    final_path = sources_dir / incoming_path.name
-    os.replace(incoming_path, final_path)
-    current.path = final_path
-    state = {
-        "current": describe(current),
-        "previous": describe(previous),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-        "last_output": {"weeks": weeks_path.name, "map": map_path.name},
-    }
-    save_state(state_path, state)
-    prune_sources(sources_dir, {final_path.name, reference_path.name})
-    log(f"termine en {(datetime.now() - started).total_seconds():.1f}s")
-    return 0
+        if code != 0:
+            return code
+        if args.dry_run:
+            return 0
+        steps += 1
+        reference_name = incoming_path.name
+        reference_date = incoming_date
 
 
 def parse_args(argv=None):
@@ -1220,6 +1245,13 @@ def parse_args(argv=None):
         "--no-download",
         action="store_true",
         help="n'utilise que les fichiers deja presents (tests, execution hors ligne)",
+    )
+    parser.add_argument(
+        "--no-publish-imports",
+        dest="publish_imports",
+        action="store_false",
+        help="ne pas deposer le CSV telecharge dans imports/france_sources/ "
+        "pour le build de base (depot actif par defaut)",
     )
     return parser.parse_args(argv)
 

@@ -80,6 +80,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -112,6 +113,7 @@ import androidx.compose.ui.unit.sp
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.ui.components.GeoTowerFadingEdgeHeight
 import fr.geotower.ui.components.isGeoTowerFadingEdgeActive
+import fr.geotower.ui.components.SafeClick
 import fr.geotower.ui.components.oneUiActionButtonShape
 import fr.geotower.ui.components.rememberSafeClick
 import fr.geotower.ui.components.rememberReorderableDragState
@@ -311,144 +313,272 @@ fun HistoryPageSettingsSheet(
 }
 
 
-@OptIn(ExperimentalMaterial3Api::class)
+/**
+ * Les destinations de la section « Pages », rassemblées en un seul objet plutôt qu'en quatorze
+ * paramètres : la section est rendue à deux endroits (sa page dédiée et le mode « tout sur une
+ * page »), et chacun devrait sinon recopier la même liasse de lambdas.
+ */
+class PagesSectionActions(
+    val onStartupPage: () -> Unit = {},
+    val onHome: () -> Unit = {},
+    val onNearby: () -> Unit = {},
+    val onMap: () -> Unit = {},
+    val onCompass: () -> Unit = {},
+    val onStats: () -> Unit = {},
+    val onDepartmentStats: () -> Unit = {},
+    val onAbout: () -> Unit = {},
+    val onSupport: () -> Unit = {},
+    val onSite: () -> Unit = {},
+    val onSpeedtests: () -> Unit = {},
+    val onTheoreticalCoverage: () -> Unit = {},
+    val onElevationProfile: () -> Unit = {},
+    val onThroughputCalculator: () -> Unit = {}
+)
+
+/** Intitulé d'une famille de pages, à l'intérieur de la section. */
 @Composable
-fun PagesCustomizationSheet(
-    onDismiss: () -> Unit,
-    sheetState: SheetState,
+private fun PagesGroupTitle(title: String) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    Text(
+        text = title,
+        style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+        fontWeight = FontWeight.Bold,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = sizing.spacing(4.dp), bottom = sizing.spacing(8.dp))
+    )
+}
+
+/** Un bouton de page : même carte que partout ailleurs dans les réglages, espacement compris. */
+@Composable
+private fun PageSettingsCard(
+    title: String,
+    desc: String,
+    icon: ImageVector,
+    onClick: () -> Unit,
+    shape: Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
     useOneUi: Boolean,
-    onStartupPageClick: () -> Unit,
-    onHomeClick: () -> Unit,
-    onNearbyClick: () -> Unit,
-    onMapClick: () -> Unit,
-    onCompassClick: () -> Unit,
-    onStatsClick: () -> Unit,
-    onDepartmentStatsClick: () -> Unit,
-    onAboutClick: () -> Unit,
-    // --- NOUVEAUX PARAMÈTRES ---
-    onSupportClick: () -> Unit,
-    onSiteClick: () -> Unit,
-    onSpeedtestsClick: () -> Unit,
-    onThroughputCalculatorClick: () -> Unit,
-    onOpenFrequencies: () -> Unit,
-    onTheoreticalCoverageClick: () -> Unit = {},
-    onElevationProfileClick: () -> Unit = {}
+    safeClick: SafeClick
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
-    val themeMode by AppConfig.themeMode
-    val isOledMode by AppConfig.isOledMode
-    val isDark = (themeMode == 2) || (themeMode == 0 && isSystemInDarkTheme())
-    val sheetBgColor = if (isDark && isOledMode) Color.Black else MaterialTheme.colorScheme.surfaceContainerLow
-    val scrollState = rememberScrollState()
+    PreferenceActionCard(
+        title = title,
+        desc = desc,
+        onClick = onClick,
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi,
+        safeClick = safeClick,
+        icon = icon
+    )
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
+}
+
+/**
+ * Section « Personnalisation des pages » : un bouton par page réglable, groupés par famille.
+ *
+ * Remplace l'ancienne feuille modale, qui devait se FERMER pour ouvrir celle d'une page. Les
+ * feuilles de chaque page s'ouvrent désormais par-dessus cette section, qui reste affichée
+ * dessous : leur bouton retour n'a plus rien à réafficher.
+ */
+@Composable
+fun SectionPages(
+    actions: PagesSectionActions,
+    shape: Shape,
+    border: BorderStroke?,
+    bubbleColor: Color,
+    useOneUi: Boolean,
+    safeClick: SafeClick
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
     val featureFlags by RemoteFeatureFlags.config
+    // Mode simplifié : l'app démarre sur la carte et n'a plus d'accueil — ces deux réglages
+    // n'auraient rien à piloter.
+    val simpleMode = AppConfig.simpleModeActive()
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = sheetBgColor) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .settingsPopupFadingEdge(scrollState)
-                .verticalScroll(scrollState)
-                .padding(bottom = sizing.spacing(48.dp), start = sizing.spacing(16.dp), end = sizing.spacing(16.dp))
-        ) {
-            Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = onDismiss) { Icon(Icons.AutoMirrored.Filled.ArrowBack, null) }
-                Text(
-                    text = stringResource(R.string.settings_pages_customization_title),
-                    style = sizing.textStyle(MaterialTheme.typography.titleLarge),
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center
-                )
-                Spacer(Modifier.width(sizing.spacing(48.dp)))
-            }
+    val hasNearby = featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)
+    val hasMap = featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)
+    val hasCompass = AppConfig.hasCompass.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)
+    val hasStats = featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)
+    val hasAbout = featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ABOUT)
+    val hasSupport = featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SUPPORT_DETAIL)
+    val hasSite = featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)
+    val hasCoverage = featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THEORETICAL_COVERAGE)
+    val hasElevation = featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ELEVATION_PROFILE)
+    val hasThroughput = featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THROUGHPUT_CALCULATOR)
 
-            Text(
-                text = stringResource(R.string.settings_pages_customization_desc),
-                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(24.dp)),
-                textAlign = TextAlign.Center
+    SectionTitle(stringResource(R.string.settings_pages_customization_title))
+    // Seule section des réglages à porter un sous-titre : les autres alignent des interrupteurs
+    // qui se lisent seuls, celle-ci n'est qu'un aiguillage vers quatorze autres écrans.
+    Text(
+        text = stringResource(R.string.settings_pages_customization_desc),
+        style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.fillMaxWidth().padding(bottom = sizing.spacing(16.dp))
+    )
+
+    // Les intitulés de famille ne s'affichent que si la famille a survécu aux drapeaux distants :
+    // un titre seul, sans carte dessous, se lirait comme un bug.
+    if (!simpleMode || hasNearby || hasMap || hasCompass || hasStats || hasAbout) {
+        PagesGroupTitle(stringResource(R.string.settings_pages_group_main))
+        if (!simpleMode) {
+            PageSettingsCard(
+                title = stringResource(R.string.appstrings_startup_page_settings),
+                desc = stringResource(R.string.settings_page_startup_desc),
+                icon = Icons.AutoMirrored.Filled.Launch,
+                onClick = actions.onStartupPage,
+                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
             )
-
-            // 1. La page de démarrage — sans objet en mode simplifié : l'app démarre sur la carte.
-            val simpleMode = AppConfig.simpleModeActive()
-            if (!simpleMode) {
-                NavigationMenuItem(title = stringResource(R.string.appstrings_startup_page_settings), icon = Icons.AutoMirrored.Filled.Launch, isSelected = false, isDark = isDark) { onStartupPageClick() }
-                Spacer(Modifier.height(sizing.spacing(12.dp)))
-            }
-
-            // 2. Les menus individuels des pages (l'accueil n'existe pas en mode simplifié)
-            if (!simpleMode) {
-                NavigationMenuItem(title = stringResource(R.string.appstrings_page_home_settings), icon = Icons.Default.Home, isSelected = false, isDark = isDark) { onHomeClick() }
-            }
-            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)) {
-                NavigationMenuItem(title = stringResource(R.string.appstrings_page_nearby_settings), icon = Icons.Default.NearMe, isSelected = false, isDark = isDark) { onNearbyClick() }
-            }
-            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
-                NavigationMenuItem(title = stringResource(R.string.appstrings_page_map_settings), icon = Icons.Default.Map, isSelected = false, isDark = isDark) { onMapClick() }
-            }
-            if (AppConfig.hasCompass.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)) {
-                NavigationMenuItem(title = stringResource(R.string.appstrings_page_compass_settings), icon = Icons.Default.Explore, isSelected = false, isDark = isDark) { onCompassClick() }
-            }
-            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
-                NavigationMenuItem(title = stringResource(R.string.appstrings_stats_title), icon = Icons.Default.BarChart, isSelected = false, isDark = isDark) { onStatsClick() }
-                NavigationMenuItem(title = stringResource(R.string.department_stats_title), icon = Icons.Default.PieChart, isSelected = false, isDark = isDark) { onDepartmentStatsClick() }
-            }
-            // Juste après les pages du menu d'accueil : « À propos » en fait partie depuis qu'il en
-            // est un élément déplaçable.
-            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ABOUT)) {
-                NavigationMenuItem(title = stringResource(R.string.appstrings_about), icon = Icons.Default.Info, isSelected = false, isDark = isDark) { onAboutClick() }
-            }
-
-            // --- NOUVELLES SECTIONS ---
-            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SUPPORT_DETAIL)) {
-                NavigationMenuItem(title = stringResource(R.string.appstrings_page_support_settings), icon = Icons.Default.VerticalAlignTop, isSelected = false, isDark = isDark) { onSupportClick() }
-            }
-            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)) {
-                // En mode simplifié la fiche site autonome n'est plus atteignable : ces blocs ne
-                // s'affichent que dépliés sous leur opérateur, et c'est ce que règle cette ligne.
-                val siteSettingsTitle = if (simpleMode) {
-                    stringResource(R.string.appstrings_page_site_embedded_settings)
-                } else {
-                    stringResource(R.string.appstrings_page_site_settings)
-                }
-                NavigationMenuItem(title = siteSettingsTitle, icon = Icons.Default.WifiTethering, isSelected = false, isDark = isDark) { onSiteClick() }
-                NavigationMenuItem(title = stringResource(R.string.appstrings_page_speedtests_settings), icon = Icons.Default.Speed, isSelected = false, isDark = isDark) { onSpeedtestsClick() }
-            }
-            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THEORETICAL_COVERAGE)) {
-                NavigationMenuItem(title = stringResource(R.string.appstrings_coverage_button), icon = Icons.Default.Map, isSelected = false, isDark = isDark) { onTheoreticalCoverageClick() }
-            }
-            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ELEVATION_PROFILE)) {
-                NavigationMenuItem(title = stringResource(R.string.appstrings_elevation_profile_title), icon = Icons.Default.VerticalAlignTop, isSelected = false, isDark = isDark) { onElevationProfileClick() }
-            }
-            if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THROUGHPUT_CALCULATOR)) {
-                NavigationMenuItem(title = stringResource(R.string.appstrings_throughput_calculator_title), icon = Icons.Default.Speed, isSelected = false, isDark = isDark) { onThroughputCalculatorClick() }
-            }
-
-            // 3. Comment cette page-ci se fait découvrir depuis le reste de l'application
-            Spacer(Modifier.height(sizing.spacing(16.dp)))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-            Spacer(Modifier.height(sizing.spacing(16.dp)))
-            PageCustomizationDiscoveryCard(
-                shape = oneUiActionButtonShape(useOneUi),
-                border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null,
-                bubbleColor = LocalGeoTowerUiStyle.current.bubbleColor,
-                useOneUi = useOneUi
+            PageSettingsCard(
+                title = stringResource(R.string.appstrings_page_home_settings),
+                desc = stringResource(R.string.settings_page_home_desc),
+                icon = Icons.Default.Home,
+                onClick = actions.onHome,
+                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
             )
-
-            // 4. Réglage transverse : la barre de défilement latérale sur toutes les pages
-            Spacer(Modifier.height(sizing.spacing(16.dp)))
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
-            Spacer(Modifier.height(sizing.spacing(16.dp)))
-            AllPagesScrollAidsCard(
-                shape = oneUiActionButtonShape(useOneUi),
-                border = if (!useOneUi) BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)) else null,
-                bubbleColor = LocalGeoTowerUiStyle.current.bubbleColor,
-                useOneUi = useOneUi
+        }
+        if (hasNearby) {
+            PageSettingsCard(
+                title = stringResource(R.string.appstrings_page_nearby_settings),
+                desc = stringResource(R.string.settings_page_nearby_desc),
+                icon = Icons.Default.NearMe,
+                onClick = actions.onNearby,
+                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
             )
-            Spacer(Modifier.height(sizing.spacing(16.dp)).navigationBarsPadding())
+        }
+        if (hasMap) {
+            PageSettingsCard(
+                title = stringResource(R.string.appstrings_page_map_settings),
+                desc = stringResource(R.string.settings_page_map_desc),
+                icon = Icons.Default.Map,
+                onClick = actions.onMap,
+                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
+            )
+        }
+        if (hasCompass) {
+            PageSettingsCard(
+                title = stringResource(R.string.appstrings_page_compass_settings),
+                desc = stringResource(R.string.settings_page_compass_desc),
+                icon = Icons.Default.Explore,
+                onClick = actions.onCompass,
+                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
+            )
+        }
+        if (hasStats) {
+            PageSettingsCard(
+                title = stringResource(R.string.appstrings_stats_title),
+                desc = stringResource(R.string.settings_page_stats_desc),
+                icon = Icons.Default.BarChart,
+                onClick = actions.onStats,
+                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
+            )
+            PageSettingsCard(
+                title = stringResource(R.string.department_stats_title),
+                desc = stringResource(R.string.settings_page_department_stats_desc),
+                icon = Icons.Default.PieChart,
+                onClick = actions.onDepartmentStats,
+                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
+            )
+        }
+        // « À propos » est un élément déplaçable du menu d'accueil : il appartient à cette famille.
+        if (hasAbout) {
+            PageSettingsCard(
+                title = stringResource(R.string.appstrings_about),
+                desc = stringResource(R.string.settings_page_about_desc),
+                icon = Icons.Default.Info,
+                onClick = actions.onAbout,
+                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
+            )
         }
     }
+
+    if (hasSupport || hasSite) {
+        PagesGroupTitle(stringResource(R.string.settings_pages_group_details))
+        if (hasSupport) {
+            PageSettingsCard(
+                title = stringResource(R.string.appstrings_page_support_settings),
+                desc = stringResource(R.string.settings_page_support_desc),
+                icon = Icons.Default.VerticalAlignTop,
+                onClick = actions.onSupport,
+                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
+            )
+        }
+        if (hasSite) {
+            // En mode simplifié la fiche site autonome n'est plus atteignable : ces blocs ne
+            // s'affichent que dépliés sous leur opérateur, et c'est ce que règle cette ligne.
+            val siteSettingsTitle = if (simpleMode) {
+                stringResource(R.string.appstrings_page_site_embedded_settings)
+            } else {
+                stringResource(R.string.appstrings_page_site_settings)
+            }
+            PageSettingsCard(
+                title = siteSettingsTitle,
+                desc = stringResource(R.string.settings_page_site_desc),
+                icon = Icons.Default.WifiTethering,
+                onClick = actions.onSite,
+                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
+            )
+            PageSettingsCard(
+                title = stringResource(R.string.appstrings_page_speedtests_settings),
+                desc = stringResource(R.string.settings_page_speedtests_desc),
+                icon = Icons.Default.Speed,
+                onClick = actions.onSpeedtests,
+                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
+            )
+        }
+    }
+
+    if (hasCoverage || hasElevation || hasThroughput) {
+        PagesGroupTitle(stringResource(R.string.settings_pages_group_tools))
+        if (hasCoverage) {
+            PageSettingsCard(
+                title = stringResource(R.string.appstrings_coverage_button),
+                desc = stringResource(R.string.settings_page_coverage_desc),
+                icon = Icons.Default.Map,
+                onClick = actions.onTheoreticalCoverage,
+                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
+            )
+        }
+        if (hasElevation) {
+            PageSettingsCard(
+                title = stringResource(R.string.appstrings_elevation_profile_title),
+                desc = stringResource(R.string.settings_page_elevation_desc),
+                icon = Icons.Default.VerticalAlignTop,
+                onClick = actions.onElevationProfile,
+                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
+            )
+        }
+        if (hasThroughput) {
+            PageSettingsCard(
+                title = stringResource(R.string.appstrings_throughput_calculator_title),
+                desc = stringResource(R.string.settings_page_throughput_desc),
+                icon = Icons.Default.Speed,
+                onClick = actions.onThroughputCalculator,
+                shape = shape, border = border, bubbleColor = bubbleColor, useOneUi = useOneUi, safeClick = safeClick
+            )
+        }
+    }
+
+    // Réglages transverses : comment cette section-ci se fait découvrir depuis le reste de
+    // l'application, puis les aides au défilement communes à toutes les pages.
+    PagesGroupTitle(stringResource(R.string.settings_pages_group_all))
+    PageCustomizationDiscoveryCard(
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi
+    )
+    Spacer(Modifier.height(sizing.spacing(12.dp)))
+    AllPagesScrollAidsCard(
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi
+    )
 }
 
 // === LE SOUS-MENU POUR CHOISIR LA PAGE DE DÉMARRAGE ===

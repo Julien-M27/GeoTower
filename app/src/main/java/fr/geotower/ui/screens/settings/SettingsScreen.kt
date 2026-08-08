@@ -58,6 +58,7 @@ import androidx.compose.material.icons.filled.WifiTethering
 import androidx.compose.material.icons.outlined.Bookmarks
 import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Notifications
@@ -134,6 +135,7 @@ import fr.geotower.utils.HomePrefs
 import fr.geotower.utils.LiveTrackingPrefs
 import fr.geotower.utils.MapDisplayPrefs
 import fr.geotower.utils.PageScrollPrefs
+import fr.geotower.utils.PowerProfile
 import fr.geotower.utils.PreferenceStores
 import fr.geotower.data.build.LocalBuildCapability
 import fr.geotower.data.db.EnbDatabaseValidator
@@ -201,10 +203,11 @@ import kotlin.math.roundToInt
 private const val SECTION_APPEARANCE = 0
 private const val SECTION_MAPPING = 1
 private const val SECTION_PREFERENCES = 2
-private const val SECTION_BACKGROUND = 3
-private const val SECTION_SYSTEM = 4
-private const val SECTION_DATABASE = 5
-private const val SECTION_COUNT = 6
+private const val SECTION_PAGES = 3
+private const val SECTION_BACKGROUND = 4
+private const val SECTION_SYSTEM = 5
+private const val SECTION_DATABASE = 6
+private const val SECTION_COUNT = 7
 
 // Ancres fines de la section « Base de données » : valeurs possibles du paramètre `section` des
 // liens profonds `geotower://settings?section=…` émis par les notifications de téléchargement
@@ -701,7 +704,6 @@ fun SettingsScreen(
     var pageThroughputBands by remember { mutableStateOf(prefs.getBoolean(ThroughputPrefs.BLOCK_BANDS_VISIBLE, true)) }
     var pageThroughputAssumptions by remember { mutableStateOf(prefs.getBoolean(ThroughputPrefs.BLOCK_ASSUMPTIONS_VISIBLE, true)) }
 
-    var showPagesCustomizationSheet by remember { mutableStateOf(false) }
     var showCoverageDefaultsSheet by remember { mutableStateOf(false) }
     var showElevationDefaultsSheet by remember { mutableStateOf(false) }
     var showMapFiltersDefaultsSheet by remember { mutableStateOf(false) }
@@ -787,15 +789,24 @@ fun SettingsScreen(
 
     LaunchedEffect(initialSection) {
         when (initialSection) {
+            // Roue dentée d'une page : on se pose sur la section « Pages », d'où la feuille est
+            // issue, pour que la refermer laisse sous les yeux les réglages des pages voisines.
+            // Section fermée par le drapeau distant : on retombe sur Préférences, comme avant,
+            // plutôt que d'ouvrir une section qui n'est rendue nulle part.
             "nearby", "map", "compass", "support", "site", "throughput" -> {
                 kotlinx.coroutines.delay(300)
-                activeSectionIndex = SECTION_PREFERENCES
+                val anchorSection = if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.PAGES_CUSTOMIZATION)) {
+                    SECTION_PAGES
+                } else {
+                    SECTION_PREFERENCES
+                }
+                activeSectionIndex = anchorSection
                 if (useSectionsHome) {
-                    openedSection = SECTION_PREFERENCES
+                    openedSection = anchorSection
                 } else if (navMode == 0 || !isWideScreen) {
-                    sectionBringIntoViewRequesters[SECTION_PREFERENCES].bringIntoView()
+                    sectionBringIntoViewRequesters[anchorSection].bringIntoView()
                     kotlinx.coroutines.delay(80)
-                    alignAnchorToViewportTop(sectionRootPositions[SECTION_PREFERENCES])
+                    alignAnchorToViewportTop(sectionRootPositions[anchorSection])
                 }
                 when (initialSection) {
                     "nearby" -> showNearbySettingsSheet = true
@@ -809,13 +820,38 @@ fun SettingsScreen(
         }
     }
 
+    // ⚠️ Cette liste est INDEXÉE par le numéro de section (`menuItems[section]` plus bas) : son
+    // ordre doit rester celui des constantes SECTION_*. Une section fermée par un drapeau distant
+    // y reste donc présente — c'est `visibleMenuItems` qui la retire de l'affichage.
     val menuItems = listOf(
         Triple(stringResource(R.string.settings_section_appearance), Icons.Outlined.Palette, SECTION_APPEARANCE),
         Triple(stringResource(R.string.settings_section_mapping), Icons.Outlined.Map, SECTION_MAPPING),
         Triple(stringResource(R.string.settings_section_preferences), Icons.Outlined.Tune, SECTION_PREFERENCES),
+        Triple(stringResource(R.string.settings_pages_customization_title), Icons.Outlined.Edit, SECTION_PAGES),
         Triple(stringResource(R.string.settings_section_background), Icons.Outlined.Notifications, SECTION_BACKGROUND),
         Triple(stringResource(R.string.settings_section_system), Icons.Outlined.Settings, SECTION_SYSTEM),
         Triple(stringResource(R.string.settings_section_database), Icons.Outlined.Storage, SECTION_DATABASE)
+    )
+    val pagesCustomizationEnabled = featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.PAGES_CUSTOMIZATION)
+    val visibleMenuItems = menuItems.filter { it.third != SECTION_PAGES || pagesCustomizationEnabled }
+
+    // Les boutons de la section « Pages ». Ils n'ont plus qu'à ouvrir leur feuille : la section
+    // reste affichée dessous, il n'y a plus de feuille parente à refermer puis à rouvrir.
+    val pagesSectionActions = PagesSectionActions(
+        onStartupPage = { safeClick { showStartupPageSheet = true } },
+        onHome = { safeClick { showHomeSettingsSheet = true } },
+        onNearby = { safeClick { showNearbySettingsSheet = true } },
+        onMap = { safeClick { showMapSettingsSheet = true } },
+        onCompass = { safeClick { showCompassSettingsSheet = true } },
+        onStats = { safeClick { showStatsSettingsSheet = true } },
+        onDepartmentStats = { safeClick { showDepartmentStatsSettingsSheet = true } },
+        onAbout = { safeClick { showAboutPageSettingsSheet = true } },
+        onSupport = { safeClick { showSupportSettingsSheet = true } },
+        onSite = { safeClick { showSiteSettingsSheet = true } },
+        onSpeedtests = { safeClick { showSpeedtestsSettingsSheet = true } },
+        onTheoreticalCoverage = { safeClick { showCoverageDefaultsSheet = true } },
+        onElevationProfile = { safeClick { showElevationDefaultsSheet = true } },
+        onThroughputCalculator = { safeClick { showThroughputCalculatorSettingsSheet = true } }
     )
     val sectionRootSnapshot = sectionRootPositions.toMap()
     val sectionBoundsSnapshot = sectionBounds.toMap()
@@ -903,14 +939,59 @@ fun SettingsScreen(
             entry(context.getString(R.string.settings_default_operator), "operateur operator orange sfr free bouygues sim defaut", SECTION_PREFERENCES) { showOperatorSheet = true }
             entry(context.getString(R.string.settings_app_language), "langue language francais anglais traduction locale", SECTION_PREFERENCES) { showLanguageSheet = true }
             entry(context.getString(R.string.settings_units_title), "unites units distance vitesse metre km mesure imperial", SECTION_PREFERENCES) { showUnitSheet = true }
-            if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.PAGES_CUSTOMIZATION)) {
-                entry(context.getString(R.string.settings_pages_customization_title), "pages personnalisation accueil carte boussole site support proximite statistiques blocs reorganiser masquer astuces bulle rappel appui long", SECTION_PREFERENCES) { showPagesCustomizationSheet = true }
-            }
             if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.EXTERNAL_LINKS_SETTINGS)) {
                 entry(context.getString(R.string.settings_external_links_title), "liens externes links cartoradio sites web", SECTION_PREFERENCES) { showExternalLinksSheet = true }
             }
             if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.SHARE_SETTINGS)) {
                 entry(context.getString(R.string.settings_default_share_content_title), "partage share image contenu carte antenne support", SECTION_PREFERENCES) { showShareSelectorSheet = true }
+            }
+
+            // --- Pages ---
+            // Une entrée PAR page, et non plus une seule pour toute la personnalisation : taper
+            // « boussole » ou « azimut » doit tomber sur le réglage, pas sur un menu à fouiller.
+            if (pagesCustomizationEnabled) {
+                entry(context.getString(R.string.settings_pages_customization_title), "pages personnalisation blocs reorganiser masquer astuces bulle rappel appui long defilement", SECTION_PAGES)
+                if (!AppConfig.simpleModeActive()) {
+                    entry(context.getString(R.string.appstrings_startup_page_settings), "demarrage startup page ouverture lancement", SECTION_PAGES) { showStartupPageSheet = true }
+                    entry(context.getString(R.string.appstrings_page_home_settings), "accueil home menu ordre pages bouton aide reorganiser appui long", SECTION_PAGES) { showHomeSettingsSheet = true }
+                }
+                if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.NEARBY)) {
+                    entry(context.getString(R.string.appstrings_page_nearby_settings), "proximite nearby recherche suggestions rayon distance", SECTION_PAGES) { showNearbySettingsSheet = true }
+                }
+                if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.MAP)) {
+                    entry(context.getString(R.string.appstrings_page_map_settings), "carte map marqueur azimut cone boite a outils filtres position echelle boussole vitesse", SECTION_PAGES) { showMapSettingsSheet = true }
+                }
+                if (AppConfig.hasCompass.value && featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.COMPASS)) {
+                    entry(context.getString(R.string.appstrings_page_compass_settings), "boussole compass azimut cap precision gps blocs", SECTION_PAGES) { showCompassSettingsSheet = true }
+                }
+                if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.STATS)) {
+                    entry(context.getString(R.string.appstrings_stats_title), "statistiques stats blocs frequences graphiques affichage", SECTION_PAGES) { showStatsSettingsSheet = true }
+                    entry(context.getString(R.string.department_stats_title), "departement department statistiques blocs autorisations", SECTION_PAGES) { showDepartmentStatsSettingsSheet = true }
+                }
+                if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ABOUT)) {
+                    entry(context.getString(R.string.appstrings_about), "a propos about parties sections ordre visibilite", SECTION_PAGES) { showAboutPageSettingsSheet = true }
+                }
+                if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SUPPORT_DETAIL)) {
+                    entry(context.getString(R.string.appstrings_page_support_settings), "support pylone fiche blocs mini carte photos operateurs", SECTION_PAGES) { showSupportSettingsSheet = true }
+                }
+                if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.SITE_DETAIL)) {
+                    val siteEntryTitle = if (AppConfig.simpleModeActive()) {
+                        context.getString(R.string.appstrings_page_site_embedded_settings)
+                    } else {
+                        context.getString(R.string.appstrings_page_site_settings)
+                    }
+                    entry(siteEntryTitle, "site antenne fiche operateur blocs frequences photos speedtest hauteur azimut", SECTION_PAGES) { showSiteSettingsSheet = true }
+                    entry(context.getString(R.string.appstrings_page_speedtests_settings), "speedtests debits mesures filtres tri enb", SECTION_PAGES) { showSpeedtestsSettingsSheet = true }
+                }
+                if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THEORETICAL_COVERAGE)) {
+                    entry(context.getString(R.string.appstrings_coverage_button), "couverture theorique coverage lobe propagation portee", SECTION_PAGES) { showCoverageDefaultsSheet = true }
+                }
+                if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.ELEVATION_PROFILE)) {
+                    entry(context.getString(R.string.appstrings_elevation_profile_title), "profil altimetrique elevation terrain batiments obstacles relief", SECTION_PAGES) { showElevationDefaultsSheet = true }
+                }
+                if (featureFlags.isScreenEnabled(RemoteFeatureFlags.Screens.THROUGHPUT_CALCULATOR)) {
+                    entry(context.getString(R.string.appstrings_throughput_calculator_title), "calculateur debit throughput blocs hypotheses bandes", SECTION_PAGES) { showThroughputCalculatorSettingsSheet = true }
+                }
             }
 
             // --- Notifications et arrière-plan ---
@@ -1169,7 +1250,7 @@ fun SettingsScreen(
                             }
                             Spacer(Modifier.height(sizing.spacing(8.dp)))
                         }
-                        menuItems.forEach { (title, icon, index) ->
+                        visibleMenuItems.forEach { (title, icon, index) ->
                             val isSelected = if (useWideSections) openedSection == index else activeSectionIndex == index
                             NavigationMenuItem(title, icon, isSelected, isDark) {
                                 activeSectionIndex = index
@@ -1391,7 +1472,7 @@ fun SettingsScreen(
                                 // bascule par sections sur téléphone, le mode de navigation
                                 // (nav_mode) sur grand écran.
                                 SettingsSectionsHome(
-                                    sections = menuItems,
+                                    sections = visibleMenuItems,
                                     onSectionClick = { openSection(it) },
                                     onShowAll = { if (useWideSections) setNavMode(0) else setSettingsSectionsMode(false) },
                                     onPhotosFavorites = { navController.navigate("photos_favorites") },
@@ -1425,7 +1506,8 @@ fun SettingsScreen(
                                     lang = appLanguage,
                                     onLang = { showLanguageSheet = true },
                                     onUnitSettings = { showUnitSheet = true },
-                                    onPages = { showPagesCustomizationSheet = true },
+                                    pagesActions = pagesSectionActions,
+                                    showPagesSection = pagesCustomizationEnabled,
                                     onExternalLinks = { showExternalLinksSheet = true },
                                     onSharePrefs = { showShareSelectorSheet = true },
                                     onPreferenceProfiles = { showPreferenceProfilesSheet = true },
@@ -1445,6 +1527,7 @@ fun SettingsScreen(
                                     appearanceSectionModifier = sectionAnchorModifiers[SECTION_APPEARANCE],
                                     mappingSectionModifier = sectionAnchorModifiers[SECTION_MAPPING],
                                     preferencesSectionModifier = sectionAnchorModifiers[SECTION_PREFERENCES],
+                                    pagesSectionModifier = sectionAnchorModifiers[SECTION_PAGES],
                                     backgroundSectionModifier = sectionAnchorModifiers[SECTION_BACKGROUND],
                                     systemSectionModifier = sectionAnchorModifiers[SECTION_SYSTEM],
                                     databaseSectionModifier = sectionAnchorModifiers[SECTION_DATABASE],
@@ -1538,7 +1621,6 @@ fun SettingsScreen(
                                         appLanguage,
                                         { showLanguageSheet = true },
                                         { showUnitSheet = true },
-                                        { showPagesCustomizationSheet = true },
                                         { showExternalLinksSheet = true },
                                         { showShareSelectorSheet = true },
                                         cardShape,
@@ -1546,6 +1628,14 @@ fun SettingsScreen(
                                         bubbleBaseColor,
                                         useOneUi,
                                         safeClick
+                                    )
+                                    SECTION_PAGES -> SectionPages(
+                                        actions = pagesSectionActions,
+                                        shape = cardShape,
+                                        border = cardBorder,
+                                        bubbleColor = bubbleBaseColor,
+                                        useOneUi = useOneUi,
+                                        safeClick = safeClick
                                     )
                                     SECTION_BACKGROUND -> SectionNotifications(
                                         defaultOperator,
@@ -1656,40 +1746,14 @@ fun SettingsScreen(
                 bubbleColor = bubbleBaseColor
             )
         }
-        // --- NOUVEAU MENU DE PERSONNALISATION DES PAGES ---
-        if (showPagesCustomizationSheet && featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.PAGES_CUSTOMIZATION)) {
-            PagesCustomizationSheet(
-                onDismiss = { showPagesCustomizationSheet = false },
-                sheetState = sheetState,
-                useOneUi = useOneUi,
-                onStartupPageClick = { safeClick { showPagesCustomizationSheet = false; showStartupPageSheet = true } },
-                onHomeClick = { safeClick { showPagesCustomizationSheet = false; showHomeSettingsSheet = true } },
-                onNearbyClick = { safeClick { showPagesCustomizationSheet = false; showNearbySettingsSheet = true } },
-                onMapClick = { safeClick { showPagesCustomizationSheet = false; showMapSettingsSheet = true } },
-                onCompassClick = { safeClick { showPagesCustomizationSheet = false; showCompassSettingsSheet = true } },
-                onStatsClick = { safeClick { showPagesCustomizationSheet = false; showStatsSettingsSheet = true } },
-                onDepartmentStatsClick = { safeClick { showPagesCustomizationSheet = false; showDepartmentStatsSettingsSheet = true } },
-                onAboutClick = { safeClick { showPagesCustomizationSheet = false; showAboutPageSettingsSheet = true } },
-                onSupportClick = { safeClick { showPagesCustomizationSheet = false; showSupportSettingsSheet = true } },
-                onSiteClick = { safeClick { showPagesCustomizationSheet = false; showSiteSettingsSheet = true } },
-                onSpeedtestsClick = { safeClick { showPagesCustomizationSheet = false; showSpeedtestsSettingsSheet = true } },
-                onThroughputCalculatorClick = { safeClick { showPagesCustomizationSheet = false; showThroughputCalculatorSettingsSheet = true } },
-                onOpenFrequencies = {
-                    // ✅ L'échange se fait ici : on ferme l'un et on ouvre l'autre
-                    showPagesCustomizationSheet = false
-                    showFrequenciesSheet = true
-                },
-                onTheoreticalCoverageClick = { safeClick { showPagesCustomizationSheet = false; showCoverageDefaultsSheet = true } },
-                onElevationProfileClick = { safeClick { showPagesCustomizationSheet = false; showElevationDefaultsSheet = true } }
-            )
-        }
-
+        // Les feuilles des pages s'ouvrent par-dessus la section « Pages », qui reste affichée
+        // dessous : leur bouton retour n'a plus qu'à les refermer.
         if (showCoverageDefaultsSheet) {
             CoverageSettingsSheet(
                 onDismiss = { showCoverageDefaultsSheet = false },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
-                onBack = { safeClick { showCoverageDefaultsSheet = false; showPagesCustomizationSheet = true } }
+                onBack = { safeClick { showCoverageDefaultsSheet = false } }
             )
         }
 
@@ -1698,7 +1762,7 @@ fun SettingsScreen(
                 onDismiss = { showElevationDefaultsSheet = false },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
-                onBack = { safeClick { showElevationDefaultsSheet = false; showPagesCustomizationSheet = true } }
+                onBack = { safeClick { showElevationDefaultsSheet = false } }
             )
         }
 
@@ -1770,11 +1834,7 @@ fun SettingsScreen(
                     prefs.edit().putString(HomePrefs.STARTUP_PAGE, newPage).apply()
                 },
                 onDismiss = { showStartupPageSheet = false },
-                onBack = {
-                    safeClick {
-                        showStartupPageSheet = false; showPagesCustomizationSheet = true
-                    }
-                }, // <-- AJOUT ICI
+                onBack = { safeClick { showStartupPageSheet = false } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -1829,12 +1889,7 @@ fun SettingsScreen(
                     showThroughputCalculationDefaultsSheet = true
                 },
                 onDismiss = { showThroughputCalculatorSettingsSheet = false },
-                onBack = {
-                    safeClick {
-                        showThroughputCalculatorSettingsSheet = false
-                        showPagesCustomizationSheet = true
-                    }
-                },
+                onBack = { safeClick { showThroughputCalculatorSettingsSheet = false } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -1879,11 +1934,7 @@ fun SettingsScreen(
                     showStatsPage = it; prefs.edit().putBoolean("show_stats_page", it).apply()
                 },
                 onDismiss = { showHomeSettingsSheet = false },
-                onBack = {
-                    safeClick {
-                        showHomeSettingsSheet = false; showPagesCustomizationSheet = true
-                    }
-                }, // <-- AJOUT ICI
+                onBack = { safeClick { showHomeSettingsSheet = false } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -1914,11 +1965,7 @@ fun SettingsScreen(
                     nearbySearchRadius = it; prefs.edit().putInt("nearby_search_radius", it).apply()
                 },
                 onDismiss = { showNearbySettingsSheet = false },
-                onBack = {
-                    safeClick {
-                        showNearbySettingsSheet = false; showPagesCustomizationSheet = true
-                    }
-                }, // <-- AJOUT ICI
+                onBack = { safeClick { showNearbySettingsSheet = false } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -1981,11 +2028,7 @@ fun SettingsScreen(
                 },
 
                 onDismiss = { showMapSettingsSheet = false },
-                onBack = {
-                    safeClick {
-                        showMapSettingsSheet = false; showPagesCustomizationSheet = true
-                    }
-                },
+                onBack = { safeClick { showMapSettingsSheet = false } },
                 onFiltersClick = { safeClick { showMapSettingsSheet = false; showMapFiltersDefaultsSheet = true } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
@@ -2015,11 +2058,7 @@ fun SettingsScreen(
                     .apply()
                 },
                 onDismiss = { showCompassSettingsSheet = false },
-                onBack = {
-                    safeClick {
-                        showCompassSettingsSheet = false; showPagesCustomizationSheet = true
-                    }
-                },
+                onBack = { safeClick { showCompassSettingsSheet = false } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -2029,7 +2068,7 @@ fun SettingsScreen(
         if (showStatsSettingsSheet) {
             StatsSettingsSheet(
                 onDismiss = { showStatsSettingsSheet = false },
-                onBack = { safeClick { showStatsSettingsSheet = false; showPagesCustomizationSheet = true } },
+                onBack = { safeClick { showStatsSettingsSheet = false } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -2039,7 +2078,7 @@ fun SettingsScreen(
         if (showDepartmentStatsSettingsSheet) {
             DepartmentStatsSettingsSheet(
                 onDismiss = { showDepartmentStatsSettingsSheet = false },
-                onBack = { safeClick { showDepartmentStatsSettingsSheet = false; showPagesCustomizationSheet = true } },
+                onBack = { safeClick { showDepartmentStatsSettingsSheet = false } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -2050,7 +2089,7 @@ fun SettingsScreen(
         if (showAboutPageSettingsSheet) {
             AboutPageSettingsSheet(
                 onDismiss = { showAboutPageSettingsSheet = false },
-                onBack = { safeClick { showAboutPageSettingsSheet = false; showPagesCustomizationSheet = true } },
+                onBack = { safeClick { showAboutPageSettingsSheet = false } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -2077,7 +2116,7 @@ fun SettingsScreen(
                     showPhotosSettingsSheet = true
                 },
                 onDismiss = { showSupportSettingsSheet = false },
-                onBack = { safeClick { showSupportSettingsSheet = false; showPagesCustomizationSheet = true } },
+                onBack = { safeClick { showSupportSettingsSheet = false } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -2090,7 +2129,7 @@ fun SettingsScreen(
         if (showSiteSettingsSheet && AppConfig.simpleModeActive()) {
             EmbeddedSiteBlocksSettingsSheet(
                 onDismiss = { showSiteSettingsSheet = false },
-                onBack = { safeClick { showSiteSettingsSheet = false; showPagesCustomizationSheet = true } },
+                onBack = { safeClick { showSiteSettingsSheet = false } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -2139,7 +2178,7 @@ fun SettingsScreen(
                     showCommunityDataSheet = true
                 },
                 onDismiss = { showSiteSettingsSheet = false },
-                onBack = { safeClick { showSiteSettingsSheet = false; showPagesCustomizationSheet = true } },
+                onBack = { safeClick { showSiteSettingsSheet = false } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -2196,7 +2235,7 @@ fun SettingsScreen(
                 },
                 onReset = ::resetSpeedtestsSettings,
                 onDismiss = { showSpeedtestsSettingsSheet = false },
-                onBack = { safeClick { showSpeedtestsSettingsSheet = false; showPagesCustomizationSheet = true } },
+                onBack = { safeClick { showSpeedtestsSettingsSheet = false } },
                 sheetState = sheetState,
                 useOneUi = useOneUi,
                 bubbleColor = bubbleBaseColor
@@ -2553,7 +2592,8 @@ fun SectionTitle(title: String) {
 fun AllSettingsContent(
     isWide: Boolean, nav: Int, onNav: (Int) -> Unit, theme: Int, onTheme: (Int) -> Unit, oled: Boolean, onOled: (Boolean) -> Unit, oneUi: Boolean, onOneUi: (Boolean) -> Unit, blur: Boolean, onBlur: (Boolean) -> Unit, logo: Int, onIcon: () -> Unit, onLogoDrawing: () -> Unit, op: String, onOp: () -> Unit, lang: String, onLang: () -> Unit,
     onUnitSettings: () -> Unit,
-    onPages: () -> Unit,
+    pagesActions: PagesSectionActions,
+    showPagesSection: Boolean,
     onExternalLinks: () -> Unit,
     onSharePrefs: () -> Unit,
     onPreferenceProfiles: () -> Unit,
@@ -2573,6 +2613,7 @@ fun AllSettingsContent(
     appearanceSectionModifier: Modifier = Modifier,
     mappingSectionModifier: Modifier = Modifier,
     preferencesSectionModifier: Modifier = Modifier,
+    pagesSectionModifier: Modifier = Modifier,
     backgroundSectionModifier: Modifier = Modifier,
     systemSectionModifier: Modifier = Modifier,
     databaseSectionModifier: Modifier = Modifier,
@@ -2610,9 +2651,15 @@ fun AllSettingsContent(
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
     Column(modifier = preferencesSectionModifier.fillMaxWidth()) {
-        SectionPreferences(op, onOp, lang, onLang, onUnitSettings, onPages, onExternalLinks, onSharePrefs, shape, border, bubbleColor, useOneUi, safeClick)
+        SectionPreferences(op, onOp, lang, onLang, onUnitSettings, onExternalLinks, onSharePrefs, shape, border, bubbleColor, useOneUi, safeClick)
     }
     Spacer(Modifier.height(sizing.spacing(32.dp)))
+    if (showPagesSection) {
+        Column(modifier = pagesSectionModifier.fillMaxWidth()) {
+            SectionPages(pagesActions, shape, border, bubbleColor, useOneUi, safeClick)
+        }
+        Spacer(Modifier.height(sizing.spacing(32.dp)))
+    }
     Column(modifier = backgroundSectionModifier.fillMaxWidth()) {
         SectionNotifications(op, shape, border, bubbleColor, useOneUi, safeClick)
     }
@@ -2842,6 +2889,27 @@ fun SectionCartographie(
         safeClick = safeClick
     )
 
+    // Comportement du repère de position. Il vit ici plutôt que dans la personnalisation des pages,
+    // qui ne parle que d'éléments à montrer ou masquer, alors que c'est un réglage de rendu.
+    Spacer(Modifier.height(sizing.spacing(16.dp)))
+    val mappingPrefs = LocalContext.current.getSharedPreferences(PreferenceStores.APP, Context.MODE_PRIVATE)
+    var smoothMapLocation by AppConfig.smoothMapLocation
+    // Mode faible conso : le lissage est forcé OFF → on montre l'interrupteur éteint et grisé.
+    PreferenceSwitchCard(
+        title = stringResource(R.string.appstrings_map_smooth_location_option),
+        desc = stringResource(R.string.appstrings_map_smooth_location_desc),
+        checked = smoothMapLocation && !PowerProfile.isEco,
+        onCheckedChange = {
+            smoothMapLocation = it
+            mappingPrefs.edit().putBoolean(AppConfig.PREF_SMOOTH_MAP_LOCATION, it).apply()
+        },
+        shape = shape,
+        border = border,
+        bubbleColor = bubbleColor,
+        useOneUi = useOneUi,
+        enabled = !PowerProfile.isEco
+    )
+
     // Les cartes hors ligne sont un fond de carte téléchargé : elles vivent ici, pas dans la
     // section base de données (qui parle des antennes ANFR).
     Spacer(Modifier.height(sizing.spacing(16.dp)))
@@ -2865,7 +2933,6 @@ fun SectionCartographie(
 fun SectionPreferences(
     op: String, onOp: () -> Unit, lang: String, onLang: () -> Unit,
     onUnitSettings: () -> Unit,
-    onPages: () -> Unit,
     onExternalLinks: () -> Unit,
     onSharePrefs: () -> Unit,
     shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, safeClick: SafeClick
@@ -2893,20 +2960,6 @@ fun SectionPreferences(
         icon = Icons.Default.Straighten
     )
 
-    if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.PAGES_CUSTOMIZATION)) {
-        Spacer(Modifier.height(sizing.spacing(12.dp)))
-        PreferenceActionCard(
-            title = stringResource(R.string.settings_pages_customization_title),
-            desc = stringResource(R.string.settings_pages_customization_desc),
-            onClick = onPages,
-            shape = shape,
-            border = border,
-            bubbleColor = bubbleColor,
-            useOneUi = useOneUi,
-            safeClick = safeClick,
-            icon = Icons.Default.Edit
-        )
-    }
     if (featureFlags.isMenuEnabled(RemoteFeatureFlags.Menus.EXTERNAL_LINKS_SETTINGS)) {
         Spacer(Modifier.height(sizing.spacing(12.dp)))
         PreferenceActionCard(
@@ -3845,21 +3898,23 @@ fun SettingsOptionCard(label: String, icon: ImageVector, isSelected: Boolean, on
 }
 
 @Composable
-fun PreferenceSwitchCard(title: String, desc: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean) {
+fun PreferenceSwitchCard(title: String, desc: String, checked: Boolean, onCheckedChange: (Boolean) -> Unit, shape: Shape, border: BorderStroke?, bubbleColor: Color, useOneUi: Boolean, enabled: Boolean = true) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     // Toujours primary !
     val accentColor = MaterialTheme.colorScheme.primary
+    val textAlpha = if (enabled) 1f else 0.38f
 
     val cardBg = if (useOneUi) bubbleColor else Color.Transparent
     Surface(shape = shape, border = border, color = cardBg, modifier = Modifier.fillMaxWidth()) {
         Row(modifier = Modifier.fillMaxWidth().padding(sizing.spacing(16.dp)), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text(title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold)
-                Text(desc, style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(title, style = sizing.textStyle(MaterialTheme.typography.titleMedium), fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurface.copy(alpha = textAlpha))
+                Text(desc, style = sizing.textStyle(MaterialTheme.typography.bodySmall), color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = textAlpha))
             }
             fr.geotower.ui.components.GeoTowerSwitch(
                 checked = checked,
                 onCheckedChange = onCheckedChange,
+                enabled = enabled,
                 useOneUi = useOneUi,
                 checkedColor = accentColor
             )
@@ -4461,6 +4516,7 @@ private fun settingsSectionDescription(section: Int): String = when (section) {
     SECTION_APPEARANCE -> stringResource(R.string.settings_hub_appearance_desc)
     SECTION_MAPPING -> stringResource(R.string.settings_hub_mapping_desc)
     SECTION_PREFERENCES -> stringResource(R.string.settings_hub_preferences_desc)
+    SECTION_PAGES -> stringResource(R.string.settings_hub_pages_desc)
     SECTION_BACKGROUND -> stringResource(R.string.settings_hub_background_desc)
     SECTION_SYSTEM -> stringResource(R.string.settings_hub_system_desc)
     else -> stringResource(R.string.settings_hub_database_desc)

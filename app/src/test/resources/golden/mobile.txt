@@ -21,10 +21,11 @@ table source_versions :: CREATE TABLE `source_versions` (`source_key` TEXT NOT N
 table support :: CREATE TABLE `support` (`id_anfr` TEXT NOT NULL, `id_support` TEXT NOT NULL, `nat_id` INTEGER, `tpo_id` INTEGER, `hauteur` REAL, PRIMARY KEY(`id_anfr`, `id_support`))
 table technique :: CREATE TABLE `technique` (`id_anfr` TEXT NOT NULL, `adm_id` INTEGER, `statut_id` INTEGER, `date_implantation` TEXT, `date_service` TEXT, `date_modif` TEXT, `details_frequences` TEXT, `adresse` TEXT, `has_active` INTEGER NOT NULL, PRIMARY KEY(`id_anfr`))
 
-# table antenne (11 lignes)
+# table antenne (12 lignes)
 aer_id=1204115|id_anfr=0292750303|id_support=497932|tae_id=16|azimut=330|hauteur_bas=30.8|is_fh=0
 aer_id=1204117|id_anfr=0292750303|id_support=497932|tae_id=16|azimut=90|hauteur_bas=30.8|is_fh=0
 aer_id=9588616|id_anfr=0292750303|id_support=497932|tae_id=17|azimut=235|hauteur_bas=29.4|is_fh=0
+aer_id=AE11|id_anfr=0000000008|id_support=S8|tae_id=16|azimut=185|hauteur_bas=28.7|is_fh=0
 aer_id=AE1|id_anfr=0000000001|id_support=S1|tae_id=16|azimut=120|hauteur_bas=28.0|is_fh=0
 aer_id=AE2|id_anfr=0000000002|id_support=S2|tae_id=32|azimut=240|hauteur_bas=30.0|is_fh=0
 aer_id=AE3|id_anfr=0000000003|id_support=S3|tae_id=16|azimut=90|hauteur_bas=20.0|is_fh=0
@@ -37,10 +38,10 @@ aer_id=AE9|id_anfr=ABC123|id_support=S9|tae_id=16|azimut=60|hauteur_bas=18.0|is_
 # table dept_stat_current (4 lignes)
 dept_code=29|dept_name=Finistere|region_code=53|area_km2=6733.0|population=915090|population_year=2022|supports=2|supports_active=2|stations=3|stations_active=3|antennas=3|antennas_active=3|antennas_fh=0|stations_per_support=1.5|antennas_per_station=1.0|supports_per_km2=2.97E-4|stations_per_km2=4.46E-4|antennas_per_km2=4.46E-4|supports_per_1k_hab=0.002186|stations_per_1k_hab=0.003278|antennas_per_1k_hab=0.003278|hab_per_support=457545.0|hab_per_station=305030.0|hab_per_antenna=305030.0
 dept_code=31|dept_name=Haute-Garonne|region_code=76|area_km2=6309.3|population=1400039|population_year=2022|supports=2|supports_active=1|stations=2|stations_active=1|antennas=2|antennas_active=1|antennas_fh=0|stations_per_support=1.0|antennas_per_station=1.0|supports_per_km2=3.17E-4|stations_per_km2=3.17E-4|antennas_per_km2=3.17E-4|supports_per_1k_hab=0.001429|stations_per_1k_hab=0.001429|antennas_per_1k_hab=0.001429|hab_per_support=700019.5|hab_per_station=700019.5|hab_per_antenna=700019.5
-dept_code=75|dept_name=Paris|region_code=11|area_km2=105.4|population=2145906|population_year=2022|supports=3|supports_active=3|stations=3|stations_active=3|antennas=3|antennas_active=3|antennas_fh=1|stations_per_support=1.0|antennas_per_station=1.0|supports_per_km2=0.028463|stations_per_km2=0.028463|antennas_per_km2=0.028463|supports_per_1k_hab=0.001398|stations_per_1k_hab=0.001398|antennas_per_1k_hab=0.001398|hab_per_support=715302.0|hab_per_station=715302.0|hab_per_antenna=715302.0
+dept_code=75|dept_name=Paris|region_code=11|area_km2=105.4|population=2145906|population_year=2022|supports=4|supports_active=4|stations=4|stations_active=4|antennas=4|antennas_active=4|antennas_fh=1|stations_per_support=1.0|antennas_per_station=1.0|supports_per_km2=0.037951|stations_per_km2=0.037951|antennas_per_km2=0.037951|supports_per_1k_hab=0.001864|stations_per_1k_hab=0.001864|antennas_per_1k_hab=0.001864|hab_per_support=536476.5|hab_per_station=536476.5|hab_per_antenna=536476.5
 dept_code=971|dept_name=Guadeloupe|region_code=01|area_km2=1628.4|population=384315|population_year=2022|supports=1|supports_active=1|stations=1|stations_active=1|antennas=1|antennas_active=1|antennas_fh=0|stations_per_support=1.0|antennas_per_station=1.0|supports_per_km2=6.14E-4|stations_per_km2=6.14E-4|antennas_per_km2=6.14E-4|supports_per_1k_hab=0.002602|stations_per_1k_hab=0.002602|antennas_per_1k_hab=0.002602|hab_per_support=384315.0|hab_per_station=384315.0|hab_per_antenna=384315.0
 
-# table dept_stat_operator_tech (25 lignes)
+# table dept_stat_operator_tech (27 lignes)
 dept_code=29|operator_name=ALL|tech=4G|supports=2|supports_active=2|stations=3|stations_active=3|antennas=3|antennas_active=3
 dept_code=29|operator_name=ALL|tech=ALL|supports=2|supports_active=2|stations=3|stations_active=3|antennas=3|antennas_active=3
 dept_code=29|operator_name=BOUYGUES TELECOM|tech=4G|supports=1|supports_active=1|stations=1|stations_active=1|antennas=1|antennas_active=1
@@ -56,18 +57,20 @@ dept_code=31|operator_name=ORANGE|tech=4G|supports=1|supports_active=1|stations=
 dept_code=31|operator_name=ORANGE|tech=ALL|supports=1|supports_active=1|stations=1|stations_active=1|antennas=1|antennas_active=1
 dept_code=31|operator_name=SFR|tech=5G|supports=1|supports_active=0|stations=1|stations_active=0|antennas=1|antennas_active=0
 dept_code=31|operator_name=SFR|tech=ALL|supports=1|supports_active=0|stations=1|stations_active=0|antennas=1|antennas_active=0
-dept_code=75|operator_name=ALL|tech=4G|supports=2|supports_active=2|stations=2|stations_active=2|antennas=3|antennas_active=3
-dept_code=75|operator_name=ALL|tech=ALL|supports=3|supports_active=3|stations=3|stations_active=3|antennas=3|antennas_active=3
+dept_code=75|operator_name=ALL|tech=4G|supports=3|supports_active=3|stations=3|stations_active=3|antennas=4|antennas_active=4
+dept_code=75|operator_name=ALL|tech=5G|supports=1|supports_active=0|stations=1|stations_active=0|antennas=0|antennas_active=0
+dept_code=75|operator_name=ALL|tech=ALL|supports=4|supports_active=4|stations=4|stations_active=4|antennas=4|antennas_active=4
 dept_code=75|operator_name=BOUYGUES TELECOM|tech=4G|supports=1|supports_active=1|stations=1|stations_active=1|antennas=2|antennas_active=2
 dept_code=75|operator_name=BOUYGUES TELECOM|tech=ALL|supports=1|supports_active=1|stations=1|stations_active=1|antennas=2|antennas_active=2
-dept_code=75|operator_name=ORANGE|tech=4G|supports=1|supports_active=1|stations=1|stations_active=1|antennas=1|antennas_active=1
-dept_code=75|operator_name=ORANGE|tech=ALL|supports=2|supports_active=2|stations=2|stations_active=2|antennas=1|antennas_active=1
+dept_code=75|operator_name=ORANGE|tech=4G|supports=2|supports_active=2|stations=2|stations_active=2|antennas=2|antennas_active=2
+dept_code=75|operator_name=ORANGE|tech=5G|supports=1|supports_active=0|stations=1|stations_active=0|antennas=0|antennas_active=0
+dept_code=75|operator_name=ORANGE|tech=ALL|supports=3|supports_active=3|stations=3|stations_active=3|antennas=2|antennas_active=2
 dept_code=971|operator_name=ALL|tech=4G|supports=1|supports_active=1|stations=1|stations_active=1|antennas=1|antennas_active=1
 dept_code=971|operator_name=ALL|tech=ALL|supports=1|supports_active=1|stations=1|stations_active=1|antennas=1|antennas_active=1
 dept_code=971|operator_name=ORANGE|tech=4G|supports=1|supports_active=1|stations=1|stations_active=1|antennas=1|antennas_active=1
 dept_code=971|operator_name=ORANGE|tech=ALL|supports=1|supports_active=1|stations=1|stations_active=1|antennas=1|antennas_active=1
 
-# table localisation (10 lignes)
+# table localisation (12 lignes)
 id_anfr=0000000001|operateur_id=2|latitude=48.85|longitude=2.35|azimuts=120|code_insee=75056|azimuts_fh=<null>|tech_mask=4|band_mask=32|arcep_nidt=NIDT1|is_zb=0
 id_anfr=0000000002|operateur_id=3|latitude=43.6|longitude=1.44|azimuts=240|code_insee=31555|azimuts_fh=<null>|tech_mask=8|band_mask=4096|arcep_nidt=<null>|is_zb=0
 id_anfr=0000000003|operateur_id=4|latitude=48.0|longitude=2.0|azimuts=90,270|code_insee=75056|azimuts_fh=<null>|tech_mask=4|band_mask=544|arcep_nidt=<null>|is_zb=0
@@ -75,6 +78,8 @@ id_anfr=0000000004|operateur_id=5|latitude=47.0|longitude=1.0|azimuts=90|code_in
 id_anfr=0000000005|operateur_id=2|latitude=45.0|longitude=3.0|azimuts=<null>|code_insee=75056|azimuts_fh=45|tech_mask=16|band_mask=16384|arcep_nidt=<null>|is_zb=0
 id_anfr=0000000006|operateur_id=2|latitude=16.24|longitude=-61.53|azimuts=180|code_insee=97105|azimuts_fh=<null>|tech_mask=4|band_mask=32|arcep_nidt=<null>|is_zb=1
 id_anfr=0000000007|operateur_id=3|latitude=44.0|longitude=5.0|azimuts=<null>|code_insee=<null>|azimuts_fh=<null>|tech_mask=8|band_mask=1024|arcep_nidt=<null>|is_zb=0
+id_anfr=0000000008|operateur_id=2|latitude=44.31|longitude=3.1|azimuts=185|code_insee=75056|azimuts_fh=<null>|tech_mask=12|band_mask=32|arcep_nidt=<null>|is_zb=0
+id_anfr=0000000009|operateur_id=5|latitude=45.1|longitude=3.2|azimuts=<null>|code_insee=<null>|azimuts_fh=<null>|tech_mask=8|band_mask=0|arcep_nidt=<null>|is_zb=0
 id_anfr=0292700369|operateur_id=3|latitude=48.245|longitude=-4.48|azimuts=90,330|code_insee=29042|azimuts_fh=<null>|tech_mask=4|band_mask=256|arcep_nidt=<null>|is_zb=0
 id_anfr=0292750303|operateur_id=4|latitude=48.245|longitude=-4.48|azimuts=90,235,330|code_insee=29042|azimuts_fh=<null>|tech_mask=4|band_mask=256|arcep_nidt=<null>|is_zb=0
 id_anfr=ABC123|operateur_id=2|latitude=46.0|longitude=4.0|azimuts=60|code_insee=31555|azimuts_fh=<null>|tech_mask=4|band_mask=128|arcep_nidt=<null>|is_zb=0
@@ -82,7 +87,7 @@ id_anfr=ABC123|operateur_id=2|latitude=46.0|longitude=4.0|azimuts=60|code_insee=
 # table metadata (1 lignes)
 version=20260601_1200|schema_version=7|country_code=FR|country_name=France|source=ANFR|date_maj_anfr=2026-06-01|zip_version=20260601-export-etalab-data.zip
 
-# table radio_stat_current (20 lignes)
+# table radio_stat_current (21 lignes)
 operator_name=BOUYGUES TELECOM|category=band|item_key=4G\|2100|label=4G 2100 MHz|total_count=1|active_count=1
 operator_name=BOUYGUES TELECOM|category=band|item_key=4G\|2600|label=4G 2600 MHz|total_count=1|active_count=1
 operator_name=BOUYGUES TELECOM|category=band|item_key=4G\|800|label=4G 800 MHz|total_count=1|active_count=1
@@ -95,9 +100,10 @@ operator_name=ORANGE_OVERSEAS|category=band|item_key=4G\|800|label=4G 800 MHz|to
 operator_name=ORANGE_OVERSEAS|category=support|item_key=ALL|label=Supports|total_count=1|active_count=1
 operator_name=ORANGE_OVERSEAS|category=tech|item_key=4G|label=4G|total_count=1|active_count=1
 operator_name=ORANGE|category=band|item_key=4G\|1800|label=4G 1800 MHz|total_count=1|active_count=1
-operator_name=ORANGE|category=band|item_key=4G\|800|label=4G 800 MHz|total_count=1|active_count=1
-operator_name=ORANGE|category=support|item_key=ALL|label=Supports|total_count=3|active_count=3
-operator_name=ORANGE|category=tech|item_key=4G|label=4G|total_count=2|active_count=2
+operator_name=ORANGE|category=band|item_key=4G\|800|label=4G 800 MHz|total_count=2|active_count=2
+operator_name=ORANGE|category=support|item_key=ALL|label=Supports|total_count=4|active_count=4
+operator_name=ORANGE|category=tech|item_key=4G|label=4G|total_count=3|active_count=3
+operator_name=ORANGE|category=tech|item_key=5G|label=5G|total_count=1|active_count=0
 operator_name=SFR|category=band|item_key=4G\|2100|label=4G 2100 MHz|total_count=1|active_count=1
 operator_name=SFR|category=band|item_key=5G\|3500|label=5G 3500 MHz|total_count=1|active_count=0
 operator_name=SFR|category=support|item_key=ALL|label=Supports|total_count=2|active_count=1
@@ -133,11 +139,12 @@ id=5|libelle=Free Mobile
 tpo_id=1|libelle=Operateur
 tpo_id=2|libelle=Collectivite
 
-# table ref_statut (4 lignes)
+# table ref_statut (5 lignes)
 id=1|libelle=Inconnu
 id=2|libelle=En service
 id=3|libelle=En projet
 id=4|libelle=Techniquement operationnel
+id=5|libelle=Projet approuve
 
 # table ref_systeme (8 lignes)
 id=1|libelle=Inconnu
@@ -161,18 +168,19 @@ id=42|identity_hash=f92129b45cc37b357c5ecb8e0ba597f0
 source_key=provenance|source_value=local_build
 source_key=quarterly_version|source_value=2026-T2
 
-# table support (9 lignes)
+# table support (10 lignes)
 id_anfr=0000000001|id_support=S1|nat_id=23|tpo_id=1|hauteur=30.0
 id_anfr=0000000002|id_support=S2|nat_id=17|tpo_id=2|hauteur=25.0
 id_anfr=0000000003|id_support=S3|nat_id=23|tpo_id=1|hauteur=25.0
 id_anfr=0000000004|id_support=S4|nat_id=23|tpo_id=1|hauteur=20.0
 id_anfr=0000000005|id_support=S5|nat_id=23|tpo_id=2|hauteur=40.0
 id_anfr=0000000006|id_support=S6|nat_id=23|tpo_id=1|hauteur=15.0
+id_anfr=0000000008|id_support=S8|nat_id=23|tpo_id=1|hauteur=30.0
 id_anfr=0292700369|id_support=497932|nat_id=23|tpo_id=1|hauteur=31.0
 id_anfr=0292750303|id_support=497932|nat_id=23|tpo_id=1|hauteur=31.0
 id_anfr=ABC123|id_support=S9|nat_id=23|tpo_id=1|hauteur=12.0
 
-# table technique (10 lignes)
+# table technique (12 lignes)
 id_anfr=0000000001|adm_id=5|statut_id=2|date_implantation=2020-01-01|date_service=2020-06-01|date_modif=2026-05-01|details_frequences=LTE 800 : 791-801 MHz \| En service \| 2026-01-01 \| Panneau : 120° (28m) [AER_ID: AE1] [DIM: 1,5m]|adresse=Rue des Lilas; angle Avenue A, Bâtiment C, 75001 PARIS|has_active=1
 id_anfr=0000000002|adm_id=6|statut_id=3|date_implantation=<null>|date_service=<null>|date_modif=<null>|details_frequences=5G NR 3500 : 3400-3800 MHz \| En projet \|  \| Panneau 5G : 240° (30m) [AER_ID: AE2]|adresse=Château d'eau, 31000 TOULOUSE|has_active=0
 id_anfr=0000000003|adm_id=7|statut_id=2|date_implantation=2019-01-01|date_service=2019-02-01|date_modif=<null>|details_frequences=Z1:eAHzCXFVMDIzMFCwUjAyNTDQNTI1N1Dw9ajSAYoaAblmlmCuQo2Ca55CcWpRWWZyKpBjZGBkpmtgBERATkBiXl5qYinICHODQxsUNIyMcjUVoh1dg+I9XawUHF1NYrl8gPZYgK0xtzTUtTAwBFmC01RDFFMtIYYaoBpqHAsAltQxPQ==|adresse=PARIS|has_active=1
@@ -180,6 +188,8 @@ id_anfr=0000000004|adm_id=8|statut_id=2|date_implantation=<null>|date_service=<n
 id_anfr=0000000005|adm_id=5|statut_id=2|date_implantation=2018-01-01|date_service=2018-02-01|date_modif=<null>|details_frequences=FH 18 GHz :  \| En service \| 2026-04-01 \| Parabole : 45° (35m) [AER_ID: AE6]|adresse=PARIS|has_active=1
 id_anfr=0000000006|adm_id=5|statut_id=2|date_implantation=2021-01-01|date_service=2021-03-01|date_modif=<null>|details_frequences=LTE 800 : 791-801 MHz \| En service \| 2026-05-01 \| Panneau : 180° (25m) [AER_ID: AE8]|adresse=Morne Rouge, 97100 BASSE-TERRE|has_active=1
 id_anfr=0000000007|adm_id=6|statut_id=4|date_implantation=<null>|date_service=<null>|date_modif=<null>|details_frequences=5G NR 700 : 703-733 MHz \| Techniquement operationnel \| 2026-05-02 \| Azimut non specifie|adresse=<null>|has_active=1
+id_anfr=0000000008|adm_id=5|statut_id=2|date_implantation=2019-01-01|date_service=2019-02-01|date_modif=<null>|details_frequences=5G NR 2100 :  \| Projet approuve \|  \| Azimut non specifie\nLTE 800 : 791-801 MHz \| En service \| 2026-06-03 \| Panneau : 185° (28,7m) [AER_ID: AE11]|adresse=Puech des Aires, 75001 PARIS|has_active=1
+id_anfr=0000000009|adm_id=<null>|statut_id=5|date_implantation=<null>|date_service=<null>|date_modif=<null>|details_frequences=5G NR 3500 :  \| Projet approuve \|  \| Azimut non specifie|adresse=<null>|has_active=0
 id_anfr=0292700369|adm_id=6|statut_id=2|date_implantation=2015-01-01|date_service=2015-02-01|date_modif=<null>|details_frequences=LTE 2100 : 1920-2170 MHz \| En service \| 2022-02-09 \| Panneau : 330° (30,8m) [AER_ID: 1204115]|adresse=CROZON|has_active=1
 id_anfr=0292750303|adm_id=7|statut_id=2|date_implantation=2016-01-01|date_service=2016-02-01|date_modif=<null>|details_frequences=LTE 2100 : 1920-2170 MHz \| En service \| 2022-02-16 \| Panneau : 330° (30,8m) [AER_ID: 1204115]|adresse=CROZON|has_active=1
 id_anfr=ABC123|adm_id=5|statut_id=2|date_implantation=2017-01-01|date_service=2017-02-01|date_modif=<null>|details_frequences=LTE 1800 : 1805-1880 MHz \| En service \| 2026-06-02 \| Panneau : 60° (18m) [AER_ID: AE9]|adresse=TOULOUSE|has_active=1

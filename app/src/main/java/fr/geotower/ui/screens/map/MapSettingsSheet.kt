@@ -38,6 +38,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -51,6 +53,7 @@ import fr.geotower.data.db.RadioDatabaseValidator
 import fr.geotower.utils.AppConfig
 import fr.geotower.utils.OperatorColorSpec
 import fr.geotower.utils.OperatorColors
+import fr.geotower.utils.PowerProfile
 import android.content.SharedPreferences
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.runtime.MutableState
@@ -123,6 +126,7 @@ fun MapFiltersControls(
     // Variables Azimuts
     var showAzimuths by AppConfig.showAzimuths
     var showMapLocationMarker by AppConfig.showMapLocationMarker
+    var smoothMapLocation by AppConfig.smoothMapLocation
     var showRadioTv by AppConfig.showRadioTv
     var showRadioBroadcast by AppConfig.showRadioBroadcast
     var showRadioPrivateMobile by AppConfig.showRadioPrivateMobile
@@ -344,6 +348,20 @@ fun MapFiltersControls(
             ) {
                 showMapLocationMarker = it
                 prefs.edit().putBoolean(AppConfig.PREF_SHOW_MAP_LOCATION_MARKER, it).apply()
+            }
+
+            Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+
+            // Mode faible conso : le déplacement fluide est forcé OFF (redessin à chaque image +
+            // accéléromètre) → on montre le bouton éteint et inactif, sans toucher au réglage.
+            SelectableButton(
+                label = stringResource(R.string.appstrings_map_smooth_location_option),
+                isSelected = smoothMapLocation && !PowerProfile.isEco,
+                modifier = Modifier.fillMaxWidth(),
+                enabled = !PowerProfile.isEco
+            ) {
+                smoothMapLocation = it
+                prefs.edit().putBoolean(AppConfig.PREF_SMOOTH_MAP_LOCATION, it).apply()
             }
 
             if (featureFlags.isFeatureEnabled(RemoteFeatureFlags.Features.SIGNALQUEST_COVERAGE)) {
@@ -617,6 +635,43 @@ fun OperatorFilterGroup(
     }
 }
 
+/**
+ * Contraste minimal exigé entre le liseré « activé » et le fond du panneau. Un trait de 1 dp
+ * n'est pas du texte : inutile de viser les 4,5:1 des règles d'accessibilité, mais en dessous
+ * de ce seuil il disparaît purement et simplement.
+ */
+private const val MIN_ACCENT_CONTRAST = 2.5f
+
+/**
+ * Certaines catégories de la base radio annexe portent une couleur très sombre (bleu nuit,
+ * sarcelle, noir des « autres stations ») : telle quelle, le liseré du bouton activé était
+ * invisible en thème sombre. On éclaircit (ou assombrit) juste ce qu'il faut pour que le trait
+ * se voie, sans perdre le code couleur de la catégorie. Les couleurs déjà contrastées ne
+ * bougent pas.
+ */
+@Composable
+private fun readableAccent(color: Color): Color {
+    val background = MaterialTheme.colorScheme.surface
+
+    fun contrastWithBackground(candidate: Color): Float {
+        val a = candidate.luminance() + 0.05f
+        val b = background.luminance() + 0.05f
+        return if (a > b) a / b else b / a
+    }
+
+    if (contrastWithBackground(color) >= MIN_ACCENT_CONTRAST) return color
+
+    val target = if (background.luminance() < 0.5f) Color.White else Color.Black
+    var adjusted = color
+    var ratio = 0.15f
+    while (ratio <= 0.9f) {
+        adjusted = lerp(color, target, ratio)
+        if (contrastWithBackground(adjusted) >= MIN_ACCENT_CONTRAST) return adjusted
+        ratio += 0.15f
+    }
+    return adjusted
+}
+
 @Composable
 fun SelectableButton(
     label: String,
@@ -625,17 +680,19 @@ fun SelectableButton(
     selectedColor: Color? = null,
     minHeight: Dp = 56.dp,
     maxLines: Int = 3,
+    enabled: Boolean = true,
     onClick: (Boolean) -> Unit
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
-    val activeColor = selectedColor ?: MaterialTheme.colorScheme.primary
+    val activeColor = readableAccent(selectedColor ?: MaterialTheme.colorScheme.primary)
 
     // Le fond reste légèrement teinté, mais le texte ne change plus de couleur
     val containerColor = if (isSelected) activeColor.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceContainerHighest
-    val contentColor = MaterialTheme.colorScheme.onSurface // Couleur fixe pour l'écriture
+    val contentColor = MaterialTheme.colorScheme.onSurface.copy(alpha = if (enabled) 1f else 0.38f)
     val border = if (isSelected) BorderStroke(sizing.component(1.dp), activeColor) else null // Bordure plus fine
 
     Surface(
+        enabled = enabled,
         onClick = { onClick(!isSelected) },
         // ✅ CORRECTION : heightIn(min = 56.dp) permet au bouton de s'agrandir s'il y a 2 lignes
         modifier = modifier.heightIn(min = sizing.component(minHeight)),
@@ -692,17 +749,24 @@ fun FreqRow(label: String, content: @Composable () -> Unit) {
 fun FreqButton(
     label: String,
     isSelected: Boolean,
+    selectedColor: Color? = null,
     onClick: (Boolean) -> Unit
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
-    val containerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer else MaterialTheme.colorScheme.surfaceVariant
-    val contentColor = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+    val activeColor = readableAccent(selectedColor ?: MaterialTheme.colorScheme.primary)
+
+    // Même rendu « activé » que les technologies (SelectableButton) : fond à peine teinté,
+    // liseré de la couleur active et texte de couleur constante.
+    val containerColor = if (isSelected) activeColor.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surfaceContainerHighest
+    val contentColor = MaterialTheme.colorScheme.onSurface
+    val border = if (isSelected) BorderStroke(sizing.component(1.dp), activeColor) else null
 
     Surface(
         onClick = { onClick(!isSelected) },
         shape = RoundedCornerShape(sizing.component(8.dp)),
         color = containerColor,
         contentColor = contentColor,
+        border = border,
         modifier = Modifier.size(width = sizing.component(if (label.length >= 12) 112.dp else 86.dp), height = sizing.component(44.dp))
     ) {
         Box(
@@ -726,12 +790,14 @@ fun FilterToggleButton(
     label: String,
     prefKey: String,
     state: MutableState<Boolean>,
-    prefs: SharedPreferences
+    prefs: SharedPreferences,
+    selectedColor: Color? = null
 ) {
     // On utilise ton design de bouton existant
     FreqButton(
         label = label,
         isSelected = state.value,
+        selectedColor = selectedColor,
         onClick = { newState ->
             state.value = newState
             prefs.edit().putBoolean(prefKey, newState).apply()

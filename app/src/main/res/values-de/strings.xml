@@ -23,7 +23,8 @@
     <string name="settings_sections_home_subtitle">Kategorie auswählen</string>
     <string name="settings_hub_appearance_desc">Design, Farben, Symbol, Größe, Layout</string>
     <string name="settings_hub_mapping_desc">Kartenhintergrund, IGN-Stil, Offline-Karten</string>
-    <string name="settings_hub_preferences_desc">Betreiber, Sprache, Einheiten, Seiten, Links, Teilen</string>
+    <string name="settings_hub_preferences_desc">Betreiber, Sprache, Einheiten, Links, Teilen</string>
+    <string name="settings_hub_pages_desc">Start, Karte, Kompass, Detailseiten, Werkzeuge</string>
     <string name="settings_hub_system_desc">Berechtigungen, Server, Diagnose</string>
     <string name="settings_hub_database_desc">Downloads, lokale Erstellung, lokale Verarbeitung</string>
     <string name="settings_api_server_desc">Hauptserver oder Ersatz-Spiegelserver</string>
@@ -49,6 +50,24 @@
     <string name="settings_units_desc">Entfernung und Geschwindigkeit</string>
     <string name="settings_pages_customization_title">Seiten anpassen</string>
     <string name="settings_pages_customization_desc">Passe die Anzeige der verschiedenen App-Seiten an</string>
+    <string name="settings_pages_group_main">Hauptseiten</string>
+    <string name="settings_pages_group_details">Detailseiten</string>
+    <string name="settings_pages_group_tools">Werkzeuge</string>
+    <string name="settings_pages_group_all">Alle Seiten</string>
+    <string name="settings_page_startup_desc">Seite, mit der die App startet</string>
+    <string name="settings_page_home_desc">Menüreihenfolge, angezeigte Seiten, Hilfe-Schaltfläche</string>
+    <string name="settings_page_nearby_desc">Suchleiste, Vorschläge, Radius</string>
+    <string name="settings_page_map_desc">Position, Azimute, Werkzeugkasten, Standardfilter</string>
+    <string name="settings_page_compass_desc">Blockreihenfolge, Position, GPS, Genauigkeit</string>
+    <string name="settings_page_stats_desc">Blöcke, Anzeigemodus, Frequenzen</string>
+    <string name="settings_page_department_stats_desc">Blöcke der Seite nach Département</string>
+    <string name="settings_page_about_desc">Reihenfolge und Sichtbarkeit der sechs Teile</string>
+    <string name="settings_page_support_desc">Blöcke, Mini-Karte, Fotos</string>
+    <string name="settings_page_site_desc">Blöcke, Frequenzen, Fotos, Speedtests</string>
+    <string name="settings_page_speedtests_desc">Filter, Sortierung, angezeigte Details</string>
+    <string name="settings_page_coverage_desc">Standardwerte der Abdeckungsberechnung</string>
+    <string name="settings_page_elevation_desc">Berücksichtigung von Gelände und Gebäuden</string>
+    <string name="settings_page_throughput_desc">Blöcke des Rechners und Standardwerte</string>
     <string name="settings_community_data_title">Community-Daten</string>
     <string name="settings_community_data_desc">Wähle Betreiber, Quellen und Anzeigereihenfolge für Fotos und Speedtests.</string>
     <string name="settings_external_links_title">Externe Links</string>
@@ -365,6 +384,8 @@
     <string name="appstrings_azimuths_title">Azimute</string>
     <string name="appstrings_back">Zurück</string>
     <string name="appstrings_bands_not_specified">Bänder nicht angegeben</string>
+    <string name="appstrings_bands_announced_not_published">Frequenzbänder und Antenne von der ANFR noch nicht veröffentlicht.</string>
+    <string name="appstrings_bands_announced_not_published_list">Frequenzbänder und Antenne von der ANFR noch nicht veröffentlicht: %1$s</string>
     <string name="appstrings_bandwidth_by_range">Bandbreite pro Frequenzbereich</string>
     <string name="appstrings_bandwidth_title">Bandbreite</string>
     <string name="appstrings_bandwidth_total">Gesamtbandbreite</string>
@@ -469,6 +490,7 @@
     <string name="appstrings_dark_mode_desc">Ideal für soziale Netzwerke (Twitter, Discord)</string>
     <string name="appstrings_database">Datenbank</string>
     <string name="appstrings_date_not_specified_anfr">Aktivierungsdatum von ANFR nicht angegeben</string>
+    <string name="appstrings_date_not_specified_short">Nicht angegeben</string>
     <string name="appstrings_dates">Daten</string>
     <string name="appstrings_db_download_success_desc">Die Datenbank wurde erfolgreich heruntergeladen!</string>
     <string name="appstrings_db_download_termine">Fertig</string>
@@ -694,6 +716,8 @@
     <string name="appstrings_map_sat">Sat</string>
     <string name="appstrings_map_satellite">Satellit</string>
     <string name="appstrings_map_scale_option">Kartenmaßstab</string>
+    <string name="appstrings_map_smooth_location_desc">Die Markierung gleitet zwischen GPS-Punkten, statt zu springen.</string>
+    <string name="appstrings_map_smooth_location_option">Flüssige Bewegung</string>
     <string name="appstrings_map_style">Kartenstil</string>
     <string name="appstrings_map_title">Antennenkarte</string>
     <string name="appstrings_map_toolbox_option">Werkzeugbox</string>
@@ -2311,7 +2335,12 @@
     <string name="appstrings_db_time_generated">Erstellt in %1$s</string>
     <string name="appstrings_db_time_downloaded">Heruntergeladen in %1$s</string>
     <string name="appstrings_local_build_running">Wird erzeugt…</string>
-    <string name="appstrings_local_build_unavailable">Auf diesem Gerät nicht verfügbar (benötigt 6 GB RAM und 1 GB frei).</string>
+    <string name="appstrings_local_build_unavailable">Dieses Gerät kann die ausgewählten Daten nicht erzeugen.</string>
+    <string name="appstrings_local_build_need_memory">App-Speicher: %1$s verfügbar, %2$s erforderlich.</string>
+    <string name="appstrings_local_build_need_storage">Freier Speicher: %1$s verfügbar, %2$s erforderlich.</string>
+    <string name="appstrings_local_build_try_anyway">Trotzdem versuchen</string>
+    <string name="appstrings_local_build_try_anyway_warning">Die Erzeugung kann mangels Speicher oder Platz fehlschlagen. Die aktuelle Datenbank wird nie verändert: Sie riskieren nur Zeit und Daten.</string>
+    <string name="appstrings_local_build_cost">Etwa %1$s freier Speicher während der Erzeugung nötig.</string>
     <string name="appstrings_local_build_phase_resolving">Offizielle Quellen werden gesucht</string>
     <string name="appstrings_local_build_phase_downloading">ANFR-Daten werden heruntergeladen</string>
     <string name="appstrings_local_build_phase_reading">ANFR-Observatorium wird gelesen</string>
@@ -2404,7 +2433,7 @@
     <string name="local_mode_maps_note">Karten, Höhendaten und Adresssuche nutzen weiterhin ihre Online-Dienste.</string>
     <string name="local_mode_db_ineligible">Dieses Gerät kann die Datenbank nicht lokal erstellen (RAM/Speicher): Sie bleibt vom Server heruntergeladen.</string>
     <string name="local_mode_db_ineligible_title">Erstellung auf diesem Gerät nicht möglich</string>
-    <string name="local_mode_db_ineligible_measured">Nötig sind %1$s RAM und %2$s frei. Hier: %3$s RAM, %4$s frei.</string>
+    <string name="local_mode_db_ineligible_measured">Nötig sind %1$s App-Speicher und %2$s frei. Hier: %3$s und %4$s frei.</string>
     <string name="local_mode_max_partial_on_this_device">Auf diesem Gerät ist die maximale Autonomie unvollständig: Fotos, Update-Prüfung, Live-API und die eNB-/gNB-Datenbank werden abgeschaltet, die Hauptdatenbanken (Mobilfunk, Rundfunk) kommen aber weiterhin vom GeoTower-Server — sonst hätte die App überhaupt keine Daten.</string>
     <string name="enb_database_local_mode_unavailable">Maximale Autonomie: Diese Datenbank lässt sich auf dem Gerät nicht erstellen und wird daher weder heruntergeladen noch aktualisiert, solange diese Stufe aktiv ist.</string>
     <string name="local_mode_download_disabled">Lokale Verarbeitung aktiv – Server-Download deaktiviert.</string>
@@ -2568,4 +2597,13 @@
     <string name="appstrings_release_v206_max_autonomy_partial">Die maximale Autonomie nennt jetzt, was sie auf deinem Gerät tatsächlich abschaltet und warum die Hauptdatenbanken weiterhin vom Server kommen können</string>
     <string name="appstrings_release_v206_outage_controls">Einstellungen zu ausgefallenen Standorten neu geordnet: Aktualisierungsintervall und Aktualisierung im Hintergrund</string>
     <string name="appstrings_release_v2012_startup_crash">Ein unerwartetes Beenden der App wurde behoben, sowohl beim Start als auch beim Öffnen der Karte oder eines Standorts</string>
+    <string name="appstrings_release_v2014_smooth_location">Die Positionsmarkierung gleitet jetzt zwischen zwei GPS-Punkten, statt zu springen, und bewegt sich per Schrittzählung weiter, wenn das GPS ausfällt. In den Kartenoptionen abschaltbar</string>
+    <string name="appstrings_release_v2014_announced_bands">Von der ANFR angekündigte Systeme, deren Frequenzbänder noch nicht veröffentlicht sind, werden nun als solche gekennzeichnet, statt leere Tabellen zu hinterlassen</string>
+    <string name="appstrings_release_v2014_azimuth_placeholder">Der interne Hinweis „Azimut nicht angegeben“ erscheint nicht mehr in den Antennendetails</string>
+    <string name="appstrings_release_v2014_pages_section">Die Seitenanpassung ist jetzt ein eigener Einstellungsbereich: eine Schaltfläche pro Seite mit Beschreibung, nach Familien gruppiert</string>
+    <string name="appstrings_release_v2014_pages_search">Die Einstellungssuche findet jetzt jede Seite einzeln (Karte, Kompass, Statistiken usw.)</string>
+    <string name="appstrings_release_v2014_local_build_budgets">Lokale Erzeugung: Die Eignung des Geräts richtet sich jetzt nach gemessenem Bedarf (Speicher und Festplattenplatz je nach gewählten Daten) statt nach einer RAM-Schwelle, die durchaus taugliche Geräte ausschloss</string>
+    <string name="appstrings_release_v2014_local_build_cost">Der benötigte Speicherplatz wird vor dem Start angezeigt, und ein Gerät unterhalb der Schätzung darf es trotzdem versuchen</string>
+    <string name="appstrings_release_v2014_local_build_announced">Die auf dem Gerät erzeugte Datenbank enthält nun ebenfalls die in der wöchentlichen ANFR-Veröffentlichung angekündigten Systeme</string>
+    <string name="appstrings_release_v2014_local_build_speed">Die lokale Erzeugung ist schneller und braucht weniger Speicher</string>
 </resources>

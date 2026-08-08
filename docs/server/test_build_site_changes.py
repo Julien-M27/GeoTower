@@ -397,6 +397,150 @@ def test_aucune_phrase_francaise_dans_le_fichier_carte(workspace):
 # --- Idempotence et garde-fous ---------------------------------------------
 
 
+def test_csv_bruts_deposes_dans_sources_sont_compresses(workspace):
+    """On doit pouvoir copier les publications telles quelles, sans les gzipper."""
+    sources = workspace / "history" / "sources"
+    sources.mkdir(parents=True)
+    write_csv(sources / "20260730120000_observatoireod_20260730.csv", [make_row()])
+    write_csv(
+        sources / "20260806120000_observatoireod_20260806.csv",
+        [make_row(statut="Accord ANFR")],
+    )
+
+    assert run(workspace) == 0
+
+    assert list(sources.glob("*.csv")) == [], "les originaux non compresses sont retires"
+    assert len(list(sources.glob("*.csv.gz"))) == 2
+    files = weeks_files(workspace)
+    assert len(files) == 1
+    header, _ = read_weeks(files[0])
+    assert (header["from"], header["to"]) == ("2026-07-30", "2026-08-06")
+
+
+def _sources_only_publication(workspace: Path, data_date: str, rows):
+    """Publication visible seulement de l'historique, pas du build."""
+    name = f"{data_date}120000_observatoireod_{data_date}.csv"
+    write_csv(workspace / "history" / "sources" / name, rows)
+    return name
+
+
+def test_csv_depose_pour_le_build(workspace):
+    publish(workspace, "20260730", [make_row()])
+    assert run(workspace) == 0
+    name = _sources_only_publication(
+        workspace, "20260806", [make_row(statut="Accord ANFR")]
+    )
+
+    assert run(workspace) == 0
+
+    depose = workspace / "imports" / "france_sources" / name
+    assert depose.is_file(), "le CSV telecharge doit servir aussi au build de base"
+    assert "sta_nm_anfr" in depose.read_text(encoding="utf-8-sig")
+
+
+def test_depot_pour_le_build_desactivable(workspace):
+    publish(workspace, "20260730", [make_row()])
+    assert run(workspace) == 0
+    name = _sources_only_publication(
+        workspace, "20260806", [make_row(statut="Accord ANFR")]
+    )
+
+    assert run(workspace, "--no-publish-imports") == 0
+
+    assert not (workspace / "imports" / "france_sources" / name).is_file()
+
+
+def test_publications_en_attente_dans_sources_ne_sont_pas_supprimees(workspace):
+    """La purge ne doit toucher qu'a ce qui est plus ancien que la paire
+    courante : une publication en attente supprimee serait perdue a jamais."""
+    sources = workspace / "history" / "sources"
+    sources.mkdir(parents=True)
+    for date, rows in (
+        ("20260716", [make_row()]),
+        ("20260723", [make_row(statut="Accord ANFR")]),
+        ("20260730", [make_row(statut="En service")]),
+    ):
+        write_csv(sources / f"{date}120000_observatoireod_{date}.csv", rows)
+
+    assert run(workspace) == 0
+
+    assert [path.name for path in weeks_files(workspace)] == [
+        "2026-07-23.jsonl.gz",
+        "2026-07-30.jsonl.gz",
+    ]
+    conservees = sorted(path.name for path in sources.glob("*.csv.gz"))
+    assert len(conservees) == 2
+    assert conservees[0].startswith("20260723")
+
+
+def test_colonnes_d_export_ignorees(workspace):
+    """id et date_maj changent sur tout le parc a chaque publication : les
+    comparer ferait apparaitre chaque site comme modifie chaque semaine."""
+    publish(workspace, "20260730", [make_row(id="1", date_maj="2026-07-30")])
+    assert run(workspace) == 0
+    publish(workspace, "20260806", [make_row(id="999", date_maj="2026-08-06")])
+    assert run(workspace) == 0
+
+    header, records = read_weeks(weeks_files(workspace)[0])
+    assert records == []
+    assert header["stations_changed"] == 0
+    assert header["rows_updated"] == 0
+    assert header["fields_changed"] == {}
+
+
+def test_vrai_changement_detecte_malgre_les_colonnes_d_export(workspace):
+    publish(
+        workspace,
+        "20260730",
+        [make_row(id="1", date_maj="2026-07-30", statut="Accord ANFR")],
+    )
+    assert run(workspace) == 0
+    publish(
+        workspace,
+        "20260806",
+        [make_row(id="999", date_maj="2026-08-06", statut="En service")],
+    )
+    assert run(workspace) == 0
+
+    header, records = read_weeks(weeks_files(workspace)[0])
+    assert header["fields_changed"] == {"statut": 1}
+    fields = records[0]["chg"][0]["f"]
+    assert set(fields) == {"statut"}
+
+
+def test_plusieurs_publications_traitees_dans_l_ordre(workspace):
+    """Rattrapage : trois publications en attente donnent trois paliers, pas un
+    seul diff bout-a-bout qui ecraserait les etapes intermediaires."""
+    publish(workspace, "20260212", [make_row()])
+    publish(workspace, "20260219", [make_row(statut="Accord ANFR")])
+    publish(
+        workspace,
+        "20260312",
+        [make_row(), make_row(emr_lb_systeme="NR 3500", generation="5G")],
+    )
+
+    assert run(workspace) == 0
+
+    files = weeks_files(workspace)
+    assert [path.name for path in files] == [
+        "2026-02-19.jsonl.gz",
+        "2026-03-12.jsonl.gz",
+    ]
+    premier, _ = read_weeks(files[0])
+    second, _ = read_weeks(files[1])
+    assert (premier["from"], premier["to"]) == ("2026-02-12", "2026-02-19")
+    assert (second["from"], second["to"]) == ("2026-02-19", "2026-03-12")
+    assert premier["gap_days"] == 7
+    assert second["gap_days"] == 21
+    assert second["rows_added"] == 1
+
+    conservees = sorted(
+        path.name for path in (workspace / "history" / "sources").glob("*.csv.gz")
+    )
+    assert len(conservees) == 2
+    assert conservees[0].startswith("20260219")
+
+
 def test_republication_identique_ne_produit_rien(workspace):
     publish(workspace, "20260730", [make_row()])
     assert run(workspace) == 0

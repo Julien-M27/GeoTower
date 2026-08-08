@@ -74,7 +74,7 @@ fun parseAndSortFrequencies(
             }
         }
 
-        if (phys.isNotBlank() && phys != "Azimut non spécifié" && phys != txtAzimuthNotSpecified) {
+        if (phys.isNotBlank() && !isAzimuthPlaceholder(phys, txtAzimuthNotSpecified)) {
             accumulator.physDetails.add(phys)
         }
     }
@@ -89,6 +89,27 @@ fun parseAndSortFrequencies(
         )
     })
 }
+
+/**
+ * Marqueur pose par les builders quand l'ANFR ne rattache pas l'emetteur a une antenne : ce n'est
+ * pas un detail d'antenne, il ne doit jamais s'afficher comme tel.
+ *
+ * GOTCHA : les deux builders l'ecrivent SANS accent (`Azimut non specifie`, cf.
+ * `docs/server/build_fr_anfr_db.py` et `GeoTowerDbBuilder`), alors que seule la forme accentuee
+ * etait filtree ici — la chaine remontait donc jusqu'a la fiche. Les deux formes sont acceptees.
+ */
+private fun isAzimuthPlaceholder(phys: String, localized: String): Boolean {
+    return phys.equals("Azimut non specifie", ignoreCase = true) ||
+        phys.equals("Azimut non spécifié", ignoreCase = true) ||
+        phys == localized
+}
+
+/**
+ * Bande « seulement annoncee » : l'ANFR declare le systeme dans son observatoire hebdomadaire mais
+ * n'a pas encore publie ses bandes ni son antenne dans l'export mensuel (jusqu'a cinq semaines de
+ * decalage entre les deux). Il n'y a donc ni spectre ni azimut a montrer, seulement la techno.
+ */
+fun FreqBand.isAnnouncedOnly(): Boolean = spectrumLines.isEmpty() && physDetails.isEmpty()
 
 internal fun addMicrowaveFallbackBands(
     bands: List<FreqBand>,

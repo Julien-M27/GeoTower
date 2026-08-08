@@ -98,7 +98,7 @@ object GeoTowerDbBuilder {
         onProgress(BuildPhase.READING_STATIONS, 0L)
 
         // 1/ CSV hebdomadaire : construit l'accumulateur station (RAM) + statuts par systeme (disque).
-        val sysInserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_sysstatus VALUES (?, ?, ?, ?)")
+        val sysInserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_sysstatus VALUES (?, ?, ?, ?, ?)")
         var weeklyRows = 0L
         for (row in sources.weekly) {
             if (dateMajAnfr == "Inconnue") {
@@ -120,7 +120,7 @@ object GeoTowerDbBuilder {
                 val statutId = statutIds.getId(row.get("statut"))
                 sysInserter.add(
                     listOf(
-                        idAnfr, sysName.uppercase(), statutIds.getLabel(statutId),
+                        idAnfr, sysName.uppercase(), sysName, statutIds.getLabel(statutId),
                         AnfrParsing.cleanText(row.get("emr_dt")).ifEmpty { null },
                     ),
                 )
@@ -341,11 +341,13 @@ object GeoTowerDbBuilder {
 
         onProgress(BuildPhase.BUILDING_DETAILS, 0L)
         // 10/ details_frequences par station : group_concat en flux (une ligne par station).
+        //     10a d'abord : les systemes annonces par le seul CSV hebdomadaire, que 10b fusionne.
+        applyAnnouncedDetails(db)
         applyDetails(db, onProgress)
 
         // Ces tables de staging ne servent plus a l'emission finale (SUP_EMETTEUR ~120 Mo) :
         // on libere avant d'ecrire les tables definitives.
-        listOf("stg_emetteur", "stg_emr_freqs", "stg_sysstatus", "stg_fh_aer").forEach {
+        listOf("stg_emetteur", "stg_emr_freqs", "stg_sysstatus", "stg_fh_aer", "stg_details_extra").forEach {
             db.execSql("DROP TABLE IF EXISTS ${db.staging(it)}")
         }
 
@@ -499,31 +501,94 @@ object GeoTowerDbBuilder {
      * Sortie identique au sortedSet d'origine, cf. tests `aggregatesMultipleEmittersBandsAndAzimutsPerStation`
      * (tri) et `deduplicatesIdenticalDetailLines` (dedup).
      */
-    private fun applyDetails(db: SqlDatabase, onProgress: (phase: BuildPhase, processed: Long) -> Unit) {
-        val inserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_details VALUES (?, ?)")
+    /**
+     * Requete d'agregation de [applyDetails]. `internal` pour que le test puisse verifier son PLAN
+     * d'execution : c'est lui, et non le resultat, qui porte la propriete critique (aucun tri
+     * temporaire sur ~2,5 M de lignes).
+     *
+     * `stg_details_extra` a AU PLUS une ligne par station : la jointure ne multiplie donc pas les
+     * lignes emetteur, et MAX() sur une valeur constante dans le groupe la restitue telle quelle.
+     */
+    internal fun detailsSql(): String {
         // Miroir SQL de la ligne "$systeme : $freqs | $statut | $date | $phys" ; aucun operande NULL
         // (systeme force a 'Inconnu' au parse, le reste en COALESCE) donc `||` ne produit jamais NULL.
         val line = "e.systeme || ' : ' || COALESCE(f.freqs_text, '') || ' | ' || " +
             "COALESCE(s.statut, sf.statut_label, 'Inconnu') || ' | ' || " +
             "COALESCE(s.emr_dt, '') || ' | ' || COALESCE(ap.physique, 'Azimut non specifie')"
+        return "SELECT e.id_anfr AS id_anfr, group_concat($line, char(10)) AS details, " +
+            "MAX(x.details) AS annonces " +
+            "FROM stg_emetteur e " +
+            "LEFT JOIN stg_emr_freqs f ON e.emr_id = f.emr_id " +
+            "LEFT JOIN stg_antenne ap ON e.aer_id = ap.aer_id " +
+            "LEFT JOIN stg_sysstatus s ON e.id_anfr = s.id_anfr AND s.systeme_upper = UPPER(e.systeme) " +
+            "LEFT JOIN stg_details_extra x ON e.id_anfr = x.id_anfr " +
+            "JOIN stg_station_final sf ON e.id_anfr = sf.id_anfr " +
+            "GROUP BY e.id_anfr"
+    }
+
+    /** Requete d'agregation de [applyAnnouncedDetails], exposee pour la meme raison. */
+    internal fun announcedDetailsSql(): String {
+        val line = "s.systeme || ' :  | ' || COALESCE(s.statut, 'Inconnu') || ' | ' || " +
+            "COALESCE(s.emr_dt, '') || ' | Azimut non specifie'"
+        return "SELECT s.id_anfr AS id_anfr, group_concat($line, char(10)) AS details " +
+            "FROM stg_sysstatus s " +
+            "WHERE NOT EXISTS (SELECT 1 FROM stg_emetteur e " +
+            "WHERE e.id_anfr = s.id_anfr AND UPPER(e.systeme) = s.systeme_upper) " +
+            "GROUP BY s.id_anfr"
+    }
+
+    private fun applyDetails(db: SqlDatabase, onProgress: (phase: BuildPhase, processed: Long) -> Unit) {
+        val inserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_details VALUES (?, ?)")
         var emitted = 0L
-        db.query(
-            "SELECT e.id_anfr AS id_anfr, group_concat($line, char(10)) AS details " +
-                "FROM stg_emetteur e " +
-                "LEFT JOIN stg_emr_freqs f ON e.emr_id = f.emr_id " +
-                "LEFT JOIN stg_antenne ap ON e.aer_id = ap.aer_id " +
-                "LEFT JOIN stg_sysstatus s ON e.id_anfr = s.id_anfr AND s.systeme_upper = UPPER(e.systeme) " +
-                "JOIN stg_station_final sf ON e.id_anfr = sf.id_anfr " +
-                "GROUP BY e.id_anfr",
-        ) { row ->
+        db.query(detailsSql()) { row ->
             val id = row.getString("id_anfr")
             val details = row.getString("details")
             if (id != null && details != null) {
-                // Reproduit le sortedSet d'origine : dedup + tri alphabetique des lignes de la station.
-                val sorted = details.split('\n').toSortedSet().joinToString("\n")
-                FrequencyDetailsEncoder.encode(sorted)?.let { inserter.add(listOf(id, it)) }
+                encodeDetails(details, row.getString("annonces"))?.let { inserter.add(listOf(id, it)) }
                 if (++emitted % EMIT_EVERY == 0L) onProgress(BuildPhase.BUILDING_DETAILS, emitted)
             }
+        }
+        // Stations que le CSV hebdomadaire connait alors que le ZIP mensuel n'a AUCUN emetteur pour
+        // elles (site tout juste declare) : la requete ci-dessus, pilotee par stg_emetteur, les ignore.
+        db.query(
+            "SELECT x.id_anfr AS id_anfr, x.details AS annonces FROM stg_details_extra x " +
+                "WHERE NOT EXISTS (SELECT 1 FROM stg_emetteur e WHERE e.id_anfr = x.id_anfr)",
+        ) { row ->
+            val id = row.getString("id_anfr")
+            if (id != null) {
+                encodeDetails(null, row.getString("annonces"))?.let { inserter.add(listOf(id, it)) }
+            }
+        }
+        inserter.flush()
+    }
+
+    /**
+     * Lignes des emetteurs du ZIP et lignes annoncees par le CSV, fusionnees comme le `set()` unique
+     * du builder serveur : dedup + tri alphabetique sur l'ensemble des lignes de la station.
+     */
+    private fun encodeDetails(details: String?, annonces: String?): String? {
+        val all = listOfNotNull(details, annonces).joinToString("\n").ifEmpty { return null }
+        return FrequencyDetailsEncoder.encode(all.split('\n').toSortedSet().joinToString("\n"))
+    }
+
+    /**
+     * Systemes connus du CSV hebdomadaire mais absents du ZIP mensuel -> une ligne de detail sans
+     * bandes ni azimut, l'observatoire ne les portant pas.
+     *
+     * POURQUOI : le ZIP mensuel a jusqu'a cinq semaines de retard sur l'observatoire. Un systeme
+     * declare entre les deux publications allume deja `tech_mask` (donc le bandeau « 5G - 4G » de la
+     * fiche) sans avoir la moindre ligne dans le tableau des emetteurs. Port de la seconde boucle de
+     * `build_frequency_details_for_station` (docs/server/build_fr_anfr_db.py).
+     *
+     * Le GROUP BY se fait EN FLUX sur l'index automatique de la cle primaire (id_anfr en tete), donc
+     * sans tri temporaire — meme exigence que [applyDetails], verifiee par `GeoTowerDbBuilderTest`.
+     */
+    private fun applyAnnouncedDetails(db: SqlDatabase) {
+        val inserter = BatchInserter(db, "INSERT OR REPLACE INTO stg_details_extra VALUES (?, ?)")
+        db.query(announcedDetailsSql()) { row ->
+            val id = row.getString("id_anfr")
+            val details = row.getString("details")
+            if (id != null && details != null) inserter.add(listOf(id, details))
         }
         inserter.flush()
     }
@@ -544,7 +609,7 @@ object GeoTowerDbBuilder {
 
     private val STAGING_TABLES = listOf(
         "stg_bande", "stg_emr_freqs", "stg_emetteur", "stg_fh_aer", "stg_antenne", "stg_antenne_sta",
-        "stg_support", "stg_sysstatus", "stg_station_final", "stg_arcep", "stg_details",
+        "stg_support", "stg_sysstatus", "stg_station_final", "stg_arcep", "stg_details", "stg_details_extra",
     )
 
     // NOTE perf : les index SECONDAIRES (ix_stg_*) ne sont PAS crees ici mais APRES le chargement en
@@ -554,7 +619,7 @@ object GeoTowerDbBuilder {
     //
     // `prefix` place ces tables dans la base de staging attachee quand il y en a une
     // (cf. [SqlDatabase.stagingPrefix]) ; vide, elles vivent dans le fichier final comme avant.
-    private fun stagingStatements(prefix: String) = listOf(
+    internal fun stagingStatements(prefix: String) = listOf(
         "CREATE TABLE ${prefix}stg_bande (emr_id TEXT, f_deb REAL, f_fin REAL, unite TEXT, f_deb_raw TEXT, f_fin_raw TEXT)",
         "CREATE TABLE ${prefix}stg_emr_freqs (emr_id TEXT PRIMARY KEY, freqs_text TEXT)",
         "CREATE TABLE ${prefix}stg_emetteur (id_anfr TEXT, emr_id TEXT, aer_id TEXT, systeme TEXT)",
@@ -563,7 +628,10 @@ object GeoTowerDbBuilder {
         // Sans cle primaire : un aer_id mutualise DOIT y apparaitre une fois par station (cf. build()).
         "CREATE TABLE ${prefix}stg_antenne_sta (id_anfr TEXT, aer_id TEXT, azimut INTEGER, is_fh INTEGER)",
         "CREATE TABLE ${prefix}stg_support (id_anfr TEXT, sup_id TEXT, nat_id INTEGER, tpo_id INTEGER, hauteur REAL, PRIMARY KEY(id_anfr, sup_id))",
-        "CREATE TABLE ${prefix}stg_sysstatus (id_anfr TEXT, systeme_upper TEXT, statut TEXT, emr_dt TEXT, PRIMARY KEY(id_anfr, systeme_upper))",
+        // `systeme` garde le libelle d'ORIGINE a cote de la cle majuscule : c'est lui qui est ecrit
+        // dans les details quand le ZIP mensuel ne connait pas encore ce systeme (cf. applyAnnouncedDetails).
+        "CREATE TABLE ${prefix}stg_sysstatus (id_anfr TEXT, systeme_upper TEXT, systeme TEXT, statut TEXT, emr_dt TEXT, PRIMARY KEY(id_anfr, systeme_upper))",
+        "CREATE TABLE ${prefix}stg_details_extra (id_anfr TEXT PRIMARY KEY, details TEXT)",
         "CREATE TABLE ${prefix}stg_station_final (id_anfr TEXT PRIMARY KEY, operateur_id INTEGER, operator_label TEXT, latitude REAL, longitude REAL, statut_id INTEGER, statut_label TEXT, adm_id INTEGER, date_imp TEXT, date_ser TEXT, date_mod TEXT, adresse TEXT, code_insee TEXT, tech_mask INTEGER, band_mask INTEGER, has_active INTEGER, azimuts TEXT, azimuts_fh TEXT)",
         "CREATE TABLE ${prefix}stg_arcep (id_anfr TEXT, operator_upper TEXT, nidt TEXT, is_zb INTEGER, PRIMARY KEY(id_anfr, operator_upper))",
         "CREATE TABLE ${prefix}stg_details (id_anfr TEXT PRIMARY KEY, details TEXT)",

@@ -675,21 +675,53 @@ def execute_many_in_batches(cur, sql, rows, batch_size=5000):
     return total
 
 
-def build_frequency_details_for_station(id_anfr, raw_emetteurs, emr_bands, dict_aer_physique):
+def format_frequency_detail_line(systeme, freqs_str, statut, date_info, phys_str):
+    """Ligne unique de `details_frequences`, telle que l'app la reparse (FrequencyDetailsParser).
+
+    Un seul endroit produit ce format : les lignes venant du ZIP mensuel et celles venant du seul
+    CSV hebdomadaire doivent etre indiscernables pour l'app.
+    """
+    return f"{systeme} : {freqs_str} | {statut} | {date_info or ''} | {phys_str}"
+
+
+def build_frequency_details_for_station(id_anfr, raw_emetteurs, emr_bands, dict_aer_physique, station, statut_ids):
+    """Lignes de detail d'une station, issues des DEUX sources ANFR.
+
+    Le ZIP mensuel (SUP_EMETTEUR x SUP_BANDE x SUP_ANTENNE) donne les lignes completes. Mais il a
+    jusqu'a cinq semaines de retard sur le CSV hebdomadaire : un systeme declare entre les deux
+    publications allume deja `tech_mask` (donc le bandeau « 5G - 4G » de la fiche) sans avoir la
+    moindre ligne ici. On complete donc avec les systemes que le CSV connait et que le ZIP ignore
+    encore, sans bandes ni azimut puisque l'observatoire ne les porte pas.
+
+    Retourne (blob compresse, nombre de lignes ajoutees depuis le seul CSV).
+    """
     detail_lines = set()
+    systemes_du_zip = set()
     for emetteur in raw_emetteurs.get(id_anfr, []):
+        systemes_du_zip.add(emetteur["sys"].upper())
         freqs_str = ", ".join(
             format_band_range(f_debut_raw, f_fin_raw, unite)
             for _f_debut, _f_fin, unite, f_debut_raw, f_fin_raw in emr_bands.get(emetteur["emr_id"], [])
         )
         phys_str = dict_aer_physique.get(emetteur["aer_id"], "Azimut non specifie")
         detail_lines.add(
-            f"{emetteur['sys']} : {freqs_str} | "
-            f"{emetteur['statut']} | "
-            f"{emetteur['date_info'] or ''} | "
-            f"{phys_str}"
+            format_frequency_detail_line(
+                emetteur["sys"], freqs_str, emetteur["statut"], emetteur["date_info"], phys_str
+            )
         )
-    return compress_frequency_details("\n".join(sorted(detail_lines)))
+
+    annonces = 0
+    for sys_upper, (statut_id, date_info, sys_label) in station["sys_status_map"].items():
+        if sys_upper in systemes_du_zip:
+            continue
+        annonces += 1
+        detail_lines.add(
+            format_frequency_detail_line(
+                sys_label, "", statut_ids.get_label(statut_id), date_info, "Azimut non specifie"
+            )
+        )
+
+    return compress_frequency_details("\n".join(sorted(detail_lines))), annonces
 
 
 def create_schema(cur):
@@ -809,9 +841,12 @@ def run_build():
 
             sys_name = clean_text(lower.get("emr_lb_systeme"))
             if sys_name:
+                # Le libelle d'ORIGINE est conserve a cote de la cle majuscule : c'est lui qui sera
+                # ecrit dans `details_frequences` si le ZIP mensuel ne connait pas encore ce systeme.
                 vip_stations[id_anfr]["sys_status_map"][sys_name.upper()] = (
                     statut_ids.get_id(lower.get("statut")),
                     clean_text(lower.get("emr_dt")) or None,
+                    sys_name,
                 )
 
     emr_bands = defaultdict(list)
@@ -878,9 +913,9 @@ def run_build():
                 continue
 
             station = vip_stations[id_anfr]
-            status_id, date_info = station["sys_status_map"].get(
+            status_id, date_info, _csv_label = station["sys_status_map"].get(
                 sys_name.upper(),
-                (station["statut_id"], None),
+                (station["statut_id"], None, sys_name),
             )
             systeme_ids.get_id(sys_name)
             raw_emetteurs[id_anfr].append(
@@ -1027,6 +1062,12 @@ def run_build():
             inserted_tech += len(tech_batch)
             tech_batch.clear()
 
+    # Systemes annonces par le CSV hebdomadaire et pas encore presents dans le ZIP mensuel :
+    # compte publie en fin de build. Un chiffre qui explose = les libelles de systeme ont diverge
+    # entre les deux sources et on fabrique des doublons, pas des complements.
+    stations_annoncees = 0
+    lignes_annoncees = 0
+
     for id_anfr, data in vip_stations.items():
         az_list = sorted(anfr_azimuts.get(id_anfr, set()), key=lambda x: int(x) if x.isdigit() else 999)
         fh_az_list = sorted(anfr_azimuts_fh.get(id_anfr, set()), key=lambda x: int(x) if x.isdigit() else 999)
@@ -1045,6 +1086,12 @@ def run_build():
             arcep_metadata.get("arcep_nidt"),
             arcep_metadata.get("is_zb", 0),
         ))
+        details_blob, annonces = build_frequency_details_for_station(
+            id_anfr, raw_emetteurs, emr_bands, dict_aer_physique, data, statut_ids
+        )
+        if annonces:
+            stations_annoncees += 1
+            lignes_annoncees += annonces
         tech_batch.append((
             id_anfr,
             data["adm_id"],
@@ -1052,7 +1099,7 @@ def run_build():
             data["date_imp"],
             data["date_ser"],
             data["date_mod"],
-            build_frequency_details_for_station(id_anfr, raw_emetteurs, emr_bands, dict_aer_physique),
+            details_blob,
             data["adresse"],
             data["has_active"],
         ))
@@ -1060,6 +1107,10 @@ def run_build():
 
     flush_station_batches(force=True)
     print(f"Stations inserees: localisation={inserted_loc}, technique={inserted_tech}")
+    print(
+        f"Systemes annonces par l'observatoire et absents du ZIP mensuel: "
+        f"{lignes_annoncees} lignes sur {stations_annoncees} stations"
+    )
     del arcep_site_metadata, vip_stations, raw_emetteurs, emr_bands, dict_aer_physique, anfr_azimuts, anfr_azimuts_fh
 
     ref_nature_data = sorted((nat_id, dict_nature.get(str(nat_id), f"Code Nature {nat_id}")) for nat_id in used_nat_ids)

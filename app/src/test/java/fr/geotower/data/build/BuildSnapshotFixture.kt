@@ -23,6 +23,9 @@ import java.util.zip.ZipOutputStream
  *    `azimuts_fh` et `antenne.is_fh` ;
  *  - station 6 : outre-mer (INSEE 97xxx) -> suffixe operateur des stats + ARCEP `is_zb` ;
  *  - station 7 : emetteur sans AER et **sans support** -> station sans adresse ni antenne ;
+ *  - station 8 : systeme annonce par l'observatoire et ABSENT du ZIP mensuel -> ligne de detail
+ *    completee sans bandes ni azimut, a cote de l'emetteur publie normalement ;
+ *  - station 9 : connue du seul observatoire, aucun fichier SUP_* -> details entierement annonces ;
  *  - stations 0292700369 / 0292750303 : site MUTUALISE (meme `aer_id` sur deux stations) ;
  *  - station ABC123 : `sta_nm_anfr` **non numerique** -> chemin de repli de toute structure de cle
  *    compacte (le futur remplacement de l'accumulateur `stations` par des primitives) ;
@@ -52,6 +55,9 @@ object BuildSnapshotFixture {
             listOf("5", "45.00 3.00", "Orange", "En service", "", "FH 18 GHz", "2026-04-01", DATE_MAJ_ANFR),
             listOf("6", "16.24 -61.53", "Orange", "En service", "4G", "LTE 800", "2026-05-01", DATE_MAJ_ANFR),
             listOf("7", "44.00 5.00", "SFR", "Techniquement operationnel", "5G", "5G NR 700", "2026-05-02", DATE_MAJ_ANFR),
+            listOf("8", "44.31 3.10", "Orange", "En service", "4G", "LTE 800", "2026-06-03", DATE_MAJ_ANFR),
+            listOf("8", "44.31 3.10", "Orange", "Projet approuve", "5G", "5G NR 2100", "", DATE_MAJ_ANFR),
+            listOf("9", "45.10 3.20", "Free Mobile", "Projet approuve", "5G", "5G NR 3500", "", DATE_MAJ_ANFR),
             listOf("0292700369", "48.245 -4.480", "SFR", "En service", "4G", "LTE 2100", "2022-02-09", DATE_MAJ_ANFR),
             listOf("0292750303", "48.245 -4.480", "Bouygues Telecom", "En service", "4G", "LTE 2100", "2022-02-16", DATE_MAJ_ANFR),
             listOf("ABC123", "46.00 4.00", "Orange", "En service", "4G", "LTE 1800", "2026-06-02", DATE_MAJ_ANFR),
@@ -69,6 +75,7 @@ object BuildSnapshotFixture {
             listOf("5", "5", "2018-01-01", "", "2018-02-01"),
             listOf("6", "5", "2021-01-01", "", "2021-03-01"),
             listOf("7", "6", "", "", ""),
+            listOf("8", "5", "2019-01-01", "", "2019-02-01"),
             listOf("0292700369", "6", "2015-01-01", "", "2015-02-01"),
             listOf("0292750303", "7", "2016-01-01", "", "2016-02-01"),
             listOf("ABC123", "5", "2017-01-01", "", "2017-02-01"),
@@ -91,6 +98,7 @@ object BuildSnapshotFixture {
             listOf("E8", "791", "801", "M"),
             listOf("E9", "1805", "1880", "M"),
             listOf("E10", "703", "733", "M"),
+            listOf("E11", "791", "801", "M"),
             listOf("E20", "174", "230", "M"),
             listOf("E21", "921", "925", "M"),
             listOf("E22", "2700", "2900", "M"),
@@ -107,6 +115,8 @@ object BuildSnapshotFixture {
             listOf("5", "E6", "AE6", "FH 18 GHz"),
             listOf("6", "E8", "AE8", "LTE 800"),
             listOf("7", "E10", "", "5G NR 700"),
+            // Station 8 : le ZIP ne porte QUE la 4G ; la 5G NR 2100 n'existe que dans l'observatoire.
+            listOf("8", "E11", "AE11", "LTE 800"),
             listOf("0292700369", "E7", "1204115", "LTE 2100"),
             listOf("0292750303", "E7", "1204115", "LTE 2100"),
             listOf("ABC123", "E9", "AE9", "LTE 1800"),
@@ -125,6 +135,7 @@ object BuildSnapshotFixture {
             listOf("4", "AE5", "S4", "16", "90", "20", ""),
             listOf("5", "AE6", "S5", "17", "45", "35", ""),
             listOf("6", "AE8", "S6", "16", "180", "25", ""),
+            listOf("8", "AE11", "S8", "16", "185", "28,7", ""),
             listOf("0292700369", "1204115", "497932", "16", "330", "30,8", ""),
             listOf("0292750303", "1204115", "497932", "16", "330", "30,8", ""),
             listOf("0292700369", "1204117", "497932", "16", "90", "30,8", ""),
@@ -149,6 +160,7 @@ object BuildSnapshotFixture {
             support("4", "S4", "23", "1", "20", "29042", "", "", "", "47", "0", "0", "N", "1", "0", "0", "W"),
             support("5", "S5", "23", "2", "40", "75056", "", "", "", "45", "0", "0", "N", "3", "0", "0", "E"),
             support("6", "S6", "23", "1", "15", "97105", "Morne Rouge", "", "97100", "16", "14", "0", "N", "61", "32", "0", "W"),
+            support("8", "S8", "23", "1", "30", "75056", "Puech des Aires", "", "75001", "44", "18", "0", "N", "3", "6", "0", "E"),
             support("0292700369", "497932", "23", "1", "31", "29042", "", "", "", "48", "14", "42", "N", "4", "28", "48", "W"),
             support("0292750303", "497932", "23", "1", "31", "29042", "", "", "", "48", "14", "42", "N", "4", "28", "48", "W"),
             support("ABC123", "S9", "23", "1", "12", "31555", "", "", "", "46", "0", "0", "N", "4", "0", "0", "E"),

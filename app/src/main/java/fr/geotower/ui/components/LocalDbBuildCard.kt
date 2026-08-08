@@ -1,5 +1,6 @@
 package fr.geotower.ui.components
 
+import android.text.format.Formatter
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +30,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -94,12 +96,21 @@ fun LocalDbBuildCard(
     val isDownloading = downloadState == WorkInfo.State.RUNNING || downloadState == WorkInfo.State.ENQUEUED
     val progress = (currentBuild?.progress?.getInt(LocalDbBuildWorker.KEY_PROGRESS, 0) ?: 0) / 100f
 
-    val eligibility = remember { LocalBuildCapability.evaluate(context) }
-
     // Packs a generer : Mobile coche par defaut (cas le plus courant + le plus utile).
     var packMobile by remember { mutableStateOf(true) }
     var packRadioBroadcast by remember { mutableStateOf(false) }
     var packNonMobileTech by remember { mutableStateOf(false) }
+
+    // L'eligibilite depend des packs COCHES : le stockage necessaire va du simple au double entre
+    // « mobile seul » et « tout », alors que la memoire, elle, ne bouge presque pas. Un appareil
+    // trop juste pour tout generer peut donc tres bien generer le pack mobile.
+    val eligibility = remember(packMobile, packRadioBroadcast, packNonMobileTech) {
+        LocalBuildCapability.evaluate(context, packMobile, packRadioBroadcast || packNonMobileTech)
+    }
+    // « Tenter quand meme » : un appareil sous les budgets mesures n'est pas forcement incapable —
+    // ils portent une marge, et un echec ne coute que du temps et des donnees (la base installee
+    // n'est jamais touchee, le build vit dans un fichier a part).
+    var forceBuild by remember { mutableStateOf(false) }
 
     // Provenance des bases installees : distingue « generee sur l'appareil » de « telechargee » et
     // fournit l'horodatage (metadata.version) du dernier build local. Re-lue a la fin de chaque build.
@@ -151,16 +162,6 @@ fun LocalDbBuildCard(
             Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
 
             when {
-                !eligibility.eligible -> {
-                    Text(
-                        text = stringResource(R.string.appstrings_local_build_unavailable),
-                        style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
-                        color = MaterialTheme.colorScheme.error,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-
                 isBuilding -> {
                     LinearWavyProgressIndicator(
                         progress = { progress },
@@ -296,14 +297,78 @@ fun LocalDbBuildCard(
                     val willReplace = (packMobile && mobileInfo.installed) ||
                         ((packRadioBroadcast || packNonMobileTech) && radioInfo.installed)
 
-                    Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
+                    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
+                    if (eligibility.eligible) {
+                        // Cout annonce AVANT de lancer : c'est un budget mesure, pas une estimation.
+                        Text(
+                            text = stringResource(
+                                R.string.appstrings_local_build_cost,
+                                Formatter.formatShortFileSize(context, eligibility.required.storageBytes),
+                            ),
+                            style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        Text(
+                            text = stringResource(R.string.appstrings_local_build_unavailable),
+                            fontWeight = FontWeight.Bold,
+                            style = sizing.textStyle(MaterialTheme.typography.bodyMedium),
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                        // Chiffres explicites : l'utilisateur voit ce qui manque, et qu'un pack de
+                        // moins peut suffire.
+                        if (eligibility.heapLimitBytes < eligibility.required.heapBytes) {
+                            Text(
+                                text = stringResource(
+                                    R.string.appstrings_local_build_need_memory,
+                                    Formatter.formatShortFileSize(context, eligibility.heapLimitBytes),
+                                    Formatter.formatShortFileSize(context, eligibility.required.heapBytes),
+                                ),
+                                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (eligibility.freeStorageBytes < eligibility.required.storageBytes) {
+                            Text(
+                                text = stringResource(
+                                    R.string.appstrings_local_build_need_storage,
+                                    Formatter.formatShortFileSize(context, eligibility.freeStorageBytes),
+                                    Formatter.formatShortFileSize(context, eligibility.required.storageBytes),
+                                ),
+                                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        if (!forceBuild) {
+                            TextButton(onClick = { safeClick("local_build_force") { forceBuild = true } }) {
+                                Text(
+                                    text = stringResource(R.string.appstrings_local_build_try_anyway),
+                                    style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                                )
+                            }
+                        } else {
+                            Text(
+                                text = stringResource(R.string.appstrings_local_build_try_anyway_warning),
+                                style = sizing.textStyle(MaterialTheme.typography.bodySmall),
+                                color = MaterialTheme.colorScheme.error,
+                                modifier = Modifier.padding(top = sizing.spacing(4.dp)),
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(sizing.spacing(12.dp)))
                     Button(
                         onClick = {
                             safeClick("local_build_start") {
-                                LocalDbBuildWorker.enqueue(workManager, packMobile, packRadioBroadcast, packNonMobileTech)
+                                LocalDbBuildWorker.enqueue(
+                                    workManager, packMobile, packRadioBroadcast, packNonMobileTech,
+                                    force = forceBuild,
+                                )
                             }
                         },
-                        enabled = !isDownloading && (packMobile || packRadioBroadcast || packNonMobileTech),
+                        enabled = !isDownloading &&
+                            (packMobile || packRadioBroadcast || packNonMobileTech) &&
+                            (eligibility.eligible || forceBuild),
                         modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = sizing.component(56.dp)),
                         shape = RoundedCornerShape(sizing.component(12.dp)),
                         colors = ButtonDefaults.buttonColors(

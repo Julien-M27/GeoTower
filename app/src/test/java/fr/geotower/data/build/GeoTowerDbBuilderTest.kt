@@ -351,6 +351,155 @@ class GeoTowerDbBuilderTest {
         }
     }
 
+    @Test
+    fun completesDetailsWithTheSystemsMissingFromTheMonthlyZip() {
+        // Cas reel du support 758790 (Severac d'Aveyron), lignes RECOPIEES de observatoireod_20260806 :
+        // l'observatoire du 06/08 annonce LTE 700, LTE 1800 et 5G NR 2100 en « Projet approuvé »
+        // (emr_dt vide), que le ZIP du 30/06 ne porte pas encore. Sans completion, la fiche affichait
+        // « 5G » dans le bandeau et trois emetteurs seulement dans le tableau.
+        //
+        // L'accent de « approuvé » n'est pas cosmetique : `classifyFrequencyStatus` ne reconnait le
+        // statut qu'avec, et `clean_text` / `cleanText` ne touchent pas aux accents.
+        val file = File.createTempFile("geotower_annonces_test", ".db").apply { deleteOnExit() }
+        fun observatoire(systeme: String, generation: String, statut: String, date: String) = row(
+            "sta_nm_anfr" to "0122290040", "coordonnees" to "44.309999999999995 , 3.102222222222222",
+            "adm_lb_nom" to "ORANGE", "statut" to statut, "generation" to generation,
+            "emr_lb_systeme" to systeme, "emr_dt" to date, "date_maj" to "2026-08-06",
+        )
+        fun emetteur(emrId: String, systeme: String) = row(
+            "sta_nm_anfr" to "0122290040", "emr_id" to emrId, "aer_id" to "115577",
+            "emr_lb_systeme" to systeme,
+        )
+        fun bande(emrId: String, debut: String, fin: String) = row(
+            "emr_id" to emrId, "ban_nb_f_deb" to debut, "ban_nb_f_fin" to fin, "ban_fg_unite" to "M",
+        )
+        val sources = AnfrSources(
+            weekly = listOf(
+                observatoire("5G NR 2100", "5G", "Projet approuvé", ""),
+                observatoire("GSM 900", "2G", "En service", "1997-12-15"),
+                observatoire("LTE 1800", "4G", "Projet approuvé", ""),
+                observatoire("LTE 700", "4G", "Projet approuvé", ""),
+                observatoire("LTE 800", "4G", "En service", "2019-03-25"),
+                observatoire("UMTS 900", "3G", "En service", "2018-12-26"),
+            ),
+            stations = listOf(row("sta_nm_anfr" to "0122290040", "adm_id" to "5")),
+            // Le ZIP mensuel du 30/06 ne porte que les trois emetteurs deja en service
+            // (identifiants et bandes releves sur l'antenne 115577).
+            bandes = listOf(
+                bande("118988", "933,9", "937,9"), bande("118988", "897,1", "897,3"),
+                bande("118988", "942,1", "942,3"), bande("118988", "888,9", "892,9"),
+                bande("10700395", "892,9", "897,1"), bande("10700395", "937,9", "942,1"),
+                bande("10700397", "811", "821"), bande("10700397", "852", "862"),
+            ),
+            emetteurs = listOf(
+                emetteur("118988", "GSM 900"),
+                emetteur("10700395", "UMTS 900"),
+                emetteur("10700397", "LTE 800"),
+            ),
+            antennes = listOf(
+                row(
+                    "sta_nm_anfr" to "0122290040", "aer_id" to "115577", "sup_id" to "758790", "tae_id" to "16",
+                    "aer_nb_azimut" to "185", "aer_nb_alt_bas" to "28,7",
+                ),
+            ),
+            supports = listOf(
+                row(
+                    "sta_nm_anfr" to "0122290040", "sup_id" to "758790", "nat_id" to "23", "tpo_id" to "1",
+                    "sup_nm_haut" to "30", "com_cd_insee" to "12254",
+                ),
+            ),
+        )
+        val references = AnfrReferences(
+            nature = mapOf("23" to "Pylone"),
+            typeAntenne = mapOf("16" to "Panneau"),
+            communes = mapOf("12254" to "SEVERAC D AVEYRON"),
+        )
+
+        JdbcSqlDatabase(file.absolutePath).use { db ->
+            GeoTowerDbBuilder.build(db, sources, references, emptyMap(), BuildConfig(version = "20260806_2021"))
+        }
+
+        DriverManager.getConnection("jdbc:sqlite:${file.absolutePath}").use { conn ->
+            // Le bandeau annoncait deja les quatre generations : le tableau des emetteurs les porte
+            // desormais toutes les six, les trois annoncees sans bandes ni azimut.
+            val loc = conn.one("SELECT * FROM localisation WHERE id_anfr = '0122290040'")!!
+            assertEquals(
+                RadioFilterMasks.TECH_2G or RadioFilterMasks.TECH_3G or
+                    RadioFilterMasks.TECH_4G or RadioFilterMasks.TECH_5G,
+                (loc["tech_mask"] as Number).toInt(),
+            )
+            val panneau = "Panneau : 185° (28,7m) [AER_ID: 115577]"
+            val tech = conn.one("SELECT * FROM technique WHERE id_anfr = '0122290040'")!!
+            assertEquals(
+                "5G NR 2100 :  | Projet approuvé |  | Azimut non specifie\n" +
+                    "GSM 900 : 933,9-937,9 MHz, 897,1-897,3 MHz, 942,1-942,3 MHz, 888,9-892,9 MHz " +
+                    "| En service | 1997-12-15 | $panneau\n" +
+                    "LTE 1800 :  | Projet approuvé |  | Azimut non specifie\n" +
+                    "LTE 700 :  | Projet approuvé |  | Azimut non specifie\n" +
+                    "LTE 800 : 811-821 MHz, 852-862 MHz | En service | 2019-03-25 | $panneau\n" +
+                    "UMTS 900 : 892,9-897,1 MHz, 937,9-942,1 MHz | En service | 2018-12-26 | $panneau",
+                FrequencyDetailsCodec.decode(tech["details_frequences"] as String?),
+            )
+        }
+    }
+
+    @Test
+    fun buildsDetailsForAStationTheMonthlyZipIgnoresEntirely() {
+        // Site tout juste declare : l'observatoire le connait, aucun fichier SUP_* ne le porte encore.
+        // Sa fiche restait vide de bout en bout.
+        val file = File.createTempFile("geotower_annonces_seules_test", ".db").apply { deleteOnExit() }
+        val sources = AnfrSources(
+            weekly = listOf(
+                row(
+                    "sta_nm_anfr" to "20", "coordonnees" to "45.00 1.00", "adm_lb_nom" to "Free Mobile",
+                    "statut" to "Projet approuve", "generation" to "5G", "emr_lb_systeme" to "5G NR 3500",
+                    "emr_dt" to "", "date_maj" to "2026-08-06",
+                ),
+                row(
+                    "sta_nm_anfr" to "20", "coordonnees" to "45.00 1.00", "adm_lb_nom" to "Free Mobile",
+                    "statut" to "Projet approuve", "generation" to "4G", "emr_lb_systeme" to "LTE 700",
+                    "emr_dt" to "", "date_maj" to "2026-08-06",
+                ),
+            ),
+            stations = emptyList(),
+            bandes = emptyList(),
+            emetteurs = emptyList(),
+            antennes = emptyList(),
+            supports = emptyList(),
+        )
+
+        JdbcSqlDatabase(file.absolutePath).use { db ->
+            GeoTowerDbBuilder.build(db, sources, AnfrReferences(), emptyMap(), BuildConfig(version = "20260806_2021"))
+        }
+
+        DriverManager.getConnection("jdbc:sqlite:${file.absolutePath}").use { conn ->
+            val tech = conn.one("SELECT * FROM technique WHERE id_anfr = '0000000020'")!!
+            assertEquals(
+                "5G NR 3500 :  | Projet approuve |  | Azimut non specifie\n" +
+                    "LTE 700 :  | Projet approuve |  | Azimut non specifie",
+                FrequencyDetailsCodec.decode(tech["details_frequences"] as String?),
+            )
+        }
+    }
+
+    @Test
+    fun detailQueriesAggregateWithoutATemporarySort() {
+        // La propriete PERF des deux agregations : le GROUP BY se fait EN FLUX sur un index dont
+        // id_anfr est en tete. Un « USE TEMP B-TREE » ici, c'est un tri de ~2,5 M de lignes sur le
+        // telephone. C'est ce qu'il faut re-verifier apres toute retouche de ces requetes.
+        // Le staging est supprime en fin de build : on le recree a vide, seul le PLAN compte ici.
+        val file = File.createTempFile("geotower_plan_test", ".db").apply { deleteOnExit() }
+        JdbcSqlDatabase(file.absolutePath).use { db ->
+            GeoTowerDbBuilder.stagingStatements(db.stagingPrefix).forEach { db.execSql(it) }
+            db.execSql("CREATE INDEX ix_stg_emetteur_id ON stg_emetteur(id_anfr, systeme, emr_id, aer_id)")
+            listOf(GeoTowerDbBuilder.detailsSql(), GeoTowerDbBuilder.announcedDetailsSql()).forEach { sql ->
+                val plan = StringBuilder()
+                db.query("EXPLAIN QUERY PLAN $sql") { row -> plan.append(row.getString("detail")).append('\n') }
+                assertFalse("tri temporaire dans le plan de :\n$sql\n$plan", plan.contains("TEMP B-TREE"))
+            }
+        }
+    }
+
     private fun Connection.one(sql: String): Map<String, Any?>? {
         createStatement().use { statement ->
             statement.executeQuery(sql).use { rs ->

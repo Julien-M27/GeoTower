@@ -48,6 +48,11 @@ object PowerProfile {
     }
     /** Cadence du capteur boussole. */
     val compassSensorDelay: Int get() = if (isEco) SensorManager.SENSOR_DELAY_UI else SensorManager.SENSOR_DELAY_GAME
+    /**
+     * Déplacement continu du repère de position (redessin à chaque image + accéléromètre pour
+     * l'estime piétonne) : coupé dès le niveau Éco, sinon suit le réglage utilisateur.
+     */
+    val smoothLocation: Boolean get() = if (isEco) false else AppConfig.smoothMapLocation.value
 
     // --- Carte -------------------------------------------------------------------
     /** Débounce (ms) du rechargement des antennes au pan/zoom. */

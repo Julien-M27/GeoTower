@@ -227,9 +227,9 @@ private fun LocalBuildIneligibleCard(
                 Text(
                     text = stringResource(
                         R.string.local_mode_db_ineligible_measured,
-                        size(LocalBuildCapability.MIN_TOTAL_RAM_GIB * 1024L * 1024L * 1024L),
-                        size(LocalBuildCapability.MIN_FREE_STORAGE_BYTES),
-                        size(eligibility.totalRamBytes),
+                        size(eligibility.required.heapBytes),
+                        size(eligibility.required.storageBytes),
+                        size(eligibility.heapLimitBytes),
                         size(eligibility.freeStorageBytes),
                     ),
                     style = sizing.textStyle(MaterialTheme.typography.bodySmall),

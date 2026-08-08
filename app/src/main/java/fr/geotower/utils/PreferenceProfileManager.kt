@@ -143,6 +143,8 @@ object PreferenceProfileManager {
         AppConfig.PREF_SELECTED_OPERATORS,
         AppConfig.PREF_UI_MODE,
         AppConfig.PREF_SHOW_MAP_LOCATION_MARKER,
+        // Ne commence pas par « show_ » : sans cette entrée explicite, les profils l'ignoreraient.
+        AppConfig.PREF_SMOOTH_MAP_LOCATION,
         AppConfig.PREF_SHOW_AZIMUTH_LINES,
         AppConfig.PREF_SHOW_AZIMUTH_CONES,
         AppConfig.PREF_SHOW_RADIO_SITES,
@@ -214,6 +216,8 @@ object PreferenceProfileManager {
         "ign_style" to "Cartographie",
         AppConfig.PREF_SHOW_SIGNALQUEST_COVERAGE_POINTS to "Cartographie",
         AppConfig.PREF_SIGNALQUEST_COVERAGE_OPERATOR_KEYS to "Cartographie",
+        // Rangé avec « Point GPS », qui tombe dans « Carte » par son préfixe show_.
+        AppConfig.PREF_SMOOTH_MAP_LOCATION to "Carte",
         "default_operator" to "Préférences",
         "app_language" to "Préférences",
         "distance_unit" to "Préférences",
@@ -253,6 +257,7 @@ object PreferenceProfileManager {
         AppLogoDrawingResources.PREF_KEY to "Logo dans l'app",
         "map_provider" to "Fond de carte",
         "ign_style" to "Style IGN",
+        AppConfig.PREF_SMOOTH_MAP_LOCATION to "Déplacement fluide du repère",
         AppConfig.PREF_SHOW_SIGNALQUEST_COVERAGE_POINTS to "Points de couverture SignalQuest",
         AppConfig.PREF_SIGNALQUEST_COVERAGE_OPERATOR_KEYS to "OpÃ©rateurs couverture SignalQuest",
         "default_operator" to "Opérateur par défaut",

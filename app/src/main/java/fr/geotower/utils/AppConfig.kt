@@ -19,6 +19,8 @@ object AppConfig {
     const val PREF_UI_SCALE_PERCENT = "ui_scale_percent"
     const val PREF_LEGACY_MENU_SIZE = "menuSize"
     const val PREF_SHOW_MAP_LOCATION_MARKER = "show_map_location_marker"
+    const val PREF_SMOOTH_MAP_LOCATION = "map_smooth_location"
+    const val DEFAULT_SMOOTH_MAP_LOCATION = true
     const val PREF_SHOW_AZIMUTH_LINES = "show_azimuths"
     const val PREF_SHOW_AZIMUTH_CONES = "show_azimuths_cone"
     const val PREF_SHOW_RADIO_SITES = "show_radio_sites"
@@ -141,6 +143,9 @@ object AppConfig {
     // précédent) ; false = les autres traits ne bougent pas (comportement par défaut).
     var measureReconnectOnDelete = mutableStateOf(false)
     var showMapLocationMarker = mutableStateOf(true)
+    // Déplacement continu du repère de position entre deux points GPS (interpolation, extrapolation
+    // et estime piétonne). Coupé d'office en mode faible consommation, cf. PowerProfile.
+    var smoothMapLocation = mutableStateOf(DEFAULT_SMOOTH_MAP_LOCATION)
     var showRadioSites = mutableStateOf(false)
     var showRadioTv = mutableStateOf(false)
     var showRadioBroadcast = mutableStateOf(false)
@@ -331,6 +336,7 @@ object AppConfig {
         showAzimuths.value = MapDisplayPrefs.showAzimuthLines.read(prefs)
         showAzimuthsCone.value = MapDisplayPrefs.showAzimuthCones.read(prefs)
         showMapLocationMarker.value = MapDisplayPrefs.showLocationMarker.read(prefs)
+        smoothMapLocation.value = MapDisplayPrefs.smoothLocation.read(prefs)
         val legacyShowRadioSites = MapDisplayPrefs.showRadioSites.read(prefs)
         showRadioTv.value = prefs.getBoolean(PREF_SHOW_RADIO_TV, legacyShowRadioSites)
         showRadioBroadcast.value = prefs.getBoolean(PREF_SHOW_RADIO_BROADCAST, legacyShowRadioSites)

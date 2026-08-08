@@ -24,28 +24,35 @@ internal data class ReleaseNoteItem(
     val text: String
 ) : ReleaseNoteEntry
 
+/**
+ * Nouveautes de la version EN COURS uniquement : la carte s'intitule « Nouveautes de la version X »
+ * (`about_new_for_version`), donc tout ce qui reste ici est presente comme appartenant a X. A chaque
+ * publication, on remplace le contenu plutot que d'y ajouter une couche.
+ */
 @Composable
 internal fun currentReleaseNotes(): ReleaseNotes = releaseNotes {
-    section(stringResource(R.string.appstrings_release_section_global)) {
-        item(stringResource(R.string.appstrings_release_v2012_startup_crash))
-    }
-
     section(stringResource(R.string.appstrings_release_section_map)) {
-        item(stringResource(R.string.appstrings_release_v206_satellite))
+        item(stringResource(R.string.appstrings_release_v2014_smooth_location))
     }
 
-    section(stringResource(R.string.appstrings_release_section_home_onboarding)) {
-        item(stringResource(R.string.appstrings_release_v206_onboarding_display_mode))
-        item(stringResource(R.string.appstrings_release_v206_onboarding_local_mode))
+    section(stringResource(R.string.appstrings_release_section_site_detail)) {
+        item(stringResource(R.string.appstrings_release_v2014_announced_bands))
+        item(stringResource(R.string.appstrings_release_v2014_azimuth_placeholder))
     }
 
     section(stringResource(R.string.appstrings_release_section_settings)) {
-        item(stringResource(R.string.appstrings_release_v206_local_mode_coherence))
-        item(stringResource(R.string.appstrings_release_v206_max_autonomy_partial))
+        item(stringResource(R.string.appstrings_release_v2014_pages_section))
+        item(stringResource(R.string.appstrings_release_v2014_pages_search))
     }
 
-    section(stringResource(R.string.appstrings_release_section_outages)) {
-        item(stringResource(R.string.appstrings_release_v206_outage_controls))
+    section(stringResource(R.string.appstrings_release_section_database)) {
+        item(stringResource(R.string.appstrings_release_v2014_local_build_budgets))
+        item(stringResource(R.string.appstrings_release_v2014_local_build_cost))
+        item(stringResource(R.string.appstrings_release_v2014_local_build_announced))
+    }
+
+    section(stringResource(R.string.appstrings_release_section_performance)) {
+        item(stringResource(R.string.appstrings_release_v2014_local_build_speed))
     }
 }
 

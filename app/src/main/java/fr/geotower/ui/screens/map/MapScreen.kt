@@ -188,9 +188,15 @@ import org.osmdroid.views.overlay.FolderOverlay
 import org.osmdroid.views.overlay.MapEventsOverlay
 import org.osmdroid.views.overlay.Marker
 import org.osmdroid.views.overlay.Polyline
-import org.osmdroid.views.overlay.mylocation.GpsMyLocationProvider
 import org.osmdroid.views.overlay.mylocation.MyLocationNewOverlay
 import androidx.compose.foundation.Canvas as ComposeCanvas
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.graphics.nativeCanvas
+import android.os.SystemClock
+import fr.geotower.utils.location.FusedMyLocationProvider
+import fr.geotower.utils.location.PedestrianDeadReckoning
+import fr.geotower.utils.location.RawFix
+import fr.geotower.utils.location.SmoothLocationEngine
 import org.osmdroid.mapsforge.MapsForgeTileProvider
 import org.osmdroid.mapsforge.MapsForgeTileSource
 import org.mapsforge.map.rendertheme.InternalRenderTheme
@@ -220,6 +226,8 @@ private const val MAP_RELOAD_MIN_VIEWPORT_SHIFT_RATIO = 0.10
 private const val MAP_MARKER_REDRAW_DEBOUNCE_MS = 40L
 private const val MAP_COMPASS_UPDATE_INTERVAL_MS = 80L
 private const val MAP_ACTIVE_FILTER_LIST_LIMIT = 3
+/** Repos de la boucle de rendu fluide quand il n'y a rien à animer (immobile ou sans position). */
+private const val SMOOTH_LOCATION_IDLE_POLL_MS = 50L
 
 private val hsBadgeDrawableCache = android.util.LruCache<Int, BitmapDrawable>(4)
 private val hsMarkerIconCache = android.util.LruCache<String, BitmapDrawable>(500)
@@ -1282,6 +1290,17 @@ fun MapScreen(
 
     var myCurrentLoc by remember { mutableStateOf<GeoPoint?>(null) }
     var currentSpeedKmH by remember { mutableIntStateOf(0) }
+
+    // --- Déplacement continu du repère de position -------------------------------------------
+    // Le GPS ne donne qu'un point par seconde : sans lissage le repère se téléporte. Le moteur
+    // interpole, extrapole sur la vitesse et le cap du dernier relevé, et laisse l'estime piétonne
+    // prendre le relais quand le signal se tait. Coupé d'office en mode faible consommation.
+    val smoothDeadReckoning = remember { PedestrianDeadReckoning() }
+    val smoothEngine = remember { SmoothLocationEngine(smoothDeadReckoning) }
+    // Compteur d'images : le lire depuis la phase de dessin force le repère à se redessiner avec la
+    // projection de l'image courante (cf. la couche fluide, plus bas).
+    var smoothFrameTick by remember { mutableIntStateOf(0) }
+    val smoothLocationEnabled = PowerProfile.smoothLocation && canUseMapLocation
     var isToolboxExpanded by rememberSaveable { mutableStateOf(false) }
     var isTimeSliderVisible by rememberSaveable { mutableStateOf(false) }
     var timeSliderThreshold by rememberSaveable { mutableStateOf<Int?>(null) }
@@ -1548,6 +1567,9 @@ fun MapScreen(
 
                 val smoothedAzimuth = continuousAzimuth[0] + delta * 0.15f
                 continuousAzimuth[0] = smoothedAzimuth
+                // L'estime piétonne oriente chaque pas sur ce cap : on lui donne la valeur lissée
+                // complète, sans passer par l'état d'interface qui, lui, est bridé en cadence.
+                smoothDeadReckoning.setHeading(smoothedAzimuth)
 
                 val now = System.currentTimeMillis()
                 if (abs(smoothedAzimuth - azimuth) > 0.75f &&
@@ -1582,6 +1604,9 @@ fun MapScreen(
                     mapViewRef?.onPause()
                     locationOverlayRef?.disableMyLocation()
                     sensorManager?.unregisterListener(sensorEventListener)
+                    // Sans relevé pendant la mise en veille, l'ancre du lissage devient périmée :
+                    // on repart d'une page blanche plutôt que de faire glisser le repère au retour.
+                    smoothEngine.reset()
                 }
                 else -> {}
             }
@@ -1589,6 +1614,7 @@ fun MapScreen(
         lifecycleOwner.lifecycle.addObserver(observer)
 
         onDispose {
+            smoothEngine.reset()
             restoreOperatorSearchSelection()
             AppConfig.timeSliderActive.value = false
             viewModel.resetCityLock()
@@ -1602,6 +1628,56 @@ fun MapScreen(
             mapViewRef?.onDetach()
             locationOverlayRef = null
             mapViewRef = null
+        }
+    }
+
+    // Accéléromètre : uniquement pour compter les pas quand le GPS décroche (estime piétonne).
+    // Capteur à faible consommation, mais on ne l'allume que si le lissage est réellement actif.
+    DisposableEffect(lifecycleOwner, smoothLocationEnabled) {
+        val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as? SensorManager
+        val accelerometer = if (smoothLocationEnabled) {
+            sensorManager?.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
+        } else {
+            null
+        }
+
+        if (sensorManager == null || accelerometer == null) {
+            smoothDeadReckoning.reset()
+            return@DisposableEffect onDispose { }
+        }
+
+        val stepListener = object : SensorEventListener {
+            override fun onSensorChanged(event: SensorEvent) {
+                // Horloge volontairement identique à celle des relevés GPS : les pas et les points
+                // sont comparés entre eux, la base de temps des capteurs ne l'est pas partout.
+                smoothDeadReckoning.onAccelerometerSample(
+                    SystemClock.elapsedRealtime(),
+                    event.values[0],
+                    event.values[1],
+                    event.values[2]
+                )
+            }
+
+            override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
+        }
+
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME ->
+                    sensorManager.registerListener(stepListener, accelerometer, SensorManager.SENSOR_DELAY_GAME)
+                Lifecycle.Event.ON_PAUSE -> {
+                    sensorManager.unregisterListener(stepListener)
+                    smoothDeadReckoning.reset()
+                }
+                else -> {}
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+            sensorManager.unregisterListener(stepListener)
+            smoothDeadReckoning.reset()
         }
     }
 
@@ -2653,7 +2729,7 @@ fun MapScreen(
 
                     controller.setZoom(prefs.getFloat("last_map_zoom", 6.0f).toDouble())
 
-                    val locationOverlay = object : CustomLocationOverlay(GpsMyLocationProvider(ctx), this, safePrimaryColor) {
+                    val locationOverlay = object : CustomLocationOverlay(FusedMyLocationProvider(ctx), this, safePrimaryColor) {
                         override fun onLocationChanged(location: android.location.Location?, source: org.osmdroid.views.overlay.mylocation.IMyLocationProvider?) {
                             super.onLocationChanged(location, source)
                             if (location != null) {
@@ -2663,6 +2739,18 @@ fun MapScreen(
                                 } else {
                                     currentSpeedKmH = 0
                                 }
+                                smoothEngine.onFix(
+                                    RawFix(
+                                        latitude = location.latitude,
+                                        longitude = location.longitude,
+                                        // Horloge monotone : l'heure système peut sauter en arrière,
+                                        // ce qui ferait diverger l'extrapolation.
+                                        timeMs = location.elapsedRealtimeNanos / 1_000_000L,
+                                        speedMps = if (location.hasSpeed()) location.speed else null,
+                                        bearingDeg = if (location.hasBearing()) location.bearing else null,
+                                        accuracyM = if (location.hasAccuracy()) location.accuracy else null
+                                    )
+                                )
                             }
                         }
                     }
@@ -2773,6 +2861,13 @@ fun MapScreen(
                         overlay.showLocationMarker = showLocationMarker
                         shouldInvalidateMap = true
                     }
+                    // Quand le lissage prend la main, le calque se tait : c'est la couche fluide qui
+                    // peint le repère, et le suivi de position est piloté image par image.
+                    if (overlay.smoothRenderingActive != smoothLocationEnabled) {
+                        overlay.smoothRenderingActive = smoothLocationEnabled
+                        shouldInvalidateMap = true
+                    }
+                    overlay.smoothFollowActive = smoothLocationEnabled && isTrackingActive
                 }
 
                 // 🗺️ LOGIQUE HORS-LIGNE
@@ -2855,6 +2950,87 @@ fun MapScreen(
                 }
             }
         )
+
+        // --- Couche de rendu fluide du repère de position ---------------------------------------
+        // Le repère est peint ICI, au-dessus de la MapView, et non dans un calque osmdroid : un
+        // calque imposerait de réinvalider toute la carte — donc de redessiner les milliers de
+        // marqueurs d'antennes — à chaque image, alors que cette couche ne repeint qu'un rond.
+        if (smoothLocationEnabled) {
+            val markerPainter = remember(safePrimaryColor) {
+                LocationMarkerPainter(context.resources.displayMetrics.density, safePrimaryColor)
+            }
+            val drawPixel = remember { android.graphics.Point() }
+            val drawPoint = remember { GeoPoint(0.0, 0.0) }
+
+            ComposeCanvas(modifier = Modifier.fillMaxSize()) {
+                // Lire le compteur d'images force ce dessin à être rejoué à chaque image, APRÈS
+                // celui de la MapView : la projection obtenue est donc celle de l'image courante, et
+                // le repère reste collé à la carte même pendant une inertie ou un pincement.
+                @Suppress("UNUSED_EXPRESSION")
+                smoothFrameTick
+                if (!showLocationMarker) return@ComposeCanvas
+                val map = mapViewRef ?: return@ComposeCanvas
+                val position = smoothEngine.sample(SystemClock.elapsedRealtime())
+                    ?: return@ComposeCanvas
+
+                drawPoint.setCoords(position.latitude, position.longitude)
+                map.projection.toPixels(drawPoint, drawPixel)
+                markerPainter.draw(
+                    canvas = drawContext.canvas.nativeCanvas,
+                    x = drawPixel.x.toFloat(),
+                    y = drawPixel.y.toFloat(),
+                    rotationDegrees = if (PowerProfile.mapCompassRotation) azimuth else 0f,
+                    showDirection = AppConfig.hasCompass.value
+                )
+            }
+
+            // Boucle d'animation : une passe par image, mais uniquement tant qu'il y a quelque chose
+            // à bouger — à l'arrêt le moteur se déclare au repos et plus rien n'est redessiné.
+            LaunchedEffect(Unit) {
+                val projected = android.graphics.Point()
+                val target = GeoPoint(0.0, 0.0)
+                var lastX = Int.MIN_VALUE
+                var lastY = Int.MIN_VALUE
+
+                while (true) {
+                    val map = mapViewRef
+                    if (map == null || smoothEngine.isIdle(SystemClock.elapsedRealtime())) {
+                        // Rien à animer (immobile, ou pas encore de position) : on relâche la boucle
+                        // plutôt que de réveiller le processeur à chaque image pour ne rien peindre.
+                        // 50 ms de latence au démarrage d'un glissement, soit moins d'un pixel.
+                        delay(SMOOTH_LOCATION_IDLE_POLL_MS)
+                        continue
+                    }
+
+                    withFrameNanos { }
+                    val now = SystemClock.elapsedRealtime()
+                    val position = smoothEngine.sample(now) ?: continue
+
+                    target.setCoords(position.latitude, position.longitude)
+                    map.projection.toPixels(target, projected)
+
+                    if (isTrackingActive) {
+                        // Poursuite : la carte glisse sous un repère qui reste au centre. On ne
+                        // recentre qu'au-delà du pixel, sinon on redessinerait la carte entière
+                        // soixante fois par seconde pour un déplacement invisible.
+                        val centerX = map.width / 2
+                        val centerY = map.height / 2
+                        if (abs(projected.x - centerX) >= 1 || abs(projected.y - centerY) >= 1) {
+                            // Instance neuve à chaque fois : osmdroid GARDE la référence comme
+                            // centre courant, lui passer notre point réutilisable le ferait muter
+                            // dans son dos.
+                            map.controller.setCenter(GeoPoint(position.latitude, position.longitude))
+                        }
+                    }
+
+                    if (projected.x != lastX || projected.y != lastY) {
+                        lastX = projected.x
+                        lastY = projected.y
+                        smoothFrameTick++
+                    }
+                }
+            }
+        }
 
         fun performSearch(query: String) {
             val cleanQuery = query.trim()
@@ -3604,7 +3780,12 @@ fun MapScreen(
                                     isTrackingActive = true
                                     locationOverlay.setEnableAutoStop(false)
                                     locationOverlay.enableMyLocation()
-                                    locationOverlay.enableFollowLocation()
+                                    // En mode fluide, le recentrage est piloté image par image par
+                                    // la couche de rendu : laisser en plus osmdroid animer la carte
+                                    // à chaque relevé ferait tourner deux poursuites concurrentes.
+                                    if (!smoothLocationEnabled) {
+                                        locationOverlay.enableFollowLocation()
+                                    }
                                     (locationOverlay.myLocation ?: myCurrentLoc)?.let { centerOnLocation(it) }
                                 }
                             }
@@ -4469,59 +4650,56 @@ open class CustomLocationOverlay(
     var currentCompassAzimuth = 0f
     var showLocationMarker = true
 
+    /**
+     * true quand la couche fluide peint elle-même le repère au-dessus de la carte : ce calque doit
+     * alors se taire, sinon les deux repères se superposeraient (l'un figé sur le dernier relevé).
+     */
+    var smoothRenderingActive = false
+
+    /**
+     * Poursuite pilotée par la couche fluide. osmdroid bloque le déplacement au doigt tant que son
+     * propre suivi est actif ; comme on ne l'utilise plus dans ce mode, on reproduit ce blocage ici,
+     * sans quoi le geste de l'utilisateur et le recentrage se battraient à chaque image.
+     */
+    var smoothFollowActive = false
+
     // --- On prépare les objets de dessin une seule fois pour éviter les allocations dans draw() ---
     private val pt = android.graphics.Point()
-    private val beamPath = android.graphics.Path()
-    private val arrowHead = android.graphics.Path()
-    private var isPathsInitialized = false
-
-    private val themeFillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { style = android.graphics.Paint.Style.FILL; color = primaryColor }
-    private val themeStrokePaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { style = android.graphics.Paint.Style.STROKE; color = primaryColor; strokeCap = android.graphics.Paint.Cap.ROUND }
-    private val whiteFillPaint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply { style = android.graphics.Paint.Style.FILL; color = android.graphics.Color.WHITE }
+    private val painter = LocationMarkerPainter(
+        mapView.context.resources.displayMetrics.density,
+        primaryColor
+    )
 
     override fun drawMyLocation(
         canvas: android.graphics.Canvas,
         projection: org.osmdroid.views.Projection,
         lastFix: android.location.Location
     ) {
+        if (!showLocationMarker || smoothRenderingActive) return
+
         // On réutilise le point existant !
         projection.toPixels(org.osmdroid.util.GeoPoint(lastFix.latitude, lastFix.longitude), pt)
-        if (!showLocationMarker) return
 
-        val density = mapView.context.resources.displayMetrics.density
-        val radius = 18f * density
-        val stemLength = 35f * density
+        painter.draw(
+            canvas = canvas,
+            x = pt.x.toFloat(),
+            y = pt.y.toFloat(),
+            rotationDegrees = if (PowerProfile.mapCompassRotation) currentCompassAzimuth else 0f,
+            showDirection = AppConfig.hasCompass.value
+        )
+    }
 
-        // On ne calcule la forme des chemins qu'à la première frame
-        if (!isPathsInitialized) {
-            themeStrokePaint.strokeWidth = 5f * density
-
-            arrowHead.apply {
-                val tipY = -(radius + stemLength + 15f)
-                val baseY = -(radius + stemLength - 5f)
-                moveTo(0f, tipY); lineTo(-12f, baseY); lineTo(12f, baseY); close()
-            }
-            isPathsInitialized = true
+    override fun onTouchEvent(
+        event: android.view.MotionEvent,
+        mapView: org.osmdroid.views.MapView
+    ): Boolean {
+        if (smoothFollowActive &&
+            event.action == android.view.MotionEvent.ACTION_MOVE &&
+            event.pointerCount == 1
+        ) {
+            return true // on avale le glissement à un doigt, le pincement reste possible
         }
-
-        canvas.save()
-        canvas.translate(pt.x.toFloat(), pt.y.toFloat())
-        canvas.rotate(if (PowerProfile.mapCompassRotation) currentCompassAzimuth else 0f)
-
-        // ❌ Le cône (beamPath) et l'effet radar (pulsePaint) ont été retirés d'ici
-
-        // ✅ On dessine uniquement le repère central fixe (le rond)
-        canvas.drawCircle(0f, 0f, radius, themeFillPaint)
-        canvas.drawCircle(0f, 0f, radius * 0.65f, whiteFillPaint)
-        canvas.drawCircle(0f, 0f, radius * 0.35f, themeFillPaint)
-
-        // ✅ On garde le trait et la flèche directionnelle si l'option est active
-        if (AppConfig.hasCompass.value) {
-            canvas.drawLine(0f, -radius, 0f, -(radius + stemLength), themeStrokePaint)
-            canvas.drawPath(arrowHead, themeFillPaint)
-        }
-
-        canvas.restore()
+        return super.onTouchEvent(event, mapView)
     }
 }
 

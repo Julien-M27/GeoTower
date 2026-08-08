@@ -298,6 +298,27 @@ suppression du VACUUM. Le rapport de 0,79 est la signature d'un bridage : cette 
 la 40e et la 59e minute d'un build continu. A reverifier sur un appareil froid avant d'en conclure
 quoi que ce soit.
 
+#### Mesure finale — build COMPLET apres correction du comptage, 2026-08-06
+
+| Poste | Reference (avant tout) | Final |
+|---|---|---|
+| Pic tas Java | 187 Mo (73 %) | **112 Mo (43 %)** |
+| Pic stockage simultane | 1350 Mo | **1157 Mo** |
+| Duree totale | 43 min 07 s | **44 min 47 s** |
+| COMPUTING_STATS | 2 min 23 s (199 Mo) | **2 min 32 s (69 Mo)** |
+
+La regression est effacee : le comptage en flux rend la phase des stats a son temps d'origine
+(+9 s) tout en consommant **130 Mo de tas en moins**. `FINALIZING` repasse de 47 s a 0 s — meme
+cause, memes tables temporaires. Le total revient a 44 min 47 s.
+
+Bilan mobile seul : **110 Mo de tas, 828 Mo de stockage, 28 min 44 s**.
+
+Point non tranche : `RADIO_BUILDING` reste au-dessus de sa reference (16 min 45 s contre
+14 min 19 s), alors que le VACUUM a disparu. Mais entre deux runs au code radio **identique** on a
+deja observe 18 min 01 s puis 16 min 45 s, soit 7,5 % d'ecart de pur bruit. Le surcout reel du
+staging attache sur cette phase est donc quelque part entre 0 et 2 min 30, et il faudrait plusieurs
+runs pour le mesurer. Non prioritaire.
+
 #### Ou on en est vis-a-vis de l'objectif
 
 - **4 Go : atteint cote memoire.** 114 Mo sur un plafond de 192 Mo (`memoryClass` typique d'un
@@ -495,7 +516,27 @@ Sur un petit telephone, un build a fond finit throttle : il dure 3x plus longtem
 - le wake lock (`LocalDbBuildWorker.kt:87`) reste necessaire ; son plafond de 4 h
   devra etre revu a la baisse une fois les durees reelles connues.
 
-### S6 — Nouveau modele d'eligibilite (l'objectif final)
+### S6 — Nouveau modele d'eligibilite — **FAIT le 2026-08-07**
+
+`LocalBuildCapability` decide desormais sur les budgets **mesures** :
+
+- critere memoire sur `ActivityManager.getMemoryClass()` (le vrai plafond) et non sur `totalMem` ;
+  112 Mo de pic mesure + 40 % de marge = **157 Mo de tas exiges** ;
+- budget disque **par pack** : 828 Mo (mobile seul) / 1157 Mo (tous packs) + 25 % de marge — le
+  pack radio seul reste une **estimation** (~600 Mo), faute de mesure ;
+- `isLowRamDevice` reste bloquant : imposer 30 a 45 min de service au premier plan a un appareil
+  que le systeme declare contraint n'a pas de sens ;
+- la carte de reglages evalue l'eligibilite **des packs coches** et se met a jour a chaque case :
+  un appareil trop juste pour tout generer voit qu'il peut generer le mobile seul ;
+- cout annonce avant lancement (espace necessaire), et **« Tenter quand meme »** pour les
+  appareils sous les seuils — l'echec est sans danger (fichier temporaire, base active intacte),
+  il ne coute que du temps et des donnees. Le drapeau descend jusqu'au pipeline
+  (`LocalDbBuildWorker.KEY_FORCE`) qui saute alors le refus.
+
+Effet attendu : la generation s'ouvre a tout appareil dont le tas atteint ~160 Mo, ce qui couvre
+l'essentiel du parc 4 Go — la ou l'ancien seuil de 6 Go les excluait tous par principe.
+
+### Redaction d'origine de S6
 
 Remplacer le couple `RAM >= 6 Go` / `1 Go libre` par un budget **par pack**, derive
 des mesures S0 :

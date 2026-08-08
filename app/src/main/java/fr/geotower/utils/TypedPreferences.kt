@@ -59,6 +59,7 @@ object MapDisplayPrefs {
     // (recalcule avec le point d'avant) ou laisser les autres traits inchangés ?
     val measureReconnectOnDelete = BooleanPreference("measure_reconnect_on_delete", false)
     val showLocationMarker = BooleanPreference(AppConfig.PREF_SHOW_MAP_LOCATION_MARKER, true)
+    val smoothLocation = BooleanPreference(AppConfig.PREF_SMOOTH_MAP_LOCATION, AppConfig.DEFAULT_SMOOTH_MAP_LOCATION)
     val showRadioSites = BooleanPreference(AppConfig.PREF_SHOW_RADIO_SITES, false)
     val showAzimuthLines = BooleanPreference(AppConfig.PREF_SHOW_AZIMUTH_LINES, AppConfig.DEFAULT_SHOW_AZIMUTH_LINES)
     val showAzimuthCones = BooleanPreference(AppConfig.PREF_SHOW_AZIMUTH_CONES, AppConfig.DEFAULT_SHOW_AZIMUTH_CONES)

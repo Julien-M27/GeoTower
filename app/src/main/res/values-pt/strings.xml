@@ -23,7 +23,8 @@
     <string name="settings_sections_home_subtitle">Escolha uma categoria</string>
     <string name="settings_hub_appearance_desc">Tema, cores, ícone, tamanho, disposição</string>
     <string name="settings_hub_mapping_desc">Fundo do mapa, estilo IGN, mapas offline</string>
-    <string name="settings_hub_preferences_desc">Operadora, idioma, unidades, páginas, ligações, partilha</string>
+    <string name="settings_hub_preferences_desc">Operadora, idioma, unidades, ligações, partilha</string>
+    <string name="settings_hub_pages_desc">Início, mapa, bússola, fichas, ferramentas</string>
     <string name="settings_hub_system_desc">Permissões, servidor, diagnóstico</string>
     <string name="settings_hub_database_desc">Descargas, geração local, processamento local</string>
     <string name="settings_api_server_desc">Servidor principal ou espelho de reserva</string>
@@ -49,6 +50,24 @@
     <string name="settings_units_desc">Distância e velocidade</string>
     <string name="settings_pages_customization_title">Personalização das páginas</string>
     <string name="settings_pages_customization_desc">Personalize a apresentação das diferentes páginas da aplicação</string>
+    <string name="settings_pages_group_main">Páginas principais</string>
+    <string name="settings_pages_group_details">Fichas</string>
+    <string name="settings_pages_group_tools">Ferramentas</string>
+    <string name="settings_pages_group_all">Todas as páginas</string>
+    <string name="settings_page_startup_desc">Página com que a aplicação abre</string>
+    <string name="settings_page_home_desc">Ordem do menu, páginas mostradas, botão de ajuda</string>
+    <string name="settings_page_nearby_desc">Barra de pesquisa, sugestões, raio</string>
+    <string name="settings_page_map_desc">Posição, azimutes, caixa de ferramentas, filtros predefinidos</string>
+    <string name="settings_page_compass_desc">Ordem dos blocos, posição, GPS, precisão</string>
+    <string name="settings_page_stats_desc">Blocos, modo de apresentação, frequências</string>
+    <string name="settings_page_department_stats_desc">Blocos da página por departamento</string>
+    <string name="settings_page_about_desc">Ordem e visibilidade das suas seis partes</string>
+    <string name="settings_page_support_desc">Blocos, mini-mapa, fotografias</string>
+    <string name="settings_page_site_desc">Blocos, frequências, fotografias, speedtests</string>
+    <string name="settings_page_speedtests_desc">Filtros, ordenação, detalhes mostrados</string>
+    <string name="settings_page_coverage_desc">Valores predefinidos do cálculo de cobertura</string>
+    <string name="settings_page_elevation_desc">Terreno e edifícios tidos em conta</string>
+    <string name="settings_page_throughput_desc">Blocos da calculadora e valores predefinidos</string>
     <string name="settings_community_data_title">Dados comunitários</string>
     <string name="settings_community_data_desc">Escolher operadores, fontes e ordem de apresentação das fotos e speedtests.</string>
     <string name="settings_external_links_title">Links externos</string>
@@ -365,6 +384,8 @@
     <string name="appstrings_azimuths_title">Azimutes</string>
     <string name="appstrings_back">Voltar</string>
     <string name="appstrings_bands_not_specified">Bandas não especificadas</string>
+    <string name="appstrings_bands_announced_not_published">Bandas de frequência e antena ainda não publicadas pela ANFR.</string>
+    <string name="appstrings_bands_announced_not_published_list">Bandas de frequência e antena ainda não publicadas pela ANFR: %1$s</string>
     <string name="appstrings_bandwidth_by_range">Largura de banda por faixa de frequência</string>
     <string name="appstrings_bandwidth_title">Largura de banda</string>
     <string name="appstrings_bandwidth_total">Largura de banda total</string>
@@ -469,6 +490,7 @@
     <string name="appstrings_dark_mode_desc">Ideal para redes sociais (Twitter, Discord)</string>
     <string name="appstrings_database">Base de dados</string>
     <string name="appstrings_date_not_specified_anfr">Data de ativação não especificada pela ANFR</string>
+    <string name="appstrings_date_not_specified_short">Não especificada</string>
     <string name="appstrings_dates">Datas</string>
     <string name="appstrings_db_download_success_desc">A base de données foi transferida com sucesso!</string>
     <string name="appstrings_db_download_termine">Terminar</string>
@@ -694,6 +716,8 @@
     <string name="appstrings_map_sat">Sat</string>
     <string name="appstrings_map_satellite">Satélite</string>
     <string name="appstrings_map_scale_option">Escala do mapa</string>
+    <string name="appstrings_map_smooth_location_desc">O marcador desliza entre os pontos GPS em vez de saltar.</string>
+    <string name="appstrings_map_smooth_location_option">Movimento fluido</string>
     <string name="appstrings_map_style">Estilo do mapa</string>
     <string name="appstrings_map_title">Mapa de Antenas</string>
     <string name="appstrings_map_toolbox_option">Ferramentas</string>
@@ -2311,7 +2335,12 @@
     <string name="appstrings_db_time_generated">Gerado em %1$s</string>
     <string name="appstrings_db_time_downloaded">Transferido em %1$s</string>
     <string name="appstrings_local_build_running">A gerar…</string>
-    <string name="appstrings_local_build_unavailable">Indisponível neste aparelho (requer 6 GB de RAM e 1 GB livre).</string>
+    <string name="appstrings_local_build_unavailable">Este aparelho não consegue gerar os dados selecionados.</string>
+    <string name="appstrings_local_build_need_memory">Memória do app: %1$s disponível, %2$s necessária.</string>
+    <string name="appstrings_local_build_need_storage">Espaço livre: %1$s disponível, %2$s necessário.</string>
+    <string name="appstrings_local_build_try_anyway">Tentar mesmo assim</string>
+    <string name="appstrings_local_build_try_anyway_warning">A geração pode falhar por falta de memória ou espaço. A base atual nunca é modificada: você arrisca apenas tempo e dados.</string>
+    <string name="appstrings_local_build_cost">Cerca de %1$s de espaço livre necessários durante a geração.</string>
     <string name="appstrings_local_build_phase_resolving">A procurar as fontes oficiais</string>
     <string name="appstrings_local_build_phase_downloading">A transferir os dados ANFR</string>
     <string name="appstrings_local_build_phase_reading">A ler o observatório ANFR</string>
@@ -2404,7 +2433,7 @@
     <string name="local_mode_maps_note">Os mapas, a altimetria e a pesquisa de endereços continuam a usar os seus serviços online.</string>
     <string name="local_mode_db_ineligible">Este dispositivo não pode gerar a base de dados localmente (RAM/armazenamento): permanece transferida do servidor.</string>
     <string name="local_mode_db_ineligible_title">Geração fora de alcance neste aparelho</string>
-    <string name="local_mode_db_ineligible_measured">São precisos %1$s de RAM e %2$s livres. Aqui: %3$s de RAM, %4$s livres.</string>
+    <string name="local_mode_db_ineligible_measured">São precisos %1$s de memória do app e %2$s livres. Aqui: %3$s e %4$s livres.</string>
     <string name="local_mode_max_partial_on_this_device">Neste aparelho, a autonomia máxima é parcial: fotos, verificação de atualizações, API em direto e base eNB / gNB são cortadas, mas as bases principais (móvel, rádio) continuam a vir do servidor GeoTower — caso contrário a aplicação ficaria sem dados nenhuns.</string>
     <string name="enb_database_local_mode_unavailable">Autonomia máxima: esta base não pode ser gerada no aparelho, por isso não é transferida nem atualizada enquanto esse nível estiver ativo.</string>
     <string name="local_mode_download_disabled">Processamento local ativo — transferência do servidor desativada.</string>
@@ -2568,4 +2597,13 @@
     <string name="appstrings_release_v206_max_autonomy_partial">A autonomia máxima indica o que desativa realmente no seu dispositivo e porque as bases principais podem continuar a vir do servidor</string>
     <string name="appstrings_release_v206_outage_controls">Definições dos sites em falha reorganizadas: frequência de atualização e atualização em segundo plano</string>
     <string name="appstrings_release_v2012_startup_crash">Corrigido um encerramento inesperado da aplicação, tanto no arranque como ao abrir o mapa ou uma ficha</string>
+    <string name="appstrings_release_v2014_smooth_location">O marcador de posição desliza entre dois pontos GPS em vez de saltar e continua a avançar contando os passos quando o GPS se cala. Pode ser desligado nas opções do mapa</string>
+    <string name="appstrings_release_v2014_announced_bands">Os sistemas anunciados pela ANFR cujas bandas ainda não foram publicadas passam a ser assinalados como tal, em vez de deixarem tabelas vazias</string>
+    <string name="appstrings_release_v2014_azimuth_placeholder">Corrigida a menção interna «Azimute não especificado» que aparecia no detalhe das antenas</string>
+    <string name="appstrings_release_v2014_pages_section">A personalização das páginas passa a ser uma secção própria das definições: um botão por página, com a sua descrição, agrupados por família</string>
+    <string name="appstrings_release_v2014_pages_search">A pesquisa nas definições encontra agora cada página individualmente (mapa, bússola, estatísticas…)</string>
+    <string name="appstrings_release_v2014_local_build_budgets">Geração local: a elegibilidade do dispositivo assenta em necessidades medidas (memória e espaço em disco consoante os dados escolhidos) em vez de um limiar de RAM, que excluía dispositivos perfeitamente capazes</string>
+    <string name="appstrings_release_v2014_local_build_cost">O espaço necessário é indicado antes de começar, e um dispositivo abaixo da estimativa pode ainda assim tentar</string>
+    <string name="appstrings_release_v2014_local_build_announced">A base gerada no dispositivo passa também a incluir os sistemas anunciados pela publicação semanal da ANFR</string>
+    <string name="appstrings_release_v2014_local_build_speed">Geração local mais rápida e menos exigente em memória</string>
 </resources>

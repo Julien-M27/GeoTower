@@ -70,11 +70,12 @@ class LocalDbBuildPipeline(
     suspend fun run(
         context: Context,
         packs: Packs,
+        force: Boolean = false,
         onProgress: (phase: BuildPhase, percent: Int, detail: String?) -> Unit,
     ): Result {
         val metrics = LocalBuildMetrics()
         val device = BuildDeviceProfiles.read(context)
-        val result = runMeasured(context, packs, metrics, onProgress)
+        val result = runMeasured(context, packs, force, metrics, onProgress)
         runCatching {
             LocalBuildReportStore.save(context, metrics.report(device, packs.label, result.success, result.reason))
         }.onFailure { AppLogger.w("GeoTowerDb", "Rapport de mesures non enregistre", it) }
@@ -84,6 +85,7 @@ class LocalDbBuildPipeline(
     private suspend fun runMeasured(
         context: Context,
         packs: Packs,
+        force: Boolean,
         metrics: LocalBuildMetrics,
         onProgress: (phase: BuildPhase, percent: Int, detail: String?) -> Unit,
     ): Result = withContext(Dispatchers.IO) {
@@ -94,8 +96,12 @@ class LocalDbBuildPipeline(
             onProgress(phase, percent, detail)
         }
 
-        val eligibility = LocalBuildCapability.evaluate(context)
-        if (!eligibility.eligible) return@withContext Result(false, eligibility.reason)
+        // Budgets mesures pour LES packs demandes (le stockage en depend fortement, pas le tas).
+        // `force` = l'utilisateur a choisi de tenter malgre un appareil sous les seuils : l'echec
+        // est sans danger (build dans un fichier temporaire, base active jamais touchee), il ne
+        // coute que du temps et de la data.
+        val eligibility = LocalBuildCapability.evaluate(context, packs.mobile, packs.anyRadio)
+        if (!eligibility.eligible && !force) return@withContext Result(false, eligibility.reason)
         if (!packs.mobile && !packs.anyRadio) return@withContext Result(false, "Aucune donnée sélectionnée")
 
         // noBackupFilesDir (pas cacheDir) : le systeme ne le purge pas en cours de build.
@@ -461,7 +467,13 @@ class LocalDbBuildPipeline(
         execSql("PRAGMA $schema.journal_mode = OFF")
         execSql("PRAGMA $schema.synchronous = OFF")
         execSql("PRAGMA $schema.cache_size = -${cacheSizeKib(totalRamBytes)}")
-        execSql("PRAGMA $schema.mmap_size = 268435456")
+        // mmap PLUS LARGE que sur la base finale : c'est ce fichier (~765 Mo) que les deux phases
+        // les plus longues parcourent en acces aleatoire (BUILDING_DETAILS et la classification
+        // radio font chacune ~10 millions de recherches d'index). Au-dela de `mmap_size`, SQLite
+        // repasse par des lectures classiques servies par son seul cache prive ; en le couvrant
+        // entierement, les pages chaudes restent dans le cache du noyau. L'espace d'adressage est
+        // gratuit sur un appareil 64 bits, et la valeur est un plafond, pas une reservation.
+        execSql("PRAGMA $schema.mmap_size = ${STAGING_MMAP_BYTES}")
     }
 
     /** Taille du cache SQLite en Kio : 1/48e de la RAM, borne a [64 Mo, 160 Mo]. */
@@ -514,6 +526,9 @@ class LocalDbBuildPipeline(
     private fun buildVersion(): String = SimpleDateFormat("yyyyMMdd_HHmm", Locale.US).format(Date())
 
     private companion object {
+        /** Plafond de projection memoire de la base de staging : au-dessus de son pic (~765 Mo). */
+        const val STAGING_MMAP_BYTES = 1_073_741_824L
+
         const val MAX_ZIP_ATTEMPTS = 3
         // Garde-fous de taille (bornes larges ; a resserrer apres mesures reelles).
         const val MAX_ZIP_BYTES = 900L * 1024 * 1024

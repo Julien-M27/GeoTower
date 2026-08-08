@@ -36,7 +36,8 @@
     <string name="settings_sections_home_subtitle">Choose a category</string>
     <string name="settings_hub_appearance_desc">Theme, colours, icon, size, layout</string>
     <string name="settings_hub_mapping_desc">Base map, IGN style, offline maps</string>
-    <string name="settings_hub_preferences_desc">Operator, language, units, pages, links, sharing</string>
+    <string name="settings_hub_preferences_desc">Operator, language, units, links, sharing</string>
+    <string name="settings_hub_pages_desc">Home, map, compass, detail pages, tools</string>
     <string name="settings_hub_system_desc">Permissions, server, diagnostics</string>
     <string name="settings_hub_database_desc">Downloads, local build, local processing</string>
     <string name="settings_api_server_desc">Main server or backup mirror</string>
@@ -62,6 +63,24 @@
     <string name="settings_units_desc">Distance and speed</string>
     <string name="settings_pages_customization_title">Pages customization</string>
     <string name="settings_pages_customization_desc">Customize the display of the different pages of the application</string>
+    <string name="settings_pages_group_main">Main pages</string>
+    <string name="settings_pages_group_details">Detail pages</string>
+    <string name="settings_pages_group_tools">Tools</string>
+    <string name="settings_pages_group_all">All pages</string>
+    <string name="settings_page_startup_desc">Page the app opens on</string>
+    <string name="settings_page_home_desc">Menu order, pages shown, help button</string>
+    <string name="settings_page_nearby_desc">Search bar, suggestions, radius</string>
+    <string name="settings_page_map_desc">Position, azimuths, toolbox, default filters</string>
+    <string name="settings_page_compass_desc">Block order, position, GPS, accuracy</string>
+    <string name="settings_page_stats_desc">Blocks, display mode, frequencies</string>
+    <string name="settings_page_department_stats_desc">Blocks of the per-department page</string>
+    <string name="settings_page_about_desc">Order and visibility of its six parts</string>
+    <string name="settings_page_support_desc">Blocks, mini map, photos</string>
+    <string name="settings_page_site_desc">Blocks, frequencies, photos, speedtests</string>
+    <string name="settings_page_speedtests_desc">Filters, sorting, details shown</string>
+    <string name="settings_page_coverage_desc">Defaults for the coverage calculation</string>
+    <string name="settings_page_elevation_desc">Terrain and buildings taken into account</string>
+    <string name="settings_page_throughput_desc">Calculator blocks and calculation defaults</string>
     <string name="settings_community_data_title">Community data</string>
     <string name="settings_community_data_desc">Choose operators, sources, and display order for photos and speedtests.</string>
     <string name="settings_external_links_title">External links</string>
@@ -442,6 +461,8 @@
     <string name="appstrings_azimuths_title">Azimuths</string>
     <string name="appstrings_back">Back</string>
     <string name="appstrings_bands_not_specified">Bands not specified</string>
+    <string name="appstrings_bands_announced_not_published">Frequency bands and antenna not yet published by ANFR.</string>
+    <string name="appstrings_bands_announced_not_published_list">Frequency bands and antenna not yet published by ANFR: %1$s</string>
     <string name="appstrings_bandwidth_by_range">Bandwidth by frequency range</string>
     <string name="appstrings_bandwidth_title">Bandwidth</string>
     <string name="appstrings_bandwidth_total">Total bandwidth</string>
@@ -546,6 +567,7 @@
     <string name="appstrings_dark_mode_desc">Ideal for social media (Twitter, Discord)</string>
     <string name="appstrings_database">Database</string>
     <string name="appstrings_date_not_specified_anfr">Activation date not specified by ANFR</string>
+    <string name="appstrings_date_not_specified_short">Not specified</string>
     <string name="appstrings_dates">Dates</string>
     <string name="appstrings_db_download_success_desc">The database was successfully downloaded!</string>
     <string name="appstrings_db_download_termine">Finish</string>
@@ -774,6 +796,8 @@
     <string name="appstrings_map_sat">Sat</string>
     <string name="appstrings_map_satellite">Satellite</string>
     <string name="appstrings_map_scale_option">Map scale</string>
+    <string name="appstrings_map_smooth_location_desc">The marker glides between GPS points instead of jumping.</string>
+    <string name="appstrings_map_smooth_location_option">Smooth movement</string>
     <string name="appstrings_map_style">Map Style</string>
     <string name="appstrings_map_title">Antenna Map</string>
     <string name="appstrings_map_toolbox_option">Toolbox</string>
@@ -2339,7 +2363,12 @@
     <string name="appstrings_local_build_pack_nonmobile_desc">Microwave links, private networks, rail…</string>
     <string name="appstrings_local_build_packs_hint">The ANFR file (required) is shared. Unchecking \"Mobile\" also skips the ~500 MB observatory download.</string>
     <string name="appstrings_local_build_running">Generating…</string>
-    <string name="appstrings_local_build_unavailable">Not available on this device (needs 6 GB RAM and 1 GB free).</string>
+    <string name="appstrings_local_build_unavailable">This device cannot generate the selected data.</string>
+    <string name="appstrings_local_build_need_memory">App memory: %1$s available, %2$s required.</string>
+    <string name="appstrings_local_build_need_storage">Free space: %1$s available, %2$s required.</string>
+    <string name="appstrings_local_build_try_anyway">Try anyway</string>
+    <string name="appstrings_local_build_try_anyway_warning">Generation may fail for lack of memory or space. The current database is never modified: you only risk time and data.</string>
+    <string name="appstrings_local_build_cost">About %1$s of free space needed during generation.</string>
     <string name="appstrings_local_build_phase_resolving">Finding official sources</string>
     <string name="appstrings_local_build_phase_downloading">Downloading ANFR data</string>
     <string name="appstrings_local_build_phase_reading">Reading the ANFR observatory</string>
@@ -2424,7 +2453,7 @@
     <string name="local_mode_maps_note">Maps, elevation and address search still use their online services.</string>
     <string name="local_mode_db_ineligible">This device can\'t build the database locally (RAM/storage): it stays downloaded from the server.</string>
     <string name="local_mode_db_ineligible_title">Building is out of reach on this device</string>
-    <string name="local_mode_db_ineligible_measured">Requires %1$s of RAM and %2$s free. This device: %3$s of RAM, %4$s free.</string>
+    <string name="local_mode_db_ineligible_measured">Requires %1$s of app memory and %2$s free. This device: %3$s and %4$s free.</string>
     <string name="local_mode_max_partial_on_this_device">On this device, maximum autonomy is partial: photos, update checks, the live API and the eNB / gNB database are cut off, but the main databases (mobile, radio) keep coming from the GeoTower server — otherwise the app would hold no data at all.</string>
     <string name="enb_database_local_mode_unavailable">Maximum autonomy: this database can\'t be built on the device, so it is neither downloaded nor updated as long as that level is active.</string>
     <string name="local_mode_download_disabled">Local processing active — server download disabled.</string>
@@ -2590,4 +2619,13 @@
     <string name="appstrings_release_v206_max_autonomy_partial">Maximum autonomy now states what it actually turns off on your device, and why the main databases may still come from the server</string>
     <string name="appstrings_release_v206_outage_controls">Outage settings reorganised: update frequency and background refresh</string>
     <string name="appstrings_release_v2012_startup_crash">Fixed an unexpected shutdown that could close the app on startup, or when opening the map or a site</string>
+    <string name="appstrings_release_v2014_smooth_location">The location marker now glides between two GPS fixes instead of jumping, and keeps moving by step counting when the GPS goes quiet. Can be turned off in the map options</string>
+    <string name="appstrings_release_v2014_announced_bands">Systems announced by ANFR whose frequency bands are not published yet are now flagged as such, instead of leaving empty tables</string>
+    <string name="appstrings_release_v2014_azimuth_placeholder">Fixed the internal note "Azimuth not specified" showing up in the antenna details</string>
+    <string name="appstrings_release_v2014_pages_section">Page customization is now a settings section of its own: one button per page, with a description, grouped by family</string>
+    <string name="appstrings_release_v2014_pages_search">Settings search now finds each page individually (map, compass, statistics, and so on)</string>
+    <string name="appstrings_release_v2014_local_build_budgets">Local generation: device eligibility is now based on measured needs (memory and disk space for the selected data) instead of a RAM threshold, which was ruling out perfectly capable devices</string>
+    <string name="appstrings_release_v2014_local_build_cost">The disk space required is shown before you start, and a device below the estimate can still give it a try</string>
+    <string name="appstrings_release_v2014_local_build_announced">The locally generated database now also carries the systems announced by the weekly ANFR release</string>
+    <string name="appstrings_release_v2014_local_build_speed">Local generation is faster and uses less memory</string>
 </resources>

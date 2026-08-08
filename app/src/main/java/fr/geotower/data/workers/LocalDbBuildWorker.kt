@@ -96,7 +96,8 @@ class LocalDbBuildWorker(
                 radioBroadcast = inputData.getBoolean(KEY_PACK_RADIO_BROADCAST, true),
                 nonMobileTech = inputData.getBoolean(KEY_PACK_NONMOBILE, true),
             )
-            val result = LocalDbBuildPipeline().run(context, packs) { phase, percent, detail ->
+            val force = inputData.getBoolean(KEY_FORCE, false)
+            val result = LocalDbBuildPipeline().run(context, packs, force) { phase, percent, detail ->
                 phaseOrdinal.set(phase.ordinal)
                 percentValue.set(percent)
                 detailValue.set(detail.orEmpty())
@@ -271,6 +272,9 @@ class LocalDbBuildWorker(
         const val KEY_PACK_RADIO_BROADCAST = "pack_radio_broadcast"
         const val KEY_PACK_NONMOBILE = "pack_nonmobile"
 
+        /** L'utilisateur a demande a generer malgre un appareil sous les budgets mesures. */
+        const val KEY_FORCE = "force"
+
         private const val TAG = "GeoTowerDb"
         private const val PROGRESS_NOTIFICATION_ID = 471_001
         private const val RESULT_NOTIFICATION_ID = 471_002
@@ -279,7 +283,12 @@ class LocalDbBuildWorker(
         /** Plafond de securite du wake lock : tres au-dela d'un build normal, mais borne. */
         private const val WAKE_LOCK_TIMEOUT_MS = 4L * 60L * 60L * 1000L
 
-        fun buildRequest(mobile: Boolean, radioBroadcast: Boolean, nonMobileTech: Boolean) =
+        fun buildRequest(
+            mobile: Boolean,
+            radioBroadcast: Boolean,
+            nonMobileTech: Boolean,
+            force: Boolean = false,
+        ) =
             OneTimeWorkRequestBuilder<LocalDbBuildWorker>()
                 .setConstraints(
                     Constraints.Builder()
@@ -291,6 +300,7 @@ class LocalDbBuildWorker(
                         KEY_PACK_MOBILE to mobile,
                         KEY_PACK_RADIO_BROADCAST to radioBroadcast,
                         KEY_PACK_NONMOBILE to nonMobileTech,
+                        KEY_FORCE to force,
                     ),
                 )
                 .apply {
@@ -305,11 +315,12 @@ class LocalDbBuildWorker(
             mobile: Boolean = true,
             radioBroadcast: Boolean = true,
             nonMobileTech: Boolean = true,
+            force: Boolean = false,
         ) {
             workManager.enqueueUniqueWork(
                 UNIQUE_WORK_NAME,
                 ExistingWorkPolicy.KEEP,
-                buildRequest(mobile, radioBroadcast, nonMobileTech),
+                buildRequest(mobile, radioBroadcast, nonMobileTech, force),
             )
         }
     }

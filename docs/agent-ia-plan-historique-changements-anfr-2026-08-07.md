@@ -136,12 +136,30 @@ Ces colonnes ne sont pas nommees dans le code : elles sont suivies automatiqueme
 comme toutes les autres, mais elles expliquent pourquoi le diff hebdomadaire sera
 nettement plus interessant qu'un simple suivi operateur/techno.
 
-**La colonne `id` n'est pas utilisee comme cle.** Rien ne prouve qu'elle soit
-stable d'une publication a l'autre — les exports Opendatasoft renumerotent souvent
-leurs enregistrements. Elle est donc suivie comme une colonne ordinaire, et le
-premier diff reel tranchera de lui-meme : si `id` bouge sur toutes les lignes, le
-compteur de changements par champ le montrera immediatement. Tant que ce n'est pas
-verifie, la cle reste le triplet.
+### 3.3 Colonnes d'export : `id` et `date_maj` (mesure du 2026-08-07)
+
+Deux paliers reels ont tranche la question, et le resultat est structurant :
+
+| Palier | Lignes "modifiees" | dont `date_maj` | dont `id` |
+|---|---|---|---|
+| 2026-07-02 -> 2026-07-09 | 823 569 / 825 844 | 823 569 (100 %) | 816 585 (99 %) |
+| 2026-07-09 -> 2026-08-06 | 820 096 / 826 369 | 820 096 (100 %) | 817 542 (99 %) |
+
+Autrement dit : l'ANFR **reestampille chaque ligne a chaque publication**.
+`date_maj` n'est pas une date de derniere modification du site, c'est la date de
+l'export ; et `id` est renumerote. La colonne `id` ne peut donc pas servir de cle
+(la cle reste le triplet), et surtout ces deux colonnes doivent etre **exclues de
+la comparaison** — sans quoi :
+
+* les 138 000 stations apparaissent modifiees chaque semaine ;
+* l'archive pese ~9 Mo par semaine de bruit pur ;
+* la timeline par site devient inutilisable (« ce site a change » toutes les semaines) ;
+* la troisieme passe relit les deux fichiers entiers en clair, au lieu de quelques
+  milliers de lignes — 4 minutes par palier au lieu de quelques dizaines de secondes.
+
+D'ou `VOLATILE_COLUMNS = {"id", "date_maj"}` dans le script. Elles restent
+presentes dans les lignes `add` / `del`, qui sont des instantanes complets ; elles
+ne declenchent simplement jamais un changement a elles seules.
 
 ---
 
@@ -160,6 +178,10 @@ Tout vit dans un dossier **frere** de `imports/` et `references/` :
   map/
     2026-08-13.map.json.gz    fichier carte allege
 ```
+
+Un CSV brut copie a la main dans `sources/` est **compresse par le script** au
+passage suivant, puis l'original est supprime : on peut donc y deposer les
+publications telles quelles, sans les gzipper au prealable.
 
 Les sources archivees **gardent leur nom d'origine** : il porte la date des
 donnees, et la renommer en `courant.csv.gz` perdrait la seule information qui
@@ -208,8 +230,25 @@ deja ete rencontre cote client, voir `OfficialSources.dataDateKey`.
    ecriture atomique (fichier temporaire puis `rename`), pour qu'une interruption
    laisse un etat rejouable plutot qu'un etat incoherent.
 
+   La purge se fait **par date** : on supprime ce qui est anterieur a la
+   publication precedente, jamais « tout sauf la paire courante ». Une purge par
+   liste de noms detruit les publications **plus recentes** qui attendent leur
+   tour — bug constate le 2026-08-07, qui a fait perdre deux paliers.
+
 Le script doit etre **idempotent** : relance sur la meme publication = aucun
 nouveau fichier, aucune rotation.
+
+### 5.1 Un palier a la fois
+
+Quand plusieurs publications sont disponibles d'un coup — rattrapage d'anciennes
+copies, cron arrete plusieurs semaines — le script traite la **plus ancienne
+strictement plus recente que la reference**, ecrit son palier, puis recommence.
+Prendre directement la plus recente ferait un seul diff bout-a-bout et perdrait
+definitivement les etapes intermediaires.
+
+Chaque palier est ecrit et `state.json` avance avant de passer au suivant : si un
+palier est refuse par un garde-fou, les precedents sont deja acquis et une
+relance repart exactement la ou elle s'est arretee.
 
 ---
 
@@ -349,16 +388,30 @@ une ancienne publication comme reference.
 
 ---
 
-## 10. Volume : a mesurer, pas a supposer
+## 10. Volume : mesure le 2026-08-07
 
-Personne ne sait aujourd'hui combien de lignes bouge une publication. L'estimation
-conditionne tout le lot suivant (base distribuee, chargement par la carte), et une
-mauvaise estimation ferait dimensionner l'app pour rien.
+Trois paliers reels, sur un parc de ~138 500 stations et ~825 000 lignes :
 
-Prevoir donc `--dry-run` : calcule le diff, affiche le nombre de changements par
-code et la taille estimee des deux fichiers, **n'ecrit rien et ne fait pas
-tourner la paire**. A lancer sur les deux premieres publications reelles avant de
-figer quoi que ce soit cote app.
+| Palier | Duree | Stations changees | Points carte | Archive | Carte |
+|---|---|---|---|---|---|
+| 21 mai -> 9 juil | 49 j | 6 582 | 5 602 | 615 Ko | 156 Ko |
+| 9 juil -> 30 juil | 21 j | 4 304 | 3 945 | 415 Ko | 100 Ko |
+| **30 juil -> 6 aout** | **7 j** | **1 774** | **1 653** | **172 Ko** | **38 Ko** |
+
+Une semaine type coute donc **~170 Ko d'archive et ~38 Ko de carte**. Sur 24 mois :
+de l'ordre de 20 Mo d'archive et 4 Mo de carte.
+
+Consequence pour le lot suivant : **le compromis « evenements importants +
+agregats » est inutile**. La base distribuee peut porter l'integralite des
+changements, detail par colonne compris, sans peser plus qu'une petite mise a
+jour. Le decoupage par departement reste utile pour le confort de chargement,
+pas pour la taille.
+
+Detail de la semaine du 6 aout, pour donner l'echelle du signal : 146 sites
+apparus, 38 disparus, 720 changements de statut, 187 systemes ajoutes, 1 070
+retires (extinction 2G/3G en cours), 10 deplacements de plus de 5 m.
+
+`--dry-run` reste disponible pour rejouer une mesure sans rien ecrire.
 
 ---
 
