@@ -11,6 +11,14 @@
 
     <application>
 
+        <!-- Descripteur Android Auto (projection). Il ne peut PAS vivre dans src/main : Google Play
+             refuse un artefact qui declare a la fois android.hardware.type.automotive et cette
+             metadonnee, les deux formats etant exclusifs. La variante automotive declare de son
+             cote com.android.automotive, sur le meme fichier @xml/automotive_app_desc. -->
+        <meta-data
+            android:name="com.google.android.gms.car.application"
+            android:resource="@xml/automotive_app_desc" />
+
         <activity-alias
             android:name="fr.geotower.MainActivityDefault"
             android:enabled="true"
