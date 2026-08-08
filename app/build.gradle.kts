@@ -20,6 +20,9 @@ val keystoreProperties = Properties().apply {
     }
 }
 
+// Decalage du versionCode de la variante Android Automotive OS (cf. productFlavors).
+val AUTOMOTIVE_VERSION_CODE_OFFSET = 10_000
+
 val defaultManifestPublicKeys =
     "geotower-prod-2026-01:MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAELaFBNviqR+Ja4TUXuLBLafOrhyLk8W34heF1+pm+XHRHJhCoCQHWhWZK1j8aXNxbYFpge62oMuwNIGB6ZHV6yw=="
 
@@ -50,6 +53,30 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    // Telephone et Android Automotive OS ne peuvent pas tenir dans un seul artefact : le format
+    // voiture doit declarer <uses-feature android.hardware.type.automotive> et exposer
+    // CarAppActivity en LAUNCHER, la ou le telephone expose ses alias d'icone. Les deux manifestes
+    // vivent donc dans src/mobile et src/automotive, et src/main garde tout le commun.
+    //
+    // Android Auto (projection) n'est PAS concerne : il reste servi par la variante mobile, via le
+    // CarAppService declare dans src/main.
+    flavorDimensions += "platform"
+    productFlavors {
+        create("mobile") {
+            dimension = "platform"
+            isDefault = true
+        }
+        create("automotive") {
+            dimension = "platform"
+            // androidx.car.app:app-automotive exige API 29 ; le telephone reste a 24.
+            minSdk = 29
+            // Google Play refuse deux artefacts partageant un versionCode. Le decalage garde les
+            // deux series lisibles (mobile 16, automotive 10016) et evite d'avoir a penser a une
+            // seconde numerotation a chaque publication.
+            versionCode = (defaultConfig.versionCode ?: 1) + AUTOMOTIVE_VERSION_CODE_OFFSET
+        }
     }
 
     signingConfigs {
@@ -103,8 +130,12 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.navigation.compose)
+    // Le coeur de la bibliotheque (CarAppService, templates) est partage ; seul l'hote change.
     implementation(libs.androidx.car.app)
-    implementation(libs.androidx.car.app.projected)
+    // Android Auto : l'app est projetee depuis le telephone.
+    "mobileImplementation"(libs.androidx.car.app.projected)
+    // Android Automotive OS : l'app tourne sur la voiture, et fournit CarAppActivity.
+    "automotiveImplementation"(libs.androidx.car.app.automotive)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.preference.ktx)
 

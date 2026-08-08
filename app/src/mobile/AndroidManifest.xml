@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Variante telephone / tablette. Android Auto (projection) est servi par cette variante : l'app
+  tourne sur le telephone et l'hote gearhead vient chercher le CarAppService declare dans src/main.
+
+  Seuls les alias de lanceur vivent ici. Ils portent le choix d'icone de l'utilisateur
+  (AppIconManager bascule leur etat active) et n'ont aucun sens sur un ecran de voiture, ou le
+  lanceur ne doit proposer que l'UI voiture.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+
+        <activity-alias
+            android:name="fr.geotower.MainActivityDefault"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@mipmap/ic_launcher_geotower"
+            android:roundIcon="@mipmap/ic_launcher_geotower_round"
+            android:label="@string/app_name"
+            android:targetActivity="fr.geotower.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="fr.geotower.MainActivityAlt"
+            android:enabled="false"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:icon="@mipmap/ic_launcher_georadio"
+            android:roundIcon="@mipmap/ic_launcher_georadio_round"
+            android:targetActivity="fr.geotower.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+        <activity-alias
+            android:name="fr.geotower.MainActivityAlt2"
+            android:enabled="false"
+            android:exported="true"
+            android:label="@string/app_name"
+            android:icon="@mipmap/ic_launcher_funny"
+            android:roundIcon="@mipmap/ic_launcher_funny_round"
+            android:targetActivity="fr.geotower.MainActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+
+    </application>
+</manifest>

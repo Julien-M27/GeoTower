@@ -3,6 +3,7 @@ package fr.geotower.ui.screens.car
 import android.content.Context
 import android.location.Location
 import androidx.car.app.CarContext
+import androidx.car.app.Screen
 import androidx.car.app.model.Action
 import androidx.car.app.model.MessageTemplate
 import androidx.car.app.model.Template
@@ -47,6 +48,15 @@ internal fun carErrorTemplate(carContext: CarContext, where: String, error: Thro
         .setHeaderAction(Action.APP_ICON)
         .build()
 }
+
+/**
+ * Action d'en-tête d'un écran qui peut se retrouver à la racine comme empilé.
+ *
+ * Un `Action.BACK` posé sur la racine affiche une flèche retour qui ferme l'app — l'hôte n'a rien
+ * derrière où revenir. L'icône de l'app est la convention voiture pour un écran racine.
+ */
+internal fun Screen.carHeaderAction(): Action =
+    if (screenManager.stackSize <= 1) Action.APP_ICON else Action.BACK
 
 internal fun formatCarDistance(distanceMeters: Float): String {
     return if (distanceMeters >= 1000f) {
