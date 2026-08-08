@@ -231,7 +231,7 @@ class CarNearbySitesScreen(
             carContext.requestPermissions(permissions) { granted, _ ->
                 if (granted.isEmpty()) {
                     carLog("Sites proches : localisation refusée")
-                    state = NearbySitesState.Error(carContext.getString(R.string.car_permission_denied))
+                    state = NearbySitesState.MissingLocationPermission
                     invalidate()
                 } else {
                     carLog("Sites proches : localisation accordée")
