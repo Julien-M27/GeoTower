@@ -50,14 +50,27 @@ class OutageLocalConfig(private val prefs: SharedPreferences) {
         }
 
     /**
-     * Mémorise le résultat d'une génération réussie (horodatage, total, répartition par opérateur),
-     * quelle que soit son origine : bouton « Générer maintenant », planification en arrière-plan ou
-     * régénération paresseuse à l'expiration du cache. C'est ce que relit la page « Source des pannes ».
+     * Détail par génération (2G/3G/4G/5G) de la dernière génération réussie, vide si inconnu.
+     * Calculé une fois ici plutôt qu'à l'affichage : la page des réglages ne relit jamais la liste
+     * complète des pannes. Voir [OutageTechBreakdown].
+     */
+    var lastTechBreakdown: List<OutageTechRow>
+        get() = OutageTechBreakdown.decode(prefs.getString(KEY_LAST_TECH_BREAKDOWN, null))
+        set(value) {
+            prefs.edit().putString(KEY_LAST_TECH_BREAKDOWN, OutageTechBreakdown.encode(value)).apply()
+        }
+
+    /**
+     * Mémorise le résultat d'une génération réussie (horodatage, total, répartition par opérateur
+     * puis par génération), quelle que soit son origine : bouton « Générer maintenant »,
+     * planification en arrière-plan ou régénération paresseuse à l'expiration du cache. C'est ce que
+     * relit la page « Source des pannes ».
      */
     fun recordGeneration(atMillis: Long, sites: List<SiteHsEntity>) {
         lastGeneratedAtMillis = atMillis
         lastGeneratedCount = sites.size
         lastBreakdown = breakdownOf(sites)
+        lastTechBreakdown = OutageTechBreakdown.of(sites)
     }
 
     val frequencyMillis: Long get() = frequencyHours.toLong() * 3_600_000L
@@ -97,6 +110,7 @@ class OutageLocalConfig(private val prefs: SharedPreferences) {
         const val KEY_LAST_GENERATED = "outages_local_last_generated_at"
         const val KEY_LAST_COUNT = "outages_local_last_count"
         const val KEY_LAST_BREAKDOWN = "outages_local_last_breakdown"
+        const val KEY_LAST_TECH_BREAKDOWN = "outages_local_last_tech_breakdown"
         const val DEFAULT_FREQUENCY_HOURS = 6
         const val MIN_FREQUENCY_HOURS = 1
         const val MAX_FREQUENCY_HOURS = 24

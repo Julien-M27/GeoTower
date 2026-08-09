@@ -966,6 +966,12 @@ fun NearEmittersScreen(
                                                         shape = RoundedCornerShape(16.dp),
                                                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.primary)
                                                     ) {
+                                                        Icon(
+                                                            Icons.Default.Search,
+                                                            contentDescription = null,
+                                                            modifier = Modifier.size(sizing.component(18.dp))
+                                                        )
+                                                        Spacer(modifier = Modifier.width(sizing.spacing(8.dp)))
                                                         Text(stringResource(R.string.appstrings_load_more_sites), fontWeight = FontWeight.Bold)
                                                     }
                                                 }

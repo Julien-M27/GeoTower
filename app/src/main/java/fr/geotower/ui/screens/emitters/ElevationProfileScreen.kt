@@ -45,6 +45,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.material.icons.filled.Settings
+import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.ui.screens.settings.ElevationProfileSettingsSheet
 import androidx.compose.material3.LoadingIndicator
 import androidx.compose.material3.MaterialTheme
@@ -554,7 +555,8 @@ fun ElevationProfileScreen(
                         fresnelObstructionMeters = fresnelObstruction,
                         frequencyMHz = frequency,
                         cardBgColor = cardBgColor,
-                        blockShape = blockShape
+                        blockShape = blockShape,
+                        stationId = antennaId
                     )
 
                     fr.geotower.ui.components.PageCustomizationFooter(onClick = { showElevationSettings = true })
@@ -808,7 +810,9 @@ private fun ProfileStatsCard(
     fresnelObstructionMeters: Double,
     frequencyMHz: Int,
     cardBgColor: Color,
-    blockShape: RoundedCornerShape
+    blockShape: RoundedCornerShape,
+    /** Station du profil : la copie des coordonnées doit pouvoir rouvrir sa fiche. */
+    stationId: String? = null
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val context = LocalContext.current
@@ -848,6 +852,14 @@ private fun ProfileStatsCard(
                     onCopy = {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         clipboard.setPrimaryClip(ClipData.newPlainText(gpsCopyLabel, gpsValue))
+                        // Ces coordonnées sont le point de départ du calcul, pas celles du site :
+                        // on ne les repose donc pas comme position de l'entrée.
+                        ShareHistoryStore.recordFieldCopy(
+                            context = context,
+                            field = ShareHistoryStore.FIELD_GPS,
+                            value = gpsValue,
+                            stationId = stationId
+                        )
                         Toast.makeText(context, coordsCopied, Toast.LENGTH_SHORT).show()
                     }
                 )

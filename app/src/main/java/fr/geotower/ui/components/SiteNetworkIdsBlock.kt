@@ -30,6 +30,7 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.R
 import fr.geotower.data.EnbRepository
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
@@ -49,7 +50,9 @@ import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 fun SiteNetworkIdsBlock(
     identifiers: EnbRepository.SiteNetworkIds,
     cardBgColor: Color,
-    blockShape: Shape
+    blockShape: Shape,
+    /** Station d'où vient le bloc : sans elle, une copie ne saurait pas quelle fiche rouvrir. */
+    stationId: String? = null
 ) {
     if (identifiers.isEmpty) return
 
@@ -85,7 +88,7 @@ fun SiteNetworkIdsBlock(
                     prefix = LTE_PREFIX,
                     values = identifiers.lte,
                     emptyText = txtNotSpecified,
-                    onCopied = { copyToClipboard(context, it, txtCopied) }
+                    onCopied = { copyToClipboard(context, it, txtCopied, stationId) }
                 )
                 Spacer(modifier = Modifier.width(sizing.spacing(12.dp)))
                 NetworkIdColumn(
@@ -94,7 +97,7 @@ fun SiteNetworkIdsBlock(
                     prefix = NR_PREFIX,
                     values = identifiers.nr,
                     emptyText = txtNotSpecified,
-                    onCopied = { copyToClipboard(context, it, txtCopied) }
+                    onCopied = { copyToClipboard(context, it, txtCopied, stationId) }
                 )
             }
 
@@ -154,9 +157,15 @@ private fun NetworkIdColumn(
     }
 }
 
-private fun copyToClipboard(context: Context, value: String, confirmation: String) {
+private fun copyToClipboard(context: Context, value: String, confirmation: String, stationId: String?) {
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText(value, value))
+    ShareHistoryStore.recordFieldCopy(
+        context = context,
+        field = ShareHistoryStore.FIELD_NETWORK_ID,
+        value = value,
+        stationId = stationId
+    )
     Toast.makeText(context, confirmation, Toast.LENGTH_SHORT).show()
 }
 

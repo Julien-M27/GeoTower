@@ -2405,6 +2405,9 @@
     <string name="outage_download_never">Desconhecida</string>
     <string name="outage_download_count">%1$d falhas guardadas</string>
     <string name="outage_download_size">Espaço ocupado: %1$s</string>
+    <string name="outage_tech_breakdown_title">Tecnologias fora de serviço</string>
+    <string name="outage_tech_breakdown_total">Total</string>
+    <string name="outage_tech_breakdown_unpublished_note">%1$s: detalhe não publicado pela operadora</string>
     <string name="outage_download_now">Transferir as falhas</string>
     <string name="outage_download_refresh">Atualizar as falhas</string>
     <string name="outage_download_running">A transferir…</string>
@@ -2483,8 +2486,8 @@
 
     <!-- Historique des sites/supports partagés ou exportés -->
     <string name="share_history_title">Histórico de partilhas</string>
-    <string name="share_history_desc">Sites, suportes e mapas que partilhou ou exportou</string>
-    <string name="share_history_empty">Ainda não há partilhas registadas. Os sites, suportes e mapas que partilhar ou exportar em PDF aparecerão aqui.</string>
+    <string name="share_history_desc">Tudo o que partilhou, copiou ou exportou a partir da app</string>
+    <string name="share_history_empty">Ainda não há registos. Tudo o que partilhar, copiar ou exportar a partir da app aparecerá aqui.</string>
     <string name="share_history_clear">Limpar o histórico</string>
     <string name="share_history_clear_title">Limpar o histórico de partilhas?</string>
     <string name="share_history_clear_desc">Todas as partilhas registadas serão eliminadas deste dispositivo.</string>
@@ -2493,6 +2496,12 @@
     <string name="share_history_kind_radio_site">Site de rádio</string>
     <string name="share_history_kind_radio_support">Suporte de rádio</string>
     <string name="share_history_kind_map">Mapa de antenas</string>
+    <string name="share_history_filter_all">Tudo</string>
+    <string name="share_history_dest_gallery">Guardada na galeria</string>
+    <string name="share_history_kind_diagnostic">Diagnóstico</string>
+    <string name="share_history_kind_settings_profile">Perfil de definições</string>
+    <string name="share_history_kind_photo">Foto</string>
+    <string name="share_history_kind_field_copy">Valor copiado</string>
     <string name="share_history_dest_share">Imagem partilhada</string>
     <string name="share_history_dest_clipboard">Imagem copiada</string>
     <string name="share_history_dest_pdf">PDF partilhado</string>
@@ -2662,4 +2671,9 @@
     <string name="appstrings_release_v2019_live_db_about">Quando não há base instalada, «Acerca de» detalha os dados servidos em direto pelo servidor: versão, estações publicadas e data de publicação</string>
     <string name="appstrings_release_v2019_about_refresh">Um botão atualiza as versões apresentadas em «Acerca de»</string>
     <string name="appstrings_release_v2019_local_mode_renamed">«Processamento local» passa a «Origem dos dados»: servidor GeoTower ou o seu dispositivo, dito de forma mais simples</string>
+
+    <!-- Notas da versão 2.0.20 -->
+    <string name="appstrings_release_v2020_outage_tech_table">Sob a repartição das falhas, uma tabela cruza operadoras e tecnologias fora de serviço; um travessão indica que uma operadora não publica esse detalhe, em vez de um zero enganador</string>
+    <string name="appstrings_release_v2020_share_history_full">O histórico deixa de se limitar a sites, postes e mapas: regista também os valores copiados, as fotos, as exportações de diagnóstico e os perfis de definições</string>
+    <string name="appstrings_release_v2020_share_history_filter">Um filtro ajuda a orientar-se por tipo de registo</string>
 </resources>

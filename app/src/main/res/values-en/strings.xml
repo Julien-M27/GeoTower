@@ -2405,6 +2405,9 @@
     <string name="outage_download_never">Unknown</string>
     <string name="outage_download_count">%1$d outages stored</string>
     <string name="outage_download_size">Space used: %1$s</string>
+    <string name="outage_tech_breakdown_title">Technologies out of service</string>
+    <string name="outage_tech_breakdown_total">Total</string>
+    <string name="outage_tech_breakdown_unpublished_note">%1$s: detail not published by the operator</string>
     <string name="outage_download_now">Download outages</string>
     <string name="outage_download_refresh">Refresh outages</string>
     <string name="outage_download_running">Downloading…</string>
@@ -2483,8 +2486,8 @@
 
     <!-- Historique des sites/supports partagés ou exportés -->
     <string name="share_history_title">Share history</string>
-    <string name="share_history_desc">Sites, supports and maps you have shared or exported</string>
-    <string name="share_history_empty">No share recorded yet. Sites, supports and maps you share or export as PDF will appear here.</string>
+    <string name="share_history_desc">Everything you have shared, copied or exported from the app</string>
+    <string name="share_history_empty">Nothing recorded yet. Everything you share, copy or export from the app will appear here.</string>
     <string name="share_history_clear">Clear history</string>
     <string name="share_history_clear_title">Clear share history?</string>
     <string name="share_history_clear_desc">All recorded shares will be deleted from this device.</string>
@@ -2493,6 +2496,12 @@
     <string name="share_history_kind_radio_site">Radio site</string>
     <string name="share_history_kind_radio_support">Radio support</string>
     <string name="share_history_kind_map">Antenna map</string>
+    <string name="share_history_filter_all">All</string>
+    <string name="share_history_dest_gallery">Saved to gallery</string>
+    <string name="share_history_kind_diagnostic">Diagnostic</string>
+    <string name="share_history_kind_settings_profile">Settings profile</string>
+    <string name="share_history_kind_photo">Photo</string>
+    <string name="share_history_kind_field_copy">Copied value</string>
     <string name="share_history_dest_share">Image shared</string>
     <string name="share_history_dest_clipboard">Image copied</string>
     <string name="share_history_dest_pdf">PDF shared</string>
@@ -2662,4 +2671,9 @@
     <string name="appstrings_release_v2019_live_db_about">When no database is installed, “About” details the data served live by the server: version, published stations and the date it went online</string>
     <string name="appstrings_release_v2019_about_refresh">A button refreshes the versions shown in “About”</string>
     <string name="appstrings_release_v2019_local_mode_renamed">“Local processing” becomes “Data source”: GeoTower server or your device, said more plainly</string>
+
+    <!-- Release notes 2.0.20 -->
+    <string name="appstrings_release_v2020_outage_tech_table">Below the outage breakdown, a table crosses operators with the technologies that are down; a dash marks an operator that does not publish that detail, instead of a misleading zero</string>
+    <string name="appstrings_release_v2020_share_history_full">The history is no longer limited to sites, masts and maps: it also records copied values, photos, diagnostic exports and settings profiles</string>
+    <string name="appstrings_release_v2020_share_history_filter">A filter helps you find your way by record type</string>
 </resources>

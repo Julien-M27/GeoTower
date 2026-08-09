@@ -1,6 +1,7 @@
 package fr.geotower.ui.components
 
 import android.content.Context
+import android.content.SharedPreferences
 import android.text.format.Formatter
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
@@ -56,6 +57,8 @@ import fr.geotower.data.AnfrRepository
 import fr.geotower.data.config.RemoteFeatureFlags
 import fr.geotower.data.outages.OutageLocalConfig
 import fr.geotower.data.outages.OutageServerInfo
+import fr.geotower.data.outages.OutageTechBreakdown
+import fr.geotower.data.outages.OutageTechRow
 import fr.geotower.data.outages.ServerOutageCache
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.utils.AppConfig
@@ -73,6 +76,7 @@ private data class ServerOutageSummary(
     val serverDate: String = "-",
     val count: Int = -1,
     val breakdown: List<Pair<String, Int>> = emptyList(),
+    val techBreakdown: List<OutageTechRow> = emptyList(),
     val sizeBytes: Long = 0L,
 ) {
     val hasCopy: Boolean get() = sizeBytes > 0L
@@ -299,6 +303,10 @@ private fun OutageServerCopySection(
                 }
             }
         }
+        OutageTechBreakdownTable(
+            rows = summary.techBreakdown,
+            modifier = Modifier.padding(top = sizing.spacing(12.dp)),
+        )
         Text(
             text = stringResource(
                 R.string.outage_download_size,
@@ -465,14 +473,34 @@ private fun OutageInfoRow(
 /** Résumé lu des prefs (écrites au téléchargement) + taille réelle du fichier conservé. */
 private fun readServerOutageSummary(context: Context): ServerOutageSummary {
     val prefs = context.getSharedPreferences(OutageLocalConfig.PREFS_NAME, Context.MODE_PRIVATE)
+    val cache = ServerOutageCache(context)
+    val count = OutageServerInfo.count(prefs)
     return ServerOutageSummary(
         downloadedAtMillis = OutageServerInfo.downloadedAtMillis(prefs),
         serverGeneratedAtMillis = OutageServerInfo.generatedAtMillis(prefs),
         serverDate = OutageServerInfo.lastUpdate(prefs),
-        count = OutageServerInfo.count(prefs),
+        count = count,
         breakdown = OutageServerInfo.breakdown(prefs),
-        sizeBytes = ServerOutageCache(context).sizeBytes(),
+        techBreakdown = techBreakdownOrBackfill(prefs, cache, count),
+        sizeBytes = cache.sizeBytes(),
     )
+}
+
+/**
+ * Détail par génération des prefs, complété depuis la copie conservée quand elle a été téléchargée
+ * avant que le résumé ne retienne ce détail. La relecture du fichier national ne se fait donc qu'UNE
+ * fois — le résultat rejoint aussitôt les prefs, d'où la carte le relira ensuite.
+ */
+private fun techBreakdownOrBackfill(
+    prefs: SharedPreferences,
+    cache: ServerOutageCache,
+    count: Int,
+): List<OutageTechRow> {
+    val stored = OutageServerInfo.techBreakdown(prefs)
+    if (stored.isNotEmpty() || count <= 0) return stored
+    val rebuilt = cache.load()?.sites?.let(OutageTechBreakdown::of).orEmpty()
+    if (rebuilt.isNotEmpty()) OutageServerInfo.recordTechBreakdown(prefs, rebuilt)
+    return rebuilt
 }
 
 private fun formatOutageDateTime(millis: Long): String =

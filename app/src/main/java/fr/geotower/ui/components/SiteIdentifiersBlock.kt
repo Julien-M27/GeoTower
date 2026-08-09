@@ -16,6 +16,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import fr.geotower.data.models.LocalisationEntity // ✅ NOUVEL IMPORT
 import androidx.compose.ui.res.stringResource
@@ -65,6 +66,15 @@ fun SiteIdentifiersBlock(
                     if (idSupportValue != txtNotSpecified) {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         clipboard.setPrimaryClip(ClipData.newPlainText(txtIdSupportCopy, idSupportValue))
+                        ShareHistoryStore.recordFieldCopy(
+                            context = context,
+                            field = ShareHistoryStore.FIELD_ID_SUPPORT,
+                            value = idSupportValue,
+                            stationId = info.idAnfr,
+                            supportId = idSupport,
+                            latitude = info.latitude,
+                            longitude = info.longitude
+                        )
                         Toast.makeText(context, txtIdCopied, Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(context, txtIdUnavailable, Toast.LENGTH_SHORT).show()
@@ -84,6 +94,15 @@ fun SiteIdentifiersBlock(
                     if (idAnfrValue != txtNotSpecified) {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         clipboard.setPrimaryClip(ClipData.newPlainText(anfrLabelClean, idAnfrValue))
+                        ShareHistoryStore.recordFieldCopy(
+                            context = context,
+                            field = ShareHistoryStore.FIELD_ID_ANFR,
+                            value = idAnfrValue,
+                            stationId = info.idAnfr,
+                            supportId = idSupport,
+                            latitude = info.latitude,
+                            longitude = info.longitude
+                        )
                         Toast.makeText(context, txtIdCopied, Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(context, txtIdUnavailable, Toast.LENGTH_SHORT).show()
@@ -101,6 +120,15 @@ fun SiteIdentifiersBlock(
                     if (arcepNidtValue != txtNotSpecified) {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         clipboard.setPrimaryClip(ClipData.newPlainText(txtArcepIdentifierLabel.substringBefore(":").trim(), arcepNidtValue))
+                        ShareHistoryStore.recordFieldCopy(
+                            context = context,
+                            field = ShareHistoryStore.FIELD_ARCEP,
+                            value = arcepNidtValue,
+                            stationId = info.idAnfr,
+                            supportId = idSupport,
+                            latitude = info.latitude,
+                            longitude = info.longitude
+                        )
                         Toast.makeText(context, txtIdCopied, Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(context, txtIdUnavailable, Toast.LENGTH_SHORT).show()

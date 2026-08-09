@@ -2405,6 +2405,9 @@
     <string name="outage_download_never">Sconosciuta</string>
     <string name="outage_download_count">%1$d guasti salvati</string>
     <string name="outage_download_size">Spazio occupato: %1$s</string>
+    <string name="outage_tech_breakdown_title">Tecnologie fuori servizio</string>
+    <string name="outage_tech_breakdown_total">Totale</string>
+    <string name="outage_tech_breakdown_unpublished_note">%1$s: dettaglio non pubblicato dall\'operatore</string>
     <string name="outage_download_now">Scarica i guasti</string>
     <string name="outage_download_refresh">Aggiorna i guasti</string>
     <string name="outage_download_running">Download in corso…</string>
@@ -2483,8 +2486,8 @@
 
     <!-- Historique des sites/supports partagés ou exportés -->
     <string name="share_history_title">Cronologia delle condivisioni</string>
-    <string name="share_history_desc">Siti, supporti e mappe che hai condiviso o esportato</string>
-    <string name="share_history_empty">Nessuna condivisione registrata. I siti, i supporti e le mappe che condividi o esporti in PDF compariranno qui.</string>
+    <string name="share_history_desc">Tutto ciò che hai condiviso, copiato o esportato dall\'app</string>
+    <string name="share_history_empty">Nessuna registrazione. Tutto ciò che condividi, copi o esporti dall\'app comparirà qui.</string>
     <string name="share_history_clear">Cancella la cronologia</string>
     <string name="share_history_clear_title">Cancellare la cronologia delle condivisioni?</string>
     <string name="share_history_clear_desc">Tutte le condivisioni registrate saranno eliminate da questo dispositivo.</string>
@@ -2493,6 +2496,12 @@
     <string name="share_history_kind_radio_site">Sito radio</string>
     <string name="share_history_kind_radio_support">Supporto radio</string>
     <string name="share_history_kind_map">Mappa delle antenne</string>
+    <string name="share_history_filter_all">Tutto</string>
+    <string name="share_history_dest_gallery">Salvata nella galleria</string>
+    <string name="share_history_kind_diagnostic">Diagnostica</string>
+    <string name="share_history_kind_settings_profile">Profilo di impostazioni</string>
+    <string name="share_history_kind_photo">Foto</string>
+    <string name="share_history_kind_field_copy">Valore copiato</string>
     <string name="share_history_dest_share">Immagine condivisa</string>
     <string name="share_history_dest_clipboard">Immagine copiata</string>
     <string name="share_history_dest_pdf">PDF condiviso</string>
@@ -2662,4 +2671,9 @@
     <string name="appstrings_release_v2019_live_db_about">Quando non è installato alcun database, «Informazioni» dettaglia i dati serviti in diretta dal server: versione, stazioni pubblicate e data di pubblicazione</string>
     <string name="appstrings_release_v2019_about_refresh">Un pulsante aggiorna le versioni mostrate in «Informazioni»</string>
     <string name="appstrings_release_v2019_local_mode_renamed">«Elaborazione locale» diventa «Origine dei dati»: server GeoTower o il tuo dispositivo, detto più semplicemente</string>
+
+    <!-- Note di versione 2.0.20 -->
+    <string name="appstrings_release_v2020_outage_tech_table">Sotto la ripartizione dei guasti, una tabella incrocia operatori e tecnologie fuori servizio; un trattino segnala che un operatore non pubblica questo dettaglio, invece di uno zero fuorviante</string>
+    <string name="appstrings_release_v2020_share_history_full">La cronologia non si limita più a siti, tralicci e mappe: registra anche i valori copiati, le foto, le esportazioni della diagnostica e i profili di impostazioni</string>
+    <string name="appstrings_release_v2020_share_history_filter">Un filtro aiuta a orientarsi per tipo di voce</string>
 </resources>

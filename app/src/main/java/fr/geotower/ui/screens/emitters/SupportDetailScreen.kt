@@ -16,6 +16,7 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -70,6 +71,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.runtime.collectAsState
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.data.workers.SignalQuestUploadScheduler
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
@@ -863,24 +865,24 @@ fun SupportDetailScreen(
                         .pageScrollbar(PageScrollPrefs.SUPPORT, scrollState)
                         .verticalScroll(scrollState)
                         .navigationBarsPadding()
-                        .padding(bottom = sizing.spacing(32.dp))
+                        .padding(top = sizing.spacing(16.dp), bottom = sizing.spacing(32.dp)),
+                    // Comme la fiche site : l'écart entre deux cartes est porté par chaque
+                    // CustomizableBlock, pour qu'un bloc masqué ne laisse aucun trou.
+                    verticalArrangement = Arrangement.Top
                 ) {
-                    Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
-
                     pageSupportOrder.forEach { block ->
-                        // spacing = 0 : sur cette page, chaque bloc porte déjà sa propre marge.
                         // Bloc « operators » en mode simplifié : son contenu est fait de fiches
                         // opérateur qui ont déjà leurs propres blocs personnalisables. Comme
                         // l'appui long est détecté en passe Initial (parent AVANT enfant), garder
                         // le sien ici ouvrait DEUX panneaux à la suite. Le bloc laisse donc la
                         // main : le panneau qui s'ouvre est celui du bloc réellement visé.
                         val blockCustomize = if (blockOwnsEmbeddedFiches(block)) null else onCustomizeBlock
-                        fr.geotower.ui.components.CustomizableBlock(block, blockCustomize, spacing = 0.dp) {
+                        fr.geotower.ui.components.CustomizableBlock(block, blockCustomize) {
                         when (block) {
                             "map" -> {
                                 if (showMap) {
                                     fr.geotower.ui.components.SharedMiniMapCard(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp)),
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp)),
                                         centerLat = mainRadio.latitude,
                                         centerLon = mainRadio.longitude,
                                         mappedAntennas = listOf(radioMiniMapAntenna),
@@ -910,7 +912,7 @@ fun SupportDetailScreen(
                             }
                             "open_map" -> {
                                 if (showOpenMap) {
-                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
+                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))) {
                                         Button(
                                             onClick = { safeClick { openMapAt(mainRadio.latitude, mainRadio.longitude) } },
                                             modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
@@ -931,7 +933,7 @@ fun SupportDetailScreen(
                             }
                             "nav" -> {
                                 if (showNav && canUseSupportNavigation) {
-                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
+                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))) {
                                         Button(
                                             onClick = { safeClick { showNavigationSheet = true } },
                                             modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
@@ -961,7 +963,7 @@ fun SupportDetailScreen(
                                         useOneUi = useOneUi,
                                         buttonShape = buttonShape,
                                         globalMapRef = globalMapRef,
-                                        modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))
+                                        modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))
                                     )
                                 }
                             }
@@ -969,29 +971,34 @@ fun SupportDetailScreen(
                         }
                     }
 
-                    fr.geotower.ui.components.PageCustomizationFooter(
-                        onClick = {
-                            settingsHighlightBlock = null
-                            showSupportSettingsSheet = true
-                        },
-                        modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))
-                    )
+                    // Le pied de page et la carte des stations ne sont pas des blocs réordonnables :
+                    // hors de la boucle, c'est ce Column qui leur donne le même écart que le reste.
+                    // Un pied de page coupé n'émet rien, et ne laisse donc aucun trou.
+                    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
+                        fr.geotower.ui.components.PageCustomizationFooter(
+                            onClick = {
+                                settingsHighlightBlock = null
+                                showSupportSettingsSheet = true
+                            },
+                            modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))
+                        )
 
-                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
-                        fr.geotower.ui.components.SupportRadioPresenceCard(
-                            radioMarkers = radioSupportMarkers,
-                            cardBgColor = cardBgColor,
-                            blockShape = blockShape,
-                            onRadioClick = { marker ->
-                                safeClick {
-                                    if (marker.stationId.isNotBlank() && marker.supportId.isNotBlank()) {
-                                        navController.navigate(
-                                            "radio_site_detail/${Uri.encode(marker.stationId)}/${Uri.encode(marker.supportId)}"
-                                        )
+                        Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))) {
+                            fr.geotower.ui.components.SupportRadioPresenceCard(
+                                radioMarkers = radioSupportMarkers,
+                                cardBgColor = cardBgColor,
+                                blockShape = blockShape,
+                                onRadioClick = { marker ->
+                                    safeClick {
+                                        if (marker.stationId.isNotBlank() && marker.supportId.isNotBlank()) {
+                                            navController.navigate(
+                                                "radio_site_detail/${Uri.encode(marker.stationId)}/${Uri.encode(marker.supportId)}"
+                                            )
+                                        }
                                     }
                                 }
-                            }
-                        )
+                            )
+                        }
                     }
                 }
             } else {
@@ -1004,10 +1011,11 @@ fun SupportDetailScreen(
                         .verticalScroll(scrollState)
                         // 🚨 AJOUT : Ajoute un espace à la fin du défilement pour ne pas cacher le dernier élément sous les boutons
                         .navigationBarsPadding()
-                        .padding(bottom = sizing.spacing(32.dp))
+                        .padding(top = sizing.spacing(16.dp), bottom = sizing.spacing(32.dp)),
+                    // Comme la fiche site : l'écart entre deux cartes est porté par chaque
+                    // CustomizableBlock, pour qu'un bloc masqué ne laisse aucun trou.
+                    verticalArrangement = Arrangement.Top
                 ) {
-                    Spacer(modifier = Modifier.height(sizing.spacing(8.dp)))
-
                     if (pendingPhotoDraftId != null && pendingSharedPhotoUris.isNotEmpty() && canUseSharedPhotoUpload) {
                         SupportSharedPhotoUploadCard(
                             photoCount = pendingSharedPhotoUris.size,
@@ -1026,22 +1034,24 @@ fun SupportDetailScreen(
                             blockShape = blockShape,
                             buttonShape = buttonShape
                         )
+                        // Hors de la boucle : cette carte porte elle-même l'écart qui la sépare
+                        // du premier bloc, que les CustomizableBlock posent sous eux.
+                        Spacer(modifier = Modifier.height(sizing.spacing(16.dp)))
                     }
 
                     pageSupportOrder.forEach { block ->
-                        // spacing = 0 : sur cette page, chaque bloc porte déjà sa propre marge.
                         // Bloc « operators » en mode simplifié : son contenu est fait de fiches
                         // opérateur qui ont déjà leurs propres blocs personnalisables. Comme
                         // l'appui long est détecté en passe Initial (parent AVANT enfant), garder
                         // le sien ici ouvrait DEUX panneaux à la suite. Le bloc laisse donc la
                         // main : le panneau qui s'ouvre est celui du bloc réellement visé.
                         val blockCustomize = if (blockOwnsEmbeddedFiches(block)) null else onCustomizeBlock
-                        fr.geotower.ui.components.CustomizableBlock(block, blockCustomize, spacing = 0.dp) {
+                        fr.geotower.ui.components.CustomizableBlock(block, blockCustomize) {
                         when (block) {
                             "map" -> {
                                 if (showMap) {
                                     fr.geotower.ui.components.SharedMiniMapCard(
-                                        modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp)),
+                                        modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp)),
                                         centerLat = mainInfo.latitude,
                                         centerLon = mainInfo.longitude,
                                         mappedAntennas = antennas,
@@ -1074,7 +1084,7 @@ fun SupportDetailScreen(
                             "photos" -> {
                                 // 🚨 CORRECTION : On retire "&& communityPhotos.isNotEmpty()"
                                 if (showPhotos && canUseSupportPhotos) {
-                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp)).padding(bottom = sizing.spacing(8.dp))) {
+                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))) {
                                         CommunityPhotosSectionShared(
                                             photos = communityPhotos,
                                             operatorName = null,
@@ -1092,7 +1102,7 @@ fun SupportDetailScreen(
                             }
                             "open_map" -> {
                                 if (showOpenMap) {
-                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
+                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))) {
                                         Button(
                                             onClick = { safeClick { openMapAt(mainInfo.latitude, mainInfo.longitude) } },
                                             modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
@@ -1113,7 +1123,7 @@ fun SupportDetailScreen(
                             }
                             "nav" -> {
                                 if (showNav && canUseSupportNavigation) {
-                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
+                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))) {
                                         Button(
                                             onClick = { safeClick { showNavigationSheet = true } },
                                             modifier = Modifier.fillMaxWidth().height(sizing.component(56.dp)),
@@ -1134,7 +1144,7 @@ fun SupportDetailScreen(
                             }
                             "share" -> {
                                 if (showShare && canUseSupportShare) {
-                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
+                                    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))) {
                                         SupportShareMenu(
                                             siteId = siteId,
                                             antennas = antennas,
@@ -1197,45 +1207,50 @@ fun SupportDetailScreen(
                         }
                     }
 
-                    fr.geotower.ui.components.PageCustomizationFooter(
-                        onClick = {
-                            settingsHighlightBlock = null
-                            showSupportSettingsSheet = true
-                        },
-                        modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))
-                    )
+                    // Le pied de page et la carte des stations ne sont pas des blocs réordonnables :
+                    // hors de la boucle, c'est ce Column qui leur donne le même écart que le reste.
+                    // Un pied de page coupé n'émet rien, et ne laisse donc aucun trou.
+                    Column(verticalArrangement = Arrangement.spacedBy(sizing.spacing(16.dp))) {
+                        fr.geotower.ui.components.PageCustomizationFooter(
+                            onClick = {
+                                settingsHighlightBlock = null
+                                showSupportSettingsSheet = true
+                            },
+                            modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))
+                        )
 
-                    if (radioSupportMarkers.isNotEmpty()) {
-                        Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
-                            // Mode simplifié : les stations non mobiles du pylône (TV, radio FM,
-                            // faisceaux, réseaux privés) se déplient ici comme les opérateurs.
-                            val expandRadioStations = AppConfig.simpleModeActive()
-                            fr.geotower.ui.components.SupportRadioPresenceCard(
-                                radioMarkers = radioSupportMarkers,
-                                cardBgColor = cardBgColor,
-                                blockShape = blockShape,
-                                expandable = expandRadioStations,
-                                expandedContent = { marker ->
-                                    if (marker.stationId.isNotBlank() && marker.supportId.isNotBlank()) {
-                                        RadioSiteDetailScreen(
-                                            navController = navController,
-                                            radioRepository = radioRepository,
-                                            stationId = marker.stationId,
-                                            supportId = marker.supportId,
-                                            embedded = true
-                                        )
-                                    }
-                                },
-                                onRadioClick = { marker ->
-                                    safeClick {
+                        if (radioSupportMarkers.isNotEmpty()) {
+                            Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))) {
+                                // Mode simplifié : les stations non mobiles du pylône (TV, radio FM,
+                                // faisceaux, réseaux privés) se déplient ici comme les opérateurs.
+                                val expandRadioStations = AppConfig.simpleModeActive()
+                                fr.geotower.ui.components.SupportRadioPresenceCard(
+                                    radioMarkers = radioSupportMarkers,
+                                    cardBgColor = cardBgColor,
+                                    blockShape = blockShape,
+                                    expandable = expandRadioStations,
+                                    expandedContent = { marker ->
                                         if (marker.stationId.isNotBlank() && marker.supportId.isNotBlank()) {
-                                            navController.navigate(
-                                                "radio_site_detail/${Uri.encode(marker.stationId)}/${Uri.encode(marker.supportId)}"
+                                            RadioSiteDetailScreen(
+                                                navController = navController,
+                                                radioRepository = radioRepository,
+                                                stationId = marker.stationId,
+                                                supportId = marker.supportId,
+                                                embedded = true
                                             )
                                         }
+                                    },
+                                    onRadioClick = { marker ->
+                                        safeClick {
+                                            if (marker.stationId.isNotBlank() && marker.supportId.isNotBlank()) {
+                                                navController.navigate(
+                                                    "radio_site_detail/${Uri.encode(marker.stationId)}/${Uri.encode(marker.supportId)}"
+                                                )
+                                            }
+                                        }
                                     }
-                                }
-                            )
+                                )
+                            }
                         }
                     }
                 }
@@ -1471,7 +1486,7 @@ private fun SupportSharedPhotoUploadCard(
     buttonShape: androidx.compose.ui.graphics.Shape
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
-    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
+    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1635,7 +1650,7 @@ private fun RadioOnlySupportDetailsSection(
         "--"
     }
 
-    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
+    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1649,6 +1664,18 @@ private fun RadioOnlySupportDetailsSection(
                     if (supportId != txtNotSpecified) {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         clipboard.setPrimaryClip(ClipData.newPlainText(txtIdSupportCopy, supportId))
+                        ShareHistoryStore.recordFieldCopy(
+                            context = context,
+                            field = ShareHistoryStore.FIELD_ID_SUPPORT,
+                            value = supportId,
+                            stationId = marker.stationId,
+                            supportId = marker.supportId,
+                            latitude = marker.latitude,
+                            longitude = marker.longitude,
+                            // Cette carte décrit le support, pas la station radio : le clic dans
+                            // l'historique doit revenir ici, sur la fiche support.
+                            kind = ShareHistoryStore.KIND_SUPPORT_FIELD_COPY
+                        )
                         Toast.makeText(context, txtIdCopied, Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(context, txtIdUnavailable, Toast.LENGTH_SHORT).show()
@@ -1662,6 +1689,16 @@ private fun RadioOnlySupportDetailsSection(
                 onCopy = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText(txtAddressCopy, fullAddress))
+                    ShareHistoryStore.recordFieldCopy(
+                        context = context,
+                        field = ShareHistoryStore.FIELD_ADDRESS,
+                        value = fullAddress,
+                        stationId = marker.stationId,
+                        supportId = marker.supportId,
+                        latitude = marker.latitude,
+                        longitude = marker.longitude,
+                        kind = ShareHistoryStore.KIND_SUPPORT_FIELD_COPY
+                    )
                     Toast.makeText(context, txtAddressCopied, Toast.LENGTH_SHORT).show()
                 }
             )
@@ -1671,6 +1708,16 @@ private fun RadioOnlySupportDetailsSection(
                 onCopy = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText(txtGpsCoordsCopy, cleanGpsCoords))
+                    ShareHistoryStore.recordFieldCopy(
+                        context = context,
+                        field = ShareHistoryStore.FIELD_GPS,
+                        value = cleanGpsCoords,
+                        stationId = marker.stationId,
+                        supportId = marker.supportId,
+                        latitude = marker.latitude,
+                        longitude = marker.longitude,
+                        kind = ShareHistoryStore.KIND_SUPPORT_FIELD_COPY
+                    )
                     Toast.makeText(context, txtCoordsCopied, Toast.LENGTH_SHORT).show()
                 }
             )

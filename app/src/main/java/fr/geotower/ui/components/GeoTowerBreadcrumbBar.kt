@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -72,11 +73,28 @@ fun GeoTowerBreadcrumbBar(
         }
     }
 
+    // Coins concentriques : la barre ET ses pastilles sont des stades (rayon = moitie de la
+    // hauteur), et la marge qui les separe est la meme sur les quatre cotes. Le rayon exterieur
+    // vaut alors toujours exactement « rayon interieur + marge », a n'importe quelle taille
+    // d'interface. Avec l'ancien MaterialTheme.shapes.extraLarge (28.dp figes) la barre gardait un
+    // bord droit des que sa hauteur depassait 56.dp, alors que la pastille restait un demi-cercle :
+    // les deux coins ne s'emboitaient plus.
+    val pillShape = RoundedCornerShape(percent = 50)
+    val pillMargin = sizing.spacing(7.dp)
+    // Un segment cliquable est une Surface(onClick), donc Material 3 lui impose la cible tactile
+    // minimale de 48.dp : son EMPLACEMENT passe a 48.dp mais la pastille restait peinte a sa
+    // hauteur naturelle (~39.dp), centree, laissant ~4,4.dp de vide en haut et en bas. La marge
+    // visible valait donc 11.dp en haut/bas contre 7.dp sur les cotes. On peint la pastille a la
+    // taille de sa cible tactile : plus de vide, marge identique sur les quatre cotes (et hauteur
+    // de barre inchangee, puisque c'est deja cette cible qui la dictait). Valeur non mise a
+    // l'echelle, comme la cible tactile de Material qu'elle vient combler.
+    val pillMinHeight = 48.dp
+
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .padding(horizontal = sizing.spacing(12.dp), vertical = sizing.spacing(6.dp)),
-        shape = MaterialTheme.shapes.extraLarge,
+        shape = pillShape,
         color = backgroundColor,
         contentColor = MaterialTheme.colorScheme.onSurface,
         tonalElevation = 2.dp
@@ -84,7 +102,7 @@ fun GeoTowerBreadcrumbBar(
         Row(
             modifier = Modifier
                 .horizontalScroll(scrollState)
-                .padding(horizontal = sizing.spacing(8.dp), vertical = sizing.spacing(7.dp)),
+                .padding(pillMargin),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(sizing.spacing(4.dp))
         ) {
@@ -99,7 +117,6 @@ fun GeoTowerBreadcrumbBar(
                 }
 
                 val isCurrent = index == items.lastIndex || item.onClick == null
-                val segmentShape = RoundedCornerShape(999.dp)
                 val segmentColor = if (isCurrent) {
                     MaterialTheme.colorScheme.primaryContainer
                 } else {
@@ -114,9 +131,10 @@ fun GeoTowerBreadcrumbBar(
                 if (item.onClick != null) {
                     Surface(
                         onClick = item.onClick,
+                        modifier = Modifier.heightIn(min = pillMinHeight),
                         color = segmentColor,
                         contentColor = segmentContentColor,
-                        shape = segmentShape,
+                        shape = pillShape,
                         tonalElevation = if (isCurrent) 0.dp else 1.dp
                     ) {
                         BreadcrumbContent(
@@ -127,9 +145,10 @@ fun GeoTowerBreadcrumbBar(
                     }
                 } else {
                     Surface(
+                        modifier = Modifier.heightIn(min = pillMinHeight),
                         color = segmentColor,
                         contentColor = segmentContentColor,
-                        shape = segmentShape,
+                        shape = pillShape,
                         tonalElevation = if (isCurrent) 0.dp else 1.dp
                     ) {
                         BreadcrumbContent(

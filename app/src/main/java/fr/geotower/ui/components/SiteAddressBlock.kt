@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import androidx.compose.ui.unit.sp
 import fr.geotower.data.models.LocalisationEntity // ✅ NOUVEL IMPORT
@@ -68,6 +69,14 @@ fun SiteAddressBlock(
                 onCopy = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText(txtAddressCopy, fullAddress))
+                    ShareHistoryStore.recordFieldCopy(
+                        context = context,
+                        field = ShareHistoryStore.FIELD_ADDRESS,
+                        value = fullAddress,
+                        stationId = info.idAnfr,
+                        latitude = info.latitude,
+                        longitude = info.longitude
+                    )
                     Toast.makeText(context, txtAddressCopied, Toast.LENGTH_SHORT).show()
                 }
             )
@@ -80,6 +89,14 @@ fun SiteAddressBlock(
                 onCopy = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText(txtGpsCoordsCopy, gpsCoords))
+                    ShareHistoryStore.recordFieldCopy(
+                        context = context,
+                        field = ShareHistoryStore.FIELD_GPS,
+                        value = gpsCoords,
+                        stationId = info.idAnfr,
+                        latitude = info.latitude,
+                        longitude = info.longitude
+                    )
                     Toast.makeText(context, txtCoordsCopied, Toast.LENGTH_SHORT).show()
                 }
             )

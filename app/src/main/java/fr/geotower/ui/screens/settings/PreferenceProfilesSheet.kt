@@ -76,6 +76,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.R
 import fr.geotower.ui.components.settingsPopupFadingEdge
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
@@ -387,6 +388,13 @@ fun PreferenceProfilesSheet(
                     onClick = {
                         val json = PreferenceProfileManager.exportProfilesJson(context, ids)
                         PreferenceProfileManager.shareExport(context, json, fileName)
+                        ShareHistoryStore.record(
+                            context = context,
+                            kind = ShareHistoryStore.KIND_SETTINGS_PROFILE,
+                            destination = ShareHistoryStore.DEST_SHARE,
+                            label = exportProfiles.joinToString(", ") { it.name },
+                            itemCount = exportProfiles.size
+                        )
                         exportIds = null
                     }
                 ) { Text(stringResource(R.string.preference_profiles_share)) }

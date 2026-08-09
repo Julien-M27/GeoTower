@@ -25,6 +25,7 @@ object OutageServerInfo {
     const val KEY_DOWNLOADED_AT = "last_hs_downloaded_at"
     const val KEY_COUNT = "last_hs_count"
     const val KEY_BREAKDOWN = "last_hs_breakdown"
+    const val KEY_TECH_BREAKDOWN = "last_hs_tech_breakdown"
 
     /** Date de la donnée serveur, « - » tant qu'aucun téléchargement n'a abouti. */
     fun lastUpdate(prefs: SharedPreferences): String =
@@ -42,6 +43,19 @@ object OutageServerInfo {
     /** Répartition par opérateur du dernier téléchargement réussi, vide si inconnue. */
     fun breakdown(prefs: SharedPreferences): List<Pair<String, Int>> =
         OutageLocalConfig.decodeBreakdown(prefs.getString(KEY_BREAKDOWN, null))
+
+    /** Détail par génération (2G/3G/4G/5G) du dernier téléchargement réussi, vide si inconnu. */
+    fun techBreakdown(prefs: SharedPreferences): List<OutageTechRow> =
+        OutageTechBreakdown.decode(prefs.getString(KEY_TECH_BREAKDOWN, null))
+
+    /**
+     * Range un détail par génération recalculé après coup, pour une copie téléchargée AVANT que le
+     * résumé ne le retienne : sans ça, le tableau des réglages resterait vide jusqu'au prochain
+     * téléchargement alors que la donnée est déjà sur l'appareil.
+     */
+    fun recordTechBreakdown(prefs: SharedPreferences, rows: List<OutageTechRow>) {
+        prefs.edit().putString(KEY_TECH_BREAKDOWN, OutageTechBreakdown.encode(rows)).apply()
+    }
 
     /**
      * Mémorise ce qu'un téléchargement réussi vient d'apporter et renvoie l'instant de production
@@ -63,6 +77,7 @@ object OutageServerInfo {
             .putLong(KEY_DOWNLOADED_AT, downloadedAtMillis)
             .putInt(KEY_COUNT, sites.size)
             .putString(KEY_BREAKDOWN, OutageLocalConfig.encodeBreakdown(OutageLocalConfig.breakdownOf(sites)))
+            .putString(KEY_TECH_BREAKDOWN, OutageTechBreakdown.encode(OutageTechBreakdown.of(sites)))
         if (generatedAt > 0L) {
             editor.putLong(KEY_GENERATED_AT, generatedAt)
         } else {
@@ -80,6 +95,7 @@ object OutageServerInfo {
             .remove(KEY_DOWNLOADED_AT)
             .remove(KEY_COUNT)
             .remove(KEY_BREAKDOWN)
+            .remove(KEY_TECH_BREAKDOWN)
             .apply()
     }
 }

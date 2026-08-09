@@ -954,16 +954,21 @@ class MainActivity : ComponentActivity() {
                                             val route = when (entry.kind) {
                                                 ShareHistoryStore.KIND_MAP ->
                                                     "map".takeIf { entry.latitude != null && entry.longitude != null }
-                                                ShareHistoryStore.KIND_MOBILE_SITE ->
+                                                ShareHistoryStore.KIND_MOBILE_SITE,
+                                                ShareHistoryStore.KIND_FIELD_COPY ->
                                                     entry.stationId.takeIf { it.isNotBlank() }
                                                         ?.let { "site_detail/${Uri.encode(it)}" }
                                                         ?: entry.supportId.takeIf { it.isNotBlank() }
                                                             ?.let { "support_detail/${Uri.encode(it)}" }
-                                                ShareHistoryStore.KIND_RADIO_SITE ->
+                                                ShareHistoryStore.KIND_RADIO_SITE,
+                                                ShareHistoryStore.KIND_RADIO_FIELD_COPY ->
                                                     entry.stationId.takeIf { it.isNotBlank() }
                                                         ?.let { "radio_site_detail/${Uri.encode(it)}/${Uri.encode(entry.supportId)}" }
                                                         ?: entry.supportId.takeIf { it.isNotBlank() }
                                                             ?.let { "support_detail/${Uri.encode(it)}" }
+                                                // Supports et copies faites sur une fiche support :
+                                                // la station est connue mais n'est pas le sujet, la
+                                                // fiche à rouvrir est bien celle du support.
                                                 else ->
                                                     entry.supportId.takeIf { it.isNotBlank() }
                                                         ?.let { "support_detail/${Uri.encode(it)}" }

@@ -55,10 +55,25 @@ object ShareHistoryStore {
     /** Partage de la carte des antennes : ni station ni support, on rouvre la carte sur le cadrage. */
     const val KIND_MAP = "map"
 
+    // Copie d'un champ de fiche (identifiant, adresse, GPS…) : le champ copié est dans `contents`.
+    // Trois sortes, une par fiche d'origine -- c'est elle que le clic doit rouvrir, et elle ne se
+    // déduit pas des identifiants enregistrés (une copie faite sur un support connaît sa station).
+    const val KIND_FIELD_COPY = "field_copy"
+    const val KIND_SUPPORT_FIELD_COPY = "support_field_copy"
+    const val KIND_RADIO_FIELD_COPY = "radio_field_copy"
+
+    /** Photo copiée, enregistrée dans la galerie ou partagée. */
+    const val KIND_PHOTO = "photo"
+
+    /** Exports de l'app, sans cible à rouvrir. */
+    const val KIND_SETTINGS_PROFILE = "settings_profile"
+    const val KIND_DIAGNOSTIC = "diagnostic"
+
     const val DEST_SHARE = "share"
     const val DEST_CLIPBOARD = "clipboard"
     const val DEST_PDF = "pdf"
     const val DEST_PDF_DOWNLOAD = "pdf_download"
+    const val DEST_GALLERY = "gallery"
 
     // Codes des blocs inclus dans l'image partagée. Ils reprennent tels quels les identifiants de
     // blocs des menus de partage (`shareOrder`), pour qu'un code ne veuille jamais dire deux choses.
@@ -95,6 +110,45 @@ object ShareHistoryStore {
     const val CONTENT_EXTRA = "extra"
     const val CONTENT_SUPPORT_ENTRIES = "support_entries"
 
+    // Champ copié, pour `kind = KIND_FIELD_COPY` : le préfixe évite qu'un code de champ soit un jour
+    // confondu avec un bloc d'image.
+    const val FIELD_ID_SUPPORT = "field_id_support"
+    const val FIELD_ID_ANFR = "field_id_anfr"
+    const val FIELD_ARCEP = "field_arcep"
+    const val FIELD_ADDRESS = "field_address"
+    const val FIELD_GPS = "field_gps"
+    const val FIELD_PANEL = "field_panel"
+    const val FIELD_NETWORK_ID = "field_network_id"
+    const val FIELD_REPORT = "field_report"
+
+    /**
+     * Copie d'un champ de fiche. La valeur copiée sert de libellé — c'est elle le sujet de l'entrée —
+     * et les identifiants restent renseignés pour que le clic rouvre la bonne fiche. `kind` dit
+     * laquelle : celle où le bouton copier a été appuyé, pas la plus précise des deux.
+     */
+    fun recordFieldCopy(
+        context: Context,
+        field: String,
+        value: String?,
+        stationId: String? = null,
+        supportId: String? = null,
+        latitude: Double? = null,
+        longitude: Double? = null,
+        kind: String = KIND_FIELD_COPY
+    ) {
+        record(
+            context = context,
+            kind = kind,
+            destination = DEST_CLIPBOARD,
+            supportId = supportId,
+            stationId = stationId,
+            label = value,
+            latitude = latitude,
+            longitude = longitude,
+            contents = field
+        )
+    }
+
     /**
      * Assemble la liste des blocs cochés : `contentsOf(incMap to CONTENT_MAP, ...)`. Renvoie `null`
      * quand rien n'est coché, pour ne pas distinguer « aucun bloc » d'une entrée d'avant ce champ.
@@ -114,7 +168,11 @@ object ShareHistoryStore {
     }
 
     private const val HISTORY_FILE_NAME = "share_history.json"
-    private const val MAX_ENTRIES = 300
+
+    // Relevé de 300 à 2000 quand les copies de champs sont entrées dans l'historique : à raison de
+    // quelques copies par fiche consultée, 300 entrées se remplissaient en quelques sessions et
+    // chassaient les vrais partages. 2000 entrées pèsent ~500 Ko de JSON, sans effet perceptible.
+    private const val MAX_ENTRIES = 2000
 
     private val gson = Gson()
 

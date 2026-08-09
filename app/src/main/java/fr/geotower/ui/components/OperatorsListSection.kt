@@ -139,9 +139,18 @@ fun OperatorsListSection(
         deferredContentReady = true
     }
 
-    Column(modifier = Modifier.padding(top = sizing.spacing(8.dp))) {
+    // En mode One UI, chaque opérateur est une carte : elle doit respirer comme les autres cartes
+    // de la page (16 dp partout). En mode Material, c'est au contraire une liste compacte séparée
+    // par des traits — coller les lignes entre elles est la mise en page voulue.
+    val cardSpacing = if (useOneUi) sizing.spacing(16.dp) else 0.dp
+    val listItemPadding = if (useOneUi) 0.dp else sizing.spacing(8.dp)
+
+    Column(verticalArrangement = Arrangement.spacedBy(cardSpacing)) {
         Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = sizing.spacing(16.dp))
+                .padding(vertical = listItemPadding),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -188,7 +197,8 @@ fun OperatorsListSection(
                 onClick = onShareAllOperators,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(4.dp))
+                    .padding(horizontal = sizing.spacing(16.dp))
+                    .padding(bottom = listItemPadding)
                     .height(sizing.component(52.dp)),
                 shape = blockShape,
                 colors = ButtonDefaults.buttonColors(
@@ -266,7 +276,7 @@ fun OperatorDetailItem(
 ) {
     val sizing = LocalGeoTowerUiStyle.current.sizing
     val modifier = if (useOneUi) {
-        Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(6.dp)).clip(blockShape).background(cardBgColor).clickable(onClick = onClick).padding(sizing.spacing(16.dp))
+        Modifier.fillMaxWidth().padding(horizontal = sizing.spacing(16.dp)).clip(blockShape).background(cardBgColor).clickable(onClick = onClick).padding(sizing.spacing(16.dp))
     } else {
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(sizing.spacing(16.dp))
     }

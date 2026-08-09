@@ -95,6 +95,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.window.Dialog
@@ -679,39 +680,63 @@ private data class PhotoExportFile(
     val mimeType: String
 )
 
-internal suspend fun copyCommunityPhotoToClipboard(context: Context, photo: CommunityPhoto) {
+/**
+ * Historise une photo sortie de l'app. Contrairement aux partages de fiche, l'entrée est écrite
+ * APRÈS coup : l'export peut échouer (réseau, taille) et une photo qui n'est jamais sortie n'a rien
+ * à faire dans l'historique. `scopeId` est le support d'où vient la photo, pour la réouverture.
+ */
+private fun recordPhotoExport(
+    context: Context,
+    photo: CommunityPhoto?,
+    destination: String,
+    scopeId: String?
+) {
+    ShareHistoryStore.record(
+        context = context,
+        kind = ShareHistoryStore.KIND_PHOTO,
+        destination = destination,
+        supportId = scopeId,
+        label = photo?.communityName
+    )
+}
+
+internal suspend fun copyCommunityPhotoToClipboard(context: Context, photo: CommunityPhoto, scopeId: String? = null) {
     val exportFile = withContext(Dispatchers.IO) {
         cacheRemotePhotoForExport(context, photo)
     }
     withContext(Dispatchers.Main) {
         copyPhotoUriToClipboard(context, exportFile.uri, exportFile.displayName)
+        recordPhotoExport(context, photo, ShareHistoryStore.DEST_CLIPBOARD, scopeId)
     }
 }
 
-internal suspend fun saveCommunityPhotoToGallery(context: Context, photo: CommunityPhoto) {
+internal suspend fun saveCommunityPhotoToGallery(context: Context, photo: CommunityPhoto, scopeId: String? = null) {
     val exportFile = withContext(Dispatchers.IO) {
         cacheRemotePhotoForExport(context, photo)
     }
     withContext(Dispatchers.IO) {
         saveImageFileToGallery(context, exportFile.file, exportFile.displayName, exportFile.mimeType)
+        recordPhotoExport(context, photo, ShareHistoryStore.DEST_GALLERY, scopeId)
     }
 }
 
-private suspend fun copyDrawablePhotoToClipboard(context: Context, drawableResId: Int) {
+private suspend fun copyDrawablePhotoToClipboard(context: Context, drawableResId: Int, scopeId: String? = null) {
     val exportFile = withContext(Dispatchers.IO) {
         cacheDrawablePhotoForExport(context, drawableResId)
     }
     withContext(Dispatchers.Main) {
         copyPhotoUriToClipboard(context, exportFile.uri, exportFile.displayName)
+        recordPhotoExport(context, null, ShareHistoryStore.DEST_CLIPBOARD, scopeId)
     }
 }
 
-private suspend fun saveDrawablePhotoToGallery(context: Context, drawableResId: Int) {
+private suspend fun saveDrawablePhotoToGallery(context: Context, drawableResId: Int, scopeId: String? = null) {
     val exportFile = withContext(Dispatchers.IO) {
         cacheDrawablePhotoForExport(context, drawableResId)
     }
     withContext(Dispatchers.IO) {
         saveImageFileToGallery(context, exportFile.file, exportFile.displayName, exportFile.mimeType)
+        recordPhotoExport(context, null, ShareHistoryStore.DEST_GALLERY, scopeId)
     }
 }
 
@@ -1473,7 +1498,7 @@ fun CommunityPhotosSectionShared(
                             enabled = !photoExportInProgress,
                             onClick = {
                                 runPhotoExport(txtPhotoCopiedToClipboard) {
-                                    copyDrawablePhotoToClipboard(context, placeholderRes)
+                                    copyDrawablePhotoToClipboard(context, placeholderRes, favoriteScopeId)
                                 }
                             }
                         )
@@ -1485,7 +1510,7 @@ fun CommunityPhotosSectionShared(
                             enabled = !photoExportInProgress,
                             onClick = {
                                 runPhotoExport(txtPhotoSavedToGallery) {
-                                    saveDrawablePhotoToGallery(context, placeholderRes)
+                                    saveDrawablePhotoToGallery(context, placeholderRes, favoriteScopeId)
                                 }
                             }
                         )
@@ -1802,7 +1827,7 @@ fun CommunityPhotosSectionShared(
                                 enabled = !photoExportInProgress,
                                 onClick = {
                                     runPhotoExport(txtPhotoCopiedToClipboard) {
-                                        copyCommunityPhotoToClipboard(context, currentPhoto)
+                                        copyCommunityPhotoToClipboard(context, currentPhoto, favoriteScopeId)
                                     }
                                 }
                             )
@@ -1814,7 +1839,7 @@ fun CommunityPhotosSectionShared(
                                 enabled = !photoExportInProgress,
                                 onClick = {
                                     runPhotoExport(txtPhotoSavedToGallery) {
-                                        saveCommunityPhotoToGallery(context, currentPhoto)
+                                        saveCommunityPhotoToGallery(context, currentPhoto, favoriteScopeId)
                                     }
                                 }
                             )

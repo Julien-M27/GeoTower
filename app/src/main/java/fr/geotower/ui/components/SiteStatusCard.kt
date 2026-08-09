@@ -33,6 +33,7 @@ import java.util.Locale
 import androidx.compose.ui.res.stringResource
 import fr.geotower.R
 import fr.geotower.data.models.SiteHsEntity
+import fr.geotower.data.outages.OutageStatusCodes
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 
 // 1. Structure pour gérer l'état de chaque case de la grille
@@ -52,9 +53,11 @@ fun serviceAvailabilityFromOutageCode(
     if (!hasTechnology) return null
     if (!isOutage) return true
 
-    return when (cleanOutageValue(outageCode)?.uppercase(Locale.ROOT)) {
-        "OK" -> true
-        "HS", "DE" -> false
+    // Lecture partagée avec le décompte par génération des réglages (OutageTechBreakdown) : une case
+    // rouge ici et une panne comptée là-bas doivent toujours désigner le même code.
+    return when {
+        OutageStatusCodes.isUp(outageCode) -> true
+        OutageStatusCodes.isDown(outageCode) -> false
         else -> null
     }
 }

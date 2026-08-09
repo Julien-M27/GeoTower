@@ -22,6 +22,7 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
+import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.ui.theme.LocalGeoTowerUiStyle
 import androidx.compose.ui.unit.sp
 import fr.geotower.data.models.LocalisationEntity
@@ -85,7 +86,7 @@ fun SupportDetailsSection(
     val txtFromMyPosition = stringResource(R.string.appstrings_from_my_position)
     val txtBearingLabel = stringResource(R.string.appstrings_bearing_label)
 
-    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(8.dp))) {
+    Box(modifier = Modifier.padding(horizontal = sizing.spacing(16.dp))) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -106,6 +107,16 @@ fun SupportDetailsSection(
                     if (supportIdValue != txtNotSpecified) {
                         val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                         clipboard.setPrimaryClip(ClipData.newPlainText(txtIdSupportCopy, supportIdValue))
+                        ShareHistoryStore.recordFieldCopy(
+                            context = context,
+                            field = ShareHistoryStore.FIELD_ID_SUPPORT,
+                            value = supportIdValue,
+                            stationId = mainInfo.idAnfr,
+                            supportId = physique?.idSupport,
+                            latitude = mainInfo.latitude,
+                            longitude = mainInfo.longitude,
+                            kind = ShareHistoryStore.KIND_SUPPORT_FIELD_COPY
+                        )
                         Toast.makeText(context, txtIdCopied, Toast.LENGTH_SHORT).show()
                     } else {
                         Toast.makeText(context, txtIdUnavailable, Toast.LENGTH_SHORT).show()
@@ -120,6 +131,16 @@ fun SupportDetailsSection(
                 onCopy = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText(txtAddressCopy, fullAddress))
+                    ShareHistoryStore.recordFieldCopy(
+                        context = context,
+                        field = ShareHistoryStore.FIELD_ADDRESS,
+                        value = fullAddress,
+                        stationId = mainInfo.idAnfr,
+                        supportId = physique?.idSupport,
+                        latitude = mainInfo.latitude,
+                        longitude = mainInfo.longitude,
+                        kind = ShareHistoryStore.KIND_SUPPORT_FIELD_COPY
+                    )
                     Toast.makeText(context, txtAddressCopied, Toast.LENGTH_SHORT).show()
                 }
             )
@@ -130,6 +151,16 @@ fun SupportDetailsSection(
                 onCopy = {
                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                     clipboard.setPrimaryClip(ClipData.newPlainText(txtGpsCoordsCopy, cleanGpsCoords))
+                    ShareHistoryStore.recordFieldCopy(
+                        context = context,
+                        field = ShareHistoryStore.FIELD_GPS,
+                        value = cleanGpsCoords,
+                        stationId = mainInfo.idAnfr,
+                        supportId = physique?.idSupport,
+                        latitude = mainInfo.latitude,
+                        longitude = mainInfo.longitude,
+                        kind = ShareHistoryStore.KIND_SUPPORT_FIELD_COPY
+                    )
                     Toast.makeText(context, txtCoordsCopied, Toast.LENGTH_SHORT).show()
                 }
             )

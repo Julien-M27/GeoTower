@@ -105,6 +105,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
@@ -1076,6 +1077,12 @@ fun SiteDetailScreen(
                         modifier = Modifier.clip(CircleShape).clickable {
                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                             clipboard.setPrimaryClip(ClipData.newPlainText(txtIdSupportCopy, antennaId.toString()))
+                            ShareHistoryStore.recordFieldCopy(
+                                context = context,
+                                field = ShareHistoryStore.FIELD_ID_ANFR,
+                                value = antennaId.toString(),
+                                stationId = antennaId.toString()
+                            )
                             haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                             Toast.makeText(context, "$txtIdCopied : $antennaId", Toast.LENGTH_SHORT).show()
                         }.padding(horizontal = sizing.spacing(16.dp), vertical = sizing.spacing(4.dp))
@@ -1693,7 +1700,8 @@ fun SiteDetailScreen(
                                 fr.geotower.ui.components.SiteNetworkIdsBlock(
                                     identifiers = networkIds,
                                     cardBgColor = cardBgColor,
-                                    blockShape = blockShape
+                                    blockShape = blockShape,
+                                    stationId = antennaId.toString()
                                 )
                             }
                         }
@@ -2785,7 +2793,9 @@ private fun RadioSiteIdentifiersCard(
                     context = context,
                     label = context.getString(R.string.appstrings_id_support_copy),
                     value = marker.supportId,
-                    toastMessage = context.getString(R.string.appstrings_id_copied)
+                    toastMessage = context.getString(R.string.appstrings_id_copied),
+                    field = ShareHistoryStore.FIELD_ID_SUPPORT,
+                    marker = marker
                 )
             }
         )
@@ -2797,7 +2807,9 @@ private fun RadioSiteIdentifiersCard(
                     context = context,
                     label = context.getString(R.string.appstrings_station_anfr),
                     value = marker.stationId,
-                    toastMessage = context.getString(R.string.appstrings_id_copied)
+                    toastMessage = context.getString(R.string.appstrings_id_copied),
+                    field = ShareHistoryStore.FIELD_ID_ANFR,
+                    marker = marker
                 )
             }
         )
@@ -2829,7 +2841,9 @@ private fun RadioSiteAddressCard(
                     context = context,
                     label = context.getString(R.string.appstrings_address_copy),
                     value = marker.addressSummary,
-                    toastMessage = context.getString(R.string.appstrings_address_copied)
+                    toastMessage = context.getString(R.string.appstrings_address_copied),
+                    field = ShareHistoryStore.FIELD_ADDRESS,
+                    marker = marker
                 )
             }
         )
@@ -2841,7 +2855,9 @@ private fun RadioSiteAddressCard(
                     context = context,
                     label = context.getString(R.string.appstrings_gps_coords_copy),
                     value = cleanGpsCoords,
-                    toastMessage = context.getString(R.string.appstrings_coords_copied)
+                    toastMessage = context.getString(R.string.appstrings_coords_copied),
+                    field = ShareHistoryStore.FIELD_GPS,
+                    marker = marker
                 )
             }
         )
@@ -2871,11 +2887,23 @@ private fun copyRadioSiteValue(
     context: Context,
     label: String,
     value: String?,
-    toastMessage: String
+    toastMessage: String,
+    field: String,
+    marker: RadioMapMarker
 ) {
     val cleanValue = value?.takeIf { it.isNotBlank() } ?: return
     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
     clipboard.setPrimaryClip(ClipData.newPlainText(label, cleanValue))
+    ShareHistoryStore.recordFieldCopy(
+        context = context,
+        field = field,
+        value = cleanValue,
+        stationId = marker.stationId,
+        supportId = marker.supportId,
+        latitude = marker.latitude,
+        longitude = marker.longitude,
+        kind = ShareHistoryStore.KIND_RADIO_FIELD_COPY
+    )
     Toast.makeText(context, toastMessage, Toast.LENGTH_SHORT).show()
 }
 

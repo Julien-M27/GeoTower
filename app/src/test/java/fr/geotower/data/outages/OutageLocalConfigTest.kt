@@ -49,12 +49,31 @@ class OutageLocalConfigTest {
     }
 
     @Test
+    fun recordGenerationPersistsTheTechnologyDetail() {
+        val config = OutageLocalConfig(FakePrefs())
+
+        config.recordGeneration(
+            atMillis = 1_700_000_000_000L,
+            sites = listOf(
+                site("1", "Orange").copy(voix4g = "HS", data4g = "HS"),
+                site("2", "Orange").copy(voix4g = "OK", data4g = "OK"),
+            ),
+        )
+
+        val orange = config.lastTechBreakdown.single()
+        assertEquals("Orange", orange.operateur)
+        assertEquals(1, orange.countFor(OutageTechnology.G4))
+        assertEquals(OutageTechBreakdown.UNPUBLISHED, orange.countFor(OutageTechnology.G5))
+    }
+
+    @Test
     fun freshInstallHasNoLastGenerationSummary() {
         val config = OutageLocalConfig(FakePrefs())
 
         assertEquals(0L, config.lastGeneratedAtMillis)
         assertEquals(-1, config.lastGeneratedCount)
         assertTrue(config.lastBreakdown.isEmpty())
+        assertTrue(config.lastTechBreakdown.isEmpty())
     }
 
     @Test

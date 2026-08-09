@@ -6,7 +6,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -29,14 +31,18 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteSweep
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Map
+import androidx.compose.material.icons.filled.Photo
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Radio
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.SettingsInputAntenna
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Share
@@ -47,6 +53,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -173,12 +180,38 @@ fun ShareHistoryScreen(
     var showClearDialog by rememberSaveable { mutableStateOf(false) }
     var historyItems by remember { mutableStateOf<List<ShareHistoryEntry>>(emptyList()) }
     var selectedIds by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    // Filtre par sorte : les familles réellement présentes dans l'historique, cochées librement.
+    // Rien de coché = tout affiché ; le filtre ne survit pas volontairement à la sortie de la page.
+    var kindFilter by rememberSaveable { mutableStateOf<List<String>>(emptyList()) }
+    val availableFamilies = remember(historyItems) {
+        val kinds = historyItems.map { it.kind }.toSet()
+        SHARE_HISTORY_FAMILIES.filter { family -> family.any { it in kinds } }
+    }
+    // Une famille disparue de l'historique (tout supprimé) ne doit pas rester cochée en douce.
+    LaunchedEffect(availableFamilies) {
+        val stillThere = availableFamilies.flatten().toSet()
+        if (kindFilter.any { it !in stillThere }) {
+            kindFilter = kindFilter.filter { it in stillThere }
+        }
+    }
+    val visibleItems = remember(historyItems, kindFilter) {
+        if (kindFilter.isEmpty()) historyItems else historyItems.filter { it.kind in kindFilter }
+    }
+    val isFiltering = kindFilter.isNotEmpty()
+    // Une entrée sélectionnée puis masquée par un changement de filtre partirait quand même à la
+    // suppression, sans que rien ne l'annonce : on la retire de la sélection.
+    LaunchedEffect(kindFilter) {
+        val visibleIds = visibleItems.map { it.id }.toSet()
+        if (selectedIds.any { it !in visibleIds }) {
+            selectedIds = selectedIds.filter { it in visibleIds }
+        }
+    }
     val selectedIdSet = selectedIds.toSet()
     val isSelectionMode = selectedIds.isNotEmpty()
     val selectedItems = historyItems.filter { it.id in selectedIdSet }
     val selectedFreedBytes = ShareHistoryStore.estimatedFreedBytes(selectedItems)
     val totalFreedBytes = ShareHistoryStore.estimatedFreedBytes(historyItems)
-    val isAllSelected = historyItems.isNotEmpty() && selectedIds.size == historyItems.size
+    val isAllSelected = visibleItems.isNotEmpty() && visibleItems.all { it.id in selectedIdSet }
 
     fun reloadHistory() {
         val nextItems = ShareHistoryStore.read(appContext)
@@ -223,7 +256,9 @@ fun ShareHistoryScreen(
                     TextButton(
                         onClick = {
                             safeClick("share_history_toggle_all") {
-                                selectedIds = if (isAllSelected) emptyList() else historyItems.map { it.id }
+                                // Sur la liste visible : sélectionner « tout » ne doit pas ramasser
+                                // ce que le filtre cache.
+                                selectedIds = if (isAllSelected) emptyList() else visibleItems.map { it.id }
                             }
                         },
                         modifier = Modifier.padding(start = sizing.spacing(4.dp))
@@ -299,13 +334,31 @@ fun ShareHistoryScreen(
                         }
                     }
                 } else {
+                    // Une seule famille enregistrée : la barre n'aurait rien à trier.
+                    if (availableFamilies.size > 1) {
+                        item {
+                            ShareHistoryKindFilterBar(
+                                families = availableFamilies,
+                                selectedKinds = kindFilter,
+                                onToggleFamily = { family ->
+                                    kindFilter = if (family.any { it in kindFilter }) {
+                                        kindFilter.filterNot { it in family }
+                                    } else {
+                                        kindFilter + family
+                                    }
+                                },
+                                onClear = { kindFilter = emptyList() }
+                            )
+                        }
+                    }
+
                     if (showCounter) {
                         item {
                             Text(
                                 text = pluralStringResource(
                                     R.plurals.share_history_recorded,
-                                    historyItems.size,
-                                    historyItems.size
+                                    visibleItems.size,
+                                    visibleItems.size
                                 ),
                                 style = sizing.textStyle(MaterialTheme.typography.bodySmall),
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -313,7 +366,7 @@ fun ShareHistoryScreen(
                         }
                     }
 
-                    items(historyItems, key = { it.id }) { item ->
+                    items(visibleItems, key = { it.id }) { item ->
                         val isSelected = item.id in selectedIdSet
                         Card(
                             colors = CardDefaults.cardColors(
@@ -350,7 +403,9 @@ fun ShareHistoryScreen(
                         }
                     }
 
-                    if (!isSelectionMode) {
+                    // Ce bouton vide TOUT l'historique : le laisser sous une liste filtrée ferait
+                    // croire qu'il ne supprime que ce qui est affiché.
+                    if (!isSelectionMode && !isFiltering) {
                         item {
                             TextButton(
                                 onClick = {
@@ -380,14 +435,15 @@ fun ShareHistoryScreen(
 
             GeoTowerDateScrollbar(
                 listState = listState,
-                timestamps = remember(historyItems, showCounter, showDateBar) {
-                    // Quand le compteur est affiché il occupe l'index 0 : on l'aligne sur la première
-                    // entrée pour que la bulle donne la bonne date dès le haut de la liste.
-                    val timestamps = historyItems.map { it.createdAtMillis }
+                timestamps = remember(visibleItems, availableFamilies, showCounter, showDateBar) {
+                    // La barre de filtres et le compteur occupent les premiers index de la liste :
+                    // on les aligne sur la première entrée pour que la bulle donne la bonne date
+                    // dès le haut, sinon tout l'index est décalé d'un cran par élément en tête.
+                    val timestamps = visibleItems.map { it.createdAtMillis }
+                    val leading = (if (availableFamilies.size > 1) 1 else 0) + (if (showCounter) 1 else 0)
                     when {
                         !showDateBar || timestamps.isEmpty() -> emptyList()
-                        showCounter -> listOf(timestamps.first()) + timestamps
-                        else -> timestamps
+                        else -> List(leading) { timestamps.first() } + timestamps
                     }
                 },
                 modifier = Modifier
@@ -518,6 +574,78 @@ fun ShareHistoryScreen(
                 }
             }
         )
+    }
+}
+
+/**
+ * Familles de sortes proposées au filtre, dans l'ordre d'affichage. Une famille = une puce : les
+ * deux sortes de copie partagent un libellé, donc une seule puce les couvre toutes les deux.
+ */
+private val SHARE_HISTORY_FAMILIES: List<List<String>> = listOf(
+    listOf(ShareHistoryStore.KIND_MOBILE_SITE),
+    listOf(ShareHistoryStore.KIND_MOBILE_SUPPORT),
+    listOf(ShareHistoryStore.KIND_RADIO_SITE),
+    listOf(ShareHistoryStore.KIND_RADIO_SUPPORT),
+    listOf(ShareHistoryStore.KIND_MAP),
+    listOf(
+        ShareHistoryStore.KIND_FIELD_COPY,
+        ShareHistoryStore.KIND_SUPPORT_FIELD_COPY,
+        ShareHistoryStore.KIND_RADIO_FIELD_COPY
+    ),
+    listOf(ShareHistoryStore.KIND_PHOTO),
+    listOf(ShareHistoryStore.KIND_SETTINGS_PROFILE),
+    listOf(ShareHistoryStore.KIND_DIAGNOSTIC)
+)
+
+/** Barre de puces en tête de liste : une par sorte présente, plus « Tout » pour revenir en arrière. */
+@Composable
+private fun ShareHistoryKindFilterBar(
+    families: List<List<String>>,
+    selectedKinds: List<String>,
+    onToggleFamily: (List<String>) -> Unit,
+    onClear: () -> Unit
+) {
+    val sizing = LocalGeoTowerUiStyle.current.sizing
+    val safeClick = rememberSafeClick()
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(sizing.spacing(8.dp)),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        FilterChip(
+            selected = selectedKinds.isEmpty(),
+            onClick = { safeClick("share_history_filter_all") { onClear() } },
+            label = {
+                Text(
+                    text = stringResource(R.string.share_history_filter_all),
+                    style = sizing.textStyle(MaterialTheme.typography.labelLarge)
+                )
+            }
+        )
+        families.forEach { family ->
+            val isSelected = family.any { it in selectedKinds }
+            FilterChip(
+                selected = isSelected,
+                onClick = { safeClick("share_history_filter_${family.first()}") { onToggleFamily(family) } },
+                leadingIcon = {
+                    Icon(
+                        shareHistoryKindIcon(family.first()),
+                        contentDescription = null,
+                        modifier = Modifier.size(sizing.component(16.dp))
+                    )
+                },
+                label = {
+                    Text(
+                        text = shareHistoryKindLabel(family.first()),
+                        style = sizing.textStyle(MaterialTheme.typography.labelLarge),
+                        maxLines = 1
+                    )
+                }
+            )
+        }
     }
 }
 
@@ -677,7 +805,9 @@ private fun shareHistoryReference(item: ShareHistoryEntry): String {
                 parts += stringResource(R.string.share_history_map_ref, String.format(Locale.US, "%.1f", it))
             }
         }
-        ShareHistoryStore.KIND_MOBILE_SUPPORT, ShareHistoryStore.KIND_RADIO_SUPPORT -> {
+        ShareHistoryStore.KIND_MOBILE_SUPPORT,
+        ShareHistoryStore.KIND_RADIO_SUPPORT,
+        ShareHistoryStore.KIND_SUPPORT_FIELD_COPY -> {
             item.supportId.takeIf { it.isNotBlank() }?.let {
                 parts += stringResource(R.string.share_history_support_ref, it)
             }
@@ -703,6 +833,13 @@ private fun shareHistoryKindLabel(kind: String): String = when (kind) {
     ShareHistoryStore.KIND_RADIO_SITE -> stringResource(R.string.share_history_kind_radio_site)
     ShareHistoryStore.KIND_RADIO_SUPPORT -> stringResource(R.string.share_history_kind_radio_support)
     ShareHistoryStore.KIND_MAP -> stringResource(R.string.share_history_kind_map)
+    ShareHistoryStore.KIND_FIELD_COPY,
+    ShareHistoryStore.KIND_SUPPORT_FIELD_COPY,
+    ShareHistoryStore.KIND_RADIO_FIELD_COPY ->
+        stringResource(R.string.share_history_kind_field_copy)
+    ShareHistoryStore.KIND_PHOTO -> stringResource(R.string.share_history_kind_photo)
+    ShareHistoryStore.KIND_SETTINGS_PROFILE -> stringResource(R.string.share_history_kind_settings_profile)
+    ShareHistoryStore.KIND_DIAGNOSTIC -> stringResource(R.string.share_history_kind_diagnostic)
     else -> stringResource(R.string.share_history_kind_mobile_site)
 }
 
@@ -711,6 +848,12 @@ private fun shareHistoryKindIcon(kind: String): ImageVector = when (kind) {
     ShareHistoryStore.KIND_RADIO_SITE -> Icons.Default.Radio
     ShareHistoryStore.KIND_RADIO_SUPPORT -> Icons.Default.SettingsInputAntenna
     ShareHistoryStore.KIND_MAP -> Icons.Default.Map
+    ShareHistoryStore.KIND_FIELD_COPY,
+    ShareHistoryStore.KIND_SUPPORT_FIELD_COPY,
+    ShareHistoryStore.KIND_RADIO_FIELD_COPY -> Icons.Default.ContentCopy
+    ShareHistoryStore.KIND_PHOTO -> Icons.Default.Photo
+    ShareHistoryStore.KIND_SETTINGS_PROFILE -> Icons.Default.Tune
+    ShareHistoryStore.KIND_DIAGNOSTIC -> Icons.Default.BugReport
     else -> Icons.Default.Tag
 }
 
@@ -753,6 +896,15 @@ private fun shareHistoryContents(item: ShareHistoryEntry): String {
             ShareHistoryStore.CONTENT_PROGRAMS -> stringResource(R.string.appstrings_radio_share_block_programs)
             ShareHistoryStore.CONTENT_EXTRA -> stringResource(R.string.appstrings_radio_share_block_extra)
             ShareHistoryStore.CONTENT_SUPPORT_ENTRIES -> stringResource(R.string.appstrings_radio_share_block_support_entries)
+            // Champs copiés : mêmes libellés que les lignes des fiches, sans le « : » final.
+            ShareHistoryStore.FIELD_ID_SUPPORT -> stringResource(R.string.appstrings_id_support_label).cleanFieldLabel()
+            ShareHistoryStore.FIELD_ID_ANFR -> stringResource(R.string.appstrings_anfr_station_number).cleanFieldLabel()
+            ShareHistoryStore.FIELD_ARCEP -> stringResource(R.string.appstrings_arcep_identifier_label).cleanFieldLabel()
+            ShareHistoryStore.FIELD_ADDRESS -> stringResource(R.string.appstrings_address_label).cleanFieldLabel()
+            ShareHistoryStore.FIELD_GPS -> stringResource(R.string.appstrings_gps_label).cleanFieldLabel()
+            ShareHistoryStore.FIELD_PANEL -> stringResource(R.string.appstrings_panel_identifier).cleanFieldLabel()
+            ShareHistoryStore.FIELD_NETWORK_ID -> stringResource(R.string.appstrings_site_network_ids_title).cleanFieldLabel()
+            ShareHistoryStore.FIELD_REPORT -> stringResource(R.string.appstrings_diagnostic_title).cleanFieldLabel()
             else -> null
         }
     }
@@ -773,6 +925,7 @@ private fun shareHistoryDestinationLabel(destination: String): String = when (de
     ShareHistoryStore.DEST_CLIPBOARD -> stringResource(R.string.share_history_dest_clipboard)
     ShareHistoryStore.DEST_PDF -> stringResource(R.string.share_history_dest_pdf)
     ShareHistoryStore.DEST_PDF_DOWNLOAD -> stringResource(R.string.share_history_dest_pdf_download)
+    ShareHistoryStore.DEST_GALLERY -> stringResource(R.string.share_history_dest_gallery)
     else -> stringResource(R.string.share_history_dest_share)
 }
 
@@ -780,5 +933,9 @@ private fun shareHistoryDestinationIcon(destination: String): ImageVector = when
     ShareHistoryStore.DEST_CLIPBOARD -> Icons.Default.ContentCopy
     ShareHistoryStore.DEST_PDF -> Icons.Default.PictureAsPdf
     ShareHistoryStore.DEST_PDF_DOWNLOAD -> Icons.Default.Download
+    ShareHistoryStore.DEST_GALLERY -> Icons.Default.PhotoLibrary
     else -> Icons.Default.Share
 }
+
+/** Les libellés de fiche finissent par « : » (convention strings.xml) : hors ligne, ça ne va pas. */
+private fun String.cleanFieldLabel(): String = substringBefore(":").trim()

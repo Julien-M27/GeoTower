@@ -148,7 +148,9 @@ fun PhotosFavoritesScreen(
     var groups by remember { mutableStateOf<List<FavoriteSiteGroup>?>(null) }
     var reloadTick by remember { mutableStateOf(0) }
 
-    var viewerState by remember { mutableStateOf<Pair<List<CommunityPhoto>, Int>?>(null) }
+    // Le site du groupe voyage avec la photo ouverte : sans lui, une photo exportée depuis cette
+    // page n'aurait aucune fiche à rouvrir dans l'historique des partages.
+    var viewerState by remember { mutableStateOf<Triple<List<CommunityPhoto>, Int, String>?>(null) }
     var pendingRemoval by remember { mutableStateOf<FavoritePhotoUi?>(null) }
 
     BackHandler(enabled = !safeBackNavigation.isLocked) {
@@ -237,7 +239,7 @@ fun PhotosFavoritesScreen(
                             onOpenPhoto = { clicked ->
                                 val resolved = group.photos.mapNotNull { it.photo }
                                 val index = resolved.indexOfFirst { it === clicked.photo }
-                                if (index >= 0) viewerState = resolved to index
+                                if (index >= 0) viewerState = Triple(resolved, index, group.siteId)
                             },
                             onRemovePhoto = { pendingRemoval = it }
                         )
@@ -250,10 +252,11 @@ fun PhotosFavoritesScreen(
         }
     }
 
-    viewerState?.let { (photos, index) ->
+    viewerState?.let { (photos, index, siteId) ->
         FavoritePhotoViewer(
             photos = photos,
             initialIndex = index,
+            siteId = siteId,
             onDismiss = { viewerState = null }
         )
     }
@@ -466,6 +469,7 @@ private fun FavoritePhotoThumbnail(
 private fun FavoritePhotoViewer(
     photos: List<CommunityPhoto>,
     initialIndex: Int,
+    siteId: String,
     onDismiss: () -> Unit
 ) {
     val sizing = LocalGeoTowerUiSizing.current
@@ -596,7 +600,7 @@ private fun FavoritePhotoViewer(
                     onClick = {
                         scope.launch {
                             try {
-                                copyCommunityPhotoToClipboard(context, currentPhoto)
+                                copyCommunityPhotoToClipboard(context, currentPhoto, siteId)
                                 Toast.makeText(context, R.string.appstrings_photo_copied_to_clipboard, Toast.LENGTH_SHORT).show()
                             } catch (e: Exception) {
                                 Toast.makeText(context, R.string.appstrings_photo_export_failed, Toast.LENGTH_SHORT).show()
@@ -613,7 +617,7 @@ private fun FavoritePhotoViewer(
                     onClick = {
                         scope.launch {
                             try {
-                                saveCommunityPhotoToGallery(context, currentPhoto)
+                                saveCommunityPhotoToGallery(context, currentPhoto, siteId)
                                 Toast.makeText(context, R.string.appstrings_photo_saved_to_gallery, Toast.LENGTH_SHORT).show()
                             } catch (e: Exception) {
                                 Toast.makeText(context, R.string.appstrings_photo_export_failed, Toast.LENGTH_SHORT).show()

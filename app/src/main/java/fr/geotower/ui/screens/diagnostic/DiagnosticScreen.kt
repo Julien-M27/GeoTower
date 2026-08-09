@@ -93,6 +93,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -1377,6 +1378,12 @@ private fun copyDiagnosticReport(context: Context, report: String) {
             report
         )
     )
+    ShareHistoryStore.record(
+        context = context,
+        kind = ShareHistoryStore.KIND_DIAGNOSTIC,
+        destination = ShareHistoryStore.DEST_CLIPBOARD,
+        contents = ShareHistoryStore.FIELD_REPORT
+    )
     Toast.makeText(context, R.string.appstrings_diagnostic_report_copied, Toast.LENGTH_SHORT).show()
 }
 
@@ -1384,7 +1391,14 @@ private fun shareDebugLog(context: Context) {
     val chooserTitle = context.getString(R.string.appstrings_diagnostic_share_log)
     if (!AppFileLog.share(context, chooserTitle)) {
         Toast.makeText(context, R.string.appstrings_diagnostic_log_empty, Toast.LENGTH_SHORT).show()
+        return
     }
+    // Enregistré seulement si le journal existait : sinon rien n'est parti.
+    ShareHistoryStore.record(
+        context = context,
+        kind = ShareHistoryStore.KIND_DIAGNOSTIC,
+        destination = ShareHistoryStore.DEST_SHARE
+    )
 }
 
 private fun hasPermission(context: Context, permission: String): Boolean {

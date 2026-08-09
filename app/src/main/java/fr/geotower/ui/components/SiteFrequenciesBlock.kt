@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import fr.geotower.data.share.ShareHistoryStore
 import fr.geotower.ui.theme.LocalGeoTowerUiSizing
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
@@ -144,7 +145,8 @@ fun SiteFrequenciesBlock(
                         txtUnknownStatus = txtUnknownStatus,
                         mapFrequencyFilter = mapFrequencyFilter,
                         txtPanelIdentifier = txtPanelIdentifier,
-                        showAntennaTypeTable = showAntennaTypeTable
+                        showAntennaTypeTable = showAntennaTypeTable,
+                        stationId = info.idAnfr
                     )
                 } else {
                     // 👇 TON CODE ACTUEL COMMENCE ICI 👇
@@ -386,6 +388,14 @@ fun SiteFrequenciesBlock(
                                                             onClick = {
                                                                 val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                                                 clipboard.setPrimaryClip(ClipData.newPlainText(txtPanelIdentifier, id))
+                                                                ShareHistoryStore.recordFieldCopy(
+                                                                    context = context,
+                                                                    field = ShareHistoryStore.FIELD_PANEL,
+                                                                    value = id,
+                                                                    stationId = info.idAnfr,
+                                                                    latitude = info.latitude,
+                                                                    longitude = info.longitude
+                                                                )
                                                                 Toast.makeText(context, txtPanelIdentifierCopied, Toast.LENGTH_SHORT).show()
                                                             },
                                                             modifier = Modifier.size(sizing.component(24.dp))
@@ -536,7 +546,9 @@ fun FrequenciesGridView(
     txtUnknownStatus: String,
     mapFrequencyFilter: FrequencyFilterSelection?,
     txtPanelIdentifier: String,
-    showAntennaTypeTable: Boolean = false
+    showAntennaTypeTable: Boolean = false,
+    /** Station affichée, transmise aux copies d'identifiant de panneau pour l'historique. */
+    stationId: String? = null
 ) {
     val sizing = LocalGeoTowerUiSizing.current
     val borderColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
@@ -980,7 +992,8 @@ fun FrequenciesGridView(
             rows = antennaTypeRows,
             borderColor = borderColor,
             headerBgColor = headerBgColor,
-            subHeaderBgColor = subHeaderBgColor
+            subHeaderBgColor = subHeaderBgColor,
+            stationId = stationId
         )
     }
 }
@@ -1080,7 +1093,9 @@ private fun AntennaTypeGridTable(
     rows: List<AntennaTypeGridRow>,
     borderColor: Color,
     headerBgColor: Color,
-    subHeaderBgColor: Color
+    subHeaderBgColor: Color,
+    /** Station du tableau : une copie d'identifiant de panneau doit savoir quelle fiche rouvrir. */
+    stationId: String? = null
 ) {
     val sizing = LocalGeoTowerUiSizing.current
     if (rows.isEmpty()) return
@@ -1213,6 +1228,12 @@ private fun AntennaTypeGridTable(
                                                 onClick = {
                                                     val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                                     clipboard.setPrimaryClip(ClipData.newPlainText(txtPanelIdentifier, id))
+                                                    ShareHistoryStore.recordFieldCopy(
+                                                        context = context,
+                                                        field = ShareHistoryStore.FIELD_PANEL,
+                                                        value = id,
+                                                        stationId = stationId
+                                                    )
                                                     Toast.makeText(context, txtPanelIdentifierCopied, Toast.LENGTH_SHORT).show()
                                                 },
                                                 modifier = Modifier.size(sizing.component(24.dp))

@@ -2405,6 +2405,9 @@
     <string name="outage_download_never">Unbekannt</string>
     <string name="outage_download_count">%1$d gespeicherte Störungen</string>
     <string name="outage_download_size">Belegter Speicher: %1$s</string>
+    <string name="outage_tech_breakdown_title">Technologien außer Betrieb</string>
+    <string name="outage_tech_breakdown_total">Gesamt</string>
+    <string name="outage_tech_breakdown_unpublished_note">%1$s: Detail vom Betreiber nicht veröffentlicht</string>
     <string name="outage_download_now">Störungen herunterladen</string>
     <string name="outage_download_refresh">Störungen aktualisieren</string>
     <string name="outage_download_running">Wird heruntergeladen…</string>
@@ -2483,8 +2486,8 @@
 
     <!-- Historique des sites/supports partagés ou exportés -->
     <string name="share_history_title">Freigabeverlauf</string>
-    <string name="share_history_desc">Standorte, Masten und Karten, die Sie geteilt oder exportiert haben</string>
-    <string name="share_history_empty">Noch keine Freigabe gespeichert. Geteilte oder als PDF exportierte Standorte, Masten und Karten erscheinen hier.</string>
+    <string name="share_history_desc">Alles, was Sie aus der App geteilt, kopiert oder exportiert haben</string>
+    <string name="share_history_empty">Noch nichts gespeichert. Alles, was Sie aus der App teilen, kopieren oder exportieren, erscheint hier.</string>
     <string name="share_history_clear">Verlauf löschen</string>
     <string name="share_history_clear_title">Freigabeverlauf löschen?</string>
     <string name="share_history_clear_desc">Alle gespeicherten Freigaben werden von diesem Gerät gelöscht.</string>
@@ -2493,6 +2496,12 @@
     <string name="share_history_kind_radio_site">Rundfunkstandort</string>
     <string name="share_history_kind_radio_support">Rundfunkmast</string>
     <string name="share_history_kind_map">Antennenkarte</string>
+    <string name="share_history_filter_all">Alle</string>
+    <string name="share_history_dest_gallery">In der Galerie gespeichert</string>
+    <string name="share_history_kind_diagnostic">Diagnose</string>
+    <string name="share_history_kind_settings_profile">Einstellungsprofil</string>
+    <string name="share_history_kind_photo">Foto</string>
+    <string name="share_history_kind_field_copy">Kopierter Wert</string>
     <string name="share_history_dest_share">Bild geteilt</string>
     <string name="share_history_dest_clipboard">Bild kopiert</string>
     <string name="share_history_dest_pdf">PDF geteilt</string>
@@ -2662,4 +2671,9 @@
     <string name="appstrings_release_v2019_live_db_about">Ist keine Datenbank installiert, zeigt „Über“ die live vom Server gelieferten Daten: Version, veröffentlichte Standorte und Datum der Veröffentlichung</string>
     <string name="appstrings_release_v2019_about_refresh">Eine Schaltfläche aktualisiert die in „Über“ angezeigten Versionen</string>
     <string name="appstrings_release_v2019_local_mode_renamed">Aus „Lokale Verarbeitung“ wird „Datenherkunft“: GeoTower-Server oder dein Gerät, schlichter gesagt</string>
+
+    <!-- Versionshinweise 2.0.20 -->
+    <string name="appstrings_release_v2020_outage_tech_table">Unter der Störungsaufstellung kreuzt eine Tabelle Betreiber und ausgefallene Technologien; ein Strich zeigt an, dass ein Betreiber diese Angabe nicht veröffentlicht, statt einer irreführenden Null</string>
+    <string name="appstrings_release_v2020_share_history_full">Der Verlauf beschränkt sich nicht mehr auf Standorte, Masten und Karten: Er hält auch kopierte Werte, Fotos, Diagnose-Exporte und Einstellungsprofile fest</string>
+    <string name="appstrings_release_v2020_share_history_filter">Ein Filter hilft, sich nach Eintragsart zurechtzufinden</string>
 </resources>
